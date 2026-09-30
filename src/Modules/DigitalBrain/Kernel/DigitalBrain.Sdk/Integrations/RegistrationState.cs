@@ -1,0 +1,19 @@
+using DigitalBrain.Contracts.Types;
+
+namespace DigitalBrain.Sdk.Integrations;
+
+// Field name to vault reference. Never a value.
+[GenerateSerializer, Alias("integration.registration.state")]
+internal sealed class RegistrationState
+{
+    [Id(0)] public Dictionary<string, SecretRef> References { get; set; } = new(StringComparer.Ordinal);
+}
+
+internal static class IntegrationVault
+{
+    public const string Owner = "integrations";
+    public const string GrainKeyPrefix = "integration/";
+    public const string CallerAppId = "integration.registration";
+
+    public static string SecretName(string integrationId, string field) => $"integration.{integrationId}.{field}";
+}

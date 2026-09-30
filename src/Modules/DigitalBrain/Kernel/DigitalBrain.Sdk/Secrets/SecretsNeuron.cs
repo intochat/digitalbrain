@@ -54,6 +54,23 @@ internal sealed class SecretsNeuron : Neuron<SecretsState>, ISecrets
         return reference;
     }
 
+    public async Task Remove(CallerContext caller, string name, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(caller);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var isOwner = caller.Kind == CallerKind.User && caller.PrincipalId == this.GetPrimaryKeyString();
+        var isPlatform = caller.Kind == CallerKind.Platform && caller.StampedBy == TrustedEdge.Platform;
+        if (!isOwner && !isPlatform)
+        {
+            throw new InvalidOperationException("Only the owner or trusted platform code can remove a secret.");
+        }
+
+        if (Snapshot.Fields.Remove(name))
+        {
+            await _state.WriteStateAsync();
+        }
+    }
+
     public Task<string> Resolve(CallerContext caller, SecretRef secret, CancellationToken cancellationToken = default)
     {
         if (caller is null || caller.Kind == CallerKind.User

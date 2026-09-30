@@ -27,6 +27,7 @@ using DigitalBrain.Microsoft.Roslyn;
 using DigitalBrain.Compute;
 using DigitalBrain.Registry;
 using DigitalBrain.Sdk.Connectors;
+using DigitalBrain.Sdk.Integrations;
 using DigitalBrain.Sdk.Secrets;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
@@ -54,6 +55,7 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serv
     .WithModule<TimeModule>()
     .WithModule<SecretsModule>()
     .WithModule<ConnectorModule>()
+    .WithModule<IntegrationsModule>()
     .WithModule<IdentityModule>()
     .WithModule<FilesModule>()
     .WithModule<GmailModule, GmailModuleOptions>(gmail => gmail.WithGmail())
