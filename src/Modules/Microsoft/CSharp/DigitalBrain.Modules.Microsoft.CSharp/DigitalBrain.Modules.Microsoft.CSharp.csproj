@@ -15,7 +15,7 @@
     <ProjectReference Include="../../../DigitalBrain/Apps/DigitalBrain.Modules.Apps.Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
     <ProjectReference Include="../../../DigitalBrain/Registry/DigitalBrain.Modules.Registry.Contracts/DigitalBrain.Modules.Registry.Contracts.csproj" />
     <ProjectReference Include="../../Aspire/DigitalBrain.Modules.Microsoft.Aspire.Contracts/DigitalBrain.Modules.Microsoft.Aspire.Contracts.csproj" />
-    <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
   </ItemGroup>
 </Project>

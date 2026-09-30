@@ -13,6 +13,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Modules.Flutter.Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
-    <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
   </ItemGroup>
 </Project>

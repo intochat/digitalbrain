@@ -9,6 +9,6 @@
     <PackageReference Include="Pulumi" />
     <PackageReference Include="Pulumi.AzureNative" />
     <PackageReference Include="Pulumi.Random" />
-    <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../DigitalBrain.Core/DigitalBrain.Core.csproj" />
   </ItemGroup>
 </Project>

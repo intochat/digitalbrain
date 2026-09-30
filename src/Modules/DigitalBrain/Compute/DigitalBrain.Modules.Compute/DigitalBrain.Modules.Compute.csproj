@@ -8,6 +8,6 @@
     <EmbeddedResource Include="PriceBook/pricebook.v0.json" LogicalName="DigitalBrain.Compute.PriceBook.pricebook.v0.json" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.Compute.Tests.Unit" />
     <ProjectReference Include="../DigitalBrain.Modules.Compute.Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
-    <ProjectReference Include="../../Kernel/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
   </ItemGroup>
 </Project>

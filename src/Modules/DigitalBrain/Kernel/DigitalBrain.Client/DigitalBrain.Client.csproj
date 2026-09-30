@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><IsPackable>true</IsPackable><Description>Connects single-file C# apps to a DigitalBrain cluster: neuron calls and live signal subscriptions.</Description></PropertyGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain" />
+    <InternalsVisibleTo Include="DigitalBrain.Core" />
     <InternalsVisibleTo Include="DigitalBrain.Testing" />
     <InternalsVisibleTo Include="DigitalBrain.Testing.Unit" />
     <InternalsVisibleTo Include="DigitalBrain.Testing.E2E" />

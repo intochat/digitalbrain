@@ -20,8 +20,8 @@
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
     <ProjectReference Include="../../Modules/Google/Flutter/DigitalBrain.Modules.Flutter.Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
-    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
-    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Kernel.Aspire.Hosting/DigitalBrain.Kernel.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Kernel.Aspire/DigitalBrain.Kernel.Aspire.csproj" />
     <ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
   </ItemGroup>
   <ItemGroup>

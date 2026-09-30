@@ -7,7 +7,7 @@
     <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/DigitalBrain.Kernel.Aspire.Hosting/DigitalBrain.Kernel.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../IntoChat/IntoChat.csproj" ReferenceOutputAssembly="true" Private="true" ExcludeAssets="none" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Mcp/DigitalBrain.Mcp.csproj" />
     <ProjectReference Include="../../../Modules/Time/DigitalBrain.Modules.Time/DigitalBrain.Modules.Time.csproj" IsAspireProjectResource="false" />

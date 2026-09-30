@@ -9,6 +9,6 @@
     <PackageReference Include="Microsoft.Orleans.Reminders" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.Time.Tests.Unit" />
     <ProjectReference Include="../DigitalBrain.Modules.Time.Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
-    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
   </ItemGroup>
 </Project>

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Silo host wiring for IntoChat. The AppHost uses DigitalBrain.Aspire.Hosting (thin).</Description>
+    <Description>Silo host wiring for IntoChat. The AppHost uses DigitalBrain.Kernel.Aspire.Hosting (thin).</Description>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -15,6 +15,6 @@
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../DigitalBrain.Core/DigitalBrain.Core.csproj" />
   </ItemGroup>
 </Project>

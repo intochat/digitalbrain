@@ -5,10 +5,10 @@
     <RootNamespace>DigitalBrain.Sdk</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Runtime.Tests.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Core.Tests.Unit" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
     <PackageReference Include="ModelContextProtocol.Core" />
-    <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../DigitalBrain.Core/DigitalBrain.Core.csproj" />
   </ItemGroup>
 </Project>

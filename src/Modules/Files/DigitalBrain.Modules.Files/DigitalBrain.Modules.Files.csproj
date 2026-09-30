@@ -10,6 +10,6 @@
     <InternalsVisibleTo Include="IntoChat.Tests.E2E" />
     <ProjectReference Include="../DigitalBrain.Modules.Files.Contracts/DigitalBrain.Modules.Files.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/Identity/DigitalBrain.Modules.Identity/DigitalBrain.Modules.Identity.csproj" />
-    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
   </ItemGroup>
 </Project>

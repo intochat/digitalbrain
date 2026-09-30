@@ -12,6 +12,6 @@
     <ProjectReference Include="../DigitalBrain.Modules.Coding.Contracts/DigitalBrain.Modules.Coding.Contracts.csproj" />
     <ProjectReference Include="../../Microsoft/DotNet/DigitalBrain.Modules.Microsoft.DotNet/DigitalBrain.Modules.Microsoft.DotNet.csproj" />
     <ProjectReference Include="../../Microsoft/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.csproj" />
-    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
   </ItemGroup>
 </Project>
