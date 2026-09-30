@@ -2,7 +2,7 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Enforcement;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit;
 
 public interface IPinger : INeuron
 {

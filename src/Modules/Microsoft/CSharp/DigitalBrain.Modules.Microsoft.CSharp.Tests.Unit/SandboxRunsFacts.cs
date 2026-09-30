@@ -2,7 +2,7 @@ using DigitalBrain.Microsoft.CSharp.Sandbox;
 using Microsoft.Extensions.Options;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit;
 
 public sealed class SandboxRunsFacts : IDisposable
 {

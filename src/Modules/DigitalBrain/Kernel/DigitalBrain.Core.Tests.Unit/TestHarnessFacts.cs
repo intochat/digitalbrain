@@ -2,7 +2,7 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using DigitalBrain.Testing.Unit;
 using Xunit;
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Core.Tests.Unit;
 
 public sealed class TestHarnessFacts
 {

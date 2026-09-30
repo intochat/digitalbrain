@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
 
-namespace DigitalBrain.Sdk.Secrets;
+namespace DigitalBrain.Platform.Secrets;
 
 public sealed class SecretsModule : IModule
 {

@@ -4,7 +4,7 @@ using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Microsoft.GitHub.Tests.Unit;
 
 public sealed class RepositoryFacts
 {

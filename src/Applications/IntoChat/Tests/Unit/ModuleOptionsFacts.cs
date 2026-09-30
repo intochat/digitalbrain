@@ -3,7 +3,7 @@ using System.Text.Json;
 using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 
-namespace IntoChat.Tests;
+namespace IntoChat.Tests.Unit;
 
 public sealed class ModuleOptionsFacts
 {

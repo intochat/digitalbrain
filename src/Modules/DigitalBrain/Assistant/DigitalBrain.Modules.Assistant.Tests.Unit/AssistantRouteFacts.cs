@@ -1,9 +1,9 @@
+using DigitalBrain.Assistant;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using DigitalBrain.Compute.Usage;
-using DigitalBrain.Testing.Routing;
 
-namespace DigitalBrain.Assistant.Tests;
+namespace DigitalBrain.Modules.Assistant.Tests.Unit;
 
 public sealed class AssistantRouteFacts
 {

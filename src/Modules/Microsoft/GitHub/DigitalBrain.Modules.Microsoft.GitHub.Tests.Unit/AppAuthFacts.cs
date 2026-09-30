@@ -4,13 +4,15 @@ using System.Text;
 using System.Text.Json;
 using DigitalBrain.Microsoft.GitHub;
 using DigitalBrain.Sdk.Integrations;
+using DigitalBrain.Platform.Integrations;
 using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Secrets;
 using DigitalBrain.Testing;
 using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Microsoft.GitHub.Tests.Unit;
 
 public sealed class AppAuthFacts
 {

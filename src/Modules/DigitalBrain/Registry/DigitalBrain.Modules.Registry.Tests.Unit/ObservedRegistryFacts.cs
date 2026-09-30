@@ -31,21 +31,21 @@ public sealed class ObservedRegistryFacts
     [Fact]
     public async Task TheIntegrationRegistrationContractIsExcludedFromTheNeuronTypeCatalog()
     {
-        await using var brain = await UnitTest.Create().WithModule<RegistryModule>().WithModule<DigitalBrain.Sdk.Integrations.IntegrationsModule>()
+        await using var brain = await UnitTest.Create().WithModule<RegistryModule>().WithModule<DigitalBrain.Platform.Integrations.IntegrationsModule>()
             .StartAsync(TestContext.Current.CancellationToken);
         var types = await brain.Get<IRegistry>(RegistryModule.Key).Types();
 
-        Assert.DoesNotContain(types, type => type.Id == "integration.registration" || type.Contract == typeof(DigitalBrain.Sdk.Integrations.IIntegrationRegistration).FullName);
+        Assert.DoesNotContain(types, type => type.Id == "integration.registration" || type.Contract == typeof(DigitalBrain.Platform.Integrations.IIntegrationRegistration).FullName);
     }
 
     [Fact]
     public async Task TheWholePlatformAssemblyContributesNoNeuronTypesToTheCatalog()
     {
-        await using var brain = await UnitTest.Create().WithModule<RegistryModule>().WithModule<DigitalBrain.Sdk.Integrations.IntegrationsModule>()
-            .WithModule<DigitalBrain.Sdk.Secrets.SecretsModule>().StartAsync(TestContext.Current.CancellationToken);
+        await using var brain = await UnitTest.Create().WithModule<RegistryModule>().WithModule<DigitalBrain.Platform.Integrations.IntegrationsModule>()
+            .WithModule<DigitalBrain.Platform.Secrets.SecretsModule>().StartAsync(TestContext.Current.CancellationToken);
         var types = await brain.Get<IRegistry>(RegistryModule.Key).Types();
 
-        var platformAssembly = typeof(DigitalBrain.Sdk.Integrations.IntegrationsModule).Assembly;
+        var platformAssembly = typeof(DigitalBrain.Platform.Integrations.IntegrationsModule).Assembly;
         var platformContracts = platformAssembly.GetExportedTypes().Where(type => type.IsInterface).Select(type => type.FullName);
         Assert.DoesNotContain(types, type => platformContracts.Contains(type.Contract));
     }

@@ -5,6 +5,7 @@ using Azure;
 using Azure.Storage.Blobs;
 using DigitalBrain.Contracts;
 using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Secrets;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;

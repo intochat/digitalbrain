@@ -6,7 +6,7 @@ using DigitalBrain.Time.Timers.Signals;
 using Orleans;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Time.Tests.Unit;
 
 public sealed class TimerFacts
 {

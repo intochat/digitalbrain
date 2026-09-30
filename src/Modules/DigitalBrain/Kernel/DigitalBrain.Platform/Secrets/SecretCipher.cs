@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace DigitalBrain.Sdk.Secrets;
+namespace DigitalBrain.Platform.Secrets;
 
 internal static class SecretCipher
 {

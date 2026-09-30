@@ -4,7 +4,7 @@ using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.ClickHouse.Tests.Unit;
 
 public sealed class ClickHouseFacts
 {

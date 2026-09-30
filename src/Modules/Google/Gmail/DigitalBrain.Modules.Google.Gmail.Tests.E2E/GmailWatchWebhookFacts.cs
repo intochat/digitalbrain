@@ -6,7 +6,7 @@ using DigitalBrain.Google.Gmail;
 using DigitalBrain.Testing;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Google.Gmail.Tests.E2E;
 
 public sealed class GmailWatchWebhookFacts
 {

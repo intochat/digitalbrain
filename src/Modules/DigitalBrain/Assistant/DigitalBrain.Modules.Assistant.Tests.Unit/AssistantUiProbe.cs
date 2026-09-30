@@ -1,3 +1,4 @@
+using DigitalBrain.Assistant;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Button;
 using DigitalBrain.Flutter.Card;
@@ -8,7 +9,7 @@ using DigitalBrain.Flutter.Text;
 using DigitalBrain.Flutter.TextField;
 using Xunit;
 
-namespace DigitalBrain.Assistant.Tests.Unit;
+namespace DigitalBrain.Modules.Assistant.Tests.Unit;
 
 // Drives the same individual controls a generic renderer exposes; no chat facade.
 internal sealed class AssistantUiProbe(IGrainFactory grains, string key)

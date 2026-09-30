@@ -7,7 +7,7 @@ using DigitalBrain.Time.Reminders.Signals;
 using Orleans;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Time.Tests.Unit;
 
 public sealed class ReminderFacts
 {

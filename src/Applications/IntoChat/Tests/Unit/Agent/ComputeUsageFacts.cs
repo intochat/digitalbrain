@@ -4,7 +4,7 @@ using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
 using Xunit;
 
-namespace IntoChat.Tests;
+namespace IntoChat.Tests.Unit;
 
 public sealed class ComputeUsageFacts
 {

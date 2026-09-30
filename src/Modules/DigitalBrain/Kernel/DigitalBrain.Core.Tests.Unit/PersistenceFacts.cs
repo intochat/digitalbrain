@@ -5,7 +5,7 @@ using DigitalBrain.Testing.Unit;
 using Orleans;
 using Orleans.Runtime;
 using Xunit;
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Core.Tests.Unit;
 
 [Alias("test.counter")]
 public interface ICounter : INeuron

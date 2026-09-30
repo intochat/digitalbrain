@@ -1,10 +1,11 @@
 using DigitalBrain.Contracts;
+using DigitalBrain.Flutter;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Flutter.Tests;
+namespace DigitalBrain.Modules.Flutter.Tests.Unit;
 
 public sealed class UiKitRouteFacts
 {

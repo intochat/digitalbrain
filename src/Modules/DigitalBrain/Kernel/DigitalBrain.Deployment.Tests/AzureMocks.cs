@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 using Pulumi;
 using Pulumi.Testing;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Deployment.Tests;
 
 // Echoes inputs as outputs, answers the ARM lookups DeploymentKit makes, and records every resource.
 internal sealed class AzureMocks : IMocks

@@ -3,7 +3,7 @@ using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.CSharp;
 using Orleans.Runtime;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit;
 
 public interface IFakeAspireProbe : IGrainWithStringKey
 {

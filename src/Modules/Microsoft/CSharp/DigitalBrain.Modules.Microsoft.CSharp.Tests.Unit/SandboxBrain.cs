@@ -2,7 +2,7 @@ using DigitalBrain.Microsoft.CSharp;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit;
 
 // A unit brain with the C# module running against a fake sandbox. In-process brains have no HTTP
 // listener, so the script edge address is configured rather than derived.

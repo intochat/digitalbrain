@@ -4,7 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit;
 
 // Stands in for the sandbox host's HTTP API: runs start Running and stop as Exited(0); a test can end
 // the latest run with any exit code or lose every run, as a replaced container would.

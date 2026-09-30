@@ -1,6 +1,6 @@
 using System.Xml.Linq;
 
-namespace IntoChat.Tests;
+namespace IntoChat.Tests.Unit;
 
 public sealed class PathTruthFacts
 {

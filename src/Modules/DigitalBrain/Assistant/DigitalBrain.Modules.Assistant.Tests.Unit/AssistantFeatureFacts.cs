@@ -1,3 +1,4 @@
+using DigitalBrain.Assistant;
 using System.Text;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
@@ -8,7 +9,7 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Assistant.Tests.Unit;
+namespace DigitalBrain.Modules.Assistant.Tests.Unit;
 
 public sealed class AssistantFeatureFacts
 {

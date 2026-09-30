@@ -4,7 +4,7 @@ using DigitalBrain.Time;
 using DigitalBrain.Time.Timers.Signals;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Time.Tests.Unit;
 
 public sealed class TimerBehaviorFacts
 {

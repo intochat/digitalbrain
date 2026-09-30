@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.AI.Tests.Unit;
 
 internal sealed record CapturedRequest(string Method, string? Path, string Body, string? Authorization);
 

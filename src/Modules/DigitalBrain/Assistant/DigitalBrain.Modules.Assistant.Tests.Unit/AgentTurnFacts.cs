@@ -9,7 +9,7 @@ using DigitalBrain.Contracts;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 
-namespace DigitalBrain.Assistant.Tests.Unit;
+namespace DigitalBrain.Modules.Assistant.Tests.Unit;
 
 public sealed class AgentTurnFacts
 {

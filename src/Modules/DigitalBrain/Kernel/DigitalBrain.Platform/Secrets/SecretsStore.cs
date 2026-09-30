@@ -1,6 +1,6 @@
 using DigitalBrain.Contracts.Types;
 
-namespace DigitalBrain.Sdk.Secrets;
+namespace DigitalBrain.Platform.Secrets;
 
 internal sealed class SecretsStore(IKeyWrapper keys)
 {

@@ -1,8 +1,9 @@
+using DigitalBrain.Sdk.Integrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
-namespace DigitalBrain.Sdk.Integrations;
+namespace DigitalBrain.Platform.Integrations;
 
 // Seeds DigitalBrain:Integrations:{id}:{Field} into registrations that are still Unconfigured. A
 // Partial registration is an operator's edit in progress and is never touched.

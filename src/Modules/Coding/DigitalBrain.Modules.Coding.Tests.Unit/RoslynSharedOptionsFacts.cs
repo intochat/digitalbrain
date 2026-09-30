@@ -3,7 +3,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Microsoft.Roslyn;
 using Microsoft.Extensions.Configuration;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Coding.Tests.Unit;
 
 public sealed class RoslynSharedOptionsFacts
 {

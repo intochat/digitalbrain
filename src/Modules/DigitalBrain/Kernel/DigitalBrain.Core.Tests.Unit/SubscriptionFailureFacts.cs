@@ -3,7 +3,7 @@ using DigitalBrain.Testing.Unit;
 using Orleans;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Core.Tests.Unit;
 
 [Alias("test.controlled-source")]
 public interface IControlledSource : INeuron

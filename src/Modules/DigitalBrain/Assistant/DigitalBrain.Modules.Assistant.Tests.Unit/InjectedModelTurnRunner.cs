@@ -4,7 +4,7 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
 using Microsoft.Extensions.Options;
 
-namespace DigitalBrain.Assistant.Tests.Unit;
+namespace DigitalBrain.Modules.Assistant.Tests.Unit;
 
 // Only provider configuration is hidden from the real runner, selecting its injected
 // deterministic IChatClient. All tool dispatch, context, and event handling stay real.

@@ -4,7 +4,7 @@ using DigitalBrain.Compute;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Compute.Tests.Unit;
 
 public sealed class ComputeRouteFacts
 {

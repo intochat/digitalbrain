@@ -1,7 +1,7 @@
 using DigitalBrain.Core;
 using Orleans.Hosting;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Core.Tests.E2E;
 
 public sealed class E2EBoundaryFacts
 {

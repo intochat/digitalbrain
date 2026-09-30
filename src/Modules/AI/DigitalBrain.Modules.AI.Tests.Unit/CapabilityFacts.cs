@@ -2,11 +2,12 @@ using DigitalBrain.AI;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Sdk.Integrations;
+using DigitalBrain.Platform.Integrations;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.AI.Tests.Unit;
 
 public sealed class CapabilityFacts
 {

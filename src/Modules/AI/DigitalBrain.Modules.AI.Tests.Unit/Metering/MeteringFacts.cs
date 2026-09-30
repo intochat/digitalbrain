@@ -6,7 +6,7 @@ using DigitalBrain.Contracts;
 using Microsoft.Extensions.AI;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.AI.Tests.Unit;
 
 public sealed class MeteringFacts
 {

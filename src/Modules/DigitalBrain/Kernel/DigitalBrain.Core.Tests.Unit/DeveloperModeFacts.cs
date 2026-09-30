@@ -3,7 +3,7 @@ using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Core.Tests.Unit;
 
 public sealed class DeveloperModeFacts
 {

@@ -1,10 +1,11 @@
+using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Apps.Tests;
+namespace DigitalBrain.Modules.Apps.Tests.Unit;
 
 public sealed class AppsRouteFacts
 {

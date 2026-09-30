@@ -1,10 +1,11 @@
+using DigitalBrain.Files;
 using DigitalBrain.Contracts;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Files.Tests;
+namespace DigitalBrain.Modules.Files.Tests.Unit;
 
 public sealed class FilesRouteFacts
 {

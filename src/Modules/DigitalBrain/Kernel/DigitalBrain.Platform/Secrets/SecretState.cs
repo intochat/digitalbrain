@@ -1,6 +1,6 @@
 using DigitalBrain.Contracts.Types;
 
-namespace DigitalBrain.Sdk.Secrets;
+namespace DigitalBrain.Platform.Secrets;
 
 [GenerateSerializer, Alias("mydata.state")]
 internal sealed class SecretsState

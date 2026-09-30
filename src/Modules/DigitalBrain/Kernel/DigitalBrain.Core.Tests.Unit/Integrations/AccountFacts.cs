@@ -4,15 +4,18 @@ using DigitalBrain.Contracts.Types;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Sdk.Integrations;
+using DigitalBrain.Platform.Integrations;
 using DigitalBrain.Sdk.Integrations.Accounts;
+using DigitalBrain.Platform.Integrations.Accounts;
 using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Secrets;
 using DigitalBrain.Testing.Unit;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Runtime.Tests.Unit.Integrations;
+namespace DigitalBrain.Core.Tests.Unit.Integrations;
 
 public sealed class AccountFacts : IDisposable
 {

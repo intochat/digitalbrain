@@ -1,10 +1,11 @@
+using DigitalBrain.Sdk.Secrets;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace DigitalBrain.Sdk.Secrets;
+namespace DigitalBrain.Platform.Secrets;
 
 internal static class SecretsEndpoints
 {

@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.AI;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.AI.Tests.Unit;
 
 internal delegate Task<ChatResponse> ChatResponder(IReadOnlyList<ChatMessage> messages, ChatOptions? options, CancellationToken cancellationToken);
 

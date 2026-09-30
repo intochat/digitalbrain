@@ -1,7 +1,7 @@
 using DigitalBrain.Compute;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Compute.Tests.Unit;
 
 public sealed class PriceBookFacts
 {

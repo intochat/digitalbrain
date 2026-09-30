@@ -2,7 +2,7 @@ using DigitalBrain.Microsoft.CSharp;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit;
 
 public sealed class CSharpTriggerFacts
 {

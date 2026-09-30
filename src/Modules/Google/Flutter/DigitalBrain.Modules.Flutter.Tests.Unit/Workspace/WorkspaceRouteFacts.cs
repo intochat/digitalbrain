@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Flutter.Tests.Workspace;
+namespace DigitalBrain.Modules.Flutter.Tests.Unit.Workspace;
 
 public sealed class WorkspaceRouteFacts
 {

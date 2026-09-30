@@ -2,7 +2,7 @@ using DigitalBrain.Memory;
 using DigitalBrain.Qdrant;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Memory.Tests.Unit;
 
 public sealed class VectorMemoryStoreFacts
 {

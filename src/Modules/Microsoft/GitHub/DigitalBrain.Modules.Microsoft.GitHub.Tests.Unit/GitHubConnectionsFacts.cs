@@ -2,7 +2,7 @@ using DigitalBrain.Microsoft.GitHub;
 using DigitalBrain.Microsoft.GitHub.Signals;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Microsoft.GitHub.Tests.Unit;
 
 public sealed class GitHubConnectionsFacts
 {

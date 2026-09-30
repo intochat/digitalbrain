@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Client;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.AI.Tests.Unit;
 
 public sealed class McpToolFacts
 {

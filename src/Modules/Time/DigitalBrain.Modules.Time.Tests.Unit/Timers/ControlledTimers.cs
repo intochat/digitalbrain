@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using Orleans.Runtime;
 using Orleans.Timers;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Time.Tests.Unit;
 
 // Controls delivery, not virtual time. Every callback still executes on a real Orleans turn.
 internal sealed class ControlledTimers : TimeProvider

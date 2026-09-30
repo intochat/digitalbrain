@@ -1,13 +1,15 @@
+using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Sdk.Integrations.Accounts;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Contracts.Types;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Enforcement;
-using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Secrets;
 using Orleans;
 using Orleans.Runtime;
 
-namespace DigitalBrain.Sdk.Integrations.Accounts;
+namespace DigitalBrain.Platform.Integrations.Accounts;
 
 // The owner's account registry. A credential is written to the shared secrets grain and the
 // record holds only its SecretRef; the value is released only inside the read-only probe.

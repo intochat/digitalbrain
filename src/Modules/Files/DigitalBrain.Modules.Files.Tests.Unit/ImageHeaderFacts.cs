@@ -1,4 +1,6 @@
-namespace DigitalBrain.Files.Tests;
+using DigitalBrain.Files;
+
+namespace DigitalBrain.Modules.Files.Tests.Unit;
 
 public sealed class ImageHeaderFacts
 {

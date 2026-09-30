@@ -1,3 +1,4 @@
+using DigitalBrain.Sdk.Integrations;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
 using Microsoft.AspNetCore.Builder;
@@ -6,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 
-namespace DigitalBrain.Sdk.Integrations;
+namespace DigitalBrain.Platform.Integrations;
 
 internal sealed record IntegrationCatalogEntry(string Id, string DisplayName, string Status, string[] MissingFields);
 

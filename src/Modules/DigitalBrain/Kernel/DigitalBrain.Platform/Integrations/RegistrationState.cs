@@ -1,6 +1,6 @@
 using DigitalBrain.Contracts.Types;
 
-namespace DigitalBrain.Sdk.Integrations;
+namespace DigitalBrain.Platform.Integrations;
 
 // Field name to vault reference, plus the values of non-secret settings. Never a secret value.
 [GenerateSerializer, Alias("integration.registration.state")]

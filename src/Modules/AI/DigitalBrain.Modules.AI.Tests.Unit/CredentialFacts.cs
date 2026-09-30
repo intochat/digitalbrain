@@ -5,6 +5,7 @@ using System.Text.Json;
 using DigitalBrain.AI;
 using DigitalBrain.AI.OpenAI;
 using DigitalBrain.Sdk.Integrations;
+using DigitalBrain.Platform.Integrations;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,7 +13,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.AI.Tests.Unit;
 
 public sealed class CredentialFacts
 {

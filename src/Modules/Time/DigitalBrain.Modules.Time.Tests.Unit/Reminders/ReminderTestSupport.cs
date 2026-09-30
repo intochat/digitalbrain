@@ -3,7 +3,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Timers;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Time.Tests.Unit;
 
 internal sealed record ReminderDelivery(GrainId Id, object Activation);
 

@@ -2,7 +2,7 @@ using System.Text.Json.Nodes;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Testing.Unit;
 
-namespace DigitalBrain.Flutter.Tests;
+namespace DigitalBrain.Modules.Flutter.Tests.Unit;
 
 public sealed class ShellPersistenceFacts
 {

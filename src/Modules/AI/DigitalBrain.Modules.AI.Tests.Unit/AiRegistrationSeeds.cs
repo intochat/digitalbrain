@@ -1,9 +1,11 @@
 using DigitalBrain.Sdk.Integrations;
+using DigitalBrain.Platform.Integrations;
 using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Secrets;
 using DigitalBrain.Testing;
 using DigitalBrain.Testing.Unit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.AI.Tests.Unit;
 
 internal static class AiRegistrationSeeds
 {

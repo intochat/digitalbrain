@@ -1,3 +1,4 @@
+using DigitalBrain.Supabase;
 using DigitalBrain.Contracts;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -5,7 +6,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Supabase.Tests;
+namespace DigitalBrain.Modules.Supabase.Tests.Unit;
 
 public sealed class TableRouteFacts
 {

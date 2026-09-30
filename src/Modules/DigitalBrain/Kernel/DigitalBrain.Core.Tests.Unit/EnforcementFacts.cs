@@ -3,7 +3,7 @@ using DigitalBrain.Core.Enforcement;
 using Orleans.Runtime;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Core.Tests.Unit;
 
 public sealed class EnforcementFacts
 {

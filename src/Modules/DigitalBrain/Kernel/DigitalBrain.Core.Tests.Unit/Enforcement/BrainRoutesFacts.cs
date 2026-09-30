@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Runtime.Tests.Unit.Enforcement;
+namespace DigitalBrain.Core.Tests.Unit.Enforcement;
 
 public sealed class BrainRoutesFacts
 {

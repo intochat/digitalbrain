@@ -1,7 +1,7 @@
 using DigitalBrain.Microsoft.CSharp;
 using Xunit;
 
-namespace DigitalBrain.Microsoft.CSharp.Tests;
+namespace DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit;
 
 public sealed class CSharpScriptCheckFacts
 {

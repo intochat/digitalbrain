@@ -3,7 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Orleans.Hosting;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Core.Tests.Unit;
 
 public sealed class ModuleOptionsFacts
 {

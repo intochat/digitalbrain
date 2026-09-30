@@ -1,3 +1,4 @@
+using DigitalBrain.Assistant;
 using System.Globalization;
 using System.Text;
 using DigitalBrain.AI.Agents;
@@ -12,7 +13,7 @@ using DigitalBrain.Specs;
 using DigitalBrain.Supabase.Tables;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Assistant.Tests.Unit;
+namespace DigitalBrain.Modules.Assistant.Tests.Unit;
 
 // The subject of a run is the key the assistant is started for.
 internal sealed class AssistantSteps : StepLibrary

@@ -1,7 +1,7 @@
 using DigitalBrain.Client;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Core.Tests.Unit;
 
 public sealed class DigitalBrainClientFacts
 {

@@ -1,11 +1,12 @@
+using DigitalBrain.Sdk.Integrations;
 using DigitalBrain.Core;
-using DigitalBrain.Sdk.Integrations.Accounts;
+using DigitalBrain.Platform.Integrations.Accounts;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
 
-namespace DigitalBrain.Sdk.Integrations;
+namespace DigitalBrain.Platform.Integrations;
 
 public sealed class IntegrationsModule : IModule
 {

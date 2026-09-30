@@ -3,7 +3,7 @@ using DigitalBrain.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.AI.Tests.Unit;
 
 public sealed class InferenceFacts
 {

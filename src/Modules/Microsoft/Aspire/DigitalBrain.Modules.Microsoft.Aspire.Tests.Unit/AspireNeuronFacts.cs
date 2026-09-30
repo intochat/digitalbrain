@@ -2,7 +2,7 @@ using DigitalBrain.Microsoft.Aspire;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Microsoft.Aspire.Tests.Unit;
 
 public sealed class AspireNeuronFacts
 {

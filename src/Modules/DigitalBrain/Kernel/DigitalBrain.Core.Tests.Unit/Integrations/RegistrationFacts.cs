@@ -5,7 +5,9 @@ using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Contracts.Types;
 using DigitalBrain.Core;
 using DigitalBrain.Sdk.Integrations;
+using DigitalBrain.Platform.Integrations;
 using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Secrets;
 using DigitalBrain.Testing;
 using DigitalBrain.Testing.Unit;
 using Microsoft.AspNetCore.Builder;
@@ -16,7 +18,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Hosting;
 using Xunit;
 
-namespace DigitalBrain.Runtime.Tests.Unit.Integrations;
+namespace DigitalBrain.Core.Tests.Unit.Integrations;
 
 public sealed class FakeGoogleModule : IModule
 {

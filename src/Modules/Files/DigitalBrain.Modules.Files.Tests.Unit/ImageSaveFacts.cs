@@ -1,5 +1,6 @@
+using DigitalBrain.Files;
 using DigitalBrain.Testing.Unit;
-namespace DigitalBrain.Files.Tests;
+namespace DigitalBrain.Modules.Files.Tests.Unit;
 
 public sealed class ImageSaveFacts
 {

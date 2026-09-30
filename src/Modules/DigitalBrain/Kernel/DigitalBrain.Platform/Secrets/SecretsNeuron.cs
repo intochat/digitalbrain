@@ -1,3 +1,4 @@
+using DigitalBrain.Sdk.Secrets;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Contracts.Types;
@@ -5,7 +6,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Core.Enforcement;
 using Orleans.Runtime;
 
-namespace DigitalBrain.Sdk.Secrets;
+namespace DigitalBrain.Platform.Secrets;
 
 [GrainType("vault")]
 internal sealed class SecretsNeuron : Neuron<SecretsState>, ISecrets

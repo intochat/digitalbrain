@@ -6,7 +6,7 @@ using IImageGenerator = DigitalBrain.AI.Media.IImageGenerator;
 using ImageGenerationRequest = DigitalBrain.AI.Media.ImageGenerationRequest;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.AI.Tests.Unit;
 
 public sealed class MediaFacts
 {

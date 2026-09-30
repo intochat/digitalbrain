@@ -6,7 +6,7 @@ using DigitalBrain.Compute.Reconciliation;
 using DigitalBrain.Compute.Storage;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Compute.Tests.Unit;
 
 public sealed class MeterFacts
 {

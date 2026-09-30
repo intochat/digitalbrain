@@ -7,7 +7,7 @@ using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Core.Tests.Unit;
 
 public sealed class RuntimeSignalFacts
 {

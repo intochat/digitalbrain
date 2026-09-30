@@ -3,7 +3,7 @@ using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.Time;
 using ITimer = DigitalBrain.Time.Timers.ITimer;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Microsoft.CSharp.Tests.E2E;
 
 // Needs a Docker daemon with Linux containers: Aspire builds and starts the sandbox on the first run,
 // and the script compiles and runs inside it against this brain.

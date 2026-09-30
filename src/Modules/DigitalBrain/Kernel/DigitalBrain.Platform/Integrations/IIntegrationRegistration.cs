@@ -3,7 +3,7 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using Orleans.Concurrency;
 
-namespace DigitalBrain.Sdk.Integrations;
+namespace DigitalBrain.Platform.Integrations;
 
 public enum RegistrationStatus
 {

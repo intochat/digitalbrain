@@ -4,7 +4,7 @@ using DigitalBrain.Testing.Unit;
 using Orleans;
 using Orleans.Concurrency;
 using Xunit;
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Core.Tests.Unit;
 
 [Alias("test.late-source")]
 public interface ILateSource : INeuron

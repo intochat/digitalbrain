@@ -1,10 +1,11 @@
+using DigitalBrain.Sdk.Integrations.Accounts;
 using System.Text.Json.Serialization;
 using DigitalBrain.Core.Enforcement;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace DigitalBrain.Sdk.Integrations.Accounts;
+namespace DigitalBrain.Platform.Integrations.Accounts;
 
 internal sealed record ConnectAccountInput(string? IntegrationId, string? ConnectionId, string? Label, string? Value, string? SecretReference);
 

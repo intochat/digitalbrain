@@ -1,6 +1,7 @@
+using DigitalBrain.Sdk.Integrations;
 using System.Reflection;
 
-namespace DigitalBrain.Sdk.Integrations;
+namespace DigitalBrain.Platform.Integrations;
 
 // A module declares what it needs with `public static IntegrationDefinition Integration` or
 // `public static IntegrationDefinition[] Integrations`; a module with neither contributes nothing.

@@ -1,7 +1,8 @@
+using DigitalBrain.Files;
 using DigitalBrain.Flutter.ImageCanvas;
 using Xunit;
 
-namespace DigitalBrain.Files.Tests;
+namespace DigitalBrain.Modules.Files.Tests.Unit;
 
 public sealed class ImageEditFacts
 {

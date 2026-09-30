@@ -7,7 +7,7 @@ using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Compute.Tests.Unit;
 
 public sealed class NeuronStoreFacts
 {

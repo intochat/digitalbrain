@@ -2,7 +2,7 @@ using DigitalBrain.Google.Gmail;
 using DigitalBrain.Testing.Unit;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Google.Gmail.Tests.Unit;
 
 public sealed class MailReceivedFacts
 {

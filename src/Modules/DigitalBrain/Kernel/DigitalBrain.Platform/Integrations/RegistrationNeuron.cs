@@ -1,11 +1,13 @@
+using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Sdk.Integrations;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Enforcement;
-using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Secrets;
 using Orleans.Runtime;
 
-namespace DigitalBrain.Sdk.Integrations;
+namespace DigitalBrain.Platform.Integrations;
 
 [GrainType("integration.registration")]
 internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrationRegistration

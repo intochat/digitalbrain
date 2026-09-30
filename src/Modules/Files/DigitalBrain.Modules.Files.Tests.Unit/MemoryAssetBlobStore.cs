@@ -1,4 +1,6 @@
-namespace DigitalBrain.Files.Tests;
+using DigitalBrain.Files;
+
+namespace DigitalBrain.Modules.Files.Tests.Unit;
 internal sealed class MemoryAssetBlobStore : IAssetBlobStore
 {
     internal Dictionary<string, byte[]> Values { get; } = [];

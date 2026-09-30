@@ -5,7 +5,7 @@ using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Timers;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Time.Tests.Unit;
 
 internal static class TimeTestControls
 {

@@ -5,7 +5,7 @@ using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.Scripted;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.AI.Tests.Unit;
 
 public sealed class GroupChatFacts
 {

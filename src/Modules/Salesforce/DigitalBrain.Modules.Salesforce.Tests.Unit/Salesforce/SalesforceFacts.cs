@@ -1,5 +1,6 @@
 using System.Text.Json;
 using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Secrets;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Signals;
 using DigitalBrain.Sdk;
@@ -7,7 +8,7 @@ using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Salesforce.Tests.Unit;
 
 public sealed class SalesforceFacts
 {

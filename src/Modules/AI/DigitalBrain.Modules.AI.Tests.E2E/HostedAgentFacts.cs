@@ -5,8 +5,9 @@ using System.Text.Json;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.AI.Agents.Signals;
+using DigitalBrain.Modules.AI.Tests.Unit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.AI.Tests.E2E;
 
 public sealed class HostedAgentFacts
 {
@@ -17,7 +18,7 @@ public sealed class HostedAgentFacts
         deadline.CancelAfter(TimeSpan.FromMinutes(5));
         var ct = deadline.Token;
         using var endpoint = new LoopbackServer();
-        await using var brain = await E2ETest.Create().WithModule<DigitalBrain.Sdk.Secrets.SecretsModule>().WithModule<DigitalBrain.Sdk.Integrations.IntegrationsModule>().WithModule<AIModule, AIOptions>(options =>
+        await using var brain = await E2ETest.Create().WithModule<DigitalBrain.Platform.Secrets.SecretsModule>().WithModule<DigitalBrain.Platform.Integrations.IntegrationsModule>().WithModule<AIModule, AIOptions>(options =>
             {
                 options.Default.Profile = "fixture";
                 options.ModelProfiles.Add("fixture", new AIModelProfileOptions

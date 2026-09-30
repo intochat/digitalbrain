@@ -2,7 +2,7 @@ using DigitalBrain.Compute;
 using DigitalBrain.Compute.Billing;
 using DigitalBrain.Compute.Metering;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Compute.Tests.Unit;
 
 public sealed class BillingFacts
 {

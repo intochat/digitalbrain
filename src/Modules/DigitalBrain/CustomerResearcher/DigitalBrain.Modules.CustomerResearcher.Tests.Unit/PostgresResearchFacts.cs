@@ -1,7 +1,8 @@
+using DigitalBrain.CustomerResearcher;
 using Npgsql;
 using Xunit;
 
-namespace DigitalBrain.CustomerResearcher.Tests.Unit;
+namespace DigitalBrain.Modules.CustomerResearcher.Tests.Unit;
 
 public sealed class PostgresResearchFacts
 {

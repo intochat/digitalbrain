@@ -1,10 +1,11 @@
 using DigitalBrain.Google.Gmail;
 using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Secrets;
 using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Google.Gmail.Tests.Unit;
 
 public sealed class GmailConnectedFacts
 {

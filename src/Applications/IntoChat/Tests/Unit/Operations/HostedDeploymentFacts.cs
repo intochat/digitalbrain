@@ -1,4 +1,4 @@
-namespace IntoChat.Tests.Operations;
+namespace IntoChat.Tests.Unit.Operations;
 
 public sealed class HostedDeploymentFacts
 {

@@ -1,13 +1,13 @@
+using DigitalBrain.Assistant;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
-using DigitalBrain.Testing.Routing;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Assistant.Tests;
+namespace DigitalBrain.Modules.Assistant.Tests.Unit;
 
 public sealed class AgentRouteFacts
 {

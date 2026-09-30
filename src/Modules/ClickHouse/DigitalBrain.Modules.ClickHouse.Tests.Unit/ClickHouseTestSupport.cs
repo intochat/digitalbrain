@@ -1,7 +1,7 @@
 using DigitalBrain.ClickHouse;
 using DigitalBrain.ClickHouse.Query;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.ClickHouse.Tests.Unit;
 
 // In-memory IClickHouseProvider so the neuron tests never touch a real server.
 internal sealed class FakeClickHouseProvider : IClickHouseProvider

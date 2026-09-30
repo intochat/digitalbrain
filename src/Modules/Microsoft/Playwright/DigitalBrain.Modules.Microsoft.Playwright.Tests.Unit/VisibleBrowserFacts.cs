@@ -1,7 +1,7 @@
 using System.Text.Json;
 using DigitalBrain.Microsoft.Playwright;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Microsoft.Playwright.Tests.Unit;
 
 public sealed class VisibleBrowserFacts
 {

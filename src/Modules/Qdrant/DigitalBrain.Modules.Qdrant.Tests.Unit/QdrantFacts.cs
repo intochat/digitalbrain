@@ -1,7 +1,7 @@
 using DigitalBrain.Qdrant;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Qdrant.Tests.Unit;
 
 public sealed class QdrantFacts
 {

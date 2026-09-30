@@ -4,7 +4,7 @@ using DigitalBrain.Deployment;
 using Pulumi;
 using Pulumi.Testing;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Deployment.Tests;
 
 // Pulumi runs one deployment per process at a time.
 [Collection(nameof(DigitalBrainDeploymentFacts))]

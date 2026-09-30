@@ -1,3 +1,4 @@
+using DigitalBrain.CustomerResearcher;
 using System.Text.Json;
 using DigitalBrain.AI;
 using DigitalBrain.Flutter.Text;
@@ -7,7 +8,7 @@ using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.CustomerResearcher.Tests.Unit;
+namespace DigitalBrain.Modules.CustomerResearcher.Tests.Unit;
 
 public sealed class ResearchFacts
 {

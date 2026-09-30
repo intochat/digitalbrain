@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
 using DigitalBrain.Contracts.Types;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Core.Tests.Unit;
 
 public sealed class TypeCatalogFacts
 {

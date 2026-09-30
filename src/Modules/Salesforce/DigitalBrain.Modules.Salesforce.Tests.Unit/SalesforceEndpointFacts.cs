@@ -1,7 +1,7 @@
 using DigitalBrain.Salesforce;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Salesforce.Tests.Unit;
 
 public sealed class SalesforceEndpointFacts
 {

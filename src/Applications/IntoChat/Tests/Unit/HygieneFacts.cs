@@ -1,4 +1,4 @@
-namespace IntoChat.Tests;
+namespace IntoChat.Tests.Unit;
 
 /// <summary>
 /// P0.1 trash-register guard: the dead server/client code named in the plan stays deleted, the

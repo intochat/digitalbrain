@@ -3,7 +3,7 @@ using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.AI.Tests.Unit;
 
 public sealed class AIOptionsRoundTripFacts
 {

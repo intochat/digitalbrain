@@ -1,8 +1,9 @@
+using DigitalBrain.CustomerResearcher;
 using DigitalBrain.Contracts;
-using DigitalBrain.Testing.Routing;
+using DigitalBrain.Modules.Assistant.Tests.Unit;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.CustomerResearcher.Tests;
+namespace DigitalBrain.Modules.CustomerResearcher.Tests.Unit;
 
 public sealed class CustomerResearcherRouteFacts
 {

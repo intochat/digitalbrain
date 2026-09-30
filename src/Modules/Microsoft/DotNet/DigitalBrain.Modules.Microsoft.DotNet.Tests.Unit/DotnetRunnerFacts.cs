@@ -1,6 +1,6 @@
 using DigitalBrain.Microsoft.DotNet;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Microsoft.DotNet.Tests.Unit;
 
 public sealed class DotnetRunnerFacts
 {

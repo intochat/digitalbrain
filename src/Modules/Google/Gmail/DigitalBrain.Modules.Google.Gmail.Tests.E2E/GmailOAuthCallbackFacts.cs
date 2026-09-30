@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Google.Gmail.Tests.E2E;
 
 public sealed class GmailOAuthCallbackFacts
 {
@@ -54,8 +54,8 @@ public sealed class GmailOAuthCallbackFacts
 
     private static Task<E2EBrain> StartAsync(TokenEndpointStub stub, CancellationToken ct, Dictionary<string, string?> seeded)
         => E2ETest.Create()
-            .WithModule<DigitalBrain.Sdk.Secrets.SecretsModule>()
-            .WithModule<DigitalBrain.Sdk.Integrations.IntegrationsModule>()
+            .WithModule<DigitalBrain.Platform.Secrets.SecretsModule>()
+            .WithModule<DigitalBrain.Platform.Integrations.IntegrationsModule>()
             .WithModule<GmailModule, GmailModuleOptions>(options => options.TokenEndpoint = stub.TokenEndpoint)
             .WithExecution(new() { PrivateConfiguration = seeded })
             .StartAsync(ct);

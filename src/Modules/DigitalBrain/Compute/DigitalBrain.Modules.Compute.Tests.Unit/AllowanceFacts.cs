@@ -4,7 +4,7 @@ using DigitalBrain.Compute.Billing;
 using DigitalBrain.Compute.Metering;
 using DigitalBrain.Contracts.Enforcement;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Compute.Tests.Unit;
 
 public sealed class AllowanceFacts
 {

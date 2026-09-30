@@ -6,7 +6,7 @@ using DigitalBrain.Compute.Ledger;
 using DigitalBrain.Testing.Unit;
 using Xunit;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Compute.Tests.Unit;
 
 public sealed class LedgerFacts
 {

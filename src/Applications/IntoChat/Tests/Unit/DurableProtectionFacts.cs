@@ -2,6 +2,7 @@ using System.Xml.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Secrets;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;

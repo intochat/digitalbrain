@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Testing.Routing;
+namespace DigitalBrain.Modules.Assistant.Tests.Unit;
 
 internal sealed record RouteSnapshot(IReadOnlyList<RouteEndpoint> Endpoints)
 {

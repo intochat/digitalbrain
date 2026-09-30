@@ -1,3 +1,4 @@
+using DigitalBrain.Sdk.Integrations;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
 using Microsoft.AspNetCore.Builder;
@@ -5,7 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
-namespace DigitalBrain.Sdk.Integrations;
+namespace DigitalBrain.Platform.Integrations;
 
 internal sealed class Capabilities(IEnumerable<ICapabilitySource> sources) : ICapabilities
 {

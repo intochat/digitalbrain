@@ -1,10 +1,11 @@
+using DigitalBrain.Assistant;
 using DigitalBrain.AI;
 using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 
-namespace DigitalBrain.Assistant.Tests.Unit;
+namespace DigitalBrain.Modules.Assistant.Tests.Unit;
 
 public sealed class VoiceFacts
 {

@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.DataProtection;
 
-namespace DigitalBrain.Sdk.Secrets;
+namespace DigitalBrain.Platform.Secrets;
 
 // The host must configure a shared key ring before selecting this wrapper.
 public sealed class DataProtectionKeyWrapper(IDataProtectionProvider provider) : IKeyWrapper

@@ -6,7 +6,7 @@ using DigitalBrain.Microsoft.CSharp;
 using Xunit;
 using static Microsoft.Extensions.Options.Options;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit;
 
 public sealed class SessionPoolRunnerFacts
 {

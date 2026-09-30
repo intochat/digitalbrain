@@ -1,6 +1,6 @@
 using DigitalBrain.Microsoft.Roslyn;
 
-namespace DigitalBrain.Tests;
+namespace DigitalBrain.Modules.Microsoft.Roslyn.Tests.Unit;
 
 public sealed class WorkspaceFacts
 {
