@@ -1,5 +1,7 @@
 # Settings and Connections proposal
 
+> Superseded by the integrations refactor (`docs/superpowers/specs/2026-09-30-integrations-design.md`); links below to the deleted Connector files are historical.
+
 Date: 2026-09-28. Source inspection only; no claim about currently connected live accounts. Product changes are proposed, not implemented.
 
 ## What exists today

@@ -16,7 +16,7 @@ of them is modeled:
    hand-flattening typed options into config strings → a per-module config class re-parsing and
    re-validating them. Its only failure mode is a runtime exception that shows an operator
    message ("configure … privately in Aspire") to an end user.
-2. **The user's accounts** (brain-scoped): connector records in `ConnectorsNeuron`, credentials
+2. **The user's accounts** (brain-scoped): integration-account neurons in `IntegrationsModule`, credentials
    in the Secrets vault as `SecretRef`s, probe/status/signals. This layer is right; only its
    name and surroundings are wrong.
 3. **Capability selection** (a choice, not a credential): which model the assistant uses.

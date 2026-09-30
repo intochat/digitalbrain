@@ -151,11 +151,6 @@ final class DigitalBrainUiClient {
     );
   }
 
-  Future<bool> salesforceConnected() async =>
-      (await _tableRequest('GET', '/agent/connections/salesforce')
-          as Map)['connected'] ==
-      true;
-
   Future<List<TableSummary>> listTables(String workspace) async {
     final body = await _tableRequest(
       'GET',

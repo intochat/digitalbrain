@@ -30,7 +30,6 @@ class WorkspaceApp extends StatefulWidget {
     this.initialLocation,
     this.persistenceKey = 'intocaht.workspace.v1',
     this.onOpenUrl,
-    this.onSalesforceConnected,
     this.kernelBaseUri,
     this.statusMessage,
     this.onReadTable,
@@ -44,7 +43,6 @@ class WorkspaceApp extends StatefulWidget {
   final Uri? initialLocation;
   final String persistenceKey;
   final OpenUrl? onOpenUrl;
-  final Future<bool> Function()? onSalesforceConnected;
   final Uri? kernelBaseUri;
   final String? statusMessage;
   final ReadTable? onReadTable;

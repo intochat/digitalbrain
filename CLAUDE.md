@@ -68,6 +68,12 @@ behaviors/*.cs   the implementation: one script per concern (plus legacy single 
   `src/Applications/IntoChat/Apps/`).
 - **Module contract:** a module ships contracts + signals + connector + fakes (Testing package) +
   renderables. Modules never ship step definitions or test-only methods on production interfaces.
+  A module declares `IModule<TOptions>`: `Validate()` runs once and the options cross the AppHost
+  boundary as one JSON value; no secrets in options (credential-shaped names are refused at
+  compile). Modules also ship `IntegrationDefinition`s; their registrations are deployment-scoped
+  `[PlatformOnly]` neurons seeded from `DigitalBrain:Integrations:{id}:{Field}` (catalog:
+  `GET /integrations`). A user's connectors are integration accounts, per brain, under
+  `/brains/{id}/integrations/accounts`.
 
 Open design fronts (do not improvise these): cross-app subscription scopes/permissions; the
 renderable palette v1 / UiPart; run-token tightening.
@@ -78,8 +84,8 @@ renderable palette v1 / UiPart; run-token tightening.
   `dotnet test src/<path-to-test-project>`. After changes: build, run the relevant unit suites,
   and smoke with `aspire run` from `src/Applications/IntoChat/AppHost` (all resources Healthy).
   Skip the 18-minute IntoChat E2E; unit suites + aspire run are the bar.
-- `src/Applications/IntoChat/Tests/Unit` has 5 known pre-existing failures (HostedDeployment ×2,
-  PathTruth, ModuleConfigurationContract ×2) — not yours to fix in passing.
+- `src/Applications/IntoChat/Tests/Unit` has 3 known pre-existing failures (HostedDeployment ×2,
+  PathTruth) — not yours to fix in passing.
 - Flutter shell: `flutter analyze` and `flutter test` from `src/Modules/Google/Flutter/app/shell`.
   Wire-shape changes in C# records must be mirrored in the Dart screens in the same change.
 - Persisted grain state: append `[Id(n)]`, never renumber; use concrete arrays, not interface

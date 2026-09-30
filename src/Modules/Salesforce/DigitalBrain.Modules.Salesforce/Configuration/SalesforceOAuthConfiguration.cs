@@ -5,8 +5,8 @@ using Microsoft.Extensions.Options;
 namespace DigitalBrain.Salesforce;
 
 // Credential validation remains lazy so an unconfigured module can start.
-// Lazy like GmailOAuthConfiguration: an unconfigured Salesforce module must not fail silo
-// startup, only refuse a login challenge or token refresh until it is configured.
+// An unconfigured Salesforce module must not fail silo startup, only refuse a login challenge
+// or token refresh until it is configured.
 internal sealed class SalesforceOAuthConfiguration(IOptions<SalesforceOAuthOptions> options)
 {
     internal SalesforceOAuthConfiguration(IConfiguration configuration)
