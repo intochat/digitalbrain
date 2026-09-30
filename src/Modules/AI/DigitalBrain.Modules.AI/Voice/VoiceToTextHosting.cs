@@ -52,7 +52,7 @@ internal static class VoiceToTextHosting
 
             case AiProvider.OpenAI:
                 services.TryAddSingleton<IAudioTranscriptionService>(sp =>
-                    new OpenAITranscriptionService(model, sp.GetRequiredService<IOptions<AIOptions>>()));
+                    new OpenAITranscriptionService(model, sp.GetRequiredService<IAiCredentials>()));
                 break;
 
             default:

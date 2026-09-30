@@ -1,6 +1,5 @@
 using System.ClientModel;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
+using DigitalBrain.Sdk.Integrations;
 using OpenAI;
 using OpenAI.Audio;
 
@@ -24,52 +23,40 @@ public sealed class OpenAITranscriptionService : IAudioTranscriptionService
     private const string OpusExtension = ".opus";
 
     private readonly TranscriptionModel _model;
-    private readonly Lazy<AudioClient>? _client;
+    private readonly IAiCredentials _credentials;
 
-    public OpenAITranscriptionService(TranscriptionModel model, IConfiguration configuration)
-        : this(model, Options.Create(AIOptions.Read(configuration)))
-    {
-    }
-
-    public OpenAITranscriptionService(TranscriptionModel model, IOptions<AIOptions> settings)
+    internal OpenAITranscriptionService(TranscriptionModel model, IAiCredentials credentials)
     {
         ArgumentNullException.ThrowIfNull(model);
-        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(credentials);
 
         _model = model;
-
-        // Every failure below leaves _client null, which reports as "not ready"
-        // rather than throwing: voice answers 503 with the reason and the rest of
-        // the process is unaffected.
-        if (!model.Formats.HasFlag(TranscriptionFormats.Text))
-        {
-            ErrorMessage =
-                $"{model.DisplayName} does not offer a plain-text response, which voice transcription requires.";
-            return;
-        }
-
-        var apiKeyKey = $"{AIClients.ConfigurationRoot}:{model.Provider}:ApiKey";
-        if (settings.Value.Provider(model.Provider).ApiKey is not { Length: > 0 } apiKey)
-        {
-            ErrorMessage = $"{model.DisplayName} requires {apiKeyKey}.";
-            return;
-        }
-
-        var options = new OpenAIClientOptions { NetworkTimeout = RequestTimeout };
-        if (settings.Value.Provider(model.Provider).Endpoint is { Length: > 0 } endpoint)
-        {
-            options.Endpoint = new Uri(endpoint);
-        }
-
-        _client = new Lazy<AudioClient>(
-            () => new AudioClient(model.Id, new ApiKeyCredential(apiKey), options));
+        _credentials = credentials;
     }
 
-    public bool IsReady => _client is not null;
+    private string Integration => AiIntegrations.IdOf(_model.Provider);
 
-    public bool InitializationFailed => _client is null;
+    // Not ready reports rather than throws: voice answers 503 with the reason and the rest of the
+    // process is unaffected.
+    public bool IsReady => _model.Formats.HasFlag(TranscriptionFormats.Text) && _credentials.IsReady(Integration);
 
-    public string? ErrorMessage { get; }
+    public bool InitializationFailed => !IsReady;
+
+    public string? ErrorMessage
+    {
+        get
+        {
+            if (!_model.Formats.HasFlag(TranscriptionFormats.Text))
+            {
+                return $"{_model.DisplayName} does not offer a plain-text response, which voice transcription requires.";
+            }
+
+            var status = _credentials.StatusOf(Integration);
+            return status.Status == RegistrationStatus.Ready
+                ? null
+                : $"{_model.DisplayName} requires the {Integration} integration, which is {status.Status}.";
+        }
+    }
 
     public string ModelId => _model.Id;
 
@@ -94,8 +81,12 @@ public sealed class OpenAITranscriptionService : IAudioTranscriptionService
     {
         ArgumentNullException.ThrowIfNull(audioStream);
 
-        var client = _client?.Value
-            ?? throw new InvalidOperationException(ErrorMessage ?? "Transcription is not configured.");
+        if (!IsReady)
+        {
+            throw new InvalidOperationException(ErrorMessage ?? "Transcription is not configured.");
+        }
+
+        var client = await CreateClientAsync(cancellationToken).ConfigureAwait(false);
 
         // Asserted against the catalogue rather than assumed: the gpt-4o transcribe
         // models reject the verbose and subtitle formats outright.
@@ -106,6 +97,18 @@ public sealed class OpenAITranscriptionService : IAudioTranscriptionService
             .ConfigureAwait(false);
 
         return transcription.Value.Text ?? string.Empty;
+    }
+
+    private async Task<AudioClient> CreateClientAsync(CancellationToken cancellationToken)
+    {
+        var apiKey = await _credentials.ReleaseSecretAsync(Integration, AiIntegrations.ApiKeyField, cancellationToken).ConfigureAwait(false);
+        var options = new OpenAIClientOptions { NetworkTimeout = RequestTimeout };
+        if (_credentials.Setting(Integration, AiIntegrations.EndpointField) is { Length: > 0 } endpoint)
+        {
+            options.Endpoint = new Uri(endpoint);
+        }
+
+        return new AudioClient(_model.Id, new ApiKeyCredential(apiKey), options);
     }
 
     // An unrecognised extension is a 400 from the provider, which would surface as

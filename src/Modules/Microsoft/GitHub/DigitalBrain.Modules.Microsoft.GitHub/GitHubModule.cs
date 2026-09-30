@@ -1,5 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Sdk;
+using DigitalBrain.Sdk.Integrations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
@@ -8,6 +9,10 @@ namespace DigitalBrain.Microsoft.GitHub;
 
 public sealed class GitHubModule : IModule<GitHubModuleOptions>
 {
+    public static IntegrationDefinition Integration { get; } = IntegrationDefinition.For("github", "GitHub")
+        .RequiresSecret("PrivateKeyPem")
+        .RequiresSetting("AppId");
+
     public void Configure(ISiloBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -18,6 +23,8 @@ public sealed class GitHubModule : IModule<GitHubModuleOptions>
         builder.Services.AddSingleton(services =>
             services.GetRequiredService<IOptions<GitHubRepositoriesOptions>>().Value.CreateBindings());
         builder.Services.AddGitHubAuthentication(builder.Configuration);
+        builder.Services.AddSingleton<GitHubAppRegistration>();
+        builder.AddStartupTask<GitHubLegacyKeySeeder>(Orleans.ServiceLifecycleStage.Active + 1);
         builder.Services.AddSingleton<GitHubInstallationTokens>();
         builder.Services.AddSingleton<IGitHubRepositorySource, GitHubRepositorySource>();
         builder.Services.AddSingleton<GitHubSetupService>();

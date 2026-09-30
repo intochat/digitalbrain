@@ -10,7 +10,6 @@ public sealed class GitHubAppOptions
     public string Slug { get; set; } = "";
     public string PublicOrigin { get; set; } = "";
     public string PublicWebhookUrl { get; set; } = "";
-    public string PrivateKeyPem { get; set; } = "";
     public string WebhookSecret { get; set; } = "";
     internal long ParsedAppId => long.TryParse(AppId, out var id) ? id : 0;
 }

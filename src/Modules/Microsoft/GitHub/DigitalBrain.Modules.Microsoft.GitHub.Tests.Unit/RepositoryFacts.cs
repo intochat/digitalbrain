@@ -71,7 +71,7 @@ public sealed class RepositoryFacts
             .StartAsync(ct);
 
     private static GitHubRepositoryBinding Binding()
-        => new("repo", 11, 9, 7, "intochat", "digitalbrain", "private-key", "0123456789abcdef");
+        => new("repo", 11, 9, 7, "intochat", "digitalbrain", "0123456789abcdef");
 }
 
 internal sealed class FakeGitHubRepositorySource : IGitHubRepositorySource

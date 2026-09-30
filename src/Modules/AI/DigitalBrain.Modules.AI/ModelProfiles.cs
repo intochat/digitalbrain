@@ -2,12 +2,15 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.AI;
 
 public sealed class ModelProfiles(IServiceProvider services, IOptionsMonitor<AIOptions> options)
 {
+    private IAiCredentials Credentials => services.GetRequiredService<IAiCredentials>();
+
     public ResolvedAgentModel Resolve(AgentModelSelection? selection, bool requiresTools = false)
     {
         selection ??= new();
@@ -58,8 +61,8 @@ public sealed class ModelProfiles(IServiceProvider services, IOptionsMonitor<AIO
         }
         else
         {
-            preset = LLMModel.All.FirstOrDefault(model => AIClients.Factory(model.Provider).IsConfigured(configuration))
-                ?? throw new InvalidOperationException("No chat provider is configured. Configure a provider API key or an Ollama endpoint.");
+            preset = LLMModel.All.FirstOrDefault(model => AIClients.Factory(model.Provider).IsConfigured(configuration, Credentials))
+                ?? throw new InvalidOperationException("No chat provider is configured. Register a provider integration or configure an Ollama endpoint.");
             provider = preset.Provider;
         }
 
@@ -79,12 +82,18 @@ public sealed class ModelProfiles(IServiceProvider services, IOptionsMonitor<AIO
             throw new ArgumentException("Model ID must contain at most 200 printable characters.", nameof(selection));
         }
         var factory = AIClients.Factory(provider);
-        if (!factory.IsConfigured(configuration) && !(provider == AiProvider.Ollama && endpoint is not null))
+        if (!factory.IsConfigured(configuration, Credentials) && !(provider == AiProvider.Ollama && endpoint is not null))
         {
-            throw new InvalidOperationException($"Provider '{provider}' is not configured. Set {AIOptions.SectionName}:{provider}:"
-                + (provider == AiProvider.Ollama ? "Endpoint." : "ApiKey."));
+            if (provider == AiProvider.Ollama)
+            {
+                throw new InvalidOperationException($"Provider 'Ollama' is not configured. Set {AIOptions.SectionName}:Ollama:Endpoint.");
+            }
+
+            Credentials.RequireReady(AiIntegrations.IdOf(provider));
         }
-        endpoint = Endpoint(endpoint ?? Clean(configuration.Provider(provider).Endpoint), provider);
+        endpoint = Endpoint(endpoint ?? (provider == AiProvider.Ollama
+            ? Clean(configuration.Ollama.Endpoint)
+            : Clean(Credentials.Setting(AiIntegrations.IdOf(provider), AiIntegrations.EndpointField))), provider);
         var capabilities = declared ?? preset?.Capabilities ?? LlmCapabilities.None;
         if ((capabilities & ~(LlmCapabilities.Tools | LlmCapabilities.Vision | LlmCapabilities.StructuredOutput)) != 0)
         {
@@ -132,9 +141,8 @@ public sealed class ModelProfiles(IServiceProvider services, IOptionsMonitor<AIO
         }
         var provider = ParseProvider(resolved.Provider);
         var configuration = new AIOptions();
-        configuration.Provider(provider).ApiKey = options.CurrentValue.Provider(provider).ApiKey;
         configuration.Provider(provider).Endpoint = resolved.Endpoint;
-        var inner = AIClients.Factory(provider).CreateChatClient(resolved.Model, configuration);
+        var inner = AIClients.Factory(provider).CreateChatClient(resolved.Model, configuration, Credentials, resolved.Endpoint);
         return new ChatClientBuilder(inner).ConfigureOptions(request =>
         {
             request.ModelId = resolved.Model;
@@ -158,7 +166,7 @@ public sealed class ModelProfiles(IServiceProvider services, IOptionsMonitor<AIO
     {
         var configuration = options.CurrentValue;
         var result = new List<ResolvedAgentModel>();
-        foreach (var preset in LLMModel.All.Where(model => AIClients.Factory(model.Provider).IsConfigured(configuration)))
+        foreach (var preset in LLMModel.All.Where(model => AIClients.Factory(model.Provider).IsConfigured(configuration, Credentials)))
         {
             result.Add(Resolve(new(Model: preset.Marker.Name)));
         }

@@ -111,7 +111,8 @@ public sealed class ResearchFacts
             silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=test;Username=test";
             silo.Services.AddSingleton<ICompanyResearchAgent>(control).AddSingleton<ICompanyResearchStore>(control)
                 .AddSingleton<IBrowserSessionProvider>(control)
-                .Configure<AIOptions>(options => { options.OpenAI.ApiKey = "fixture"; options.Default.Provider = "OpenAI"; options.Default.Model = "fixture"; });
+                .AddSingleton<IAiCredentials>(new FixedAiCredentials().Ready("openai", "fixture"))
+                .Configure<AIOptions>(options => { options.Default.Provider = "OpenAI"; options.Default.Model = "fixture"; });
         }).StartAsync(TestContext.Current.CancellationToken);
     private static async Task<ICustomerResearcher> Connect(UnitBrain brain, string workspace)
     {

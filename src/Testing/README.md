@@ -125,6 +125,10 @@ var execution = new TestExecutionOptions
 };
 ```
 
+AI providers (`openai`, `anthropic`, `google`, `xai`) take `ApiKey` and `Endpoint`, Tavily (`tavily`) takes `ApiKey`,
+and GitHub (`github`) takes `PrivateKeyPem` and `AppId`, all under `DigitalBrain:Integrations:{id}:{Field}`. Compose
+`SecretsModule` and `IntegrationsModule` beside the module so the seeds land.
+
 Hosted runs write these to an ACL-restricted temporary file, expose only its path to the runtime, and
 delete it on rollback or disposal. Unit applies them locally. Test-owned identity and connection
 settings cannot be overridden.

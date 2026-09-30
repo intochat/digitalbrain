@@ -16,14 +16,9 @@ public sealed class SpeechTransportFacts
         deadline.CancelAfter(TimeSpan.FromSeconds(30));
         var ct = deadline.Token;
         using var endpoint = new SpeechEndpoint();
-        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+        await using var brain = await UnitTest.Create().WithRegistrations(AiRegistrationSeeds.OpenAI(endpoint: endpoint.Url)).WithModule<AIModule>()
             .ConfigureSilo(silo =>
             {
-                silo.Services.Configure<AIOptions>(options =>
-                {
-                    options.OpenAI.ApiKey = "test-only";
-                    options.OpenAI.Endpoint = endpoint.Url;
-                });
                 silo.Services.AddOpenAISpeechSynthesis("fixture-tts");
             }).StartAsync(ct);
         var speech = brain.Get<ISpeechSynthesizer>("real-speech-transport");

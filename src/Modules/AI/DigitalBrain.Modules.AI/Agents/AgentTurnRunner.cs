@@ -115,8 +115,8 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
             var configuration = services.GetService<IOptions<AIOptions>>()?.Value;
             var configured = configuration is not null && (configuration.Default.Profile is not null
                 || configuration.Default.Model is not null || configuration.Default.Provider is not null
-                || configuration.OpenAI.ApiKey is not null || configuration.Anthropic.ApiKey is not null
-                || configuration.Google.ApiKey is not null || configuration.XAI.ApiKey is not null || configuration.Ollama.Endpoint is not null);
+                || configuration.Ollama.Endpoint is not null
+                || AiIntegrations.KeyedProviders.Any(provider => services.GetRequiredService<IAiCredentials>().IsReady(AiIntegrations.IdOf(provider))));
             IChatClient client;
             bool owned;
             ChatOptions options;

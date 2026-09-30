@@ -34,12 +34,10 @@ public sealed class AgentModelsFacts
     {
         using var services = Services(options =>
         {
-            options.OpenAI.ApiKey = "secret-api-key";
-            options.OpenAI.Endpoint = "https://private.example/v1";
             options.ModelProfiles["work"] = new() { Provider = "OpenAI", Model = "private-chat", Capabilities = LlmCapabilities.Tools };
             options.ModelProfiles["no-tools"] = new() { Provider = "OpenAI", Model = "text-only" };
             options.ModelProfiles["unconfigured"] = new() { Provider = "Google", Model = "remote-chat", Capabilities = LlmCapabilities.Tools };
-        });
+        }, new FixedAiCredentials().Ready("openai", "secret-api-key", "https://private.example/v1"));
         var catalog = Catalog(services);
         var result = catalog.Read();
         Assert.True(result.Automatic.Available);
@@ -69,9 +67,8 @@ public sealed class AgentModelsFacts
     {
         using var services = Services(options =>
         {
-            options.OpenAI.ApiKey = "configured";
             options.ModelProfiles["work"] = new() { Provider = "OpenAI", Model = "private-chat", Capabilities = LlmCapabilities.Tools };
-        });
+        }, new FixedAiCredentials().Ready("openai", "configured"));
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         { ["IntoChat:Assistant:Model"] = "IGpt56Luna" }).Build();
         var catalog = Catalog(services, configuration);
@@ -86,12 +83,13 @@ public sealed class AgentModelsFacts
     [Fact]
     public void AutomaticWithoutServerOverrideKeepsAiDefault()
     {
-        using var services = Services(options => { options.OpenAI.ApiKey = "configured"; });
+        using var services = Services(_ => { }, new FixedAiCredentials().Ready("openai", "configured"));
         Assert.Null(Catalog(services).Select(null));
     }
 
-    private static ServiceProvider Services(Action<AIOptions> configure) => new ServiceCollection()
-        .Configure(configure).AddSingleton<ModelProfiles>().BuildServiceProvider();
+    private static ServiceProvider Services(Action<AIOptions> configure, FixedAiCredentials? credentials = null) => new ServiceCollection()
+        .Configure(configure).AddSingleton<IAiCredentials>(credentials ?? new FixedAiCredentials())
+        .AddSingleton<ModelProfiles>().BuildServiceProvider();
 
     private static AgentModelCatalog Catalog(ServiceProvider services, IConfiguration? configuration = null) => new(
         services.GetRequiredService<ModelProfiles>(), services.GetRequiredService<IOptionsMonitor<AIOptions>>(),

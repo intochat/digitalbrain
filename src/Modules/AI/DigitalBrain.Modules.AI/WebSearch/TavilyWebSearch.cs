@@ -2,39 +2,24 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.AI.WebSearch;
 
 public sealed class TavilyWebSearch : IWebSearch
 {
-    public const string ApiKeyConfigurationKey = "DigitalBrain:AI:Tavily:ApiKey";
     public const string EnabledConfigurationKey = "DigitalBrain:AI:Tavily:Enabled";
 
     private static readonly Uri SearchEndpoint = new("https://api.tavily.com/search");
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _httpClient;
-    private readonly string _apiKey;
+    private readonly IAiCredentials _credentials;
 
-    public TavilyWebSearch(HttpClient httpClient, IConfiguration configuration)
-        : this(httpClient, Options.Create(AIOptions.Read(configuration)))
-    {
-    }
-
-    public TavilyWebSearch(HttpClient httpClient, IOptions<AIOptions> options)
-        : this(httpClient, options.Value.Tavily.ApiKey
-            ?? throw new InvalidOperationException(
-                $"Tavily web search is enabled but {ApiKeyConfigurationKey} is missing."))
-    {
-    }
-
-    internal TavilyWebSearch(HttpClient httpClient, string apiKey)
+    internal TavilyWebSearch(HttpClient httpClient, IAiCredentials credentials)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
-        ArgumentException.ThrowIfNullOrWhiteSpace(apiKey);
+        ArgumentNullException.ThrowIfNull(credentials);
         _httpClient = httpClient;
-        _apiKey = apiKey;
+        _credentials = credentials;
     }
 
     public async Task<WebSearchResponse> SearchAsync(
@@ -46,17 +31,18 @@ public sealed class TavilyWebSearch : IWebSearch
         ArgumentOutOfRangeException.ThrowIfLessThan(maxResults, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(maxResults, 20);
 
+        var apiKey = await _credentials.ReleaseSecretAsync(AiIntegrations.TavilyId, AiIntegrations.ApiKeyField, cancellationToken).ConfigureAwait(false);
         using var request = new HttpRequestMessage(HttpMethod.Post, SearchEndpoint)
         {
             Content = JsonContent.Create(new SearchRequest(query, "basic", false, maxResults), options: SerializerOptions),
         };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
 
         using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
         {
             var detail = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            detail = detail.Replace(_apiKey, "[REDACTED]", StringComparison.Ordinal);
+            detail = detail.Replace(apiKey, "[REDACTED]", StringComparison.Ordinal);
             if (detail.Length > 2048)
             {
                 detail = detail[..2048] + "…";

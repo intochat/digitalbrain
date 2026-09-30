@@ -26,7 +26,8 @@ public sealed class InferenceTransportFacts
                 AllowedReasoning = ["high"],
                 ContextWindowTokens = 8192
             };
-        }).AddSingleton<ModelProfiles>().AddSingleton<InferenceService>().BuildServiceProvider();
+        }).AddSingleton<IAiCredentials>(new FixedAiCredentials())
+            .AddSingleton<ModelProfiles>().AddSingleton<InferenceService>().BuildServiceProvider();
         var serve = endpoint.Reply("application/x-ndjson", """
             {"model":"fixture","created_at":"2026-09-22T00:00:00Z","message":{"role":"assistant","content":"done"},"done":true,"done_reason":"stop","prompt_eval_count":1,"eval_count":1}
             """ + "\n", ct);
@@ -42,8 +43,8 @@ public sealed class InferenceTransportFacts
     {
         var ct = TestContext.Current.CancellationToken;
         using var endpoint = new Loopback();
-        await using var brain = await UnitTest.Create().WithModule<AIModule>()
-            .ConfigureSilo(silo => silo.Services.Configure<AIOptions>(options => Configure(options, endpoint.Url)))
+        await using var brain = await UnitTest.Create().WithRegistrations(AiRegistrationSeeds.OpenAI(endpoint: endpoint.Url)).WithModule<AIModule>()
+            .ConfigureSilo(silo => silo.Services.Configure<AIOptions>(Configure))
             .StartAsync(ct);
         var serve = endpoint.Reply("application/json", """
             {"id":"response-1","object":"chat.completion","created":1,"model":"test-model","choices":[{"index":0,"message":{"role":"assistant","content":null,"tool_calls":[{"id":"call-1","type":"function","function":{"name":"lookup","arguments":"{\"id\":42}"}}]},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}}
@@ -91,13 +92,12 @@ public sealed class InferenceTransportFacts
     }
 
     private static ServiceProvider Services(string endpoint)
-        => new ServiceCollection().AddOptions().Configure<AIOptions>(options => Configure(options, endpoint))
+        => new ServiceCollection().AddOptions().Configure<AIOptions>(Configure)
+            .AddSingleton<IAiCredentials>(new FixedAiCredentials().Ready("openai", "test-only", endpoint))
             .AddSingleton<ModelProfiles>().AddSingleton<InferenceService>().BuildServiceProvider();
 
-    private static void Configure(AIOptions options, string endpoint)
+    private static void Configure(AIOptions options)
     {
-        options.OpenAI.ApiKey = "test-only";
-        options.OpenAI.Endpoint = endpoint;
         options.Default.Provider = "OpenAI";
         options.Default.Model = "test-model";
         options.Default.Capabilities = LlmCapabilities.Tools;

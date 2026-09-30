@@ -3,6 +3,7 @@ using DigitalBrain.AI.Media;
 using DigitalBrain.AI.WebSearch;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Core;
+using DigitalBrain.Sdk.Integrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -16,6 +17,8 @@ public sealed class AIModule : IModule<AIOptions>
 {
     public const string McpServersKey = "DigitalBrain:AI:McpServers";
 
+    public static IntegrationDefinition[] Integrations => AiIntegrations.Definitions;
+
     public void Configure(ISiloBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -24,6 +27,9 @@ public sealed class AIModule : IModule<AIOptions>
         var options = AIOptions.Read(builder.Configuration);
         var workspace = builder.Configuration.GetSection(AIWorkspaceOptions.SectionName).Get<AIWorkspaceOptions>() ?? new();
 
+        builder.Services.TryAddSingleton(TimeProvider.System);
+        builder.Services.TryAddSingleton<IAiCredentials, RegistrationCredentials>();
+        builder.AddStartupTask<AiLegacyKeySeeder>(Orleans.ServiceLifecycleStage.Active + 1);
         AIClients.Add(builder.Services);
         builder.Services.TryAddSingleton<Agents.IAgentTurnRunner, Agents.AgentTurnRunner>();
         builder.Services.TryAddSingleton<ModelProfiles>();

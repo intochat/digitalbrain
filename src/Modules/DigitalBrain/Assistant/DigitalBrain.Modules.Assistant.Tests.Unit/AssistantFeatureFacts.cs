@@ -35,8 +35,9 @@ public sealed class AssistantFeatureFacts
             .WithModule<SpecsModule>()
             .WithModule<SupabaseModule>()
             .ConfigureSilo(silo => silo.Services
+                .AddSingleton<IAiCredentials>(new FixedAiCredentials().Ready("openai", "fixture"))
                 .AddSingleton<StepLibrary, AssistantSteps>()
-                .Configure<AIOptions>(options => { options.OpenAI.ApiKey = "fixture"; options.Default.Provider = "OpenAI"; options.Default.Model = "fixture"; options.Default.Capabilities = LlmCapabilities.Tools; })
+                .Configure<AIOptions>(options => { options.Default.Provider = "OpenAI"; options.Default.Model = "fixture"; options.Default.Capabilities = LlmCapabilities.Tools; })
                 .AddSingleton<InjectedModelTurnRunner>()
                 .AddSingleton<IAgentTurnRunner>(services => services.GetRequiredService<InjectedModelTurnRunner>())
                 .AddSingleton<IChatClient>(new ScriptedAssistantModel())

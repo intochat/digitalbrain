@@ -1,8 +1,4 @@
-using System.ClientModel;
-using Anthropic;
 using Microsoft.Extensions.AI;
-using OllamaSharp;
-using OpenAI;
 
 namespace DigitalBrain.AI;
 
@@ -10,28 +6,29 @@ internal abstract class ApiKeyProviderFactory : ILlmProviderFactory
 {
     public abstract AiProvider Provider { get; }
 
-    public bool IsConfigured(AIOptions configuration)
-        => !string.IsNullOrEmpty(configuration.Provider(Provider).ApiKey);
+    public bool IsConfigured(AIOptions configuration, IAiCredentials credentials)
+        => credentials.IsReady(IntegrationId);
 
-    public virtual IChatClient CreateChatClient(LLMModel model, AIOptions configuration)
-        => CreateChatClient(model.Id, configuration);
+    public virtual IChatClient CreateChatClient(LLMModel model, AIOptions configuration, IAiCredentials credentials)
+        => CreateChatClient(model.Id, configuration, credentials);
 
-    public abstract IChatClient CreateChatClient(string model, AIOptions configuration);
+    public abstract IChatClient CreateChatClient(string model, AIOptions configuration, IAiCredentials credentials, string? endpoint = null);
 
     public abstract IEmbeddingGenerator<string, Embedding<float>> CreateEmbeddingGenerator(
         EmbeddingModel model,
-        AIOptions configuration);
+        AIOptions configuration,
+        IAiCredentials credentials);
 
-    protected string ApiKeyConfigurationKey => $"{AIClients.ConfigurationRoot}:{Provider}:ApiKey";
+    protected string IntegrationId => AiIntegrations.IdOf(Provider);
 
-    protected string RequireApiKey(AIOptions configuration, Type marker, string hostingMethod)
-        => RequireApiKey(configuration, marker.Name, hostingMethod);
+    // Releases inside the factory: the key exists in memory only for the duration of client construction.
+    protected string ReleaseApiKey(IAiCredentials credentials)
+    {
+        credentials.RequireReady(IntegrationId);
+        return credentials.ReleaseSecret(IntegrationId, AiIntegrations.ApiKeyField);
+    }
 
-    protected string RequireApiKey(AIOptions configuration, string model, string hostingMethod)
-        => configuration.Provider(Provider).ApiKey is { Length: > 0 } apiKey
-            ? apiKey
-            : throw new InvalidOperationException(
-                $"{model} requires {ApiKeyConfigurationKey}. Configure the provider through "
-                + $"AIModule.{hostingMethod} in AppHost and supply the "
-                + $"{Provider.ToString().ToLowerInvariant()}-api-key secret parameter.");
+    protected Uri EndpointOf(IAiCredentials credentials, string? pinned)
+        => new(pinned is { Length: > 0 } ? pinned
+            : credentials.Setting(IntegrationId, AiIntegrations.EndpointField) ?? AiIntegrations.DefaultEndpointOf(Provider));
 }

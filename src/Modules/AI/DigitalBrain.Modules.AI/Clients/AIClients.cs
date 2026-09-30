@@ -51,7 +51,8 @@ internal static class AIClients
                 {
                     var inner = Factories[model.Provider].CreateEmbeddingGenerator(
                         model,
-                        provider.GetRequiredService<IOptions<AIOptions>>().Value);
+                        provider.GetRequiredService<IOptions<AIOptions>>().Value,
+                        provider.GetRequiredService<IAiCredentials>());
                     return provider.GetService<IIntentUsageSink>() is { } sink
                         ? new MeteringEmbeddingGenerator(inner, sink, model.Provider.ToString(), model.Id)
                         : inner;
@@ -74,7 +75,7 @@ internal static class AIClients
 
     private static IChatClient BuildChatPipeline(IServiceProvider provider, LLMModel model)
         => BuildChatPipeline(provider, model, Factories[model.Provider].CreateChatClient(
-            model, provider.GetRequiredService<IOptions<AIOptions>>().Value));
+            model, provider.GetRequiredService<IOptions<AIOptions>>().Value, provider.GetRequiredService<IAiCredentials>()));
 
     internal static IChatClient BuildChatPipeline(IServiceProvider provider, LLMModel model, IChatClient innerClient)
         => BuildChatPipeline(provider, model.SupportsTools, model.Marker.Name, innerClient,
@@ -132,15 +133,15 @@ internal static class AIClients
         var model = configuration.Default.Model is { Length: > 0 } markerName
             ? LLMModel.FindByMarkerName(markerName)
                 ?? throw UnknownMarker(DefaultModelKey, markerName, LLMModel.All.Select(static m => m.Marker.Name))
-            : FirstConfiguredModel(configuration);
+            : FirstConfiguredModel(configuration, provider.GetRequiredService<IAiCredentials>());
         return provider.GetRequiredKeyedService<IChatClient>(model.Marker);
     }
 
-    private static LLMModel FirstConfiguredModel(AIOptions configuration)
-        => LLMModel.All.FirstOrDefault(model => Factories[model.Provider].IsConfigured(configuration))
+    private static LLMModel FirstConfiguredModel(AIOptions configuration, IAiCredentials credentials)
+        => LLMModel.All.FirstOrDefault(model => Factories[model.Provider].IsConfigured(configuration, credentials))
             ?? throw new InvalidOperationException(
-                $"No LLM provider is configured. Supply a provider API key (for example "
-                + $"{ConfigurationRoot}:OpenAI:ApiKey) or an Ollama endpoint, or pin {DefaultModelKey}.");
+                "No LLM provider is configured. Register a provider through POST /integrations/{id}/registration "
+                + $"(or seed DigitalBrain:Integrations:openai:ApiKey), supply an Ollama endpoint, or pin {DefaultModelKey}.");
 
     private static IEmbeddingGenerator<string, Embedding<float>> DefaultEmbeddingGenerator(IServiceProvider provider)
     {
@@ -157,7 +158,7 @@ internal static class AIClients
         // configured: silently switching it changes vector dimensions and orphans
         // every existing Qdrant collection.
         var local = EmbeddingModel.All.Single(static model => model.Marker == typeof(Ollama.IEmbeddingGemma));
-        if (!Factories[local.Provider].IsConfigured(configuration))
+        if (!Factories[local.Provider].IsConfigured(configuration, provider.GetRequiredService<IAiCredentials>()))
         {
             throw new InvalidOperationException(
                 $"No embedding model is configured. Supply an Ollama endpoint for {local.Marker.Name}, "
@@ -191,11 +192,8 @@ internal static class AIClients
             return;
         }
 
-        if (configuration.Provider(model.Provider).ApiKey is { Length: > 0 })
-        {
-            services.AddSingleton<IImageGeneration>(sp =>
-                new OpenAIImageGeneration(model, sp.GetRequiredService<IOptions<AIOptions>>()));
-        }
+        services.AddSingleton<IImageGeneration>(sp =>
+            new OpenAIImageGeneration(model, sp.GetRequiredService<IAiCredentials>()));
     }
 
     private static InvalidOperationException UnknownMarker(

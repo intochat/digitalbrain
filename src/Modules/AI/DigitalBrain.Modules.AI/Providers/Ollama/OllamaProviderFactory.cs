@@ -12,13 +12,13 @@ internal sealed class OllamaProviderFactory : ILlmProviderFactory
 
     public AiProvider Provider => AiProvider.Ollama;
 
-    public bool IsConfigured(AIOptions configuration)
+    public bool IsConfigured(AIOptions configuration, IAiCredentials credentials)
         => !string.IsNullOrEmpty(configuration.Ollama.Endpoint);
 
-    public IChatClient CreateChatClient(LLMModel model, AIOptions configuration)
-        => CreateChatClient(configuration.Ollama.Models.GetValueOrDefault(model.Marker.Name)?.Model ?? model.Id, configuration);
+    public IChatClient CreateChatClient(LLMModel model, AIOptions configuration, IAiCredentials credentials)
+        => CreateChatClient(configuration.Ollama.Models.GetValueOrDefault(model.Marker.Name)?.Model ?? model.Id, configuration, credentials);
 
-    public IChatClient CreateChatClient(string model, AIOptions configuration)
+    public IChatClient CreateChatClient(string model, AIOptions configuration, IAiCredentials credentials, string? endpoint = null)
         => new ChatClientBuilder(CreateApiClient(configuration, model, model, "WithLlm", useMarkerOverride: false))
             .ConfigureOptions(static options =>
             {
@@ -32,7 +32,8 @@ internal sealed class OllamaProviderFactory : ILlmProviderFactory
 
     public IEmbeddingGenerator<string, Embedding<float>> CreateEmbeddingGenerator(
         EmbeddingModel model,
-        AIOptions configuration)
+        AIOptions configuration,
+        IAiCredentials credentials)
         => CreateApiClient(configuration, model.Marker.Name, model.Id, "WithEmbedding");
 
     private static string EndpointConfigurationKey => $"{AIClients.ConfigurationRoot}:Ollama:Endpoint";

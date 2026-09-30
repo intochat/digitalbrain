@@ -19,6 +19,6 @@ internal static class WebSearchHosting
         }
 
         services.AddHttpClient(nameof(TavilyWebSearch)).AddTypedClient<IWebSearch>((http, sp) =>
-            new TavilyWebSearch(http, sp.GetRequiredService<IOptions<AIOptions>>()));
+            new TavilyWebSearch(http, sp.GetRequiredService<IAiCredentials>()));
     }
 }

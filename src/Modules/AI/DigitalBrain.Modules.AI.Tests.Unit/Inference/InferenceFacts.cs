@@ -90,7 +90,6 @@ public sealed class InferenceFacts
     {
         using var services = new ServiceCollection().AddOptions().Configure<AIOptions>(options =>
         {
-            options.OpenAI.ApiKey = "test-only";
             options.ModelProfiles["bounded"] = new()
             {
                 Provider = "OpenAI",
@@ -102,7 +101,8 @@ public sealed class InferenceFacts
                 SupportsTopP = false,
                 AllowedReasoning = ["none", "low"],
             };
-        }).AddSingleton<ModelProfiles>().AddSingleton<InferenceService>().BuildServiceProvider();
+        }).AddSingleton<IAiCredentials>(new FixedAiCredentials().Ready("openai", "test-only"))
+            .AddSingleton<ModelProfiles>().AddSingleton<InferenceService>().BuildServiceProvider();
         var descriptor = services.GetRequiredService<InferenceService>().Describe(new(Profile: "bounded"));
         Assert.Equal(4000, descriptor.ContextWindowTokens);
         Assert.Equal(500, descriptor.MaximumOutputTokens);
@@ -121,10 +121,9 @@ public sealed class InferenceFacts
     public async Task GenericAndTypedNeuronsResolveAndRejectMismatchedProfiles()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+        await using var brain = await UnitTest.Create().WithRegistrations(AiRegistrationSeeds.OpenAI()).WithModule<AIModule>()
             .ConfigureSilo(silo => silo.Services.Configure<AIOptions>(options =>
             {
-                options.OpenAI.ApiKey = "test-only";
                 options.ModelProfiles["custom"] = new() { Provider = "OpenAI", Model = "custom-model" };
             })).StartAsync(ct);
         var generic = brain.Get<ILLM>("generic");

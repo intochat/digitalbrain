@@ -1,7 +1,5 @@
 using System.ClientModel;
-using Anthropic;
 using Microsoft.Extensions.AI;
-using OllamaSharp;
 using OpenAI;
 
 namespace DigitalBrain.AI;
@@ -10,12 +8,10 @@ internal abstract class OpenAICompatibleProviderFactory : ApiKeyProviderFactory
 {
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromMinutes(5);
 
-    protected abstract Uri? DefaultEndpoint { get; }
-
-    public override IChatClient CreateChatClient(string model, AIOptions configuration)
+    public override IChatClient CreateChatClient(string model, AIOptions configuration, IAiCredentials credentials, string? endpoint = null)
     {
         var builder = new ChatClientBuilder(
-            CreateClient(configuration, model, "WithLlm").GetChatClient(model).AsIChatClient());
+            CreateClient(credentials, endpoint).GetChatClient(model).AsIChatClient());
 
         if (Provider is AiProvider.OpenAI && model.StartsWith("gpt-5.6", StringComparison.OrdinalIgnoreCase))
         {
@@ -38,20 +34,13 @@ internal abstract class OpenAICompatibleProviderFactory : ApiKeyProviderFactory
 
     public override IEmbeddingGenerator<string, Embedding<float>> CreateEmbeddingGenerator(
         EmbeddingModel model,
-        AIOptions configuration)
-        => CreateClient(configuration, model.Marker.Name, "WithEmbedding").GetEmbeddingClient(model.Id).AsIEmbeddingGenerator();
+        AIOptions configuration,
+        IAiCredentials credentials)
+        => CreateClient(credentials, null).GetEmbeddingClient(model.Id).AsIEmbeddingGenerator();
 
-    private OpenAIClient CreateClient(AIOptions configuration, string model, string hostingMethod)
+    private OpenAIClient CreateClient(IAiCredentials credentials, string? pinnedEndpoint)
     {
-        var options = new OpenAIClientOptions { NetworkTimeout = RequestTimeout };
-        var endpoint = configuration.Provider(Provider).Endpoint is { Length: > 0 } configured
-            ? new Uri(configured)
-            : DefaultEndpoint;
-        if (endpoint is not null)
-        {
-            options.Endpoint = endpoint;
-        }
-
-        return new OpenAIClient(new ApiKeyCredential(RequireApiKey(configuration, model, hostingMethod)), options);
+        var options = new OpenAIClientOptions { NetworkTimeout = RequestTimeout, Endpoint = EndpointOf(credentials, pinnedEndpoint) };
+        return new OpenAIClient(new ApiKeyCredential(ReleaseApiKey(credentials)), options);
     }
 }

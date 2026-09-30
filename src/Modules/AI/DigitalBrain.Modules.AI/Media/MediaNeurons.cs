@@ -45,7 +45,7 @@ public abstract class MediaNeuron : Neuron
 public sealed class ImageGeneratorNeuron(IServiceProvider services) : MediaNeuron, IImageGenerator
 {
     public Task<MediaCapabilities> Describe() => Task.FromResult(Capabilities(MediaOperation.ImageGeneration,
-        () => services.GetService<IImageGeneration>() is not null));
+        () => services.GetService<IImageGeneration>() is { } images && (images is not IConditionallyAvailable conditional || conditional.IsAvailable)));
     public Task<ImageGenerationResult> Generate(ImageGenerationRequest request, CancellationToken cancellationToken = default)
         => Execute(MediaOperation.ImageGeneration, cancellationToken, async id =>
         {

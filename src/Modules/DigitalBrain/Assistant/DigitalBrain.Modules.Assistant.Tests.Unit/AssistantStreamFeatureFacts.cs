@@ -22,9 +22,9 @@ public sealed class AssistantStreamFeatureFacts
                 silo.Services.AddSingleton<StepLibrary, AssistantStreamSteps>();
                 silo.Services.AddSingleton<StreamScenarioRunner>();
                 silo.Services.AddSingleton<IAgentTurnRunner>(services => services.GetRequiredService<StreamScenarioRunner>());
+                silo.Services.AddSingleton<IAiCredentials>(new FixedAiCredentials().Ready("openai", "test-no-network"));
                 silo.Services.Configure<AIOptions>(options =>
                 {
-                    options.OpenAI.ApiKey = "test-no-network";
                     options.Default.Provider = "OpenAI";
                     options.Default.Model = "gpt-4.1-mini";
                     options.Default.Capabilities = LlmCapabilities.Tools;

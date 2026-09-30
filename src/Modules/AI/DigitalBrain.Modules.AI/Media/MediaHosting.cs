@@ -19,12 +19,12 @@ public static class MediaHosting
         return services;
     }
 
-    /// <summary>Enable OpenAI speech explicitly, using AIOptions.OpenAI credentials and endpoint.</summary>
+    /// <summary>Enable OpenAI speech explicitly, using the OpenAI integration registration.</summary>
     public static IServiceCollection AddOpenAISpeechSynthesis(this IServiceCollection services, string model)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
         services.Replace(ServiceDescriptor.Singleton<ISpeechSynthesisTransport>(sp =>
-            new OpenAI.OpenAISpeechSynthesis(model, sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<AIOptions>>())));
+            new OpenAI.OpenAISpeechSynthesis(model, sp.GetRequiredService<IAiCredentials>())));
         return services;
     }
 }

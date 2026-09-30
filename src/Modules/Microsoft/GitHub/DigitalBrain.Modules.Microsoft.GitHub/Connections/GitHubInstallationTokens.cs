@@ -14,9 +14,12 @@ internal sealed class GitHubInstallationTokens : IDisposable
     private readonly TimeProvider _time;
     private readonly ConcurrentDictionary<string, Slot> _slots = new(StringComparer.Ordinal);
 
-    public GitHubInstallationTokens() : this(null, null) { }
-    internal GitHubInstallationTokens(HttpMessageHandler? handler, TimeProvider? time)
+    private readonly GitHubAppRegistration _registration;
+
+    public GitHubInstallationTokens(GitHubAppRegistration registration) : this(registration, null, null) { }
+    internal GitHubInstallationTokens(GitHubAppRegistration registration, HttpMessageHandler? handler, TimeProvider? time)
     {
+        _registration = registration;
         _http = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false })
         { Timeout = TimeSpan.FromSeconds(20), MaxResponseContentBufferSize = 65536 };
         _time = time ?? TimeProvider.System;
@@ -40,7 +43,7 @@ internal sealed class GitHubInstallationTokens : IDisposable
             }
             using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(binding.ApiHost,
                 $"app/installations/{binding.InstallationId}/access_tokens"));
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", CreateAppJwt(binding, _time.GetUtcNow()));
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await CreateAppJwtAsync(binding, cancellationToken).ConfigureAwait(false));
             AddHeaders(request);
             request.Content = JsonContent.Create(new
             {
@@ -87,17 +90,28 @@ internal sealed class GitHubInstallationTokens : IDisposable
         finally { slot.Gate.Release(); }
     }
 
-    internal static string CreateAppJwt(GitHubRepositoryBinding binding, DateTimeOffset now)
+    private async Task<string> CreateAppJwtAsync(GitHubRepositoryBinding binding, CancellationToken cancellationToken)
+    {
+        var app = await _registration.ReleaseAsync(cancellationToken).ConfigureAwait(false);
+        if (app.AppId != binding.AppId)
+        {
+            throw new GitHubUnavailableException("The repository binding belongs to a different GitHub App than the registered one.");
+        }
+
+        return CreateAppJwt(app, _time.GetUtcNow());
+    }
+
+    internal static string CreateAppJwt(GitHubAppCredentials app, DateTimeOffset now)
     {
         var header = Base64Url(Encoding.UTF8.GetBytes("{\"alg\":\"RS256\",\"typ\":\"JWT\"}"));
         var payload = Base64Url(JsonSerializer.SerializeToUtf8Bytes(new
         {
             iat = now.AddSeconds(-60).ToUnixTimeSeconds(),
             exp = now.AddMinutes(9).ToUnixTimeSeconds(),
-            iss = binding.AppId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            iss = app.AppId.ToString(System.Globalization.CultureInfo.InvariantCulture),
         }));
         using var rsa = RSA.Create();
-        rsa.ImportFromPem(binding.PrivateKeyPem);
+        rsa.ImportFromPem(app.PrivateKeyPem);
         var message = $"{header}.{payload}";
         return $"{message}.{Base64Url(rsa.SignData(Encoding.ASCII.GetBytes(message), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1))}";
     }

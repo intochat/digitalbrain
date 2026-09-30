@@ -4,7 +4,7 @@ namespace DigitalBrain.Microsoft.GitHub;
 
 internal sealed class GitHubSetupService(
     IOptions<GitHubAppOptions> options, GitHubRepositoryBindings bindings, IGrainFactory grains,
-    GitHubInstallationTokens tokens, IGitHubRepositorySource source)
+    GitHubInstallationTokens tokens, IGitHubRepositorySource source, GitHubAppRegistration registration)
 {
     internal const string AppRoot = "DigitalBrain:Microsoft:GitHub:App";
     public async Task<GitHubSetupResult> ResolveAsync(
@@ -19,15 +19,16 @@ internal sealed class GitHubSetupService(
                 .List().WaitAsync(cancellationToken)).Connections.FirstOrDefault(record =>
                     string.Equals(record.RepositoryOwner, coordinates.Owner, StringComparison.OrdinalIgnoreCase)
                     && string.Equals(record.RepositoryName, coordinates.Name, StringComparison.OrdinalIgnoreCase));
-            if (saved is not null && Configured(saved.AppId))
+            if (saved is not null && await ConfiguredAsync(saved.AppId, cancellationToken))
             {
                 binding = Create(saved);
             }
         }
         if (binding is null)
         {
-            return new(url, Configured(null) ? "authentication_required" : "operator_setup_required", null, [],
-                Configured(null)
+            var configured = await ConfiguredAsync(null, cancellationToken);
+            return new(url, configured ? "authentication_required" : "operator_setup_required", null, [],
+                configured
                     ? "Connect GitHub and select repository access to resume this request."
                     : "The operator must configure the GitHub App id, private key, webhook secret and OAuth callback before connection.");
         }
@@ -81,7 +82,7 @@ internal sealed class GitHubSetupService(
 
     public async Task<GitHubSetupResult> ConnectAsync(GitHubRepositoryAccess access, CancellationToken cancellationToken = default)
     {
-        if (!Configured(access.AppId))
+        if (!await ConfiguredAsync(access.AppId, cancellationToken))
         {
             throw new GitHubUnavailableException("GitHub App operator setup is incomplete or this installation belongs to a different App.");
         }
@@ -108,15 +109,15 @@ internal sealed class GitHubSetupService(
         return await ResolveAsync($"https://github.com/{access.RepositoryOwner}/{access.RepositoryName}", cancellationToken);
     }
 
-    private bool Configured(long? appId)
-        => options.Value.ParsedAppId > 0 && (appId is null || appId == options.Value.ParsedAppId)
-            && !string.IsNullOrWhiteSpace(options.Value.PrivateKeyPem)
+    private async Task<bool> ConfiguredAsync(long? appId, CancellationToken cancellationToken)
+        => await registration.ReadAppIdAsync(cancellationToken) is { } registeredAppId
+            && (appId is null || appId == registeredAppId)
             && options.Value.WebhookSecret is { Length: >= 16 };
 
     private GitHubRepositoryBinding Create(GitHubConnectionRecord record)
         => new(record.Id, record.RepositoryId, record.InstallationId, record.AppId,
             record.RepositoryOwner, record.RepositoryName,
-            options.Value.PrivateKeyPem!, options.Value.WebhookSecret!,
+            options.Value.WebhookSecret!,
             authorizationEpoch: record.Epoch);
 
     internal static (string Owner, string Name) ParseUrl(string value)

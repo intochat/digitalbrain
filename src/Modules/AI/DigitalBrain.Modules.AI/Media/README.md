@@ -17,7 +17,7 @@ embedding batches contain at most 128 inputs.
 
 `AddMediaNeurons()` registers the default unavailable speech transport. To enable
 the real OpenAI adapter, register `AddOpenAISpeechSynthesis("gpt-4o-mini-tts")` and
-configure `AIOptions.OpenAI.ApiKey` (and optionally `Endpoint`). The adapter returns
+register the `openai` integration (`ApiKey` and `Endpoint`). The adapter returns
 MP3 bytes. A host can instead register `ISpeechSynthesisTransport` for another
 provider or deterministic tests. Availability means configured, not a network
 health check. No external provider call is made by the default test suite.

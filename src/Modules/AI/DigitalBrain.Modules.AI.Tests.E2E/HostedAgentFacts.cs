@@ -17,7 +17,7 @@ public sealed class HostedAgentFacts
         deadline.CancelAfter(TimeSpan.FromMinutes(5));
         var ct = deadline.Token;
         using var endpoint = new Loopback();
-        await using var brain = await E2ETest.Create().WithModule<AIModule, AIOptions>(options =>
+        await using var brain = await E2ETest.Create().WithModule<DigitalBrain.Sdk.Secrets.SecretsModule>().WithModule<DigitalBrain.Sdk.Integrations.IntegrationsModule>().WithModule<AIModule, AIOptions>(options =>
             {
                 options.Default.Profile = "fixture";
                 options.ModelProfiles.Add("fixture", new AIModelProfileOptions
@@ -30,7 +30,11 @@ public sealed class HostedAgentFacts
             })
             .WithExecution(new TestExecutionOptions
             {
-                PrivateConfiguration = new Dictionary<string, string?> { ["DigitalBrain:AI:OpenAI:ApiKey"] = "test-only" },
+                PrivateConfiguration = new Dictionary<string, string?>
+                {
+                    ["DigitalBrain:Integrations:openai:ApiKey"] = "test-only",
+                    ["DigitalBrain:Integrations:openai:Endpoint"] = endpoint.Url,
+                },
             }).StartAsync(ct);
         var agent = brain.Get<IAgent>("hosted-assistant");
         await using var replied = await brain.Observe<AgentReplied>(agent, ct);

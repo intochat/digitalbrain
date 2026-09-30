@@ -10,13 +10,15 @@ internal interface ILlmProviderFactory
 {
     AiProvider Provider { get; }
 
-    bool IsConfigured(AIOptions configuration);
+    bool IsConfigured(AIOptions configuration, IAiCredentials credentials);
 
-    IChatClient CreateChatClient(LLMModel model, AIOptions configuration);
+    IChatClient CreateChatClient(LLMModel model, AIOptions configuration, IAiCredentials credentials);
 
-    IChatClient CreateChatClient(string model, AIOptions configuration);
+    // The endpoint pins one client to a resolved model's endpoint; without it a hosted provider uses its registration.
+    IChatClient CreateChatClient(string model, AIOptions configuration, IAiCredentials credentials, string? endpoint = null);
 
     IEmbeddingGenerator<string, Embedding<float>> CreateEmbeddingGenerator(
         EmbeddingModel model,
-        AIOptions configuration);
+        AIOptions configuration,
+        IAiCredentials credentials);
 }

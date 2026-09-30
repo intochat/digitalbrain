@@ -9,7 +9,7 @@ namespace DigitalBrain.AI;
 
 // Defense in depth, not an isolation guarantee: deterministic rejection plus an
 // independent tool-less classification. No agent pipeline, transcript or tool telemetry.
-internal sealed partial class UntrustedContentScreen(IOptions<AIOptions> options) : IUntrustedContentScreen
+internal sealed partial class UntrustedContentScreen(IOptions<AIOptions> options, IAiCredentials credentials) : IUntrustedContentScreen
 {
     // Whole MCP inventories can exceed 32 KiB and have no pagination/filter schema.
     // Screen the complete bounded result together; splitting it could hide instructions
@@ -46,7 +46,7 @@ internal sealed partial class UntrustedContentScreen(IOptions<AIOptions> options
                 throw new InvalidOperationException();
             }
 
-            using var client = new OpenAIProviderFactory().CreateChatClient(model, options.Value);
+            using var client = new OpenAIProviderFactory().CreateChatClient(model, options.Value, credentials);
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeout.CancelAfter(TimeSpan.FromSeconds(30));
             var response = await client.GetResponseAsync([

@@ -32,19 +32,14 @@ public sealed class AIOptions : IModuleOptions
 
     public void Validate()
     {
-        if (OpenAI.ApiKey is not null || Anthropic.ApiKey is not null || Google.ApiKey is not null
-            || XAI.ApiKey is not null || Ollama.ApiKey is not null || Tavily.ApiKey is not null)
-        {
-            throw new ArgumentException("API keys cannot be supplied in module declarations. Use private configuration or Aspire secret parameters instead.");
-        }
         if (Hosting.Llms.Any(name => LLMModel.FindByMarkerName(name) is null))
         { throw new ArgumentException("Unknown LLM marker in the module declaration."); }
         if (Hosting.Embeddings.Any(name => EmbeddingModel.FindByMarkerName(name) is null))
         { throw new ArgumentException("Unknown embedding marker in the module declaration."); }
     }
 
-    // The declared topology and defaults arrive as the module's options; provider credentials and
-    // the keys hosting projects into the environment stay on the DigitalBrain:AI configuration path.
+    // The declared topology and defaults arrive as the module's options; the DigitalBrain:AI keys hosting
+    // projects into the environment only seed provider registrations (see AiLegacyKeySeeder).
     internal static AIOptions Read(IConfiguration configuration)
     {
         var options = configuration.GetModuleOptions<AIOptions>(nameof(AIModule));
@@ -129,7 +124,7 @@ public sealed class AITelemetryOptions
 
 public class AIProviderOptions
 {
-    public string? ApiKey { get; set; }
+    // For key-based providers this only seeds the provider registration's Endpoint at startup.
     public string? Endpoint { get; set; }
 }
 
@@ -147,5 +142,4 @@ public sealed class AIModelOptions
 public sealed class TavilyOptions
 {
     public bool Enabled { get; set; }
-    public string? ApiKey { get; set; }
 }

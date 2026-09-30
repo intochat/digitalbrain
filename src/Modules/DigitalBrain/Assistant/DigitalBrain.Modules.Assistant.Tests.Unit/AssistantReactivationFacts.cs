@@ -21,9 +21,9 @@ public sealed class AssistantReactivationFacts
         var runner = new StreamScenarioRunner();
         await using var brain = await UnitTest.Create().WithModule<AssistantModule>().RequireModules([typeof(DigitalBrain.Apps.AppsModule), typeof(DigitalBrain.AI.AIModule), typeof(DigitalBrain.Compute.ComputeModule), typeof(DigitalBrain.Flutter.FlutterModule)])
             .ConfigureSilo(silo => silo.Services.AddSingleton<IAgentTurnRunner>(runner)
+                .AddSingleton<IAiCredentials>(new FixedAiCredentials().Ready("openai", "fixture"))
                 .Configure<AIOptions>(options =>
                 {
-                    options.OpenAI.ApiKey = "fixture";
                     options.Default.Provider = "OpenAI";
                     options.Default.Model = "fixture";
                     options.Default.Capabilities = LlmCapabilities.Tools;
