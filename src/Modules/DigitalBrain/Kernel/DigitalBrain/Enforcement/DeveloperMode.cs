@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Configuration;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Core.Enforcement;
 
 public static class DeveloperMode
 {

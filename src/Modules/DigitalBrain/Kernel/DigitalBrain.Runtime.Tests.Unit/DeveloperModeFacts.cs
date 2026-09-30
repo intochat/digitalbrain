@@ -1,3 +1,4 @@
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 using Xunit;

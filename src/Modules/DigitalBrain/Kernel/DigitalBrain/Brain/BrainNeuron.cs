@@ -1,16 +1,7 @@
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
 using Orleans.Runtime;
 
-namespace DigitalBrain.Identity;
-
-[GenerateSerializer, Alias("brain.state")]
-internal sealed record BrainState
-{
-    [Id(0)] public string Name { get; set; } = "";
-    [Id(1)] public string OwnerAccountId { get; set; } = "";
-    [Id(2)] public DateTimeOffset EstablishedAt { get; set; }
-}
+namespace DigitalBrain.Core;
 
 [GrainType("brain")]
 internal sealed class BrainNeuron : Neuron<BrainState>, IBrain
