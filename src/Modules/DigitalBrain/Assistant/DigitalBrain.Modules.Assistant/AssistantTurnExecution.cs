@@ -15,13 +15,6 @@ using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Assistant;
 
-[GenerateSerializer, Alias("assistant.run")]
-public sealed record AssistantRun(
-    [property: Id(0)] string ThreadId,
-    [property: Id(1)] string RunId,
-    [property: Id(2)] string Message,
-    [property: Id(3)] string Owner,
-    [property: Id(4)] string? ModelProfile = null);
 
 // Executed inside the Assistant neuron. Owns model calls, replay, cancellation,
 // retained history, tools, metering and receipts; no HTTP or Flutter dependencies.

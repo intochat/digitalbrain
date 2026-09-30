@@ -7,6 +7,7 @@
     <PackageReference Include="Microsoft.Orleans.Sdk" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../DigitalBrain.Modules.Assistant.Contracts/DigitalBrain.Modules.Assistant.Contracts.csproj" />
     <ProjectReference Include="../../Apps/DigitalBrain.Modules.Apps/DigitalBrain.Modules.Apps.csproj" />
     <ProjectReference Include="../../../Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp/DigitalBrain.Modules.Microsoft.CSharp.csproj" />
     <ProjectReference Include="../../Compute/DigitalBrain.Modules.Compute/DigitalBrain.Modules.Compute.csproj" />

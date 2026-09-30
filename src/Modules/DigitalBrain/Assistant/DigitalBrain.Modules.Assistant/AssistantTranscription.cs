@@ -2,11 +2,6 @@ using DigitalBrain.AI;
 
 namespace DigitalBrain.Assistant;
 
-[GenerateSerializer, Alias("assistant.transcription-result")]
-public sealed record AssistantTranscriptionResult(
-    [property: Id(0)] int Status,
-    [property: Id(1)] string? Text = null,
-    [property: Id(2)] string? Error = null);
 
 public sealed class AssistantTranscription(IAudioTranscriptionService? transcription)
 {

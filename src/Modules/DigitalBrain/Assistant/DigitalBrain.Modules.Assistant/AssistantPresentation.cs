@@ -8,26 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.Assistant;
 
-[GenerateSerializer, Alias("assistant.thread")]
-public sealed record AssistantThread
-{
-    [Id(0)] public required string Id { get; init; }
-    [Id(1)] public string Title { get; init; } = "New conversation";
-    [Id(2)] public string Draft { get; init; } = "";
-    [Id(3)] public string? ModelProfile { get; init; }
-    [Id(4)] public IReadOnlyList<ChatEntry> Messages { get; init; } = [];
-    [Id(5)] public IReadOnlyList<string> Receipts { get; init; } = [];
-    [Id(6)] public IReadOnlyList<string> Results { get; init; } = [];
-    [Id(7)] public string? Error { get; init; }
-    [Id(8)] public string? Status { get; init; }
-    [Id(9)] public string? TurnId { get; init; }
-}
-
-[GenerateSerializer, Alias("assistant.window")]
-public sealed record AssistantWindow(
-    [property: Id(0)] string Id,
-    [property: Id(1)] string Title,
-    [property: Id(2)] UiChildRef Surface);
 
 internal sealed partial class AssistantNeuron
 {

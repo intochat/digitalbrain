@@ -17,43 +17,6 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Assistant;
 
-[Alias("apps.assistant"), Orleans.Metadata.DefaultGrainType("apps.assistant")]
-public interface IAssistant : INeuron, IUiEventHandler
-{
-    Task Activate();
-    [ReadOnly] Task<AssistantState> Read();
-    Task<AssistantWindow> OpenWindow(string? draft = null, string? title = null);
-    Task SetDraft(string draft);
-    Task RestoreLegacy(string projectJson);
-    [OneWay] Task Act(string action, string? value);
-    Task<AssistantTranscriptionResult> Transcribe(string? base64, CancellationToken ct = default);
-    [AlwaysInterleave, ResponseTimeout("00:10:00")] IAsyncEnumerable<string> Run(AssistantRun request, CancellationToken ct = default);
-    Task<AgentConversationState> ReadConversation(string threadId, CancellationToken ct = default);
-    Task<AgentModelCatalog.ModelCatalog> Models();
-    Task Configure(AgentDefinition definition);
-    Task<IAgent> Conversation(string threadId);
-    Task<AgentDefinition> DefineTurn(bool developerMode, string? summary);
-    // One-way, so the chat or voice input that announced the request is free to take the reply.
-    [OneWay] Task Answer(string message);
-    [OneWay] Task Hear(byte[] audio, string mimeType);
-}
-
-[GenerateSerializer, Alias("apps.assistant-state")]
-public sealed record AssistantState
-{
-    [Id(0)] public bool Active { get; init; }
-    [Id(1)] public AgentDefinition? Definition { get; init; }
-    [Id(2)] public string SelectedThread { get; init; } = "";
-    [Id(3)] public IReadOnlyList<AssistantThread> Threads { get; init; } = [];
-    [Id(4)] public string Owner { get; init; } = "";
-    [Id(5)] public bool LegacyRestored { get; init; }
-}
-
-[GenerateSerializer, Alias("apps.assistant-activated")]
-public sealed record AssistantActivated([property: Id(0)] string Key) : Signal;
-
-[GenerateSerializer, Alias("apps.assistant-configured")]
-public sealed record AssistantConfigured([property: Id(0)] string Key) : Signal;
 
 // Input commands may arrive while a turn streams its presentation.
 [Reentrant, GrainType("apps.assistant")]
@@ -78,7 +41,7 @@ internal sealed partial class AssistantNeuron(
     public async Task<AgentConversationState> ReadConversation(string threadId, CancellationToken ct = default)
         => await (await Conversation(threadId)).ReadConversation(ct);
 
-    public Task<AgentModelCatalog.ModelCatalog> Models() => Task.FromResult(new AssistantTurnExecution(services, GrainFactory).Models.Read());
+    public Task<ModelCatalog> Models() => Task.FromResult(new AssistantTurnExecution(services, GrainFactory).Models.Read());
 
     public Task<IAgent> Conversation(string threadId)
     {

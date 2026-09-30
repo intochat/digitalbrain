@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup><PackageReference Include="Microsoft.Orleans.Sdk" /></ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../DigitalBrain.Modules.CustomerResearcher.Contracts/DigitalBrain.Modules.CustomerResearcher.Contracts.csproj" />
     <ProjectReference Include="../../Apps/DigitalBrain.Modules.Apps/DigitalBrain.Modules.Apps.csproj" />
     <ProjectReference Include="../../../AI/DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj" />
     <ProjectReference Include="../../../Google/Flutter/DigitalBrain.Modules.Flutter/DigitalBrain.Modules.Flutter.csproj" />
