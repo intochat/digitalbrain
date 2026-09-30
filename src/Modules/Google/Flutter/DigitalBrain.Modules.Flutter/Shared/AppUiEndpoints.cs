@@ -1,9 +1,5 @@
-using DigitalBrain.Identity.Configuration;
-using DigitalBrain.Apps;
-using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Types;
-using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Button;
 using DigitalBrain.Flutter.Card;
@@ -20,64 +16,24 @@ using DigitalBrain.Flutter.Select;
 using DigitalBrain.Flutter.FileInput;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Flutter.WebBrowser;
+using DigitalBrain.Apps;
+using DigitalBrain.Core.Enforcement;
 using System.Text.Json;
-using IntoChat.Workspace;
-using Microsoft.Extensions.Options;
-using DigitalBrain.Identity;
-namespace IntoChat.Apps;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 
-internal static class AppEndpoints
+namespace DigitalBrain.Flutter;
+
+internal static class AppUiEndpoints
 {
-    public static void MapLocalApps(this IEndpointRouteBuilder routes)
+    public static void Map(IEndpointRouteBuilder endpoints)
     {
-        var apps = routes.MapGroup("/workspaces/{workspaceId}/apps").AddEndpointFilter(BrainAccessFilter.EnforceAsync);
-        apps.MapGet("", (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        var apps = BrainRoutes.Group(endpoints, "/apps");
+        apps.MapGet("/node", (string kind, string name, IDigitalBrain brain, CancellationToken ct) => AppHttp.Respond(async () =>
         {
-            var scope = Scope(auth.Value, workspaceId);
-            var installed = await brain.Get<IAppCatalog>(scope).List().WaitAsync(ct);
-            var manifests = installed.Select(installation => installation.Manifest)
-                .OrderBy(manifest => manifest.Name, StringComparer.Ordinal)
-                .Select(manifest => new
-                {
-                    id = manifest.Id,
-                    name = manifest.Name,
-                    description = manifest.DescriptionForPeople,
-                    kind = manifest.Kind.ToString().ToLowerInvariant(),
-                    uiEntry = manifest.UiEntry,
-                    examplePrompts = manifest.ExamplePrompts,
-                    permissions = manifest.Permissions.Select(permission => new
-                    {
-                        semanticTypeId = permission.SemanticTypeId,
-                        reason = permission.Reason,
-                        write = permission.Write,
-                    }),
-                    meters = manifest.Meters.Select(meter => new
-                    {
-                        meterId = meter.MeterId,
-                        unit = meter.Unit,
-                        aggregation = meter.Aggregation,
-                        proposedPriceInCompute = meter.ProposedPriceInCompute,
-                    }),
-                })
-                .ToArray();
-            return Results.Ok(manifests);
-        }));
-        apps.MapGet("/{appId}/consent", (string workspaceId, string appId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
-        {
-            var scope = Scope(auth.Value, workspaceId);
-            var sheet = await brain.Get<IAppConsent>(scope).Review(appId).WaitAsync(ct);
-            return Results.Ok(sheet);
-        }));
-        apps.MapPost("/{appId}/consent/approve", (string workspaceId, string appId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
-        {
-            var scope = Scope(auth.Value, workspaceId);
-            var sheet = await brain.Get<IAppConsent>(scope).Approve(appId).WaitAsync(ct);
-            return Results.Ok(sheet);
-        }));
-        apps.MapGet("/node", (string workspaceId, string kind, string name, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
-        {
-            var scope = Scope(auth.Value, workspaceId);
-            if (!OwnsUi(scope, name)) { throw new UnauthorizedAccessException("The UI belongs to another workspace."); }
+            var scope = BrainScope.CurrentId();
+            if (!OwnsUi(scope, name)) { throw new UnauthorizedAccessException("The UI belongs to another brain."); }
             return kind switch
             {
                 "text" => Results.Ok(await brain.Get<IText>(name).Read().WaitAsync(ct)),
@@ -97,9 +53,9 @@ internal static class AppEndpoints
                 _ => throw new ArgumentException("Unknown app UI kind.")
             };
         }));
-        apps.MapPost("/event", (string workspaceId, UiEvent input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
+        apps.MapPost("/event", (UiEvent input, IDigitalBrain brain, CancellationToken ct) => AppHttp.Respond(async () =>
         {
-            var scope = Scope(auth.Value, workspaceId);
+            var scope = BrainScope.CurrentId();
             if (!OwnsUi(scope, input.Name)) { throw new UnauthorizedAccessException(); }
             switch (input.Kind)
             {
@@ -148,8 +104,8 @@ internal static class AppEndpoints
             }
             return Results.Ok(new { delivered = true });
         }));
-
     }
+
     private static bool OwnsUi(string scope, string name) =>
         new[] { "/apps/", "/images/", "/applications/", "/packages/" }.Any(area => name.StartsWith(scope + area, StringComparison.Ordinal));
 
@@ -159,17 +115,6 @@ internal static class AppEndpoints
         catch (FormatException) { throw new ArgumentException("Audio must be base64 encoded."); }
     }
 
-    private static string Scope(BasicAuthOptions auth, string workspace) => WorkspaceScope.Current(auth, workspace).Id;
-    private static async Task<IResult> Respond(Func<Task<IResult>> action)
-    {
-        try { return await action(); }
-        catch (UnauthorizedAccessException) { return Results.Json(new { error = "This file belongs to another workspace." }, statusCode: 403); }
-        catch (FileNotFoundException) { return Results.NotFound(new { error = "The file no longer exists. Refresh Files." }); }
-        catch (KeyNotFoundException) { return Results.NotFound(new { error = "The requested image or operation was not found." }); }
-        catch (ArgumentException error) { return Results.BadRequest(new { error = error.Message }); }
-        catch (InvalidOperationException error) { return Results.Conflict(new { error = error.Message }); }
-        catch (IOException error) { return Results.Json(new { error = error.Message.Contains("changed since", StringComparison.Ordinal) ? error.Message : "The local file could not be accessed. Check its permissions and retry." }, statusCode: 503); }
-    }
     internal sealed record UiEvent(string Kind, string Name, string? Action = null, string? Value = null, long Revision = 0, string? Field = null, string? MimeType = null);
     private sealed record BrowserConnection(int Port, string SessionId);
 }

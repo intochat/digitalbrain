@@ -37,5 +37,6 @@ public sealed class FlutterModule : IModule
         ArgumentNullException.ThrowIfNull(endpoints);
         endpoints.MapUiKit();
         endpoints.MapShellPersistence();
+        AppUiEndpoints.Map(endpoints);
     }
 }

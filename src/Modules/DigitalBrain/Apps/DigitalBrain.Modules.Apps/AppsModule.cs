@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
@@ -15,5 +16,11 @@ public sealed class AppsModule : IModule
         ArgumentNullException.ThrowIfNull(silo);
         silo.Services.TryAddSingleton(TimeProvider.System);
         silo.Services.TryAddSingleton<ITestScriptRunner, CSharpFileTestRunner>();
+    }
+
+    public void Configure(IEndpointRouteBuilder endpoints)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        AppsEndpoints.Map(endpoints);
     }
 }

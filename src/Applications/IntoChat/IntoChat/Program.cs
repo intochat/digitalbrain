@@ -49,7 +49,6 @@ app.MapWorkspaceDataEndpoints();
 app.MapWorkspaceAgent();
 app.MapWorkspaceConnections();
 app.MapWorkspaceVoice();
-app.MapLocalApps();
 app.MapBuiltInApps();
 
 app.Run();
