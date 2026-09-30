@@ -52,7 +52,7 @@ internal static class PostgresHostingExtensions
 
             if (configuration.DatabaseName is { } databaseName)
             {
-                var server = brain.ApplicationBuilder.AddPostgres("postgres-server").WithParentRelationship(module);
+                var server = brain.ApplicationBuilder.AddPostgres("postgres-server").WithParentRelationship(module).WithRepl();
                 if (configuration.PersistentStorage) { server.WithDataVolume().WithLifetime(ContainerLifetime.Persistent); }
                 _database = server.AddDatabase("postgres-database", databaseName);
             }
