@@ -18,7 +18,7 @@ internal static class WorkspaceEndpoints
 
     public static void MapWorkspaceDataEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var routes = endpoints.MapGroup("").AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
+        var routes = endpoints.MapGroup("").AddEndpointFilter(BrainAccessFilter.EnforceAsync);
         routes.MapGet("/workspaces/{workspaceId}", (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct)
             => Respond(async () => Results.Ok(await GetWorkspace(brain, auth.Value, workspaceId).Read().WaitAsync(ct))));
         routes.MapPost("/workspaces/{workspaceId}/windows/{windowId}/close",

@@ -21,9 +21,9 @@ internal static class ApplicationEndpoints
             var key = CustomerResearcherSurface.Key(WorkspaceScope.Current(auth.Value, workspaceId).Id);
             var window = await brain.Get<ICustomerResearcher>(key).OpenWindow();
             return Results.Ok(new { id = window.Id, title = window.Title, kind = "surface", surface = window.Surface });
-        }).AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
+        }).AddEndpointFilter(BrainAccessFilter.EnforceAsync);
         var assistant = routes.MapGroup("/workspaces/{workspaceId}/applications/assistant")
-            .AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
+            .AddEndpointFilter(BrainAccessFilter.EnforceAsync);
         assistant.MapPost("/start", async (string workspaceId, JsonElement input, IDigitalBrain brain, IOptions<BasicAuthOptions> auth) =>
         {
             var appKey = AssistantSurface.Key(WorkspaceScope.Current(auth.Value, workspaceId).Id);

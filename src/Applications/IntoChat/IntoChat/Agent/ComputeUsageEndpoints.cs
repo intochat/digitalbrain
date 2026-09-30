@@ -54,6 +54,6 @@ internal static class ComputeUsageEndpoints
                 });
             }
             return Results.Ok(new { items, page.NextCursor });
-        }).AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
+        }).AddEndpointFilter(BrainAccessFilter.EnforceAsync);
     }
 }

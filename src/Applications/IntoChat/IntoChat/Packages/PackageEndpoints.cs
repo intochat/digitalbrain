@@ -58,11 +58,11 @@ internal static class PackageEndpoints
 
         routes.MapPost("/workspaces/{workspaceId}/csharp/{id}/share", (string workspaceId, string id, ShareCSharpRequest request, CSharpSharing sharing, CancellationToken ct)
                 => sharing.Share(workspaceId, id, request, ct))
-            .AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync)
+            .AddEndpointFilter(BrainAccessFilter.EnforceAsync)
             .AddEndpointFilter(Guard);
 
         var installed = routes.MapGroup("/workspaces/{workspaceId}/packages/{owner}/{name}")
-            .AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync)
+            .AddEndpointFilter(BrainAccessFilter.EnforceAsync)
             .AddEndpointFilter(Guard);
         installed.MapGet("", (string workspaceId, string owner, string name, PackageService service)
             => service.ReadApp(workspaceId, PackageId.Create(owner, name)));

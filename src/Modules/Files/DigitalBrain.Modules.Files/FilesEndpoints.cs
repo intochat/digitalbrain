@@ -16,7 +16,7 @@ internal static class FilesEndpoints
 {
     public static void Map(IEndpointRouteBuilder endpoints)
     {
-        var apps = endpoints.MapGroup("/workspaces/{workspaceId}/apps").AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
+        var apps = endpoints.MapGroup("/workspaces/{workspaceId}/apps").AddEndpointFilter(BrainAccessFilter.EnforceAsync);
         apps.MapGet("/files", (string workspaceId, int? offset, string? sort, string? filter, IDigitalBrain brain, WorkspaceFileStore files, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);

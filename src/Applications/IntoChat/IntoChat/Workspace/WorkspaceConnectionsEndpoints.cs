@@ -30,7 +30,7 @@ internal static class WorkspaceConnectionsEndpoints
                 { return Results.BadRequest(); }
             return await next(context);
         });
-        group.AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
+        group.AddEndpointFilter(BrainAccessFilter.EnforceAsync);
         group.MapGet("", async (string workspaceId, IGrainFactory grains, IOptions<BasicAuthOptions> auth, IEnumerable<BrowserLogins> logins, CancellationToken ct) =>
         {
             var scope = WorkspaceScope.Current(auth.Value, workspaceId);

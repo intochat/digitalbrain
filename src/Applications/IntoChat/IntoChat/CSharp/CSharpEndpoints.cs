@@ -24,7 +24,7 @@ internal static class CSharpEndpoints
 
     public static void MapCSharp(this IEndpointRouteBuilder routes)
     {
-        var files = routes.MapGroup("/workspaces/{workspaceId}/csharp").AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
+        var files = routes.MapGroup("/workspaces/{workspaceId}/csharp").AddEndpointFilter(BrainAccessFilter.EnforceAsync);
         files.AddEndpointFilter(async (context, next) =>
         {
             if (!DeveloperModeEnabled(context.HttpContext.RequestServices)) { return Results.NotFound(); }

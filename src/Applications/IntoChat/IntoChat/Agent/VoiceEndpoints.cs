@@ -23,6 +23,6 @@ internal static class VoiceEndpoints
             var result = await brain.Get<IAssistant>(AssistantSurface.Key(scope.Id)).Transcribe(input.Audio, ct);
             return result.Status == 200 ? Results.Ok(new { text = result.Text })
                 : Results.Json(new { error = result.Error }, statusCode: result.Status);
-        }).AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(6 * 1024 * 1024));
+        }).AddEndpointFilter(BrainAccessFilter.EnforceAsync).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(6 * 1024 * 1024));
     }
 }

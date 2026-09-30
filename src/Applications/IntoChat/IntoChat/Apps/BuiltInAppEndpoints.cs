@@ -18,7 +18,7 @@ internal static class BuiltInAppEndpoints
     public static void MapBuiltInApps(this IEndpointRouteBuilder routes)
     {
         var apps = routes.MapGroup("/workspaces/{workspaceId}/built-in")
-            .AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
+            .AddEndpointFilter(BrainAccessFilter.EnforceAsync);
         apps.MapPost("/activate", async (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth) =>
         {
             await brain.Get<IAssistant>(AssistantSurface.Key(WorkspaceScope.Current(auth.Value, workspaceId).Id)).Activate();

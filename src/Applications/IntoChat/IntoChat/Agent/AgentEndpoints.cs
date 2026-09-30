@@ -22,12 +22,12 @@ internal static class AgentEndpoints
             if (!WorkspaceScope.IsValidId(workspaceId) || !WorkspaceScope.IsValidId(threadId)) { return Results.BadRequest(); }
             var scope = WorkspaceScope.Current(auth.Value, workspaceId);
             return Results.Ok(await brain.Get<IAssistant>(AssistantSurface.Key(scope.Id)).ReadConversation(threadId, ct));
-        }).AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
+        }).AddEndpointFilter(BrainAccessFilter.EnforceAsync);
         routes.MapPost("/agent", async (AgentInput input, HttpContext http, IDigitalBrain brain, IOptions<BasicAuthOptions> auth) =>
         {
             if (!WorkspaceScope.IsValidId(input.WorkspaceId) || input.Messages is not { Count: 1 } || input.Messages[0].Role != "user")
             { http.Response.StatusCode = 400; return; }
-            if (await WorkspaceAccessFilter.Decide(http, input.WorkspaceId) is { } denied) { await denied.ExecuteAsync(http); return; }
+            if (await BrainAccessFilter.Decide(http, input.WorkspaceId) is { } denied) { await denied.ExecuteAsync(http); return; }
             var scope = WorkspaceScope.Current(auth.Value, input.WorkspaceId);
             var request = new AssistantRun(input.ThreadId, input.RunId, input.Messages[0].Content, scope.Owner, input.ModelProfile);
             try

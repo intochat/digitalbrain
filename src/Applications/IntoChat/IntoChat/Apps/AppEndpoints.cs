@@ -30,7 +30,7 @@ internal static class AppEndpoints
 {
     public static void MapLocalApps(this IEndpointRouteBuilder routes)
     {
-        var apps = routes.MapGroup("/workspaces/{workspaceId}/apps").AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
+        var apps = routes.MapGroup("/workspaces/{workspaceId}/apps").AddEndpointFilter(BrainAccessFilter.EnforceAsync);
         apps.MapGet("", (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) => Respond(async () =>
         {
             var scope = Scope(auth.Value, workspaceId);
