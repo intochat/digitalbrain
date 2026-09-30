@@ -149,7 +149,7 @@ public sealed class CanarySecretFacts
         await using var off = await IntoChatE2ETest.Create()
             .WithResourceEnvironment(new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                ["IntoChat__DeveloperMode"] = "false",
+                ["DigitalBrain__DeveloperMode"] = "false",
             })
             .StartAsync(ct);
 

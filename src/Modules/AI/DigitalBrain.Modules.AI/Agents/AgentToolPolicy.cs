@@ -61,11 +61,6 @@ public static class AgentToolPolicy
     public static string? UnsupportedCSharpAuthoring(bool developerMode, string message) =>
         !developerMode && RequestsCSharpAuthoring(message) ? CSharpAuthoringFallback : null;
 
-    // An absent setting is the required default-on for the local owner; an explicit but
-    // unparseable value fails closed instead of silently granting developer tools.
-    public static bool DeveloperModeEnabled(string? configured) =>
-        configured is null || (bool.TryParse(configured, out var enabled) && enabled);
-
     public static bool RequestsCSharpAuthoring(string message)
     {
         if (string.IsNullOrWhiteSpace(message)) { return false; }

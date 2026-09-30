@@ -1,3 +1,4 @@
+using DigitalBrain.Core;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Apps;
 using DigitalBrain.Core.Enforcement;
@@ -61,7 +62,7 @@ public static class PackageRouteGuard
     public static async ValueTask<object?> Guard(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
         var configuration = context.HttpContext.RequestServices.GetRequiredService<IConfiguration>();
-        if (!AgentToolPolicy.DeveloperModeEnabled(configuration["IntoChat:DeveloperMode"])) { return Results.NotFound(); }
+        if (!DeveloperMode.IsEnabled(configuration)) { return Results.NotFound(); }
         try { return await next(context); }
         catch (ArgumentException error) { return Results.Problem(error.Message, statusCode: StatusCodes.Status400BadRequest); }
         catch (UnauthorizedAccessException error) { return Results.Problem(error.Message, statusCode: StatusCodes.Status403Forbidden); }

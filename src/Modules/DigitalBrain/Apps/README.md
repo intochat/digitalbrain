@@ -81,7 +81,7 @@ IntoChat's `POST /brains/{brainId}/csharp/{id}/share` commits the file's current
 
 ## Trust
 
-Installing a package runs its code in a container with full client access to the brain; the container is not a permission boundary. IntoChat composes the CSharp module only in the developer profile. Its package routes need `IntoChat:DeveloperMode`, and running packages needs the host's C# sandbox (composing `CSharpModule` in a repository declares it). A public marketplace needs per-app identities first.
+Installing a package runs its code in a container with full client access to the brain; the container is not a permission boundary. IntoChat composes the CSharp module only in the developer profile. Its package routes need `DigitalBrain:DeveloperMode`, and running packages needs the host's C# sandbox (composing `CSharpModule` in a repository declares it). A public marketplace needs per-app identities first.
 
 ## Tests
 

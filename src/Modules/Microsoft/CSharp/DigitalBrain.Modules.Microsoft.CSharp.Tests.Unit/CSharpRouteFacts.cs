@@ -22,19 +22,13 @@ public sealed class CSharpRouteFacts
     [Fact]
     public async Task CSharpAuthoringIsNotFoundWhenDeveloperModeIsOff()
     {
-        Assert.Equal(StatusCodes.Status404NotFound, await ListStatus(("DigitalBrain:CSharpAuthoring:DeveloperMode", "false")));
-    }
-
-    [Fact]
-    public async Task CSharpAuthoringIsNotFoundWhenOnlyTheLegacyDeveloperModeKeyIsOff()
-    {
-        Assert.Equal(StatusCodes.Status404NotFound, await ListStatus(("IntoChat:DeveloperMode", "false")));
+        Assert.Equal(StatusCodes.Status404NotFound, await ListStatus(("DigitalBrain:DeveloperMode", "false")));
     }
 
     [Fact]
     public async Task CSharpAuthoringIsNotFoundWhenDeveloperModeIsUnparseable()
     {
-        Assert.Equal(StatusCodes.Status404NotFound, await ListStatus(("IntoChat:DeveloperMode", "maybe")));
+        Assert.Equal(StatusCodes.Status404NotFound, await ListStatus(("DigitalBrain:DeveloperMode", "maybe")));
     }
 
     private static async Task<int> ListStatus(params (string Key, string Value)[] settings)

@@ -1,3 +1,4 @@
+using DigitalBrain.Core;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Aspire;
 using DigitalBrain.Compute;
@@ -39,7 +40,7 @@ app.UseAccountSession();
 app.MapDefaultEndpoints();
 // Developer mode is a server setting, so a client cannot grant itself the C# console.
 app.MapGet("/session/capabilities", static (IConfiguration configuration) =>
-    Results.Ok(new { developerMode = AgentToolPolicy.DeveloperModeEnabled(configuration["IntoChat:DeveloperMode"]) }));
+    Results.Ok(new { developerMode = DeveloperMode.IsEnabled(configuration) }));
 app.MapDigitalBrainModules();
 app.MapMarketplace();
 

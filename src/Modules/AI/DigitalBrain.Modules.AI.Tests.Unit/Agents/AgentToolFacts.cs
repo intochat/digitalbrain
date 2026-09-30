@@ -174,16 +174,6 @@ public sealed class AgentToolFacts
         Assert.Equal(AgentToolPolicy.ProductTools, AgentToolPolicy.SelectTools(developerMode: false, ["csharp_run"]));
     }
 
-    [Theory]
-    [InlineData(null, true)]
-    [InlineData("true", true)]
-    [InlineData("True", true)]
-    [InlineData("false", false)]
-    [InlineData("False", false)]
-    [InlineData("yes", false)]
-    [InlineData("", false)]
-    public void DeveloperModeFailsClosedOnInvalidConfigurationButDefaultsOn(string? configured, bool expected)
-        => Assert.Equal(expected, AgentToolPolicy.DeveloperModeEnabled(configured));
     [Fact]
     public async Task SelectedContextProvidersReachTheModelBeforeTheMessage()
     {

@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using System.Text;
 using System.Text.Json;
+using DigitalBrain.Core;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.AI.Metering;
@@ -101,7 +102,7 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
                 }
                 else
                 {
-                    var developerMode = AgentToolPolicy.DeveloperModeEnabled(configuration["IntoChat:DeveloperMode"]);
+                    var developerMode = DeveloperMode.IsEnabled(configuration);
                     var fallback = AgentToolPolicy.UnsupportedCSharpAuthoring(developerMode, userText);
                     if (fallback is not null)
                     {
