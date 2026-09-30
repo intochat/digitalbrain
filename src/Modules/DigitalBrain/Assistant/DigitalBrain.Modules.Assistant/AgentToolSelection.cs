@@ -2,7 +2,7 @@ using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
 using DigitalBrain.Flutter.Workspace;
 
-namespace DigitalBrain.Apps.Assistant;
+namespace DigitalBrain.Assistant;
 
 // The app tools a turn gets from the workspace itself, as each app's manifest declares them: apps
 // installed in it and apps whose windows are open. Tools of apps that match the owner's words come

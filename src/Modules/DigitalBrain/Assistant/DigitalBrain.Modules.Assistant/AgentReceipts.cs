@@ -2,7 +2,7 @@ using DigitalBrain.AI.Metering;
 using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
 
-namespace DigitalBrain.Apps.Assistant;
+namespace DigitalBrain.Assistant;
 
 public enum AgentRunOutcome { Succeeded, Failed, Cancelled }
 

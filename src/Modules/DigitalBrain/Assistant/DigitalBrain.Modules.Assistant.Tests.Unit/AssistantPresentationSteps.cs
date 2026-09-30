@@ -8,7 +8,7 @@ using DigitalBrain.Specs;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Apps.Assistant.Tests.Unit;
+namespace DigitalBrain.Assistant.Tests.Unit;
 
 internal sealed partial class AssistantStreamSteps
 {
@@ -35,19 +35,19 @@ internal sealed partial class AssistantStreamSteps
             await App(context).RestoreLegacy("""
                 {"selectedConversationId":"old","conversations":[{"id":"old","threadId":"retired-model-thread","title":"","draft":"Keep this","modelProfile":"profile:retired"}]}
                 """);
-            await context.Services.GetRequiredService<ApplicationCatalog>().Start(AppDefinition.NameOf<AssistantApp>(), context.Subject);
+            await context.Grains.GetGrain<IAssistant>(context.Subject).Activate();
             await ui.AssertExplicitControls();
             await ui.WaitForDraft("Keep this");
-            var models = await ui.Select(AssistantApp.ModelPart).Read();
+            var models = await ui.Select(AssistantSurface.ModelPart).Read();
             Assert.Equal("profile:retired", models.Selected);
             Assert.False(Assert.Single(models.Options, model => model.Id == "profile:retired").Enabled);
-            Assert.All((await ui.Select(AssistantApp.ThreadsPart).Read()).Options, option => Assert.False(string.IsNullOrWhiteSpace(option.Label)));
+            Assert.All((await ui.Select(AssistantSurface.ThreadsPart).Read()).Options, option => Assert.False(string.IsNullOrWhiteSpace(option.Label)));
         });
         Step("a bound file input adds attachment content to the draft", "A generic file capture reaches the app without submitting a turn.", async context =>
         {
             var ui = await StartUi(context);
             await ui.Input("Review this");
-            await context.Grains.GetGrain<IFileInput>(UiComposer.NameOf(context.Subject, AssistantApp.AttachPart))
+            await context.Grains.GetGrain<IFileInput>(UiComposer.NameOf(context.Subject, AssistantSurface.AttachPart))
                 .Capture("notes.txt", "A useful note");
             var state = await ui.Until(thread => thread.Draft.Contains("A useful note", StringComparison.Ordinal), context.CancellationToken);
             Assert.Contains("Review this", state.Draft);
@@ -70,22 +70,22 @@ internal sealed partial class AssistantStreamSteps
             await ui.Until(state => state.Draft == "keep first draft", context.CancellationToken);
             await App(context).Activate();
             Assert.Equal("keep first draft", (await ui.Read()).Draft);
-            await ui.Button(AssistantApp.NewPart).Click();
+            await ui.Button(AssistantSurface.NewPart).Click();
             var second = await ui.Until(state => state.Id != first, context.CancellationToken);
             Assert.Empty(second.Messages);
             Assert.Equal("", second.Draft);
             await ui.Input("second draft");
             await ui.Until(state => state.Draft == "second draft", context.CancellationToken);
-            await Assert.ThrowsAsync<ArgumentException>(() => ui.Select(AssistantApp.ModelPart).Choose("profile:missing"));
+            await Assert.ThrowsAsync<ArgumentException>(() => ui.Select(AssistantSurface.ModelPart).Choose("profile:missing"));
             Assert.Null((await ui.Read()).ModelProfile);
-            var model = (await ui.Select(AssistantApp.ModelPart).Read()).Options.First(item => item.Enabled && item.Id.Length > 0).Id;
-            await ui.Select(AssistantApp.ModelPart).Choose(model);
+            var model = (await ui.Select(AssistantSurface.ModelPart).Read()).Options.First(item => item.Enabled && item.Id.Length > 0).Id;
+            await ui.Select(AssistantSurface.ModelPart).Choose(model);
             await ui.Until(state => state.ModelProfile == model && state.Error is null, context.CancellationToken);
-            await ui.Select(AssistantApp.ThreadsPart).Choose(first);
+            await ui.Select(AssistantSurface.ThreadsPart).Choose(first);
             var restored = await ui.Until(state => state.Id == first, context.CancellationToken);
             Assert.Equal("keep first draft", restored.Draft);
             Assert.Equal(2, restored.Messages.Count);
-            await ui.Select(AssistantApp.ThreadsPart).Choose(second.Id);
+            await ui.Select(AssistantSurface.ThreadsPart).Choose(second.Id);
             var restoredSecond = await ui.Until(state => state.Id == second.Id, context.CancellationToken);
             Assert.Equal("second draft", restoredSecond.Draft);
             Assert.Equal(model, restoredSecond.ModelProfile);
@@ -98,7 +98,7 @@ internal sealed partial class AssistantStreamSteps
             await runner.UiHolding.Task.WaitAsync(TimeSpan.FromSeconds(10), context.CancellationToken);
             var active = await ui.Until(state => state.TurnId is not null, context.CancellationToken);
             Assert.NotNull(active.TurnId);
-            await ui.Button(AssistantApp.StopPart).Click();
+            await ui.Button(AssistantSurface.StopPart).Click();
             await ui.Until(state => state.TurnId is null, context.CancellationToken);
             Assert.Null((await App(context).ReadConversation(active.Id)).ActiveRunId);
             await ui.Submit("hello");
@@ -128,7 +128,7 @@ internal sealed partial class AssistantStreamSteps
             await App(context).Activate();
             Assert.Equal("new authoritative draft", (await ui.Read()).Draft);
             Assert.Equal(2, (await App(context).Read()).Threads.Count);
-            await ui.Select(AssistantApp.ThreadsPart).Choose("local-thread");
+            await ui.Select(AssistantSurface.ThreadsPart).Choose("local-thread");
             var local = await ui.Until(state => state.Id == "local-thread", context.CancellationToken);
             Assert.Equal("local draft", local.Draft);
             Assert.Equal("local-only message", Assert.Single(local.Messages).Text);
@@ -220,7 +220,7 @@ internal sealed partial class AssistantStreamSteps
     }
     private static async Task<AssistantUiProbe> StartUi(StepContext context)
     {
-        await context.Services.GetRequiredService<ApplicationCatalog>().Start(AppDefinition.NameOf<AssistantApp>(), context.Subject);
+        await context.Grains.GetGrain<IAssistant>(context.Subject).Activate();
         var ui = new AssistantUiProbe(context.Grains, context.Subject);
         await ui.AssertExplicitControls();
         return ui;

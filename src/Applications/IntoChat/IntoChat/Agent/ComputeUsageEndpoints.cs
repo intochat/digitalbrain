@@ -1,5 +1,5 @@
 using DigitalBrain.Identity.Configuration;
-using DigitalBrain.Apps.Assistant;
+using DigitalBrain.Assistant;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

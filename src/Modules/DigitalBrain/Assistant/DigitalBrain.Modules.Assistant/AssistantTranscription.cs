@@ -1,6 +1,6 @@
 using DigitalBrain.AI;
 
-namespace DigitalBrain.Apps.Assistant;
+namespace DigitalBrain.Assistant;
 
 [GenerateSerializer, Alias("assistant.transcription-result")]
 public sealed record AssistantTranscriptionResult(

@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.AI;
 
-namespace DigitalBrain.Apps.Assistant.Tests.Unit;
+namespace DigitalBrain.Assistant.Tests.Unit;
 
 // Exercise the explicit Supabase tools, including their real window-opening behavior.
 internal sealed class ScriptedAssistantModel : IChatClient

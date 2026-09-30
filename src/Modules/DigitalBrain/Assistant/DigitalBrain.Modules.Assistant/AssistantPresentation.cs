@@ -6,7 +6,7 @@ using DigitalBrain.Flutter.Workspace;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace DigitalBrain.Apps.Assistant;
+namespace DigitalBrain.Assistant;
 
 [GenerateSerializer, Alias("assistant.thread")]
 public sealed record AssistantThread
@@ -101,8 +101,8 @@ internal sealed partial class AssistantNeuron
         title = string.IsNullOrWhiteSpace(title) ? "Assistant" : title.Trim();
         if (title.Length > 200) { throw new ArgumentException("A window title has at most 200 characters."); }
         var id = "assistant-" + Guid.NewGuid().ToString("N");
-        var key = AssistantApp.Key(Workspace) + "/" + id;
-        await services.GetRequiredService<ApplicationCatalog>().Start(AppDefinition.NameOf<AssistantApp>(), key);
+        var key = AssistantSurface.Key(Workspace) + "/" + id;
+        await GrainFactory.GetGrain<IAssistant>(key).Activate();
         if (draft is not null) { await GrainFactory.GetGrain<IAssistant>(key).SetDraft(draft); }
         var surface = new UiChildRef(UIVocabulary.SurfaceType, UiComposer.NameOf(key, "surface"));
         await GrainFactory.GetGrain<IWorkspace>(Workspace).EnsureOpenAsync(id, title, WindowReference.For(surface), CancellationToken.None);

@@ -8,7 +8,7 @@ using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Apps.Assistant.Tests.Unit;
+namespace DigitalBrain.Assistant.Tests.Unit;
 
 public sealed class AssistantStreamFeatureFacts
 {
@@ -16,7 +16,7 @@ public sealed class AssistantStreamFeatureFacts
     public async Task MainApplicationStreamFeatureIsGreen()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithApp<AssistantApp>().WithModule<SpecsModule>()
+        await using var brain = await UnitTest.Create().WithModule<AssistantModule>().RequireModules([typeof(DigitalBrain.Apps.AppsModule), typeof(DigitalBrain.AI.AIModule), typeof(DigitalBrain.Compute.ComputeModule), typeof(DigitalBrain.Flutter.FlutterModule)]).WithModule<SpecsModule>()
             .ConfigureSilo(silo =>
             {
                 silo.Services.AddSingleton<StepLibrary, AssistantStreamSteps>();
@@ -55,7 +55,7 @@ internal sealed partial class AssistantStreamSteps : StepLibrary
             Assert.Equal("Hello world", Text(events));
             Assert.Equal("Hello world", Assert.Single((await app.ReadConversation("one")).Turns).AssistantText);
             Assert.Empty((await app.ReadConversation("two")).Turns);
-            Assert.Empty((await context.Grains.GetGrain<IAssistant>(AssistantApp.Key(context.Subject.Split("/applications/")[0] + "-other")).ReadConversation("one")).Turns);
+            Assert.Empty((await context.Grains.GetGrain<IAssistant>(AssistantSurface.Key(context.Subject.Split("/applications/")[0] + "-other")).ReadConversation("one")).Turns);
         });
         Step("the application replays once and rejects conflicting run input", "Replay does not invoke the model or duplicate history.", async context =>
         {

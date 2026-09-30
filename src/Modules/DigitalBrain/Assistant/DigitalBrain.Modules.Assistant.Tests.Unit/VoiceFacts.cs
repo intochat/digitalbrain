@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 
-namespace DigitalBrain.Apps.Assistant.Tests.Unit;
+namespace DigitalBrain.Assistant.Tests.Unit;
 
 public sealed class VoiceFacts
 {
@@ -43,10 +43,10 @@ public sealed class VoiceFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var provider = new Transcription();
-        await using var brain = await UnitTest.Create().WithApp<AssistantApp>()
+        await using var brain = await UnitTest.Create().WithModule<AssistantModule>().RequireModules([typeof(DigitalBrain.Apps.AppsModule), typeof(DigitalBrain.AI.AIModule), typeof(DigitalBrain.Compute.ComputeModule), typeof(DigitalBrain.Flutter.FlutterModule)])
             .ConfigureSilo(silo => silo.Services.AddSingleton<IAudioTranscriptionService>(provider))
             .StartAsync(ct);
-        var app = brain.Get<IAssistant>(AssistantApp.Key("voice-workspace"));
+        var app = brain.Get<IAssistant>(AssistantSurface.Key("voice-workspace"));
         var rejected = await app.Transcribe("invalid", ct);
         Assert.Equal(400, rejected.Status);
         Assert.Equal("Invalid audio encoding.", rejected.Error);

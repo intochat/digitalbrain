@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
-namespace DigitalBrain.Apps.Assistant;
+namespace DigitalBrain.Assistant;
 
 public static class AssistantConversations
 {

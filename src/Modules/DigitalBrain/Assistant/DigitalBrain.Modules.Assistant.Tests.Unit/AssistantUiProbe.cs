@@ -8,13 +8,13 @@ using DigitalBrain.Flutter.Text;
 using DigitalBrain.Flutter.TextField;
 using Xunit;
 
-namespace DigitalBrain.Apps.Assistant.Tests.Unit;
+namespace DigitalBrain.Assistant.Tests.Unit;
 
 // Drives the same individual controls a generic renderer exposes; no chat facade.
 internal sealed class AssistantUiProbe(IGrainFactory grains, string key)
 {
     public IAssistant App => grains.GetGrain<IAssistant>(key);
-    public ITextField Draft => grains.GetGrain<ITextField>(UiComposer.NameOf(key, AssistantApp.DraftPart));
+    public ITextField Draft => grains.GetGrain<ITextField>(UiComposer.NameOf(key, AssistantSurface.DraftPart));
     public IButton Button(string part) => grains.GetGrain<IButton>(UiComposer.NameOf(key, part));
     public ISelect Select(string part) => grains.GetGrain<ISelect>(UiComposer.NameOf(key, part));
 
@@ -44,7 +44,7 @@ internal sealed class AssistantUiProbe(IGrainFactory grains, string key)
     public async Task Submit(string? text = null)
     {
         if (text is not null) { await Input(text); }
-        await Button(AssistantApp.SendPart).Click();
+        await Button(AssistantSurface.SendPart).Click();
     }
 
     public async Task<AssistantThread> Until(Func<AssistantThread, bool> matches, CancellationToken ct = default)
@@ -85,17 +85,17 @@ internal sealed class AssistantUiProbe(IGrainFactory grains, string key)
         Assert.DoesNotContain(tree, node => node.Kind == "uichat");
         foreach (var (part, kind) in new[]
         {
-            (AssistantApp.ThreadsPart, "select"), (AssistantApp.ModelPart, "select"),
-            (AssistantApp.DraftPart, "textfield"), (AssistantApp.VoicePart, "voiceinput"),
-            (AssistantApp.AttachPart, "fileinput"), (AssistantApp.SendPart, "button"),
-            (AssistantApp.StopPart, "button"), (AssistantApp.NewPart, "button"),
-            (AssistantApp.StatusPart, "text"), (AssistantApp.MessagesPart, "layout"),
-            (AssistantApp.ResultsPart, "layout"), (AssistantApp.ReceiptsPart, "layout"),
+            (AssistantSurface.ThreadsPart, "select"), (AssistantSurface.ModelPart, "select"),
+            (AssistantSurface.DraftPart, "textfield"), (AssistantSurface.VoicePart, "voiceinput"),
+            (AssistantSurface.AttachPart, "fileinput"), (AssistantSurface.SendPart, "button"),
+            (AssistantSurface.StopPart, "button"), (AssistantSurface.NewPart, "button"),
+            (AssistantSurface.StatusPart, "text"), (AssistantSurface.MessagesPart, "layout"),
+            (AssistantSurface.ResultsPart, "layout"), (AssistantSurface.ReceiptsPart, "layout"),
         })
         { Assert.Contains(tree, node => node.Kind == kind && node.Name == UiComposer.NameOf(key, part)); }
         var draft = await Draft.Read();
         Assert.Equal("multiline", draft.Kind);
-        Assert.Equal(UiComposer.NameOf(key, AssistantApp.SendPart), draft.SubmitButton);
+        Assert.Equal(UiComposer.NameOf(key, AssistantSurface.SendPart), draft.SubmitButton);
     }
 
     public async Task<string> VisibleText()

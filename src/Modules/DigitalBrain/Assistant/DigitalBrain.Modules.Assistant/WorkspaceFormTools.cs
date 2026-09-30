@@ -12,7 +12,7 @@ using DigitalBrain.Flutter.Layout;
 using DigitalBrain.Flutter.Surface;
 using Microsoft.Extensions.AI;
 
-namespace DigitalBrain.Apps.Assistant;
+namespace DigitalBrain.Assistant;
 
 // One declarative form window per assistant call. The model asks for typed fields by name and
 // receives the handle plus the field types; submitted values never travel back to the model.

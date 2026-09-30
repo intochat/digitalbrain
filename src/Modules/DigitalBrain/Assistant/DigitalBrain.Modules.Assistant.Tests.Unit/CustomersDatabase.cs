@@ -1,7 +1,7 @@
 using DigitalBrain.Supabase;
 using DigitalBrain.Supabase.Tables;
 
-namespace DigitalBrain.Apps.Assistant.Tests.Unit;
+namespace DigitalBrain.Assistant.Tests.Unit;
 
 // A Supabase stand-in holding one table the scenarios fill; cells are JSON text, as on the wire.
 internal sealed class CustomersDatabase : ISupabaseProvider

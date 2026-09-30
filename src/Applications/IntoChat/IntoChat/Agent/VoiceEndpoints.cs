@@ -1,5 +1,5 @@
 using DigitalBrain.Identity.Configuration;
-using DigitalBrain.Apps.Assistant;
+using DigitalBrain.Assistant;
 using DigitalBrain.Contracts;
 using DigitalBrain.Identity;
 using DigitalBrain.Core.Enforcement;
@@ -20,7 +20,7 @@ internal static class VoiceEndpoints
         {
             if (!WorkspaceScope.IsValidId(workspaceId)) { return Results.BadRequest(); }
             var scope = WorkspaceScope.Current(auth.Value, workspaceId);
-            var result = await brain.Get<IAssistant>(AssistantApp.Key(scope.Id)).Transcribe(input.Audio, ct);
+            var result = await brain.Get<IAssistant>(AssistantSurface.Key(scope.Id)).Transcribe(input.Audio, ct);
             return result.Status == 200 ? Results.Ok(new { text = result.Text })
                 : Results.Json(new { error = result.Error }, statusCode: result.Status);
         }).AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync).WithMetadata(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(6 * 1024 * 1024));

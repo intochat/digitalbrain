@@ -6,6 +6,7 @@ using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
 using DigitalBrain.Apps;
+using DigitalBrain.Assistant;
 using DigitalBrain.Specs;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.ClickHouse;
@@ -63,6 +64,7 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serv
     .WithModule<RegistryModule>()
     .WithModule<SpecsModule>()
     .WithModule<AppsModule>()
+    .WithModule<AssistantModule>()
     .WithModule<AspireModule>()
     .WithModule<RoslynModule>()
     .WithModule<DotNetModule>()

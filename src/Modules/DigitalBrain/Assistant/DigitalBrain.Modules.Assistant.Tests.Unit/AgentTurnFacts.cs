@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text;
 using DigitalBrain.AI;
-using DigitalBrain.Apps.Assistant;
+using DigitalBrain.Assistant;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.AI.Metering;
 using DigitalBrain.Compute;
@@ -9,7 +9,7 @@ using DigitalBrain.Contracts;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 
-namespace DigitalBrain.Apps.Assistant.Tests.Unit;
+namespace DigitalBrain.Assistant.Tests.Unit;
 
 public sealed class AgentTurnFacts
 {

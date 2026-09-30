@@ -12,7 +12,7 @@ using DigitalBrain.Specs;
 using DigitalBrain.Supabase.Tables;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Apps.Assistant.Tests.Unit;
+namespace DigitalBrain.Assistant.Tests.Unit;
 
 // The subject of a run is the key the assistant is started for.
 internal sealed class AssistantSteps : StepLibrary
@@ -24,7 +24,7 @@ internal sealed class AssistantSteps : StepLibrary
     public AssistantSteps()
     {
         Step("the assistant is started", "Starts the assistant app for the subject key.", context =>
-            context.Services.GetRequiredService<ApplicationCatalog>().Start(AppDefinition.NameOf<AssistantApp>(), context.Subject));
+            context.Grains.GetGrain<IAssistant>(context.Subject).Activate());
         Step("its surface is titled {string}", "The assistant's surface shows this title.", async (context, args) =>
         {
             var title = (await Surface(context).Read()).Definition.Title;
@@ -60,7 +60,7 @@ internal sealed class AssistantSteps : StepLibrary
         });
         Step("another workspace has no turns in conversation {string}", "Workspace conversations remain isolated.", async (context, args) =>
         {
-            var other = context.Grains.GetGrain<IAssistant>(AssistantApp.Key(context.Subject.Split("/applications/")[0] + "-other"));
+            var other = context.Grains.GetGrain<IAssistant>(AssistantSurface.Key(context.Subject.Split("/applications/")[0] + "-other"));
             var conversation = await other.Conversation(args.Text(0));
             if ((await conversation.ReadConversation(context.CancellationToken)).Turns.Count != 0)
             { throw new StepFailedException("History leaked across workspaces."); }
@@ -91,7 +91,7 @@ internal sealed class AssistantSteps : StepLibrary
             Ui(context).Submit(args.Text(0)));
         Step("I send the draft", "Clicks the bound send button.", context => Ui(context).Submit());
         Step("I say {string} by voice", "Records audio that the transcriber hears as this text.", (context, args) =>
-            context.Grains.GetGrain<IVoiceInput>(UiComposer.NameOf(context.Subject, AssistantApp.VoicePart))
+            context.Grains.GetGrain<IVoiceInput>(UiComposer.NameOf(context.Subject, AssistantSurface.VoicePart))
                 .Capture(RecordedText(args.Text(0)), "audio/wav"));
         Step("the chat shows my message {string}", "The chat shows this message from the user.", (context, args) =>
             Shows(context, ChatRole.User, args.Text(0)));

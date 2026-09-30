@@ -1,4 +1,4 @@
-using DigitalBrain.Apps.Assistant;
+using DigitalBrain.Assistant;
 using DigitalBrain.AI.Metering;
 using DigitalBrain.Compute;
 using DigitalBrain.Contracts;

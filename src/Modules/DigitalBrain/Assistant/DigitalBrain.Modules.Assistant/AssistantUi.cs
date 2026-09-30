@@ -9,7 +9,7 @@ using DigitalBrain.Flutter.Select;
 using DigitalBrain.Flutter.Text;
 using Orleans;
 
-namespace DigitalBrain.Apps.Assistant;
+namespace DigitalBrain.Assistant;
 
 internal sealed partial class AssistantNeuron
 {
@@ -23,20 +23,20 @@ internal sealed partial class AssistantNeuron
             var models = await Models();
             var thread = Thread(Snapshot.SelectedThread);
             var busy = _running.ContainsKey(thread.Id);
-            await Publish(AssistantApp.DraftPart, thread.Draft, () => Draft.SetValue(thread.Draft));
-            await Choices(AssistantApp.ThreadsPart, "Conversation",
+            await Publish(AssistantSurface.DraftPart, thread.Draft, () => Draft.SetValue(thread.Draft));
+            await Choices(AssistantSurface.ThreadsPart, "Conversation",
                 Snapshot.Threads.Select(item => new SelectOption(item.Id, string.IsNullOrWhiteSpace(item.Title) ? "Conversation" : item.Title)).ToArray(), thread.Id);
             var options = new[] { models.Automatic }.Concat(models.Models)
                 .Select(model => new SelectOption(model.Id ?? "", model.Label, model.Available)).ToList();
             if (thread.ModelProfile is { } profile && options.All(option => option.Id != profile))
             { options.Add(new(profile, profile + " (unavailable)", false)); }
-            await Choices(AssistantApp.ModelPart, "Model", options.ToArray(), thread.ModelProfile ?? "");
-            await Publish(AssistantApp.StatusPart, thread.Error ?? thread.Status ?? "", () =>
-                GrainFactory.GetGrain<IText>(Name(AssistantApp.StatusPart)).Set(thread.Error ?? thread.Status ?? ""));
-            await Publish(AssistantApp.SendPart, !busy, () =>
-                GrainFactory.GetGrain<IButton>(Name(AssistantApp.SendPart)).Set("Send", "submit", !busy));
-            await Publish(AssistantApp.StopPart, busy, () =>
-                GrainFactory.GetGrain<IButton>(Name(AssistantApp.StopPart)).Set("Stop", "cancel", busy));
+            await Choices(AssistantSurface.ModelPart, "Model", options.ToArray(), thread.ModelProfile ?? "");
+            await Publish(AssistantSurface.StatusPart, thread.Error ?? thread.Status ?? "", () =>
+                GrainFactory.GetGrain<IText>(Name(AssistantSurface.StatusPart)).Set(thread.Error ?? thread.Status ?? ""));
+            await Publish(AssistantSurface.SendPart, !busy, () =>
+                GrainFactory.GetGrain<IButton>(Name(AssistantSurface.SendPart)).Set("Send", "submit", !busy));
+            await Publish(AssistantSurface.StopPart, busy, () =>
+                GrainFactory.GetGrain<IButton>(Name(AssistantSurface.StopPart)).Set("Stop", "cancel", busy));
 
             var messages = new List<UiChildRef>();
             foreach (var message in thread.Messages)
@@ -45,7 +45,7 @@ internal sealed partial class AssistantNeuron
                 await Card(part, message.Role == ChatRole.User ? "You" : "Assistant", message.Text);
                 messages.Add(new(UIVocabulary.CardType, Name(part)));
             }
-            await List(AssistantApp.MessagesPart, messages);
+            await List(AssistantSurface.MessagesPart, messages);
 
             var results = new List<UiChildRef>();
             for (var index = 0; index < thread.Results.Count; index++)
@@ -89,7 +89,7 @@ internal sealed partial class AssistantNeuron
                 await Card(part, title, body, children);
                 results.Add(new(UIVocabulary.CardType, Name(part)));
             }
-            await List(AssistantApp.ResultsPart, results);
+            await List(AssistantSurface.ResultsPart, results);
 
             var receipts = new List<UiChildRef>();
             for (var index = 0; index < thread.Receipts.Count; index++)
@@ -98,7 +98,7 @@ internal sealed partial class AssistantNeuron
                 await Card(part, "Receipt", ReceiptBody(thread.Receipts[index]));
                 receipts.Add(new(UIVocabulary.CardType, Name(part)));
             }
-            await List(AssistantApp.ReceiptsPart, receipts);
+            await List(AssistantSurface.ReceiptsPart, receipts);
         }
         finally { _presentation.Release(); }
     }

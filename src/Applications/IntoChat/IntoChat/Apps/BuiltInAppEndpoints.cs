@@ -1,7 +1,7 @@
 using DigitalBrain.Identity.Configuration;
 using DigitalBrain.Contracts;
 using DigitalBrain.Apps;
-using DigitalBrain.Apps.Assistant;
+using DigitalBrain.Assistant;
 using DigitalBrain.Flutter;
 using DigitalBrain.Core.Enforcement;
 using IntoChat.Apps.BuiltIn;
@@ -17,9 +17,9 @@ internal static class BuiltInAppEndpoints
     {
         var apps = routes.MapGroup("/workspaces/{workspaceId}/built-in")
             .AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
-        apps.MapPost("/activate", async (string workspaceId, ApplicationCatalog catalog, IOptions<BasicAuthOptions> auth) =>
+        apps.MapPost("/activate", async (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth) =>
         {
-            await catalog.Start(AppDefinition.NameOf<AssistantApp>(), AssistantApp.Key(WorkspaceScope.Current(auth.Value, workspaceId).Id));
+            await brain.Get<IAssistant>(AssistantSurface.Key(WorkspaceScope.Current(auth.Value, workspaceId).Id)).Activate();
             return Results.NoContent();
         });
         apps.MapPost("/{appId}/open", async (string workspaceId, string appId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth) =>
@@ -27,7 +27,7 @@ internal static class BuiltInAppEndpoints
             var key = WorkspaceScope.Current(auth.Value, workspaceId).Id;
             if (appId == "assistant")
             {
-                var window = await brain.Get<IAssistant>(AssistantApp.Key(key)).OpenWindow();
+                var window = await brain.Get<IAssistant>(AssistantSurface.Key(key)).OpenWindow();
                 return Results.Ok(new { id = window.Id, title = window.Title, kind = "surface", surface = window.Surface });
             }
             return appId switch

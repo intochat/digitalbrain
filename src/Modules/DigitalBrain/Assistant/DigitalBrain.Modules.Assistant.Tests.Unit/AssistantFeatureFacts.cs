@@ -8,14 +8,14 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Apps.Assistant.Tests.Unit;
+namespace DigitalBrain.Assistant.Tests.Unit;
 
 public sealed class AssistantFeatureFacts
 {
     [Fact]
-    public void ApplicationCompositionBelongsToAppsNotKernel()
+    public void TheAssistantIsAModuleNotACompiledApplication()
     {
-        Assert.Equal("DigitalBrain.Apps", typeof(AssistantApp).GetInterfaces().Single().Namespace);
+        Assert.Contains(typeof(DigitalBrain.Core.IModule), typeof(AssistantModule).GetInterfaces());
         Assert.Null(typeof(DigitalBrain.Core.BrainCompositionBuilder).Assembly.GetType("DigitalBrain.Core.IApplication"));
     }
 
@@ -31,7 +31,7 @@ public sealed class AssistantFeatureFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create()
-            .WithApp<AssistantApp>()
+            .WithModule<AssistantModule>().RequireModules([typeof(DigitalBrain.Apps.AppsModule), typeof(DigitalBrain.AI.AIModule), typeof(DigitalBrain.Compute.ComputeModule), typeof(DigitalBrain.Flutter.FlutterModule)])
             .WithModule<SpecsModule>()
             .WithModule<SupabaseModule>()
             .ConfigureSilo(silo => silo.Services

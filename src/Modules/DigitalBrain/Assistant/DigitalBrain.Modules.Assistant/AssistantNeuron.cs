@@ -15,7 +15,7 @@ using DigitalBrain.Flutter.VoiceInput.Signals;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
-namespace DigitalBrain.Apps.Assistant;
+namespace DigitalBrain.Assistant;
 
 [Alias("apps.assistant"), Orleans.Metadata.DefaultGrainType("apps.assistant")]
 public interface IAssistant : INeuron, IUiEventHandler
@@ -62,7 +62,7 @@ internal sealed partial class AssistantNeuron(
     : Neuron<AssistantState>(store), IAssistant
 {
     private string Key => this.GetPrimaryKeyString();
-    private ITextField Draft => GrainFactory.GetGrain<ITextField>(UiComposer.NameOf(Key, AssistantApp.DraftPart));
+    private ITextField Draft => GrainFactory.GetGrain<ITextField>(UiComposer.NameOf(Key, AssistantSurface.DraftPart));
     public Task<AssistantState> Read() => Task.FromResult(Snapshot);
     // An assistant started for a workspace is keyed "{workspace}/applications/assistant".
     private string Workspace => Key.Split("/applications/")[0];
@@ -123,6 +123,7 @@ internal sealed partial class AssistantNeuron(
 
     public async Task Activate()
     {
+        await AssistantSurface.Compose(GrainFactory, Key);
         if (!Snapshot.Active) { await Change(state => state with { Active = true }); }
         _published.Clear();
         await InitializePresentation();
@@ -149,19 +150,19 @@ internal sealed partial class AssistantNeuron(
         var prefix = Key + "/";
         switch (signal)
         {
-            case TextFieldChanged changed when changed.Name == prefix + AssistantApp.DraftPart:
+            case TextFieldChanged changed when changed.Name == prefix + AssistantSurface.DraftPart:
                 await Act("draft", changed.Value);
                 break;
-            case SelectChanged changed when changed.Name == prefix + AssistantApp.ThreadsPart:
+            case SelectChanged changed when changed.Name == prefix + AssistantSurface.ThreadsPart:
                 await Act("conversation", changed.Value);
                 break;
-            case SelectChanged changed when changed.Name == prefix + AssistantApp.ModelPart:
+            case SelectChanged changed when changed.Name == prefix + AssistantSurface.ModelPart:
                 await Act("model", changed.Value);
                 break;
-            case FileCaptured captured when captured.Name == prefix + AssistantApp.AttachPart:
+            case FileCaptured captured when captured.Name == prefix + AssistantSurface.AttachPart:
                 await Act("attach", System.Text.Json.JsonSerializer.Serialize(new { name = captured.FileName, content = captured.Content }));
                 break;
-            case VoiceCaptured captured when captured.Name == prefix + AssistantApp.VoicePart:
+            case VoiceCaptured captured when captured.Name == prefix + AssistantSurface.VoicePart:
                 await Hear(captured.Audio, captured.MimeType);
                 break;
             case ButtonClicked clicked when clicked.Name.StartsWith(prefix, StringComparison.Ordinal):

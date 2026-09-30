@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 using Xunit;
 
-namespace DigitalBrain.Apps.Assistant.Tests.Unit;
+namespace DigitalBrain.Assistant.Tests.Unit;
 
 public sealed class AssistantReactivationFacts
 {
@@ -19,7 +19,7 @@ public sealed class AssistantReactivationFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var runner = new StreamScenarioRunner();
-        await using var brain = await UnitTest.Create().WithApp<AssistantApp>()
+        await using var brain = await UnitTest.Create().WithModule<AssistantModule>().RequireModules([typeof(DigitalBrain.Apps.AppsModule), typeof(DigitalBrain.AI.AIModule), typeof(DigitalBrain.Compute.ComputeModule), typeof(DigitalBrain.Flutter.FlutterModule)])
             .ConfigureSilo(silo => silo.Services.AddSingleton<IAgentTurnRunner>(runner)
                 .Configure<AIOptions>(options =>
                 {
@@ -28,17 +28,17 @@ public sealed class AssistantReactivationFacts
                     options.Default.Model = "fixture";
                     options.Default.Capabilities = LlmCapabilities.Tools;
                 })).StartAsync(ct);
-        var key = AssistantApp.Key("reactivation");
+        var key = AssistantSurface.Key("reactivation");
         var app = brain.Get<IAssistant>(key);
         var ui = new AssistantUiProbe(brain.Grains, key);
-        await brain.SiloServices.GetRequiredService<ApplicationCatalog>().Start(AppDefinition.NameOf<AssistantApp>(), key);
+        await brain.Grains.GetGrain<IAssistant>(key).Activate();
         await ui.Input("saved draft");
         var composed = await ui.Tree();
         var thread = (await ui.Read()).Id;
         var input = ui.Draft;
-        var send = ui.Button(AssistantApp.SendPart);
-        var inputBinding = brain.Get<IUiBinding>(UiComposer.NameOf(key, AssistantApp.DraftPart));
-        var sendBinding = brain.Get<IUiBinding>(UiComposer.NameOf(key, AssistantApp.SendPart));
+        var send = ui.Button(AssistantSurface.SendPart);
+        var inputBinding = brain.Get<IUiBinding>(UiComposer.NameOf(key, AssistantSurface.DraftPart));
+        var sendBinding = brain.Get<IUiBinding>(UiComposer.NameOf(key, AssistantSurface.SendPart));
         await brain.DeactivateAsync(app, ct);
         await brain.DeactivateAsync(input, ct);
         await brain.DeactivateAsync(send, ct);

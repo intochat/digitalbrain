@@ -4,7 +4,7 @@ using System.Text.Json;
 using DigitalBrain.AI.Metering;
 using DigitalBrain.Compute;
 
-namespace DigitalBrain.Apps.Assistant;
+namespace DigitalBrain.Assistant;
 
 public sealed record ComputeUsageItem(string Id, DateTimeOffset OccurredAt, string Title, string Outcome,
     decimal? PreviewCompute, decimal? ChargedCompute, decimal? ReservedCompute, string PriceBookVersion,

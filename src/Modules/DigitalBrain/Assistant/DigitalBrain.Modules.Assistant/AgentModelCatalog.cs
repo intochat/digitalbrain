@@ -2,7 +2,7 @@ using Microsoft.Extensions.Configuration;
 using DigitalBrain.AI;
 using Microsoft.Extensions.Options;
 
-namespace DigitalBrain.Apps.Assistant;
+namespace DigitalBrain.Assistant;
 
 // This is the browser's allowlist. Never serialize a resolved model: it contains
 // operator-owned endpoints. Provider credentials remain entirely server-owned.

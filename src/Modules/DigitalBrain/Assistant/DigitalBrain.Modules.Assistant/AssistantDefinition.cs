@@ -1,7 +1,7 @@
 using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.AI.Agents;
 
-namespace DigitalBrain.Apps.Assistant;
+namespace DigitalBrain.Assistant;
 
 // Product policy owned by the Assistant application. The neuron adds workspace tools and
 // retained conversation context before executing a turn.

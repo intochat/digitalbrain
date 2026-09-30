@@ -1,7 +1,7 @@
 using DigitalBrain.Identity.Configuration;
 using System.Text.Json;
 using DigitalBrain.Contracts;
-using DigitalBrain.Apps.Assistant;
+using DigitalBrain.Assistant;
 using DigitalBrain.Identity;
 using DigitalBrain.Core.Enforcement;
 using IntoChat.Workspace;
@@ -16,12 +16,12 @@ internal static class AgentEndpoints
     public static void MapWorkspaceAgent(this IEndpointRouteBuilder routes)
     {
         routes.MapGet("/ai/models", async (IDigitalBrain brain) =>
-            Results.Ok(await brain.Get<IAssistant>(AssistantApp.Key("catalog")).Models()));
+            Results.Ok(await brain.Get<IAssistant>(AssistantSurface.Key("catalog")).Models()));
         routes.MapGet("/workspaces/{workspaceId}/conversations/{threadId}", async (string workspaceId, string threadId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth, CancellationToken ct) =>
         {
             if (!WorkspaceScope.IsValidId(workspaceId) || !WorkspaceScope.IsValidId(threadId)) { return Results.BadRequest(); }
             var scope = WorkspaceScope.Current(auth.Value, workspaceId);
-            return Results.Ok(await brain.Get<IAssistant>(AssistantApp.Key(scope.Id)).ReadConversation(threadId, ct));
+            return Results.Ok(await brain.Get<IAssistant>(AssistantSurface.Key(scope.Id)).ReadConversation(threadId, ct));
         }).AddEndpointFilter(WorkspaceAccessFilter.EnforceAsync);
         routes.MapPost("/agent", async (AgentInput input, HttpContext http, IDigitalBrain brain, IOptions<BasicAuthOptions> auth) =>
         {
@@ -32,7 +32,7 @@ internal static class AgentEndpoints
             var request = new AssistantRun(input.ThreadId, input.RunId, input.Messages[0].Content, scope.Owner, input.ModelProfile);
             try
             {
-                await foreach (var item in brain.Get<IAssistant>(AssistantApp.Key(scope.Id)).Run(request, http.RequestAborted))
+                await foreach (var item in brain.Get<IAssistant>(AssistantSurface.Key(scope.Id)).Run(request, http.RequestAborted))
                 {
                     if (!http.Response.HasStarted)
                     {
