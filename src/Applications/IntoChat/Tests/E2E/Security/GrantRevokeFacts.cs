@@ -7,30 +7,32 @@ namespace IntoChat.Tests.E2E.Security;
 
 // The grants list and revoke routes at the HTTP edge are scoped to the caller's workspace.
 // Enforcement of a grant on a call is covered by Identity's GrantFacts.
-public sealed class GrantRevokeFacts
+[Collection(IntoChatHostCollection.Name)]
+public sealed class GrantRevokeFacts(IntoChatHostFixture host)
 {
     [Fact(Timeout = 300_000)]
     public async Task GrantsAreListedAndRevokedOnlyInTheOwnersWorkspace()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.StartAsync(ct);
+        await using var brain = await host.LeaseAsync(ct);
+        var suffix = Guid.NewGuid().ToString("N")[..8];
 
         using var alice = CookieClient(brain.HttpClient);
         using var bob = CookieClient(brain.HttpClient);
         using var aliceLogin = await alice.PostAsJsonAsync(
             "/identity/register",
-            new { principalId = "alice", displayName = "Alice", password = "alice-password-123" }, ct);
+            new { principalId = "alice-" + suffix, displayName = "Alice", password = "alice-password-123" }, ct);
         Assert.Equal(HttpStatusCode.OK, aliceLogin.StatusCode);
         using var bobLogin = await bob.PostAsJsonAsync(
             "/identity/register",
-            new { principalId = "bob", displayName = "Bob", password = "bob-password-123" }, ct);
+            new { principalId = "bob-" + suffix, displayName = "Bob", password = "bob-password-123" }, ct);
         Assert.Equal(HttpStatusCode.OK, bobLogin.StatusCode);
 
         var member = await aliceLogin.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(ct);
         var workspace = member!.BrainId;
         using var create = await alice.PostAsJsonAsync(
             $"/brains/{workspace}/grants",
-            new { appId = "app-1", semanticTypeId = "person.birthDate", mode = 2 },
+            new { appId = "app-1", semanticTypeId = "person.birthDate", mode = 2, workspaceId = workspace },
             ct);
         Assert.Equal(HttpStatusCode.OK, create.StatusCode);
 
