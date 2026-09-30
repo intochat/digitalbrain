@@ -286,35 +286,3 @@ internal static class UiKitEndpoints
         });
     }
 }
-
-internal sealed record ButtonSet(string Label, string Action, bool Enabled = true);
-internal sealed record ToggleSet(string Label, bool On);
-internal sealed record TextSet(string Markdown);
-internal sealed record TextFieldConfigure(string Label, string Kind);
-internal sealed record TextFieldValue(string Value);
-internal sealed record SliderConfigure(double Min, double Max, double Step);
-internal sealed record SliderValue(double Value);
-internal sealed record ProgressSet(bool Determinate, double Value, string Label);
-internal sealed record InfoBarShow(string Severity, string Title, string Body);
-internal sealed record CardSet(string Title, string Body, IReadOnlyList<UiChildRef>? Children);
-internal sealed record ImageSet(string Url, string MediaType, string Prompt);
-internal sealed record VideoLoad(string Url, double Duration);
-internal sealed record VideoSeek(double Seconds);
-internal sealed record BrowserNavigate(string Uri, string? Title);
-internal sealed record ChartRender(string Title, string Kind, IReadOnlyList<ChartPoint> Points);
-internal sealed record GraphRender(string Title, IReadOnlyList<GraphNode> Nodes, IReadOnlyList<GraphEdge> Edges);
-internal sealed record TableReplace(string Title, IReadOnlyList<TableColumn> Columns, IReadOnlyList<IReadOnlyList<string>> Rows);
-internal sealed record TableView(string Sort, string Filter);
-internal sealed record CalendarSet(string Mode, IReadOnlyList<string> Selected);
-internal sealed record ClockSet(string Label, DateTimeOffset? DueAt);
-internal sealed record MapSet(double Lat, double Lng, double Zoom, IReadOnlyList<MapMarker> Markers);
-internal sealed record PersonSet(string DisplayName, string AvatarUrl);
-internal sealed record RatingSet(int Max, int Value);
-internal sealed record ColorSet(string Hex);
-internal sealed record ExpanderSet(string Header, bool Expanded, IReadOnlyList<UiChildRef>? Children);
-internal sealed record TabsSet(IReadOnlyList<TabItem> Tabs, string SelectedId);
-internal sealed record TabsSelect(string Id);
-internal sealed record TreeSet(IReadOnlyList<TreeNode> Nodes);
-internal sealed record TreeSelect(string Id);
-internal sealed record SheetSet(string Title, IReadOnlyList<SheetCell> Cells);
-internal sealed record FormDraft(string Name, string Value);
