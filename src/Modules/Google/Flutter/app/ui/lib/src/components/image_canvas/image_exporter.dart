@@ -19,8 +19,9 @@ abstract final class ImageExporter {
         crop.left < 0 ||
         crop.top < 0 ||
         crop.right > source.width ||
-        crop.bottom > source.height)
+        crop.bottom > source.height) {
       throw ArgumentError('Crop must be inside the source image.');
+    }
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder)
       ..clipRect(Rect.fromLTWH(0, 0, crop.width, crop.height))
@@ -34,10 +35,11 @@ abstract final class ImageExporter {
       );
       try {
         final data = await output.toByteData(format: ui.ImageByteFormat.png);
-        if (data == null)
+        if (data == null) {
           throw StateError(
             'PNG export failed. Your edits are still available.',
           );
+        }
         return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
       } finally {
         output.dispose();

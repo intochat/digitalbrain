@@ -10,8 +10,9 @@ import 'package:flutter/material.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   const output = String.fromEnvironment('BROWSER_SMOKE_ATTACHMENT');
-  if (output.isEmpty)
+  if (output.isEmpty) {
     throw ArgumentError('BROWSER_SMOKE_ATTACHMENT is required.');
+  }
   runApp(
     MaterialApp(
       home: Scaffold(

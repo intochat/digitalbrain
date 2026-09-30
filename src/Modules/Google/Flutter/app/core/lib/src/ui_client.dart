@@ -595,12 +595,8 @@ final class DigitalBrainUiClient {
     String? cursor,
     int limit = 20,
   }) async {
-    final query = Uri(
-      queryParameters: {
-        'limit': '$limit',
-        if (cursor != null) 'cursor': cursor,
-      },
-    ).query;
+    final query = Uri(queryParameters: {'limit': '$limit', 'cursor': ?cursor})
+        .query;
     return ComputeUsagePage.fromJson(
       Map<String, dynamic>.from(
         await _tableRequest(
