@@ -94,15 +94,27 @@ runtime-verified); "only Endpoint set → Partial" registration case; Dart core 
   no TODO/FIXME (good).
 - **Naming**: 8 file-name/type mismatches.
 
-## 5. Proposed cleanup workstreams (priority order)
+## 5. Cleanup workstreams — status 2026-09-30 (late)
 
-1. **Fix the broken** (§1): gallery drift, collector.yaml fact, backspace theory. Small.
-2. **Merge with master** (§2): rename reconciliation → Gmail-watch re-implementation → host/CI.
-   Do this BEFORE deep restructuring or the conflicts get worse.
-3. **Test purge + hardening**: delete tombstones/duplicates (~60 facts), fix the green-under-bug
-   set, replace ThrowsAny with typed assertions, de-template Flutter facts, split the Steps DSL,
-   move non-Aspire E2E to Unit. One pass per area using the per-test tables.
-4. **Dead-code deletion** (§4): the zero-reference batch is mechanical.
-5. **File/namespace normalization**: ratify the namespace rule, split the worst multi-type files
-   (UiKitEndpoints first), kill the 78 summaries.
+1. ~~Fix the broken~~ **DONE**: gallery drift fixed (registry gained webbrowser, gallery data
+   didn't), collector.yaml fact deleted, backspace theory fixed (`@"a\b"`) + retargeted at the
+   real handler. **Known-failure set is now EMPTY** — IntoChat Unit 60/60.
+2. ~~Merge with master~~ **DONE by supersession**: owner chose `merge -s ours` — branch is the new
+   version, master's 15 commits content-discarded. Follow-ups: re-implement Gmail watch (PR #105)
+   on the registration model; master's Qdrant rename discarded (branch layout stands).
+3. ~~Test purge + hardening~~ **DONE** (commits 67a630230..13b3acb36): ~35 facts deleted
+   (tombstones/duplicates/fake-tests), 18 templated Flutter E2E files collapsed to representatives,
+   Steps DSL unrolled (15 individual facts), green-under-bug set fixed, ThrowsAny → typed
+   (exposed+fixed a real bug: UntrustedCallerException wasn't Orleans-serializable), shared test
+   plumbing extracted, 7 route facts hardened to exact method+pattern sets, UiKit's 64 routes
+   pinned exactly (caught+fixed a dead `imagecanvass` route typo), table 409/403 HTTP facts
+   restored, ChaosCharge/OTLP moved E2E→Unit. Remaining accepted gaps: Qdrant has no real-server
+   test; Flutter E2E environment fails 10/12 on baseline (pre-existing, needs its own fix);
+   src/Testing has no self-tests; Dart core package untested.
+4. **Dead-code deletion** (§4): NEXT — the zero-reference batch is mechanical.
+5. **File/namespace normalization**: ratify the namespace rule (recommendation: module-root),
+   split the worst multi-type files (UiKitEndpoints first), kill the 78 summaries.
 6. **Framework self-tests + coverage gaps**: last, once the suites are lean.
+
+Kernel redesign (was discussed separately): phases 1+2 DONE — brain in Core, Core/Kernel naming,
+DigitalBrain.Platform credential ring script-invisible by assembly identity.
