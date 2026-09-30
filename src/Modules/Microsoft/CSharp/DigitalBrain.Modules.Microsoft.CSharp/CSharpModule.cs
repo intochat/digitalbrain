@@ -31,7 +31,6 @@ public sealed class CSharpModule : IModule
             // Unset composition values arrive as empty strings, not nulls.
             if (string.IsNullOrWhiteSpace(options.SourceRoot)) { options.SourceRoot = FindRepositoryRoot(); }
         });
-        builder.Services.AddOptions<CSharpAuthoringOptions>().BindConfiguration(CSharpAuthoringOptions.SectionName);
         builder.Services.AddCSharpAuthoring();
         builder.Services.TryAddSingleton<CSharpSharing>();
         builder.Services.TryAddScoped(provider => provider.GetRequiredService<CSharpToolService>().ForScope(BrainScope.CurrentId()));
