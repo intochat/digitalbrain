@@ -17,8 +17,8 @@ namespace IntoChat.Tests.Unit.Marketplace;
 public sealed class ShippedAppFacts
 {
     [Fact]
-    public void GroupChatAssistantSettingsAndWordCountShip()
-        => Assert.Equal(["assistant", "group-chat", "settings", "word-count"], ShippedApps.Load().Select(app => app.Package.Name).Order());
+    public void EveryFirstPartyPackageShips()
+        => Assert.Equal(["assistant", "customer-researcher", "group-chat", "settings", "word-count"], ShippedApps.Load().Select(app => app.Package.Name).Order());
 
     [Fact]
     public void EveryShippedProgramAndTestsFileParsesAsCSharp()
