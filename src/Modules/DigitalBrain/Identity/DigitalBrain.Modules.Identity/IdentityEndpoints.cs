@@ -27,15 +27,14 @@ internal static class IdentityEndpoints
         routes.MapGet("/identity/session", Session);
         routes.MapPost("/identity/logout", (Delegate)LogoutAsync);
         routes.MapPost("/identity/brains", CreateBrainAsync);
-        var grants = routes.MapGroup("/workspaces/{workspaceId}/grants")
-            .AddEndpointFilter(DigitalBrain.Core.Enforcement.BrainAccessFilter.EnforceAsync);
-        grants.MapGet("", async (string workspaceId, IDigitalBrain brain, CancellationToken ct) =>
-            Results.Ok(await Grants(brain, workspaceId).ListAsync(ct)));
-        grants.MapPost("", async (string workspaceId, Grant input, IDigitalBrain brain, CancellationToken ct) =>
-            Results.Ok(await Grants(brain, workspaceId).GrantAsync(input, ct)));
-        grants.MapPost("/revoke", async (string workspaceId, RevokeGrant input, IDigitalBrain brain, CancellationToken ct) =>
+        var grants = BrainRoutes.Group(routes, "/grants");
+        grants.MapGet("", async (string brainId, IDigitalBrain brain, CancellationToken ct) =>
+            Results.Ok(await Grants(brain, brainId).ListAsync(ct)));
+        grants.MapPost("", async (string brainId, Grant input, IDigitalBrain brain, CancellationToken ct) =>
+            Results.Ok(await Grants(brain, brainId).GrantAsync(input, ct)));
+        grants.MapPost("/revoke", async (string brainId, RevokeGrant input, IDigitalBrain brain, CancellationToken ct) =>
         {
-            await Grants(brain, workspaceId).RevokeAsync(input.AppId, input.SemanticTypeId, input.Mode, ct);
+            await Grants(brain, brainId).RevokeAsync(input.AppId, input.SemanticTypeId, input.Mode, ct);
             return Results.NoContent();
         });
     }
@@ -107,7 +106,7 @@ internal static class IdentityEndpoints
 
     private static IIdentityDirectory Directory(IDigitalBrain brain) => brain.Get<IIdentityDirectory>(IdentityGrains.Directory);
 
-    private static IGrantStore Grants(IDigitalBrain brain, string workspaceId) => brain.Get<IGrantStore>(IdentityGrains.Grants(workspaceId));
+    private static IGrantStore Grants(IDigitalBrain brain, string brainId) => brain.Get<IGrantStore>(IdentityGrains.Grants(brainId));
 
     internal sealed record LoginRequest(string PrincipalId, string? Password = null);
     internal sealed record RegisterRequest(string PrincipalId, string? Password = null, string? DisplayName = null);

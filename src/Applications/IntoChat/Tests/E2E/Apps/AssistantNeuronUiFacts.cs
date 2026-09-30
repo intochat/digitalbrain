@@ -18,12 +18,12 @@ public sealed class AssistantNeuronUiFacts
         await LeadData.SeedAsync(brain, "Neuron UI", ct);
         async Task<JsonElement> Open()
         {
-            using var response = await brain.HttpClient.PostAsJsonAsync("/workspaces/neuron-ui/applications/assistant/open", new { draft = "Show active leads" }, ct);
+            using var response = await brain.HttpClient.PostAsJsonAsync("/brains/neuron-ui/applications/assistant/open", new { draft = "Show active leads" }, ct);
             response.EnsureSuccessStatusCode();
             return await response.Content.ReadFromJsonAsync<JsonElement>(ct);
         }
         Task<JsonElement> Read(string kind, string name) => brain.HttpClient.GetFromJsonAsync<JsonElement>(
-            "/workspaces/neuron-ui/apps/node?kind=" + kind + "&name=" + Uri.EscapeDataString(name), ct);
+            "/brains/neuron-ui/apps/node?kind=" + kind + "&name=" + Uri.EscapeDataString(name), ct);
         async Task<Dictionary<string, (string Kind, JsonElement State)>> Tree(JsonElement window)
         {
             var nodes = new Dictionary<string, (string, JsonElement)>();
@@ -60,7 +60,7 @@ public sealed class AssistantNeuronUiFacts
         var send = Part(firstTree, "send", "button");
         var otherDraft = Part(secondTree, "draft", "textfield");
         Assert.Equal("Show active leads", firstTree[draft].State.GetProperty("value").GetString());
-        using var submitted = await brain.HttpClient.PostAsJsonAsync("/workspaces/neuron-ui/apps/event", new { kind = "button", name = send }, ct);
+        using var submitted = await brain.HttpClient.PostAsJsonAsync("/brains/neuron-ui/apps/event", new { kind = "button", name = send }, ct);
         submitted.EnsureSuccessStatusCode();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(TimeSpan.FromSeconds(45));

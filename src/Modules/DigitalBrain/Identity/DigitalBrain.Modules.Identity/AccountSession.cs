@@ -131,11 +131,7 @@ public static class AccountSession
         var brainId = context.Request.RouteValues.TryGetValue("brainId", out var routeBrain)
             && routeBrain is string { Length: > 0 } brainValue
                 ? brainValue
-                // workspaceId fallback dies with the last /workspaces route (transition only)
-                : context.Request.RouteValues.TryGetValue("workspaceId", out var routeWorkspace)
-                    && routeWorkspace is string { Length: > 0 } workspaceValue
-                        ? workspaceValue
-                        : claimBrain is { Length: > 0 } ? claimBrain : DefaultLogin;
+                : claimBrain is { Length: > 0 } ? claimBrain : DefaultLogin;
         return new CallerContext
         {
             PrincipalId = principalId,

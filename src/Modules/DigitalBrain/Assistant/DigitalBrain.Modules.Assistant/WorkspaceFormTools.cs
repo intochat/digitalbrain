@@ -70,7 +70,7 @@ public sealed class WorkspaceFormTools(IDigitalBrain brain) : IAgentToolFactory
     private async Task<object> ViewAsync(AgentToolContext trusted, string formId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(formId) || formId.Length > 256 || !formId.StartsWith(trusted.ScopeId + "/apps/", StringComparison.Ordinal))
-        { throw new ArgumentException("The form handle belongs to another workspace.", nameof(formId)); }
+        { throw new ArgumentException("The form handle belongs to another brain.", nameof(formId)); }
         var state = await brain.Get<IForm>(formId).Read().WaitAsync(ct);
         if (state.Fields.Count == 0) { throw new KeyNotFoundException("No such form; call show_form first."); }
         await ShowWindowAsync(trusted.ScopeId, formId, state.Title, ct);

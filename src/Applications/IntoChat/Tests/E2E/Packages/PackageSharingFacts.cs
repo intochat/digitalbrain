@@ -31,7 +31,7 @@ public sealed class PackageSharingFacts
             new { content = ResearcherPackage.Content("Forged"), message = "Not mine", expectedHead = original.GetProperty("id").GetString() }, Json, ct))
         { Assert.Equal(HttpStatusCode.Forbidden, forged.StatusCode); }
 
-        var app = $"/workspaces/{bob.Workspace}/packages/alice/researcher";
+        var app = $"/brains/{bob.Workspace}/packages/alice/researcher";
         await People.Send(bob.Client, HttpMethod.Post, app, new { }, ct);
         Assert.Equal("Research (plain): What is Orleans?", await Ask(bob.Client, app, "What is Orleans?", ct));
         using (var foreign = await alice.Client.GetAsync(app, ct)) { Assert.Equal(HttpStatusCode.Forbidden, foreign.StatusCode); }

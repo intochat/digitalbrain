@@ -21,10 +21,10 @@ public sealed class CrossWorkspaceFacts
         await slider.Configure(0, 10, 1);
         await slider.SetValue(7);
 
-        var owner = await brain.HttpClient.GetFromJsonAsync<SliderState>("/workspaces/workspace-a/ui/sliders/volume", Json, ct);
+        var owner = await brain.HttpClient.GetFromJsonAsync<SliderState>("/brains/workspace-a/ui/sliders/volume", Json, ct);
         Assert.Equal(7, owner!.Value);
 
-        var foreign = await brain.HttpClient.GetFromJsonAsync<SliderState>("/workspaces/workspace-b/ui/sliders/volume", Json, ct);
+        var foreign = await brain.HttpClient.GetFromJsonAsync<SliderState>("/brains/workspace-b/ui/sliders/volume", Json, ct);
         Assert.Equal(0, foreign!.Value);
     }
 
@@ -53,23 +53,23 @@ public sealed class CrossWorkspaceFacts
         var bobWorkspace = bobMember!.BrainId;
 
         // Bob reaches his own workspace but is forbidden from Alice's scoped value and app node.
-        using var ownUi = await bob.GetAsync($"/workspaces/{bobWorkspace}/ui/sliders/volume", ct);
+        using var ownUi = await bob.GetAsync($"/brains/{bobWorkspace}/ui/sliders/volume", ct);
         Assert.Equal(HttpStatusCode.OK, ownUi.StatusCode);
 
-        using var foreignWorkspace = await bob.GetAsync($"/workspaces/{aliceWorkspace}", ct);
+        using var foreignWorkspace = await bob.GetAsync($"/brains/{aliceWorkspace}", ct);
         Assert.Equal(HttpStatusCode.Forbidden, foreignWorkspace.StatusCode);
-        using var foreignSources = await bob.PostAsJsonAsync($"/workspaces/{aliceWorkspace}/connected-sources", new { sources = new[] { "stolen" } }, ct);
+        using var foreignSources = await bob.PostAsJsonAsync($"/brains/{aliceWorkspace}/connected-sources", new { sources = new[] { "stolen" } }, ct);
         Assert.Equal(HttpStatusCode.Forbidden, foreignSources.StatusCode);
 
-        using var foreignUi = await bob.GetAsync($"/workspaces/{aliceWorkspace}/ui/sliders/volume", ct);
+        using var foreignUi = await bob.GetAsync($"/brains/{aliceWorkspace}/ui/sliders/volume", ct);
         Assert.Equal(HttpStatusCode.Forbidden, foreignUi.StatusCode);
 
-        using var foreignNode = await bob.GetAsync($"/workspaces/{aliceWorkspace}/apps/node?kind=text&name={aliceWorkspace}/apps/forms/intake", ct);
+        using var foreignNode = await bob.GetAsync($"/brains/{aliceWorkspace}/apps/node?kind=text&name={aliceWorkspace}/apps/forms/intake", ct);
         Assert.Equal(HttpStatusCode.Forbidden, foreignNode.StatusCode);
 
-        using var foreignCompute = await bob.GetAsync($"/workspaces/{aliceWorkspace}/compute/usage", ct);
+        using var foreignCompute = await bob.GetAsync($"/brains/{aliceWorkspace}/compute/usage", ct);
         Assert.Equal(HttpStatusCode.Forbidden, foreignCompute.StatusCode);
-        using var ownCompute = await bob.GetAsync($"/workspaces/{bobWorkspace}/compute/usage", ct);
+        using var ownCompute = await bob.GetAsync($"/brains/{bobWorkspace}/compute/usage", ct);
         Assert.Equal(HttpStatusCode.OK, ownCompute.StatusCode);
 
         await brain.Get<DigitalBrain.Compute.IWallet>(aliceMember.AccountId).ChargeAsync(new DigitalBrain.Compute.LedgerEntry

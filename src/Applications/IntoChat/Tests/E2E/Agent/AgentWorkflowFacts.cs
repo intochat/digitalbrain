@@ -1,3 +1,4 @@
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Assistant;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -26,13 +27,13 @@ public sealed class AgentWorkflowFacts
         await LeadData.SeedAsync(brain, "Beyond first page", ct);
         async Task<string> Ask(string run)
         {
-            using var response = await brain.HttpClient.PostAsJsonAsync("/agent", new { workspaceId = "failures", threadId = "thread", runId = run, messages = new[] { new { role = "user", content = "Show leads" } } }, ct);
+            using var response = await brain.HttpClient.PostAsJsonAsync("/agent", new { brainId = "failures", threadId = "thread", runId = run, messages = new[] { new { role = "user", content = "Show leads" } } }, ct);
             return await response.Content.ReadAsStringAsync(ct);
         }
         model.Sql = "select id, company, email from leads where false";
         var emptyStream = await Ask("empty");
         Assert.True(emptyStream.Contains("RUN_FINISHED", StringComparison.Ordinal), emptyStream + "\n" + string.Join("\n", model.Errors) + "\n" + string.Join("\n", model.Requests.Select(r => r.GetRawText())));
-        var workspace = brain.Get<IWorkspace>(WorkspaceScope.Create("owner", "failures").Id);
+        var workspace = brain.Get<IWorkspace>(BrainScope.Create("owner", "failures").Id);
         var window = Assert.Single((await workspace.Read()).Windows);
         Assert.Empty((await brain.Get<DigitalBrain.Supabase.Tables.ISupabaseTable>(window.Reference.NeuronId).Read(new(0, 25)))!.Rows);
         model.Sql = "delete from leads";
@@ -40,9 +41,9 @@ public sealed class AgentWorkflowFacts
         Assert.Contains("RUN_ERROR", invalid);
         Assert.DoesNotContain("RUN_FINISHED", invalid);
         // The endpoint still flushes the failed intent's usage in one durable batch.
-        Assert.NotEmpty((await brain.Get<IIntentUsage>(ComputeUsageEndpoints.IntentId(WorkspaceScope.Create("owner", "failures").Id, "thread", "invalid")).ReadAsync(ct)).Entries);
+        Assert.NotEmpty((await brain.Get<IIntentUsage>(ComputeUsageEndpoints.IntentId(BrainScope.Create("owner", "failures").Id, "thread", "invalid")).ReadAsync(ct)).Entries);
         // P1.2: a failed run keeps its turn in the conversation history.
-        var failedAgent = brain.Get<IAgent>(AssistantConversations.Key(WorkspaceScope.Create("owner", "failures").Id, "thread"));
+        var failedAgent = brain.Get<IAgent>(AssistantConversations.Key(BrainScope.Create("owner", "failures").Id, "thread"));
         Assert.Contains((await failedAgent.ReadConversation(ct)).Turns, turn => turn.RunId == "invalid");
         model.Sql = "select company from leads";
         model.BeforeTable = token => LeadData.DropAsync(brain, token);
@@ -63,7 +64,7 @@ public sealed class AgentWorkflowFacts
             .StartAsync(ct);
         await LeadData.SeedAsync(brain, "Beyond first page", ct);
         model.Delay = TimeSpan.FromMinutes(1);
-        var input = new { workspaceId = "cancel", threadId = "thread", runId = "cancel-run", messages = new[] { new { role = "user", content = "Show leads" } } };
+        var input = new { brainId = "cancel", threadId = "thread", runId = "cancel-run", messages = new[] { new { role = "user", content = "Show leads" } } };
         using var request = new HttpRequestMessage(HttpMethod.Post, "/agent") { Content = JsonContent.Create(input) };
         using var response = await brain.HttpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
         await model.ToolRequested.Task.WaitAsync(TimeSpan.FromSeconds(30), ct);
@@ -72,7 +73,7 @@ public sealed class AgentWorkflowFacts
         Assert.Contains("RUN_ERROR", duplicateStream);
         Assert.DoesNotContain("RUN_FINISHED", duplicateStream);
         response.Dispose();
-        var scope = WorkspaceScope.Create("owner", "cancel").Id;
+        var scope = BrainScope.Create("owner", "cancel").Id;
         var conversation = brain.Get<IAgent>(AssistantConversations.Key(scope, "thread"));
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(TimeSpan.FromSeconds(30));
@@ -85,7 +86,7 @@ public sealed class AgentWorkflowFacts
         JsonElement cancelled;
         do
         {
-            using var page = JsonDocument.Parse(await brain.HttpClient.GetStringAsync("/workspaces/cancel/compute/usage", ct));
+            using var page = JsonDocument.Parse(await brain.HttpClient.GetStringAsync("/brains/cancel/compute/usage", ct));
             cancelled = page.RootElement.GetProperty("items").Clone();
             if (cancelled.GetArrayLength() == 0) { await Task.Delay(100, deadline.Token); }
         } while (cancelled.GetArrayLength() == 0);
@@ -95,7 +96,7 @@ public sealed class AgentWorkflowFacts
         model.Delay = TimeSpan.Zero;
         using var retried = await brain.HttpClient.PostAsJsonAsync("/agent", input, ct);
         Assert.Contains("RUN_FINISHED", await retried.Content.ReadAsStringAsync(ct));
-        using var history = JsonDocument.Parse(await brain.HttpClient.GetStringAsync("/workspaces/cancel/compute/usage", ct));
+        using var history = JsonDocument.Parse(await brain.HttpClient.GetStringAsync("/brains/cancel/compute/usage", ct));
         var row = Assert.Single(history.RootElement.GetProperty("items").EnumerateArray());
         Assert.Equal("Succeeded", row.GetProperty("outcome").GetString());
         Assert.Equal(usageId, row.GetProperty("id").GetString());
@@ -113,21 +114,21 @@ public sealed class AgentWorkflowFacts
         await connection.OpenAsync(ct);
         await using var seed = new NpgsqlCommand("CREATE TABLE leads (id int, company text, email text, active boolean); INSERT INTO leads VALUES (1, 'Real company', 'real@example.test', true)", connection);
         await seed.ExecuteNonQueryAsync(ct);
-        var input = new { workspaceId = "agent", threadId = "thread", runId = "run", messages = new[] { new { role = "user", content = "Show active leads" } } };
+        var input = new { brainId = "agent", threadId = "thread", runId = "run", messages = new[] { new { role = "user", content = "Show active leads" } } };
         using var response = await brain.HttpClient.PostAsJsonAsync("/agent", input, ct);
         var stream = await response.Content.ReadAsStringAsync(ct);
         Assert.Contains("RUN_FINISHED", stream);
         Assert.DoesNotContain("RUN_ERROR", stream);
         Assert.Contains("TOOL_CALL_RESULT", stream);
         model.AssertCompleted();
-        var usage = brain.Get<IIntentUsage>(ComputeUsageEndpoints.IntentId(WorkspaceScope.Create("owner", "agent").Id, "thread", "run"));
+        var usage = brain.Get<IIntentUsage>(ComputeUsageEndpoints.IntentId(BrainScope.Create("owner", "agent").Id, "thread", "run"));
         var recorded = await usage.ReadAsync(ct);
         Assert.NotEmpty(recorded.Entries);
         Assert.All(recorded.Entries, entry => Assert.True(entry.UsageReported, "The scripted model reports usage for every call."));
         Assert.All(recorded.Entries, entry => Assert.Equal(AiProvider.OpenAI.ToString(), entry.Provider));
         Assert.All(recorded.Entries, entry => Assert.Equal("gpt-5.6-luna", entry.Model));
         var recordedCount = recorded.Entries.Length;
-        var workspace = brain.Get<IWorkspace>(WorkspaceScope.Create("owner", "agent").Id);
+        var workspace = brain.Get<IWorkspace>(BrainScope.Create("owner", "agent").Id);
         var state = await workspace.Read();
         Assert.True(Assert.Single(state.Windows).IsOpen);
         var count = model.Requests.Count;
@@ -135,9 +136,9 @@ public sealed class AgentWorkflowFacts
         Assert.Contains("RUN_FINISHED", await replay.Content.ReadAsStringAsync(ct));
         Assert.Equal(count, model.Requests.Count);
         Assert.Equal(recordedCount, (await usage.ReadAsync(ct)).Entries.Length);
-        var history = await brain.HttpClient.GetFromJsonAsync<AgentConversationState>("/workspaces/agent/conversations/thread", ct);
+        var history = await brain.HttpClient.GetFromJsonAsync<AgentConversationState>("/brains/agent/conversations/thread", ct);
         Assert.Equal(Assert.Single(state.Windows).Id, Assert.Single(Assert.Single(history!.Turns).ResultIds));
-        var otherHistory = await brain.HttpClient.GetFromJsonAsync<AgentConversationState>("/workspaces/other/conversations/thread", ct);
+        var otherHistory = await brain.HttpClient.GetFromJsonAsync<AgentConversationState>("/brains/other/conversations/thread", ct);
         Assert.Empty(otherHistory!.Turns);
         using var next = await brain.HttpClient.PostAsJsonAsync("/agent", input with { runId = "next" }, ct);
         Assert.Contains("RUN_FINISHED", await next.Content.ReadAsStringAsync(ct));

@@ -1,3 +1,4 @@
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Supabase.Tables;
@@ -19,7 +20,7 @@ public sealed class SupabaseTableDisplayFacts
         var page = brain.Page;
         await page.SetViewportSizeAsync(1600, 1000);
         var projectId = await WorkspaceBrowser.CreateProjectAsync(page, "Data workspace");
-        var workspace = brain.Get<IWorkspace>(WorkspaceScope.Create("owner", projectId).Id);
+        var workspace = brain.Get<IWorkspace>(BrainScope.Create("owner", projectId).Id);
         var table = brain.Get<ISupabaseTable>("active-leads");
         var snapshot = await table.CreateFromQuery(new("Active leads", "select id, company, email from leads where active order by id"));
         await workspace.Open(new("show-leads", "leads-window", "Active leads", WindowReference.Table(snapshot.Id), (await workspace.Read()).Revision));
@@ -51,7 +52,7 @@ public sealed class SupabaseTableDisplayFacts
         var page = brain.Page;
         await page.SetViewportSizeAsync(1600, 1000);
         var projectId = await WorkspaceBrowser.CreateProjectAsync(page, "Unavailable data");
-        var workspace = brain.Get<IWorkspace>(WorkspaceScope.Create("owner", projectId).Id);
+        var workspace = brain.Get<IWorkspace>(BrainScope.Create("owner", projectId).Id);
         var table = brain.Get<ISupabaseTable>("empty-leads");
         var snapshot = await table.CreateFromQuery(new("Empty leads", "select id, company, email from leads where false"));
         await workspace.Open(new("show-empty", "empty-window", "Empty leads", WindowReference.Table(snapshot.Id), (await workspace.Read()).Revision));

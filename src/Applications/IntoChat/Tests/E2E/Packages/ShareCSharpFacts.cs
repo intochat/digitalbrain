@@ -21,7 +21,7 @@ public sealed class ShareCSharpFacts
             .StartAsync(ct);
         using var alice = await People.SignedIn(brain.HttpClient, "alice", ct);
         using var bob = await People.SignedIn(brain.HttpClient, "bob", ct);
-        var greeter = $"/workspaces/{alice.Workspace}/csharp/greeter";
+        var greeter = $"/brains/{alice.Workspace}/csharp/greeter";
 
         using (var nothingToShare = await alice.Client.PostAsJsonAsync(greeter + "/share", new { }, Json, ct))
         { Assert.Equal(HttpStatusCode.NotFound, nothingToShare.StatusCode); }
@@ -46,7 +46,7 @@ public sealed class ShareCSharpFacts
         Assert.Empty(manifest.GetProperty("settings").EnumerateArray());
         Assert.Equal("twitter", Assert.Single(manifest.GetProperty("accounts").EnumerateArray()).GetProperty("name").GetString());
 
-        using (var missing = await bob.Client.PostAsJsonAsync($"/workspaces/{bob.Workspace}/packages/alice/greeter", new { }, Json, ct))
+        using (var missing = await bob.Client.PostAsJsonAsync($"/brains/{bob.Workspace}/packages/alice/greeter", new { }, Json, ct))
         { Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode); }
         await brain.Get<IConnectors>("bob").Connect(new ConnectRequest
         {
@@ -58,14 +58,14 @@ public sealed class ShareCSharpFacts
         }, ct);
 
         var options = await People.Send(bob.Client, HttpMethod.Get,
-            $"/workspaces/{bob.Workspace}/packages/alice/greeter/accounts", null, ct);
+            $"/brains/{bob.Workspace}/packages/alice/greeter/accounts", null, ct);
         Assert.Equal("bob-twitter", Assert.Single(options.GetProperty("slots").EnumerateArray())
             .GetProperty("accounts").EnumerateArray().Single().GetProperty("id").GetString());
-        using (var wrong = await bob.Client.PostAsJsonAsync($"/workspaces/{bob.Workspace}/packages/alice/greeter",
+        using (var wrong = await bob.Client.PostAsJsonAsync($"/brains/{bob.Workspace}/packages/alice/greeter",
             new { accounts = new { twitter = "alice-twitter" } }, Json, ct))
         { Assert.Equal(HttpStatusCode.BadRequest, wrong.StatusCode); }
 
-        var installed = await People.Send(bob.Client, HttpMethod.Post, $"/workspaces/{bob.Workspace}/packages/alice/greeter",
+        var installed = await People.Send(bob.Client, HttpMethod.Post, $"/brains/{bob.Workspace}/packages/alice/greeter",
             new { accounts = new { twitter = "bob-twitter" } }, ct);
         Assert.Equal("bob-twitter", installed.GetProperty("app").GetProperty("accounts").GetProperty("twitter").GetString());
         var file = brain.Get<ICSharpFile>(installed.GetProperty("app").GetProperty("csharpFiles")[0].GetString()!);
@@ -77,7 +77,7 @@ public sealed class ShareCSharpFacts
             Assert.True((await file.Read(timeout.Token)).Status != CSharpFileStatus.Exited, logs);
             await Task.Delay(500, timeout.Token);
         }
-        await People.Send(bob.Client, HttpMethod.Delete, $"/workspaces/{bob.Workspace}/packages/alice/greeter", null, ct);
+        await People.Send(bob.Client, HttpMethod.Delete, $"/brains/{bob.Workspace}/packages/alice/greeter", null, ct);
     }
 
     private const string GreeterSource = """

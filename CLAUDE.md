@@ -20,6 +20,11 @@ Everything is made of four words. Anything that looks like a fifth concept is a 
   neuron whose external system is the person, so `On<Clicked>(button)` and `On<Posted>(elon)` are
   the same mechanism.
 
+A **brain** is itself a neuron (`IBrain`); a user has one or more. The registry and every scope are
+per brain: `BrainScope.CurrentId()` reads the brain from the kernel-stamped caller, and module
+endpoints mount under `BrainRoutes.Group` → `/brains/{brainId}` (id validation + membership filter
+applied once). "Workspace" survives only as the Flutter window-layout vocabulary.
+
 The full ratified standard: `docs/superpowers/specs/2026-09-29-programmable-brain-vision-design.md`.
 
 ## The self-programming model
@@ -56,7 +61,7 @@ behaviors/*.cs   the implementation: one script per concern (plus legacy single 
   handlers dedup through neuron state. Derived state (a window arrangement, a summary) is re-derived
   wholesale, never incrementally patched. `Arm`/`Trigger` (run-per-signal with
   `brain.Trigger<T>()`) still exists for single-trigger files.
-- **Install is per workspace** (`IApp`): settings plus account slots bound to the installer's own
+- **Install is per brain** (`IApp`): settings plus account slots bound to the installer's own
   connected accounts — a shared email summarizer runs against each user's Gmail. Each
   `behaviors/*.cs` becomes its own `ICSharpFile`; failure isolation is per behavior. First-party
   apps ship through the same commit→verify→publish pipeline (`ShippedAppPublisher`, folders under

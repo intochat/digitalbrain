@@ -1,3 +1,4 @@
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Assistant;
 using System.Text.Json;
 using Aspire.Hosting.Testing;
@@ -56,7 +57,7 @@ public sealed class AgentTableJourneyFacts
             await Assertions.Expect(page.GetByText("Response stopped.", new() { Exact = true })).ToBeVisibleAsync();
             using var input = JsonDocument.Parse(request.PostData!);
             var threadId = input.RootElement.GetProperty("threadId").GetString()!;
-            var conversation = brain.Get<IAgent>(AssistantConversations.Key(WorkspaceScope.Create("owner", projectId).Id, threadId));
+            var conversation = brain.Get<IAgent>(AssistantConversations.Key(BrainScope.Create("owner", projectId).Id, threadId));
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
             deadline.CancelAfter(TimeSpan.FromSeconds(30));
             while ((await conversation.ReadConversation(ct)).ActiveRunId is not null) { await Task.Delay(100, deadline.Token); }
@@ -118,7 +119,7 @@ public sealed class AgentTableJourneyFacts
         var page = brain.Page;
         await page.SetViewportSizeAsync(1600, 1000);
         var projectId = await WorkspaceBrowser.CreateProjectAsync(page, "Refine workspace");
-        var workspace = brain.Get<IWorkspace>(WorkspaceScope.Create("owner", projectId).Id);
+        var workspace = brain.Get<IWorkspace>(BrainScope.Create("owner", projectId).Id);
 
         await SendAsync(page, "Show all customers from Supabase");
         var window = page.GetByRole(AriaRole.Region, new() { Name = "Active leads", Exact = true });

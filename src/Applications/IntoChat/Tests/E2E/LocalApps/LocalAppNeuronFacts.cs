@@ -1,3 +1,4 @@
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Flutter.Collection;
 using DigitalBrain.Files;
 using DigitalBrain.Identity;
@@ -14,7 +15,7 @@ public sealed class LocalAppNeuronFacts
         {
             await File.WriteAllBytesAsync(Path.Combine(root, "image.png"), Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg=="), ct);
             await using var brain = await IntoChatE2ETest.Create().StartAsync(ct);
-            var scope = WorkspaceScope.Create("owner", "local-neurons").Id;
+            var scope = BrainScope.Create("owner", "local-neurons").Id;
             await WorkspaceUploadFixture.Upload(brain.HttpClient, "local-neurons", Directory.GetFiles(root, "*.png"));
             var files = brain.Get<IFileExplorer>(scope);
             var surface = await files.Navigate();
@@ -39,7 +40,7 @@ public sealed class LocalAppNeuronFacts
             Assert.Equal(2, saved.Revision);
             Assert.Equal(1, saved.LastSavedRevision);
             Assert.NotNull(save.Recipe.Crop);
-            Assert.Null((await brain.Get<IImageDocument>(WorkspaceScope.Create("owner", "another").Id + "/images/" + opened.Id).Read()).Asset);
+            Assert.Null((await brain.Get<IImageDocument>(BrainScope.Create("owner", "another").Id + "/images/" + opened.Id).Read()).Asset);
         }
         finally { Directory.Delete(root, true); }
     }

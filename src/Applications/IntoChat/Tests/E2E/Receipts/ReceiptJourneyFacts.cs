@@ -1,3 +1,4 @@
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Assistant;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -22,7 +23,7 @@ public sealed class ReceiptJourneyFacts
         await LeadData.SeedAsync(brain, "Receipt run", ct);
 
         using var response = await brain.HttpClient.PostAsJsonAsync("/agent",
-            new { workspaceId = "receipts", threadId = "thread", runId = "receipt-run", messages = new[] { new { role = "user", content = "Show leads" } } }, ct);
+            new { brainId = "receipts", threadId = "thread", runId = "receipt-run", messages = new[] { new { role = "user", content = "Show leads" } } }, ct);
         var stream = await response.Content.ReadAsStringAsync(ct);
         Assert.Contains("RUN_FINISHED", stream);
         var receipt = ReceiptFrom(stream);
@@ -40,14 +41,14 @@ public sealed class ReceiptJourneyFacts
 
         // A second intent receives its own streamed recap and usage batch.
         using var replay = await brain.HttpClient.PostAsJsonAsync("/agent",
-            new { workspaceId = "receipts", threadId = "thread", runId = "receipt-run-2", messages = new[] { new { role = "user", content = "Show leads" } } }, ct);
+            new { brainId = "receipts", threadId = "thread", runId = "receipt-run-2", messages = new[] { new { role = "user", content = "Show leads" } } }, ct);
         var secondStream = await replay.Content.ReadAsStringAsync(ct);
         Assert.Contains("RUN_FINISHED", secondStream);
         Assert.Equal("RECEIPT", ReceiptFrom(secondStream).GetProperty("type").GetString());
-        Assert.NotEmpty((await brain.Get<IIntentUsage>(ComputeUsageEndpoints.IntentId(WorkspaceScope.Create("owner", "receipts").Id, "thread", "receipt-run-2")).ReadAsync(ct)).Entries);
+        Assert.NotEmpty((await brain.Get<IIntentUsage>(ComputeUsageEndpoints.IntentId(BrainScope.Create("owner", "receipts").Id, "thread", "receipt-run-2")).ReadAsync(ct)).Entries);
 
         // Reopening the panel reads durable, paged history independently of the chat stream.
-        using var firstPage = JsonDocument.Parse(await brain.HttpClient.GetStringAsync("/workspaces/receipts/compute/usage?limit=1", ct));
+        using var firstPage = JsonDocument.Parse(await brain.HttpClient.GetStringAsync("/brains/receipts/compute/usage?limit=1", ct));
         var firstItem = Assert.Single(firstPage.RootElement.GetProperty("items").EnumerateArray());
         Assert.Equal(ReceiptFrom(secondStream).GetProperty("id").GetString(), firstItem.GetProperty("id").GetString());
         Assert.NotEmpty(firstItem.GetProperty("modelUsage").EnumerateArray());
@@ -55,14 +56,14 @@ public sealed class ReceiptJourneyFacts
         Assert.Equal(0m, firstItem.GetProperty("reservedCompute").GetDecimal());
         var cursor = firstPage.RootElement.GetProperty("nextCursor").GetString();
         Assert.NotNull(cursor);
-        using var secondPage = JsonDocument.Parse(await brain.HttpClient.GetStringAsync("/workspaces/receipts/compute/usage?limit=1&cursor=" + Uri.EscapeDataString(cursor), ct));
+        using var secondPage = JsonDocument.Parse(await brain.HttpClient.GetStringAsync("/brains/receipts/compute/usage?limit=1&cursor=" + Uri.EscapeDataString(cursor), ct));
         Assert.Equal(receipt.GetProperty("id").GetString(), Assert.Single(secondPage.RootElement.GetProperty("items").EnumerateArray()).GetProperty("id").GetString());
         Assert.Equal(JsonValueKind.Null, secondPage.RootElement.GetProperty("nextCursor").ValueKind);
-        using var isolated = JsonDocument.Parse(await brain.HttpClient.GetStringAsync("/workspaces/other/compute/usage", ct));
+        using var isolated = JsonDocument.Parse(await brain.HttpClient.GetStringAsync("/brains/other/compute/usage", ct));
         Assert.Empty(isolated.RootElement.GetProperty("items").EnumerateArray());
-        using var badLimit = await brain.HttpClient.GetAsync("/workspaces/receipts/compute/usage?limit=0", ct);
+        using var badLimit = await brain.HttpClient.GetAsync("/brains/receipts/compute/usage?limit=0", ct);
         Assert.Equal(System.Net.HttpStatusCode.BadRequest, badLimit.StatusCode);
-        using var badCursor = await brain.HttpClient.GetAsync("/workspaces/other/compute/usage?cursor=" + Uri.EscapeDataString(cursor), ct);
+        using var badCursor = await brain.HttpClient.GetAsync("/brains/other/compute/usage?cursor=" + Uri.EscapeDataString(cursor), ct);
         Assert.Equal(System.Net.HttpStatusCode.BadRequest, badCursor.StatusCode);
     }
 

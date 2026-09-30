@@ -29,28 +29,28 @@ public sealed class GrantRevokeFacts
         var member = await aliceLogin.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(ct);
         var workspace = member!.BrainId;
         using var create = await alice.PostAsJsonAsync(
-            $"/workspaces/{workspace}/grants",
-            new { appId = "app-1", semanticTypeId = "person.birthDate", mode = 2, workspaceId = workspace },
+            $"/brains/{workspace}/grants",
+            new { appId = "app-1", semanticTypeId = "person.birthDate", mode = 2 },
             ct);
         Assert.Equal(HttpStatusCode.OK, create.StatusCode);
 
-        using var listed = await alice.GetAsync($"/workspaces/{workspace}/grants", ct);
+        using var listed = await alice.GetAsync($"/brains/{workspace}/grants", ct);
         Assert.Equal(HttpStatusCode.OK, listed.StatusCode);
         var listedJson = await listed.Content.ReadAsStringAsync(ct);
         var grants = JsonSerializer.Deserialize<JsonElement[]>(listedJson)!;
         var grantJson = Assert.Single(grants);
         Assert.Equal("app-1", grantJson.GetProperty("appId").GetString());
 
-        using var foreign = await bob.GetAsync($"/workspaces/{workspace}/grants", ct);
+        using var foreign = await bob.GetAsync($"/brains/{workspace}/grants", ct);
         Assert.Equal(HttpStatusCode.Forbidden, foreign.StatusCode);
 
         using var revoke = await alice.PostAsJsonAsync(
-            $"/workspaces/{workspace}/grants/revoke",
+            $"/brains/{workspace}/grants/revoke",
             new { appId = "app-1", semanticTypeId = "person.birthDate", mode = 2 },
             ct);
         Assert.Equal(HttpStatusCode.NoContent, revoke.StatusCode);
 
-        using var emptied = await alice.GetAsync($"/workspaces/{workspace}/grants", ct);
+        using var emptied = await alice.GetAsync($"/brains/{workspace}/grants", ct);
         Assert.Empty(JsonSerializer.Deserialize<JsonElement[]>(await emptied.Content.ReadAsStringAsync(ct))!);
     }
 

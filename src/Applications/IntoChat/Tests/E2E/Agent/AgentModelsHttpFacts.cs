@@ -38,7 +38,7 @@ public sealed class AgentModelsHttpFacts
 
         using var rejected = await brain.HttpClient.PostAsJsonAsync("/agent", new
         {
-            workspaceId = "model-validation", threadId = "thread", runId = "unknown-model",
+            brainId = "model-validation", threadId = "thread", runId = "unknown-model",
             modelProfile = "profile:does-not-exist",
             messages = new[] { new { role = "user", content = "Hello" } },
         }, ct);
@@ -47,7 +47,7 @@ public sealed class AgentModelsHttpFacts
         using var failure = JsonDocument.Parse(await rejected.Content.ReadAsStringAsync(ct));
         Assert.Equal("MODEL_UNAVAILABLE", failure.RootElement.GetProperty("code").GetString());
         var conversation = await brain.HttpClient.GetFromJsonAsync<AgentConversationState>(
-            "/workspaces/model-validation/conversations/thread", ct);
+            "/brains/model-validation/conversations/thread", ct);
         Assert.NotNull(conversation);
         Assert.Null(conversation.ActiveRunId);
         Assert.Empty(conversation.Turns);

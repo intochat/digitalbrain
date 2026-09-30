@@ -1,3 +1,4 @@
+using DigitalBrain.Core.Enforcement;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Aspire.Hosting;
@@ -21,11 +22,11 @@ public sealed class WorkspaceDataFacts
         await connection.OpenAsync(ct);
         await using var seed = new NpgsqlCommand("CREATE TABLE leads (id int, name text, active boolean); INSERT INTO leads SELECT n, CASE WHEN n = 55 THEN 'Beyond page one' ELSE 'Lead ' || n END, true FROM generate_series(1,60) n", connection);
         await seed.ExecuteNonQueryAsync(ct);
-        var scope = WorkspaceScope.Create("owner", "workspace-a");
+        var scope = BrainScope.Create("owner", "workspace-a");
         var table = brain.Get<ISupabaseTable>("workspace-http-table");
         await table.CreateFromQuery(new("Leads", "select id, name, active from leads order by id"));
         await brain.Get<IWorkspace>(scope.Id).Open(new("open", "window", "Leads", WindowReference.Table("workspace-http-table"), 0));
-        var path = "/workspaces/workspace-a/tables/workspace-http-table";
+        var path = "/brains/workspace-a/tables/workspace-http-table";
         var first = await brain.HttpClient.GetFromJsonAsync<JsonElement>(path + "?offset=0&limit=25", ct);
         Assert.Equal(25, first.GetProperty("rows").GetArrayLength());
         Assert.Equal(60, first.GetProperty("totalRows").GetInt32());
@@ -57,13 +58,13 @@ public sealed class WorkspaceDataFacts
         Assert.Equal(55, filtered.GetProperty("rows")[0].GetProperty("cells")[0].GetInt32());
         using var stale = await brain.HttpClient.PostAsJsonAsync(path + "/view", update, ct);
         Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
-        using var foreign = await brain.HttpClient.GetAsync("/workspaces/workspace-b/tables/workspace-http-table", ct);
+        using var foreign = await brain.HttpClient.GetAsync("/brains/workspace-b/tables/workspace-http-table", ct);
         Assert.Equal(HttpStatusCode.NotFound, foreign.StatusCode);
-        using var closedResponse = await brain.HttpClient.PostAsJsonAsync("/workspaces/workspace-a/windows/window/close", new { expectedRevision = 1 }, ct);
+        using var closedResponse = await brain.HttpClient.PostAsJsonAsync("/brains/workspace-a/windows/window/close", new { expectedRevision = 1 }, ct);
         Assert.Equal(HttpStatusCode.OK, closedResponse.StatusCode);
         var closed = await closedResponse.Content.ReadFromJsonAsync<WorkspaceState>(ct);
         Assert.False(Assert.Single(closed!.Windows).IsOpen);
-        using var reopenedResponse = await brain.HttpClient.PostAsJsonAsync("/workspaces/workspace-a/windows/window/reopen", new { operationId = "explicit-reopen", expectedRevision = 2 }, ct);
+        using var reopenedResponse = await brain.HttpClient.PostAsJsonAsync("/brains/workspace-a/windows/window/reopen", new { operationId = "explicit-reopen", expectedRevision = 2 }, ct);
         Assert.Equal(HttpStatusCode.OK, reopenedResponse.StatusCode);
         var reopened = await reopenedResponse.Content.ReadFromJsonAsync<WorkspaceState>(ct);
         Assert.True(Assert.Single(reopened!.Windows).IsOpen);

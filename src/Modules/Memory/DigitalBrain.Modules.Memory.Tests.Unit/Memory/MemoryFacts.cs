@@ -145,17 +145,17 @@ public sealed class MemoryFacts
         var store = new InMemoryVectorMemoryStore();
         await using var brain = await Start(store, ct);
         var memory = brain.Get<IMemory>("owner");
-        await memory.Remember(new("intochat.workspace", "a", "alpha", [], null));
-        await memory.Remember(new("intochat.workspace", "b", "beta", [], null));
+        await memory.Remember(new("intochat.brain", "a", "alpha", [], null));
+        await memory.Remember(new("intochat.brain", "b", "beta", [], null));
         await memory.Remember(new("other", "c", "gamma", [], null));
         await using var purged = await brain.Observe<NamespacePurged>(memory, ct);
 
-        var removed = await memory.PurgeNamespace(new("intochat.workspace"));
+        var removed = await memory.PurgeNamespace(new("intochat.brain"));
 
         Assert.Equal(2, removed);
         var published = await purged.NextAsync(ct: ct);
-        Assert.Equal("intochat.workspace", published.Namespace);
-        Assert.Empty((await memory.Recall(new("intochat.workspace", "alpha", 5, []))).Matches);
+        Assert.Equal("intochat.brain", published.Namespace);
+        Assert.Empty((await memory.Recall(new("intochat.brain", "alpha", 5, []))).Matches);
         Assert.Single((await memory.Recall(new("other", "gamma", 5, []))).Matches);
     }
 

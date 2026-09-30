@@ -7,7 +7,7 @@ internal static class WorkspaceUploadFixture
         foreach (var image in images)
         {
             using var content = new ByteArrayContent(await File.ReadAllBytesAsync(image));
-            using var response = await http.PostAsync($"/workspaces/{Uri.EscapeDataString(workspaceId)}/apps/files/upload?name={Uri.EscapeDataString(Path.GetFileName(image))}", content);
+            using var response = await http.PostAsync($"/brains/{Uri.EscapeDataString(workspaceId)}/apps/files/upload?name={Uri.EscapeDataString(Path.GetFileName(image))}", content);
             response.EnsureSuccessStatusCode();
         }
     }

@@ -6,7 +6,7 @@ namespace DigitalBrain.CustomerResearcher.Tests.Unit;
 public sealed class PostgresResearchFacts
 {
     [Fact]
-    public async Task LivePostgresUpsertIsWorkspaceScopedAndParameterized()
+    public async Task LivePostgresUpsertIsBrainScopedAndParameterized()
     {
         var connectionString = Environment.GetEnvironmentVariable("CUSTOMER_RESEARCH_TEST_POSTGRES");
         Assert.SkipWhen(string.IsNullOrWhiteSpace(connectionString), "Set CUSTOMER_RESEARCH_TEST_POSTGRES to run the live PostgreSQL persistence test.");

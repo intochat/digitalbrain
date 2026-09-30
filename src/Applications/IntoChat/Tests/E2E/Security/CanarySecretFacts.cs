@@ -119,7 +119,7 @@ public sealed class CanarySecretFacts
         Assert.DoesNotContain(Canary, reference, StringComparison.Ordinal);
 
         using var evented = await brain.HttpClient.PostAsJsonAsync(
-            $"/workspaces/{workspace}/apps/event",
+            $"/brains/{workspace}/apps/event",
             new { kind = "form", name = scope + "/apps/forms/intake", action = "secret", field = "password", value = reference },
             ct);
         Assert.Equal(System.Net.HttpStatusCode.OK, evented.StatusCode);
@@ -156,7 +156,7 @@ public sealed class CanarySecretFacts
 
         var gated = await off.HttpClient.GetFromJsonAsync<JsonElement>("/session/capabilities", ct);
         Assert.False(gated.GetProperty("developerMode").GetBoolean());
-        using var files = await off.HttpClient.GetAsync($"/workspaces/{Owner}/csharp/", ct);
+        using var files = await off.HttpClient.GetAsync($"/brains/{Owner}/csharp/", ct);
         Assert.Equal(System.Net.HttpStatusCode.NotFound, files.StatusCode);
     }
 

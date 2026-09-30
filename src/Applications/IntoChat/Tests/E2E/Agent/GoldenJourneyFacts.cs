@@ -1,3 +1,4 @@
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Assistant;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -33,7 +34,7 @@ public sealed class GoldenJourneyFacts
         var report = await RepeatAsync(async (attempt, token) =>
         {
             var workspaceId = $"j1-{attempt:D2}";
-            var scope = WorkspaceScope.Create("owner", workspaceId);
+            var scope = BrainScope.Create("owner", workspaceId);
             var workspace = brain.Get<IWorkspace>(scope.Id);
 
             await AskAsync(brain, workspaceId, "thread", $"{workspaceId}-open", "Show me all customers", token);
@@ -70,7 +71,7 @@ public sealed class GoldenJourneyFacts
         var report = await RepeatAsync(async (attempt, token) =>
         {
             var workspaceId = $"j2a-{attempt:D2}";
-            var scope = WorkspaceScope.Create("owner", workspaceId);
+            var scope = BrainScope.Create("owner", workspaceId);
             var workspace = brain.Get<IWorkspace>(scope.Id);
 
             var drawn = await AskAsync(brain, workspaceId, "thread", $"{workspaceId}-draw",
@@ -121,7 +122,7 @@ public sealed class GoldenJourneyFacts
     private static async Task<string> AskAsync(E2EBrain brain, string workspaceId, string threadId, string runId, string message, CancellationToken ct)
     {
         using var response = await brain.HttpClient.PostAsJsonAsync("/agent",
-            new { workspaceId, threadId, runId, messages = new[] { new { role = "user", content = message } } }, ct);
+            new { brainId = workspaceId, threadId, runId, messages = new[] { new { role = "user", content = message } } }, ct);
         var stream = await response.Content.ReadAsStringAsync(ct);
         Assert.Contains("RUN_FINISHED", stream, StringComparison.Ordinal);
         Assert.DoesNotContain("RUN_ERROR", stream, StringComparison.Ordinal);

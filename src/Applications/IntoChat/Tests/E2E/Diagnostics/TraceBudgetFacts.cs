@@ -41,7 +41,7 @@ public sealed class TraceBudgetFacts
 
         await Task.Delay(TimeSpan.FromSeconds(2), ct);
         var intentStart = collector.Snapshot().Count;
-        var input = new { workspaceId = "trace", threadId = "thread", runId = "run", messages = new[] { new { role = "user", content = "Show active leads" } } };
+        var input = new { brainId = "trace", threadId = "thread", runId = "run", messages = new[] { new { role = "user", content = "Show active leads" } } };
         using var response = await brain.HttpClient.PostAsJsonAsync("/agent", input, ct);
         var stream = await response.Content.ReadAsStringAsync(ct);
         Assert.Contains("RUN_FINISHED", stream);
@@ -99,7 +99,7 @@ public sealed class TraceBudgetFacts
         Assert.Empty(collector.Errors());
     }
 
-    private const string ConversationPath = "/workspaces/trace/conversations/thread";
+    private const string ConversationPath = "/brains/trace/conversations/thread";
 
     private static CapturedSpan[] GrainCallSpans(TestTelemetryCollector collector, int from)
         => collector.Snapshot().Skip(from)
