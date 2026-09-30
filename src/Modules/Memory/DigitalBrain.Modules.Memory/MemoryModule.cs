@@ -19,6 +19,5 @@ public sealed class MemoryModule : IModule<MemoryModuleOptions>
         var collectionName = silo.Configuration.GetModuleOptions<MemoryModuleOptions>(nameof(MemoryModule)).CollectionName;
         services.TryAddSingleton(provider => new VectorMemoryStore(provider.GetRequiredService<IQdrant>(), collectionName));
         services.TryAddSingleton<IVectorMemoryStore>(provider => provider.GetRequiredService<VectorMemoryStore>());
-        services.TryAddSingleton<ILegacyVectorMemoryStore>(provider => provider.GetRequiredService<VectorMemoryStore>());
     }
 }

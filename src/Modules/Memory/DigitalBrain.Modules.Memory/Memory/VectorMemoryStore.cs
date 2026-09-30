@@ -5,7 +5,7 @@ namespace DigitalBrain.Memory;
 
 // The optional Qdrant projection of canonical memory. The payload schema is unchanged from the
 // direct-client store, so existing collections keep working.
-internal sealed class VectorMemoryStore(IQdrant qdrant, string? collectionName) : IVectorMemoryStore, ILegacyVectorMemoryStore
+internal sealed class VectorMemoryStore(IQdrant qdrant, string? collectionName) : IVectorMemoryStore
 {
     internal const string DefaultCollectionName = "digitalbrain_vector_memory";
 
@@ -52,20 +52,6 @@ internal sealed class VectorMemoryStore(IQdrant qdrant, string? collectionName) 
     public Task<long> RemoveNamespaceAsync(string name, string @namespace, CancellationToken cancellationToken)
         => qdrant.DeleteWhere(_collection, Scope(name, @namespace), cancellationToken);
 
-    public async Task<LegacyMemoryPage> ReadPage(string name, string @namespace, string? cursor, int limit, CancellationToken ct)
-    {
-        if (limit is < 1 or > 128) { throw new ArgumentOutOfRangeException(nameof(limit)); }
-        var page = await qdrant.Scroll(_collection, Scope(name, @namespace), cursor, limit, ct).ConfigureAwait(false);
-        var entries = page.Points.Select(point =>
-        {
-            if (!Matches(point.Payload, NameField, name) || !Matches(point.Payload, NamespaceField, @namespace))
-            { throw new InvalidOperationException("Legacy memory returned an out-of-scope entry."); }
-            return new VectorMemoryEntry(name, @namespace, point.Payload.GetValueOrDefault(KeyField, ""),
-                point.Payload.GetValueOrDefault(TextField, ""), Tags(point.Payload), ProtectedPayload(point.Payload), point.Vector);
-        }).ToArray();
-        return new(entries, page.NextCursor);
-    }
-
     private static string PointKey(string name, string @namespace, string key) => name + "\0" + @namespace + "\0" + key;
 
     private static Dictionary<string, string> Scope(string name, string @namespace)
@@ -73,17 +59,4 @@ internal sealed class VectorMemoryStore(IQdrant qdrant, string? collectionName) 
 
     private static bool Matches(IReadOnlyDictionary<string, string> payload, string field, string expected)
         => payload.TryGetValue(field, out var value) && string.Equals(value, expected, StringComparison.Ordinal);
-
-    private static MemoryTag[] Tags(IReadOnlyDictionary<string, string> payload)
-        => [.. payload.Where(static field => field.Key.StartsWith(MetadataPrefix, StringComparison.Ordinal))
-            .Select(static field => new MemoryTag(field.Key[MetadataPrefix.Length..], field.Value))];
-
-    private static ProtectedPayloadReference? ProtectedPayload(IReadOnlyDictionary<string, string> payload)
-    {
-        if (!payload.TryGetValue(PayloadIdField, out var id) || !Guid.TryParse(id, out var payloadId)) { return null; }
-        DateTimeOffset? expiresAt = payload.TryGetValue(PayloadExpiresField, out var expires)
-            && DateTimeOffset.TryParse(expires, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed)
-            ? parsed : null;
-        return new ProtectedPayloadReference(payloadId.ToString("D"), expiresAt);
-    }
 }

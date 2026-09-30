@@ -8,9 +8,3 @@ internal interface IVectorMemoryStore
 
     Task<long> RemoveNamespaceAsync(string name, string @namespace, CancellationToken cancellationToken);
 }
-
-internal interface ILegacyVectorMemoryStore
-{
-    Task<LegacyMemoryPage> ReadPage(string name, string @namespace, string? cursor, int limit, CancellationToken ct);
-}
-internal sealed record LegacyMemoryPage(IReadOnlyList<VectorMemoryEntry> Entries, string? NextCursor);

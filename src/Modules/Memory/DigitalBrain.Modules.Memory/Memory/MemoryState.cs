@@ -15,7 +15,7 @@ internal sealed record MemoryNamespace
 {
     [Id(0)] public int Generation { get; init; }
     [Id(1)] public HashSet<int> Pages { get; init; } = [];
-    [Id(2)] public bool LegacyImportBlocked { get; init; }
+    // Id(2) retired; never reuse
     [Id(3)] public bool IndexPurgePending { get; init; }
     [Id(4)] public Dictionary<int, HashSet<int>> RetiredPages { get; init; } = [];
 }

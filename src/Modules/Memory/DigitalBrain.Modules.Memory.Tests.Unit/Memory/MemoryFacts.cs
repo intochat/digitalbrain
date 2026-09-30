@@ -49,30 +49,6 @@ public sealed class MemoryFacts
     }
 
     [Fact]
-    public async Task LegacyImportIsPagedScopedIdempotentAndDoesNotRestoreDeletedOrOverwriteNewerNotes()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var source = new InMemoryVectorMemoryStore();
-        await source.UpsertAsync(new("owner", "notes", "a", "legacy a", [new("tag", "kept")], new(Guid.NewGuid().ToString(), null), [1, 1]), ct);
-        await source.UpsertAsync(new("owner", "notes", "b", "legacy b", [], null, [1, 1]), ct);
-        await source.UpsertAsync(new("someone-else", "notes", "secret", "private", [], null, [1, 1]), ct);
-        await using var brain = await Start(source, ct);
-        var memory = brain.Get<IMemory>("owner");
-        var first = await memory.ImportLegacy("notes", limit: 1);
-        Assert.Equal(1, first.Imported);
-        Assert.NotNull(first.NextCursor);
-        Assert.Equal(0, (await memory.ImportLegacy("notes", limit: 1)).Imported);
-        await memory.Remember(new("notes", "b", "newer b", [], null));
-        Assert.Equal(0, (await memory.ImportLegacy("notes", first.NextCursor, 1)).Imported);
-        await memory.Forget(new("notes", "a"));
-        Assert.Equal(0, (await memory.ImportLegacy("notes", limit: 1)).Imported);
-        Assert.Equal("newer b", Assert.Single((await memory.Recall(new("notes", "text", 5, []))).Matches).Text);
-        Assert.Equal(2, source.Entries("owner", "notes").Length);
-        await memory.PurgeNamespace(new("notes"));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => memory.ImportLegacy("notes"));
-    }
-
-    [Fact]
     public async Task MemoryWorksWithoutAnyQdrantRegistration()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -176,7 +152,6 @@ public sealed class MemoryFacts
             .ConfigureSilo(silo =>
             {
                 silo.Services.AddSingleton<IVectorMemoryStore>(store);
-                silo.Services.AddSingleton<ILegacyVectorMemoryStore>(store);
                 silo.Services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new FakeEmbeddings());
             })
             .StartAsync(ct);
@@ -200,7 +175,7 @@ internal sealed class FakeEmbeddings : IEmbeddingGenerator<string, Embedding<flo
     public void Dispose() { }
 }
 
-internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore, ILegacyVectorMemoryStore
+internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore
 {
     private readonly Dictionary<(string Owner, string Namespace, string Key), VectorMemoryEntry> _entries = [];
     internal bool FailWrites { get; set; }
@@ -224,12 +199,5 @@ internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore, ILegacyVec
         var keys = _entries.Keys.Where(entry => entry.Owner == name && entry.Namespace == @namespace).ToArray();
         foreach (var key in keys) { _entries.Remove(key); }
         return Task.FromResult((long)keys.Length);
-    }
-
-    public Task<LegacyMemoryPage> ReadPage(string name, string @namespace, string? cursor, int limit, CancellationToken ct)
-    {
-        var offset = cursor is null ? 0 : int.Parse(cursor, System.Globalization.CultureInfo.InvariantCulture);
-        var entries = _entries.Values.Where(entry => entry.Name == name && entry.Namespace == @namespace).OrderBy(entry => entry.Key, StringComparer.Ordinal).ToArray();
-        return Task.FromResult(new LegacyMemoryPage(entries.Skip(offset).Take(limit).ToArray(), offset + limit < entries.Length ? (offset + limit).ToString(System.Globalization.CultureInfo.InvariantCulture) : null));
     }
 }

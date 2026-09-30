@@ -232,22 +232,7 @@ internal static class ShellSnapshotParts
             { throw new ArgumentException("Invalid conversation messages; the source has been retained."); }
         }
     }
-
-    internal static JsonNode MergeImport(JsonNode current, JsonNode legacy)
-    {
-        var merged = current.DeepClone();
-        var target = merged["projects"]!.AsArray();
-        foreach (var project in legacy["projects"]!.AsArray())
-        {
-            var id = project!["id"]!.GetValue<string>();
-            var existing = target.FirstOrDefault(p => p!["id"]!.GetValue<string>() == id);
-            if (existing is null) { target.Add(project.DeepClone()); }
-            else if (!JsonNode.DeepEquals(existing, project))
-            { throw new InvalidOperationException("Local and server versions of a project differ. The local copy has been retained; resolve the import before saving."); }
-        }
-        return merged;
-    }
-}
+}
 
 [GenerateSerializer]
 internal sealed class ShellPartState { [Id(0)] public string? Json { get; set; } }
@@ -274,7 +259,7 @@ internal sealed class ShellHeadState
 {
     [Id(0)] public long Revision { get; set; }
     [Id(1)] public string? Root { get; set; }
-    [Id(2)] public Dictionary<string, string> Imports { get; set; } = [];
+    // Id(2) retired; never reuse
     [Id(3)] public string? LastOperation { get; set; }
     [Id(4)] public string? LastDigest { get; set; }
 }
@@ -283,7 +268,7 @@ internal sealed record ShellRead([property: Id(0)] long Revision, [property: Id(
 internal interface IShellState : IGrainWithStringKey
 {
     Task<ShellRead> Read();
-    Task<ShellRead> Save(long expectedRevision, string operationId, string json, bool import);
+    Task<ShellRead> Save(long expectedRevision, string operationId, string json);
 }
 [GrainType("intochat.shell-state")]
 internal sealed class ShellStateNeuron([PersistentState("head", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ShellHeadState> state) : Grain, IShellState
@@ -292,28 +277,24 @@ internal sealed class ShellStateNeuron([PersistentState("head", DigitalBrainName
     public async Task<ShellRead> Read() => new(state.State.Revision, state.State.Root is { } root
         ? (await ShellSnapshotParts.Read(root, hash => Part(hash).Read())).ToJsonString() : null);
 
-    public async Task<ShellRead> Save(long expectedRevision, string operationId, string json, bool import)
+    public async Task<ShellRead> Save(long expectedRevision, string operationId, string json)
     {
         if (!Guid.TryParse(operationId, out _)) { throw new ArgumentException("Use a unique operation ID."); }
         var digest = ShellSnapshotParts.Digest(json);
-        if (state.State.Imports.TryGetValue(operationId, out var imported) || state.State.LastOperation == operationId)
+        if (state.State.LastOperation == operationId)
         {
-            if ((imported ?? state.State.LastDigest) != digest) { throw new InvalidOperationException("Operation ID was reused with different data."); }
+            if (state.State.LastDigest != digest) { throw new InvalidOperationException("Operation ID was reused with different data."); }
             return await Read();
         }
         if (state.State.Revision != expectedRevision) { throw new InvalidOperationException("Workspace changed on another client. Reload before saving."); }
         var snapshot = JsonNode.Parse(json) ?? throw new ArgumentException("Missing snapshot.");
         ShellSnapshotParts.Validate(snapshot);
-        if (import && state.State.Root is not null)
-        { snapshot = ShellSnapshotParts.MergeImport(JsonNode.Parse((await Read()).Json!)!, snapshot); }
         var root = await ShellSnapshotParts.Write(snapshot, (hash, value) => Part(hash).Put(value));
         var old = state.State;
         state.State = new()
         {
-            Root = root, Revision = old.Revision + 1, LastOperation = operationId, LastDigest = digest,
-            Imports = new(old.Imports)
+            Root = root, Revision = old.Revision + 1, LastOperation = operationId, LastDigest = digest
         };
-        if (import) { state.State.Imports.Add(operationId, digest); }
         try { await state.WriteStateAsync(); } catch { state.State = old; throw; }
         return await Read();
     }
@@ -331,19 +312,18 @@ internal static class ShellPersistenceEndpoints
         }
         static IResult View(ShellRead value) => Results.Ok(new { value.Revision, Snapshot = value.Json is null ? null : JsonNode.Parse(value.Json) });
         routes.MapGet("/shell/state", async (IGrainFactory grains) => View(await State(grains).Read()));
-        static async Task<IResult> Save(ShellWrite input, IGrainFactory grains, bool import)
+        static async Task<IResult> Save(ShellWrite input, IGrainFactory grains)
         {
             try
             {
                 var json = input.Snapshot.ToJsonString();
                 if (Encoding.UTF8.GetByteCount(json) > 16 * 1024 * 1024) { return Results.StatusCode(413); }
-                return View(await State(grains).Save(input.ExpectedRevision, input.OperationId, json, import));
+                return View(await State(grains).Save(input.ExpectedRevision, input.OperationId, json));
             }
             catch (ArgumentException e) { return Results.BadRequest(new { error = e.Message }); }
             catch (InvalidOperationException e) { return Results.Conflict(new { error = e.Message }); }
         }
-        routes.MapPut("/shell/state", (ShellWrite input, IGrainFactory grains) => Save(input, grains, false));
-        routes.MapPost("/shell/import", (ShellWrite input, IGrainFactory grains) => Save(input, grains, true));
+        routes.MapPut("/shell/state", (ShellWrite input, IGrainFactory grains) => Save(input, grains));
     }
     internal sealed record ShellWrite(long ExpectedRevision, string OperationId, JsonNode Snapshot);
 }

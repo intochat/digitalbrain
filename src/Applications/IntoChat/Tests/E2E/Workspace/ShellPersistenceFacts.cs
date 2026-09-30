@@ -9,40 +9,6 @@ namespace IntoChat.Tests.E2E.Workspace;
 
 public sealed class ShellPersistenceFacts
 {
-    [Fact(Timeout = 240_000)]
-    public async Task EstablishedWorkspaceImportsWithinClientDeadline()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.StartAsync(ct);
-        var snapshot = new JsonObject
-        {
-            ["version"] = 1,
-            ["projects"] = new JsonArray(Enumerable.Range(0, 6).Select(project => (JsonNode?)new JsonObject
-            {
-                ["id"] = $"project-{project}",
-                ["conversations"] = new JsonArray(new JsonObject
-                {
-                    ["id"] = "chat",
-                    ["messages"] = new JsonArray(Enumerable.Range(0, 180).Select(message => (JsonNode?)new JsonObject
-                    {
-                        ["role"] = "user", ["content"] = $"{project}:{message}:" + new string('x', 900),
-                        ["metadata"] = new JsonObject { ["usage"] = new JsonObject { ["tokens"] = message } }
-                    }).ToArray())
-                })
-            }).ToArray())
-        };
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        deadline.CancelAfter(TimeSpan.FromSeconds(30));
-        var operationId = Guid.NewGuid().ToString();
-        using var imported = await brain.HttpClient.PostAsJsonAsync("/shell/import", new { expectedRevision = 0, operationId, snapshot }, deadline.Token);
-        imported.EnsureSuccessStatusCode();
-        var restored = await brain.HttpClient.GetFromJsonAsync<JsonObject>("/shell/state", deadline.Token);
-        Assert.True(JsonNode.DeepEquals(snapshot, restored!["snapshot"]));
-        using var replay = await brain.HttpClient.PostAsJsonAsync("/shell/import", new { expectedRevision = 0, operationId, snapshot }, deadline.Token);
-        replay.EnsureSuccessStatusCode();
-        Assert.Equal(1, (await replay.Content.ReadFromJsonAsync<JsonObject>(deadline.Token))!["revision"]!.GetValue<int>());
-    }
-
     [Fact(Timeout = 300_000)]
     public async Task FreshBrowserRestoresWorkspaceWithoutDeviceStorage()
     {
@@ -80,17 +46,17 @@ public sealed class ShellPersistenceFacts
         Assert.Equal(0, empty!["revision"]!.GetValue<int>());
         Assert.Null(empty["snapshot"]);
         var snapshot = JsonNode.Parse("""{"version":1,"projects":[{"id":"restored","name":"Saved workspace","conversations":[{"id":"chat","draft":"unfinished","messages":[{"role":"user","content":"remember this"}]}],"artifacts":[]}],"selectedProjectId":"restored","settings":{"theme":"dark"}}""");
-        var operationId = Guid.NewGuid().ToString();
-        using var imported = await http.PostAsJsonAsync("/shell/import", new { expectedRevision = 0, operationId, snapshot }, ct);
-        imported.EnsureSuccessStatusCode();
+        using var first = await http.PutAsJsonAsync("/shell/state", new { expectedRevision = 0, operationId = Guid.NewGuid().ToString(), snapshot }, ct);
+        first.EnsureSuccessStatusCode();
         using var fresh = new HttpClient { BaseAddress = http.BaseAddress };
         var restored = await fresh.GetFromJsonAsync<JsonObject>("/shell/state", ct);
         Assert.True(JsonNode.DeepEquals(snapshot, restored!["snapshot"]));
-        using var saved = await fresh.PutAsJsonAsync("/shell/state", new { expectedRevision = 1, operationId = Guid.NewGuid().ToString(), snapshot }, ct);
+        var savedOperationId = Guid.NewGuid().ToString();
+        using var saved = await fresh.PutAsJsonAsync("/shell/state", new { expectedRevision = 1, operationId = savedOperationId, snapshot }, ct);
         saved.EnsureSuccessStatusCode();
         using var stale = await http.PutAsJsonAsync("/shell/state", new { expectedRevision = 1, operationId = Guid.NewGuid().ToString(), snapshot }, ct);
         Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
-        using var replay = await http.PostAsJsonAsync("/shell/import", new { expectedRevision = 0, operationId, snapshot }, ct);
+        using var replay = await http.PutAsJsonAsync("/shell/state", new { expectedRevision = 1, operationId = savedOperationId, snapshot }, ct);
         replay.EnsureSuccessStatusCode();
         Assert.Equal(2, (await replay.Content.ReadFromJsonAsync<JsonObject>(ct))!["revision"]!.GetValue<int>());
         if (!restart) { return; }

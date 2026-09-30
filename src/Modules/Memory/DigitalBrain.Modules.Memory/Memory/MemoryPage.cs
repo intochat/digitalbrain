@@ -8,7 +8,7 @@ namespace DigitalBrain.Memory;
 [Alias("memory.page"), Orleans.Metadata.DefaultGrainType("memory.page")]
 internal interface IMemoryPage : INeuron
 {
-    Task<bool> Put(VectorMemoryEntry entry, bool importOnly = false);
+    Task<bool> Put(VectorMemoryEntry entry);
     Task<bool> Remove(string name, string @namespace, string key);
     Task<int> Count();
     Task<bool> Contains(string key);
@@ -36,10 +36,9 @@ internal sealed record MemoryDeletion([property: Id(0)] string Name, [property: 
 internal sealed class MemoryPageNeuron([PersistentState("entries", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<MemoryPageState> store) : Neuron, IMemoryPage
 {
     internal const int Capacity = 64;
-    public async Task<bool> Put(VectorMemoryEntry entry, bool importOnly = false)
+    public async Task<bool> Put(VectorMemoryEntry entry)
     {
         Validate(entry);
-        if (importOnly && (store.State.Entries.ContainsKey(entry.Key) || store.State.Deleted.ContainsKey(entry.Key))) { return false; }
         if (!store.State.Entries.ContainsKey(entry.Key) && !store.State.Deleted.ContainsKey(entry.Key)
             && store.State.Entries.Count + store.State.Deleted.Count >= Capacity)
         { throw new InvalidOperationException("This memory partition is full. Choose another namespace."); }

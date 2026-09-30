@@ -48,7 +48,7 @@ public sealed class ShellPersistenceFacts
     }
 
     [Fact]
-    public async Task RevisionConflictsAndImportRetriesDoNotReplaceNewerState()
+    public async Task RevisionConflictsAndOperationRetriesDoNotReplaceNewerState()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().StartAsync(ct);
@@ -56,14 +56,15 @@ public sealed class ShellPersistenceFacts
         var other = brain.Get<IShellState>(ShellPersistenceEndpoints.Scope("account", "bob"));
         Assert.Null((await state.Read()).Json);
         var operation = Guid.NewGuid().ToString();
-        var imported = await state.Save(0, operation, EmptySnapshot, true);
-        Assert.Equal(1, imported.Revision);
+        var first = await state.Save(0, operation, EmptySnapshot);
+        Assert.Equal(1, first.Revision);
         var changed = EmptySnapshot.Replace("\"settings\":{}", "\"settings\":{\"theme\":\"dark\"}", StringComparison.Ordinal);
-        var saved = await state.Save(1, Guid.NewGuid().ToString(), changed, false);
+        var savedOperation = Guid.NewGuid().ToString();
+        var saved = await state.Save(1, savedOperation, changed);
         Assert.Equal(2, saved.Revision);
-        Assert.Equal(saved, await state.Save(0, operation, EmptySnapshot, true));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => state.Save(1, Guid.NewGuid().ToString(), EmptySnapshot, false));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => state.Save(2, operation, changed, true));
+        Assert.Equal(saved, await state.Save(1, savedOperation, changed));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => state.Save(1, Guid.NewGuid().ToString(), EmptySnapshot));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => state.Save(2, savedOperation, EmptySnapshot));
         Assert.Equal(saved, await state.Read());
         Assert.Null((await other.Read()).Json);
     }
@@ -119,17 +120,5 @@ public sealed class ShellPersistenceFacts
         Assert.All(restored.AsArray(), item => Assert.Empty(item!["metadata"]!.AsObject()));
         Assert.Equal(parts.Count, calls.Count);
         Assert.All(calls.Values, count => Assert.Equal(1, count));
-    }
-
-    [Fact]
-    public void ImportPreservesNewerServerRecordsAndAddsMissingProjects()
-    {
-        var server = JsonNode.Parse("""{"version":1,"settings":{"theme":"dark"},"projects":[{"id":"a","name":"new","conversations":[],"artifacts":[]}]}""")!;
-        var legacy = JsonNode.Parse("""{"version":1,"settings":{"theme":"light"},"projects":[{"id":"a","name":"old","conversations":[],"artifacts":[]},{"id":"b","conversations":[],"artifacts":[]}]}""")!;
-        Assert.Throws<InvalidOperationException>(() => ShellSnapshotParts.MergeImport(server, legacy));
-        legacy["projects"]!.AsArray().RemoveAt(0);
-        var merged = ShellSnapshotParts.MergeImport(server, legacy);
-        Assert.Equal(2, merged["projects"]!.AsArray().Count);
-        Assert.Equal("dark", merged["settings"]!["theme"]!.GetValue<string>());
     }
 }

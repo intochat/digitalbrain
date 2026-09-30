@@ -12,7 +12,7 @@ using Orleans.Runtime;
 namespace DigitalBrain.Memory;
 
 // Canonical text, metadata and vectors live in bounded Default-storage neurons.
-// Qdrant is an optional, explicitly rebuildable projection and a legacy import source.
+// Qdrant is an optional, explicitly rebuildable projection.
 [GrainType("memory")]
 internal sealed class MemoryNeuron(TimeProvider time,
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<MemoryState> state) : Neuron, IMemory
@@ -51,7 +51,7 @@ internal sealed class MemoryNeuron(TimeProvider time,
         foreach (var id in previous.Pages) { count += await Page(note.Namespace, previous.Generation, id).Count(); }
         var next = new MemoryNamespace
         {
-            Generation = checked(previous.Generation + 1), LegacyImportBlocked = true, IndexPurgePending = true,
+            Generation = checked(previous.Generation + 1), IndexPurgePending = true,
             RetiredPages = new(previous.RetiredPages) { [previous.Generation] = previous.Pages },
         };
         await Save(Current with { Namespaces = new(Current.Namespaces) { [note.Namespace] = next }, ForgottenCount = Current.ForgottenCount + (int)Math.Min(count, int.MaxValue), LastChangedAt = time.GetUtcNow() });
@@ -85,24 +85,6 @@ internal sealed class MemoryNeuron(TimeProvider time,
             matches = matches.OrderByDescending(match => match.Score).ThenBy(match => match.Note.Key, StringComparer.Ordinal).Take(query.Limit).ToList();
         }
         return new(matches.Select(match => match.Note).ToArray());
-    }
-    public async Task<MemoryImportResult> ImportLegacy(string @namespace, string? cursor = null, int limit = 128)
-    {
-        RequireKey(@namespace, "import");
-        if (limit is < 1 or > 128) { throw new ArgumentOutOfRangeException(nameof(limit)); }
-        if (Current.Namespaces.GetValueOrDefault(@namespace)?.LegacyImportBlocked == true)
-        { throw new InvalidOperationException("This namespace was purged. Legacy import is blocked to prevent restoring deleted notes."); }
-        var source = ServiceProvider.GetService<ILegacyVectorMemoryStore>()
-            ?? throw new InvalidOperationException("No legacy memory source is configured.");
-        var page = await source.ReadPage(Owner, @namespace, cursor, limit, CancellationToken.None);
-        var imported = 0;
-        foreach (var entry in page.Entries)
-        {
-            if (entry.Name != Owner || entry.Namespace != @namespace) { throw new InvalidOperationException("Legacy memory returned an out-of-scope entry."); }
-            MemoryPageNeuron.Validate(entry);
-            if (await (await EnsurePage(@namespace, entry.Key)).Put(entry, importOnly: true)) { imported++; }
-        }
-        return new(imported, page.NextCursor);
     }
     public async Task<MemoryIndexResult> RebuildIndex(string @namespace)
     {

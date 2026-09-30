@@ -28,7 +28,6 @@ void main() {
       expect(api.snapshot?['projects'], hasLength(1));
       expect(api.snapshot!['projects'][0]['id'], 'default');
       expect(api.snapshot!['projects'][0]['title'], 'Personal');
-      expect(api.imports, 0);
       await tester.pumpWidget(const SizedBox());
       await api.events.close();
       client.close();
@@ -201,11 +200,10 @@ void main() {
 
 class _StartupClient extends FirstRunClient {
   Map<String, dynamic>? snapshot;
-  int revision = 0, imports = 0;
+  int revision = 0;
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     if (!request.url.path.startsWith('/shell/')) return super.send(request);
-    if (request.url.path == '/shell/import') imports++;
     if (request.method != 'GET') {
       final command =
           jsonDecode(await request.finalize().bytesToString()) as Map;
