@@ -87,6 +87,16 @@ public sealed class PostgresAspireHostingFacts
         Assert.Single(builder.Resources.OfType<PostgresDatabaseResource>());
     }
 
+    [Fact]
+    public void HostingAdapterIsFoundByNameAndAMisnamedAssemblyFailsLoudly()
+    {
+        Assert.IsType<PostgresModuleHosting>(DigitalBrainHostingExtensions.FindModuleHosting(typeof(PostgresModule), typeof(PostgresModuleHosting).Assembly));
+        Assert.Throws<InvalidOperationException>(() =>
+            DigitalBrainHostingExtensions.FindModuleHosting(typeof(SupabaseLookalikeModule), typeof(PostgresModuleHosting).Assembly));
+    }
+
+    private sealed class SupabaseLookalikeModule;
+
     private static ModuleDefinition Definition(bool enabled, bool persistent)
         => ModuleOptionsSerialization.Compile<PostgresModule, PostgresModuleOptions>(new()
         {

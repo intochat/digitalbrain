@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.Roslyn.Tests.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Coding.Tests.Unit" />
     <ProjectReference Include="../DigitalBrain.Modules.Microsoft.Roslyn.Contracts/DigitalBrain.Modules.Microsoft.Roslyn.Contracts.csproj" />
     <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain/DigitalBrain.csproj" />
   </ItemGroup>

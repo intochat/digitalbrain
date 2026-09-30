@@ -101,14 +101,25 @@ public static class DigitalBrainHostingExtensions
 
     // A module's hosting adapter lives in the sibling "<ModuleAssembly>.Aspire.Hosting" assembly (which references the
     // module, so the module cannot name it) as the IDigitalBrainModuleHosting called "<ModuleTypeName>Hosting".
+    // A module without that assembly has no hosting; an assembly that lacks the named type is a naming mistake and fails loudly.
     private static IDigitalBrainModuleHosting? ResolveModuleHosting(Type moduleType)
     {
         Assembly hostingAssembly;
         try { hostingAssembly = Assembly.Load(moduleType.Assembly.GetName().Name + ".Aspire.Hosting"); }
         catch (FileNotFoundException) { return null; }
+        return FindModuleHosting(moduleType, hostingAssembly);
+    }
+
+    public static IDigitalBrainModuleHosting FindModuleHosting(Type moduleType, Assembly hostingAssembly)
+    {
+        ArgumentNullException.ThrowIfNull(moduleType);
+        ArgumentNullException.ThrowIfNull(hostingAssembly);
+        var expectedName = moduleType.Name + "Hosting";
         var hostingType = hostingAssembly.GetTypes().SingleOrDefault(type =>
-            type is { IsAbstract: false } && typeof(IDigitalBrainModuleHosting).IsAssignableFrom(type) && type.Name == moduleType.Name + "Hosting");
-        return hostingType is null ? null : (IDigitalBrainModuleHosting)Activator.CreateInstance(hostingType)!;
+            type is { IsAbstract: false } && typeof(IDigitalBrainModuleHosting).IsAssignableFrom(type) && type.Name == expectedName)
+            ?? throw new InvalidOperationException(
+                $"{hostingAssembly.GetName().Name} has no {nameof(IDigitalBrainModuleHosting)} named {expectedName} for {moduleType.Name}.");
+        return (IDigitalBrainModuleHosting)Activator.CreateInstance(hostingType)!;
     }
 
     public static IResourceBuilder<TResource> WithReference<TResource>(this IResourceBuilder<TResource> builder, DigitalBrainBuilder brain)

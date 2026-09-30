@@ -15,8 +15,7 @@ public sealed class AspireModule : IModule<AspireOptions>
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddOptions<AspireOptions>()
-            .Configure<IConfiguration>((options, configuration) => configuration.PopulateModuleOptions(nameof(AspireModule), options))
-            .BindConfiguration(AspireOptions.SectionName);
+            .Configure<IConfiguration>((options, configuration) => configuration.PopulateModuleOptions(nameof(AspireModule), options));
         builder.Services.TryAddSingleton<AspireBridge>();
     }
 

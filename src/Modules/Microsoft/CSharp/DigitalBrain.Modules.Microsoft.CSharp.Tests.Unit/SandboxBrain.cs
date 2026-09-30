@@ -13,7 +13,7 @@ internal static class SandboxBrain
             .ConfigureSilo(silo =>
             {
                 silo.Services.AddHttpClient<ICSharpRunner, AspireSandboxRunner>().ConfigurePrimaryHttpMessageHandler(() => sandbox);
-                silo.Services.PostConfigure<CSharpOptions>(options => options.EdgeUrl = "http://edge.test/");
+                silo.Services.PostConfigure<CSharpDeploymentSettings>(options => options.EdgeUrl = "http://edge.test/");
                 configure?.Invoke(silo);
             })
             .StartAsync(ct);

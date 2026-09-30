@@ -18,10 +18,11 @@ public sealed class CSharpModule : IModule<CSharpOptions>
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddOptions<CSharpOptions>()
             .Configure<IConfiguration>((options, configuration) => configuration.PopulateModuleOptions(nameof(CSharpModule), options))
-            .BindConfiguration(CSharpOptions.SectionName).PostConfigure(options =>
+            .PostConfigure(options =>
         {
             if (string.IsNullOrWhiteSpace(options.SourceRoot)) { options.SourceRoot = FindRepositoryRoot(); }
         });
+        builder.Services.AddOptions<CSharpDeploymentSettings>().BindConfiguration(CSharpDeploymentSettings.SectionName);
         builder.Services.AddCSharpAuthoring();
         builder.Services.TryAddSingleton<CSharpSharing>();
         builder.Services.TryAddScoped(provider => provider.GetRequiredService<CSharpToolService>().ForScope(BrainScope.CurrentId()));
@@ -34,7 +35,7 @@ public sealed class CSharpModule : IModule<CSharpOptions>
         builder.Services.TryAddSingleton<CSharpDirectives>();
         builder.Services.TryAddSingleton<CSharpContractDiscovery>();
         builder.Services.TryAddSingleton<CSharpScriptCheck>();
-        if (!string.IsNullOrWhiteSpace(builder.Configuration[CSharpOptions.SectionName + ":SessionPoolEndpoint"]))
+        if (!string.IsNullOrWhiteSpace(builder.Configuration[CSharpDeploymentSettings.SectionName + ":SessionPoolEndpoint"]))
         {
             builder.Services.TryAddSingleton<TokenCredential>(_ => new DefaultAzureCredential());
             builder.Services.AddHttpClient<ICSharpRunner, SessionPoolRunner>();

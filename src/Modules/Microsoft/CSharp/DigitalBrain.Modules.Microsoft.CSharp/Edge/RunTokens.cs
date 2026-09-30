@@ -9,7 +9,7 @@ internal sealed record RunTokenClaims(string File, string Run, DateTimeOffset Ex
 
 // A run's bearer token for the script edge: the file and run it speaks for, signed with HMAC-SHA256.
 // Development signs with a key made at startup; production must configure one shared by every silo.
-internal sealed class RunTokens(IOptions<CSharpOptions> options, TimeProvider time)
+internal sealed class RunTokens(IOptions<CSharpDeploymentSettings> options, TimeProvider time)
 {
     internal static readonly TimeSpan Lifetime = TimeSpan.FromDays(7);
 

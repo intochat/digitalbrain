@@ -63,7 +63,7 @@ public sealed class SessionPoolRunnerFacts
     }
 
     private static SessionPoolRunner Runner(FakePool pool)
-        => new(new HttpClient(pool), new FixedCredential(), Create(new CSharpOptions { SessionPoolEndpoint = Pool }));
+        => new(new HttpClient(pool), new FixedCredential(), Create(new CSharpDeploymentSettings { SessionPoolEndpoint = Pool }));
 
     private sealed class FixedCredential : TokenCredential
     {

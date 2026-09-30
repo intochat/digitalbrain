@@ -52,12 +52,7 @@ public interface IModule
     void Configure(IEndpointRouteBuilder endpoints) { }
 }
 
-public interface IModule<TOptions> : IModule where TOptions : class, IModuleOptions, new()
-{
-    // Aspire-side hosting hook; convention {ModuleNamespace}.Aspire.Hosting.{ModuleName}Hosting,
-    // overridable here. Replaces [ModuleHosting("assembly-qualified string")].
-    static virtual Type? Hosting => null;
-}
+public interface IModule<TOptions> : IModule where TOptions : class, IModuleOptions, new();
 
 public interface IModuleOptions
 {
@@ -65,6 +60,8 @@ public interface IModuleOptions
 }
 ```
 
+- Hosting resolves by convention: assembly `<ModuleAssembly>.Aspire.Hosting`, type `<ModuleTypeName>Hosting`
+  (replaces `[ModuleHosting]`); a missing assembly means no hosting, a loaded assembly without the named type fails loudly.
 - Kernel compiles once, generically: `Compile<TModule,TOptions>(options)` → `options.Validate()`
   → `JsonSerializer.Serialize(options)` stored under one config key
   (`DigitalBrain:Modules:{Name}:Options`) to cross the AppHost→host boundary. Host side:

@@ -9,7 +9,7 @@ namespace DigitalBrain.Microsoft.CSharp;
 
 // What a run is told: where the brain's script edge is, the run's token, its settings and, for a
 // triggered run, the signal that started it. Nothing about Orleans reaches the script.
-internal sealed class ScriptRunEnvironment(RunTokens tokens, IOptions<CSharpOptions> options, IServiceProvider services)
+internal sealed class ScriptRunEnvironment(RunTokens tokens, IOptions<CSharpDeploymentSettings> options, IServiceProvider services)
 {
     // Development sandboxes reach the brain on the Docker host.
     internal const string DockerHost = "host.docker.internal";

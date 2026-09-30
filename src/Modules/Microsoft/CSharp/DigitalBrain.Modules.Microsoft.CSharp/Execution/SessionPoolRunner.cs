@@ -8,7 +8,7 @@ namespace DigitalBrain.Microsoft.CSharp;
 // Production: an Azure Container Apps custom-container session pool runs the Sandbox image, one
 // Hyper-V session per owner with that owner's scripts side by side. The pool allocates a session on
 // the first request carrying a new identifier, so reads check the session exists before touching it.
-internal sealed class SessionPoolRunner(HttpClient http, TokenCredential credential, IOptions<CSharpOptions> options) : ICSharpRunner
+internal sealed class SessionPoolRunner(HttpClient http, TokenCredential credential, IOptions<CSharpDeploymentSettings> options) : ICSharpRunner
 {
     private const string ManagementApiVersion = "2025-02-02-preview";
     private static readonly TokenRequestContext PoolScope = new(["https://dynamicsessions.io/.default"]);

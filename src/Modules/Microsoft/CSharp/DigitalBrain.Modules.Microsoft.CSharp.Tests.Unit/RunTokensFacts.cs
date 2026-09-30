@@ -10,7 +10,7 @@ public sealed class RunTokensFacts
     public void ATokenNamesItsFileAndRunUntilItExpires()
     {
         var time = new MovableTime();
-        var tokens = new RunTokens(Create(new CSharpOptions()), time);
+        var tokens = new RunTokens(Create(new CSharpDeploymentSettings()), time);
 
         var token = tokens.Issue("workspace/report", "run-1");
 
@@ -23,9 +23,9 @@ public sealed class RunTokensFacts
     public void SilosSharingAKeyAcceptEachOthersTokensAndNoOtherKeyDoes()
     {
         var key = Convert.ToBase64String(new byte[32]);
-        var issuer = new RunTokens(Create(new CSharpOptions { RunTokenKey = key }), TimeProvider.System);
-        var peer = new RunTokens(Create(new CSharpOptions { RunTokenKey = key }), TimeProvider.System);
-        var stranger = new RunTokens(Create(new CSharpOptions()), TimeProvider.System);
+        var issuer = new RunTokens(Create(new CSharpDeploymentSettings { RunTokenKey = key }), TimeProvider.System);
+        var peer = new RunTokens(Create(new CSharpDeploymentSettings { RunTokenKey = key }), TimeProvider.System);
+        var stranger = new RunTokens(Create(new CSharpDeploymentSettings()), TimeProvider.System);
 
         var token = issuer.Issue("f", "r");
 

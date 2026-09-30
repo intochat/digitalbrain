@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -29,7 +30,7 @@ internal static class AspireBridgeEndpoints
 
     private static async ValueTask<object?> RequireBridgeKey(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
-        var expected = context.HttpContext.RequestServices.GetRequiredService<IOptions<AspireOptions>>().Value.BridgeKey;
+        var expected = context.HttpContext.RequestServices.GetRequiredService<IConfiguration>()[AspireModule.ConfigurationRoot + ":BridgeKey"];
         if (string.IsNullOrEmpty(expected)) { return TypedResults.NotFound(); }
         var presented = context.HttpContext.Request.Headers[AspireBridgeRoutes.KeyHeader].ToString();
         return CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(presented), Encoding.UTF8.GetBytes(expected))

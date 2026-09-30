@@ -57,4 +57,16 @@ public sealed class ModuleOptionsFacts
         Assert.Equal(JsonSerializer.Serialize(original, optionsType), JsonSerializer.Serialize(bound, optionsType));
         ModuleSettingsValidation.ValidatePublicSettings([definition]);
     }
+
+    [Fact]
+    public void NoOptionsTypeCarriesAJsonIgnoredWritableMember()
+    {
+        var offenders = ModulesWithOptions().Select(row => OptionsTypeOf(row.Data)!)
+            .SelectMany(options => options.GetProperties()
+                .Where(property => property.SetMethod is { IsPublic: true } && property.GetCustomAttribute<System.Text.Json.Serialization.JsonIgnoreAttribute>() is not null)
+                .Select(property => $"{options.Name}.{property.Name}"))
+            .ToList();
+
+        Assert.Empty(offenders);
+    }
 }
