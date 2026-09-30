@@ -1,8 +1,6 @@
-using DigitalBrain.Contracts.Types;
 using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Sdk;
-using DigitalBrain.Sdk.Connectors;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,10 +8,10 @@ using Xunit;
 
 namespace DigitalBrain.Tests;
 
-public sealed class ConnectionsFacts
+public sealed class SalesforceAccountFacts
 {
     [Fact]
-    public void ConnectionsAreServedOnlyUnderTheBrainRoute()
+    public void SalesforceServesOnlyItsServiceRoutesUnderTheAccountsRoute()
     {
         var builder = WebApplication.CreateBuilder();
         builder.Services.AddSingleton(typeof(IGrainFactory), _ => null!);
@@ -23,32 +21,9 @@ public sealed class ConnectionsFacts
         var routes = app.DataSources.SelectMany(source => source.Endpoints)
             .OfType<RouteEndpoint>().Select(endpoint => endpoint.RoutePattern.RawText!).ToArray();
 
-        Assert.Contains("/brains/{brainId}/connections/", routes);
-        Assert.Contains("/brains/{brainId}/connections/services/{provider}/start", routes);
-        Assert.All(routes, route => Assert.StartsWith("/brains/{brainId}/connections", route));
+        Assert.Contains("/brains/{brainId}/integrations/accounts/services/{provider}/start", routes);
+        Assert.All(routes, route => Assert.StartsWith("/brains/{brainId}/integrations/accounts/services", route));
     }
-
-    [Fact]
-    public void PackageAccountsIncludeScopedCredentialsAndOnlyOwnedLegacyRecords()
-    {
-        var scope = BrainScope.Create("alice", "one");
-        static ConnectorRecord Record(string id, string workspace, string owner) => new()
-        {
-            Id = id, Source = "gmail", WorkspaceId = workspace, Status = ConnectorStatus.Connected,
-            Credential = SecretRef.For(owner, id, id, true),
-        };
-        var result = ScopedConnectorRecords.Combine(scope, "alice",
-            [Record("new", "one", "alice"), Record("wrong-workspace", "two", "alice")],
-            [Record("legacy", "alice", "alice"), Record("foreign", "alice", "bob")]);
-        Assert.Equal(["new", "legacy"], result.Select(record => record.Id));
-    }
-
-    [Theory]
-    [InlineData(ConnectorStatus.Connected, "Configured")]
-    [InlineData(ConnectorStatus.Expired, "Expired")]
-    [InlineData(ConnectorStatus.Failing, "Unavailable")]
-    public void StoredCredentialsDoNotImplyVerification(ConnectorStatus status, string expected)
-        => Assert.Equal(expected, ConnectionsEndpoints.Status(status));
 
     [Fact]
     public void AuthorizationStartRequiresConfiguredProviderAndMintsDistinctCapabilities()

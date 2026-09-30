@@ -2,25 +2,26 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Contracts.Types;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Sdk.Secrets;
 using Orleans;
 using Orleans.Runtime;
 
-namespace DigitalBrain.Sdk.Connectors;
+namespace DigitalBrain.Sdk.Integrations.Accounts;
 
-// The owner's connection registry. A credential is written to the shared secrets grain and the
+// The owner's account registry. A credential is written to the shared secrets grain and the
 // record holds only its SecretRef; the value is released only inside the read-only probe.
-[GrainType(ConnectorNames.NeuronType)]
-internal sealed class ConnectorsNeuron : Neuron<ConnectorsState>, IConnectors
+[GrainType(AccountNames.NeuronType)] // alias predates the integrations rename; persisted, do not touch
+internal sealed class IntegrationAccountsNeuron : Neuron<IntegrationAccountsState>, IIntegrationAccounts
 {
     private readonly IGrainFactory _grains;
-    private readonly IConnectorProbe _probe;
+    private readonly IAccountProbe _probe;
     private readonly TimeProvider _time;
 
-    public ConnectorsNeuron(
-        [PersistentState("connections", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ConnectorsState> store,
+    public IntegrationAccountsNeuron(
+        [PersistentState("connections", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<IntegrationAccountsState> store,
         IGrainFactory grains,
-        IConnectorProbe probe,
+        IAccountProbe probe,
         TimeProvider time) : base(store)
     {
         _grains = grains;
@@ -28,7 +29,7 @@ internal sealed class ConnectorsNeuron : Neuron<ConnectorsState>, IConnectors
         _time = time;
     }
 
-    public Task<ConnectorRecord[]> List(CancellationToken cancellationToken = default)
+    public Task<IntegrationAccount[]> List(CancellationToken cancellationToken = default)
     {
         var records = Snapshot.Connections.Values
             .OrderBy(record => record.Id, StringComparer.Ordinal)
@@ -36,11 +37,12 @@ internal sealed class ConnectorsNeuron : Neuron<ConnectorsState>, IConnectors
         return Task.FromResult(records);
     }
 
-    public async Task<ConnectorRecord> Connect(ConnectRequest request, CallerContext caller, CancellationToken cancellationToken = default)
+    public async Task<IntegrationAccount> Connect(ConnectAccount request, CancellationToken cancellationToken = default)
     {
+        var caller = CallerForWrite();
         ArgumentNullException.ThrowIfNull(request);
-        ArgumentException.ThrowIfNullOrWhiteSpace(request.Source);
-        var source = request.Source.Trim();
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.IntegrationId);
+        var source = request.IntegrationId.Trim();
         if (string.IsNullOrWhiteSpace(request.ConnectionId))
         {
             throw new ArgumentException("A connection id is required.", nameof(request));
@@ -48,53 +50,55 @@ internal sealed class ConnectorsNeuron : Neuron<ConnectorsState>, IConnectors
 
         var credential = await StoreOrReferenceAsync(source, request, caller, cancellationToken);
         var result = await RunProbeAsync(source, credential, caller, cancellationToken);
-        var record = new ConnectorRecord
+        var record = new IntegrationAccount
         {
             Id = request.ConnectionId,
-            Source = source,
+            IntegrationId = source,
             WorkspaceId = caller.BrainId,
             Credential = credential,
             Status = ToStatus(result.Outcome),
             LastProbedAt = _time.GetUtcNow(),
         };
         Snapshot.Connections[record.Id] = record;
-        await Save(Snapshot, new ConnectorStatusChanged(record.Id, record.Source, record.Status));
+        await Save(Snapshot, new AccountStatusChanged(record.Id, record.IntegrationId, record.Status));
         return record;
     }
 
-    public async Task<ConnectorRecord> Probe(string connectionId, CallerContext caller, CancellationToken cancellationToken = default)
+    public async Task<IntegrationAccount> Probe(string connectionId, CancellationToken cancellationToken = default)
     {
+        var caller = CallerForWrite();
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionId);
         if (!Snapshot.Connections.TryGetValue(connectionId, out var current))
         {
-            throw new ConnectorNotConfiguredException($"Connection '{connectionId}' is not configured.");
+            throw new AccountNotConfiguredException($"Connection '{connectionId}' is not configured.");
         }
 
-        var result = await RunProbeAsync(current.Source, current.Credential, caller, cancellationToken);
+        var result = await RunProbeAsync(current.IntegrationId, current.Credential, caller, cancellationToken);
         var record = current with { Status = ToStatus(result.Outcome), LastProbedAt = _time.GetUtcNow() };
         Snapshot.Connections[connectionId] = record;
-        await Save(Snapshot, new ConnectorStatusChanged(record.Id, record.Source, record.Status));
+        await Save(Snapshot, new AccountStatusChanged(record.Id, record.IntegrationId, record.Status));
         return record;
     }
 
-    public async Task Disconnect(string connectionId, CallerContext caller, CancellationToken cancellationToken = default)
+    public async Task Disconnect(string connectionId, CancellationToken cancellationToken = default)
     {
+        CallerForWrite();
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionId);
         if (!Snapshot.Connections.Remove(connectionId))
         {
             return;
         }
 
-        await Save(Snapshot, new ConnectorDisconnected(connectionId));
+        await Save(Snapshot, new AccountDisconnected(connectionId));
     }
 
-    private async Task<SecretRef> StoreOrReferenceAsync(string source, ConnectRequest request, CallerContext caller, CancellationToken cancellationToken)
+    private async Task<SecretRef> StoreOrReferenceAsync(string source, ConnectAccount request, CallerContext caller, CancellationToken cancellationToken)
     {
         if (!string.IsNullOrWhiteSpace(request.SecretReference))
         {
-            if (!SecretRef.IsReference(request.SecretReference))
+            if (!SecretRef.IsReference(request.SecretReference) || !OwnedByCaller(request.SecretReference, caller))
             {
-                throw new ArgumentException("SecretReference must be an existing vault reference (secret://…).", nameof(request));
+                throw new ArgumentException("SecretReference must be an existing reference into your own vault.", nameof(request));
             }
 
             return new SecretRef { Reference = request.SecretReference, Label = request.Label ?? source, Status = SecretStatus.Set };
@@ -115,7 +119,28 @@ internal sealed class ConnectorsNeuron : Neuron<ConnectorsState>, IConnectors
         return await vault.Set(caller, fieldPath, request.Label ?? source, request.Value, cancellationToken);
     }
 
-    private async Task<ConnectorProbeResult> RunProbeAsync(string source, SecretRef credential, CallerContext caller, CancellationToken cancellationToken)
+    // The vault owner named by a reference must be the caller's own principal; another owner's vault,
+    // the platform vault included, is never bindable.
+    private static bool OwnedByCaller(string reference, CallerContext caller)
+    {
+        try { return new SecretRef { Reference = reference }.Owner == caller.PrincipalId; }
+        catch (InvalidOperationException) { return false; }
+    }
+
+    // The ambient stamp is the only trusted caller. Installed apps run under an App stamp and may not
+    // reach the account registry whatever else they pass.
+    private static CallerContext CallerForWrite()
+    {
+        var caller = CallerContextStamper.Require();
+        if (caller.Kind == CallerKind.App || caller.StampedBy == TrustedEdge.AppProxy)
+        {
+            throw new InvalidOperationException("Installed apps cannot manage integration accounts.");
+        }
+
+        return caller;
+    }
+
+    private async Task<AccountProbeResult> RunProbeAsync(string source, SecretRef credential, CallerContext caller, CancellationToken cancellationToken)
     {
         string value;
         try
@@ -124,7 +149,7 @@ internal sealed class ConnectorsNeuron : Neuron<ConnectorsState>, IConnectors
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
-            return ConnectorProbeResult.Failing("The stored credential could not be resolved.");
+            return AccountProbeResult.Failing("The stored credential could not be resolved.");
         }
 
         try
@@ -133,7 +158,7 @@ internal sealed class ConnectorsNeuron : Neuron<ConnectorsState>, IConnectors
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
-            return ConnectorProbeResult.Failing("The read-only probe failed.");
+            return AccountProbeResult.Failing("The read-only probe failed.");
         }
     }
 
@@ -142,14 +167,14 @@ internal sealed class ConnectorsNeuron : Neuron<ConnectorsState>, IConnectors
     {
         Kind = CallerKind.Platform,
         StampedBy = TrustedEdge.Platform,
-        AppId = string.IsNullOrEmpty(caller.AppId) ? ConnectorNames.NeuronType : caller.AppId,
+        AppId = string.IsNullOrEmpty(caller.AppId) ? AccountNames.NeuronType : caller.AppId,
     };
 
-    private static ConnectorStatus ToStatus(ConnectorProbeOutcome outcome) => outcome switch
+    private static AccountStatus ToStatus(AccountProbeOutcome outcome) => outcome switch
     {
-        ConnectorProbeOutcome.Connected => ConnectorStatus.Connected,
-        ConnectorProbeOutcome.Expired => ConnectorStatus.Expired,
-        _ => ConnectorStatus.Failing,
+        AccountProbeOutcome.Connected => AccountStatus.Connected,
+        AccountProbeOutcome.Expired => AccountStatus.Expired,
+        _ => AccountStatus.Failing,
     };
 
     private static string FieldPath(string registry, string source, string connectionId) => "connections." +

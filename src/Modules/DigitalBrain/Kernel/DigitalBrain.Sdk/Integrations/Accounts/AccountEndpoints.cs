@@ -1,0 +1,119 @@
+using System.Text.Json.Serialization;
+using DigitalBrain.Core.Enforcement;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+
+namespace DigitalBrain.Sdk.Integrations.Accounts;
+
+// An account that lives outside the vault-backed registry (an OAuth grant held by its own neuron).
+// The integration's module contributes it so the accounts surface stays integration-neutral.
+public interface IExternalAccount
+{
+    string ConnectionId { get; }
+
+    Task<AccountRow?> ReadAsync(IGrainFactory grains, CancellationToken cancellationToken);
+
+    Task DisconnectAsync(IGrainFactory grains, CancellationToken cancellationToken);
+}
+
+public sealed record AccountRow(
+    string Id,
+    string IntegrationId,
+    string Status,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] DateTimeOffset? LastProbedAt = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Account = null);
+
+internal sealed record ConnectAccountInput(string? IntegrationId, string? ConnectionId, string? Label, string? Value, string? SecretReference);
+
+internal sealed record AccountAction(string? ConnectionId);
+
+internal static class AccountEndpoints
+{
+    internal static string Status(AccountStatus status) => status switch
+    {
+        AccountStatus.Connected => "Configured",
+        AccountStatus.Expired => "Expired",
+        AccountStatus.Disconnected => "Disconnected",
+        _ => "Unavailable",
+    };
+
+    internal static void MapAccounts(this IEndpointRouteBuilder endpoints)
+    {
+        var group = BrainRoutes.Group(endpoints, "/integrations/accounts");
+        group.MapGet("", async (IGrainFactory grains, IEnumerable<IExternalAccount> external, CancellationToken cancellationToken) =>
+        {
+            var scope = CurrentScope();
+            var owner = CallerContextStamper.Require().PrincipalId;
+            var rows = ScopedAccounts.Combine(scope, owner,
+                await grains.GetGrain<IIntegrationAccounts>(scope.Id).List(cancellationToken),
+                await grains.GetGrain<IIntegrationAccounts>(owner).List(cancellationToken)).Select(Project).ToList();
+            foreach (var account in external)
+            {
+                if (await account.ReadAsync(grains, cancellationToken) is { } row) { rows.Add(row); }
+            }
+
+            return Results.Ok(rows);
+        });
+
+        group.MapPost("/connect", async (ConnectAccountInput input, IGrainFactory grains, CancellationToken cancellationToken) =>
+        {
+            // The browser may supply a new value, never a reference into any vault.
+            if (input.SecretReference is not null) { return Results.BadRequest(new { error = "Supply a connection value." }); }
+            if (string.IsNullOrWhiteSpace(input.ConnectionId) || input.ConnectionId.StartsWith("oauth:", StringComparison.Ordinal)) { return Results.BadRequest(); }
+            try
+            {
+                var request = new ConnectAccount
+                {
+                    IntegrationId = input.IntegrationId ?? "",
+                    ConnectionId = input.ConnectionId,
+                    Label = input.Label,
+                    Value = input.Value,
+                };
+                return Results.Ok(Project(await grains.GetGrain<IIntegrationAccounts>(CurrentScope().Id).Connect(request, cancellationToken)));
+            }
+            catch (ArgumentException error) { return Results.BadRequest(new { error = error.Message }); }
+        });
+
+        group.MapPost("/probe", async (AccountAction input, IGrainFactory grains, IEnumerable<IExternalAccount> external, CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(input.ConnectionId)) { return Results.BadRequest(); }
+            if (external.FirstOrDefault(account => account.ConnectionId == input.ConnectionId) is { } oauth)
+            { return await oauth.ReadAsync(grains, cancellationToken) is { } row ? Results.Ok(row) : Results.NotFound(); }
+            try { return Results.Ok(Project(await (await RegistryFor(grains, input.ConnectionId, cancellationToken)).Probe(input.ConnectionId, cancellationToken))); }
+            catch (AccountNotConfiguredException) { return Results.NotFound(); }
+        });
+
+        group.MapPost("/disconnect", async (AccountAction input, IGrainFactory grains, IEnumerable<IExternalAccount> external, CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(input.ConnectionId)) { return Results.BadRequest(); }
+            if (external.FirstOrDefault(account => account.ConnectionId == input.ConnectionId) is { } oauth)
+            {
+                await oauth.DisconnectAsync(grains, cancellationToken);
+                return Results.Ok();
+            }
+
+            await (await RegistryFor(grains, input.ConnectionId, cancellationToken)).Disconnect(input.ConnectionId, cancellationToken);
+            return Results.Ok();
+        });
+    }
+
+    private static BrainScope CurrentScope()
+    {
+        var caller = CallerContextStamper.Require();
+        return BrainScope.Create(caller.AccountId, caller.BrainId);
+    }
+
+    private static async Task<IIntegrationAccounts> RegistryFor(IGrainFactory grains, string connectionId, CancellationToken cancellationToken)
+    {
+        var scope = CurrentScope();
+        var current = grains.GetGrain<IIntegrationAccounts>(scope.Id);
+        if ((await current.List(cancellationToken)).Any(account => account.Id == connectionId)) { return current; }
+        var owner = CallerContextStamper.Require().PrincipalId;
+        var legacy = grains.GetGrain<IIntegrationAccounts>(owner);
+        return ScopedAccounts.Combine(scope, owner, [], await legacy.List(cancellationToken)).Any(account => account.Id == connectionId) ? legacy : current;
+    }
+
+    private static AccountRow Project(IntegrationAccount account)
+        => new(account.Id, account.IntegrationId, Status(account.Status), account.LastProbedAt);
+}

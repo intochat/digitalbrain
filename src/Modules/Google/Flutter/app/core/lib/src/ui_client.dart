@@ -774,7 +774,7 @@ final class DigitalBrainUiClient {
     Map<String, Object?>? body,
   }) => jsonRequest(
     body == null ? 'GET' : 'POST',
-    '/brains/${Uri.encodeComponent(workspaceId)}/connections/services${path.isEmpty ? '' : '/$path'}',
+    '/brains/${Uri.encodeComponent(workspaceId)}/integrations/accounts/services${path.isEmpty ? '' : '/$path'}',
     body,
   );
 
@@ -784,23 +784,9 @@ final class DigitalBrainUiClient {
     Map<String, Object?>? body,
   }) => jsonRequest(
     body == null ? 'GET' : 'POST',
-    '/brains/${Uri.encodeComponent(workspaceId)}/connections${path.isEmpty ? '' : '/$path'}',
+    '/brains/${Uri.encodeComponent(workspaceId)}/integrations/accounts${path.isEmpty ? '' : '/$path'}',
     body,
   );
-
-  Future<Object?> connectionsRequest(
-    String owner,
-    String path, {
-    Map<String, Object?>? body,
-  }) async {
-    final response = await _request(
-      body == null ? 'GET' : 'POST',
-      '/connections/${Uri.encodeComponent(owner)}${path.isEmpty ? '' : '/$path'}',
-      body: body,
-      timeout: const Duration(seconds: 30),
-    );
-    return response.body.isEmpty ? null : jsonDecode(response.body);
-  }
 
   /// The consent sheet for an app before it is installed.
   Future<ConsentSheet> consentSheet(

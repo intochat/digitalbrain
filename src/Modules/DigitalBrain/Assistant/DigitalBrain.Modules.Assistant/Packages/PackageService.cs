@@ -2,7 +2,7 @@ using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Microsoft.CSharp;
-using DigitalBrain.Sdk.Connectors;
+using DigitalBrain.Sdk.Integrations.Accounts;
 
 namespace DigitalBrain.Assistant;
 
@@ -71,10 +71,10 @@ internal sealed class PackageService(
         var declared = (await Package(id).ReadRevision(revision.Revision)).Content.Manifest.Accounts ?? [];
         var scope = CurrentScope();
         var owner = CallerContextStamper.Require().PrincipalId;
-        var available = ScopedConnectorRecords.Combine(scope, owner,
-            await brain.Get<IConnectors>(scope.Id).List(), await brain.Get<IConnectors>(owner).List());
+        var available = ScopedAccounts.Combine(scope, owner,
+            await brain.Get<IIntegrationAccounts>(scope.Id).List(), await brain.Get<IIntegrationAccounts>(owner).List());
         return new(revision.Revision, declared.Select(slot => new PackageAccountSlot(slot.Name, slot.Source, slot.Description,
-            available.Where(account => account.Source == slot.Source && account.Status == ConnectorStatus.Connected)
+            available.Where(account => account.IntegrationId == slot.Source && account.Status == AccountStatus.Connected)
                 .OrderBy(account => account.Id, StringComparer.Ordinal)
                 .Select(account => new PackageAccountChoice(account.Id, account.Credential.Label)).ToArray())).ToArray());
     }
@@ -168,14 +168,14 @@ internal sealed class PackageService(
         if (declared.Count == 0 && selected.Count == 0) { return; }
         var scope = CurrentScope();
         var owner = CallerContextStamper.Require().PrincipalId;
-        var available = ScopedConnectorRecords.Combine(scope, owner,
-            await brain.Get<IConnectors>(scope.Id).List(), await brain.Get<IConnectors>(owner).List());
+        var available = ScopedAccounts.Combine(scope, owner,
+            await brain.Get<IIntegrationAccounts>(scope.Id).List(), await brain.Get<IIntegrationAccounts>(owner).List());
         foreach (var slot in declared)
         {
             if (!selected.TryGetValue(slot.Name, out var id) || string.IsNullOrWhiteSpace(id))
             { throw new ArgumentException($"Choose an account for {slot.Name} ({slot.Source})."); }
-            var account = available.FirstOrDefault(item => item.Id == id && item.Source == slot.Source);
-            if (account is null || account.Status != ConnectorStatus.Connected)
+            var account = available.FirstOrDefault(item => item.Id == id && item.IntegrationId == slot.Source);
+            if (account is null || account.Status != AccountStatus.Connected)
             { throw new ArgumentException($"Account {id} is not a connected {slot.Source} account in this workspace."); }
         }
         if (selected.Keys.Any(key => !declared.Any(slot => slot.Name == key)))

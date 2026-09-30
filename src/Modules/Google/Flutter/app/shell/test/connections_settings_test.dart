@@ -15,7 +15,7 @@ void main() {
       String path, {
       Map<String, Object?>? body,
     }) async => [
-      {'source': 'gmail', 'id': 'new-account', 'status': 'Configured'},
+      {'integrationId': 'gmail', 'id': 'new-account', 'status': 'Configured'},
     ];
     Widget surface(
       Future<Object?> Function(String, {Map<String, Object?>? body}) request,
@@ -26,7 +26,7 @@ void main() {
     await tester.pumpWidget(surface(newRequest));
     await tester.pumpAndSettle();
     delayed.complete([
-      {'source': 'gmail', 'id': 'old-account', 'status': 'Configured'},
+      {'integrationId': 'gmail', 'id': 'old-account', 'status': 'Configured'},
     ]);
     await tester.pumpAndSettle();
     expect(find.textContaining('new-account'), findsOneWidget);
@@ -50,7 +50,7 @@ void main() {
       String path, {
       Map<String, Object?>? body,
     }) async => [
-      {'id': 'mail', 'source': 'gmail', 'status': 'Connected'},
+      {'id': 'mail', 'integrationId': 'gmail', 'status': 'Connected'},
     ];
     Future<Object?> services(String path, {Map<String, Object?>? body}) async {
       if (path.isEmpty) {

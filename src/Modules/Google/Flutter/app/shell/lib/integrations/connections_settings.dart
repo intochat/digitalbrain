@@ -201,12 +201,12 @@ class _ConnectionsSettingsState extends State<ConnectionsSettings> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${_serviceName(row['source'])}${'${row['id']}'.startsWith('oauth:') ? '' : ' · ${row['id']}'}',
+                  '${_serviceName(row['integrationId'])}${'${row['id']}'.startsWith('oauth:') ? '' : ' · ${row['id']}'}',
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 Text(connectionStatus(row['status'])),
                 if (row['account'] is String) Text(row['account'] as String),
-                if (row['source'] == 'gmail')
+                if (row['integrationId'] == 'gmail')
                   const Text(
                     'Gmail credential only. Calendar and Drive access is not established.',
                   ),
@@ -215,13 +215,13 @@ class _ConnectionsSettingsState extends State<ConnectionsSettings> {
                   children: [
                     if (_services.any(
                       (service) =>
-                          service['id'] == row['source'] &&
+                          service['id'] == row['integrationId'] &&
                           service['available'] == true,
                     ))
                       TextButton.icon(
                         onPressed: _busy || widget.onOpen == null
                             ? null
-                            : () => _start('${row['source']}'),
+                            : () => _start('${row['integrationId']}'),
                         icon: const Icon(Icons.login),
                         label: const Text('Reconnect'),
                       ),

@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Microsoft.CSharp;
-using DigitalBrain.Sdk.Connectors;
 
 namespace IntoChat.Tests.E2E.Packages;
 
@@ -48,14 +47,8 @@ public sealed class ShareCSharpFacts
 
         using (var missing = await bob.Client.PostAsJsonAsync($"/brains/{bob.Workspace}/packages/alice/greeter", new { }, Json, ct))
         { Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode); }
-        await brain.Get<IConnectors>("bob").Connect(new ConnectRequest
-        {
-            Source = "twitter", ConnectionId = "bob-twitter", Value = "test-token"
-        }, new CallerContext
-        {
-            PrincipalId = "bob", AccountId = "bob", BrainId = "bob",
-            Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp
-        }, ct);
+        await People.Send(bob.Client, HttpMethod.Post, $"/brains/{bob.Workspace}/integrations/accounts/connect",
+            new { integrationId = "twitter", connectionId = "bob-twitter", value = "test-token" }, ct);
 
         var options = await People.Send(bob.Client, HttpMethod.Get,
             $"/brains/{bob.Workspace}/packages/alice/greeter/accounts", null, ct);

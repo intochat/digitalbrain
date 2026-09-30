@@ -41,7 +41,7 @@ void main() {
   testWidgets('lists status and probes and disconnects', (tester) async {
     final harness = _Harness()
       ..records = [
-        {'id': 'db', 'source': 'supabase', 'status': 'Expired'},
+        {'id': 'db', 'integrationId': 'supabase', 'status': 'Expired'},
       ];
     await tester.pumpWidget(
       MaterialApp(home: Scaffold(body: ConnectWindow(request: harness.request))),
@@ -73,7 +73,7 @@ final class _Harness {
         return records;
       case 'connect':
         records = [
-          {'id': body!['connectionId'], 'source': body['source'], 'status': 'Connected'},
+          {'id': body!['connectionId'], 'integrationId': body['integrationId'], 'status': 'Connected'},
         ];
         return records.single;
       case 'disconnect':

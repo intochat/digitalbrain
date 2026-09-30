@@ -26,7 +26,6 @@ using DigitalBrain.Microsoft.DotNet;
 using DigitalBrain.Microsoft.Roslyn;
 using DigitalBrain.Compute;
 using DigitalBrain.Registry;
-using DigitalBrain.Sdk.Connectors;
 using DigitalBrain.Sdk.Integrations;
 using DigitalBrain.Sdk.Secrets;
 using DigitalBrain.Salesforce;
@@ -54,7 +53,6 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serv
     .WithModule<PlaywrightModule>()
     .WithModule<TimeModule>()
     .WithModule<SecretsModule>()
-    .WithModule<ConnectorModule>()
     .WithModule<IntegrationsModule>()
     .WithModule<IdentityModule>()
     .WithModule<FilesModule>()

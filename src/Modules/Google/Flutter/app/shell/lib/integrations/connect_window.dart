@@ -105,7 +105,7 @@ class _ConnectWindowState extends State<ConnectWindow> {
       final result = await widget.request(
         'connect',
         body: {
-          'source': source,
+          'integrationId': source,
           'connectionId': _connectionId.text.trim(),
           'label': source,
           'value': secret,
@@ -116,7 +116,7 @@ class _ConnectWindowState extends State<ConnectWindow> {
       setState(() {
         _connectionId.clear();
         notice =
-            'Configured ${record['source']} (${connectionStatus(record['status'])}).';
+            'Configured ${record['integrationId']} (${connectionStatus(record['status'])}).';
       });
       await load();
     } catch (failure) {
@@ -277,7 +277,7 @@ class _ConnectWindowState extends State<ConnectWindow> {
                             : Icons.error_outline,
                       ),
                       title: Text(
-                        '${connection['source']} · ${connection['id']}',
+                        '${connection['integrationId']} · ${connection['id']}',
                       ),
                       subtitle: Text(connectionStatus(connection['status'])),
                       trailing: Row(

@@ -45,7 +45,6 @@ public sealed class CanarySecretFacts
         Assert.Equal(System.Net.HttpStatusCode.OK, seeded.StatusCode);
         var seedBody = await seeded.Content.ReadAsStringAsync(ct);
         Assert.DoesNotContain(Canary, seedBody, StringComparison.Ordinal);
-        Assert.Contains("secret://", seedBody, StringComparison.Ordinal);
 
         await WaitForAsync(() => collector.Snapshot().Count > 0, ct);
         await Task.Delay(TimeSpan.FromSeconds(3), ct);
@@ -72,15 +71,14 @@ public sealed class CanarySecretFacts
             .StartAsync(ct);
 
         using var seeded = await brain.HttpClient.PostAsJsonAsync(
-            $"/connections/{Owner}/connect",
-            new { source, connectionId = $"conn-{source}", label = source, value = Canary },
+            $"/brains/{Owner}/integrations/accounts/connect",
+            new { integrationId = source, connectionId = $"conn-{source}", label = source, value = Canary },
             ct);
         Assert.Equal(System.Net.HttpStatusCode.OK, seeded.StatusCode);
         var seedBody = await seeded.Content.ReadAsStringAsync(ct);
         Assert.DoesNotContain(Canary, seedBody, StringComparison.Ordinal);
-        Assert.Contains("secret://", seedBody, StringComparison.Ordinal);
 
-        var list = await brain.HttpClient.GetStringAsync($"/connections/{Owner}", ct);
+        var list = await brain.HttpClient.GetStringAsync($"/brains/{Owner}/integrations/accounts", ct);
         Assert.DoesNotContain(Canary, list, StringComparison.Ordinal);
 
         await WaitForAsync(() => collector.Snapshot().Count > 0, ct);
