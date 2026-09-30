@@ -43,6 +43,6 @@
     <ProjectReference Include="../../../Modules/DigitalBrain/Specs/DigitalBrain.Modules.Specs/DigitalBrain.Modules.Specs.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="../Apps/**/*" LogicalName="IntoChat.ShippedApps/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../Apps/**/*" LogicalName="IntoChat.ShippedApps/%(RecursiveDir)%(Filename)%(Extension)" Link="ShippedApps/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>
