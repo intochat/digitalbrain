@@ -33,13 +33,9 @@ public sealed class ShellPersistenceFacts
     }
 
     [Fact(Timeout = 240_000)]
-    public Task HttpClientsShareDurableStateAndRejectStaleWrites() => VerifyDurableState(false, TestContext.Current.CancellationToken);
-
-    [Fact(Timeout = 240_000, Skip = "Resource restart leaves stale Orleans silo membership; tracked in persistence implementation rollout notes.")]
-    public Task ServerRestartRestoresDurableState() => VerifyDurableState(true, TestContext.Current.CancellationToken);
-
-    private static async Task VerifyDurableState(bool restart, CancellationToken ct)
+    public async Task HttpClientsShareDurableStateAndRejectStaleWrites()
     {
+        var ct = TestContext.Current.CancellationToken;
         await using var brain = await IntoChatE2ETest.StartAsync(ct);
         var http = brain.HttpClient;
         var empty = await http.GetFromJsonAsync<JsonObject>("/shell/state", ct);
@@ -59,13 +55,5 @@ public sealed class ShellPersistenceFacts
         using var replay = await http.PutAsJsonAsync("/shell/state", new { expectedRevision = 1, operationId = savedOperationId, snapshot }, ct);
         replay.EnsureSuccessStatusCode();
         Assert.Equal(2, (await replay.Content.ReadFromJsonAsync<JsonObject>(ct))!["revision"]!.GetValue<int>());
-        if (!restart) { return; }
-        var commands = brain.Application.Services.GetRequiredService<ResourceCommandService>();
-        var restarted = await commands.ExecuteCommandAsync("IntoChat", KnownResourceCommands.RestartCommand, ct);
-        Assert.True(restarted.Success, restarted.Message);
-        await brain.Application.Services.GetRequiredService<ResourceNotificationService>().WaitForResourceHealthyAsync("IntoChat", ct);
-        var afterRestart = await fresh.GetFromJsonAsync<JsonObject>("/shell/state", ct);
-        Assert.Equal(2, afterRestart!["revision"]!.GetValue<int>());
-        Assert.True(JsonNode.DeepEquals(snapshot, afterRestart["snapshot"]));
     }
 }

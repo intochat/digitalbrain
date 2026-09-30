@@ -1,21 +1,20 @@
-using System.Net.Http.Json;
 using DigitalBrain.AI;
 using DigitalBrain.Compute;
 using DigitalBrain.Contracts.Enforcement;
-using IntoChat.Tests.E2E.Agent;
+using DigitalBrain.Compute.Allowances;
 
-namespace IntoChat.Tests.E2E.Compute;
+namespace IntoChat.Tests.Unit.Compute;
 
 // Chaos and prompt-injection facts for the allowance path. The model never reaches a paid call
 // without an allowance: a scripted sequence of tool calls is replayed as CallRequests against the
 // one durable ledger and every call without an allowance is stopped.
 public sealed class ChaosChargeFacts
 {
-    [Fact(Timeout = 240_000)]
+    [Fact]
     public async Task ChaosFindsNoDoubleChargesAndActualNeverExceedsTheLimit()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.StartAsync(ct);
+        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var ledger = brain.Get<IAllowanceLedger>("account-chaos");
         await ledger.SetLimitsAsync(new LimitPolicy { AccountLimitCompute = 100m }, ct);
         await ledger.GrantAsync(Allowance("account-chaos", "ws-chaos", 100m), ct);
@@ -30,14 +29,15 @@ public sealed class ChaosChargeFacts
         await ledger.SettleAsync(reservation.ReservationId, 90m, FailureClass.ModelRetry, ct);
 
         var report = await ledger.ReadLimitsAsync(ct);
+        Assert.Equal(90m, report.SpentCompute);
         Assert.True(report.SpentCompute <= report.LimitCompute);
     }
 
-    [Fact(Timeout = 240_000)]
+    [Fact]
     public async Task AScriptedModelMakesZeroPaidCallsWithoutAnAllowance()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.StartAsync(ct);
+        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var ledger = brain.Get<IAllowanceLedger>("account-injected");
 
         var injected = new[]
@@ -58,11 +58,11 @@ public sealed class ChaosChargeFacts
         Assert.Equal(3, (await ledger.ListPendingAsync(ct)).Length);
     }
 
-    [Fact(Timeout = 240_000)]
-    public async Task ARevokedGrantAndAPermissionGrowthRequireReconsent()
+    [Fact]
+    public async Task APermissionGrowthBeyondTheConsentedScopeRequiresReconsent()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.StartAsync(ct);
+        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var ledger = brain.Get<IAllowanceLedger>("account-consent");
 
         await ledger.GrantAsync(new Allowance

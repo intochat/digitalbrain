@@ -1,6 +1,8 @@
 using System.Text;
 
-namespace IntoChat.Tests.E2E.Diagnostics;
+using IntoChat.Tests.E2E.Diagnostics;
+
+namespace IntoChat.Tests.Unit.Diagnostics;
 
 /// <summary>
 /// Guards the minimal OTLP reader used by the trace budget and capture facts: the fields those

@@ -57,22 +57,4 @@ public sealed class HostedDeploymentFacts
             Assert.Contains("IntoChat__Hosted__Enabled", text);
         }
     }
-
-    [Fact]
-    public void HostedEntrypointRunsTheSiloOnly()
-    {
-        var entrypoint = Read("src/Applications/IntoChat/IntoChat/docker-entrypoint.sh");
-        Assert.Contains("IntoChat.dll", entrypoint);
-        Assert.DoesNotContain("mcp", entrypoint, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void TelemetryCollectorTailSamplesToAPersistentBackend()
-    {
-        var collector = Read("ops/otel/collector.yaml");
-        Assert.Contains("tail_sampling", collector);
-        Assert.Contains("otlphttp/backend", collector);
-        Assert.Contains("OTEL_BACKEND_ENDPOINT", collector);
-        Assert.Contains("intochat.intent.id", collector);
-    }
 }

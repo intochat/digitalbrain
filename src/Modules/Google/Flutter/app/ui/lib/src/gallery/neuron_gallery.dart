@@ -133,6 +133,10 @@ Map<String, dynamic> neuronExample(String kind) => switch (kind) {
       },
     ],
   },
+  'webbrowser' => {
+    'title': 'Reading list',
+    'uri': 'https://example.com/reading-list',
+  },
   'voiceinput' => {'label': 'Hold to talk'},
   'fileinput' => {'label': 'Attach file'},
   'select' => {

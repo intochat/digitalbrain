@@ -11,25 +11,13 @@ public sealed class ProfileCompositionFacts
     private static readonly string[] UserPathModules =
         ["AI", "Memory", "ClickHouse", "Supabase", "Time", "Gmail", "Salesforce", "GitHub", "Flutter"];
 
-    [Fact]
-    public async Task DeveloperProfileComposesToolingModules()
+    [Theory]
+    [InlineData("developer")]
+    [InlineData("product")]
+    public async Task EveryProfileComposesToolingAndUserPathModules(string profile)
     {
-        var names = await ResourceNames(["IntoChat:Profile=developer"], TestContext.Current.CancellationToken);
-        foreach (var module in ToolingModules) { Assert.Contains(module, names); }
-        foreach (var module in UserPathModules) { Assert.Contains(module, names); }
-    }
-
-    [Fact]
-    public async Task ProductProfileComposesToolingModules()
-    {
-        var names = await ResourceNames(["IntoChat:Profile=product"], TestContext.Current.CancellationToken);
-        foreach (var module in ToolingModules) { Assert.Contains(module, names); }
-        foreach (var module in UserPathModules) { Assert.Contains(module, names); }
-    }
-
-    private static async Task<string[]> ResourceNames(string[] args, CancellationToken cancellationToken)
-    {
-        var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.IntoChat_AppHost>(args, cancellationToken);
-        return appHost.Resources.Select(resource => resource.Name).ToArray();
+        var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.IntoChat_AppHost>([$"IntoChat:Profile={profile}"], TestContext.Current.CancellationToken);
+        var names = appHost.Resources.Select(resource => resource.Name).ToArray();
+        foreach (var module in ToolingModules.Concat(UserPathModules)) { Assert.Contains(module, names); }
     }
 }

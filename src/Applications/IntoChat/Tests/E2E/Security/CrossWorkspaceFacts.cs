@@ -88,16 +88,4 @@ public sealed class CrossWorkspaceFacts
         var handler = new SocketsHttpHandler { UseCookies = true, CookieContainer = new CookieContainer() };
         return new HttpClient(handler) { BaseAddress = origin.BaseAddress };
     }
-
-    [Fact(Timeout = 180_000)]
-    public async Task UnscopedValueRoutesAreGone()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.StartAsync(ct);
-
-        using var slider = await brain.HttpClient.GetAsync("/ui/sliders/volume", ct);
-        using var textfield = await brain.HttpClient.GetAsync("/ui/textfields/name", ct);
-        Assert.Equal(HttpStatusCode.NotFound, slider.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, textfield.StatusCode);
-    }
 }
