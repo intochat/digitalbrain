@@ -67,30 +67,6 @@ public sealed class CredentialFacts
     }
 
     [Fact]
-    public async Task LegacyProviderKeysSeedTheRegistrationWithTheDefaultEndpoint()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create()
-            .WithRegistrations(new TestExecutionOptions
-            {
-                PrivateConfiguration = new Dictionary<string, string?>
-                {
-                    ["DigitalBrain:AI:Anthropic:ApiKey"] = Canary,
-                    ["DigitalBrain:AI:Tavily:ApiKey"] = Canary,
-                },
-            })
-            .WithModule<AIModule>().StartAsync(ct);
-
-        var anthropic = await brain.Get<IIntegrationRegistration>("integration/anthropic").Read();
-        var tavily = await brain.Get<IIntegrationRegistration>("integration/tavily").Read();
-
-        Assert.Equal(RegistrationStatus.Ready, anthropic.Status);
-        Assert.Equal("https://api.anthropic.com", anthropic.Settings["Endpoint"]);
-        Assert.Equal(RegistrationStatus.Ready, tavily.Status);
-        Assert.Equal(RegistrationStatus.Unconfigured, (await brain.Get<IIntegrationRegistration>("integration/openai").Read()).Status);
-    }
-
-    [Fact]
     public async Task SeedingOnlyTheApiKeyIsReadyAndTheDefaultEndpointIsUsed()
     {
         var ct = TestContext.Current.CancellationToken;

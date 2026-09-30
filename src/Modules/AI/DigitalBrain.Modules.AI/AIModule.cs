@@ -29,7 +29,6 @@ public sealed class AIModule : IModule<AIOptions>
 
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.TryAddSingleton<IAiCredentials, RegistrationCredentials>();
-        builder.AddStartupTask<AiLegacyKeySeeder>(Orleans.ServiceLifecycleStage.Active + 1);
         AIClients.Add(builder.Services);
         builder.Services.TryAddSingleton<Agents.IAgentTurnRunner, Agents.AgentTurnRunner>();
         builder.Services.TryAddSingleton<ModelProfiles>();

@@ -63,12 +63,14 @@ public static class GitHubAppHostingExtensions
             _clientSecret ??= brain.ApplicationBuilder.AddParameter("github-app-client-secret", secret: true)
                 .WithDescription("GitHub App OAuth client secret; user tokens are only used during authorization.");
             const string root = "DigitalBrain:Microsoft:GitHub:App";
+            const string IntegrationRoot = "DigitalBrain:Integrations:github";
             builder.WithEnvironment(EnvironmentKeys.For(root, "AppId"), appId.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                .WithEnvironment(EnvironmentKeys.For(IntegrationRoot, "AppId"), appId.ToString(System.Globalization.CultureInfo.InvariantCulture))
                 .WithEnvironment(EnvironmentKeys.For(root, "Slug"), slug)
                 .WithEnvironment(EnvironmentKeys.For(root, "ClientId"), clientId)
                 .WithEnvironment(EnvironmentKeys.For(root, "PublicOrigin"), publicOrigin.AbsoluteUri)
                 .WithEnvironment(EnvironmentKeys.For(root, "PublicWebhookUrl"), publicWebhookUrl.AbsoluteUri)
-                .WithEnvironment(EnvironmentKeys.For(root, "PrivateKeyPem"), _privateKey)
+                .WithEnvironment(EnvironmentKeys.For(IntegrationRoot, "PrivateKeyPem"), _privateKey)
                 .WithEnvironment(EnvironmentKeys.For(root, "WebhookSecret"), _webhookSecret)
                 .WithEnvironment(EnvironmentKeys.For(root, "ClientSecret"), _clientSecret);
         }

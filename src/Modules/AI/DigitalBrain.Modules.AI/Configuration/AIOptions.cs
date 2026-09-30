@@ -38,13 +38,12 @@ public sealed class AIOptions : IModuleOptions
         { throw new ArgumentException("Unknown embedding marker in the module declaration."); }
     }
 
-    // The declared topology and defaults arrive as the module's options; the DigitalBrain:AI keys hosting
-    // projects into the environment only seed provider registrations (see AiLegacyKeySeeder).
+    // The declared topology and defaults arrive as the module's options.
     internal static AIOptions Read(IConfiguration configuration)
     {
         var options = configuration.GetModuleOptions<AIOptions>(nameof(AIModule));
         configuration.GetSection(SectionName).Bind(options);
-        ProjectLegacyKeys(options, configuration);
+        ProjectOllamaModelMarkers(options, configuration);
         return options;
     }
 
@@ -71,7 +70,7 @@ public sealed class AIOptions : IModuleOptions
 
     // Model markers are open-ended child keys beside Endpoint, rather than under Models.
     // Keep that public configuration shape.
-    private static void ProjectLegacyKeys(AIOptions options, IConfiguration configuration)
+    private static void ProjectOllamaModelMarkers(AIOptions options, IConfiguration configuration)
     {
         foreach (var section in configuration.GetSection($"{SectionName}:Ollama").GetChildren())
         {

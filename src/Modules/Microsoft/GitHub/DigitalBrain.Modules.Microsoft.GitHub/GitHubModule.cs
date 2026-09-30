@@ -24,7 +24,6 @@ public sealed class GitHubModule : IModule<GitHubModuleOptions>
             services.GetRequiredService<IOptions<GitHubRepositoriesOptions>>().Value.CreateBindings());
         builder.Services.AddGitHubAuthentication(builder.Configuration);
         builder.Services.AddSingleton<GitHubAppRegistration>();
-        builder.AddStartupTask<GitHubLegacyKeySeeder>(Orleans.ServiceLifecycleStage.Active + 1);
         builder.Services.AddSingleton<GitHubInstallationTokens>();
         builder.Services.AddSingleton<IGitHubRepositorySource, GitHubRepositorySource>();
         builder.Services.AddSingleton<GitHubSetupService>();

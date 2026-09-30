@@ -56,6 +56,7 @@ public static class GitHubHostingExtensions
             {
                 throw new InvalidOperationException("Configure at most 32 GitHub repositories with unique binding and endpoint identities.");
             }
+            projection.SeedsIntegration = _repositories.Count == 0;
             _repositories.Add(id, projection);
         }
 
@@ -74,6 +75,8 @@ public static class GitHubHostingExtensions
     {
         private IResourceBuilder<ParameterResource>? _privateKey;
         private IResourceBuilder<ParameterResource>? _webhookSecret;
+
+        internal bool SeedsIntegration { get; set; }
 
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
@@ -94,6 +97,13 @@ public static class GitHubHostingExtensions
                 .WithEnvironment(EnvironmentKeys.For(root, "EndpointId"), endpointId)
                 .WithEnvironment(EnvironmentKeys.For(root, "PrivateKeyPem"), _privateKey)
                 .WithEnvironment(EnvironmentKeys.For(root, "WebhookSecret"), _webhookSecret);
+            if (SeedsIntegration)
+            {
+                const string integrationRoot = "DigitalBrain:Integrations:github";
+                builder
+                    .WithEnvironment(EnvironmentKeys.For(integrationRoot, "AppId"), appId.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                    .WithEnvironment(EnvironmentKeys.For(integrationRoot, "PrivateKeyPem"), _privateKey);
+            }
             if (apiHost is not null)
             {
                 builder.WithEnvironment(EnvironmentKeys.For(root, "ApiHost"), apiHost.AbsoluteUri);

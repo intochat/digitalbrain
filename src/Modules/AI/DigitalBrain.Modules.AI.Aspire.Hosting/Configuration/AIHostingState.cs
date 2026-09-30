@@ -82,7 +82,7 @@ public static partial class AIHostingExtensions
 
             foreach (var (provider, apiKey) in _providerApiKeys)
             {
-                builder.WithEnvironment($"DigitalBrain__AI__{provider}__ApiKey", apiKey);
+                builder.WithEnvironment(EnvironmentKeys.For($"DigitalBrain:Integrations:{provider.ToString().ToLowerInvariant()}", "ApiKey"), apiKey);
             }
 
             if (_defaultLlmMarker is { } llmMarker)

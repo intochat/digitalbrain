@@ -7,7 +7,7 @@ namespace DigitalBrain.AI.Aspire.Hosting;
 
 public static partial class AIHostingExtensions
 {
-    private const string TavilyApiKeyEnvironmentKey = "DigitalBrain__AI__Tavily__ApiKey";
+    private const string TavilyApiKeyEnvironmentKey = "DigitalBrain__Integrations__tavily__ApiKey";
     private const string TavilyEnabledEnvironmentKey = "DigitalBrain__AI__Tavily__Enabled";
     private const string TavilyApiKeyDescription = "API key for Tavily web search. Sign up at [Tavily](https://www.tavily.com/) and copy your API key from your account dashboard. Paste it here to enable web search for DigitalBrain agents.";
     private const string EnableSensitiveDataEnvironmentKey =
