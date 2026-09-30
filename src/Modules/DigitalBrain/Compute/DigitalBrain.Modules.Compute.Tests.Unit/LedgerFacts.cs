@@ -1,3 +1,6 @@
+using DigitalBrain.Compute.Storage;
+using Orleans;
+using Microsoft.Extensions.DependencyInjection;
 using DigitalBrain.Compute;
 using DigitalBrain.Compute.Ledger;
 using DigitalBrain.Testing.Unit;
@@ -10,8 +13,9 @@ public sealed class LedgerFacts
     [Fact]
     public async Task ChargeTotalsExcludeOtherAccountsIntentsAndPlatformCost()
     {
-        var store = new InMemoryLedgerStore();
         var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        var store = new NeuronLedgerStore(brain.SiloServices.GetRequiredService<IGrainFactory>());
         await store.AppendAsync(Charge("a", 7m) with { IntentId = "run" }, ct);
         await store.AppendAsync(Charge("b", 3m) with { IntentId = "other" }, ct);
         await store.AppendAsync(Charge("c", 9m) with { AccountId = "other", IntentId = "run" }, ct);
@@ -24,7 +28,8 @@ public sealed class LedgerFacts
     public async Task ConcurrentWritersNeverDoubleCharge()
     {
         var ct = TestContext.Current.CancellationToken;
-        var store = new InMemoryLedgerStore();
+        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        var store = new NeuronLedgerStore(brain.SiloServices.GetRequiredService<IGrainFactory>());
 
         var results = await Task.WhenAll(Enumerable.Range(0, 64)
             .Select(_ => store.AppendAsync(Charge("charge-intent-1", 7m), ct).AsTask()));

@@ -1,4 +1,5 @@
 using DigitalBrain.Contracts.Enforcement;
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Sdk.Secrets;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -67,7 +68,7 @@ public sealed class SecretsFacts
         var secrets = brain.Get<ISecrets>(Owner);
         var reference = await secrets.Set(UserCaller(), "api.key", "API key", Canary, ct);
 
-        await Assert.ThrowsAnyAsync<Exception>(() => secrets.Resolve(UserCaller(), reference, ct));
+        await Assert.ThrowsAsync<UntrustedCallerException>(() => secrets.Resolve(UserCaller(), reference, ct));
         Assert.Equal(Canary, await secrets.Resolve(PlatformCaller(), reference, ct));
     }
 

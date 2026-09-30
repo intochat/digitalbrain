@@ -54,4 +54,5 @@ public static class CallerContextStamper
     };
 }
 
+[GenerateSerializer]
 public sealed class UntrustedCallerException(string message) : Exception(message);

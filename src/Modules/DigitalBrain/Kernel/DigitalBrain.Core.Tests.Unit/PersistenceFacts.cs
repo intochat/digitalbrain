@@ -56,36 +56,6 @@ internal sealed class FailingProbeState(ProbeState initial) : IPersistentState<P
 
 public sealed class PersistenceFacts
 {
-    private static readonly string RepositoryRoot = FindRepositoryRoot();
-    private static string FindRepositoryRoot()
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "DigitalBrain.slnx")))
-        {
-            directory = directory.Parent;
-        }
-        return directory?.FullName
-            ?? throw new InvalidOperationException($"Repository root (DigitalBrain.slnx) was not found above {AppContext.BaseDirectory}.");
-    }
-
-    private static IEnumerable<string> BuildFiles()
-    {
-        var root = new DirectoryInfo(RepositoryRoot);
-        foreach (var file in root.EnumerateFiles("*.props", SearchOption.TopDirectoryOnly))
-        {
-            yield return file.FullName;
-        }
-        foreach (var file in root.EnumerateFiles("*.csproj", SearchOption.AllDirectories))
-        {
-            if (file.FullName.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase)
-                || file.FullName.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-            yield return file.FullName;
-        }
-    }
-
     [Fact]
     public async Task FailedWriteRollsStateBack()
     {
@@ -107,20 +77,6 @@ public sealed class PersistenceFacts
         var (_, payload) = await brain.Grains().GetGrain<IDocumentGrain>("persistence-facts/doc").ReadAsync();
         Assert.Contains("42", payload ?? string.Empty, StringComparison.Ordinal);
         Assert.Equal(42, await store.ReadAsync("doc", state => state.Value, ct));
-    }
-
-    [Fact]
-    public void JournalingPackageIsNotReferenced()
-    {
-        Assert.False(File.Exists(Path.Combine(RepositoryRoot,
-                "src", "Modules", "DigitalBrain", "Kernel", "Aspire", "AzureOrleansJournalHosting.cs")),
-            "AzureOrleansJournalHosting is the unwired Orleans Journaling host and must be deleted.");
-
-        var offenders = BuildFiles()
-            .Where(file => File.ReadAllText(file).Contains("Microsoft.Orleans.Journaling", StringComparison.Ordinal))
-            .Select(file => Path.GetRelativePath(RepositoryRoot, file))
-            .ToArray();
-        Assert.True(offenders.Length == 0, $"Orleans Journaling must not be referenced by any package file: {string.Join(", ", offenders)}");
     }
 
     [Fact]

@@ -2,6 +2,7 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Contracts.Types;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Enforcement;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Sdk.Secrets;
@@ -57,7 +58,7 @@ internal sealed class SecretsNeuron : Neuron<SecretsState>, ISecrets
             || caller.StampedBy is not (TrustedEdge.AppProxy or TrustedEdge.Platform)
             || string.IsNullOrEmpty(caller.AppId))
         {
-            throw new InvalidOperationException("Only a trusted outbound call can resolve a secret.");
+            throw new UntrustedCallerException("Only a trusted outbound call can resolve a secret.");
         }
 
         Snapshot.Owner = this.GetPrimaryKeyString();

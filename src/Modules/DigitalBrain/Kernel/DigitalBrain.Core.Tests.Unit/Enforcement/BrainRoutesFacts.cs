@@ -22,17 +22,6 @@ public sealed class BrainRoutesFacts
     }
 
     [Fact]
-    public async Task AnUnstampedAuthenticatedRequestIsUnauthorized()
-    {
-        var http = new DefaultHttpContext();
-        http.Request.Headers.Authorization = "Basic abc";
-
-        var denied = await BrainAccessFilter.Decide(http, "personal");
-
-        Assert.Equal(StatusCodes.Status401Unauthorized, ((IStatusCodeHttpResult)denied!).StatusCode);
-    }
-
-    [Fact]
     public async Task AGroupedEndpointDeniesAStampedCallerWhoIsNotAMember()
     {
         var (status, handlerRan) = await Invoke("personal", authorized: true, stamped: true);

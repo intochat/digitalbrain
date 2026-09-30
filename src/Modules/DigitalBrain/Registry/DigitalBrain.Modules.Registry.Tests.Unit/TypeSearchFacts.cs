@@ -53,7 +53,11 @@ public sealed class TypeSearchFacts
         await using var brain = await UnitTest.Create().WithModule<RegistryModule>().StartAsync(TestContext.Current.CancellationToken);
         var registry = brain.Get<IRegistry>(RegistryModule.Key);
         Assert.DoesNotContain(await registry.Types(), type => type.Id == "test.registry-clock");
-        brain.SiloServices.GetRequiredService<LocalSignalHub>().Publish(new ModuleLoaded(typeof(RegistryFixtureModule).AssemblyQualifiedName!));
+        var hub = brain.SiloServices.GetRequiredService<LocalSignalHub>();
+        using var announcements = hub.Subscribe<ModuleLoaded>();
+        var announced = new ModuleLoaded(typeof(RegistryFixtureModule).AssemblyQualifiedName!);
+        hub.Publish(announced);
+        Assert.Same(announced, await announcements.Reader.ReadAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
         Assert.DoesNotContain(await registry.Types(), type => type.Id == "test.registry-clock");
     }
 

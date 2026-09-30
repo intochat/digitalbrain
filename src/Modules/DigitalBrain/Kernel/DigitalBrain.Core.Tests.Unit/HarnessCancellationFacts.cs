@@ -58,7 +58,7 @@ public sealed class HarnessCancellationFacts
             var failure = await Assert.ThrowsAsync<AggregateException>(() => disposing.WaitAsync(TimeSpan.FromSeconds(7), ct));
             if (throws) { Assert.Contains("callback failed", failure.ToString()); }
             else { Assert.Contains("timed out", failure.ToString(), StringComparison.OrdinalIgnoreCase); }
-            await Assert.ThrowsAnyAsync<Exception>(() => brain.SubscribeAsync<Number>(brain.Get<ITestEmitter>("closed"), ct));
+            await Assert.ThrowsAsync<ObjectDisposedException>(() => brain.SubscribeAsync<Number>(brain.Get<ITestEmitter>("closed"), ct));
         }
         finally
         {

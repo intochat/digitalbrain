@@ -61,7 +61,7 @@ public sealed class DigitalBrainDeploymentFacts
         var mocks = new AzureMocks();
         using var config = AzureMocks.Config(new Dictionary<string, string> { ["api-key"] = "sk-123", ["client-id"] = "client-abc" });
 
-        var error = await Assert.ThrowsAnyAsync<Exception>(() => Deploy(mocks, []));
+        var error = await Assert.ThrowsAsync<Pulumi.RunException>(() => Deploy(mocks, []));
 
         Assert.Contains("vectors.bindings.grpc.url", error.ToString(), StringComparison.Ordinal);
     }

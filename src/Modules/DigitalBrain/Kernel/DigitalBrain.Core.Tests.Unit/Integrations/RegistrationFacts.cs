@@ -437,9 +437,6 @@ public sealed class RegistrationFacts
     private static ConfigureRegistration Values(params (string Field, string Value)[] values)
         => new() { Values = values.ToDictionary(pair => pair.Field, pair => pair.Value) };
 
-    private static ClaimsPrincipal Principal(string role)
-        => new(new ClaimsIdentity([new Claim(ClaimTypes.Role, role)], "test"));
-
     private static CallerContext Caller(CallerKind kind, TrustedEdge edge) => new()
     {
         PrincipalId = "someone",

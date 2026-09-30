@@ -183,7 +183,7 @@ public sealed class AccountFacts : IDisposable
 
         Assert.Equal(Owner, account.Credential.Owner);
         Orleans.Runtime.RequestContext.Clear();
-        await Assert.ThrowsAnyAsync<Exception>(() => brain.Get<IIntegrationAccounts>("workspace-one")
+        await Assert.ThrowsAsync<UntrustedCallerException>(() => brain.Get<IIntegrationAccounts>("workspace-one")
             .Connect(new ConnectAccount { IntegrationId = "gmail", ConnectionId = "mail2", Value = "v" }, ct));
         CallerContextStamper.Stamp(UserCaller());
         Assert.Equal("mail", Assert.Single(await brain.Get<IIntegrationAccounts>("workspace-one").List(ct)).Id);

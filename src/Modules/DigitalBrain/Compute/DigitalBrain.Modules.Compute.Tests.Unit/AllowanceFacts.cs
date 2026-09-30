@@ -280,53 +280,6 @@ public sealed class AllowanceFacts
         Assert.Equal(0m, report.SpentCompute);
     }
 
-    [Fact]
-    public void RecurringMetersAccrueWithoutAUserIntentAndAppearOnTheStatement()
-    {
-        var meter = RecurringMeters.Accrue("ws-1", "storage.gb_month", 2m, "gb_month", new DateTimeOffset(2026, 9, 10, 0, 0, 0, TimeSpan.Zero));
-        Assert.Equal("recurring:storage.gb_month:2026-09", meter.IntentId);
-
-        var statement = StatementBuilder.Build("account", "2026-09", [], [meter], new PriceBook(), Now);
-
-        var line = Assert.Single(statement.Lines);
-        Assert.True(line.Recurring);
-        Assert.Equal("storage.gb_month", line.MeterId);
-    }
-
-    [Fact]
-    public async Task TheFakeInvoicingProviderIsDeterministicAndNeverCallsOut()
-    {
-        var invoice = new Invoice
-        {
-            InvoiceId = "inv-1",
-            AccountId = "account",
-            Period = "2026-09",
-            AmountUsd = 12.5m,
-            Currency = "usd",
-        };
-
-        var provider = new FakeInvoicingProvider();
-        var first = await provider.CreateAsync(invoice, TestContext.Current.CancellationToken);
-        var second = await provider.CreateAsync(invoice, TestContext.Current.CancellationToken);
-
-        Assert.Equal(InvoiceStatus.Open, first.Status);
-        Assert.Equal(first.ProviderReference, second.ProviderReference);
-        Assert.Equal("fake-invoice:inv-1", first.ProviderReference);
-    }
-
-    [Fact]
-    public void AStatementMapsToADeterministicInvoice()
-    {
-        var meter = RecurringMeters.Accrue("ws-1", "storage.gb_month", 2m, "gb_month", new DateTimeOffset(2026, 9, 10, 0, 0, 0, TimeSpan.Zero));
-        var statement = StatementBuilder.Build("account", "2026-09", [], [meter], new PriceBook(), Now);
-
-        var invoice = BillingService.InvoiceFor(statement);
-
-        Assert.Equal("inv:account:2026-09", invoice.InvoiceId);
-        Assert.Equal(statement.Lines, invoice.Lines);
-        Assert.Equal(statement.TotalUsd, invoice.AmountUsd);
-    }
-
     private static Allowance AllowanceOf(string id, string workspace, ApprovalLevel level, AllowanceScope scope, decimal limit,
         string? appId = null, string? operation = null)
         => new()

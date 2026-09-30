@@ -1,3 +1,5 @@
+using Orleans;
+using Microsoft.Extensions.DependencyInjection;
 using DigitalBrain.Compute;
 using DigitalBrain.Compute.Metering;
 using DigitalBrain.Compute.Reconciliation;
@@ -43,7 +45,8 @@ public sealed class MeterFacts
     public async Task ConcurrentDuplicateAppendsRecordOneEvent()
     {
         var ct = TestContext.Current.CancellationToken;
-        var store = new InMemoryMeterStore();
+        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        var store = new NeuronMeterStore(brain.SiloServices.GetRequiredService<IGrainFactory>());
 
         var results = await Task.WhenAll(Enumerable.Range(0, 64)
             .Select(_ => store.AppendAsync(Event(), ct).AsTask()));

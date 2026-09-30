@@ -2,6 +2,8 @@ using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Identity;
 using DigitalBrain.Identity.Grants;
 using DigitalBrain.Testing.Unit;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans;
 using Xunit;
 
 namespace DigitalBrain.Modules.Identity.Tests.Unit;
@@ -109,7 +111,7 @@ public sealed class GrantFacts
     }
 
     [Fact]
-    public async Task ConsumingAOnceGrantMakesTheNextReadLookEmpty()
+    public async Task RevokingAOnceGrantEmptiesTheStoreAndTheNextReadLooksMissing()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
@@ -124,6 +126,31 @@ public sealed class GrantFacts
             Request(CallerKind.App, "app-1", "ws-1", "person.birthDate"), null, await store.ListAsync(ct));
         Assert.Equal(CallDenial.MissingGrant, decision!.Denial);
         Assert.Contains("missing", decision.Explanation, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task TheStoreConsumePathSpendsOnlyTheOnceGrantsItIsGiven()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        var store = brain.Get<IGrantStore>(IdentityGrains.Grants("ws-1"));
+        var onceBirthDate = Grant(GrantMode.Once, "person.birthDate", "app-1", "ws-1");
+        var onceEmail = Grant(GrantMode.Once, "person.email", "app-1", "ws-1");
+        var alwaysBirthDate = Grant(GrantMode.Always, "person.birthDate", "app-1", "ws-1");
+        await store.GrantAsync(onceBirthDate, ct);
+        await store.GrantAsync(onceEmail, ct);
+        await store.GrantAsync(alwaysBirthDate, ct);
+        var source = new GrainGrantPolicySource(brain.SiloServices.GetRequiredService<IGrainFactory>());
+        var caller = Request(CallerKind.App, "app-1", "ws-1", "person.birthDate").Caller;
+
+        await source.ConsumeOnceAsync(caller, [onceBirthDate], ct);
+
+        var remaining = await source.ListGrantsAsync(caller, ct);
+        Assert.Equal(2, remaining.Count);
+        Assert.Contains(remaining, grant => grant.Mode == GrantMode.Once && grant.SemanticTypeId == "person.email");
+        Assert.Contains(remaining, grant => grant.Mode == GrantMode.Always && grant.SemanticTypeId == "person.birthDate");
+        var decision = GrantRules.Evaluate(Request(CallerKind.App, "app-1", "ws-1", "person.birthDate"), null, remaining);
+        Assert.True(decision!.Allowed);
     }
 
     [Fact]

@@ -69,7 +69,10 @@ public sealed class RuntimeSignalFacts
         await using var brain = await UnitTest.Create().StartAsync(ct);
         using var signals = brain.SiloServices.GetRequiredService<LocalSignalHub>().Subscribe<NeuronActivity>();
         await Assert.ThrowsAsync<InvalidOperationException>(() => brain.Get<IRuntimeProbe>("fail").Ping());
-        Assert.False(signals.Reader.TryRead(out _));
+        await brain.Get<IRuntimeProbe>("healthy").Ping();
+
+        var firstActivation = Assert.IsType<NeuronActivated>(await signals.Reader.ReadAsync(ct).AsTask().WaitAsync(TimeSpan.FromSeconds(5), ct));
+        Assert.Equal("healthy", firstActivation.Key);
     }
 
     public sealed class RuntimeFixtureModule : IModule

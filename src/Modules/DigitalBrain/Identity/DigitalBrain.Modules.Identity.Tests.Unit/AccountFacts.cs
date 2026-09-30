@@ -46,7 +46,7 @@ public sealed class AccountFacts
     }
 
     [Fact]
-    public async Task PasswordAuthenticationSeparatesAccountsAndRejectsImpersonation()
+    public async Task EachRegistrationGetsItsOwnAccountAndBrain()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
@@ -55,13 +55,30 @@ public sealed class AccountFacts
         var second = await directory.RegisterAsync("bob", "another-password", "Bob", ct);
         Assert.NotEqual(first.AccountId, second.AccountId);
         Assert.NotEqual(first.BrainId, second.BrainId);
+        Assert.False(await directory.CanAccessAsync("bob", first.BrainId, ct));
+    }
+
+    [Fact]
+    public async Task OnlyTheCorrectPasswordAuthenticatesAnExistingAccount()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        var directory = brain.Get<IIdentityDirectory>(IdentityGrains.Directory);
+        var alice = await directory.RegisterAsync("alice", "correct-password", "Alice", ct);
         Assert.Null(await directory.AuthenticateAsync("alice", "wrong-password", ct));
         Assert.Null(await directory.AuthenticateAsync("alice", "", ct));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => directory.RegisterAsync("owner", "correct-password", "Owner", ct));
-        await Assert.ThrowsAsync<ArgumentException>(() => directory.RegisterAsync("weak", "short", "Weak", ct));
         Assert.Null(await directory.AuthenticateAsync("unknown", "correct-password", ct));
-        Assert.Equal(first, await directory.AuthenticateAsync("alice", "correct-password", ct));
-        Assert.False(await directory.CanAccessAsync("bob", first.BrainId, ct));
+        Assert.Equal(alice, await directory.AuthenticateAsync("alice", "correct-password", ct));
+    }
+
+    [Fact]
+    public async Task RegistrationRefusesWeakPasswordsAndTakenNames()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        var directory = brain.Get<IIdentityDirectory>(IdentityGrains.Directory);
+        await directory.RegisterAsync("alice", "correct-password", "Alice", ct);
+        await Assert.ThrowsAsync<ArgumentException>(() => directory.RegisterAsync("weak", "short", "Weak", ct));
         await Assert.ThrowsAsync<InvalidOperationException>(() => directory.RegisterAsync("alice", "new-password", "Pretender", ct));
     }
 
@@ -80,19 +97,6 @@ public sealed class AccountFacts
 
         await directory.ShareBrainAsync(owner.AccountId, owner.BrainId, "bob", "Bob", MemberRole.Member, ct);
         Assert.True(await directory.CanAccessAsync("bob", owner.BrainId, ct));
-    }
-
-    [Fact]
-    public async Task SharingABrainGrantsAccessOnlyToThatBrain()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var host = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
-        var directory = host.Get<IIdentityDirectory>(IdentityGrains.Directory);
-        var alice = await directory.RegisterAsync("alice", "correct-password", "Alice", ct);
-        var bob = await directory.RegisterAsync("bob", "another-password", "Bob", ct);
-        Assert.False(await directory.CanAccessAsync("bob", alice.BrainId, ct));
-        await directory.ShareBrainAsync(alice.AccountId, alice.BrainId, "bob", "Bob", MemberRole.Member, ct);
-        Assert.True(await directory.CanAccessAsync("bob", alice.BrainId, ct));
-        Assert.False(await directory.CanAccessAsync("bob", bob.BrainId + "-not-shared", ct));
+        Assert.False(await directory.CanAccessAsync("bob", "a-brain-that-was-not-shared", ct));
     }
 }

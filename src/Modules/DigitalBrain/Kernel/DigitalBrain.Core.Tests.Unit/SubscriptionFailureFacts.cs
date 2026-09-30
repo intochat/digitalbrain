@@ -79,7 +79,8 @@ public sealed class SubscriptionFailureFacts
         await source.Configure(mode);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(ct);
         if (mode == "late") { cancel.CancelAfter(50); }
-        await Assert.ThrowsAnyAsync<Exception>(() => brain.SubscribeAsync<Number>(source, cancel.Token));
+        if (mode == "late") { await Assert.ThrowsAnyAsync<OperationCanceledException>(() => brain.SubscribeAsync<Number>(source, cancel.Token)); }
+        else { await Assert.ThrowsAsync<IOException>(() => brain.SubscribeAsync<Number>(source, cancel.Token)); }
         Assert.Equal(0, await source.Members());
         Assert.InRange(await source.Cleanups(), 1, 2);
     }
