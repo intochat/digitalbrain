@@ -5,6 +5,7 @@
   <ItemGroup>
     <ProjectReference Include="../Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj" />
     <ProjectReference Include="../../Time/DigitalBrain.Modules.Time.Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
+    <ProjectReference Include="../Registry/DigitalBrain.Modules.Registry.Contracts/DigitalBrain.Modules.Registry.Contracts.csproj" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
   </ItemGroup>
 </Project>

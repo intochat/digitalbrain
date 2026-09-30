@@ -21,5 +21,12 @@ public sealed class NeuronContracts
         ? contract
         : throw new ArgumentException($"{name} is not a loaded neuron contract. Pass the full type name from neurons_list.");
 
-    public static Assembly[] Loaded() => [typeof(INeuron).Assembly, typeof(DigitalBrain.Time.Timers.ITimer).Assembly];
+    // This server is a brain client, so its addressable surface is whatever contract assemblies are
+    // deployed beside it: every referenced DigitalBrain.Modules.*.Contracts plus the kernel's.
+    public static Assembly[] Deployed() =>
+    [
+        typeof(INeuron).Assembly,
+        .. Directory.GetFiles(AppContext.BaseDirectory, "DigitalBrain.Modules.*.Contracts.dll")
+            .Select(path => Assembly.Load(AssemblyName.GetAssemblyName(path))),
+    ];
 }

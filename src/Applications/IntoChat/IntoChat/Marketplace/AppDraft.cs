@@ -66,6 +66,7 @@ internal sealed class AppDraftNeuron(
 {
     private const int MaxAuthorRetries = 2;
     private const int MaxBuildAttempts = 3;
+    private const int MaxBuilderRounds = 12;
     private const int MaxRequestLength = 4000;
     private static readonly string[] ConfigurationRuntimes = [GroupChatRuntime.RuntimeName, "prompt"];
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
@@ -184,7 +185,7 @@ internal sealed class AppDraftNeuron(
             .AppendLine($"What the person wants: {Snapshot.Request}")
             .AppendLine().AppendLine("Specification:").AppendLine(Snapshot.Spec);
         if (failures.Length > 0) { task.AppendLine().AppendLine("The previous attempt failed:").AppendLine(failures); }
-        var built = Parse<BuiltApp>(await ModelAddress.Complete(GrainFactory, BuilderModel, AgentPrompts.Builder, task.ToString()));
+        var built = Parse<BuiltApp>(await BuilderConversation(task.ToString()));
         var files = new Dictionary<string, string>(built.Files ?? new Dictionary<string, string>(), StringComparer.Ordinal)
         {
             [PackageContent.SpecPath] = Snapshot.Spec,
@@ -197,6 +198,58 @@ internal sealed class AppDraftNeuron(
                 Runtime: Snapshot.Runtime),
             built.Source ?? "",
             files);
+    }
+
+    // The Builder works with tools: it searches the registry for contracts, reads their details and
+    // compile-checks its C# before answering. A model that never calls a tool (a scripted one, or a
+    // confident real one) simply answers in the first round.
+    private async Task<string> BuilderConversation(string task)
+    {
+        var model = ModelAddress.Resolve(GrainFactory, BuilderModel);
+        var messages = new List<AiMessage>
+        {
+            new("system", [new AiText(AgentPrompts.Builder)]),
+            new("user", [new AiText(task)]),
+        };
+        for (var round = 0; round < MaxBuilderRounds; round++)
+        {
+            var result = await model.Generate(new InferenceRequest(messages, Tools: BuilderTools.Definitions));
+            messages.AddRange(result.Messages);
+            var calls = result.Messages.SelectMany(message => message.Content).OfType<AiToolCall>().ToArray();
+            if (calls.Length == 0)
+            {
+                return string.Concat(result.Messages.SelectMany(message => message.Content).OfType<AiText>().Select(content => content.Text)).Trim();
+            }
+            var results = new List<AiContent>();
+            foreach (var call in calls) { results.Add(new AiToolResult(call.CallId, await ExecuteBuilderTool(call))); }
+            messages.Add(new AiMessage("tool", results));
+        }
+        throw new InvalidDataException($"The Builder used tools for {MaxBuilderRounds} rounds without producing the implementation.");
+    }
+
+    private async Task<string> ExecuteBuilderTool(AiToolCall call)
+    {
+        try
+        {
+            return call.Name switch
+            {
+                BuilderTools.SearchContracts => JsonSerializer.Serialize(
+                    await BuilderTools.Search(GrainFactory, Parse<BuilderTools.SearchArguments>(call.ArgumentsJson).Query), Json),
+                BuilderTools.ReadContracts => JsonSerializer.Serialize(
+                    await Require(csharp?.Discovery).Read(Parse<BuilderTools.ReadArguments>(call.ArgumentsJson).Modules ?? []), Json),
+                BuilderTools.CheckCSharp => JsonSerializer.Serialize(
+                    Require(csharp?.Check).Check(Parse<BuilderTools.CheckArguments>(call.ArgumentsJson).Files ?? new Dictionary<string, string>()), Json),
+                _ => throw new ArgumentException($"Unknown tool '{call.Name}'."),
+            };
+        }
+        // A failed tool call is the model's problem to correct, not the build's end.
+        catch (Exception error) when (error is not OperationCanceledException)
+        {
+            return JsonSerializer.Serialize(new { error = error.Message }, Json);
+        }
+
+        static T Require<T>(T? service) where T : class
+            => service ?? throw new InvalidOperationException(MarketplaceService.SandboxMissing);
     }
 
     private static string Failures(AppTestRun run)
@@ -237,18 +290,4 @@ internal sealed class AppDraftNeuron(
     private sealed record AuthoredApp(string Name, string Title, string Description, string Runtime, string Spec);
     private sealed record BuiltApp(IReadOnlyList<BuiltSetting>? Settings, IReadOnlyDictionary<string, string>? Files, string? Source);
     private sealed record BuiltSetting(string Name, string? Description, string? Default);
-}
-
-internal static class AgentPrompts
-{
-    public static string Author { get; } = Load("author.md");
-    public static string Builder { get; } = Load("builder.md");
-
-    private static string Load(string name)
-    {
-        using var stream = typeof(AgentPrompts).Assembly.GetManifestResourceStream("IntoChat.Agents." + name)
-            ?? throw new InvalidOperationException($"The {name} agent prompt is not embedded.");
-        using var reader = new StreamReader(stream);
-        return reader.ReadToEnd();
-    }
 }

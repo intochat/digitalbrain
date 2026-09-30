@@ -8,7 +8,7 @@ public sealed class NeuronContractFacts
     [Fact]
     public void LoadedContractsIncludeTheTimer()
     {
-        var contracts = new NeuronContracts(NeuronContracts.Loaded());
+        var contracts = new NeuronContracts(NeuronContracts.Deployed());
         Assert.Contains(typeof(TimerNeuron).FullName, contracts.Names);
         Assert.Equal(typeof(TimerNeuron), contracts.Find(typeof(TimerNeuron).FullName!));
     }
@@ -16,7 +16,7 @@ public sealed class NeuronContractFacts
     [Fact]
     public void UnknownContractIsRejected()
     {
-        var contracts = new NeuronContracts(NeuronContracts.Loaded());
+        var contracts = new NeuronContracts(NeuronContracts.Deployed());
         var error = Assert.Throws<ArgumentException>(() => contracts.Find("DigitalBrain.Missing.IMissing"));
         Assert.Contains("neurons_list", error.Message);
     }

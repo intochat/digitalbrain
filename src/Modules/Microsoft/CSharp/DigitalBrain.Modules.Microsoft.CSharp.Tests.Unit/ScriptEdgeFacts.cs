@@ -83,15 +83,16 @@ public sealed class ScriptEdgeFacts
     }
 
     [Fact]
-    public async Task TheModuleAllowsTheInstalledContractAssemblies()
+    public async Task TheModuleAllowsTheComposedModulesContractAssembliesOnly()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await SandboxBrain.StartAsync(new FakeSandbox(), ct);
 
         var contracts = brain.SiloServices.GetRequiredService<ScriptContracts>();
 
-        Assert.Equal(typeof(DigitalBrain.Microsoft.Aspire.IAspire), contracts.Find(typeof(DigitalBrain.Microsoft.Aspire.IAspire).FullName!));
         Assert.Equal(typeof(ICSharpFile), contracts.Find(typeof(ICSharpFile).FullName!));
+        // Aspire's contracts are deployed beside this host, but its module is not composed here.
+        Assert.Throws<ArgumentException>(() => contracts.Find(typeof(DigitalBrain.Microsoft.Aspire.IAspire).FullName!));
     }
 
     [Fact]

@@ -39,11 +39,34 @@ internal sealed class ScriptedLlmNeuron(
         var script = store.State;
         if (script.Answered >= script.Replies.Count)
         { throw new InvalidOperationException($"Scripted model '{this.GetPrimaryKeyString()}' ran out of replies after {script.Answered}."); }
-        var prompt = string.Join("\n", request.Messages.SelectMany(message => message.Content).OfType<AiText>().Select(text => text.Text));
+        var prompt = string.Join("\n", request.Messages.SelectMany(message => message.Content).Select(content => content switch
+        {
+            AiText text => text.Text,
+            AiToolResult result => result.ResultJson,
+            _ => null,
+        }).Where(text => text is not null));
         var reply = script.Replies[script.Answered];
         store.State = script with { Answered = script.Answered + 1, Prompts = [.. script.Prompts, prompt] };
         await store.WriteStateAsync(cancellationToken);
-        return new InferenceResult([new AiMessage("assistant", [new AiText(reply)])], "stop", null, null, ModelName);
+        return new InferenceResult([new AiMessage("assistant", [ToolCall(reply) ?? (AiContent)new AiText(reply)])], "stop", null, null, ModelName);
+    }
+
+    // A scripted reply of exactly {"tool": "...", "arguments": {...}} plays a tool-calling turn, so
+    // tests can drive an agent loop deterministically the way scripted text drives a completion.
+    private static AiToolCall? ToolCall(string reply)
+    {
+        if (!reply.TrimStart().StartsWith('{')) { return null; }
+        try
+        {
+            using var document = System.Text.Json.JsonDocument.Parse(reply);
+            return document.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object
+                && document.RootElement.EnumerateObject().Count() == 2
+                && document.RootElement.TryGetProperty("tool", out var tool)
+                && document.RootElement.TryGetProperty("arguments", out var arguments)
+                ? new AiToolCall(Guid.NewGuid().ToString("N"), tool.GetString()!, arguments.GetRawText())
+                : null;
+        }
+        catch (System.Text.Json.JsonException) { return null; }
     }
 
     public async IAsyncEnumerable<InferenceUpdate> GenerateStreaming(InferenceRequest request,

@@ -33,10 +33,12 @@ public sealed class CSharpModule : IModule
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.TryAddSingleton<RunTokens>();
         builder.Services.TryAddSingleton<ScriptRunEnvironment>();
-        // Explicit: DI would pick the assemblies constructor and resolve an empty IEnumerable<Assembly>.
-        builder.Services.TryAddSingleton(_ => new ScriptContracts());
+        // Explicit: DI would resolve the assemblies parameter as an empty IEnumerable<Assembly>.
+        builder.Services.TryAddSingleton(provider => new ScriptContracts(provider.GetRequiredService<ModuleInventory>().ContractAssemblies()));
         builder.Services.TryAddTransient<ScriptEdge>();
-        builder.Services.TryAddSingleton<CSharpContractCatalog>();
+        builder.Services.TryAddSingleton<CSharpDirectives>();
+        builder.Services.TryAddSingleton<CSharpContractDiscovery>();
+        builder.Services.TryAddSingleton<CSharpScriptCheck>();
         if (!string.IsNullOrWhiteSpace(builder.Configuration[CSharpOptions.SectionName + ":SessionPoolEndpoint"]))
         {
             builder.Services.TryAddSingleton<TokenCredential>(_ => new DefaultAzureCredential());

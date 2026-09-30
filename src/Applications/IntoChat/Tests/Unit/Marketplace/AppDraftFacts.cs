@@ -60,6 +60,27 @@ public sealed class AppDraftFacts
     }
 
     [Fact]
+    public async Task ABuilderThatCallsAToolGetsItsResultAndStillPublishes()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartAsync(ct);
+        await brain.Get<IScriptedLLM>("author").Script([Authored(Spec)]);
+        // The first scripted reply is a tool call; the loop answers it and asks again.
+        await brain.Get<IScriptedLLM>("builder").Script([
+            """{"tool":"check_csharp","arguments":{"files":{"tests.cs":"var answer = 1;\nConsole.WriteLine(answer);"}}}""",
+            Built("// proof v1", "Shout the answer in capitals."),
+        ]);
+        ScriptedTestRunner.BySourceMarker["// proof v1"] = (0, "dbtest:pass It shouts");
+        StampAlice();
+        var draft = brain.Get<IAppDraft>("alice/drafts/" + Guid.NewGuid().ToString("N"));
+        await draft.Draft("Shout back.");
+
+        var built = await draft.Build();
+
+        Assert.Equal(AppDraftStatus.Published, built.Draft.Status);
+    }
+
+    [Fact]
     public async Task AnImplementationWithoutTestsIsAFailedAttempt()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -207,7 +228,12 @@ public sealed class AppDraftFacts
             silo.Services.AddAppRuntime<PromptRuntime>();
             silo.Services.AddSingleton<DigitalBrain.Apps.ITestScriptRunner>(_ => runner ?? new ScriptedTestRunner());
             silo.Services.AddSingleton<CSharpCatalogStore>();
-            if (canRun) { silo.Services.AddSingleton(new CSharpContractCatalog(Options.Create(new CSharpOptions()))); }
+            if (canRun)
+            {
+                silo.Services.AddSingleton(provider => new CSharpContractDiscovery(provider.GetRequiredService<DigitalBrain.Contracts.IDigitalBrain>(),
+                    new DigitalBrain.Core.ModuleInventory([]), new CSharpDirectives(Options.Create(new CSharpOptions()))));
+                silo.Services.AddSingleton<CSharpScriptCheck>();
+            }
             silo.Services.AddSingleton<CSharpToolService>();
         })
         .StartAsync(ct);

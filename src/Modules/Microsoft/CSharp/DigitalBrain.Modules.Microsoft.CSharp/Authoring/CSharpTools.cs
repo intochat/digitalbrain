@@ -9,8 +9,8 @@ namespace DigitalBrain.Microsoft.CSharp;
 public sealed record CSharpFileView(CSharpDescription Description, CSharpFileSnapshot File, string? Logs = null);
 public sealed record WriteCSharpFileRequest(string Source, string? Name = null, string? Purpose = null);
 
-// The contract catalog is registered by CSharpModule, so its absence means this host cannot run C# files.
-public sealed class CSharpToolService(IDigitalBrain brain, CSharpCatalogStore catalog, CSharpContractCatalog? contracts = null)
+// The contract discovery is registered by CSharpModule, so its absence means this host cannot run C# files.
+public sealed class CSharpToolService(IDigitalBrain brain, CSharpCatalogStore catalog, CSharpContractDiscovery? contracts = null, CSharpScriptCheck? check = null)
 {
     public static readonly (MethodInfo Method, string Name)[] Tools = [.. typeof(ScopedCSharpTools).GetMethods()
         .Select(method => (Method: method, Tool: method.GetCustomAttribute<McpServerToolAttribute>()))
@@ -18,19 +18,21 @@ public sealed class CSharpToolService(IDigitalBrain brain, CSharpCatalogStore ca
         .Select(candidate => (candidate.Method, candidate.Tool!.Name!))];
 
     public bool CanRun => contracts is not null;
+    public CSharpContractDiscovery? Discovery => contracts;
+    public CSharpScriptCheck? Check => check;
 
     public ScopedCSharpTools ForScope(string scope) => new(brain, catalog, contracts, scope, CanRun);
 }
 
 [McpServerToolType]
-public sealed class ScopedCSharpTools(IDigitalBrain brain, CSharpCatalogStore catalog, CSharpContractCatalog? contracts, string scope, bool canRun)
+public sealed class ScopedCSharpTools(IDigitalBrain brain, CSharpCatalogStore catalog, CSharpContractDiscovery? contracts, string scope, bool canRun)
 {
     private const int LogTail = 150;
 
     public bool CanRun => canRun;
 
-    [McpServerTool(Name = "csharp_contracts"), Description("Discover installed module IDs, neuron contracts, the #:project directive per module and an example single-file C# app. Pass modules=[] first, then select exact returned IDs (for example time and flutter).")]
-    public CSharpContractCatalogSnapshot Contracts(string[] modules) => RequireModule().Read(modules);
+    [McpServerTool(Name = "csharp_contracts"), Description("Discover installed module IDs, neuron contracts with their signals, the #:project directive per module and an example single-file C# app. Pass modules=[] first, then select exact returned IDs (for example time and flutter).")]
+    public Task<CSharpContractCatalogSnapshot> Contracts(string[] modules, CancellationToken ct) => RequireModule().Read(modules, ct);
 
     [McpServerTool(Name = "csharp_write"), Description("Save the full source of a single-file C# app and its readable name and purpose. The app connects with `await using var brain = await DigitalBrainClient.ConnectAsync(args);` and operates neurons through brain.Get<T>(id) and brain.On<TSignal>(neuron). Copy the #:project lines for the contracts you use from csharp_contracts. Saving does not restart a running app; use csharp_run start.")]
     public async Task<CSharpFileView> Write(string id, string source, string? name, string? purpose, CancellationToken ct)
@@ -103,6 +105,6 @@ public sealed class ScopedCSharpTools(IDigitalBrain brain, CSharpCatalogStore ca
         return brain.Get<ICSharpFile>(CSharpCatalogStore.FileKey(scope, id));
     }
 
-    private CSharpContractCatalog RequireModule()
+    private CSharpContractDiscovery RequireModule()
         => contracts ?? throw new InvalidOperationException("This host does not run C# files; compose CSharpModule.");
 }

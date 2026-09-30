@@ -19,6 +19,10 @@ public sealed class ObservedRegistryFacts
         var types = await brain.Get<IRegistry>(RegistryModule.Key).Types();
 
         Assert.Contains(types, type => type.Id == "timer" && type.Methods.Any(method => method.Contains("Start", StringComparison.Ordinal)));
+        var timer = types.Single(type => type.Id == "timer");
+        Assert.Equal(typeof(DigitalBrain.Time.Timers.ITimer).FullName, timer.Contract);
+        Assert.Equal("time", timer.ModuleId);
+        Assert.Contains(timer.Signals!, signal => signal.Contains("TimerTick", StringComparison.Ordinal) && signal.Contains("TimerId", StringComparison.Ordinal));
         Assert.Contains(types, type => type.Id == "reminder");
         Assert.DoesNotContain(types, type => type.Id == "test.registry-clock");
         await Assert.ThrowsAsync<InvalidOperationException>(() => brain.Get<IRegistry>(RegistryModule.Key).Search("schedule a timer", cancellationToken: TestContext.Current.CancellationToken));

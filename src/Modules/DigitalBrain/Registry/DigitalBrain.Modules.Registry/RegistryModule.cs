@@ -11,7 +11,7 @@ namespace DigitalBrain.Registry;
 [ModuleConfiguration(typeof(RegistryConfigurationContract))]
 public sealed class RegistryModule : IModule
 {
-    public const string Key = "registry";
+    public const string Key = IRegistry.Key;
     public static ModuleDefinition Define() => new(typeof(RegistryModule));
 
     public void Configure(ISiloBuilder silo)

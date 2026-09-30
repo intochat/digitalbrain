@@ -10,13 +10,17 @@ namespace DigitalBrain.Mcp;
 [McpServerToolType]
 internal sealed class NeuronTools(IDigitalBrain brain)
 {
-    private static readonly NeuronContracts Contracts = new(NeuronContracts.Loaded());
+    private static readonly NeuronContracts Contracts = new(NeuronContracts.Deployed());
     private static readonly HashSet<string> ObserverMethods = [nameof(INeuron.Watch), nameof(INeuron.Unwatch)];
     private static readonly JsonSerializerOptions Json = JsonSerializerOptions.Web;
     private static readonly MethodInfo GetNeuron = typeof(IDigitalBrain).GetMethod(nameof(IDigitalBrain.Get))!;
 
     [McpServerTool(Name = "neurons_list"), Description("List neuron contracts this host can address. Pass the full type name to neurons_get and neurons_call.")]
     public IReadOnlyList<string> List() => [.. Contracts.Names.Order(StringComparer.Ordinal)];
+
+    [McpServerTool(Name = "neurons_search"), Description("Search the brain's registry for neuron types by what they do. Returns each match's contract type name, methods and signals; the brain must compose RegistryModule.")]
+    public async Task<IReadOnlyList<DigitalBrain.Registry.NeuronTypeHit>> Search(string query, CancellationToken cancellationToken = default)
+        => await brain.Get<DigitalBrain.Registry.IRegistry>(DigitalBrain.Registry.IRegistry.Key).Search(query, cancellationToken: cancellationToken);
 
     [McpServerTool(Name = "neurons_get"), Description("Resolve a neuron. contract is a full type name from neurons_list, key is the grain key, for example a timer name.")]
     public string Get(string contract, string key)

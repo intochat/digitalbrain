@@ -3,15 +3,14 @@ using DigitalBrain.Contracts;
 
 namespace DigitalBrain.Microsoft.CSharp;
 
-// The neuron contracts scripts may call: interfaces from installed contract assemblies, nothing else.
+// The neuron contracts scripts may call: interfaces from the composed modules' contract
+// assemblies, nothing else. Composing a module is what exposes its contracts to scripts.
 internal sealed class ScriptContracts(IEnumerable<Assembly> assemblies)
 {
     private readonly IReadOnlyDictionary<string, Type> _contracts = assemblies
         .SelectMany(assembly => assembly.GetExportedTypes())
         .Where(type => type.IsInterface && typeof(INeuron).IsAssignableFrom(type) && type != typeof(INeuron))
         .ToDictionary(type => type.FullName!, StringComparer.Ordinal);
-
-    public ScriptContracts() : this(CSharpContractCatalog.ContractAssemblies()) { }
 
     public Type Find(string name) => _contracts.TryGetValue(name, out var contract)
         ? contract
