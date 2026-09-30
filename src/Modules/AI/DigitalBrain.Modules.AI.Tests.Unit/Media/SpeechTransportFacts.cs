@@ -1,5 +1,3 @@
-using System.Net;
-using System.Net.Sockets;
 using System.Text.Json;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Media;
@@ -15,7 +13,7 @@ public sealed class SpeechTransportFacts
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(30));
         var ct = deadline.Token;
-        using var endpoint = new SpeechEndpoint();
+        using var endpoint = new LoopbackServer();
         await using var brain = await UnitTest.Create().WithRegistrations(AiRegistrationSeeds.OpenAI(endpoint: endpoint.Url)).WithModule<AIModule>()
             .ConfigureSilo(silo =>
             {
@@ -25,7 +23,7 @@ public sealed class SpeechTransportFacts
         Assert.True((await speech.Describe()).Available);
         await using var completed = await brain.Observe<SpeechSynthesized>(speech, ct);
         byte[] mp3 = [0x49, 0x44, 0x33, 0x04, 0, 0];
-        var requestTask = endpoint.Reply(mp3, ct);
+        var requestTask = endpoint.ReplyOnce("audio/mpeg", mp3, ct);
         var response = await speech.Synthesize(new SpeechSynthesisRequest("Read this aloud.", "coral"), ct);
         var request = await requestTask;
         using var json = JsonDocument.Parse(request.Body);
@@ -41,34 +39,5 @@ public sealed class SpeechTransportFacts
         var signal = await completed.NextAsync(ct: ct);
         Assert.Equal(response.OperationId, signal.OperationId);
         Assert.Equal(response.Model, signal.Model);
-    }
-
-    private sealed class SpeechEndpoint : IDisposable
-    {
-        private readonly HttpListener _listener = new();
-        public string Url { get; }
-        public SpeechEndpoint()
-        {
-            using var reservation = new TcpListener(IPAddress.Loopback, 0);
-            reservation.Start();
-            var port = ((IPEndPoint)reservation.LocalEndpoint).Port;
-            reservation.Stop();
-            Url = $"http://localhost:{port}/";
-            _listener.Prefixes.Add(Url);
-            _listener.Start();
-        }
-        public async Task<(string Method, string? Path, string Body)> Reply(byte[] audio, CancellationToken ct)
-        {
-            var context = await _listener.GetContextAsync().WaitAsync(ct);
-            using var reader = new StreamReader(context.Request.InputStream);
-            var body = await reader.ReadToEndAsync(ct);
-            var request = (context.Request.HttpMethod, context.Request.Url?.AbsolutePath, body);
-            context.Response.ContentType = "audio/mpeg";
-            context.Response.ContentLength64 = audio.Length;
-            await context.Response.OutputStream.WriteAsync(audio, ct);
-            context.Response.Close();
-            return request;
-        }
-        public void Dispose() => _listener.Close();
     }
 }

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using DigitalBrain.AI;
+using DigitalBrain.Tests;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -30,7 +31,7 @@ public sealed class TelemetryFacts
             .BuildServiceProvider();
         // No request scope, identity, profile or classification: the host setting is sufficient,
         // including for a singleton client used repeatedly by background application neurons.
-        using var client = AIClients.BuildChatPipeline(services, true, name, new Client(), useFunctionInvocation: false);
+        using var client = AIClients.BuildChatPipeline(services, true, name, Client(), useFunctionInvocation: false);
         ChatMessage[] messages = [new(ChatRole.User, "capture-prompt-canary"),
             new(ChatRole.Tool, [new FunctionResultContent("call-1", "capture-tool-canary")])];
         for (var call = 0; call < 2; call++)
@@ -51,16 +52,9 @@ public sealed class TelemetryFacts
         }
     }
 
-    private sealed class Client : IChatClient
-    {
-        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
-            => Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "capture-answer-canary")) { ModelId = "test-model" });
-        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages,
-            ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            foreach (var update in (await GetResponseAsync(messages, options, cancellationToken)).ToChatResponseUpdates()) { yield return update; }
-        }
-        public object? GetService(Type serviceType, object? serviceKey = null) => null;
-        public void Dispose() { }
-    }
+    private static StubChatClient Client() => new(
+        (_, _, _) => Task.FromResult(CannedResponse()),
+        (_, _, _) => CannedResponse().ToChatResponseUpdates().ToAsyncEnumerable());
+
+    private static ChatResponse CannedResponse() => new(new ChatMessage(ChatRole.Assistant, "capture-answer-canary")) { ModelId = "test-model" };
 }

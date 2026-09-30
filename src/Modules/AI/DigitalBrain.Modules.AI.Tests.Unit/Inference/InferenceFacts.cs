@@ -7,13 +7,25 @@ namespace DigitalBrain.Tests;
 
 public sealed class InferenceFacts
 {
-    [Fact]
-    public void TypedProviderSettingsCannotBeAppliedToAnotherProvider()
+    public static TheoryData<InferenceOptions> OpenAiScopedOptions => new()
+    {
+        new InferenceOptions(Provider: new DigitalBrain.AI.OpenAI.OpenAIInferenceOptions(ParallelToolCalls: false)),
+        new InferenceOptions(ProviderOptions: new Dictionary<string, string> { ["parallel_tool_calls"] = "false" }),
+    };
+
+    [Theory]
+    [MemberData(nameof(OpenAiScopedOptions))]
+    public void ProviderScopedOptionsApplyOnlyToTheirOwnProvider(InferenceOptions options)
     {
         var model = new ResolvedAgentModel("OpenAI", "model", null, null, "revision", LlmCapabilities.Tools, null, null);
-        var options = new InferenceOptions(Provider: new DigitalBrain.AI.OpenAI.OpenAIInferenceOptions(ParallelToolCalls: false));
         Assert.False(InferenceMapping.CreateOptions(model, options).AllowMultipleToolCalls);
         Assert.Throws<ArgumentException>(() => InferenceMapping.CreateOptions(model with { Provider = "Anthropic" }, options));
+    }
+
+    [Fact]
+    public void TypedProviderSettingsSurviveJsonRoundTrip()
+    {
+        var options = new InferenceOptions(Provider: new DigitalBrain.AI.OpenAI.OpenAIInferenceOptions(ParallelToolCalls: false));
         var restored = JsonSerializer.Deserialize<InferenceOptions>(JsonSerializer.Serialize(options));
         Assert.IsType<DigitalBrain.AI.OpenAI.OpenAIInferenceOptions>(restored!.Provider);
     }
@@ -75,15 +87,6 @@ public sealed class InferenceFacts
         => Assert.Throws<ArgumentException>(() => InferenceMapping.CreateOptions(
             new("OpenAI", "model", null, null, "revision", LlmCapabilities.None, null, null),
             new(ProviderOptions: new Dictionary<string, string> { ["made-up"] = "true" })));
-
-    [Fact]
-    public void ProviderSpecificOptionsValidateTheirOwnerAndValue()
-    {
-        var model = new ResolvedAgentModel("OpenAI", "model", null, null, "revision", LlmCapabilities.Tools, null, null);
-        var settings = new InferenceOptions(ProviderOptions: new Dictionary<string, string> { ["parallel_tool_calls"] = "false" });
-        Assert.False(InferenceMapping.CreateOptions(model, settings).AllowMultipleToolCalls);
-        Assert.Throws<ArgumentException>(() => InferenceMapping.CreateOptions(model with { Provider = "Anthropic" }, settings));
-    }
 
     [Fact]
     public void ProfileSettingsAndLimitsAreDescribedAndEnforced()

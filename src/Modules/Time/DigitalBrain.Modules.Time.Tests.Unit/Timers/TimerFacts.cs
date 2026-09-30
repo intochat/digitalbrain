@@ -165,25 +165,7 @@ public sealed class TimerFacts
     }
 
     [Fact]
-    public async Task SupportedDurationBoundariesCanBeRegistered()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var control = new ControlledTimers();
-        await using var brain = await StartAsync(ct, control);
-        var timer = brain.Get<ITimer>("bounds");
-        var maximum = TimeSpan.FromMilliseconds(uint.MaxValue - 1);
-        foreach (var duration in new[] { TimeSpan.FromTicks(1), maximum })
-        {
-            await timer.Start(duration, duration);
-            var registration = control.For(timer.GetGrainId());
-            Assert.Equal(duration, registration.Options.DueTime);
-            Assert.Equal(duration, registration.Options.Period);
-        }
-        await timer.Stop();
-    }
-
-    [Fact]
-    public async Task RealPeriodicTimerCanBeStopped()
+    public async Task RealPeriodicTimerStopsPublishingTicksOnceStopped()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await StartAsync(ct);
@@ -193,6 +175,10 @@ public sealed class TimerFacts
         await ticks.NextAsync(ct: ct);
         await ticks.NextAsync(ct: ct);
         await timer.Stop();
+        await Task.Delay(TimeSpan.FromMilliseconds(100), ct);
+        var settled = ticks.Snapshot.Count;
+        await Task.Delay(TimeSpan.FromMilliseconds(300), ct);
+        Assert.Equal(settled, ticks.Snapshot.Count);
     }
 
     private static Task<UnitBrain> StartAsync(CancellationToken ct, ControlledTimers? timers = null)

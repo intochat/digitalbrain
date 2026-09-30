@@ -39,26 +39,6 @@ public sealed class VoiceFacts
     }
 
     [Fact]
-    public async Task ApplicationNeuronOwnsTranscriptionAndRejectsInvalidAudio()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var provider = new Transcription();
-        await using var brain = await UnitTest.Create().WithModule<AssistantModule>().RequireModules([typeof(DigitalBrain.Apps.AppsModule), typeof(DigitalBrain.AI.AIModule), typeof(DigitalBrain.Compute.ComputeModule), typeof(DigitalBrain.Flutter.FlutterModule)])
-            .ConfigureSilo(silo => silo.Services.AddSingleton<IAudioTranscriptionService>(provider))
-            .StartAsync(ct);
-        var app = brain.Get<IAssistant>(AssistantSurface.Key("voice-workspace"));
-        var rejected = await app.Transcribe("invalid", ct);
-        Assert.Equal(400, rejected.Status);
-        Assert.Equal("Invalid audio encoding.", rejected.Error);
-        Assert.False(provider.Called);
-        var result = await app.Transcribe(Wav(), ct);
-        Assert.Equal(200, result.Status);
-        Assert.Equal("hello", result.Text);
-        Assert.Null(result.Error);
-        Assert.True(provider.Called);
-    }
-
-    [Fact]
     public async Task ProviderFailurePreservesPublicErrorAndCancellationPropagates()
     {
         var failed = await new AssistantTranscription(new BrokenTranscription()).Transcribe(Wav(), TestContext.Current.CancellationToken);

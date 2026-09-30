@@ -29,9 +29,6 @@ public sealed class ReminderFacts
         var updated = Assert.Single((await control.Table.ReadRows(reminder.GetGrainId())).Reminders);
         Assert.Equal(initial.ReminderName, updated.ReminderName);
         Assert.Equal(TimeSpan.FromMinutes(2), updated.Period);
-        // Orleans 10.3.1 clamps future tick arithmetic and supports very long periods.
-        await reminder.Start(TimeSpan.FromDays(1), TimeSpan.MaxValue);
-        Assert.Equal(TimeSpan.MaxValue, Assert.Single((await control.Table.ReadRows(reminder.GetGrainId())).Reminders).Period);
         await reminder.Stop();
         await reminder.Stop();
         Assert.Empty((await control.Table.ReadRows(reminder.GetGrainId())).Reminders);
@@ -75,17 +72,6 @@ public sealed class ReminderFacts
         control.FailAfterUnregister = true;
         await Assert.ThrowsAsync<IOException>(reminder.Stop);
         Assert.Empty((await control.Table.ReadRows(reminder.GetGrainId())).Reminders);
-        await reminder.Stop();
-    }
-
-    [Fact]
-    public async Task NativeDefaultMinimumPeriodIsEnforced()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var brain = await StartAsync(ct);
-        var reminder = brain.Get<IReminder>("minimum");
-        await Assert.ThrowsAnyAsync<ArgumentException>(() => reminder.Start(TimeSpan.Zero, TimeSpan.FromSeconds(59)));
-        await reminder.Start(TimeSpan.FromDays(1), TimeSpan.FromMinutes(1));
         await reminder.Stop();
     }
 

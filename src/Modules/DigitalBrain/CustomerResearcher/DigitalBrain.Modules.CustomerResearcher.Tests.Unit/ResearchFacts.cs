@@ -26,6 +26,16 @@ public sealed class ResearchFacts
         Assert.Null(result.Company.Email);
         Assert.Equal(2, result.Company.Evidence.Count);
         Assert.Null(CompanyResearchAgent.Validate(json, []).Company);
+
+        const string observedText = "Acme headquarters: Amsterdam, The Netherlands. Email one@acme.example";
+        var multipleEmails = CompanyResearchAgent.Validate(JsonSerializer.SerializeToElement(new
+        {
+            status = "found", companyName = "Acme", website = "https://acme.example/", location = "Amsterdam, The Netherlands",
+            email = "one@acme.example;two@acme.example",
+        }), [new("https://acme.example/contact", "Acme", observedText, [])]);
+        Assert.Equal("Amsterdam, The Netherlands", multipleEmails.Company!.Location);
+        Assert.Null(multipleEmails.Company.Email);
+        Assert.All(multipleEmails.Company.Evidence, evidence => Assert.Contains(evidence.Quote, observedText));
     }
 
     [Fact]

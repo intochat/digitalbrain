@@ -15,8 +15,8 @@ public sealed class AgentStreamingFacts
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(15));
-        var client = new BurstClient();
-        using var services = new ServiceCollection().AddSingleton<IChatClient>(client).BuildServiceProvider();
+        var client = new BurstProvider();
+        using var services = new ServiceCollection().AddSingleton<IChatClient>(client.Client).BuildServiceProvider();
         await using var stream = new AgentTurnRunner(services).RunAsync(new("agent", "run", "scope", [], "hello", null, Streaming: true), deadline.Token).GetAsyncEnumerator(deadline.Token);
         Assert.True(await stream.MoveNextAsync());
         Assert.IsType<AgentTurnEvent.Started>(stream.Current);
@@ -36,9 +36,9 @@ public sealed class AgentStreamingFacts
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(15));
         var ct = deadline.Token;
-        var provider = new WaitingStreamClient();
+        var provider = new WaitingStreamProvider();
         await using var brain = await UnitTest.Create().WithModule<AIModule>()
-            .ConfigureSilo(s => s.Services.AddSingleton<IChatClient>(provider)).StartAsync(ct);
+            .ConfigureSilo(s => s.Services.AddSingleton<IChatClient>(provider.Client)).StartAsync(ct);
         var agent = brain.Get<IAgent>("abandoned");
         await using var changes = await brain.Observe<AgentRunChanged>(agent, ct);
         await using (var response = agent.GetResponseStream("hello", ct).GetAsyncEnumerator(ct))
@@ -53,30 +53,33 @@ public sealed class AgentStreamingFacts
         Assert.Empty(await agent.GetHistory(ct));
     }
 
-    private sealed class BurstClient : IChatClient
+    private sealed class BurstProvider
     {
         public TaskCompletionSource Failing { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+
+        public StubChatClient Client => StubChatClient.StreamingOnly(Stream);
+
+        private async IAsyncEnumerable<ChatResponseUpdate> Stream(IReadOnlyList<ChatMessage> messages, ChatOptions? options,
+            [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             for (var i = 0; i < 64; i++) { yield return new(ChatRole.Assistant, "x"); }
             Failing.TrySetResult();
             await Task.CompletedTask;
             throw new IOException("Provider stopped");
         }
-        public object? GetService(Type type, object? key = null) => null;
-        public void Dispose() { }
     }
-    private sealed class WaitingStreamClient : IChatClient
+
+    private sealed class WaitingStreamProvider
     {
         public TaskCompletionSource Cancelled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
+
+        public StubChatClient Client => StubChatClient.StreamingOnly(Stream);
+
+        private async IAsyncEnumerable<ChatResponseUpdate> Stream(IReadOnlyList<ChatMessage> messages, ChatOptions? options,
+            [EnumeratorCancellation] CancellationToken cancellationToken)
         {
             try { yield return new(ChatRole.Assistant, "partial"); await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken); }
             finally { Cancelled.TrySetResult(); }
         }
-        public object? GetService(Type type, object? key = null) => null;
-        public void Dispose() { }
     }
 }

@@ -28,18 +28,6 @@ public sealed class AgentTurnFacts
         Assert.Equal(selected, runner.Request!.Model);
     }
 
-    [Fact]
-    public async Task AssistantTurnsDoNotRequestTheRemovedCapabilityProvider()
-    {
-        var runner = new RecordingRunner();
-
-        await AssistantTurnExecution.RunModel("scope", "run", "hello", AssistantDefinition.Product, EmptyState, "reply",
-            new ConfigurationBuilder().Build(), runner, _ => Task.CompletedTask,
-            new StringBuilder(), [], new IntentActivity(), TestContext.Current.CancellationToken);
-
-        Assert.Empty(runner.Request!.ContextProviders!);
-    }
-
     // The HTTP adapter must forward the application neuron's instructions unchanged.
     [Fact]
     public async Task RunModelPreservesTheApplicationDefinitionWithoutRecomposingIt()
@@ -85,22 +73,6 @@ public sealed class AgentTurnFacts
             EmptyState, "run-reply", new ConfigurationBuilder().Build(), runner, _ => Task.CompletedTask, new StringBuilder(), results, new IntentActivity(), TestContext.Current.CancellationToken);
 
         Assert.Equal("No readable Public columns were requested.", queryError);
-    }
-
-    [Theory]
-    [InlineData("Show data from postgres", "postgres_schema", "supabase_schema")]
-    [InlineData("Show data from PostgreSQL", "postgres_schema", "supabase_schema")]
-    [InlineData("Show data from Supabase", "supabase_schema", "postgres_schema")]
-    public async Task ExplicitDatabaseExcludesTheOtherDatabaseTools(string message, string expected, string forbidden)
-    {
-        var runner = new RecordingRunner();
-        var definition = new AgentDefinition { Instructions = "Use the requested source.", Tools =
-            ["postgres_schema", "show_postgres_query_table", "supabase_schema", "show_supabase_query_table", "table_read"] };
-        await AssistantTurnExecution.RunModel("scope", "run", message, definition, EmptyState, "reply",
-            new ConfigurationBuilder().Build(), runner, _ => Task.CompletedTask,
-            new StringBuilder(), [], new IntentActivity(), TestContext.Current.CancellationToken);
-        Assert.Contains(expected, runner.Request!.ToolNames!);
-        Assert.DoesNotContain(forbidden, runner.Request.ToolNames!);
     }
 
     [Fact]

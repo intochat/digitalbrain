@@ -12,7 +12,7 @@ public sealed class AgentToolOfferFacts
     public async Task AnOfferedToolJoinsTheRestOfTheTurn()
     {
         var ct = TestContext.Current.CancellationToken;
-        using var services = new ServiceCollection().AddSingleton<IChatClient>(new FindThenCallClient())
+        using var services = new ServiceCollection().AddSingleton<IChatClient>(FindThenCallClient())
             .AddSingleton<IAgentToolFactory>(new OfferingTools()).BuildServiceProvider();
         var events = new List<AgentTurnEvent>();
 
@@ -36,25 +36,15 @@ public sealed class AgentToolOfferFacts
         ];
     }
 
-    private sealed class FindThenCallClient : IChatClient
+    private static StubChatClient FindThenCallClient() => new((messages, _, _) =>
     {
-        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        var results = messages.SelectMany(message => message.Contents).OfType<FunctionResultContent>().ToArray();
+        var reply = results.Length switch
         {
-            var results = messages.SelectMany(message => message.Contents).OfType<FunctionResultContent>().ToArray();
-            var reply = results.Length switch
-            {
-                0 => new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("call-1", "find", new Dictionary<string, object?>())]),
-                1 => new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("call-2", "extra", new Dictionary<string, object?>())]),
-                _ => new ChatMessage(ChatRole.Assistant, results[^1].Result!.ToString()),
-            };
-            return Task.FromResult(new ChatResponse(reply));
-        }
-
-        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
-            [EnumeratorCancellation] CancellationToken cancellationToken = default)
-        { await Task.CompletedTask; yield break; }
-
-        public object? GetService(Type serviceType, object? serviceKey = null) => null;
-        public void Dispose() { }
-    }
+            0 => new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("call-1", "find", new Dictionary<string, object?>())]),
+            1 => new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("call-2", "extra", new Dictionary<string, object?>())]),
+            _ => new ChatMessage(ChatRole.Assistant, results[^1].Result!.ToString()),
+        };
+        return Task.FromResult(new ChatResponse(reply));
+    });
 }

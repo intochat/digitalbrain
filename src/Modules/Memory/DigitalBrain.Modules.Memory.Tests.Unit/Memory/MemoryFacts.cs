@@ -90,10 +90,27 @@ public sealed class MemoryFacts
         await memory.Remember(new("notes", "a", "alpha", [new MemoryTag("topic", "greeting")], null));
         await memory.Remember(new("notes", "b", "beta", [new MemoryTag("topic", "shopping")], null));
 
-        var recall = await memory.Recall(new("notes", "query", 5, [new MemoryTag("topic", "shopping")]));
+        var recall = await memory.Recall(new("notes", "alpha", 5, [new MemoryTag("topic", "shopping")]));
 
         var match = Assert.Single(recall.Matches);
         Assert.Equal("b", match.Key);
+    }
+
+    [Fact]
+    public async Task RecallRanksBySimilarityAndStopsAtTheLimit()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await Start(new InMemoryVectorMemoryStore(), ct);
+        var memory = brain.Get<IMemory>("owner");
+        await memory.Remember(new("notes", "unrelated", "zzzz jazz", [], null));
+        await memory.Remember(new("notes", "close", "apple tart", [], null));
+        await memory.Remember(new("notes", "exact", "apple pie", [], null));
+
+        var ranked = await memory.Recall(new("notes", "apple pie", 3, []));
+        Assert.Equal(["exact", "close", "unrelated"], ranked.Matches.Select(match => match.Key));
+
+        var limited = await memory.Recall(new("notes", "apple pie", 2, []));
+        Assert.Equal(["exact", "close"], limited.Matches.Select(match => match.Key));
     }
 
     [Fact]
@@ -165,7 +182,7 @@ internal sealed class FakeEmbeddings : IEmbeddingGenerator<string, Embedding<flo
         CancellationToken cancellationToken = default)
     {
         var embeddings = values
-            .Select(static value => new Embedding<float>(new[] { value.Length, 1f }))
+            .Select(static value => new Embedding<float>(LetterFrequencies(value)))
             .ToList();
         return Task.FromResult(new GeneratedEmbeddings<Embedding<float>>(embeddings));
     }
@@ -173,6 +190,16 @@ internal sealed class FakeEmbeddings : IEmbeddingGenerator<string, Embedding<flo
     public object? GetService(Type serviceType, object? serviceKey = null) => null;
 
     public void Dispose() { }
+
+    // Texts sharing letters point the same way, so cosine ranking orders them by similarity; the last
+    // component keeps every vector non-zero.
+    private static float[] LetterFrequencies(string text)
+    {
+        var vector = new float[27];
+        foreach (var letter in text.ToLowerInvariant().Where(character => character is >= 'a' and <= 'z')) { vector[letter - 'a']++; }
+        vector[26] = 0.01f;
+        return vector;
+    }
 }
 
 internal sealed class InMemoryVectorMemoryStore : IVectorMemoryStore

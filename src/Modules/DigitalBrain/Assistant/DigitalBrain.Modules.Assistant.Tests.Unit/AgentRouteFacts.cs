@@ -1,9 +1,10 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Testing.Routing;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
+using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Assistant.Tests;
@@ -13,19 +14,14 @@ public sealed class AgentRouteFacts
     [Fact]
     public void ConversationsVoiceAndInstalledPackagesAreServedUnderTheBrainRouteAndRegistryStaysGlobal()
     {
-        var builder = WebApplication.CreateBuilder();
-        builder.Services.AddSingleton(typeof(IDigitalBrain), _ => null!);
-        builder.Services.AddSingleton(typeof(PackageService), _ => null!);
-        IEndpointRouteBuilder app = builder.Build();
-        AgentEndpoints.Map(app);
-        PackageEndpoints.Map(app);
+        var snapshot = RouteSnapshot.Map(services =>
+        {
+            services.AddSingleton(typeof(IDigitalBrain), _ => null!);
+            services.AddSingleton(typeof(PackageService), _ => null!);
+        }, app => { AgentEndpoints.Map(app); PackageEndpoints.Map(app); });
 
-        var routes = app.DataSources.SelectMany(source => source.Endpoints)
-            .OfType<RouteEndpoint>().Select(endpoint => endpoint.RoutePattern.RawText!).ToArray();
-
-        var endpointKeys = app.DataSources.SelectMany(source => source.Endpoints).OfType<RouteEndpoint>()
-            .Select(endpoint => string.Join(",", endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? []) + " " + endpoint.RoutePattern.RawText).ToArray();
-        Assert.Equal(endpointKeys.Length, endpointKeys.Distinct().Count());
+        snapshot.AssertEveryMethodAndRouteIsDistinct();
+        var routes = snapshot.Routes;
         Assert.Contains("/brains/{brainId}/conversations/{threadId}", routes);
         Assert.Contains("/brains/{brainId}/voice", routes);
         Assert.Contains("/brains/{brainId}/packages/{owner}/{name}/invocations", routes);
@@ -37,7 +33,7 @@ public sealed class AgentRouteFacts
     }
 
     [Fact]
-    public async Task TheAgentRouteDecidesMembershipFromTheBodyBrain()
+    public async Task TheAgentRouteDecidesMembershipFromTheBodyBrainAndIgnoresTheStampedBrain()
     {
         var access = new AliceOwnsHerBrain();
         var alicesBrain = "research";
@@ -46,27 +42,38 @@ public sealed class AgentRouteFacts
         Assert.Equal(StatusCodes.Status403Forbidden, ((IStatusCodeHttpResult)bob.Denied!).StatusCode);
         Assert.Null(bob.Scope);
 
-        var alice = await Resolve(access, "alice", alicesBrain);
+        var alice = await Resolve(access, "alice", alicesBrain, stampedBrain: "personal");
         Assert.Null(alice.Denied);
         Assert.Equal(BrainScope.Create("alice", alicesBrain).Id, alice.Scope!.Id);
-    }
-
-    [Fact]
-    public async Task TheBodyBrainWinsOverTheBrainTheCallerWasStampedWith()
-    {
-        var resolved = await Resolve(new AliceOwnsHerBrain(), "alice", "research", stampedBrain: "personal");
-
-        Assert.Equal(BrainScope.Create("alice", "research").Id, resolved.Scope!.Id);
-        Assert.NotEqual(BrainScope.Create("alice", "personal").Id, resolved.Scope.Id);
+        Assert.NotEqual(BrainScope.Create("alice", "personal").Id, alice.Scope.Id);
     }
 
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("a/b")]
-    [InlineData("a\b")]
+    [InlineData(@"a")]
     public void AnAbsentOrInvalidBodyBrainIsRejectedByTheValidationTheHandlerUses(string? brainId)
         => Assert.False(BrainScope.IsValidId(brainId));
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("\"\"")]
+    [InlineData("\"a/b\"")]
+    [InlineData("\"a\\b\"")]
+    public async Task TheAgentEndpointAnswers400ForAnAbsentOrInvalidBodyBrain(string brainIdJson)
+    {
+        var snapshot = RouteSnapshot.Map(services => services.AddSingleton(typeof(IDigitalBrain), _ => null!), AgentEndpoints.Map);
+        var agent = snapshot.Endpoints.Single(endpoint => endpoint.RoutePattern.RawText == "/agent");
+        var http = new DefaultHttpContext { RequestServices = new ServiceCollection().AddLogging().AddSingleton(typeof(IDigitalBrain), _ => null!).BuildServiceProvider() };
+        http.Request.ContentType = "application/json";
+        http.Request.Body = new MemoryStream(Encoding.UTF8.GetBytes(
+            $$"""{"brainId":{{brainIdJson}},"threadId":"t","runId":"r","messages":[{"role":"user","content":"hi"}]}"""));
+
+        await agent.RequestDelegate!(http);
+
+        Assert.Equal(StatusCodes.Status400BadRequest, http.Response.StatusCode);
+    }
 
     private static async Task<(BrainScope? Scope, IResult? Denied)> Resolve(IBrainAccess access, string principal, string bodyBrain, string stampedBrain = "personal")
     {

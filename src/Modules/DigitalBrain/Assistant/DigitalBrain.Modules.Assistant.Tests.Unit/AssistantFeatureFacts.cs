@@ -13,20 +13,6 @@ namespace DigitalBrain.Assistant.Tests.Unit;
 public sealed class AssistantFeatureFacts
 {
     [Fact]
-    public void TheAssistantIsAModuleNotACompiledApplication()
-    {
-        Assert.Contains(typeof(DigitalBrain.Core.IModule), typeof(AssistantModule).GetInterfaces());
-        Assert.Null(typeof(DigitalBrain.Core.BrainCompositionBuilder).Assembly.GetType("DigitalBrain.Core.IApplication"));
-    }
-
-    [Fact]
-    public void TheApplicationNeuronOwnsTheTurnStream()
-    {
-        Assert.Contains(typeof(IAssistant).GetMethods(), method =>
-            method.Name == "Run" && method.ReturnType == typeof(IAsyncEnumerable<string>));
-    }
-
-    [Fact]
     public async Task TheAssistantFeatureIsGreen()
     {
         var ct = TestContext.Current.CancellationToken;

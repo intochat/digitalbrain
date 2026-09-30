@@ -37,13 +37,15 @@ public sealed class MediaFacts
     public async Task OversizedInputIsRejectedBeforeProviderInvocation()
     {
         var ct = TestContext.Current.CancellationToken;
+        var provider = new Images();
         await using var brain = await UnitTest.Create().WithModule<AIModule>()
-            .ConfigureSilo(s => { s.Services.AddMediaNeurons(); s.Services.AddSingleton<IImageGeneration>(new Images()); })
+            .ConfigureSilo(s => { s.Services.AddMediaNeurons(); s.Services.AddSingleton<IImageGeneration>(provider); })
             .StartAsync(ct);
         var image = brain.Get<IImageGenerator>("invalid");
         await using var failed = await brain.Observe<MediaOperationFailed>(image, ct);
         await Assert.ThrowsAsync<ArgumentException>(() => image.Generate(new ImageGenerationRequest(new string('x', 32769)), ct));
         Assert.Equal("failed", (await failed.NextAsync(ct: ct)).Code);
+        Assert.Equal(0, provider.Calls);
     }
 
     [Fact]
@@ -94,8 +96,12 @@ public sealed class MediaFacts
 
     private sealed class Images : IImageGeneration
     {
+        public int Calls { get; private set; }
         public Task<GeneratedUiImage> GenerateAsync(string prompt, CancellationToken cancellationToken)
-            => Task.FromResult(new GeneratedUiImage([1, 2], "image/png", "test-image"));
+        {
+            Calls++;
+            return Task.FromResult(new GeneratedUiImage([1, 2], "image/png", "test-image"));
+        }
     }
 
     private sealed class BlockingImages : IImageGeneration

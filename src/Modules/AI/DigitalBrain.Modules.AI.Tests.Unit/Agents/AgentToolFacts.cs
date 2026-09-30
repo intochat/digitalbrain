@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using DigitalBrain.AI.Agents;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,7 +12,7 @@ public sealed class AgentToolFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var tool = new ObservedStartTools();
-        using var services = new ServiceCollection().AddSingleton<IChatClient>(new ScriptedClient())
+        using var services = new ServiceCollection().AddSingleton<IChatClient>(ScriptedClient())
             .AddSingleton<IAgentToolFactory>(tool).BuildServiceProvider();
         await foreach (var item in new AgentTurnRunner(services).RunAsync(new("agent", "run", "scope", [], "ask", null, ToolNames: ["lookup"]), ct))
         {
@@ -38,7 +37,7 @@ public sealed class AgentToolFacts
     public async Task ToolsUseActualCallIdentityAndNeverShareRunContext()
     {
         var ct = TestContext.Current.CancellationToken;
-        using var services = new ServiceCollection().AddSingleton<IChatClient>(new ScriptedClient())
+        using var services = new ServiceCollection().AddSingleton<IChatClient>(ScriptedClient())
             .AddSingleton<IAgentToolFactory, Tools>().BuildServiceProvider();
         var runner = new AgentTurnRunner(services);
         async Task<string[]> Run(string scope)
@@ -56,7 +55,7 @@ public sealed class AgentToolFacts
     [Fact]
     public async Task MissingSelectedToolFailsExplicitly()
     {
-        using var services = new ServiceCollection().AddSingleton<IChatClient>(new ScriptedClient()).BuildServiceProvider();
+        using var services = new ServiceCollection().AddSingleton<IChatClient>(ScriptedClient()).BuildServiceProvider();
         var runner = new AgentTurnRunner(services);
         var events = new List<AgentTurnEvent>();
         await foreach (var item in runner.RunAsync(new("agent", "run", "scope", [], "ask", null, ToolNames: ["missing"]), TestContext.Current.CancellationToken)) { events.Add(item); }
@@ -67,7 +66,7 @@ public sealed class AgentToolFacts
     [Fact]
     public async Task DelayedToolFailureNeverFinishesTheRun()
     {
-        using var services = new ServiceCollection().AddSingleton<IChatClient>(new ScriptedClient())
+        using var services = new ServiceCollection().AddSingleton<IChatClient>(ScriptedClient())
             .AddSingleton<IAgentToolFactory>(new Tools(fail: true)).BuildServiceProvider();
         var events = new List<AgentTurnEvent>();
         await foreach (var item in new AgentTurnRunner(services).RunAsync(new("agent", "run", "scope", [], "ask", null, ToolNames: ["lookup"]), TestContext.Current.CancellationToken)) { events.Add(item); }
@@ -83,7 +82,7 @@ public sealed class AgentToolFacts
     [Fact]
     public async Task UnknownRequestedToolCannotBecomeSuccess()
     {
-        using var services = new ServiceCollection().AddSingleton<IChatClient>(new ScriptedClient("unknown"))
+        using var services = new ServiceCollection().AddSingleton<IChatClient>(ScriptedClient("unknown"))
             .AddSingleton<IAgentToolFactory, Tools>().BuildServiceProvider();
         var events = new List<AgentTurnEvent>();
         await foreach (var item in new AgentTurnRunner(services).RunAsync(new("agent", "run", "scope", [], "ask", null, ToolNames: ["lookup"]), TestContext.Current.CancellationToken)) { events.Add(item); }
@@ -102,6 +101,17 @@ public sealed class AgentToolFacts
         Assert.True(tools.Count <= AgentToolPolicy.MaxDefaultTools);
     }
 
+    [Theory]
+    [InlineData("Show data from postgres", "postgres_schema", "supabase_schema")]
+    [InlineData("Show data from PostgreSQL", "postgres_schema", "supabase_schema")]
+    [InlineData("Show data from Supabase", "supabase_schema", "postgres_schema")]
+    public void ExplicitDatabaseExcludesTheOtherDatabaseTools(string message, string expected, string forbidden)
+    {
+        var tools = AgentToolPolicy.SelectTools(developerMode: false, [], message: message);
+        Assert.Contains(expected, tools);
+        Assert.DoesNotContain(forbidden, tools);
+    }
+
     [Fact]
     public void UnavailablePostgresDoesNotSubstituteSupabase()
     {
@@ -109,13 +119,15 @@ public sealed class AgentToolFacts
         Assert.Empty(tools);
     }
     [Fact]
-    public void DefaultAllowlistIsAtMostEightToolsAndExcludesCSharpTools()
+    public void DefaultAllowlistIsTheEightProductToolsAndExcludesCSharpTools()
     {
         var selected = AgentToolPolicy.SelectTools(developerMode: false,
             ["csharp_contracts", "csharp_write", "csharp_run"]);
-        Assert.True(selected.Count <= AgentToolPolicy.MaxDefaultTools);
-        Assert.DoesNotContain(selected, AgentToolPolicy.IsCSharpTool);
-        Assert.Equal(AgentToolPolicy.ProductTools, selected);
+        Assert.Equal(
+            ["table_read", "table_refine", "show_form", "show_view",
+             "supabase_schema", "show_supabase_query_table", "postgres_schema", "show_postgres_query_table"],
+            selected);
+        Assert.Equal(8, AgentToolPolicy.MaxDefaultTools);
     }
 
     [Fact]
@@ -154,7 +166,6 @@ public sealed class AgentToolFacts
         string[] developerTools = ["csharp_contracts", "csharp_write", "csharp_run"];
         var selected = AgentToolPolicy.SelectTools(developerMode: true, developerTools);
         Assert.Equal(AgentToolPolicy.ProductTools.Concat(developerTools), selected);
-        Assert.Contains("csharp_run", selected);
     }
 
     [Fact]
@@ -171,14 +182,13 @@ public sealed class AgentToolFacts
     public void DeveloperModeOffStillAnswersOrdinaryTableRequests()
     {
         Assert.Null(AgentToolPolicy.UnsupportedCSharpAuthoring(developerMode: false, "show me all customers"));
-        Assert.Equal(AgentToolPolicy.ProductTools, AgentToolPolicy.SelectTools(developerMode: false, ["csharp_run"]));
     }
 
     [Fact]
     public async Task SelectedContextProvidersReachTheModelBeforeTheMessage()
     {
         var ct = TestContext.Current.CancellationToken;
-        var client = new RecordingClient();
+        var client = StubChatClient.Replying("done");
         using var services = new ServiceCollection().AddSingleton<IChatClient>(client)
             .AddSingleton<IAgentContextProvider>(new FixedContext("capabilities", "Available: invoices"))
             .AddSingleton<IAgentContextProvider>(new FixedContext("unselected", "must not appear"))
@@ -197,7 +207,7 @@ public sealed class AgentToolFacts
     public async Task ContextToolsJoinTheTurnOnlyWhenTheHostRegistersThem()
     {
         var ct = TestContext.Current.CancellationToken;
-        using var services = new ServiceCollection().AddSingleton<IChatClient>(new ScriptedClient())
+        using var services = new ServiceCollection().AddSingleton<IChatClient>(ScriptedClient())
             .AddSingleton<IAgentToolFactory, Tools>()
             .AddSingleton<IAgentContextProvider>(new FixedContext("capabilities", "Available: lookup", ["lookup", "not_registered"]))
             .BuildServiceProvider();
@@ -221,41 +231,11 @@ public sealed class AgentToolFacts
         public Task<AgentContext> Provide(AgentContextRequest request, CancellationToken ct) => throw new InvalidOperationException("down");
     }
 
-    private sealed class RecordingClient : IChatClient
+    private static StubChatClient ScriptedClient(string toolName = "lookup") => new((messages, _, _) =>
     {
-        public List<ChatMessage[]> Requests { get; } = [];
-
-        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
-        {
-            Requests.Add([.. messages]);
-            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "done")));
-        }
-
-        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null,
-            [EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            Requests.Add([.. messages]);
-            await Task.Yield();
-            yield return new ChatResponseUpdate(ChatRole.Assistant, "done");
-        }
-
-        public object? GetService(Type serviceType, object? serviceKey = null) => null;
-
-        public void Dispose() { }
-    }
-
-    private sealed class ScriptedClient(string toolName = "lookup") : IChatClient
-    {
-        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
-        {
-            var result = messages.SelectMany(m => m.Contents).OfType<FunctionResultContent>().LastOrDefault();
-            return Task.FromResult(new ChatResponse(result is null
-                ? new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("actual-call", toolName, new Dictionary<string, object?>())])
-                : new ChatMessage(ChatRole.Assistant, result.Result!.ToString())));
-        }
-        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
-        { await Task.CompletedTask; yield break; }
-        public object? GetService(Type serviceType, object? serviceKey = null) => serviceType.IsInstanceOfType(this) ? this : null;
-        public void Dispose() { }
-    }
+        var result = messages.SelectMany(m => m.Contents).OfType<FunctionResultContent>().LastOrDefault();
+        return Task.FromResult(new ChatResponse(result is null
+            ? new ChatMessage(ChatRole.Assistant, [new FunctionCallContent("actual-call", toolName, new Dictionary<string, object?>())])
+            : new ChatMessage(ChatRole.Assistant, result.Result!.ToString())));
+    });
 }

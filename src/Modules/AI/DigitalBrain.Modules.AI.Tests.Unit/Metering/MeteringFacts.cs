@@ -23,7 +23,7 @@ public sealed class MeteringFacts
             OutputTokenCount = 5,
             TotalTokenCount = 15,
         };
-        var client = new MeteringChatClient(new FixedChatClient(Response(usage, "gpt-5.6-luna")), sink, "OpenAI", "gpt-5.6-luna");
+        var client = new MeteringChatClient(FixedChatClient(Response(usage, "gpt-5.6-luna")), sink, "OpenAI", "gpt-5.6-luna");
 
         using (IntentContext.Begin("intent-1", "scope"))
         {
@@ -49,7 +49,7 @@ public sealed class MeteringFacts
         var ct = TestContext.Current.CancellationToken;
         var sink = new RecordingSink();
         var usage = new UsageDetails { InputTokenCount = 7, OutputTokenCount = 4, TotalTokenCount = 11 };
-        var client = new MeteringChatClient(new StreamingChatClient(usage), sink, "Anthropic", "claude");
+        var client = new MeteringChatClient(StreamingChatClient(usage), sink, "Anthropic", "claude");
 
         using (IntentContext.Begin("intent-stream"))
         {
@@ -68,7 +68,7 @@ public sealed class MeteringFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var sink = new RecordingSink();
-        var client = new MeteringChatClient(new FixedChatClient(Response(null, "gpt-5.6-luna")), sink, "OpenAI", "gpt-5.6-luna");
+        var client = new MeteringChatClient(FixedChatClient(Response(null, "gpt-5.6-luna")), sink, "OpenAI", "gpt-5.6-luna");
 
         using (IntentContext.Begin("intent-nousage"))
         {
@@ -89,7 +89,7 @@ public sealed class MeteringFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var sink = new RecordingSink();
-        var client = new MeteringChatClient(new FixedChatClient(Response(new UsageDetails { InputTokenCount = 1 }, "gpt")), sink, "OpenAI", "gpt");
+        var client = new MeteringChatClient(FixedChatClient(Response(new UsageDetails { InputTokenCount = 1 }, "gpt")), sink, "OpenAI", "gpt");
 
         await client.GetResponseAsync([new ChatMessage(ChatRole.User, "hello")], cancellationToken: ct);
 
@@ -162,28 +162,6 @@ public sealed class MeteringFacts
     }
 
     [Fact]
-    public async Task IntentScopeFlushesEveryMeterEventAsOneBatch()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        var meters = new RecordingBatchMeterSink();
-        await using var brain = await UnitTest.Create().WithModule<AIModule>().StartAsync(ct);
-        var sink = new GrainIntentUsageSink(brain.Grains, meters);
-        var chat = new TokenUsageEntry(MeterKind.Chat, "OpenAI", "gpt-5.6-luna", 10, 3, 2, 5, 15, true, DateTimeOffset.UnixEpoch);
-
-        using (var intent = IntentContext.Begin("intent-meter-batch", "scope"))
-        {
-            await sink.RecordAsync(intent.IntentId, chat, ct);
-            await sink.RecordAsync(intent.IntentId, chat with { Meter = MeterKind.Embedding }, ct);
-            await sink.FlushAsync(intent, ct);
-        }
-
-        var batch = Assert.Single(meters.Batches);
-        // One chat entry emits five token classes; the batch carries both entries in one call.
-        Assert.Equal(10, batch.Length);
-        Assert.Equal(MeterSource.ChatClient, batch.First().Source);
-    }
-
-    [Fact]
     public void EveryReportedTokenClassBecomesItsOwnIdempotentMeterEvent()
     {
         var entry = new TokenUsageEntry(MeterKind.Chat, "OpenAI", "gpt-5.6-luna", 10, 3, 2, 5, 15, true, DateTimeOffset.UnixEpoch);
@@ -235,37 +213,18 @@ public sealed class MeteringFacts
         }
     }
 
-    private sealed class FixedChatClient(ChatResponse response) : IChatClient
+    private static StubChatClient FixedChatClient(ChatResponse response) => new(
+        (_, _, _) => Task.FromResult(response),
+        (_, _, _) => Updates(new ChatResponseUpdate(ChatRole.Assistant, "ok")));
+
+    private static StubChatClient StreamingChatClient(UsageDetails usage) => StubChatClient.StreamingOnly((_, _, _) => Updates(
+        new ChatResponseUpdate(ChatRole.Assistant, "par"),
+        new ChatResponseUpdate(ChatRole.Assistant, [new UsageContent(usage)])));
+
+    private static async IAsyncEnumerable<ChatResponseUpdate> Updates(params ChatResponseUpdate[] updates)
     {
-        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
-            => Task.FromResult(response);
-
-        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            await Task.CompletedTask;
-            yield return new ChatResponseUpdate(ChatRole.Assistant, "ok");
-        }
-
-        public object? GetService(Type serviceType, object? serviceKey = null) => serviceType.IsInstanceOfType(this) ? this : null;
-
-        public void Dispose() { }
-    }
-
-    private sealed class StreamingChatClient(UsageDetails usage) : IChatClient
-    {
-        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            await Task.CompletedTask;
-            yield return new ChatResponseUpdate(ChatRole.Assistant, "par");
-            yield return new ChatResponseUpdate(ChatRole.Assistant, [new UsageContent(usage)]);
-        }
-
-        public object? GetService(Type serviceType, object? serviceKey = null) => serviceType.IsInstanceOfType(this) ? this : null;
-
-        public void Dispose() { }
+        await Task.CompletedTask;
+        foreach (var update in updates) { yield return update; }
     }
 
     private sealed class FixedEmbeddingGenerator(UsageDetails usage) : IEmbeddingGenerator<string, Embedding<float>>

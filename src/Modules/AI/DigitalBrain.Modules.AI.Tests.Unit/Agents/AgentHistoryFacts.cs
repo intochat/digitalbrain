@@ -17,7 +17,7 @@ public sealed class AgentHistoryFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<AIModule>()
-            .ConfigureSilo(silo => silo.Services.AddSingleton<IChatClient>(new HistoryClient())).StartAsync(ct);
+            .ConfigureSilo(silo => silo.Services.AddSingleton<IChatClient>(HistoryClient())).StartAsync(ct);
         var agent = brain.Get<IAgent>("durable");
         await agent.Configure(new() { DisplayName = "Writer", Instructions = "Write carefully" }, 0, ct);
         await Assert.ThrowsAsync<InvalidOperationException>(() => agent.Configure(new(), 0, ct));
@@ -35,7 +35,7 @@ public sealed class AgentHistoryFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<AIModule>()
-            .ConfigureSilo(silo => silo.Services.AddSingleton<IChatClient>(new HistoryClient())).StartAsync(ct);
+            .ConfigureSilo(silo => silo.Services.AddSingleton<IChatClient>(HistoryClient())).StartAsync(ct);
         var agent = brain.Get<IAgent>("stream");
         var text = "";
         await foreach (var delta in agent.GetResponseStream("hello", ct)) { text += delta; }
@@ -49,7 +49,7 @@ public sealed class AgentHistoryFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<AIModule>()
-            .ConfigureSilo(silo => silo.Services.AddSingleton<IChatClient>(new HistoryClient()))
+            .ConfigureSilo(silo => silo.Services.AddSingleton<IChatClient>(HistoryClient()))
             .StartAsync(ct);
         var agent = brain.Get<IAgent>("history");
         Assert.Equal("first", (await agent.Ask(new("first"))).Text);
@@ -57,17 +57,14 @@ public sealed class AgentHistoryFacts
         Assert.Equal("other", (await brain.Get<IAgent>("separate").Ask(new("other"))).Text);
     }
 
-    private sealed class HistoryClient : IChatClient
+    private static StubChatClient HistoryClient() => new(
+        (messages, _, _) => Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, string.Join("|", messages.Select(m => m.Text))))),
+        (messages, _, _) => SingleUpdate(string.Join("|", messages.Select(m => m.Text))));
+
+    private static async IAsyncEnumerable<ChatResponseUpdate> SingleUpdate(string text)
     {
-        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
-            => Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, string.Join("|", messages.Select(m => m.Text)))));
-        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
-        {
-            await Task.CompletedTask;
-            yield return new ChatResponseUpdate(ChatRole.Assistant, string.Join("|", messages.Select(m => m.Text)));
-        }
-        public object? GetService(Type serviceType, object? serviceKey = null) => serviceType.IsInstanceOfType(this) ? this : null;
-        public void Dispose() { }
+        await Task.CompletedTask;
+        yield return new ChatResponseUpdate(ChatRole.Assistant, text);
     }
 
     // The conversation history is capped, not unbounded: at the 4,096-message budget the oldest

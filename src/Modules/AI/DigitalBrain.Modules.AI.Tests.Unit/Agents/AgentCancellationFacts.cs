@@ -13,9 +13,9 @@ public sealed class AgentCancellationFacts
     public async Task CancelInterleavesWithInferenceAndDoesNotCommitAnIncompleteTurn()
     {
         var ct = TestContext.Current.CancellationToken;
-        var provider = new WaitingClient();
+        var provider = new WaitingProvider();
         await using var brain = await UnitTest.Create().WithModule<AIModule>()
-            .ConfigureSilo(s => s.Services.AddSingleton<IChatClient>(provider)).StartAsync(ct);
+            .ConfigureSilo(s => s.Services.AddSingleton<IChatClient>(provider.Client)).StartAsync(ct);
         var agent = brain.Get<IAgent>("cancel");
         var response = agent.GetResponse("wait", ct);
         await provider.Entered.Task.WaitAsync(ct);
@@ -32,26 +32,33 @@ public sealed class AgentCancellationFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<AIModule>()
-            .ConfigureSilo(s => s.Services.AddSingleton<IChatClient>(new WaitingClient(fail: true))).StartAsync(ct);
+            .ConfigureSilo(s => s.Services.AddSingleton<IChatClient>(new WaitingProvider(fail: true).Client)).StartAsync(ct);
         var agent = brain.Get<IAgent>("failed");
         await Assert.ThrowsAsync<InvalidOperationException>(() => agent.GetResponse("fail", ct));
         Assert.Empty(await agent.GetHistory(ct));
         Assert.Equal(AgentRunStatus.Failed, (await agent.GetState(ct)).LastRun!.Status);
     }
 
-    private sealed class WaitingClient(bool fail = false) : IChatClient
+    private sealed class WaitingProvider(bool fail = false)
     {
         public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public async Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+
+        public StubChatClient Client => new(Respond, Stream);
+
+        private async Task<ChatResponse> Respond(IReadOnlyList<ChatMessage> messages, ChatOptions? options, CancellationToken cancellationToken)
         {
             Entered.TrySetResult();
             if (fail) { throw new IOException("Provider unavailable"); }
             await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
             throw new InvalidOperationException("Unreachable");
         }
-        public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, [EnumeratorCancellation] CancellationToken cancellationToken = default)
-        { await Task.CompletedTask; yield return new(ChatRole.Assistant, "partial"); await GetResponseAsync(messages, options, cancellationToken); }
-        public object? GetService(Type serviceType, object? serviceKey = null) => serviceType.IsInstanceOfType(this) ? this : null;
-        public void Dispose() { }
+
+        private async IAsyncEnumerable<ChatResponseUpdate> Stream(IReadOnlyList<ChatMessage> messages, ChatOptions? options,
+            [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.CompletedTask;
+            yield return new(ChatRole.Assistant, "partial");
+            await Respond(messages, options, cancellationToken);
+        }
     }
 }

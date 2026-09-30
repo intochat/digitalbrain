@@ -41,7 +41,7 @@ public sealed class CredentialFacts
     public async Task ASeededProviderKeyIsReleasedOnlyInsideTheFactory()
     {
         var ct = TestContext.Current.CancellationToken;
-        using var provider = new KeyCapturingProvider();
+        using var provider = new LoopbackServer();
         await using var brain = await UnitTest.Create()
             .WithRegistrations(AiRegistrationSeeds.OpenAI(Canary, provider.Url))
             .WithModule<AIModule>()
@@ -54,7 +54,7 @@ public sealed class CredentialFacts
         var registration = brain.Get<IIntegrationRegistration>("integration/openai");
         await using var changes = await brain.Observe<RegistrationChanged>(registration, ct);
 
-        var seen = provider.ReplyOnce(ct);
+        var seen = ReplyOnceCapturingKey(provider, ct);
         await brain.Get<ILLM>("default").Generate(new([new("user", [new AiText("hi")])]), cancellationToken: ct);
 
         Assert.Equal("Bearer " + Canary, await seen);
@@ -92,7 +92,7 @@ public sealed class CredentialFacts
         var ct = TestContext.Current.CancellationToken;
         const string Rotated = "canary-rotated-key-2c9e4d";
         var clock = new SteppingTimeProvider();
-        using var provider = new KeyCapturingProvider();
+        using var provider = new LoopbackServer();
         await using var brain = await UnitTest.Create()
             .WithRegistrations(AiRegistrationSeeds.OpenAI(Canary, provider.Url))
             .WithModule<AIModule>()
@@ -101,7 +101,7 @@ public sealed class CredentialFacts
         var client = brain.SiloServices.GetRequiredKeyedService<IChatClient>(typeof(IGpt56Sol));
         var hi = new[] { new ChatMessage(ChatRole.User, "hi") };
 
-        var first = provider.ReplyOnce(ct);
+        var first = ReplyOnceCapturingKey(provider, ct);
         await client.GetResponseAsync(hi, cancellationToken: ct);
         Assert.Equal("Bearer " + Canary, await first);
 
@@ -112,7 +112,7 @@ public sealed class CredentialFacts
 
         await registration.Configure(new() { Values = { ["ApiKey"] = Rotated } });
         clock.Advance(TimeSpan.FromSeconds(6));
-        var second = provider.ReplyOnce(ct);
+        var second = ReplyOnceCapturingKey(provider, ct);
         await client.GetResponseAsync(hi, cancellationToken: ct);
         Assert.Equal("Bearer " + Rotated, await second);
     }
@@ -147,7 +147,7 @@ public sealed class CredentialFacts
         var ct = TestContext.Current.CancellationToken;
         var logs = new CapturingLoggerProvider();
         var clock = new SteppingTimeProvider();
-        using var provider = new KeyCapturingProvider(HttpStatusCode.Unauthorized);
+        using var provider = new LoopbackServer();
         await using var brain = await UnitTest.Create()
             .WithRegistrations(AiRegistrationSeeds.OpenAI(Canary, provider.Url))
             .WithModule<AIModule>()
@@ -164,7 +164,7 @@ public sealed class CredentialFacts
             }).StartAsync(ct);
         var registration = brain.Get<IIntegrationRegistration>("integration/openai");
 
-        var refused = provider.ReplyOnce(ct);
+        var refused = ReplyOnceCapturingKey(provider, ct, HttpStatusCode.Unauthorized);
         var failure = await Assert.ThrowsAnyAsync<Exception>(() => brain.Get<ILLM>("default").Generate(new([new("user", [new AiText("hi")])]), cancellationToken: ct));
         Assert.Equal("Bearer " + Canary, await refused);
         await registration.Clear("ApiKey");
@@ -208,40 +208,10 @@ public sealed class CredentialFacts
         }
     }
 
-    private sealed class KeyCapturingProvider : IDisposable
-    {
-        private readonly HttpListener _listener = new();
-        private readonly HttpStatusCode _status;
+    private const string ChatCompletionJson = """
+        {"id":"r","object":"chat.completion","created":1,"model":"test-model","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
+        """;
 
-        public KeyCapturingProvider(HttpStatusCode status = HttpStatusCode.OK)
-        {
-            _status = status;
-            using var reservation = new TcpListener(IPAddress.Loopback, 0);
-            reservation.Start();
-            var port = ((IPEndPoint)reservation.LocalEndpoint).Port;
-            reservation.Stop();
-            Url = $"http://localhost:{port}/";
-            _listener.Prefixes.Add(Url);
-            _listener.Start();
-        }
-
-        public string Url { get; }
-
-        public async Task<string?> ReplyOnce(CancellationToken cancellationToken)
-        {
-            var context = await _listener.GetContextAsync().WaitAsync(cancellationToken);
-            var authorization = context.Request.Headers["Authorization"];
-            var bytes = Encoding.UTF8.GetBytes("""
-                {"id":"r","object":"chat.completion","created":1,"model":"test-model","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
-                """);
-            context.Response.StatusCode = (int)_status;
-            context.Response.ContentType = "application/json";
-            context.Response.ContentLength64 = bytes.Length;
-            await context.Response.OutputStream.WriteAsync(bytes, cancellationToken);
-            context.Response.Close();
-            return authorization;
-        }
-
-        public void Dispose() => _listener.Close();
-    }
+    private static async Task<string?> ReplyOnceCapturingKey(LoopbackServer provider, CancellationToken cancellationToken, HttpStatusCode status = HttpStatusCode.OK)
+        => (await provider.ReplyOnce("application/json", ChatCompletionJson, cancellationToken, status)).Authorization;
 }

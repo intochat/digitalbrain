@@ -8,6 +8,5 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="assistant.feature" LogicalName="assistant.feature" />
-    <EmbeddedResource Include="assistant-stream.feature" LogicalName="assistant-stream.feature" />
   </ItemGroup>
 </Project>

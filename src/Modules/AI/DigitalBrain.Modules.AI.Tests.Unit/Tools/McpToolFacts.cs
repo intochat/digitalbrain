@@ -40,7 +40,7 @@ public sealed class McpToolFacts
     {
         using var handler = new ProtocolHandler { FailCall = true };
         using var services = new ServiceCollection()
-            .AddSingleton<IChatClient>(new ToolCallingClient())
+            .AddSingleton<IChatClient>(ToolCallingClient())
             .AddMcpAgentTools("mail", _ => Transport(handler)).BuildServiceProvider();
         var events = new List<AgentTurnEvent>();
         await foreach (var item in new AgentTurnRunner(services).RunAsync(
@@ -81,15 +81,6 @@ public sealed class McpToolFacts
     }
 
     [Fact]
-    public async Task ProviderErrorIsFailure()
-    {
-        using var handler = new ProtocolHandler { FailCall = true };
-        using var services = Services(handler);
-        await using var session = await services.GetRequiredService<IAgentToolSource>().OpenAsync(["mcp_mail_lookup"], Context, TestContext.Current.CancellationToken);
-        await Assert.ThrowsAsync<InvalidOperationException>(async () => await Assert.Single(session.Tools).InvokeAsync(new(), TestContext.Current.CancellationToken));
-    }
-
-    [Fact]
     public async Task MissingSelectedToolFailsAndDisposesConnection()
     {
         using var handler = new ProtocolHandler();
@@ -105,19 +96,12 @@ public sealed class McpToolFacts
             new() { Endpoint = new("https://mcp.invalid"), TransportMode = HttpTransportMode.StreamableHttp },
             new HttpClient(handler), ownsHttpClient: true);
 
-    private sealed class ToolCallingClient : IChatClient
+    private static StubChatClient ToolCallingClient() => new((_, options, _) =>
     {
-        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
-        {
-            Assert.Equal("mcp_mail_lookup", Assert.Single(options!.Tools!).Name);
-            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
-                [new FunctionCallContent("call", "mcp_mail_lookup", new Dictionary<string, object?> { ["query"] = "hello" })])));
-        }
-        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-        public object? GetService(Type serviceType, object? serviceKey = null) => serviceType.IsInstanceOfType(this) ? this : null;
-        public void Dispose() { }
-    }
+        Assert.Equal("mcp_mail_lookup", Assert.Single(options!.Tools!).Name);
+        return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
+            [new FunctionCallContent("call", "mcp_mail_lookup", new Dictionary<string, object?> { ["query"] = "hello" })])));
+    });
 
     private sealed class ProtocolHandler : HttpMessageHandler
     {

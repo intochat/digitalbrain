@@ -7,20 +7,6 @@ namespace DigitalBrain.CustomerResearcher.Tests.Unit;
 public sealed class ResearchWorkflowFacts
 {
     [Fact]
-    public void EvidenceIsBuiltFromObservedTextRatherThanModelGeneratedQuotes()
-    {
-        var result = CompanyResearchAgent.Validate(System.Text.Json.JsonSerializer.SerializeToElement(new
-        {
-            status = "found", companyName = "Acme", website = "https://acme.example/", location = "Amsterdam, The Netherlands",
-            email = "one@acme.example;two@acme.example",
-        }), [new("https://acme.example/contact", "Acme", "Acme headquarters: Amsterdam, The Netherlands. Email one@acme.example", [])]);
-        Assert.NotNull(result.Company);
-        Assert.Equal("Amsterdam, The Netherlands", result.Company.Location);
-        Assert.Null(result.Company.Email);
-        Assert.All(result.Company.Evidence, evidence => Assert.Contains(evidence.Quote, "Acme headquarters: Amsterdam, The Netherlands. Email one@acme.example"));
-    }
-
-    [Fact]
     public async Task BrowsesBeforeModelAndExtractsOnlyAfterOpeningSource()
     {
         var browser = new Browser();
