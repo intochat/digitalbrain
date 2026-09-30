@@ -1,14 +1,5 @@
 namespace DigitalBrain.Specs;
 
-internal sealed record ParsedStep(int Line, string Keyword, string Text, string? DocString);
-internal sealed record ParsedScenario(string Name, int Line, IReadOnlyList<string> Tags, IReadOnlyList<ParsedStep> Steps);
-internal sealed record ParsedFeature(string Name, IReadOnlyList<ParsedStep> Background, IReadOnlyList<ParsedScenario> Scenarios);
-
-internal sealed class SpecSyntaxException(int line, string message) : Exception(message)
-{
-    public int Line { get; } = line;
-}
-
 // The subset of Gherkin a spec needs: Feature, free description, Background, Scenario, tags,
 // comments, Given/When/Then/And/But/* steps and """ doc strings. Anything else is a syntax error
 // with its line, so an author sees exactly what to fix.

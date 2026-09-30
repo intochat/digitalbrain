@@ -1,5 +1,4 @@
 using DigitalBrain.Sdk.Secrets;
-using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -33,5 +32,3 @@ internal static class SecretsEndpoints
         });
     }
 }
-
-internal sealed record SecretInput(string Name, string? Label, string? Value);

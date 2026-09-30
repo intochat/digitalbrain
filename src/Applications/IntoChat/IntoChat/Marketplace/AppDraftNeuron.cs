@@ -6,55 +6,9 @@ using DigitalBrain.AI.OpenAI;
 using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
-using Orleans.Concurrency;
 using Orleans.Runtime;
 
 namespace IntoChat.Marketplace;
-
-// An app someone is creating by describing it. The Author agent writes its spec in plain language;
-// the person reads and edits it; the Builder agent then writes the tests and the implementation, and
-// the app is published only once its tests run green. Keyed "{owner}/drafts/{id}".
-[Alias("intochat.app-draft"), Orleans.Metadata.DefaultGrainType("intochat.app-draft")]
-public interface IAppDraft : INeuron
-{
-    [ResponseTimeout("00:10:00")] Task<AppDraftView> Draft(string request);
-    [ResponseTimeout("00:10:00")] Task<AppDraftView> Revise(string instruction);
-    Task<AppDraftView> EditSpec(string spec);
-    [ResponseTimeout("02:00:00")] Task<AppDraftView> Build();
-    [ReadOnly, AlwaysInterleave] Task<AppDraftView> Read();
-}
-
-public enum AppDraftStatus { Empty, Drafted, Building, Published, Failed }
-
-[GenerateSerializer, Alias("intochat.app-draft-attempt")]
-public sealed record AppDraftAttempt(
-    [property: Id(0)] string Revision,
-    [property: Id(1)] bool Green,
-    [property: Id(2)] string Failures);
-
-[GenerateSerializer, Alias("intochat.app-draft-state")]
-public sealed record AppDraftState
-{
-    [Id(0)] public long Revision { get; init; }
-    [Id(1)] public string Request { get; init; } = "";
-    [Id(2)] public string Name { get; init; } = "";
-    [Id(3)] public string Title { get; init; } = "";
-    [Id(4)] public string Description { get; init; } = "";
-    [Id(5)] public string Runtime { get; init; } = "";
-    [Id(6)] public string Spec { get; init; } = "";
-    [Id(7)] public AppDraftStatus Status { get; init; }
-    [Id(8)] public IReadOnlyList<AppDraftAttempt> Attempts { get; init; } = [];
-    [Id(9)] public PackageRevisionRef? Published { get; init; }
-    [Id(10)] public string Error { get; init; } = "";
-}
-
-[GenerateSerializer, Alias("intochat.app-draft-view")]
-public sealed record AppDraftView(
-    [property: Id(0)] AppDraftState Draft,
-    [property: Id(1)] AppVerification? Verification);
-
-[GenerateSerializer, Alias("intochat.app-draft-changed")]
-public sealed record AppDraftChanged([property: Id(0)] string DraftId, [property: Id(1)] long Revision, [property: Id(2)] AppDraftStatus Status) : Signal;
 
 [GrainType("intochat.app-draft")]
 internal sealed class AppDraftNeuron(

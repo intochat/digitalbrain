@@ -4,13 +4,6 @@ using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.CustomerResearcher;
 
-public sealed record ResearchResult(CompanyResearch? Company, string Status);
-public interface ICompanyResearchAgent
-{
-    Task<ResearchResult> Research(string query, IPlaywright browser, CancellationToken ct);
-    Task<ResearchResult> Research(string query, IPlaywright browser, Func<string, Task> progress, CancellationToken ct) => Research(query, browser, ct);
-}
-
 public sealed class CompanyResearchAgent(IChatClient client) : ICompanyResearchAgent
 {
     public Task<ResearchResult> Research(string query, IPlaywright browser, CancellationToken ct) => Research(query, browser, _ => Task.CompletedTask, ct);
@@ -192,9 +185,4 @@ public sealed class CompanyResearchAgent(IChatClient client) : ICompanyResearchA
         var company = new CompanyResearch(name, website, Verified("location"), Verified("email"), Verified("phone"), Verified("industry"), Verified("summary"), evidence);
         return new(company, "Verified");
     }
-}
-
-internal static class ResearchHostNames
-{
-    public static string TrimStartWww(this string host) => host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? host[4..] : host;
 }

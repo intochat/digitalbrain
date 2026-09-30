@@ -8,30 +8,6 @@ using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.AI.Agents;
 
-public interface IAgentTurnRunner
-{
-    IAsyncEnumerable<AgentTurnEvent> RunAsync(AgentTurnRequest request, CancellationToken ct);
-}
-public sealed record AgentTurnRequest(string AgentId, string RunId, string ScopeId,
-    IReadOnlyList<AgentConversationTurn> History, string Message, AgentModelSelection? Model,
-    string? Instructions = null, IReadOnlyList<string>? ToolNames = null,
-    IReadOnlyList<AiMessage>? Messages = null, AiMessage? Input = null,
-    bool Streaming = false, int MaxModelCalls = 16, TimeSpan? Timeout = null, InferenceOptions? Options = null,
-    IReadOnlyList<string>? ContextProviders = null);
-public abstract record AgentTurnEvent
-{
-    internal TaskCompletionSource? Observed { get; set; }
-    public sealed record Started(string RunId) : AgentTurnEvent;
-    public sealed record ModelSelected(ResolvedAgentModel Model, ModelDescriptor Descriptor) : AgentTurnEvent;
-    public sealed record Text(string Content) : AgentTurnEvent;
-    public sealed record ToolStarted(string CallId, string Name, string Arguments) : AgentTurnEvent;
-    public sealed record ToolCompleted(string CallId, string Name, string Result) : AgentTurnEvent;
-    public sealed record ToolFailed(string CallId, string Name) : AgentTurnEvent;
-    public sealed record Completed(IReadOnlyList<AiMessage> Messages, AgentUsage? Usage) : AgentTurnEvent;
-    public sealed record Finished : AgentTurnEvent;
-    public sealed record Failed(string Message, bool Cancelled = false) : AgentTurnEvent;
-}
-
 // Providers propose calls; this is the single, bounded tool invocation loop.
 public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunner
 {

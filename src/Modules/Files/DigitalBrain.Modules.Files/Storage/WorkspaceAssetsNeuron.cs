@@ -5,24 +5,6 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Files;
 
-[Alias("intochat.workspace-assets"), Orleans.Metadata.DefaultGrainType("intochat.workspace-assets")]
-internal interface IWorkspaceAssets : INeuron
-{
-    Task<WorkspaceAsset[]> List();
-    Task<ImageAsset> Register(WorkspaceAsset asset);
-    Task<ImageAsset> Read(string documentId);
-}
-
-[GenerateSerializer, Alias("intochat.workspace-asset")]
-public sealed record WorkspaceAsset([property: Id(0)] ImageAsset Image, [property: Id(1)] long Bytes, [property: Id(2)] DateTimeOffset CreatedAt);
-
-[GenerateSerializer, Alias("intochat.workspace-assets-state")]
-public sealed class WorkspaceAssetsState
-{
-    [Id(0)] public Dictionary<string, WorkspaceAsset> Assets { get; set; } = [];
-    [Id(1)] public HashSet<string> Pages { get; set; } = [];
-}
-
 [GrainType("intochat.workspace-assets")]
 internal sealed class WorkspaceAssetsNeuron([PersistentState("assets", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<WorkspaceAssetsState> store) : Neuron, IWorkspaceAssets
 {
@@ -75,36 +57,5 @@ internal sealed class WorkspaceAssetsNeuron([PersistentState("assets", DigitalBr
     {
         if (id.Length != 64 || id.Any(character => !char.IsAsciiHexDigit(character))) { throw new ArgumentException("Invalid workspace asset ID.", nameof(id)); }
         return id[..2].ToLowerInvariant();
-    }
-}
-
-[Alias("intochat.workspace-asset-page"), Orleans.Metadata.DefaultGrainType("intochat.workspace-asset-page")]
-internal interface IWorkspaceAssetPage : INeuron
-{
-    Task<WorkspaceAsset[]> List();
-    Task<ImageAsset?> Read(string documentId);
-    Task<bool> HasCapacity();
-    Task<ImageAsset> Register(WorkspaceAsset asset);
-}
-
-[GrainType("intochat.workspace-asset-page")]
-internal sealed class WorkspaceAssetPageNeuron([PersistentState("assets-page", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<WorkspaceAssetsState> store) : Neuron, IWorkspaceAssetPage
-{
-    public Task<WorkspaceAsset[]> List() => Task.FromResult(store.State.Assets.Values.ToArray());
-    public Task<ImageAsset?> Read(string documentId) => Task.FromResult(store.State.Assets.GetValueOrDefault(documentId)?.Image);
-    public Task<bool> HasCapacity() => Task.FromResult(store.State.Assets.Count < 256);
-    public async Task<ImageAsset> Register(WorkspaceAsset asset)
-    {
-        if (store.State.Assets.TryGetValue(asset.Image.DocumentId, out var previous))
-        {
-            if (previous.Image.Id != asset.Image.Id) { throw new InvalidOperationException("The document already identifies different content."); }
-            return previous.Image;
-        }
-        if (store.State.Assets.Count >= 256) { throw new InvalidOperationException("This workspace asset partition is full."); }
-        var old = store.State;
-        store.State = new() { Assets = new(old.Assets) { [asset.Image.DocumentId] = asset } };
-        try { await store.WriteStateAsync(); }
-        catch { store.State = old; throw; }
-        return asset.Image;
     }
 }

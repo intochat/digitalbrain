@@ -1,13 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
-using DigitalBrain.Contracts;
-using DigitalBrain.Core.Enforcement;
 using Orleans;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
-using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Workspace;
 
@@ -232,98 +226,5 @@ internal static class ShellSnapshotParts
             { throw new ArgumentException("Invalid conversation messages; the source has been retained."); }
         }
     }
-}
 
-[GenerateSerializer]
-internal sealed class ShellPartState { [Id(0)] public string? Json { get; set; } }
-internal interface IShellPart : IGrainWithStringKey
-{
-    Task Put(string json);
-    Task<string> Read();
-}
-[GrainType("intochat.shell-part")]
-internal sealed class ShellPartNeuron([PersistentState("part", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ShellPartState> state) : Grain, IShellPart
-{
-    public async Task Put(string json)
-    {
-        if (state.State.Json == json) { return; }
-        if (state.State.Json is not null) { throw new InvalidOperationException("Immutable workspace record cannot be replaced."); }
-        state.State = new() { Json = json };
-        try { await state.WriteStateAsync(); } catch { state.State = new(); throw; }
-    }
-    public Task<string> Read() => Task.FromResult(state.State.Json ?? throw new InvalidDataException("Workspace record is missing."));
-}
-
-[GenerateSerializer]
-internal sealed class ShellHeadState
-{
-    [Id(0)] public long Revision { get; set; }
-    [Id(1)] public string? Root { get; set; }
-    // Id(2) retired; never reuse
-    [Id(3)] public string? LastOperation { get; set; }
-    [Id(4)] public string? LastDigest { get; set; }
-}
-[GenerateSerializer]
-internal sealed record ShellRead([property: Id(0)] long Revision, [property: Id(1)] string? Json);
-internal interface IShellState : IGrainWithStringKey
-{
-    Task<ShellRead> Read();
-    Task<ShellRead> Save(long expectedRevision, string operationId, string json);
-}
-[GrainType("intochat.shell-state")]
-internal sealed class ShellStateNeuron([PersistentState("head", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ShellHeadState> state) : Grain, IShellState
-{
-    private IShellPart Part(string hash) => GrainFactory.GetGrain<IShellPart>(this.GetPrimaryKeyString() + "/" + hash);
-    public async Task<ShellRead> Read() => new(state.State.Revision, state.State.Root is { } root
-        ? (await ShellSnapshotParts.Read(root, hash => Part(hash).Read())).ToJsonString() : null);
-
-    public async Task<ShellRead> Save(long expectedRevision, string operationId, string json)
-    {
-        if (!Guid.TryParse(operationId, out _)) { throw new ArgumentException("Use a unique operation ID."); }
-        var digest = ShellSnapshotParts.Digest(json);
-        if (state.State.LastOperation == operationId)
-        {
-            if (state.State.LastDigest != digest) { throw new InvalidOperationException("Operation ID was reused with different data."); }
-            return await Read();
-        }
-        if (state.State.Revision != expectedRevision) { throw new InvalidOperationException("Workspace changed on another client. Reload before saving."); }
-        var snapshot = JsonNode.Parse(json) ?? throw new ArgumentException("Missing snapshot.");
-        ShellSnapshotParts.Validate(snapshot);
-        var root = await ShellSnapshotParts.Write(snapshot, (hash, value) => Part(hash).Put(value));
-        var old = state.State;
-        state.State = new()
-        {
-            Root = root, Revision = old.Revision + 1, LastOperation = operationId, LastDigest = digest
-        };
-        try { await state.WriteStateAsync(); } catch { state.State = old; throw; }
-        return await Read();
-    }
-}
-
-internal static class ShellPersistenceEndpoints
-{
-    internal static string Scope(string account, string principal) => "shell-" + ShellSnapshotParts.Digest(account + "\0" + principal);
-    public static void MapShellPersistence(this IEndpointRouteBuilder routes)
-    {
-        static IShellState State(IGrainFactory grains)
-        {
-            var caller = CallerContextStamper.Require();
-            return grains.GetGrain<IShellState>(Scope(caller.AccountId, caller.PrincipalId));
-        }
-        static IResult View(ShellRead value) => Results.Ok(new { value.Revision, Snapshot = value.Json is null ? null : JsonNode.Parse(value.Json) });
-        routes.MapGet("/shell/state", async (IGrainFactory grains) => View(await State(grains).Read()));
-        static async Task<IResult> Save(ShellWrite input, IGrainFactory grains)
-        {
-            try
-            {
-                var json = input.Snapshot.ToJsonString();
-                if (Encoding.UTF8.GetByteCount(json) > 16 * 1024 * 1024) { return Results.StatusCode(413); }
-                return View(await State(grains).Save(input.ExpectedRevision, input.OperationId, json));
-            }
-            catch (ArgumentException e) { return Results.BadRequest(new { error = e.Message }); }
-            catch (InvalidOperationException e) { return Results.Conflict(new { error = e.Message }); }
-        }
-        routes.MapPut("/shell/state", (ShellWrite input, IGrainFactory grains) => Save(input, grains));
-    }
-    internal sealed record ShellWrite(long ExpectedRevision, string OperationId, JsonNode Snapshot);
 }

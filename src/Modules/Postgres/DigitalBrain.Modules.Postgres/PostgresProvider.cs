@@ -6,13 +6,6 @@ using Npgsql;
 
 namespace DigitalBrain.Postgres;
 
-public interface IPostgresProvider
-{
-    Task<PostgresQueryResult> QueryAsync(string sql, int maxRows, CancellationToken cancellationToken);
-    Task<PostgresSchema> ReadSchemaAsync(string? table, CancellationToken cancellationToken);
-    Task<PostgresConnection> PingAsync(CancellationToken cancellationToken);
-}
-
 internal sealed class PostgresProvider([FromKeyedServices(PostgresHosting.DataSourceKey)] NpgsqlDataSource source) : IPostgresProvider
 {
     public async Task<PostgresQueryResult> QueryAsync(string sql, int maxRows, CancellationToken cancellationToken)
@@ -124,53 +117,4 @@ internal sealed class PostgresProvider([FromKeyedServices(PostgresHosting.DataSo
             throw new PostgresUnavailableException("Postgres is unreachable or the database connection failed. Check the configured connection string and network.");
         }
     }
-}
-// Read PostgreSQL's text protocol so unknown extension types and arbitrary-precision numbers
-// are never forced through lossy CLR conversions. Text filters use this same server spelling.
-// Cells travel as their own JSON text so no foreign serializer is needed at the grain boundary.
-internal static class PostgresCells
-{
-    private const decimal MaxSafeInteger = 9007199254740991m;
-
-    public static string ToCell(string? value, string tableType)
-    {
-        if (value is null) { return "null"; }
-        if (tableType == PostgresTypeMap.Boolean && value is "t" or "f")
-        {
-            return value == "t" ? "true" : "false";
-        }
-        if (tableType == PostgresTypeMap.Number &&
-            decimal.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) &&
-            Math.Abs(number) <= MaxSafeInteger && SignificantDigits(value) <= 15 &&
-            (number != 0 || SignificantDigits(value) == 0) &&
-            double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var original) && original == (double)number)
-        {
-            return JsonSerializer.SerializeToElement(number).GetRawText();
-        }
-        return JsonSerializer.SerializeToElement(value.Length > 4000 ? value[..4000] : value).GetRawText();
-    }
-
-    private static int SignificantDigits(string value)
-    {
-        var exponent = value.IndexOfAny(['e', 'E']);
-        var mantissa = exponent < 0 ? value : value[..exponent];
-        return mantissa.Replace(".", "", StringComparison.Ordinal).TrimStart('-', '+', '0').TrimEnd('0').Length;
-    }
-}
-internal static class PostgresTypeMap
-{
-    public const string Text = "text";
-    public const string Number = "number";
-    public const string Date = "date";
-    public const string Boolean = "boolean";
-
-    public static string ToTableType(string type) => type switch
-    {
-        Text or Number or Date or Boolean => type,
-        "bool" => Boolean,
-        "int2" or "int4" or "int8" or "smallint" or "integer" or "bigint" or
-        "float4" or "float8" or "real" or "double precision" or "numeric" or "decimal" or "money" => Number,
-        _ => Text,
-    };
-
 }

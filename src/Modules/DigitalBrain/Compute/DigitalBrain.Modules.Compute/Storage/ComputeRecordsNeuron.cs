@@ -1,49 +1,8 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
-using DigitalBrain.Compute.Usage;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Compute.Storage;
-
-[GenerateSerializer]
-internal sealed class ComputePartState { [Id(0)] public string? Json { get; set; } }
-internal interface IComputePart : IGrainWithStringKey
-{
-    Task Put(string json);
-    Task<string> Read();
-}
-[GrainType("compute.record-part")]
-internal sealed class ComputePartNeuron([PersistentState("part", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ComputePartState> state) : Grain, IComputePart
-{
-    public async Task Put(string json)
-    {
-        if (UsagePaging.Hash(json) != this.GetPrimaryKeyString() || json.Length > 8 * 1024 * 1024)
-        { throw new ArgumentException("Invalid immutable compute part."); }
-        if (state.State.Json == json) { return; }
-        if (state.State.Json is not null) { throw new InvalidOperationException("Compute records are immutable."); }
-        state.State = new() { Json = json };
-        try { await state.WriteStateAsync(); }
-        catch { state.State = new(); throw; }
-    }
-    public Task<string> Read() => Task.FromResult(state.State.Json ?? throw new InvalidDataException("Missing compute record."));
-}
-
-[GenerateSerializer]
-internal sealed class ComputeRecordsState
-{
-    [Id(0)] public string? Root { get; set; }
-    // [Id(1)] retired (LegacyImported); never reuse
-}
-
-[GenerateSerializer]
-internal sealed record ComputeRecordPage([property: Id(0)] ComputeStoredRecord[] Items, [property: Id(1)] string? NextKey);
-
-internal interface IComputeRecords : INeuron
-{
-    Task<int> Put(ComputeStoredRecord[] records, bool overwrite);
-    Task<ComputeStoredRecord[]> Read();
-    Task<ComputeRecordPage> Page(string? before, int limit);
-}
 
 // A non-reentrant writer serializes deduplication and root publication. Children
 // commit first; storage failure cannot expose a partial batch or double charge.

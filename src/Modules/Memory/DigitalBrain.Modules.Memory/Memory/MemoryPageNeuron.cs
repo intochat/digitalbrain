@@ -5,33 +5,6 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Memory;
 
-[Alias("memory.page"), Orleans.Metadata.DefaultGrainType("memory.page")]
-internal interface IMemoryPage : INeuron
-{
-    Task<bool> Put(VectorMemoryEntry entry);
-    Task<bool> Remove(string name, string @namespace, string key);
-    Task<int> Count();
-    Task<bool> Contains(string key);
-    Task<bool> HasCapacity();
-    Task Clear();
-    Task<MemoryMatch[]> Search(float[] vector, int limit, Dictionary<string, string> tags);
-    Task<MemoryIndexResult> Rebuild();
-}
-
-[GenerateSerializer, Alias("memory.match")]
-internal sealed record MemoryMatch([property: Id(0)] RecalledMemory Note, [property: Id(1)] double Score);
-
-[GenerateSerializer, Alias("memory.page-state")]
-internal sealed record MemoryPageState
-{
-    [Id(0)] public Dictionary<string, VectorMemoryEntry> Entries { get; init; } = [];
-    [Id(1)] public Dictionary<string, MemoryDeletion> Deleted { get; init; } = [];
-    [Id(2)] public HashSet<string> Pending { get; init; } = [];
-}
-
-[GenerateSerializer, Alias("memory.deletion")]
-internal sealed record MemoryDeletion([property: Id(0)] string Name, [property: Id(1)] string Namespace);
-
 [GrainType("memory.page")]
 internal sealed class MemoryPageNeuron([PersistentState("entries", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<MemoryPageState> store) : Neuron, IMemoryPage
 {

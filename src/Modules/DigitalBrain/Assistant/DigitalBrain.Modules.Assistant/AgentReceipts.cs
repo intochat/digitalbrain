@@ -4,43 +4,6 @@ using DigitalBrain.Contracts;
 
 namespace DigitalBrain.Assistant;
 
-public enum AgentRunOutcome { Succeeded, Failed, Cancelled }
-
-public sealed record AgentCall(string AppId, string Operation, bool Discovered, bool Succeeded);
-
-public sealed record AgentTouchedData(string Source, string SemanticTypeId, bool ReadOnly, long RowsRead);
-
-public sealed record AgentReceipt(
-    AgentRunOutcome Outcome,
-    string Summary,
-    IReadOnlyList<AgentCall> Calls,
-    IReadOnlyList<AgentTouchedData> Touched,
-    int ModelCalls,
-    decimal Compute);
-
-// Collected during a turn for the receipt card sent in the agent stream.
-public sealed class IntentActivity
-{
-    private readonly Dictionary<string, AgentTouchedData> _touched = new(StringComparer.Ordinal);
-
-    public List<AgentCall> Calls { get; } = [];
-    public IReadOnlyList<AgentTouchedData> Touched => [.. _touched.Values];
-
-    public void RecordTool(string name, bool succeeded, string? source, long rowsRead)
-    {
-        Calls.Add(new AgentCall(name, name, false, succeeded));
-        if (!succeeded)
-        {
-            return;
-        }
-        if (rowsRead <= 0 && string.IsNullOrWhiteSpace(source)) { return; }
-        var key = string.IsNullOrWhiteSpace(source) ? name : source;
-        _touched[key] = _touched.TryGetValue(key, out var existing)
-            ? existing with { RowsRead = existing.RowsRead + rowsRead }
-            : new AgentTouchedData(key, "table", true, rowsRead);
-    }
-}
-
 public static class AgentReceipts
 {
     public static AgentReceipt Create(IPriceBook priceBook, IntentContext intent, IntentActivity activity, AgentRunOutcome outcome, TokenUsageEntry[]? cumulativeUsage = null)
