@@ -111,7 +111,7 @@ runtime-verified); "only Endpoint set → Partial" registration case; Dart core 
    restored, ChaosCharge/OTLP moved E2E→Unit. Remaining accepted gaps: Qdrant has no real-server
    test; Flutter E2E environment fails 10/12 on baseline (pre-existing, needs its own fix);
    src/Testing has no self-tests; Dart core package untested.
-4. **Dead-code deletion** (§4): NEXT — the zero-reference batch is mechanical.
+4. ~~Dead-code deletion~~ **DONE** (51b63427b, review-verified): 10 files + 3 co-located types + 10 members deleted, 3 file-type name mismatches renamed; most audit items were FALSE POSITIVES on re-verify (AI markers live in registration tables, Deployment projects reflection-discovered by design, IAgentToolSource has a production impl) — kept with documented reasons in structure.md DELETION RESULT.
 5. **File/namespace normalization**: ratify the namespace rule (recommendation: module-root),
    split the worst multi-type files (UiKitEndpoints first), kill the 78 summaries.
 6. **Framework self-tests + coverage gaps**: last, once the suites are lean.
