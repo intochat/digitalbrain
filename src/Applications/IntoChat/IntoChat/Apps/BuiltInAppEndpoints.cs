@@ -43,9 +43,20 @@ internal static class BuiltInAppEndpoints
     {
         var package = PackageId.Create(ShippedApps.Publisher, "settings");
         var app = brain.Get<IApp>(packages.AppKey(workspaceId, package));
-        if ((await app.Read()).Status != AppStatus.Installed)
+        var snapshot = await app.Read();
+        if (snapshot.Status != AppStatus.Installed)
         {
-            await packages.Install(workspaceId, package, new InstallPackageRequest());
+            // A concurrent open may have installed it first; that outcome is the one we wanted.
+            try { await packages.Install(workspaceId, package, new InstallPackageRequest()); }
+            catch (InvalidOperationException)
+            {
+                if ((await app.Read()).Status != AppStatus.Installed) { throw; }
+            }
+        }
+        else if (snapshot.Revision is { } installed
+            && (await packages.Read(package)).Published is { } published && installed.Revision != published)
+        {
+            await packages.Upgrade(workspaceId, package, new UpgradePackageRequest());
         }
         var invocation = await packages.Invoke(workspaceId, package, new InvokePackageRequest("open", ""));
         var deadline = DateTimeOffset.UtcNow.AddSeconds(30);

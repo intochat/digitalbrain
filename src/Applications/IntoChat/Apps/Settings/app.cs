@@ -23,7 +23,12 @@ async Task<AppResponse> Answer(Guid id, string operation)
     if (operation == "open") { await Compose(); }
     var name = (await displayName.Read()).Value;
     var chosen = (await theme.Read()).Value;
-    var preferences = new { displayName = name, theme = chosen is "dark" or "light" ? chosen : "system" };
+    // Preferences are bounded the way the shell renders them: a short name, a known theme.
+    var preferences = new
+    {
+        displayName = name.Length > 120 ? name[..120] : name,
+        theme = chosen is "dark" or "light" ? chosen : "system",
+    };
     return new(id, JsonSerializer.Serialize(new { surface = appKey + "/surface", preferences }), null);
 }
 
