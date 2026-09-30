@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace DigitalBrain.AI.Media;
 
-/// <summary>Host-only transport; no SDK types cross the neuron boundary.</summary>
+// Host-only transport; no SDK types cross the neuron boundary.
 public interface ISpeechSynthesisTransport
 {
     bool IsAvailable { get; }

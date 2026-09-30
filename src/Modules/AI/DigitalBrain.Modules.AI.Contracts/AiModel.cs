@@ -1,34 +1,25 @@
 namespace DigitalBrain.AI;
 
-/// <summary>
-/// One shape for every kind of model — chat, embedding, transcription, image.
-/// A model is a compile-time fact: an <see cref="Id"/> on the wire, an
-/// <see cref="AiProvider"/> that serves it, and a marker type that identifies it
-/// everywhere else.
-/// </summary>
+// One shape for every kind of model — chat, embedding, transcription, image. A model is a compile-time
+// fact: an Id on the wire, an AiProvider that serves it, and a marker type that identifies it
+// everywhere else.
 public abstract class AiModel
 {
-    /// <summary>The provider's own identifier, sent on the wire.</summary>
     public abstract string Id { get; }
 
     public abstract AiProvider Provider { get; }
 
-    /// <summary>
-    /// The marker interface for this model. Used as the keyed-service key and as
-    /// the name configuration pins a default by.
-    /// </summary>
+    // The marker interface for this model. Used as the keyed-service key and as the name configuration
+    // pins a default by.
     public abstract Type Marker { get; }
 
-    /// <summary>
-    /// Human-facing only — never a lookup key. Defaults to the marker name
-    /// without its interface prefix.
-    /// </summary>
+    // Human-facing only — never a lookup key. Defaults to the marker name without its interface prefix.
     public virtual string DisplayName =>
         Marker.Name is ['I', var initial, ..] && char.IsUpper(initial)
             ? Marker.Name[1..]
             : Marker.Name;
 
-    /// <summary>Runs on the owner's machine: no per-token cost, no network.</summary>
+    // Runs on the owner's machine: no per-token cost, no network.
     public bool IsLocal => Provider is AiProvider.Ollama or AiProvider.FoundryLocal;
 }
 

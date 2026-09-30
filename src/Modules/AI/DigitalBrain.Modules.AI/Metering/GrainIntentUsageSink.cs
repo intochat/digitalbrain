@@ -4,12 +4,10 @@ using Orleans;
 
 namespace DigitalBrain.AI.Metering;
 
-/// <summary>
-/// Accumulates metered entries in the ambient <see cref="IntentContext"/> and writes the whole
-/// intent's usage to the durable per-intent neuron in one batch on flush. A direct call without an
-/// ambient intent (for example a test or a background embedding) still persists immediately.
-/// When the Compute module is loaded, the same batch is converted into idempotent meter events.
-/// </summary>
+// Accumulates metered entries in the ambient IntentContext and writes the whole intent's usage to the
+// durable per-intent neuron in one batch on flush. A direct call without an ambient intent (for
+// example a test or a background embedding) still persists immediately. When the Compute module is
+// loaded, the same batch is converted into idempotent meter events.
 internal sealed class GrainIntentUsageSink(IGrainFactory grains, IMeterSink? meterSink = null) : IIntentUsageSink
 {
     public async Task RecordAsync(string intentId, TokenUsageEntry entry, CancellationToken cancellationToken = default)

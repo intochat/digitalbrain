@@ -2,7 +2,7 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Salesforce;
 
-/// <summary>Public module settings. Credentials remain in the host's secret configuration.</summary>
+// Public module settings. Credentials remain in the host's secret configuration.
 public sealed record SalesforceModuleOptions : IModuleOptions
 {
     public Uri? McpEndpoint { get; set; }

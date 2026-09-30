@@ -6,14 +6,13 @@ using System.Text.Json;
 
 namespace DigitalBrain.AI.Agents;
 
-/// <summary>Opens the selected host-registered tools for one execution.</summary>
 public interface IAgentToolSource
 {
     Task<IAgentToolSession> OpenAsync(IReadOnlyList<string> selectedToolNames,
         Func<AgentToolContext> context, CancellationToken ct);
 }
 
-/// <summary>Owns live tool connections until the execution completes.</summary>
+// Owns live tool connections until the execution completes.
 public interface IAgentToolSession : IAsyncDisposable
 {
     IReadOnlyList<AIFunction> Tools { get; }
@@ -21,7 +20,7 @@ public interface IAgentToolSession : IAsyncDisposable
 
 public static class McpAgentTools
 {
-    /// <summary>Registers a server. Agents must select exact names of the form mcp_{serverId}_{toolName}.</summary>
+    // Registers a server. Agents must select exact names of the form mcp_{serverId}_{toolName}.
     public static IServiceCollection AddMcpAgentTools(this IServiceCollection services, string serverId, Uri endpoint)
     {
         ArgumentNullException.ThrowIfNull(endpoint);
@@ -30,7 +29,7 @@ public static class McpAgentTools
         return services.AddMcpAgentTools(serverId, _ => new HttpClientTransport(new() { Endpoint = endpoint }));
     }
 
-    /// <summary>Creates a fresh transport per execution; the execution owns its client and transport.</summary>
+    // Creates a fresh transport per execution; the execution owns its client and transport.
     public static IServiceCollection AddMcpAgentTools(this IServiceCollection services, string serverId,
         Func<IServiceProvider, IClientTransport> transportFactory)
     {

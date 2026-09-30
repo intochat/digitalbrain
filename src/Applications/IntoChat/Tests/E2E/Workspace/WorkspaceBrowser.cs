@@ -2,7 +2,7 @@ using Microsoft.Playwright;
 
 namespace IntoChat.Tests.E2E.Workspace;
 
-/// <summary>Only project navigation and Flutter text-input readiness; no scenario orchestration.</summary>
+// Only project navigation and Flutter text-input readiness; no scenario orchestration.
 internal static class WorkspaceBrowser
 {
     public static async Task<string> CreateProjectAsync(IPage page, string title)

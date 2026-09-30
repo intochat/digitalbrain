@@ -2,7 +2,7 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Postgres;
 
-/// <summary>Public settings. Connection credentials remain in the host's private configuration.</summary>
+// Public settings. Connection credentials remain in the host's private configuration.
 public sealed class PostgresModuleOptions : IModuleOptions
 {
     public string ConnectionName { get; set; } = PostgresModule.ConnectionName;

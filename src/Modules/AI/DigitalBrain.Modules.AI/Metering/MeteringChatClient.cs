@@ -4,13 +4,11 @@ using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.AI.Metering;
 
-/// <summary>
-/// Records the provider's reported token classes for every chat call made under an
-/// <see cref="IntentContext"/>. It sits at the innermost pipeline layer so it measures one raw
-/// provider call, and it records once per call — streaming usage is accumulated from the
-/// updates exactly as <see cref="ChatResponseExtensions.ToChatResponse(IEnumerable{ChatResponseUpdate})"/>
-/// aggregates it, so a turn is never counted twice.
-/// </summary>
+// Records the provider's reported token classes for every chat call made under an IntentContext. It
+// sits at the innermost pipeline layer so it measures one raw provider call, and it records once per
+// call — streaming usage is accumulated from the updates exactly as
+// ChatResponseExtensions.ToChatResponse(IEnumerable{ChatResponseUpdate}) aggregates it, so a turn is
+// never counted twice.
 internal sealed class MeteringChatClient(IChatClient innerClient, IIntentUsageSink sink, string provider, string model)
     : DelegatingChatClient(innerClient)
 {

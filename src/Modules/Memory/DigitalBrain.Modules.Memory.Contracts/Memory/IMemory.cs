@@ -12,7 +12,6 @@ public interface IMemory : INeuron
 
     Task<long> PurgeNamespace(PurgeNamespace note);
 
-    /// <summary>Rebuilds the optional search index from canonical neuron pages.</summary>
     Task<MemoryIndexResult> RebuildIndex(string @namespace);
 
     [ReadOnly]

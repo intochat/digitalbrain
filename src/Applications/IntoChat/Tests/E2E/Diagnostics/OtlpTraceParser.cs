@@ -2,11 +2,9 @@ using System.Globalization;
 
 namespace IntoChat.Tests.E2E.Diagnostics;
 
-/// <summary>
-/// Minimal OTLP/HTTP protobuf reader for the fields the trace budget and the capture facts need:
-/// span identity, name, instrumentation scope, string attributes, and GenAI log bodies.
-/// It deliberately ignores everything else on the wire.
-/// </summary>
+// Minimal OTLP/HTTP protobuf reader for the fields the trace budget and the capture facts need: span
+// identity, name, instrumentation scope, string attributes, and GenAI log bodies. It deliberately
+// ignores everything else on the wire.
 internal static class OtlpTraceParser
 {
     public static IReadOnlyList<CapturedSpan> Parse(byte[] body)

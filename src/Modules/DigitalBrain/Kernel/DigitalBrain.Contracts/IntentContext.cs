@@ -1,18 +1,14 @@
 namespace DigitalBrain.Contracts;
 
-/// <summary>
-/// One meterable provider-call entry. The concrete token-usage shape is owned by the module that
-/// calls the provider; the kernel only carries entries so the intent scope can batch them.
-/// </summary>
+// One meterable provider-call entry. The concrete token-usage shape is owned by the module that calls
+// the provider; the kernel only carries entries so the intent scope can batch them.
 public interface IIntentUsageEntry;
 
-/// <summary>
-/// The ambient identity of the user request being served. Stamped only at a trusted edge
-/// (the HTTP endpoint that starts an intent) and read by metering decorators so usage is
-/// keyed by intent id rather than by whichever grain happens to make the call. The endpoint
-/// also owns the intent's usage batch here, so all provider calls in the intent accumulate in
-/// one place and are flushed once by the batch sink when the intent completes.
-/// </summary>
+// The ambient identity of the user request being served. Stamped only at a trusted edge (the HTTP
+// endpoint that starts an intent) and read by metering decorators so usage is keyed by intent id
+// rather than by whichever grain happens to make the call. The endpoint also owns the intent's usage
+// batch here, so all provider calls in the intent accumulate in one place and are flushed once by the
+// batch sink when the intent completes.
 public sealed record IntentContext(string IntentId, string? ScopeId = null) : IDisposable
 {
     private static readonly AsyncLocal<IntentContext?> Ambient = new();
@@ -22,7 +18,6 @@ public sealed record IntentContext(string IntentId, string? ScopeId = null) : ID
 
     public static IntentContext? Current => Ambient.Value;
 
-    /// <summary>The provider-call entries recorded so far in this intent.</summary>
     public IReadOnlyList<IIntentUsageEntry> Usage => _usage;
 
     public void AddUsage(IIntentUsageEntry entry)

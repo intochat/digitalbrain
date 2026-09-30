@@ -3,10 +3,8 @@ using System.Net.Sockets;
 
 namespace IntoChat.Tests.E2E.Diagnostics;
 
-/// <summary>
-/// Receives OTLP/HTTP protobuf trace exports from the test host and its child processes so a
-/// test can count real spans. It listens on a loopback port and keeps a thread-safe snapshot.
-/// </summary>
+// Receives OTLP/HTTP protobuf trace exports from the test host and its child processes so a test can
+// count real spans. It listens on a loopback port and keeps a thread-safe snapshot.
 internal sealed class TestTelemetryCollector : IAsyncDisposable
 {
     private readonly HttpListener _listener;

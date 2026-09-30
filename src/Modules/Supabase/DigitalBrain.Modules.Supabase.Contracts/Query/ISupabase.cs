@@ -6,11 +6,11 @@ namespace DigitalBrain.Supabase;
 [Alias("supabase")]
 public interface ISupabase : INeuron
 {
-    /// <summary>Runs one read-only SELECT with server-side caps and returns typed rows.</summary>
+    // Runs one read-only SELECT with server-side caps and returns typed rows.
     [ReadOnly, Alias("query")]
     Task<SupabaseQueryResult> Query(SupabaseQuery query);
 
-    /// <summary>Reads tables and columns of the configured database; omit Table for the index.</summary>
+    // Reads tables and columns of the configured database; omit Table for the index.
     [ReadOnly, Alias("schema")]
     Task<SupabaseSchema> ReadSchema(ReadSupabaseSchema query);
 

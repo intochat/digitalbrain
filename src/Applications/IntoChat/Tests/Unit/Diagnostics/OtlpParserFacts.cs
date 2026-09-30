@@ -4,10 +4,8 @@ using IntoChat.Tests.E2E.Diagnostics;
 
 namespace IntoChat.Tests.Unit.Diagnostics;
 
-/// <summary>
-/// Guards the minimal OTLP reader used by the trace budget and capture facts: the fields those
-/// facts depend on (name, span identity, string attributes, log body) must survive the wire shape.
-/// </summary>
+// Guards the minimal OTLP reader used by the trace budget and capture facts: the fields those facts
+// depend on (name, span identity, string attributes, log body) must survive the wire shape.
 public sealed class OtlpParserFacts
 {
     [Fact]

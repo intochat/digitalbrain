@@ -3,11 +3,9 @@ using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.AI.Metering;
 
-/// <summary>
-/// Records the provider's reported token classes for embedding calls made under an
-/// <see cref="IntentContext"/>. Embeddings are a separate meter from chat, so they are recorded
-/// with their own provider/model identity rather than folded into a chat entry.
-/// </summary>
+// Records the provider's reported token classes for embedding calls made under an IntentContext.
+// Embeddings are a separate meter from chat, so they are recorded with their own provider/model
+// identity rather than folded into a chat entry.
 internal sealed class MeteringEmbeddingGenerator(
     IEmbeddingGenerator<string, Embedding<float>> innerGenerator, IIntentUsageSink sink, string provider, string model)
     : DelegatingEmbeddingGenerator<string, Embedding<float>>(innerGenerator)

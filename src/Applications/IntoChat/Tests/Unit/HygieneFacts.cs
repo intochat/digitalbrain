@@ -1,9 +1,7 @@
 namespace IntoChat.Tests.Unit;
 
-/// <summary>
-/// P0.1 trash-register guard: the dead server/client code named in the plan stays deleted, the
-/// duplicate process runner stays consolidated, and the demo behaviors stay out of the product host.
-/// </summary>
+// P0.1 trash-register guard: the dead server/client code named in the plan stays deleted, the
+// duplicate process runner stays consolidated, and the demo behaviors stay out of the product host.
 public sealed class HygieneFacts
 {
     private static readonly string RepositoryRoot = FindRepositoryRoot();

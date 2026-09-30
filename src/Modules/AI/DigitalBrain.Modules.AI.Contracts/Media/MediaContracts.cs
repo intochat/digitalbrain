@@ -14,7 +14,7 @@ public sealed record MediaCapabilities(
     [property: Id(4)] int MaxTextCharacters = 32_768,
     [property: Id(5)] int MaxBatchItems = 1);
 
-/// <summary>Bounded inline media for stage one; no remote URL fetching or filesystem access.</summary>
+// Bounded inline media for stage one; no remote URL fetching or filesystem access.
 [GenerateSerializer, Alias("ai.media.MediaPayload")]
 public sealed record MediaPayload([property: Id(0)] byte[] Content, [property: Id(1)] string MediaType);
 [GenerateSerializer, Alias("ai.media.ImageGenerationRequest")]

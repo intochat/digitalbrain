@@ -6,19 +6,19 @@ namespace DigitalBrain.Supabase.Tables;
 [Alias("supabase.table")]
 public interface ISupabaseTable : INeuron
 {
-    /// <summary>Creates a table whose rows are served live from a read-only Supabase query.</summary>
+    // Creates a table whose rows are served live from a read-only Supabase query.
     Task<SupabaseTableSnapshot> CreateFromQuery(CreateQueryTable request);
 
-    /// <summary>Creates once for an operation; identical retries return the saved view.</summary>
+    // Creates once for an operation; identical retries return the saved view.
     Task<SupabaseTableSnapshot> CreateFromQueryOnce(string operationId, CreateQueryTable request, CancellationToken cancellationToken = default);
 
-    /// <summary>Replaces the saved view at an expected revision.</summary>
+    // Replaces the saved view at an expected revision.
     Task<SupabaseTableSnapshot> UpdateView(UpdateSupabaseTableView request);
 
     [ReadOnly]
     Task<SupabaseTableSnapshot?> Read(ReadSupabaseTable query);
 
-    /// <summary>Computes one aggregate over the saved view's filtered rows without returning rows.</summary>
+    // Computes one aggregate over the saved view's filtered rows without returning rows.
     [ReadOnly]
     Task<SupabaseTableAggregate?> Aggregate(ReadSupabaseTableAggregate query);
 

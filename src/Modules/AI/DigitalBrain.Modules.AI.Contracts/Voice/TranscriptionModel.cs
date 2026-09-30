@@ -1,14 +1,9 @@
 namespace DigitalBrain.AI;
 
-/// <summary>
-/// Response shapes a transcription model can return.
-/// </summary>
-/// <remarks>
-/// Not decoration: the gpt-4o transcribe models accept only text and json, while
-/// verbose json and the subtitle formats are whisper-1's alone. Declaring it lets
-/// a caller assert the format it wants is available instead of learning so from a
-/// 400 at the provider.
-/// </remarks>
+// Not decoration: the gpt-4o transcribe models accept only text and json, while
+// verbose json and the subtitle formats are whisper-1's alone. Declaring it lets
+// a caller assert the format it wants is available instead of learning so from a
+// 400 at the provider.
 [Flags]
 public enum TranscriptionFormats
 {
@@ -22,9 +17,7 @@ public enum TranscriptionFormats
 
 public abstract class TranscriptionModel : AiModel
 {
-    /// <summary>
-    /// Defaults to plain text, which every transcription model can return.
-    /// </summary>
+    // Defaults to plain text, which every transcription model can return.
     public virtual TranscriptionFormats Formats => TranscriptionFormats.Text;
 
     // Hosted models precede local ones, and better local models precede weaker

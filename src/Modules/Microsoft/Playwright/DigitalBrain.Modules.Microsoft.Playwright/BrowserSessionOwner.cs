@@ -1,6 +1,6 @@
 namespace DigitalBrain.Microsoft.Playwright;
 
-/// <summary>Owns one transient page connection; replacements invalidate all older work.</summary>
+// Owns one transient page connection; replacements invalidate all older work.
 public sealed class BrowserSessionOwner(IBrowserSessionProvider provider) : IAsyncDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);

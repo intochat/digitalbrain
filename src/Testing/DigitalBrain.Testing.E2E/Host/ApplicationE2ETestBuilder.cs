@@ -45,10 +45,8 @@ public sealed class E2ETestBuilder<TAppHost> where TAppHost : class
         return this;
     }
 
-    /// <summary>
-    /// Adds environment variables to the primary application resource, for test-only wiring such
-    /// as pointing the OTLP exporter at a collector owned by the test process.
-    /// </summary>
+    // Adds environment variables to the primary application resource, for test-only wiring such as
+    // pointing the OTLP exporter at a collector owned by the test process.
     public E2ETestBuilder<TAppHost> WithResourceEnvironment(IReadOnlyDictionary<string, string> environment)
     {
         EnsureMutable();

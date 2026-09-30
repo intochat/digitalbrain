@@ -1,6 +1,7 @@
 namespace DigitalBrain.Core;
 
-/// <summary>Option edits for modules already declared by an application, applied to that application's own options.</summary>
+// Option edits for modules already declared by an application, applied to that application's own
+// options.
 public sealed class CompositionOverrides
 {
     private readonly Dictionary<Type, List<Delegate>> _optionEdits = [];

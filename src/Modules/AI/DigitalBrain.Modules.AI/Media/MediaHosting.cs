@@ -11,7 +11,6 @@ public static class MediaHosting
         return services;
     }
 
-    /// <summary>Enable OpenAI speech explicitly, using the OpenAI integration registration.</summary>
     public static IServiceCollection AddOpenAISpeechSynthesis(this IServiceCollection services, string model)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(model);

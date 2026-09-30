@@ -15,7 +15,7 @@ public interface ICompanyResearchStore
     Task Save(string workspace, string researchId, CompanyResearch company, CancellationToken ct);
 }
 
-/// <summary>Typed application writes; the general Postgres query interface remains read-only.</summary>
+// Typed application writes; the general Postgres query interface remains read-only.
 public sealed class CompanyResearchStore([FromKeyedServices(PostgresHosting.DataSourceKey)] NpgsqlDataSource source) : ICompanyResearchStore
 {
     public async Task Save(string workspace, string researchId, CompanyResearch company, CancellationToken ct)

@@ -1,6 +1,6 @@
 namespace DigitalBrain.Salesforce;
 
-/// <summary>Redeems a one-use login nonce; the instance URL must be HTTPS.</summary>
+// Redeems a one-use login nonce; the instance URL must be HTTPS.
 [GenerateSerializer]
 [Alias("salesforce.connect-account")]
 public sealed record ConnectSalesforceAccount(

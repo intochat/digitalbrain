@@ -1,6 +1,6 @@
 namespace DigitalBrain.Microsoft.Playwright;
 
-/// <summary>Each browser action owns a fresh budget; earlier in-flight responses retain their old budget.</summary>
+// Each browser action owns a fresh budget; earlier in-flight responses retain their old budget.
 internal sealed class BrowserActivityBudget
 {
     private int _requests;

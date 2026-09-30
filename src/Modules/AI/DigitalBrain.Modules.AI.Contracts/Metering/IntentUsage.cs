@@ -2,14 +2,11 @@ using DigitalBrain.Contracts;
 
 namespace DigitalBrain.AI.Metering;
 
-/// <summary>Which kind of provider call produced the tokens.</summary>
 public enum MeterKind { Chat, Embedding }
 
-/// <summary>
-/// One provider call's reported usage. Every token class is nullable: null means the provider
-/// did not report that class, never zero. <see cref="UsageReported"/> is false when the
-/// provider returned no usage at all, so an unreported call is distinguishable from a free one.
-/// </summary>
+// One provider call's reported usage. Every token class is nullable: null means the provider did not
+// report that class, never zero. UsageReported is false when the provider returned no usage at all, so
+// an unreported call is distinguishable from a free one.
 [GenerateSerializer, Alias("ai.token-usage-entry")]
 public sealed record TokenUsageEntry(
     [property: Id(0)] MeterKind Meter,
@@ -23,16 +20,13 @@ public sealed record TokenUsageEntry(
     [property: Id(8)] bool UsageReported,
     [property: Id(9)] DateTimeOffset At) : IIntentUsageEntry;
 
-/// <summary>The durable token usage recorded for one intent id.</summary>
 [GenerateSerializer, Alias("ai.intent-token-usage")]
 public sealed record IntentTokenUsage(
     [property: Id(0)] string IntentId,
     [property: Id(1)] TokenUsageEntry[] Entries);
 
-/// <summary>
-/// The durable per-intent usage row. Keyed by intent id and owned by the AI module; P1.4
-/// receipts and the P2.2 Compute meter consume it rather than deriving usage from sampled traces.
-/// </summary>
+// The durable per-intent usage row. Keyed by intent id and owned by the AI module; P1.4 receipts and
+// the P2.2 Compute meter consume it rather than deriving usage from sampled traces.
 [Alias("ai.intent-usage")]
 [Orleans.Metadata.DefaultGrainType("ai-intent-usage")]
 public interface IIntentUsage : INeuron

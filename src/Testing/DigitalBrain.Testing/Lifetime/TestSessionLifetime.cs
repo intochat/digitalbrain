@@ -1,6 +1,6 @@
 namespace DigitalBrain.Testing;
 
-/// <summary>Owns resources in acquisition order and releases them in reverse order.</summary>
+// Owns resources in acquisition order and releases them in reverse order.
 public sealed class TestSessionLifetime
 {
     private readonly Lock _gate = new();

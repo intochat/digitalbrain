@@ -1,6 +1,5 @@
 namespace DigitalBrain.Memory;
 
-/// <summary>A note to forget.</summary>
 [GenerateSerializer]
 [Alias("memory.forget")]
 public sealed record Forget(

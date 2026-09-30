@@ -1,6 +1,5 @@
 namespace DigitalBrain.Memory;
 
-/// <summary>A query for matching notes.</summary>
 [GenerateSerializer]
 [Alias("memory.recall")]
 public sealed record Recall(

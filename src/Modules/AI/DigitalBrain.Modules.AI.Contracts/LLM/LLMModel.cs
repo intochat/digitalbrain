@@ -2,11 +2,8 @@ namespace DigitalBrain.AI;
 
 public abstract class LLMModel : AiModel
 {
-    /// <summary>
-    /// Defaults to tool-calling only. Every catalogued model has always been
-    /// treated as tool-capable; vision and structured output go undeclared until
-    /// a model is actually confirmed to support them.
-    /// </summary>
+    // Defaults to tool-calling only. Every catalogued model has always been treated as tool-capable;
+    // vision and structured output go undeclared until a model is actually confirmed to support them.
     public virtual LlmCapabilities Capabilities => LlmCapabilities.Tools;
 
     public bool SupportsTools => Capabilities.HasFlag(LlmCapabilities.Tools);

@@ -7,11 +7,11 @@ namespace DigitalBrain.Postgres;
 [Orleans.Metadata.DefaultGrainType("postgres")]
 public interface IPostgres : INeuron
 {
-    /// <summary>Runs one read-only SELECT with server-side caps and returns typed rows.</summary>
+    // Runs one read-only SELECT with server-side caps and returns typed rows.
     [ReadOnly, Alias("query")]
     Task<PostgresQueryResult> Query(PostgresQuery query);
 
-    /// <summary>Reads tables and columns of the configured database; omit Table for the index.</summary>
+    // Reads tables and columns of the configured database; omit Table for the index.
     [ReadOnly, Alias("schema")]
     Task<PostgresSchema> ReadSchema(ReadPostgresSchema query);
 

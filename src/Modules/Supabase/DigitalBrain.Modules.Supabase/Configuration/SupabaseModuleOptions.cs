@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Supabase;
 
-/// <summary>Public module settings. Credentials remain in the host's secret configuration.</summary>
+// Public module settings. Credentials remain in the host's secret configuration.
 public sealed class SupabaseModuleOptions : IModuleOptions
 {
     public string Provider { get; set; } = SupabaseModule.ProviderName;

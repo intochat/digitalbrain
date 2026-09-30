@@ -1,6 +1,5 @@
 namespace DigitalBrain.Memory;
 
-/// <summary>A note to remember.</summary>
 [GenerateSerializer]
 [Alias("memory.remember")]
 public sealed record Remember(

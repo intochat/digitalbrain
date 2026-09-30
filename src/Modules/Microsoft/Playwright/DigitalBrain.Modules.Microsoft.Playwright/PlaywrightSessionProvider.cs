@@ -5,7 +5,7 @@ using Sdk = global::Microsoft.Playwright;
 
 namespace DigitalBrain.Microsoft.Playwright;
 
-/// <summary>Connects to a page owned by the desktop. It never creates or closes native pages.</summary>
+// Connects to a page owned by the desktop. It never creates or closes native pages.
 public sealed class PlaywrightSessionProvider : IBrowserSessionProvider
 {
     private readonly ConcurrentDictionary<(int Port, string SessionId), string> _targets = new();
