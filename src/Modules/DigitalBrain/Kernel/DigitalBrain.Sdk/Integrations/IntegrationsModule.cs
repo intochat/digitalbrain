@@ -17,6 +17,7 @@ public sealed class IntegrationsModule : IModule
             IntegrationDiscovery.Collect(services.GetRequiredService<ModuleInventory>().Types));
         silo.Services.TryAddSingleton(TimeProvider.System);
         silo.Services.TryAddSingleton<IAccountProbe, CredentialPresenceProbe>();
+        silo.Services.TryAddSingleton<ICapabilities, Capabilities>();
         silo.AddStartupTask<RegistrationSeeder>();
     }
 
@@ -25,5 +26,6 @@ public sealed class IntegrationsModule : IModule
         ArgumentNullException.ThrowIfNull(endpoints);
         endpoints.MapIntegrations();
         endpoints.MapAccounts();
+        endpoints.MapCapabilities();
     }
 }

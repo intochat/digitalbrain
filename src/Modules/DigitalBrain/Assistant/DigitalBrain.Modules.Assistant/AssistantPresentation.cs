@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DigitalBrain.AI;
 using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Chat;
@@ -173,7 +174,7 @@ internal sealed partial class AssistantNeuron
         {
             services.GetRequiredService<ILoggerFactory>().CreateLogger("Assistant").LogWarning(error, "Conversation action {Action} failed", action);
             if (Snapshot.Threads.Count > 0)
-            { await ChangeThread(Snapshot.SelectedThread, thread => thread with { Error = error is ArgumentException ? error.Message : "The action could not be completed. Please try again." }); }
+            { await ChangeThread(Snapshot.SelectedThread, thread => thread with { Error = error is ArgumentException or ProviderUnavailableException ? error.Message : "The action could not be completed. Please try again." }); }
         }
         await Present();
     }
@@ -236,7 +237,7 @@ internal sealed partial class AssistantNeuron
         catch (Exception error)
         {
             services.GetRequiredService<ILoggerFactory>().CreateLogger("Assistant").LogWarning(error, "Conversation presentation run failed");
-            await ChangeThread(id, thread => thread with { Error = error is ArgumentException ? error.Message : "The request could not be completed. Please try again." });
+            await ChangeThread(id, thread => thread with { Error = error is ArgumentException or ProviderUnavailableException ? error.Message : "The request could not be completed. Please try again." });
         }
         finally
         {

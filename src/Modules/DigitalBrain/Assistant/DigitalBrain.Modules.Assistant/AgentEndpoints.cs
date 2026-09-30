@@ -1,3 +1,4 @@
+using DigitalBrain.AI;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core.Enforcement;
 using Microsoft.AspNetCore.Builder;
@@ -54,6 +55,10 @@ internal static class AgentEndpoints
                 http.Response.StatusCode = StatusCodes.Status400BadRequest;
                 await http.Response.WriteAsJsonAsync(new { code = "MODEL_UNAVAILABLE", message = error.Message }, http.RequestAborted);
             }
+            catch (ProviderUnavailableException error) when (!http.Response.HasStarted)
+            {
+                await ProviderUnavailable(error).ExecuteAsync(http);
+            }
             catch (InvalidOperationException error) when (!http.Response.HasStarted)
             {
                 http.Response.StatusCode = StatusCodes.Status409Conflict;
@@ -61,6 +66,9 @@ internal static class AgentEndpoints
             }
         });
     }
+
+    internal static IResult ProviderUnavailable(ProviderUnavailableException error)
+        => Results.Json(new { integration = error.Integration, status = error.Status, missing = error.Missing }, statusCode: StatusCodes.Status409Conflict);
 
     internal static async Task<(BrainScope? Scope, IResult? Denied)> ResolveBodyBrain(HttpContext http, string brainId)
     {

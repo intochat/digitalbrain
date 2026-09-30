@@ -33,6 +33,7 @@ public sealed class AIModule : IModule<AIOptions>
         AIClients.Add(builder.Services);
         builder.Services.TryAddSingleton<Agents.IAgentTurnRunner, Agents.AgentTurnRunner>();
         builder.Services.TryAddSingleton<ModelProfiles>();
+        builder.Services.AddSingleton<ICapabilitySource, AiModelCapabilities>();
         builder.Services.TryAddSingleton<InferenceService>();
         builder.Services.AddMediaNeurons();
         AIClients.AddImageGeneration(builder.Services, options);

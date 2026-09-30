@@ -190,6 +190,20 @@ public sealed class AccountFacts : IDisposable
     }
 
     [Fact]
+    public void CapabilitiesAreServedUnderTheBrainScopedIntegrationsRoute()
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.Services.AddSingleton(typeof(IGrainFactory), _ => null!);
+        IEndpointRouteBuilder app = builder.Build();
+        new IntegrationsModule().Configure(app);
+
+        var routes = app.DataSources.SelectMany(source => source.Endpoints)
+            .OfType<RouteEndpoint>().Select(endpoint => endpoint.RoutePattern.RawText!).ToArray();
+
+        Assert.Contains("/brains/{brainId}/integrations/capabilities", routes);
+    }
+
+    [Fact]
     public void AccountsAreServedOnlyUnderTheBrainScopedAccountsRoute()
     {
         var builder = WebApplication.CreateBuilder();

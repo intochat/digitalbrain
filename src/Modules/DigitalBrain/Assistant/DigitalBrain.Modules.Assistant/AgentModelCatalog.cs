@@ -22,10 +22,10 @@ public sealed class AgentModelCatalog(ModelProfiles profiles, IOptionsMonitor<AI
         var selection = id is null ? Default()
             : Choices().FirstOrDefault(choice => string.Equals(choice.Id, id, StringComparison.Ordinal))?.Selection
                 ?? throw new ArgumentException("The selected model is unavailable. Choose a model from Settings.");
-        if (Resolve(selection) is null)
-        {
-            throw new ArgumentException("The selected model is unavailable or does not support assistant tools. Choose a model from Settings.");
-        }
+        try { profiles.Resolve(selection, requiresTools: true); }
+        catch (ProviderUnavailableException) { throw; }
+        catch (Exception error) when (error is ArgumentException or InvalidOperationException or NotSupportedException)
+        { throw new ArgumentException("The selected model is unavailable or does not support assistant tools. Choose a model from Settings."); }
         return selection;
     }
 
