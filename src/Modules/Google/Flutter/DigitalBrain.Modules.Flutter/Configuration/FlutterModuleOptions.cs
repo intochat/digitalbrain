@@ -22,8 +22,6 @@ public sealed record FlutterModuleOptions : IModuleOptions
     public FlutterModuleOptions RunWebApp() => WithHost(FlutterHostKind.Web);
     public FlutterModuleOptions RunDesktopApp() => WithHost(FlutterHostKind.Window);
     public FlutterModuleOptions BackendOnly() => WithHost(FlutterHostKind.None);
-    public FlutterModuleOptions AsReleaseBuild() { Hosting = Hosting with { ReleaseBuild = true }; return this; }
-    public FlutterModuleOptions AsDebugBuild() { Hosting = Hosting with { ReleaseBuild = false }; return this; }
 
     public void Validate()
     {

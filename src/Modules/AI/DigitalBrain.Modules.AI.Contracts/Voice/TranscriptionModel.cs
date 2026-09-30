@@ -27,9 +27,6 @@ public abstract class TranscriptionModel : AiModel
     /// </summary>
     public virtual TranscriptionFormats Formats => TranscriptionFormats.Text;
 
-    /// <summary>Whether timestamps can be requested from this model.</summary>
-    public bool SupportsTimestamps => Formats.HasFlag(TranscriptionFormats.VerboseJson);
-
     // Hosted models precede local ones, and better local models precede weaker
     // ones: the Foundry service walks the local entries in order when its
     // configured model is absent from the machine's catalog. This ordering is

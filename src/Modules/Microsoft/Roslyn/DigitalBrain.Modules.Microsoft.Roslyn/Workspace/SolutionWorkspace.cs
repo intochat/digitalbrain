@@ -32,9 +32,6 @@ public sealed class SolutionWorkspace(ISolutionLoader loader, ILogger<SolutionWo
         }
     }
 
-    // Design section 4.2: semantic queries run at most two at a time.
-    internal int AvailableQuerySlots => _queryGate.CurrentCount;
-
     public long SnapshotVersion => Interlocked.Read(ref _snapshotVersion);
 
     internal Action<string>? Opened { get; set; }

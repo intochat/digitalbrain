@@ -37,9 +37,6 @@ public sealed record AssistantState
     // [Id(5)] retired (LegacyRestored); never reuse
 }
 
-[GenerateSerializer, Alias("apps.assistant-activated")]
-public sealed record AssistantActivated([property: Id(0)] string Key) : Signal;
-
 [GenerateSerializer, Alias("apps.assistant-configured")]
 public sealed record AssistantConfigured([property: Id(0)] string Key) : Signal;
 

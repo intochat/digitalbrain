@@ -5,20 +5,6 @@ namespace DigitalBrain.Microsoft.GitHub;
 
 public static class GitHubConfigurationHostingExtensions
 {
-    public static DigitalBrainModuleBuilder<GitHubModule> WithConfiguredGitHubRepositories(
-        this DigitalBrainModuleBuilder<GitHubModule> module, IConfiguration configuration)
-    {
-        module.WithConfiguredGitHubApp(configuration);
-        var repositories = configuration.GetSection("DigitalBrain:Microsoft:GitHub:Repositories")
-            .Get<Dictionary<string, GitHubRepositoryHostingOptions>>() ?? [];
-        foreach (var (id, options) in repositories)
-        {
-            module.WithGitHubRepository(id, options.AppId, options.InstallationId, options.RepositoryId,
-                options.RepoOwner, options.RepoName, options.EndpointId, options.ApiHost, options.McpEndpoint);
-        }
-        return module;
-    }
-
     public static DigitalBrainModuleBuilder<GitHubModule> WithConfiguredGitHubApp(
         this DigitalBrainModuleBuilder<GitHubModule> module, IConfiguration configuration)
     {

@@ -20,8 +20,6 @@ public sealed partial class ManifestValues(AspireManifest manifest, Func<string,
         if (secret) { _secretProvided.Add(resource + "." + path); }
     }
 
-    public bool IsProvided(string resource, string path) => _provided.ContainsKey(resource + "." + path);
-
     // Secret when any parameter it reads is secret, so composites like connection strings stay secret.
     public bool IsSecret(string expression) => References(expression).Any(reference
         => _secretProvided.Contains(reference.Resource + "." + reference.Path) || Reads(reference.Resource).Any(manifest.IsSecretParameter));

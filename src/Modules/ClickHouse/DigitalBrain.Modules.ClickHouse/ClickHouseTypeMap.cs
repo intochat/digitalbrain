@@ -48,19 +48,6 @@ internal static class ClickHouseTypeMap
             || (core == "String" && clickHouseType.Contains("LowCardinality(", StringComparison.Ordinal));
     }
 
-    // ORDER BY is not defined for these, so they never serve as paging tiebreakers.
-    public static bool IsOrderable(string clickHouseType)
-    {
-        var core = Unwrap(clickHouseType);
-        return !(core.StartsWith("JSON", StringComparison.Ordinal)
-            || core.StartsWith("Object(", StringComparison.Ordinal)
-            || core.StartsWith("AggregateFunction(", StringComparison.Ordinal)
-            || core.StartsWith("SimpleAggregateFunction(", StringComparison.Ordinal)
-            || core.StartsWith("Nested(", StringComparison.Ordinal)
-            || core.StartsWith("Dynamic", StringComparison.Ordinal)
-            || core.StartsWith("Variant(", StringComparison.Ordinal));
-    }
-
     private static bool TryStrip(string type, string wrapper, out string inner)
     {
         if (type.StartsWith(wrapper, StringComparison.Ordinal) && type.EndsWith(')'))

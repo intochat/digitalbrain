@@ -20,8 +20,6 @@ public static class TypeCatalog
             ? type
             : throw new ArgumentOutOfRangeException(nameof(kind), kind, "No semantic type is registered for this field kind.");
 
-    public static bool IsMcpFormMappable(FieldKind kind) => McpFormKinds.Contains(kind);
-
     public static IReadOnlyList<string> AllowedFor(FieldKind kind) => kind switch
     {
         FieldKind.PlainText => ["text"],
