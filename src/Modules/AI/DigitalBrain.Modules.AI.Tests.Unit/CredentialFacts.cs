@@ -6,7 +6,9 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.OpenAI;
 using DigitalBrain.Sdk.Integrations;
 using DigitalBrain.Testing;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -88,12 +90,111 @@ public sealed class CredentialFacts
         Assert.Equal(RegistrationStatus.Unconfigured, (await brain.Get<IIntegrationRegistration>("integration/openai").Read()).Status);
     }
 
+    [Fact]
+    public async Task AClearedOrRotatedRegistrationTakesEffectOnTheLiveClientWithoutARestart()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        const string Rotated = "canary-rotated-key-2c9e4d";
+        var clock = new SteppingTimeProvider();
+        using var provider = new KeyCapturingProvider();
+        await using var brain = await UnitTest.Create()
+            .WithRegistrations(AiRegistrationSeeds.OpenAI(Canary, provider.Url))
+            .WithModule<AIModule>()
+            .ConfigureSilo(silo => silo.Services.AddSingleton<TimeProvider>(clock)).StartAsync(ct);
+        var registration = brain.Get<IIntegrationRegistration>("integration/openai");
+        var client = brain.SiloServices.GetRequiredKeyedService<IChatClient>(typeof(IGpt56Sol));
+        var hi = new[] { new ChatMessage(ChatRole.User, "hi") };
+
+        var first = provider.ReplyOnce(ct);
+        await client.GetResponseAsync(hi, cancellationToken: ct);
+        Assert.Equal("Bearer " + Canary, await first);
+
+        await registration.Clear("ApiKey");
+        clock.Advance(TimeSpan.FromSeconds(6));
+        var unavailable = await Assert.ThrowsAsync<ProviderUnavailableException>(() => client.GetResponseAsync(hi, cancellationToken: ct));
+        Assert.Equal(["ApiKey"], unavailable.Missing);
+
+        await registration.Configure(new() { Values = { ["ApiKey"] = Rotated } });
+        clock.Advance(TimeSpan.FromSeconds(6));
+        var second = provider.ReplyOnce(ct);
+        await client.GetResponseAsync(hi, cancellationToken: ct);
+        Assert.Equal("Bearer " + Rotated, await second);
+    }
+
+    [Fact]
+    public async Task AProviderRefusalNeverLeaksTheKeyIntoErrorsOrLogs()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var logs = new CapturingLoggerProvider();
+        var clock = new SteppingTimeProvider();
+        using var provider = new KeyCapturingProvider(HttpStatusCode.Unauthorized);
+        await using var brain = await UnitTest.Create()
+            .WithRegistrations(AiRegistrationSeeds.OpenAI(Canary, provider.Url))
+            .WithModule<AIModule>()
+            .ConfigureSilo(silo =>
+            {
+                silo.Services.AddLogging(logging => logging.AddProvider(logs));
+                silo.Services.AddSingleton<TimeProvider>(clock);
+                silo.Services.Configure<AIOptions>(options =>
+                {
+                    options.Default.Provider = "OpenAI";
+                    options.Default.Model = "test-model";
+                    options.Default.Capabilities = LlmCapabilities.Tools;
+                });
+            }).StartAsync(ct);
+        var registration = brain.Get<IIntegrationRegistration>("integration/openai");
+
+        var refused = provider.ReplyOnce(ct);
+        var failure = await Assert.ThrowsAnyAsync<Exception>(() => brain.Get<ILLM>("default").Generate(new([new("user", [new AiText("hi")])]), cancellationToken: ct));
+        await refused;
+        await registration.Clear("ApiKey");
+        clock.Advance(TimeSpan.FromSeconds(6));
+        var unavailable = await Assert.ThrowsAsync<ProviderUnavailableException>(() => brain.Get<IGpt56Sol>("cleared").Describe());
+
+        Assert.DoesNotContain(Canary, failure.ToString());
+        Assert.DoesNotContain(Canary, unavailable.ToString());
+        Assert.DoesNotContain(Canary, JsonSerializer.Serialize(new { unavailable.Integration, unavailable.Status, unavailable.Missing }));
+        Assert.DoesNotContain(Canary, logs.Text);
+    }
+
+    private sealed class SteppingTimeProvider : TimeProvider
+    {
+        private DateTimeOffset _now = DateTimeOffset.UtcNow;
+
+        public override DateTimeOffset GetUtcNow() => _now;
+
+        public void Advance(TimeSpan by) => _now += by;
+    }
+
+    private sealed class CapturingLoggerProvider : ILoggerProvider
+    {
+        private readonly System.Collections.Concurrent.ConcurrentQueue<string> _lines = new();
+
+        public string Text => string.Join(Environment.NewLine, _lines);
+
+        public ILogger CreateLogger(string categoryName) => new Sink(_lines);
+
+        public void Dispose() { }
+
+        private sealed class Sink(System.Collections.Concurrent.ConcurrentQueue<string> lines) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+            public bool IsEnabled(LogLevel logLevel) => true;
+
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+                => lines.Enqueue(formatter(state, exception) + exception);
+        }
+    }
+
     private sealed class KeyCapturingProvider : IDisposable
     {
         private readonly HttpListener _listener = new();
+        private readonly HttpStatusCode _status;
 
-        public KeyCapturingProvider()
+        public KeyCapturingProvider(HttpStatusCode status = HttpStatusCode.OK)
         {
+            _status = status;
             using var reservation = new TcpListener(IPAddress.Loopback, 0);
             reservation.Start();
             var port = ((IPEndPoint)reservation.LocalEndpoint).Port;
@@ -112,6 +213,7 @@ public sealed class CredentialFacts
             var bytes = Encoding.UTF8.GetBytes("""
                 {"id":"r","object":"chat.completion","created":1,"model":"test-model","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}
                 """);
+            context.Response.StatusCode = (int)_status;
             context.Response.ContentType = "application/json";
             context.Response.ContentLength64 = bytes.Length;
             await context.Response.OutputStream.WriteAsync(bytes, cancellationToken);

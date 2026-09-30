@@ -49,10 +49,13 @@ internal static class AIClients
                 model.Marker,
                 (provider, _) =>
                 {
-                    var inner = Factories[model.Provider].CreateEmbeddingGenerator(
-                        model,
-                        provider.GetRequiredService<IOptions<AIOptions>>().Value,
-                        provider.GetRequiredService<IAiCredentials>());
+                    var inner = AiIntegrations.KeyedProviders.Contains(model.Provider)
+                        ? new RebuildingEmbeddingGenerator(
+                            () => Factories[model.Provider].CreateEmbeddingGenerator(
+                                model, provider.GetRequiredService<IOptions<AIOptions>>().Value, provider.GetRequiredService<IAiCredentials>()),
+                            GenerationOf(provider, model.Provider))
+                        : Factories[model.Provider].CreateEmbeddingGenerator(
+                            model, provider.GetRequiredService<IOptions<AIOptions>>().Value, provider.GetRequiredService<IAiCredentials>());
                     return provider.GetService<IIntentUsageSink>() is { } sink
                         ? new MeteringEmbeddingGenerator(inner, sink, model.Provider.ToString(), model.Id)
                         : inner;
@@ -74,8 +77,18 @@ internal static class AIClients
             ?? throw new ArgumentException($"Provider '{provider}' does not support runtime chat model selection.", nameof(provider));
 
     private static IChatClient BuildChatPipeline(IServiceProvider provider, LLMModel model)
-        => BuildChatPipeline(provider, model, Factories[model.Provider].CreateChatClient(
-            model, provider.GetRequiredService<IOptions<AIOptions>>().Value, provider.GetRequiredService<IAiCredentials>()));
+        => BuildChatPipeline(provider, model, Rebuilding(provider, model.Provider,
+            () => Factories[model.Provider].CreateChatClient(
+                model, provider.GetRequiredService<IOptions<AIOptions>>().Value, provider.GetRequiredService<IAiCredentials>())));
+
+    // A keyed provider's client is rebuilt when its registration is re-read, so a cleared or rotated key takes effect without a restart.
+    private static IChatClient Rebuilding(IServiceProvider services, AiProvider provider, Func<IChatClient> create)
+        => AiIntegrations.KeyedProviders.Contains(provider)
+            ? new RebuildingChatClient(create, GenerationOf(services, provider))
+            : create();
+
+    private static Func<long> GenerationOf(IServiceProvider services, AiProvider provider)
+        => () => services.GetRequiredService<IAiCredentials>().GenerationOf(AiIntegrations.IdOf(provider));
 
     internal static IChatClient BuildChatPipeline(IServiceProvider provider, LLMModel model, IChatClient innerClient)
         => BuildChatPipeline(provider, model.SupportsTools, model.Marker.Name, innerClient,

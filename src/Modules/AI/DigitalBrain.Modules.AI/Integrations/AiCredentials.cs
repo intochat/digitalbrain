@@ -30,6 +30,9 @@ internal interface IAiCredentials
 {
     RegistrationSnapshot StatusOf(string integrationId);
 
+    // Changes whenever the registration is re-read, so holders of a released key know to rebuild.
+    long GenerationOf(string integrationId);
+
     string ReleaseSecret(string integrationId, string field);
 
     Task<string> ReleaseSecretAsync(string integrationId, string field, CancellationToken cancellationToken = default);
@@ -51,7 +54,14 @@ internal sealed class RegistrationCredentials(IGrainFactory grains, TimeProvider
         AppId = "ai",
     };
 
-    private readonly ConcurrentDictionary<string, (RegistrationSnapshot Snapshot, DateTimeOffset ReadAt)> _statuses = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, (RegistrationSnapshot Snapshot, DateTimeOffset ReadAt, long Generation)> _statuses = new(StringComparer.Ordinal);
+    private long _generation;
+
+    public long GenerationOf(string integrationId)
+    {
+        StatusOf(integrationId);
+        return _statuses.TryGetValue(integrationId, out var cached) ? cached.Generation : 0;
+    }
 
     public string ReleaseSecret(string integrationId, string field)
         => Task.Run(() => ReleaseSecretAsync(integrationId, field)).GetAwaiter().GetResult();
@@ -89,7 +99,7 @@ internal sealed class RegistrationCredentials(IGrainFactory grains, TimeProvider
             snapshot = new RegistrationSnapshot { IntegrationId = integrationId, Status = RegistrationStatus.Unconfigured };
         }
 
-        _statuses[integrationId] = (snapshot, now);
+        _statuses[integrationId] = (snapshot, now, Interlocked.Increment(ref _generation));
         return snapshot;
     }
 }
@@ -104,6 +114,8 @@ internal sealed class FixedAiCredentials : IAiCredentials
         _ready[integrationId] = (apiKey, endpoint);
         return this;
     }
+
+    public long GenerationOf(string integrationId) => 0;
 
     public RegistrationSnapshot StatusOf(string integrationId)
         => _ready.TryGetValue(integrationId, out var entry)
