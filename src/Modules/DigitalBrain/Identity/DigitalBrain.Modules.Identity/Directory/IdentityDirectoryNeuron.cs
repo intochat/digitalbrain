@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Identity;
 using Orleans.Runtime;
 
@@ -42,6 +43,7 @@ internal sealed class IdentityDirectoryNeuron : Neuron<IdentityDirectoryState>, 
         Snapshot.Members.Add(member);
         Snapshot.PasswordHashes.Add(principalId, Passwords.HashPassword(principalId, password));
         await _store.WriteStateAsync();
+        await EstablishBrainAsync(member);
         return member;
     }
 
@@ -108,8 +110,13 @@ internal sealed class IdentityDirectoryNeuron : Neuron<IdentityDirectoryState>, 
         var member = NewMember(accountId, workspaceId, principalId, displayName, role);
         next.Members.Add(member);
         await _store.WriteStateAsync();
+        await EstablishBrainAsync(member);
         return member;
     }
+
+    private Task EstablishBrainAsync(Member member) =>
+        GrainFactory.GetGrain<IBrain>(BrainScope.Create(member.AccountId, member.WorkspaceId).Id)
+            .Establish(new(member.WorkspaceId, member.AccountId));
 
     private static Member NewMember(string accountId, string workspaceId, string principalId, string displayName, MemberRole role) => new()
     {
