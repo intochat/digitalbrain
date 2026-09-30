@@ -1,6 +1,7 @@
 using Azure.Core;
 using Azure.Identity;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Enforcement;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -30,6 +31,10 @@ public sealed class CSharpModule : IModule
             // Unset composition values arrive as empty strings, not nulls.
             if (string.IsNullOrWhiteSpace(options.SourceRoot)) { options.SourceRoot = FindRepositoryRoot(); }
         });
+        builder.Services.AddOptions<CSharpAuthoringOptions>().BindConfiguration(CSharpAuthoringOptions.SectionName);
+        builder.Services.AddCSharpAuthoring();
+        builder.Services.TryAddSingleton<CSharpSharing>();
+        builder.Services.TryAddScoped(provider => provider.GetRequiredService<CSharpToolService>().ForScope(BrainScope.CurrentId()));
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.TryAddSingleton<RunTokens>();
         builder.Services.TryAddSingleton<ScriptRunEnvironment>();
@@ -51,6 +56,7 @@ public sealed class CSharpModule : IModule
     {
         ArgumentNullException.ThrowIfNull(endpoints);
         endpoints.MapScriptEdge();
+        CSharpAuthoringEndpoints.Map(endpoints);
     }
 
     public static string? FindRepositoryRoot()

@@ -1,24 +1,19 @@
-using DigitalBrain.Identity.Configuration;
-using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core.Enforcement;
-using IntoChat.Workspace;
-using Microsoft.Extensions.Options;
-using DigitalBrain.Identity;
 
-namespace IntoChat.Packages;
+namespace DigitalBrain.Microsoft.CSharp;
 
-// Publishes a workspace C# file as a package owned by the signed-in person.
-internal sealed class CSharpSharing(IDigitalBrain brain, CSharpToolService files, IOptions<BasicAuthOptions> auth)
+// Publishes a brain C# file as a package owned by the signed-in person.
+public sealed class CSharpSharing(IDigitalBrain brain, CSharpToolService files)
 {
     private const int MaxTitleLength = 100;
     private const int MaxDescriptionLength = 2000;
 
-    public async Task<PackageSnapshot> Share(string workspaceId, string fileId, ShareCSharpRequest request, CancellationToken cancellationToken)
+    public async Task<PackageSnapshot> Share(string fileId, ShareCSharpRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var workspace = files.ForScope(WorkspaceScope.Current(auth.Value, workspaceId).Id);
+        var workspace = files.ForScope(BrainScope.CurrentId());
         var (description, file, _) = await workspace.Read(fileId, cancellationToken);
         if (string.IsNullOrWhiteSpace(file.Source)) { throw new InvalidOperationException($"{fileId} has no source to share."); }
         var manifest = new PackageManifest(Shorten(description.Name, MaxTitleLength), Shorten(description.Purpose, MaxDescriptionLength), [], [], request.Accounts ?? []);

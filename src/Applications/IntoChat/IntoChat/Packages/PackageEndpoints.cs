@@ -13,7 +13,6 @@ internal static class PackageEndpoints
     public static void AddPackages(this IHostApplicationBuilder builder)
     {
         builder.Services.AddSingleton<PackageService>();
-        builder.Services.AddSingleton<CSharpSharing>();
         builder.Services.AddSingleton<MarketplaceService>();
         builder.Services.AddAppRuntime<GroupChatRuntime>();
         builder.Services.AddAppRuntime<PromptRuntime>();
@@ -55,11 +54,6 @@ internal static class PackageEndpoints
             => marketplace.Verify(PackageId.Create(owner, name), revision));
         packages.MapPost("/{owner}/{name}/publish", (string owner, string name, PublishPackageRequest request, PackageService service)
             => service.Publish(PackageId.Create(owner, name), request));
-
-        routes.MapPost("/workspaces/{workspaceId}/csharp/{id}/share", (string workspaceId, string id, ShareCSharpRequest request, CSharpSharing sharing, CancellationToken ct)
-                => sharing.Share(workspaceId, id, request, ct))
-            .AddEndpointFilter(BrainAccessFilter.EnforceAsync)
-            .AddEndpointFilter(Guard);
 
         var installed = routes.MapGroup("/workspaces/{workspaceId}/packages/{owner}/{name}")
             .AddEndpointFilter(BrainAccessFilter.EnforceAsync)

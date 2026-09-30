@@ -19,7 +19,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddIntoChatOptions();
 builder.AddServiceDefaults();
 builder.AddDigitalBrain();
-builder.AddCSharp();
 builder.AddPackages();
 builder.AddKernelCors();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -45,7 +44,6 @@ app.MapDefaultEndpoints();
 // Developer mode is a server setting, so a client cannot grant itself the C# console.
 app.MapGet("/session/capabilities", static (IConfiguration configuration) =>
     Results.Ok(new { developerMode = AgentToolPolicy.DeveloperModeEnabled(configuration["IntoChat:DeveloperMode"]) }));
-app.MapCSharp();
 app.MapPackages();
 app.MapDigitalBrainModules();
 app.MapGet("/compute/limits", static async (IDigitalBrain brain, CancellationToken ct) =>
