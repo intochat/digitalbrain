@@ -49,7 +49,11 @@ internal sealed class AppConsentNeuron(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(appId);
         var catalogued = await GrainFactory.GetGrain<IAppManifestDirectory>(AppManifestDirectoryGrains.Key).Read();
-        var entry = catalogued.FirstOrDefault(scoped => string.Equals(scoped.Manifest.Id, appId, StringComparison.Ordinal))
+        // Only globally scoped apps and this workspace's own publications are consentable here;
+        // another workspace's catalogue entry is not offered across the boundary.
+        var entry = catalogued.FirstOrDefault(scoped =>
+                string.Equals(scoped.Manifest.Id, appId, StringComparison.Ordinal)
+                && (scoped.OwningWorkspaceId is null || string.Equals(scoped.OwningWorkspaceId, this.GetPrimaryKeyString(), StringComparison.Ordinal)))
             ?? throw new KeyNotFoundException($"No catalogued app '{appId}' is available for consent.");
         return entry.Manifest;
     }

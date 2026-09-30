@@ -36,8 +36,6 @@ internal static class AppEndpoints
             var scope = Scope(auth.Value, workspaceId);
             var installed = await brain.Get<IAppCatalog>(scope).List().WaitAsync(ct);
             var manifests = installed.Select(installation => installation.Manifest)
-                .GroupBy(manifest => manifest.Id, StringComparer.Ordinal)
-                .Select(group => group.Last())
                 .OrderBy(manifest => manifest.Name, StringComparer.Ordinal)
                 .Select(manifest => new
                 {
