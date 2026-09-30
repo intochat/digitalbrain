@@ -1,5 +1,6 @@
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Core;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
@@ -13,5 +14,11 @@ public sealed class AssistantModule : IModule
     {
         ArgumentNullException.ThrowIfNull(silo);
         silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IAgentToolFactory, WorkspaceFormTools>());
+    }
+
+    public void Configure(IEndpointRouteBuilder endpoints)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        ComputeUsageEndpoints.Map(endpoints);
     }
 }

@@ -46,12 +46,9 @@ app.MapGet("/session/capabilities", static (IConfiguration configuration) =>
     Results.Ok(new { developerMode = AgentToolPolicy.DeveloperModeEnabled(configuration["IntoChat:DeveloperMode"]) }));
 app.MapPackages();
 app.MapDigitalBrainModules();
-app.MapGet("/compute/limits", static async (IDigitalBrain brain, CancellationToken ct) =>
-    Results.Ok(await brain.Get<IAllowanceLedger>(CallerContextStamper.Require().AccountId).ReadLimitsAsync(ct)));
 app.MapWorkspaceDataEndpoints();
 app.MapWorkspaceAgent();
 app.MapWorkspaceConnections();
-app.MapComputeUsage();
 app.MapWorkspaceVoice();
 app.MapLocalApps();
 app.MapBuiltInApps();
