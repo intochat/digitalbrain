@@ -8,7 +8,8 @@ namespace IntoChat.Tests.E2E.Packages;
 
 // Alice writes a C# app and shares it with one request; the package carries its code and account
 // slots, never Alice's settings, and Bob's install runs it with his own account.
-public sealed class ShareCSharpFacts
+[Collection(IntoChatHostCollection.Name)]
+public sealed class ShareCSharpFacts(IntoChatHostFixture host)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -16,10 +17,12 @@ public sealed class ShareCSharpFacts
     public async Task ACSharpAppIsSharedWithoutSettingsAndInstalledWithTheRecipientsAccount()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.Create()
-            .StartAsync(ct);
-        using var alice = await People.SignedIn(brain.HttpClient, "alice", ct);
-        using var bob = await People.SignedIn(brain.HttpClient, "bob", ct);
+        await using var brain = await host.LeaseAsync(ct);
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var aliceName = "alice-" + suffix;
+        var bobName = "bob-" + suffix;
+        using var alice = await People.SignedIn(brain.HttpClient, aliceName, ct);
+        using var bob = await People.SignedIn(brain.HttpClient, bobName, ct);
         var greeter = $"/brains/{alice.Workspace}/csharp/greeter";
 
         using (var nothingToShare = await alice.Client.PostAsJsonAsync(greeter + "/share", new { }, Json, ct))
@@ -33,32 +36,32 @@ public sealed class ShareCSharpFacts
         var shared = await People.Send(alice.Client, HttpMethod.Post, greeter + "/share", share, ct);
         var reshared = await People.Send(alice.Client, HttpMethod.Post, greeter + "/share", share, ct);
 
-        Assert.Equal("alice", shared.GetProperty("id").GetProperty("owner").GetString());
+        Assert.Equal(aliceName, shared.GetProperty("id").GetProperty("owner").GetString());
         Assert.Equal("greeter", shared.GetProperty("id").GetProperty("name").GetString());
         var published = shared.GetProperty("published").GetString();
         Assert.Equal(published, shared.GetProperty("head").GetString());
         Assert.Equal(published, reshared.GetProperty("published").GetString());
         Assert.Single(reshared.GetProperty("history").EnumerateArray());
-        var revision = await People.Send(bob.Client, HttpMethod.Get, $"/packages/alice/greeter/revisions/{published}", null, ct);
+        var revision = await People.Send(bob.Client, HttpMethod.Get, $"/packages/{aliceName}/greeter/revisions/{published}", null, ct);
         var manifest = revision.GetProperty("content").GetProperty("manifest");
         Assert.Equal("Greeter", manifest.GetProperty("title").GetString());
         Assert.Empty(manifest.GetProperty("settings").EnumerateArray());
         Assert.Equal("twitter", Assert.Single(manifest.GetProperty("accounts").EnumerateArray()).GetProperty("name").GetString());
 
-        using (var missing = await bob.Client.PostAsJsonAsync($"/brains/{bob.Workspace}/packages/alice/greeter", new { }, Json, ct))
+        using (var missing = await bob.Client.PostAsJsonAsync($"/brains/{bob.Workspace}/packages/{aliceName}/greeter", new { }, Json, ct))
         { Assert.Equal(HttpStatusCode.BadRequest, missing.StatusCode); }
         await People.Send(bob.Client, HttpMethod.Post, $"/brains/{bob.Workspace}/integrations/accounts/connect",
             new { integrationId = "twitter", connectionId = "bob-twitter", value = "test-token" }, ct);
 
         var options = await People.Send(bob.Client, HttpMethod.Get,
-            $"/brains/{bob.Workspace}/packages/alice/greeter/accounts", null, ct);
+            $"/brains/{bob.Workspace}/packages/{aliceName}/greeter/accounts", null, ct);
         Assert.Equal("bob-twitter", Assert.Single(options.GetProperty("slots").EnumerateArray())
             .GetProperty("accounts").EnumerateArray().Single().GetProperty("id").GetString());
-        using (var wrong = await bob.Client.PostAsJsonAsync($"/brains/{bob.Workspace}/packages/alice/greeter",
+        using (var wrong = await bob.Client.PostAsJsonAsync($"/brains/{bob.Workspace}/packages/{aliceName}/greeter",
             new { accounts = new { twitter = "alice-twitter" } }, Json, ct))
         { Assert.Equal(HttpStatusCode.BadRequest, wrong.StatusCode); }
 
-        var installed = await People.Send(bob.Client, HttpMethod.Post, $"/brains/{bob.Workspace}/packages/alice/greeter",
+        var installed = await People.Send(bob.Client, HttpMethod.Post, $"/brains/{bob.Workspace}/packages/{aliceName}/greeter",
             new { accounts = new { twitter = "bob-twitter" } }, ct);
         Assert.Equal("bob-twitter", installed.GetProperty("app").GetProperty("accounts").GetProperty("twitter").GetString());
         var file = brain.Get<ICSharpFile>(installed.GetProperty("app").GetProperty("csharpFiles")[0].GetString()!);
@@ -70,7 +73,7 @@ public sealed class ShareCSharpFacts
             Assert.True((await file.Read(timeout.Token)).Status != CSharpFileStatus.Exited, logs);
             await Task.Delay(500, timeout.Token);
         }
-        await People.Send(bob.Client, HttpMethod.Delete, $"/brains/{bob.Workspace}/packages/alice/greeter", null, ct);
+        await People.Send(bob.Client, HttpMethod.Delete, $"/brains/{bob.Workspace}/packages/{aliceName}/greeter", null, ct);
     }
 
     private const string GreeterSource = """

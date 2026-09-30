@@ -8,16 +8,16 @@ using Xunit;
 
 namespace DigitalBrain.Modules.Flutter.Tests.E2E.Toggle;
 
-public sealed class ToggleHttpFacts
+[Collection(FlutterBackendCollection.Name)]
+public sealed class ToggleHttpFacts(FlutterBackendFixture host)
 {
     [Fact]
     public async Task GetMatchesSet()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.Create().WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
-            .StartAsync(ct);
-        await brain.Get<IToggle>(UiScope.Key(BrainScope.Create("owner", "workspace-a").Id, "dark")).Set("Dark", true);
-        var state = await brain.HttpClient.GetFromJsonAsync<ToggleState>("/brains/workspace-a/ui/toggles/dark", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+        await using var brain = await host.LeaseAsync(ct);
+        await brain.Get<IToggle>(UiScope.Key(BrainScope.Create("owner", brain.WorkspaceId).Id, "dark")).Set("Dark", true);
+        var state = await brain.HttpClient.GetFromJsonAsync<ToggleState>($"/brains/{brain.WorkspaceId}/ui/toggles/dark", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.True(state!.On);
     }
 }

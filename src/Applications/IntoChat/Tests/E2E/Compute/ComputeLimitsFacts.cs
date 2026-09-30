@@ -4,13 +4,14 @@ using IntoChat.Tests.E2E.Agent;
 
 namespace IntoChat.Tests.E2E.Compute;
 
-public sealed class ComputeLimitsFacts
+[Collection(IntoChatHostCollection.Name)]
+public sealed class ComputeLimitsFacts(IntoChatHostFixture host)
 {
     [Fact(Timeout = 240_000)]
     public async Task ComputePanelReadsTheSignedInAccountsLimits()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.StartAsync(ct);
+        await using var brain = await host.LeaseAsync(ct);
         await brain.Get<IAllowanceLedger>("owner")
             .SetLimitsAsync(new LimitPolicy { AccountLimitCompute = 100m }, ct);
 

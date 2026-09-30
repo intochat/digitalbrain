@@ -8,14 +8,14 @@ using Xunit;
 
 namespace DigitalBrain.Modules.Google.Gmail.Tests.E2E;
 
-public sealed class GmailWatchWebhookFacts
+[Collection(GmailHostCollection.Name)]
+public sealed class GmailWatchWebhookFacts(GmailHostFixture host)
 {
     [Fact]
     public async Task GmailWatchHttpPublishesMailReceived()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.Create().WithModule<GmailModule>()
-            .StartAsync(ct);
+        await using var brain = await host.LeaseAsync(ct);
         var gmail = brain.Get<IGmail>("user@gmail.com");
         await using var mail = await brain.Observe<MailReceived>(gmail, ct);
         var data = Convert.ToBase64String(Encoding.UTF8.GetBytes(

@@ -6,7 +6,8 @@ using IntoChat.Tests.E2E.Diagnostics;
 namespace IntoChat.Tests.E2E.Security;
 
 // A secret must not appear in HTTP responses, traces, or logs. SecretsFacts inspects persisted state.
-public sealed class CanarySecretFacts
+[Collection(IntoChatHostCollection.Name)]
+public sealed class CanarySecretFacts(IntoChatHostFixture host)
 {
     private const string Owner = "owner";
     private const string Canary = "canary-secret-7f3a91";
@@ -15,7 +16,7 @@ public sealed class CanarySecretFacts
     public async Task AnotherOwnersSecretIsForbiddenWhateverThePathSays()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.Create().StartAsync(ct);
+        await using var brain = await host.LeaseAsync(ct);
 
         using var write = await brain.HttpClient.PostAsJsonAsync(
             "/secrets/someone-else",
@@ -141,7 +142,7 @@ public sealed class CanarySecretFacts
     public async Task CSharpConsoleIsGatedByServerDeveloperMode()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var on = await IntoChatE2ETest.Create().StartAsync(ct);
+        await using var on = await host.LeaseAsync(ct);
 
         var capabilities = await on.HttpClient.GetFromJsonAsync<JsonElement>("/session/capabilities", ct);
         Assert.True(capabilities.GetProperty("developerMode").GetBoolean());

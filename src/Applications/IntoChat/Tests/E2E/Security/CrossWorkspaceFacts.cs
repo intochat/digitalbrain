@@ -7,7 +7,8 @@ using DigitalBrain.Identity;
 
 namespace IntoChat.Tests.E2E.Security;
 
-public sealed class CrossWorkspaceFacts
+[Collection(IntoChatHostCollection.Name)]
+public sealed class CrossWorkspaceFacts(IntoChatHostFixture host)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -32,19 +33,20 @@ public sealed class CrossWorkspaceFacts
     public async Task ASignedInPrincipalCannotReachAnotherPrincipalsWorkspace()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.StartAsync(ct);
+        await using var brain = await host.LeaseAsync(ct);
+        var suffix = Guid.NewGuid().ToString("N")[..8];
 
         using var alice = CookieClient(brain.HttpClient);
         using var bob = CookieClient(brain.HttpClient);
 
         using var aliceLogin = await alice.PostAsJsonAsync(
             "/identity/register",
-            new { principalId = "alice", displayName = "Alice", password = "alice-password-123" }, ct);
+            new { principalId = "alice-" + suffix, displayName = "Alice", password = "alice-password-123" }, ct);
         Assert.Equal(HttpStatusCode.OK, aliceLogin.StatusCode);
 
         using var bobLogin = await bob.PostAsJsonAsync(
             "/identity/register",
-            new { principalId = "bob", displayName = "Bob", password = "bob-password-123" }, ct);
+            new { principalId = "bob-" + suffix, displayName = "Bob", password = "bob-password-123" }, ct);
         Assert.Equal(HttpStatusCode.OK, bobLogin.StatusCode);
 
         var aliceMember = await aliceLogin.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(Json, ct);

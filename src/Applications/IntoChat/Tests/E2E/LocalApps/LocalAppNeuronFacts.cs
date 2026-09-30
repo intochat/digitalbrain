@@ -4,7 +4,8 @@ using DigitalBrain.Files;
 using DigitalBrain.Identity;
 namespace IntoChat.Tests.E2E.LocalApps;
 
-public sealed class LocalAppNeuronFacts
+[Collection(IntoChatHostCollection.Name)]
+public sealed class LocalAppNeuronFacts(IntoChatHostFixture host)
 {
     [Fact(Timeout = 180_000)]
     public async Task RealApplicationNeuronsShareDocumentStateAndKeepSavesBoundToTheirRevision()
@@ -14,7 +15,7 @@ public sealed class LocalAppNeuronFacts
         try
         {
             await File.WriteAllBytesAsync(Path.Combine(root, "image.png"), Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg=="), ct);
-            await using var brain = await IntoChatE2ETest.Create().StartAsync(ct);
+            await using var brain = await host.LeaseAsync(ct);
             var scope = BrainScope.Create("owner", "local-neurons").Id;
             await WorkspaceUploadFixture.Upload(brain.HttpClient, "local-neurons", Directory.GetFiles(root, "*.png"));
             var files = brain.Get<IFileExplorer>(scope);
