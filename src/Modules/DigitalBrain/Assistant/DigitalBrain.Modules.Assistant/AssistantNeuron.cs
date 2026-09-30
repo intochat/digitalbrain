@@ -62,7 +62,7 @@ internal sealed partial class AssistantNeuron(
     : Neuron<AssistantState>(store), IAssistant
 {
     private string Key => this.GetPrimaryKeyString();
-    private ITextField Draft => GrainFactory.GetGrain<ITextField>(UiComposer.NameOf(Key, AssistantSurface.DraftPart));
+    private ITextField Draft => GrainFactory.GetGrain<ITextField>(UiParts.NameOf(Key, AssistantSurface.DraftPart));
     public Task<AssistantState> Read() => Task.FromResult(Snapshot);
     // An assistant started for a workspace is keyed "{workspace}/applications/assistant".
     private string Workspace => Key.Split("/applications/")[0];

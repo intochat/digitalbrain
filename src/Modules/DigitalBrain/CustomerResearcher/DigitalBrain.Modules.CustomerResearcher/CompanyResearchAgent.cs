@@ -2,7 +2,7 @@ using System.Text.Json;
 using DigitalBrain.Microsoft.Playwright;
 using Microsoft.Extensions.AI;
 
-namespace DigitalBrain.Apps.CustomerResearcher;
+namespace DigitalBrain.CustomerResearcher;
 
 public sealed record ResearchResult(CompanyResearch? Company, string Status);
 public interface ICompanyResearchAgent

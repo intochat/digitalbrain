@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using NpgsqlTypes;
 
-namespace DigitalBrain.Apps.CustomerResearcher;
+namespace DigitalBrain.CustomerResearcher;
 
 public sealed record ResearchEvidence(string Field, string Value, string Url, string Quote);
 public sealed record CompanyResearch(string CompanyName, string? Website, string? Location, string? Email,

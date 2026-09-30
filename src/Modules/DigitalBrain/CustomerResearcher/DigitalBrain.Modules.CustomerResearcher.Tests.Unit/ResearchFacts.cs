@@ -7,7 +7,7 @@ using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Apps.CustomerResearcher.Tests.Unit;
+namespace DigitalBrain.CustomerResearcher.Tests.Unit;
 
 public sealed class ResearchFacts
 {
@@ -91,7 +91,7 @@ public sealed class ResearchFacts
         control.Block = null;
         if (disconnect)
         {
-            await app.HandleUiEvent(new BrowserDisconnected(CustomerResearcherApp.Key("workspace-a") + "/window/browser", new string('a', 32)));
+            await app.HandleUiEvent(new BrowserDisconnected(CustomerResearcherSurface.Key("workspace-a") + "/window/browser", new string('a', 32)));
             await Until(async () => await Status(brain, "workspace-a") == "Browser disconnected");
         }
         else
@@ -106,7 +106,7 @@ public sealed class ResearchFacts
         Assert.Equal(disconnect ? 0 : 1, control.Saves.Count);
     }
 
-    private static Task<UnitBrain> Start(Control control) => UnitTest.Create().WithApp<CustomerResearcherApp>()
+    private static Task<UnitBrain> Start(Control control) => UnitTest.Create().WithModule<CustomerResearcherModule>().RequireModules([typeof(DigitalBrain.Apps.AppsModule), typeof(DigitalBrain.AI.AIModule), typeof(DigitalBrain.Flutter.FlutterModule), typeof(DigitalBrain.Microsoft.Playwright.PlaywrightModule), typeof(DigitalBrain.Postgres.PostgresModule)])
         .ConfigureSilo(silo => {
             silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=test;Username=test";
             silo.Services.AddSingleton<ICompanyResearchAgent>(control).AddSingleton<ICompanyResearchStore>(control)
@@ -115,14 +115,14 @@ public sealed class ResearchFacts
         }).StartAsync(TestContext.Current.CancellationToken);
     private static async Task<ICustomerResearcher> Connect(UnitBrain brain, string workspace)
     {
-        var key = CustomerResearcherApp.Key(workspace) + "/window";
+        var key = CustomerResearcherSurface.Key(workspace) + "/window";
         var app = brain.Get<ICustomerResearcher>(key);
         await app.HandleUiEvent(new BrowserConnected(key + "/browser", 12345, new string('a', 32)));
         await Until(async () => await Status(brain, workspace) == "Ready");
         return app;
     }
     private static async Task<string> Status(UnitBrain brain, string workspace) =>
-        (await brain.Get<IText>(CustomerResearcherApp.Key(workspace) + "/window/status").Read()).Markdown;
+        (await brain.Get<IText>(CustomerResearcherSurface.Key(workspace) + "/window/status").Read()).Markdown;
     private static async Task Until(Func<Task<bool>> predicate)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));

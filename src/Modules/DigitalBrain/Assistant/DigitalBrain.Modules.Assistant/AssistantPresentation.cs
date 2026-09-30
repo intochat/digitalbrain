@@ -104,7 +104,7 @@ internal sealed partial class AssistantNeuron
         var key = AssistantSurface.Key(Workspace) + "/" + id;
         await GrainFactory.GetGrain<IAssistant>(key).Activate();
         if (draft is not null) { await GrainFactory.GetGrain<IAssistant>(key).SetDraft(draft); }
-        var surface = new UiChildRef(UIVocabulary.SurfaceType, UiComposer.NameOf(key, "surface"));
+        var surface = new UiChildRef(UIVocabulary.SurfaceType, UiParts.NameOf(key, "surface"));
         await GrainFactory.GetGrain<IWorkspace>(Workspace).EnsureOpenAsync(id, title, WindowReference.For(surface), CancellationToken.None);
         return new(id, title, surface);
     }

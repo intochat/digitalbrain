@@ -2,7 +2,7 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Microsoft.Playwright;
 using Microsoft.Extensions.AI;
 
-namespace DigitalBrain.Apps.CustomerResearcher.Tests.Unit;
+namespace DigitalBrain.CustomerResearcher.Tests.Unit;
 
 public sealed class ResearchWorkflowFacts
 {

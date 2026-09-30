@@ -34,7 +34,6 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Events.OnRedirectToAccessDenied = context => { context.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; };
     });
 builder.AddDurableProtection();
-builder.Services.AddApplications();
 
 var app = builder.Build();
 

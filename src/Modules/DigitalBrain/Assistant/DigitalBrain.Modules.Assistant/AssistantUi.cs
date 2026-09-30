@@ -103,7 +103,7 @@ internal sealed partial class AssistantNeuron
         finally { _presentation.Release(); }
     }
 
-    private string Name(string part) => UiComposer.NameOf(Key, part);
+    private string Name(string part) => UiParts.NameOf(Key, part);
 
     private Task Choices(string part, string label, SelectOption[] options, string selected) =>
         Publish(part, new { options, selected }, () => GrainFactory.GetGrain<ISelect>(Name(part)).Set(label, options, selected));

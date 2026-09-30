@@ -47,7 +47,7 @@ internal sealed partial class AssistantStreamSteps
         {
             var ui = await StartUi(context);
             await ui.Input("Review this");
-            await context.Grains.GetGrain<IFileInput>(UiComposer.NameOf(context.Subject, AssistantSurface.AttachPart))
+            await context.Grains.GetGrain<IFileInput>(UiParts.NameOf(context.Subject, AssistantSurface.AttachPart))
                 .Capture("notes.txt", "A useful note");
             var state = await ui.Until(thread => thread.Draft.Contains("A useful note", StringComparison.Ordinal), context.CancellationToken);
             Assert.Contains("Review this", state.Draft);

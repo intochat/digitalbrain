@@ -14,9 +14,9 @@ namespace DigitalBrain.Assistant.Tests.Unit;
 internal sealed class AssistantUiProbe(IGrainFactory grains, string key)
 {
     public IAssistant App => grains.GetGrain<IAssistant>(key);
-    public ITextField Draft => grains.GetGrain<ITextField>(UiComposer.NameOf(key, AssistantSurface.DraftPart));
-    public IButton Button(string part) => grains.GetGrain<IButton>(UiComposer.NameOf(key, part));
-    public ISelect Select(string part) => grains.GetGrain<ISelect>(UiComposer.NameOf(key, part));
+    public ITextField Draft => grains.GetGrain<ITextField>(UiParts.NameOf(key, AssistantSurface.DraftPart));
+    public IButton Button(string part) => grains.GetGrain<IButton>(UiParts.NameOf(key, part));
+    public ISelect Select(string part) => grains.GetGrain<ISelect>(UiParts.NameOf(key, part));
 
     public async Task<AssistantThread> Read()
     {
@@ -75,7 +75,7 @@ internal sealed class AssistantUiProbe(IGrainFactory grains, string key)
             };
             foreach (var child in children) { await Visit(child); }
         }
-        await Visit(new("surface", UiComposer.NameOf(key, "surface")));
+        await Visit(new("surface", UiParts.NameOf(key, "surface")));
         return nodes;
     }
 
@@ -92,10 +92,10 @@ internal sealed class AssistantUiProbe(IGrainFactory grains, string key)
             (AssistantSurface.StatusPart, "text"), (AssistantSurface.MessagesPart, "layout"),
             (AssistantSurface.ResultsPart, "layout"), (AssistantSurface.ReceiptsPart, "layout"),
         })
-        { Assert.Contains(tree, node => node.Kind == kind && node.Name == UiComposer.NameOf(key, part)); }
+        { Assert.Contains(tree, node => node.Kind == kind && node.Name == UiParts.NameOf(key, part)); }
         var draft = await Draft.Read();
         Assert.Equal("multiline", draft.Kind);
-        Assert.Equal(UiComposer.NameOf(key, AssistantSurface.SendPart), draft.SubmitButton);
+        Assert.Equal(UiParts.NameOf(key, AssistantSurface.SendPart), draft.SubmitButton);
     }
 
     public async Task<string> VisibleText()

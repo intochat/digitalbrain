@@ -91,7 +91,7 @@ internal sealed class AssistantSteps : StepLibrary
             Ui(context).Submit(args.Text(0)));
         Step("I send the draft", "Clicks the bound send button.", context => Ui(context).Submit());
         Step("I say {string} by voice", "Records audio that the transcriber hears as this text.", (context, args) =>
-            context.Grains.GetGrain<IVoiceInput>(UiComposer.NameOf(context.Subject, AssistantSurface.VoicePart))
+            context.Grains.GetGrain<IVoiceInput>(UiParts.NameOf(context.Subject, AssistantSurface.VoicePart))
                 .Capture(RecordedText(args.Text(0)), "audio/wav"));
         Step("the chat shows my message {string}", "The chat shows this message from the user.", (context, args) =>
             Shows(context, ChatRole.User, args.Text(0)));
@@ -134,7 +134,7 @@ internal sealed class AssistantSteps : StepLibrary
 
     private static IAssistant Assistant(StepContext context) => context.Grains.GetGrain<IAssistant>(context.Subject);
 
-    private static ISurface Surface(StepContext context) => context.Grains.GetGrain<ISurface>(UiComposer.NameOf(context.Subject, "surface"));
+    private static ISurface Surface(StepContext context) => context.Grains.GetGrain<ISurface>(UiParts.NameOf(context.Subject, "surface"));
 
     private static AssistantUiProbe Ui(StepContext context) => new(context.Grains, context.Subject);
 

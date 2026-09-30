@@ -31,7 +31,7 @@ public static class AssistantSurface
 
     public static async Task Compose(IGrainFactory grains, string key)
     {
-        string Name(string part) => UiComposer.NameOf(key, part);
+        string Name(string part) => UiParts.NameOf(key, part);
         UiChildRef Ref(string kind, string part) => new(kind, Name(part));
         Task Bind(string part) => grains.GetGrain<IUiBinding>(Name(part)).Bind(grains.GetGrain<IAssistant>(key));
         async Task Layout(string part, string mode, UiChildRef[] children, double[]? extents = null, bool followEnd = false)

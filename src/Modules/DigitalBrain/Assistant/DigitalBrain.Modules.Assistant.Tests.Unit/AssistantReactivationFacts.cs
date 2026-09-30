@@ -37,8 +37,8 @@ public sealed class AssistantReactivationFacts
         var thread = (await ui.Read()).Id;
         var input = ui.Draft;
         var send = ui.Button(AssistantSurface.SendPart);
-        var inputBinding = brain.Get<IUiBinding>(UiComposer.NameOf(key, AssistantSurface.DraftPart));
-        var sendBinding = brain.Get<IUiBinding>(UiComposer.NameOf(key, AssistantSurface.SendPart));
+        var inputBinding = brain.Get<IUiBinding>(UiParts.NameOf(key, AssistantSurface.DraftPart));
+        var sendBinding = brain.Get<IUiBinding>(UiParts.NameOf(key, AssistantSurface.SendPart));
         await brain.DeactivateAsync(app, ct);
         await brain.DeactivateAsync(input, ct);
         await brain.DeactivateAsync(send, ct);

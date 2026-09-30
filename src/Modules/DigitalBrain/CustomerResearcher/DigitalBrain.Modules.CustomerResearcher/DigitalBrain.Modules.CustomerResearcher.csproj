@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Live company research: a driven browser, an agent and a Postgres store behind one surface.</Description>
+    <RootNamespace>DigitalBrain.CustomerResearcher</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup><PackageReference Include="Microsoft.Orleans.Sdk" /></ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Apps/DigitalBrain.Modules.Apps/DigitalBrain.Modules.Apps.csproj" />
+    <ProjectReference Include="../../../AI/DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj" />
+    <ProjectReference Include="../../../Google/Flutter/DigitalBrain.Modules.Flutter/DigitalBrain.Modules.Flutter.csproj" />
+    <ProjectReference Include="../../../Microsoft/Playwright/DigitalBrain.Modules.Microsoft.Playwright/DigitalBrain.Modules.Microsoft.Playwright.csproj" />
+    <ProjectReference Include="../../../Postgres/DigitalBrain.Modules.Postgres/DigitalBrain.Modules.Postgres.csproj" />
+  </ItemGroup>
+</Project>

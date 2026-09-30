@@ -14,7 +14,7 @@
     <ProjectReference Include="../../../Modules/DigitalBrain/Compute/DigitalBrain.Modules.Compute/DigitalBrain.Modules.Compute.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps/DigitalBrain.Modules.Apps.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Assistant/DigitalBrain.Modules.Assistant/DigitalBrain.Modules.Assistant.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/DigitalBrain/Assistant/DigitalBrain.Modules.Assistant/DigitalBrain.Modules.Assistant.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/CustomerResearcher/DigitalBrain.Modules.CustomerResearcher/DigitalBrain.Modules.CustomerResearcher.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Specs/DigitalBrain.Modules.Specs/DigitalBrain.Modules.Specs.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Registry/DigitalBrain.Modules.Registry/DigitalBrain.Modules.Registry.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Google/Gmail/DigitalBrain.Modules.Google.Gmail/DigitalBrain.Modules.Google.Gmail.csproj" IsAspireProjectResource="false" />

@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
-namespace DigitalBrain.Apps.CustomerResearcher;
+namespace DigitalBrain.CustomerResearcher;
 
 [Alias("apps.customer-researcher"), Orleans.Metadata.DefaultGrainType("apps.customer-researcher")]
 public interface ICustomerResearcher : INeuron, IUiEventHandler
@@ -41,15 +41,19 @@ internal sealed class CustomerResearcherNeuron(
     private bool _ready;
     private BrowserAttachment? _attachment;
     private long _generation;
-    public Task Activate() => Status("Waiting for browser…");
-    private Task Status(string text) => GrainFactory.GetGrain<IText>(UiComposer.NameOf(Key, "status")).Set(text);
+    public async Task Activate()
+    {
+        await CustomerResearcherSurface.Compose(GrainFactory, Key);
+        await Status("Waiting for browser…");
+    }
+    private Task Status(string text) => GrainFactory.GetGrain<IText>(UiParts.NameOf(Key, "status")).Set(text);
 
     public async Task<ResearchWindow> OpenWindow()
     {
         var id = Guid.NewGuid().ToString("N");
-        var key = CustomerResearcherApp.Key(Workspace) + "/" + id;
-        await services.GetRequiredService<ApplicationCatalog>().Start(AppDefinition.NameOf<CustomerResearcherApp>(), key);
-        var surface = new UiChildRef(UIVocabulary.SurfaceType, UiComposer.NameOf(key, "surface"));
+        var key = CustomerResearcherSurface.Key(Workspace) + "/" + id;
+        await GrainFactory.GetGrain<ICustomerResearcher>(key).Activate();
+        var surface = new UiChildRef(UIVocabulary.SurfaceType, UiParts.NameOf(key, "surface"));
         await GrainFactory.GetGrain<IWorkspace>(Workspace).EnsureOpenAsync(id, "Customer Researcher", WindowReference.For(surface), CancellationToken.None);
         return new(id, "Customer Researcher", surface);
     }
