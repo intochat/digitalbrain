@@ -80,7 +80,7 @@ public static class BrainScope   // replaces WorkspaceScope
 ### Enforcement applied once
 
 - Kernel truth: the existing `GrantCallFilterStage` / `ICallFilterStage` pipeline, unchanged.
-- HTTP edge: `MapDigitalBrainModules` maps modules inside a `/brains/{brainId}` route group that
+- HTTP edge: each module maps its routes through `BrainRoutes.Group` (one shared definition in the kernel), a `/brains/{brainId}` route group that
   carries the membership filter (today's `WorkspaceAccessFilter.EnforceAsync`, renamed
   `BrainAccessFilter`) **once**. The ~30 per-endpoint `AddEndpointFilter` calls are deleted.
 - `BrainAccessFilter.Decide` survives for the one body-carried case (`POST /agent`).

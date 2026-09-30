@@ -14,8 +14,7 @@ public static class BrainAccessFilter
     {
         ArgumentNullException.ThrowIfNull(context);
         var http = context.HttpContext;
-        var brainId = http.Request.RouteValues["brain"] as string
-            ?? http.Request.RouteValues["brainId"] as string;
+        var brainId = http.Request.RouteValues["brainId"] as string;
         if (string.IsNullOrWhiteSpace(brainId)) { return await next(context); }
 
         return await Decide(http, brainId) is { } denied ? denied : await next(context);

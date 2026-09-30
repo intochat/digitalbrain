@@ -77,7 +77,7 @@ until its verification is green. A csharp app's programs are its `Source` plus e
 
 ## Sharing from the C# console
 
-IntoChat's `POST /workspaces/{workspaceId}/csharp/{id}/share` commits the file's current source to `{you}/{name}` and publishes it. The package's title and description come from the file's name and purpose, and the request may declare account slots. Settings are never shared. Sharing unchanged code again publishes the same revision.
+IntoChat's `POST /brains/{brainId}/csharp/{id}/share` commits the file's current source to `{you}/{name}` and publishes it. The package's title and description come from the file's name and purpose, and the request may declare account slots. Settings are never shared. Sharing unchanged code again publishes the same revision.
 
 ## Trust
 
