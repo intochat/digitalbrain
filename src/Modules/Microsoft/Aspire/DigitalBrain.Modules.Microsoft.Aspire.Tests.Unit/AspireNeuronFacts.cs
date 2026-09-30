@@ -7,6 +7,7 @@ namespace DigitalBrain.Modules.Microsoft.Aspire.Tests.Unit;
 public sealed class AspireNeuronFacts
 {
     private const string Application = "DigitalBrain";
+    private const string StampedPublisher = "microsoft.aspire/" + Application;
 
     [Fact]
     public async Task EveryReportedStateChangeIsSignalledOnceAndListed()
@@ -21,8 +22,8 @@ public sealed class AspireNeuronFacts
         await reporter.Report(new("csharp-sandbox", "Container", "Starting", null, []));
         await reporter.Report(new("csharp-sandbox", "Container", "Running", "Healthy", ["http://localhost:5000"]));
 
-        Assert.Equal(new ResourceStateChanged("csharp-sandbox", "Starting", null, null), await changes.NextAsync(ct: ct));
-        Assert.Equal(new ResourceStateChanged("csharp-sandbox", "Running", "Healthy", "Starting"), await changes.NextAsync(ct: ct));
+        Assert.Equal(new ResourceStateChanged("csharp-sandbox", "Starting", null, null) { Publisher = StampedPublisher }, await changes.NextAsync(ct: ct));
+        Assert.Equal(new ResourceStateChanged("csharp-sandbox", "Running", "Healthy", "Starting") { Publisher = StampedPublisher }, await changes.NextAsync(ct: ct));
         var sandbox = Assert.Single(await aspire.ListResources(ct));
         Assert.Equal("http://localhost:5000", Assert.Single(sandbox.Urls));
     }
