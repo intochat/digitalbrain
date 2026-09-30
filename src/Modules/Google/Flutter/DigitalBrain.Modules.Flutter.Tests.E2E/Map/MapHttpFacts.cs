@@ -16,7 +16,7 @@ public sealed class MapHttpFacts
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
         await brain.Get<IMap>(UiScope.Key("workspace-a", "hq")).Set(47.6, -122.3, 10, []);
-        var state = await brain.HttpClient.GetFromJsonAsync<MapState>("/workspaces/workspace-a/ui/maps/hq", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+        var state = await brain.HttpClient.GetFromJsonAsync<MapState>("/brains/workspace-a/ui/maps/hq", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.Equal(10, state!.Zoom);
     }
 }

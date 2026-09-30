@@ -16,7 +16,7 @@ public sealed class CalendarHttpFacts
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
         await brain.Get<ICalendar>(UiScope.Key("workspace-a", "cal")).Set("day", ["2026-09-20"]);
-        var state = await brain.HttpClient.GetFromJsonAsync<CalendarState>("/workspaces/workspace-a/ui/calendars/cal", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+        var state = await brain.HttpClient.GetFromJsonAsync<CalendarState>("/brains/workspace-a/ui/calendars/cal", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.Equal("day", state!.Mode);
     }
 }

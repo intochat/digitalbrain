@@ -22,17 +22,17 @@ public sealed class ExpanderHttpFacts
         var expander = brain.Get<IExpander>(UiScope.Key("workspace-a", "more"));
         await using var changed = await brain.Observe<ExpanderChanged>(expander, ct);
 
-        using var collapsed = await brain.HttpClient.PostAsJsonAsync("/workspaces/workspace-a/ui/expanders/more",
+        using var collapsed = await brain.HttpClient.PostAsJsonAsync("/brains/workspace-a/ui/expanders/more",
             new { header = "More", expanded = false, children = Array.Empty<object>() }, ct);
         Assert.Equal(HttpStatusCode.Accepted, collapsed.StatusCode);
         Assert.False((await changed.NextAsync(ct: ct)).Expanded);
         Assert.False((await expander.Read()).Expanded);
-        Assert.False((await brain.HttpClient.GetFromJsonAsync<ExpanderState>("/workspaces/workspace-a/ui/expanders/more", Json, ct))!.Expanded);
+        Assert.False((await brain.HttpClient.GetFromJsonAsync<ExpanderState>("/brains/workspace-a/ui/expanders/more", Json, ct))!.Expanded);
 
-        using var toggle = await brain.HttpClient.PostAsync("/workspaces/workspace-a/ui/expanders/more/toggle", null, ct);
+        using var toggle = await brain.HttpClient.PostAsync("/brains/workspace-a/ui/expanders/more/toggle", null, ct);
         Assert.Equal(HttpStatusCode.Accepted, toggle.StatusCode);
         Assert.True((await changed.NextAsync(ct: ct)).Expanded);
         Assert.True((await expander.Read()).Expanded);
-        Assert.True((await brain.HttpClient.GetFromJsonAsync<ExpanderState>("/workspaces/workspace-a/ui/expanders/more", Json, ct))!.Expanded);
+        Assert.True((await brain.HttpClient.GetFromJsonAsync<ExpanderState>("/brains/workspace-a/ui/expanders/more", Json, ct))!.Expanded);
     }
 }

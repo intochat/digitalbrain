@@ -18,7 +18,7 @@ public sealed class TabsHttpFacts
         await brain.Get<ITabs>(UiScope.Key("workspace-a", "pages")).Set(
             [new TabItem("a", "A", new UiChildRef("text", "about"))],
             "a");
-        var state = await brain.HttpClient.GetFromJsonAsync<TabsState>("/workspaces/workspace-a/ui/tabs/pages", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+        var state = await brain.HttpClient.GetFromJsonAsync<TabsState>("/brains/workspace-a/ui/tabs/pages", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.Equal("a", state!.SelectedId);
     }
 }

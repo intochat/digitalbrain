@@ -24,7 +24,7 @@ public sealed class FormHttpFacts
         ]));
         await form.Submit(new([new("name", "Ada"), new("birthDate", "1815-12-10")], defined.Revision));
 
-        var state = await brain.HttpClient.GetFromJsonAsync<FormState>("/workspaces/workspace-a/ui/forms/intake",
+        var state = await brain.HttpClient.GetFromJsonAsync<FormState>("/brains/workspace-a/ui/forms/intake",
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
 
         Assert.NotNull(state);

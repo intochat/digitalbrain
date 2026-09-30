@@ -16,7 +16,7 @@ public sealed class InfoBarHttpFacts
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
         await brain.Get<IInfoBar>(UiScope.Key("workspace-a", "warn")).Show("warning", "Heads up", "disk");
-        var state = await brain.HttpClient.GetFromJsonAsync<InfoBarState>("/workspaces/workspace-a/ui/infobars/warn", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+        var state = await brain.HttpClient.GetFromJsonAsync<InfoBarState>("/brains/workspace-a/ui/infobars/warn", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.True(state!.Visible);
     }
 }

@@ -16,7 +16,7 @@ public sealed class TreeHttpFacts
         await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
         await brain.Get<ITree>(UiScope.Key("workspace-a", "fs")).Set([new TreeNode("root", null, "root")]);
-        var state = await brain.HttpClient.GetFromJsonAsync<TreeState>("/workspaces/workspace-a/ui/trees/fs", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
+        var state = await brain.HttpClient.GetFromJsonAsync<TreeState>("/brains/workspace-a/ui/trees/fs", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);
         Assert.Equal("root", state!.SelectedId);
     }
 }

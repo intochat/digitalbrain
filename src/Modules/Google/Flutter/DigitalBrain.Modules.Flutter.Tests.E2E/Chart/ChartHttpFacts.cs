@@ -21,11 +21,11 @@ public sealed class ChartHttpFacts
             .StartAsync(ct);
         var chart = brain.Get<IChart>(UiScope.Key("workspace-a", "btc"));
         await using var frames = await brain.Observe<ChartChanged>(chart, ct);
-        using var render = await brain.HttpClient.PostAsJsonAsync("/workspaces/workspace-a/ui/charts/btc/render",
+        using var render = await brain.HttpClient.PostAsJsonAsync("/brains/workspace-a/ui/charts/btc/render",
             new { title = "BTC", kind = "line", points = new[] { new { eventId = "t0", label = "open", value = 64000 } } }, ct);
         Assert.Equal(HttpStatusCode.Accepted, render.StatusCode);
         Assert.Equal("BTC", (await frames.NextAsync(ct: ct)).Title);
-        var http = await brain.HttpClient.GetFromJsonAsync<ChartState>("/workspaces/workspace-a/ui/charts/btc", Json, ct);
+        var http = await brain.HttpClient.GetFromJsonAsync<ChartState>("/brains/workspace-a/ui/charts/btc", Json, ct);
         Assert.Equal("line", http!.Kind);
         Assert.Equal(64000, http.Points[0].Value);
         Assert.Equal("BTC", (await chart.Read()).Title);

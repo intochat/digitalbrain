@@ -18,11 +18,11 @@ public sealed class TextFieldHttpFacts
         var field = brain.Get<ITextField>(UiScope.Key("workspace-a", "name"));
         await field.Configure("Name", "secret");
 
-        using var set = await brain.HttpClient.PostAsJsonAsync("/workspaces/workspace-a/ui/textfields/name/value", new { value = "Ada" }, ct);
+        using var set = await brain.HttpClient.PostAsJsonAsync("/brains/workspace-a/ui/textfields/name/value", new { value = "Ada" }, ct);
         Assert.Equal(HttpStatusCode.Accepted, set.StatusCode);
         Assert.Equal("Ada", (await field.Read()).Value);
 
-        using var removed = await brain.HttpClient.GetAsync("/workspaces/workspace-a/ui/textfields/name", ct);
+        using var removed = await brain.HttpClient.GetAsync("/brains/workspace-a/ui/textfields/name", ct);
         Assert.Equal(HttpStatusCode.NotFound, removed.StatusCode);
         using var unscoped = await brain.HttpClient.GetAsync("/ui/textfields/name", ct);
         Assert.Equal(HttpStatusCode.NotFound, unscoped.StatusCode);
