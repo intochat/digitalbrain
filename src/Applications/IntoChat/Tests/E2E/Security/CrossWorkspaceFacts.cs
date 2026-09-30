@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Slider;
 using DigitalBrain.Identity;
@@ -16,17 +17,26 @@ public sealed class CrossWorkspaceFacts(IntoChatHostFixture host)
     public async Task SecondWorkspaceCannotReadTheFirstsValue()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.StartAsync(ct);
+        await using var brain = await host.LeaseAsync(ct);
+        var firstWorkspace = brain.WorkspaceId;
+        var secondWorkspace = "workspace-" + Guid.NewGuid().ToString("N");
+        var firstSlider = brain.Get<ISlider>(UiScope.Key(BrainScope.Create("owner", firstWorkspace).Id, "volume"));
+        var secondSlider = brain.Get<ISlider>(UiScope.Key(BrainScope.Create("owner", secondWorkspace).Id, "volume"));
+        await firstSlider.Configure(0, 10, 1);
+        await firstSlider.SetValue(7);
 
-        var slider = brain.Get<ISlider>(UiScope.Key("workspace-a", "volume"));
-        await slider.Configure(0, 10, 1);
-        await slider.SetValue(7);
+        var first = await brain.HttpClient.GetFromJsonAsync<SliderState>($"/brains/{firstWorkspace}/ui/sliders/volume", Json, ct);
+        Assert.Equal(7, first!.Value);
 
-        var owner = await brain.HttpClient.GetFromJsonAsync<SliderState>("/brains/workspace-a/ui/sliders/volume", Json, ct);
-        Assert.Equal(7, owner!.Value);
+        var second = await brain.HttpClient.GetFromJsonAsync<SliderState>($"/brains/{secondWorkspace}/ui/sliders/volume", Json, ct);
+        Assert.Equal(0, second!.Value);
 
-        var foreign = await brain.HttpClient.GetFromJsonAsync<SliderState>("/brains/workspace-b/ui/sliders/volume", Json, ct);
-        Assert.Equal(0, foreign!.Value);
+        await secondSlider.Configure(0, 10, 1);
+        await secondSlider.SetValue(3);
+        var secondAfterWrite = await brain.HttpClient.GetFromJsonAsync<SliderState>($"/brains/{secondWorkspace}/ui/sliders/volume", Json, ct);
+        var firstAfterSecondWrite = await brain.HttpClient.GetFromJsonAsync<SliderState>($"/brains/{firstWorkspace}/ui/sliders/volume", Json, ct);
+        Assert.Equal(3, secondAfterWrite!.Value);
+        Assert.Equal(7, firstAfterSecondWrite!.Value);
     }
 
     [Fact(Timeout = 180_000)]
