@@ -23,6 +23,9 @@ public sealed class AgentRouteFacts
         var routes = app.DataSources.SelectMany(source => source.Endpoints)
             .OfType<RouteEndpoint>().Select(endpoint => endpoint.RoutePattern.RawText!).ToArray();
 
+        var endpointKeys = app.DataSources.SelectMany(source => source.Endpoints).OfType<RouteEndpoint>()
+            .Select(endpoint => string.Join(",", endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? []) + " " + endpoint.RoutePattern.RawText).ToArray();
+        Assert.Equal(endpointKeys.Length, endpointKeys.Distinct().Count());
         Assert.Contains("/brains/{brainId}/conversations/{threadId}", routes);
         Assert.Contains("/brains/{brainId}/voice", routes);
         Assert.Contains("/brains/{brainId}/packages/{owner}/{name}/invocations", routes);
@@ -56,6 +59,14 @@ public sealed class AgentRouteFacts
         Assert.Equal(BrainScope.Create("alice", "research").Id, resolved.Scope!.Id);
         Assert.NotEqual(BrainScope.Create("alice", "personal").Id, resolved.Scope.Id);
     }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("a/b")]
+    [InlineData("a\b")]
+    public void AnAbsentOrInvalidBodyBrainIsRejectedByTheValidationTheHandlerUses(string? brainId)
+        => Assert.False(BrainScope.IsValidId(brainId));
 
     private static async Task<(BrainScope? Scope, IResult? Denied)> Resolve(IBrainAccess access, string principal, string bodyBrain, string stampedBrain = "personal")
     {

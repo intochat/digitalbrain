@@ -24,7 +24,5 @@ public sealed class AssistantModule : IModule
         AssistantEndpoints.Map(endpoints);
         AgentEndpoints.Map(endpoints);
         PackageEndpoints.Map(endpoints);
-        AgentEndpoints.Map(endpoints);
-        PackageEndpoints.Map(endpoints);
     }
 }

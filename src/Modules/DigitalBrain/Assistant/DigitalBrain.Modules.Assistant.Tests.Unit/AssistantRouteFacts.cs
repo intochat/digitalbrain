@@ -2,6 +2,7 @@ using DigitalBrain.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using DigitalBrain.Compute.Usage;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
 namespace DigitalBrain.Assistant.Tests;
@@ -21,6 +22,9 @@ public sealed class AssistantRouteFacts
         var routes = app.DataSources.SelectMany(source => source.Endpoints)
             .OfType<RouteEndpoint>().Select(endpoint => endpoint.RoutePattern.RawText!).ToArray();
 
+        var endpointKeys = app.DataSources.SelectMany(source => source.Endpoints).OfType<RouteEndpoint>()
+            .Select(endpoint => string.Join(",", endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? []) + " " + endpoint.RoutePattern.RawText).ToArray();
+        Assert.Equal(endpointKeys.Length, endpointKeys.Distinct().Count());
         Assert.Contains("/brains/{brainId}/compute/usage", routes);
         Assert.Contains("/brains/{brainId}/applications/assistant/open", routes);
         Assert.Contains("/brains/{brainId}/applications/assistant/start", routes);
