@@ -119,8 +119,8 @@ var execution = new TestExecutionOptions
 {
     PrivateConfiguration = new Dictionary<string, string?>
     {
-        ["DigitalBrain:Google:Gmail:OAuth:ClientId"] = "integration-client",
-        ["DigitalBrain:Google:Gmail:OAuth:ClientSecret"] = "integration-secret",
+        ["DigitalBrain:Integrations:gmail:ClientId"] = "integration-client",
+        ["DigitalBrain:Integrations:gmail:ClientSecret"] = "integration-secret",
     },
 };
 ```
