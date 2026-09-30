@@ -80,6 +80,9 @@ renderable palette v1 / UiPart; run-token tightening.
 
 ## Working in this repo
 
+- Layout: Kernel = the privileged ring of projects under `Modules/DigitalBrain/Kernel/`; Core
+  (`DigitalBrain.Core`) = the neuron runtime; Platform (phase 2) = the credential ring scripts can
+  never see.
 - Build/tests per project (never the `.slnx` — Windows handshake bug):
   `dotnet test src/<path-to-test-project>`. After changes: build, run the relevant unit suites,
   and smoke with `aspire run` from `src/Applications/IntoChat/AppHost` (all resources Healthy).

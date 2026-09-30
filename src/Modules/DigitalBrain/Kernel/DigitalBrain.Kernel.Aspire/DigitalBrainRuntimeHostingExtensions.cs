@@ -13,7 +13,7 @@ namespace DigitalBrain.Aspire;
 
 public static class DigitalBrainRuntimeHostingExtensions
 {
-    public static IHostApplicationBuilder AddDigitalBrain(this IHostApplicationBuilder builder)
+    public static IHostApplicationBuilder AddDigitalBrainRuntime(this IHostApplicationBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
 

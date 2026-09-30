@@ -12,7 +12,7 @@ foreach (var moduleTypeName in builder.Configuration.GetSection("DigitalBrain:Mo
 {
     _ = Type.GetType(moduleTypeName, throwOnError: true);
 }
-builder.AddDigitalBrain();
+builder.AddDigitalBrainRuntime();
 builder.Services.AddHealthChecks();
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
     .SetIsOriginAllowed(origin => Uri.TryCreate(origin, UriKind.Absolute, out var uri) && uri.IsLoopback)

@@ -15,7 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddIntoChatOptions();
 builder.AddServiceDefaults();
-builder.AddDigitalBrain();
+builder.AddDigitalBrainRuntime();
 builder.AddMarketplace();
 builder.AddKernelCors();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
