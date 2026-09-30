@@ -19,7 +19,6 @@ public abstract class AiModel
             ? Marker.Name[1..]
             : Marker.Name;
 
-    // Runs on the owner's machine: no per-token cost, no network.
     public bool IsLocal => Provider is AiProvider.Ollama or AiProvider.FoundryLocal;
 }
 

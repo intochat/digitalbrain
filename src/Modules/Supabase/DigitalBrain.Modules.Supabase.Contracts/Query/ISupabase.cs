@@ -6,7 +6,7 @@ namespace DigitalBrain.Supabase;
 [Alias("supabase")]
 public interface ISupabase : INeuron
 {
-    // Runs one read-only SELECT with server-side caps and returns typed rows.
+    // Server-side caps.
     [ReadOnly, Alias("query")]
     Task<SupabaseQueryResult> Query(SupabaseQuery query);
 

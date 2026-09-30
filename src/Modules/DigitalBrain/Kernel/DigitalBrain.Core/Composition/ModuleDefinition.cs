@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Routing;
 
 namespace DigitalBrain.Core;
 
-// An immutable, transportable selection of a production module and its public settings.
 public sealed class ModuleDefinition : IModule
 {
     public ModuleDefinition(Type moduleType, IReadOnlyDictionary<string, string?>? configuration = null,

@@ -12,7 +12,7 @@ public enum LlmCapabilities
 {
     None = 0,
 
-    // Can emit tool calls. Models without this are never shown tools.
+    // Models without this are never shown tools.
     Tools = 1,
 
     Vision = 1 << 1,

@@ -2,7 +2,6 @@ using DigitalBrain.Core;
 
 namespace DigitalBrain.Google.Gmail;
 
-// Public module settings. Credentials remain in the host's secret configuration.
 public sealed record GmailModuleOptions : IModuleOptions
 {
     public Uri TokenEndpoint { get; set; } = new("https://oauth2.googleapis.com/token");

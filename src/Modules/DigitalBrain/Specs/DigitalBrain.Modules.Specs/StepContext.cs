@@ -11,7 +11,6 @@ public sealed class StepContext(string subject, IGrainFactory grains, IServicePr
     public IServiceProvider Services { get; } = services;
     public CancellationToken CancellationToken { get; } = cancellationToken;
 
-    // What one step leaves for the next, for example the last answer a When step received.
     public void Remember<T>(string name, T value) where T : notnull => _items[name] = value;
 
     public bool TryRecall<T>(string name, out T value)

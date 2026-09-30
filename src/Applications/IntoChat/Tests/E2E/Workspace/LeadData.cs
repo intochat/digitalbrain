@@ -3,7 +3,6 @@ using Npgsql;
 
 namespace IntoChat.Tests.E2E.Workspace;
 
-// Scenario data in the application's own temporary database; owns no deployment.
 internal static class LeadData
 {
     public static async Task CreateWideCustomersAsync(E2EBrain brain, CancellationToken ct)

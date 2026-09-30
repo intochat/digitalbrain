@@ -14,7 +14,6 @@ internal sealed class StepBinder(IEnumerable<StepLibrary> libraries)
         {
             var match = definition.Matcher.Match(step.Text);
             if (!match.Success) { continue; }
-            // A quoted parameter is highlighted with its quotes.
             var parameters = match.Groups.Cast<Group>().Skip(1)
                 .Select((group, index) => definition.Kinds[index] == "string"
                     ? new StepParameter(group.Index - 1, group.Length + 2, "string")

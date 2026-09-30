@@ -1,6 +1,5 @@
 namespace DigitalBrain.Assistant;
 
-// Collected during a turn for the receipt card sent in the agent stream.
 public sealed class IntentActivity
 {
     private readonly Dictionary<string, AgentTouchedData> _touched = new(StringComparer.Ordinal);

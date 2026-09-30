@@ -13,7 +13,6 @@ using DigitalBrain.Supabase;
 
 namespace IntoChat.Tests.E2E;
 
-// Overrides for the real application graph. Scenarios own data and protocol fixtures.
 internal static class IntoChatE2ETest
 {
     // Port 1 is deliberately unserved: unused provider calls fail instead of reaching live services.
