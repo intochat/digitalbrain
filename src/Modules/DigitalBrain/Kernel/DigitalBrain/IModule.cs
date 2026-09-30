@@ -9,3 +9,13 @@ public interface IModule
 
     void Configure(IEndpointRouteBuilder endpoints) { }
 }
+
+public interface IModule<TOptions> : IModule where TOptions : class, IModuleOptions, new()
+{
+    static virtual Type? Hosting => null;
+}
+
+public interface IModuleOptions
+{
+    void Validate();
+}

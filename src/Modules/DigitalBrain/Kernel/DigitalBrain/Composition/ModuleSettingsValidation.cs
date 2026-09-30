@@ -6,6 +6,7 @@ public static class ModuleSettingsValidation
     {
         foreach (var key in modules.SelectMany(m => m.Configuration.Keys))
         {
+            if (ModuleOptionsSerialization.IsOptionsKey(key)) { continue; }
             if (string.IsNullOrWhiteSpace(key) || key.Contains("__", StringComparison.Ordinal)
                 || key.StartsWith("Orleans:", StringComparison.OrdinalIgnoreCase)
                 || key.StartsWith("ConnectionStrings:", StringComparison.OrdinalIgnoreCase)
