@@ -18,6 +18,12 @@ internal sealed class RebuildingChatClient(Func<IChatClient> create, Func<long> 
 
     public void Dispose() => _inner?.Dispose();
 
+    private void RetireInner()
+    {
+        DeferredDisposal.After(_inner);
+        _inner = null;
+    }
+
     private IChatClient Current()
     {
         lock (_gate)
@@ -25,8 +31,7 @@ internal sealed class RebuildingChatClient(Func<IChatClient> create, Func<long> 
             var now = generation();
             if (_inner is null || now != _builtAt)
             {
-                _inner?.Dispose();
-                _inner = null;
+                RetireInner();
                 _inner = create();
                 _builtAt = now;
             }
@@ -50,6 +55,12 @@ internal sealed class RebuildingEmbeddingGenerator(Func<IEmbeddingGenerator<stri
 
     public void Dispose() => _inner?.Dispose();
 
+    private void RetireInner()
+    {
+        DeferredDisposal.After(_inner);
+        _inner = null;
+    }
+
     private IEmbeddingGenerator<string, Embedding<float>> Current()
     {
         lock (_gate)
@@ -57,13 +68,27 @@ internal sealed class RebuildingEmbeddingGenerator(Func<IEmbeddingGenerator<stri
             var now = generation();
             if (_inner is null || now != _builtAt)
             {
-                _inner?.Dispose();
-                _inner = null;
+                RetireInner();
                 _inner = create();
                 _builtAt = now;
             }
 
             return _inner;
+        }
+    }
+}
+
+// A replaced client may still be serving an in-flight call or stream, and some own their HttpClient; it is
+// disposed after a grace longer than the provider request timeout instead of underneath that call.
+internal static class DeferredDisposal
+{
+    internal static readonly TimeSpan Grace = TimeSpan.FromMinutes(6);
+
+    internal static void After(IDisposable? retired)
+    {
+        if (retired is not null)
+        {
+            _ = Task.Delay(Grace).ContinueWith(_ => retired.Dispose(), TaskScheduler.Default);
         }
     }
 }

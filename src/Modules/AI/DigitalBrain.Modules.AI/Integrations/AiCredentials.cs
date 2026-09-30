@@ -30,7 +30,7 @@ internal interface IAiCredentials
 {
     RegistrationSnapshot StatusOf(string integrationId);
 
-    // Changes whenever the registration is re-read, so holders of a released key know to rebuild.
+    // Changes only when the registration actually changed (status, settings or a rotated secret), so holders of a released key know to rebuild.
     long GenerationOf(string integrationId);
 
     string ReleaseSecret(string integrationId, string field);
@@ -78,6 +78,12 @@ internal sealed class RegistrationCredentials(IGrainFactory grains, TimeProvider
         return released.Values[field];
     }
 
+    private static bool SameRegistration(RegistrationSnapshot before, RegistrationSnapshot after)
+        => before.Status == after.Status && before.Revision == after.Revision
+            && before.MissingFields.SequenceEqual(after.MissingFields, StringComparer.Ordinal)
+            && before.Settings.Count == after.Settings.Count
+            && before.Settings.All(pair => after.Settings.TryGetValue(pair.Key, out var value) && value == pair.Value);
+
     private IIntegrationRegistration Registration(string integrationId) => grains.GetGrain<IIntegrationRegistration>("integration/" + integrationId);
 
     public RegistrationSnapshot StatusOf(string integrationId)
@@ -99,7 +105,10 @@ internal sealed class RegistrationCredentials(IGrainFactory grains, TimeProvider
             snapshot = new RegistrationSnapshot { IntegrationId = integrationId, Status = RegistrationStatus.Unconfigured };
         }
 
-        _statuses[integrationId] = (snapshot, now, Interlocked.Increment(ref _generation));
+        var generation = _statuses.TryGetValue(integrationId, out var previous) && SameRegistration(previous.Snapshot, snapshot)
+            ? previous.Generation
+            : Interlocked.Increment(ref _generation);
+        _statuses[integrationId] = (snapshot, now, generation);
         return snapshot;
     }
 }

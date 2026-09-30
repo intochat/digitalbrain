@@ -68,7 +68,7 @@ public sealed class RegistrationFacts
         Assert.Equal(RegistrationStatus.Ready, signal.Status);
 
         Assert.Equal(
-            ["IntegrationId", "MissingFields", "Settings", "Status"],
+            ["IntegrationId", "MissingFields", "Revision", "Settings", "Status"],
             typeof(RegistrationSnapshot).GetProperties().Select(property => property.Name).Order().ToArray());
         Assert.DoesNotContain(Canary, JsonSerializer.Serialize(snapshot), StringComparison.Ordinal);
         Assert.DoesNotContain(Canary, JsonSerializer.Serialize(signal), StringComparison.Ordinal);

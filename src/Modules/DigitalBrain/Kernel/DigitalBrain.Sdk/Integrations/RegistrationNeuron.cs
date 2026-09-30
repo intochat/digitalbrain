@@ -74,6 +74,7 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
             }
         }
 
+        next.Revision++;
         var snapshot = SnapshotOf(next);
         await Save(next, new RegistrationChanged(Definition.Id, snapshot.Status));
         return snapshot;
@@ -96,6 +97,7 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
         next.References.Remove(field);
         next.Settings.Remove(field);
         await _grains.GetGrain<ISecrets>(IntegrationVault.Owner).Remove(PlatformCaller(), IntegrationVault.SecretName(Definition.Id, field));
+        next.Revision++;
         var snapshot = SnapshotOf(next);
         await Save(next, new RegistrationChanged(Definition.Id, snapshot.Status));
         return snapshot;
@@ -143,6 +145,7 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
     {
         References = new(state.References, StringComparer.Ordinal),
         Settings = new(state.Settings, StringComparer.Ordinal),
+        Revision = state.Revision,
     };
 
     private RegistrationSnapshot SnapshotOf(RegistrationState state)
@@ -151,7 +154,7 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
         var status = missing.Length == 0 ? RegistrationStatus.Ready
             : missing.Length == Definition.AllFields.Count ? RegistrationStatus.Unconfigured
             : RegistrationStatus.Partial;
-        return new RegistrationSnapshot { IntegrationId = Definition.Id, Status = status, MissingFields = missing, Settings = new(state.Settings, StringComparer.Ordinal) };
+        return new RegistrationSnapshot { IntegrationId = Definition.Id, Status = status, MissingFields = missing, Settings = new(state.Settings, StringComparer.Ordinal), Revision = state.Revision };
     }
 
     private IntegrationDefinition Resolve()

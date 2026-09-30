@@ -122,6 +122,30 @@ public sealed class CredentialFacts
     }
 
     [Fact]
+    public async Task RefreshesWithoutARegistrationChangeNeverInvalidateReleasedKeysButRotationDoes()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var clock = new SteppingTimeProvider();
+        await using var brain = await UnitTest.Create()
+            .WithRegistrations(AiRegistrationSeeds.OpenAI(Canary))
+            .WithModule<AIModule>()
+            .ConfigureSilo(silo => silo.Services.AddSingleton<TimeProvider>(clock)).StartAsync(ct);
+        var credentials = brain.SiloServices.GetRequiredService<IAiCredentials>();
+
+        var seeded = credentials.GenerationOf("openai");
+        clock.Advance(TimeSpan.FromSeconds(6));
+        var refreshed = credentials.GenerationOf("openai");
+        clock.Advance(TimeSpan.FromSeconds(6));
+        var refreshedAgain = credentials.GenerationOf("openai");
+        await brain.Get<IIntegrationRegistration>("integration/openai").Configure(new() { Values = { ["ApiKey"] = "canary-rotated-in-place" } });
+        clock.Advance(TimeSpan.FromSeconds(6));
+
+        Assert.Equal(seeded, refreshed);
+        Assert.Equal(seeded, refreshedAgain);
+        Assert.NotEqual(seeded, credentials.GenerationOf("openai"));
+    }
+
+    [Fact]
     public async Task AProviderRefusalNeverLeaksTheKeyIntoErrorsOrLogs()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -146,7 +170,7 @@ public sealed class CredentialFacts
 
         var refused = provider.ReplyOnce(ct);
         var failure = await Assert.ThrowsAnyAsync<Exception>(() => brain.Get<ILLM>("default").Generate(new([new("user", [new AiText("hi")])]), cancellationToken: ct));
-        await refused;
+        Assert.Equal("Bearer " + Canary, await refused);
         await registration.Clear("ApiKey");
         clock.Advance(TimeSpan.FromSeconds(6));
         var unavailable = await Assert.ThrowsAsync<ProviderUnavailableException>(() => brain.Get<IGpt56Sol>("cleared").Describe());
@@ -154,6 +178,7 @@ public sealed class CredentialFacts
         Assert.DoesNotContain(Canary, failure.ToString());
         Assert.DoesNotContain(Canary, unavailable.ToString());
         Assert.DoesNotContain(Canary, JsonSerializer.Serialize(new { unavailable.Integration, unavailable.Status, unavailable.Missing }));
+        Assert.NotEmpty(logs.Text);
         Assert.DoesNotContain(Canary, logs.Text);
     }
 

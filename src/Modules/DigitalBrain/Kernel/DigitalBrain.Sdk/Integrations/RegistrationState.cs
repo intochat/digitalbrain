@@ -10,6 +10,9 @@ internal sealed class RegistrationState
 
     // Non-secret setting values only; secret fields never appear here.
     [Id(1)] public Dictionary<string, string> Settings { get; set; } = new(StringComparer.Ordinal);
+
+    // Bumped by every write, so holders of a released secret can tell a rotation from no change.
+    [Id(2)] public long Revision { get; set; }
 }
 
 internal static class IntegrationVault

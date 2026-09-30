@@ -39,6 +39,7 @@ public sealed record RegistrationSnapshot
     [Id(1)] public RegistrationStatus Status { get; init; }
     [Id(2)] public string[] MissingFields { get; init; } = [];
     [Id(3)] public Dictionary<string, string> Settings { get; init; } = [];
+    [Id(4)] public long Revision { get; init; }
 }
 
 // Field name to value. The values go to the vault immediately, and the record never prints them.
