@@ -64,7 +64,7 @@ internal sealed class GmailNeuron(
     {
         PrincipalId = "gmail",
         AccountId = "gmail",
-        WorkspaceId = "gmail",
+        BrainId = "gmail",
         Kind = CallerKind.Platform,
         StampedBy = TrustedEdge.Platform,
         AppId = "gmail",

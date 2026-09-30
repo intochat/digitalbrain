@@ -65,7 +65,7 @@ internal static class ConnectorEndpoints
     {
         PrincipalId = owner,
         AccountId = owner,
-        WorkspaceId = owner,
+        BrainId = owner,
         Kind = CallerKind.User,
         StampedBy = TrustedEdge.AuthenticatedHttp,
     };

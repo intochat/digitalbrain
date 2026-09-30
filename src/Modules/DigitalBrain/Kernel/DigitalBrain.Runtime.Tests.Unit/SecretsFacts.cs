@@ -113,7 +113,7 @@ public sealed class SecretsFacts
     {
         PrincipalId = Owner,
         AccountId = Owner,
-        WorkspaceId = Owner,
+        BrainId = Owner,
         Kind = CallerKind.User,
         StampedBy = TrustedEdge.AuthenticatedHttp,
     };
@@ -122,7 +122,7 @@ public sealed class SecretsFacts
     {
         PrincipalId = "test-app",
         AccountId = Owner,
-        WorkspaceId = Owner,
+        BrainId = Owner,
         Kind = CallerKind.Platform,
         StampedBy = TrustedEdge.Platform,
         AppId = "test-app",

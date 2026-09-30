@@ -10,7 +10,7 @@ internal static class Caller
     {
         PrincipalId = principal,
         AccountId = "account-" + principal,
-        WorkspaceId = "workspace-" + principal,
+        BrainId = "workspace-" + principal,
         Kind = CallerKind.User,
         StampedBy = TrustedEdge.AuthenticatedHttp,
     });

@@ -1,28 +1,15 @@
-using DigitalBrain.Identity.Configuration;
-using System.Diagnostics.CodeAnalysis;
-using System.Security.Cryptography;
-using System.Text;
 using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Identity.Configuration;
 
 namespace DigitalBrain.Identity;
 
-public sealed record WorkspaceScope(string Id, string Owner, string WorkspaceId)
+// Temporary shim; deleted in Task 11.
+public static class WorkspaceScope
 {
-    public static WorkspaceScope Current(BasicAuthOptions auth, string workspaceId)
+    public static BrainScope Create(string owner, string name) => BrainScope.Create(owner, name);
+    public static bool IsValidId(string? value) => BrainScope.IsValidId(value);
+
+    public static BrainScope Current(BasicAuthOptions auth, string workspaceId)
         => Create(CallerContextStamper.TryGet(out var caller) ? caller.AccountId
             : auth.Username is { Length: > 0 } owner ? owner : AccountSession.DefaultLogin, workspaceId);
-
-    public static WorkspaceScope Create(string owner, string workspaceId)
-    {
-        if (!IsValidId(workspaceId))
-        { throw new ArgumentException("A workspace ID must contain 1–200 characters without path separators.", nameof(workspaceId)); }
-        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
-        var digest = SHA256.HashData(Encoding.UTF8.GetBytes(owner + "\0" + workspaceId));
-        return new("workspace-" + Convert.ToHexStringLower(digest), owner, workspaceId);
-    }
-
-    // Workspace, thread and run ids travel in routes and grain keys: 1-200 characters, no control
-    // characters and no path separators.
-    public static bool IsValidId([NotNullWhen(true)] string? value)
-        => !string.IsNullOrWhiteSpace(value) && value.Length <= 200 && !value.Any(c => char.IsControl(c) || c is '/' or '\\');
 }

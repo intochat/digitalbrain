@@ -39,7 +39,7 @@ public static class CallerContextStamper
     public static bool IsTrusted(CallerContext context) =>
         !string.IsNullOrWhiteSpace(context.PrincipalId)
         && !string.IsNullOrWhiteSpace(context.AccountId)
-        && !string.IsNullOrWhiteSpace(context.WorkspaceId)
+        && !string.IsNullOrWhiteSpace(context.BrainId)
         && Enum.IsDefined(context.Kind)
         && Enum.IsDefined(context.StampedBy)
         && IsEdgeAllowed(context.Kind, context.StampedBy);

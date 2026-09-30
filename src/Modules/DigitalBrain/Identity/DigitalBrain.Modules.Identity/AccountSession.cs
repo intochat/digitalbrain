@@ -136,7 +136,7 @@ public static class AccountSession
         {
             PrincipalId = principalId,
             AccountId = accountId,
-            WorkspaceId = workspaceId,
+            BrainId = workspaceId,
             Kind = CallerKind.User,
             StampedBy = TrustedEdge.AuthenticatedHttp,
         };

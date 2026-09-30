@@ -104,7 +104,7 @@ public sealed class EnforcementFacts
     {
         PrincipalId = "owner",
         AccountId = "account-1",
-        WorkspaceId = "default",
+        BrainId = "default",
         Kind = kind,
         StampedBy = edge,
     };

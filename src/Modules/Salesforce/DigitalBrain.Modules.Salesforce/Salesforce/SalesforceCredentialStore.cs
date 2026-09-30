@@ -78,7 +78,7 @@ internal sealed class SalesforceCredentialStore(
     {
         PrincipalId = "salesforce",
         AccountId = "salesforce",
-        WorkspaceId = "salesforce",
+        BrainId = "salesforce",
         Kind = CallerKind.Platform,
         StampedBy = TrustedEdge.Platform,
         AppId = "salesforce",

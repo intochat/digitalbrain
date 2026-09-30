@@ -18,8 +18,8 @@ public sealed class ConnectFlowFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<SecretsModule>().WithModule<ConnectorModule>().StartAsync(ct);
         var input = new ConnectRequest { Source = "gmail", ConnectionId = "mail", Value = "first" };
-        var first = await brain.Get<IConnectors>("workspace-one").Connect(input, UserCaller() with { WorkspaceId = "one" }, ct);
-        var second = await brain.Get<IConnectors>("workspace-two").Connect(input with { Value = "second" }, UserCaller() with { WorkspaceId = "two" }, ct);
+        var first = await brain.Get<IConnectors>("workspace-one").Connect(input, UserCaller() with { BrainId = "one" }, ct);
+        var second = await brain.Get<IConnectors>("workspace-two").Connect(input with { Value = "second" }, UserCaller() with { BrainId = "two" }, ct);
         Assert.NotEqual(first.Credential.Reference, second.Credential.Reference);
         var platform = UserCaller() with { Kind = CallerKind.Platform, StampedBy = TrustedEdge.Platform, AppId = "connections" };
         Assert.Equal("first", await brain.Get<ISecrets>(Owner).Resolve(platform, first.Credential, ct));
@@ -139,7 +139,7 @@ public sealed class ConnectFlowFacts
     {
         PrincipalId = Owner,
         AccountId = Owner,
-        WorkspaceId = Owner,
+        BrainId = Owner,
         Kind = CallerKind.User,
         StampedBy = TrustedEdge.AuthenticatedHttp,
     };

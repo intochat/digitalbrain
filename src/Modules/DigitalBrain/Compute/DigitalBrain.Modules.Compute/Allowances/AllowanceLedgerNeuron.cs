@@ -80,7 +80,7 @@ internal sealed class AllowanceLedgerNeuron : Neuron<AllowanceLedgerState>, IAll
                 ReservedCompute = request.EstimatedCompute,
                 OccurredAt = now,
                 IntentId = request.Caller.IntentId,
-                WorkspaceId = request.Caller.WorkspaceId,
+                WorkspaceId = request.Caller.BrainId,
                 AppId = request.Caller.AppId,
                 Operation = request.Operation,
             });
@@ -221,7 +221,7 @@ internal sealed class AllowanceLedgerNeuron : Neuron<AllowanceLedgerState>, IAll
         next.Pending.Add(new PendingApproval
         {
             ApprovalId = approvalId,
-            WorkspaceId = request.Caller.WorkspaceId,
+            WorkspaceId = request.Caller.BrainId,
             AppId = request.Caller.AppId,
             Operation = request.Operation,
             EstimatedCompute = request.EstimatedCompute,

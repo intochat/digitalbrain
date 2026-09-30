@@ -25,7 +25,7 @@ internal sealed class ShippedAppPublisher(IDigitalBrain brain, MarketplaceServic
         {
             PrincipalId = ShippedApps.Publisher,
             AccountId = ShippedApps.Publisher,
-            WorkspaceId = ShippedApps.Publisher,
+            BrainId = ShippedApps.Publisher,
             Kind = CallerKind.Platform,
             StampedBy = TrustedEdge.Platform,
         });

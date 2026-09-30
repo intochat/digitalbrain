@@ -105,7 +105,7 @@ internal static class WorkspaceConnectionsEndpoints
         var legacy = grains.GetGrain<IConnectors>(owner);
         return WorkspaceConnectionRecords.Combine(scope, owner, [], await legacy.List(ct)).Any(record => record.Id == id) ? legacy : current;
     }
-    private static CallerContext Caller(string workspaceId) => CallerContextStamper.Require() with { WorkspaceId = workspaceId };
+    private static CallerContext Caller(string workspaceId) => CallerContextStamper.Require() with { BrainId = workspaceId };
     private static object Project(ConnectorRecord record) => new { record.Id, record.Source, status = Status(record.Status), record.LastProbedAt };
     private static object ProjectSalesforce(SalesforceConnection record) => new
     {

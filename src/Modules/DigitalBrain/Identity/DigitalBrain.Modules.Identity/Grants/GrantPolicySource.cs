@@ -21,12 +21,12 @@ internal sealed class GrainGrantPolicySource(IGrainFactory grains) : IGrantPolic
             .FindMemberAsync(caller.PrincipalId, cancellationToken));
 
     public ValueTask<IReadOnlyList<Grant>> ListGrantsAsync(CallerContext caller, CancellationToken cancellationToken)
-        => new(grains.GetGrain<IGrantStore>(IdentityGrains.Grants(caller.WorkspaceId))
+        => new(grains.GetGrain<IGrantStore>(IdentityGrains.Grants(caller.BrainId))
             .ListAsync(cancellationToken));
 
     public async ValueTask ConsumeOnceAsync(CallerContext caller, IReadOnlyList<Grant> grants, CancellationToken cancellationToken)
     {
-        var store = grains.GetGrain<IGrantStore>(IdentityGrains.Grants(caller.WorkspaceId));
+        var store = grains.GetGrain<IGrantStore>(IdentityGrains.Grants(caller.BrainId));
         foreach (var grant in grants)
         {
             await store.RevokeAsync(grant.AppId, grant.SemanticTypeId, GrantMode.Once, cancellationToken).ConfigureAwait(false);

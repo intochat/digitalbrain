@@ -52,7 +52,7 @@ internal sealed class ConnectorsNeuron : Neuron<ConnectorsState>, IConnectors
         {
             Id = request.ConnectionId,
             Source = source,
-            WorkspaceId = caller.WorkspaceId,
+            WorkspaceId = caller.BrainId,
             Credential = credential,
             Status = ToStatus(result.Outcome),
             LastProbedAt = _time.GetUtcNow(),

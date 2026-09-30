@@ -12,7 +12,7 @@ public sealed class ScriptEdgeFacts
 {
     private static readonly CallerContext Alice = new()
     {
-        PrincipalId = "alice", AccountId = "account-a", WorkspaceId = "workspace-a",
+        PrincipalId = "alice", AccountId = "account-a", BrainId = "workspace-a",
         Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp,
     };
 

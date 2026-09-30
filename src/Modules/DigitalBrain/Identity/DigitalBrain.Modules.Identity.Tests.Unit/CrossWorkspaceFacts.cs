@@ -29,7 +29,7 @@ public sealed class CrossWorkspaceFacts
             {
                 PrincipalId = "owner",
                 AccountId = "account-1",
-                WorkspaceId = "workspace-a",
+                BrainId = "workspace-a",
                 Kind = CallerKind.User,
                 StampedBy = TrustedEdge.AuthenticatedHttp,
             },

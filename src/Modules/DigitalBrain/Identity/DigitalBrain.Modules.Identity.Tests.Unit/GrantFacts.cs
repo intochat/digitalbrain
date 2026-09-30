@@ -174,7 +174,7 @@ public sealed class GrantFacts
         {
             PrincipalId = "principal-1",
             AccountId = "account-1",
-            WorkspaceId = workspaceId,
+            BrainId = workspaceId,
             Kind = kind,
             StampedBy = kind == CallerKind.App ? TrustedEdge.AppProxy : TrustedEdge.AuthenticatedHttp,
             AppId = appId,

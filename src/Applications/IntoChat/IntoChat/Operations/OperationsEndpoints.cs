@@ -22,7 +22,7 @@ internal static class OperationsEndpoints
                 {
                     var scope = WorkspaceScope.Current(auth.Value, workspaceId);
                     var report = await brain.Get<IProblemReports>(scope.Id)
-                        .Add(scope.WorkspaceId, input.IntentId!, input.Message!.Trim()).WaitAsync(ct);
+                        .Add(scope.Name, input.IntentId!, input.Message!.Trim()).WaitAsync(ct);
                     return Results.Created($"/workspaces/{workspaceId}/reports", report);
                 }
                 catch (ArgumentException error) { return Results.BadRequest(new { error = error.Message }); }

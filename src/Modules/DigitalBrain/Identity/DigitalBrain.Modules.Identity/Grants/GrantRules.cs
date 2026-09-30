@@ -14,7 +14,7 @@ public static class GrantRules
         grants ??= [];
 
         var caller = request.Caller;
-        if (member is not null && !string.Equals(member.WorkspaceId, caller.WorkspaceId, StringComparison.Ordinal))
+        if (member is not null && !string.Equals(member.WorkspaceId, caller.BrainId, StringComparison.Ordinal))
         {
             return CallDecision.Deny(CallDenial.OutsideWorkspace, "The principal is not a member of this workspace.");
         }
@@ -55,7 +55,7 @@ public static class GrantRules
         [
             .. grants.Where(grant => !grant.Revoked
                 && grant.Mode == GrantMode.Once
-                && string.Equals(grant.WorkspaceId, caller.WorkspaceId, StringComparison.Ordinal)
+                && string.Equals(grant.WorkspaceId, caller.BrainId, StringComparison.Ordinal)
                 && string.Equals(grant.AppId, caller.AppId, StringComparison.Ordinal)
                 && request.SemanticTypeIds.Contains(grant.SemanticTypeId, StringComparer.Ordinal)),
         ];
@@ -63,7 +63,7 @@ public static class GrantRules
 
     private static bool IsGranted(CallerContext caller, string semanticTypeId, IReadOnlyList<Grant> grants)
         => grants.Any(grant => !grant.Revoked
-            && string.Equals(grant.WorkspaceId, caller.WorkspaceId, StringComparison.Ordinal)
+            && string.Equals(grant.WorkspaceId, caller.BrainId, StringComparison.Ordinal)
             && string.Equals(grant.AppId, caller.AppId, StringComparison.Ordinal)
             && string.Equals(grant.SemanticTypeId, semanticTypeId, StringComparison.Ordinal)
             && ModeSatisfied(grant, caller));
