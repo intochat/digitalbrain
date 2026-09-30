@@ -16,8 +16,8 @@ public sealed class LocalAppNeuronFacts(IntoChatHostFixture host)
         {
             await File.WriteAllBytesAsync(Path.Combine(root, "image.png"), Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4////fwAJ+wP9KobjigAAAABJRU5ErkJggg=="), ct);
             await using var brain = await host.LeaseAsync(ct);
-            var scope = BrainScope.Create("owner", "local-neurons").Id;
-            await WorkspaceUploadFixture.Upload(brain.HttpClient, "local-neurons", Directory.GetFiles(root, "*.png"));
+            var scope = BrainScope.Create("owner", brain.WorkspaceId).Id;
+            await WorkspaceUploadFixture.Upload(brain.HttpClient, brain.WorkspaceId, Directory.GetFiles(root, "*.png"));
             var files = brain.Get<IFileExplorer>(scope);
             var surface = await files.Navigate();
             Assert.Equal("surface", surface.Surface!.Kind);
@@ -41,7 +41,7 @@ public sealed class LocalAppNeuronFacts(IntoChatHostFixture host)
             Assert.Equal(2, saved.Revision);
             Assert.Equal(1, saved.LastSavedRevision);
             Assert.NotNull(save.Recipe.Crop);
-            Assert.Null((await brain.Get<IImageDocument>(BrainScope.Create("owner", "another").Id + "/images/" + opened.Id).Read()).Asset);
+            Assert.Null((await brain.Get<IImageDocument>(BrainScope.Create("owner", brain.WorkspaceId + "-another").Id + "/images/" + opened.Id).Read()).Asset);
         }
         finally { Directory.Delete(root, true); }
     }

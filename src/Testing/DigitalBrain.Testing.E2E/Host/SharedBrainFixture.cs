@@ -18,8 +18,16 @@ public abstract class SharedBrainFixture : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (!_host.IsValueCreated) { return; }
-        try { await (await _host.Value.ConfigureAwait(false)).DisposeAsync().ConfigureAwait(false); }
-        catch (InvalidOperationException) when (_host.Value.IsFaulted) { /* boot failure already surfaced to the facts */ }
+        try
+        {
+            if (_host.IsValueCreated)
+            {
+                try { await (await _host.Value.ConfigureAwait(false)).DisposeAsync().ConfigureAwait(false); }
+                catch when (_host.Value.IsFaulted) { /* boot failure already surfaced to the facts */ }
+            }
+        }
+        finally { await OnDisposedAsync().ConfigureAwait(false); }
     }
+
+    protected virtual ValueTask OnDisposedAsync() => ValueTask.CompletedTask;
 }

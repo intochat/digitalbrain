@@ -20,9 +20,8 @@ public sealed class GmailHostFixture : SharedBrainFixture
             .StartAsync(cancellationToken);
     }
 
-    public new async ValueTask DisposeAsync()
+    protected override async ValueTask OnDisposedAsync()
     {
-        await base.DisposeAsync();
         if (_tokenEndpoint.IsValueCreated) { await (await _tokenEndpoint.Value).DisposeAsync(); }
     }
 
