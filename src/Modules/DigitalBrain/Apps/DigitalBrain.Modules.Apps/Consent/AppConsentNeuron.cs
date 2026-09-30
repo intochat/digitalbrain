@@ -1,4 +1,3 @@
-using DigitalBrain.Apps.Manifests;
 using DigitalBrain.Apps.Signals;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
@@ -19,15 +18,15 @@ internal sealed class AppConsentNeuron(
     [PersistentState("app-consent", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<AppConsentState> store)
     : Neuron<AppConsentState>(store), IAppConsent
 {
-    public Task<AppConsentSheet> Review(string appId)
+    public async Task<AppConsentSheet> Review(string appId)
     {
-        var manifest = Manifest(appId);
-        return Task.FromResult(ConsentSheetBuilder.Build(manifest, Snapshot.Approved.ContainsKey(appId)));
+        var manifest = await Manifest(appId);
+        return ConsentSheetBuilder.Build(manifest, Snapshot.Approved.ContainsKey(appId));
     }
 
     public async Task<AppConsentSheet> Approve(string appId)
     {
-        var manifest = Manifest(appId);
+        var manifest = await Manifest(appId);
         if (!Snapshot.Approved.ContainsKey(appId))
         {
             var next = new AppConsentState
@@ -46,13 +45,12 @@ internal sealed class AppConsentNeuron(
 
     public Task<bool> IsApproved(string appId) => Task.FromResult(Snapshot.Approved.ContainsKey(appId));
 
-    private static AppManifest Manifest(string appId)
+    private async Task<AppManifest> Manifest(string appId)
     {
-        if (string.IsNullOrWhiteSpace(appId) || !FirstPartyApps.Contains(appId))
-        {
-            throw new KeyNotFoundException($"No first-party app '{appId}' is registered for consent.");
-        }
-
-        return FirstPartyApps.Get(appId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(appId);
+        var catalogued = await GrainFactory.GetGrain<IAppManifestDirectory>(AppManifestDirectoryGrains.Key).Read();
+        var entry = catalogued.FirstOrDefault(scoped => string.Equals(scoped.Manifest.Id, appId, StringComparison.Ordinal))
+            ?? throw new KeyNotFoundException($"No catalogued app '{appId}' is available for consent.");
+        return entry.Manifest;
     }
 }

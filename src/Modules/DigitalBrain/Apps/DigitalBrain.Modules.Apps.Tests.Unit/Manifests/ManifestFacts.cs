@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using DigitalBrain.Apps;
-using DigitalBrain.Apps.Manifests;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,13 +32,6 @@ public sealed class ManifestFacts
         DescriptionForPeople = "A test widget.",
         DescriptionForModel = "Read and rename a test widget.",
     };
-
-    [Fact]
-    public void FirstPartyAppsDeclareTheAgentToolsTheHostRegisters()
-    {
-        Assert.Empty(FirstPartyApps.Get("intochat.image-editor").AgentTools);
-        Assert.Empty(FirstPartyApps.Get("intochat.forms").AgentTools);
-    }
 
     [Fact]
     public void GeneratedManifestCannotDriftFromTheInterface()
@@ -97,19 +89,6 @@ public sealed class ManifestFacts
 
         var error = Assert.Throws<AppManifestException>(() => ManifestValidator.Validate(manifest));
         Assert.Contains("not-a-catalog-type", error.Message);
-    }
-
-    [Fact]
-    public void EveryFirstPartyAppCarriesAValidGeneratedManifest()
-    {
-        var manifests = FirstPartyApps.All();
-        Assert.Equal(4, manifests.Count);
-        Assert.All(manifests, ManifestValidator.Validate);
-        foreach (var id in new[] { "intochat.files", "intochat.forms", "intochat.image-editor", "intochat.customer-tables" })
-        {
-            Assert.True(FirstPartyApps.Contains(id), $"Missing first-party manifest '{id}'.");
-            Assert.NotEmpty(FirstPartyApps.Get(id).Operations);
-        }
     }
 
     [Fact]

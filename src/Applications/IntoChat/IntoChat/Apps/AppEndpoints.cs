@@ -1,6 +1,5 @@
 using DigitalBrain.Identity.Configuration;
 using DigitalBrain.Apps;
-using DigitalBrain.Apps.Manifests;
 using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Types;
@@ -36,8 +35,7 @@ internal static class AppEndpoints
         {
             var scope = Scope(auth.Value, workspaceId);
             var installed = await brain.Get<IAppCatalog>(scope).List().WaitAsync(ct);
-            var manifests = FirstPartyApps.All()
-                .Concat(installed.Select(installation => installation.Manifest))
+            var manifests = installed.Select(installation => installation.Manifest)
                 .GroupBy(manifest => manifest.Id, StringComparer.Ordinal)
                 .Select(group => group.Last())
                 .OrderBy(manifest => manifest.Name, StringComparer.Ordinal)

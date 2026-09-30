@@ -7,9 +7,6 @@ public sealed record ScopedAppManifest
     [Id(1)] public AppManifestScope Scope { get; init; }
     [Id(2)] public string? WorkspaceId { get; init; }
 
-    public static ScopedAppManifest Global(AppManifest manifest) =>
-        new() { Manifest = manifest, Scope = AppManifestScope.Global };
-
     public static ScopedAppManifest InWorkspace(AppManifest manifest, string workspaceId) =>
         new() { Manifest = manifest, Scope = AppManifestScope.Workspace, WorkspaceId = workspaceId };
 

@@ -10,10 +10,4 @@
     <ProjectReference Include="../../Kernel/DigitalBrain/DigitalBrain.csproj" />
     <ProjectReference Include="../../../Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Contracts/DigitalBrain.Modules.Microsoft.CSharp.Contracts.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="../../../../Apps/files/app.json" LogicalName="DigitalBrain.Apps.FirstParty.files.app.json" />
-    <EmbeddedResource Include="../../../../Apps/forms/app.json" LogicalName="DigitalBrain.Apps.FirstParty.forms.app.json" />
-    <EmbeddedResource Include="../../../../Apps/image-editor/app.json" LogicalName="DigitalBrain.Apps.FirstParty.image-editor.app.json" />
-    <EmbeddedResource Include="../../../../Apps/customer-tables/app.json" LogicalName="DigitalBrain.Apps.FirstParty.customer-tables.app.json" />
-  </ItemGroup>
 </Project>

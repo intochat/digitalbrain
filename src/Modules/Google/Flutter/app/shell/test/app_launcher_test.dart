@@ -3,63 +3,40 @@ import 'package:digitalbrain_flutter_shell/workspace/app_launcher.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('the launcher falls back to the built-in first-party entries', () {
+  test('the shell surfaces are always offered', () {
     final entries = launcherEntries(const []);
     expect(entries.map((e) => e.launchKey), ['files', 'images']);
     expect(entries.first.title, 'Files');
     expect(entries.first.subtitle, 'Workspace assets');
   });
 
-  test('first-party manifests drive the launcher keys and labels', () {
+  test('a declarative catalog app is offered by its manifest id', () {
     final entries = launcherEntries(const [
       AppManifestSummary(
-        id: 'intochat.files',
-        name: 'Files',
-        description: 'ignored for known apps',
+        id: 'intochat.saved-lead-form',
+        name: 'Lead form',
+        description: 'Enter a lead',
         kind: 'declarative',
-        uiEntry: 'app-files',
+        uiEntry: 'app-saved-lead-form',
       ),
+    ]);
+    final lead = entries.singleWhere(
+      (e) => e.launchKey == 'intochat.saved-lead-form',
+    );
+    expect(lead.title, 'Lead form');
+    expect(lead.subtitle, 'Enter a lead');
+    expect(entries.map((e) => e.launchKey), contains('files'));
+  });
+
+  test('a non-declarative catalog app is not offered', () {
+    final entries = launcherEntries(const [
       AppManifestSummary(
-        id: 'intochat.image-editor',
-        name: 'Image Editor',
-        description: 'ignored for known apps',
-        kind: 'declarative',
+        id: 'intochat.assistant',
+        name: 'Assistant',
+        description: 'Answers questions',
+        kind: 'prompt',
       ),
     ]);
     expect(entries.map((e) => e.launchKey), ['files', 'images']);
-    expect(
-      entries.singleWhere((e) => e.launchKey == 'files').subtitle,
-      'Workspace assets',
-    );
   });
-
-  test('an app the shell cannot open yet is not offered', () {
-    final entries = launcherEntries(const [
-      AppManifestSummary(
-        id: 'intochat.customer-tables',
-        name: 'Customer Tables',
-        description: 'Read live tables',
-        kind: 'declarative',
-      ),
-    ]);
-    expect(entries, isEmpty);
-  });
-
-  test(
-    'a catalog app without a shell window is offered by its manifest id',
-    () {
-      final entries = launcherEntries(const [
-        AppManifestSummary(
-          id: 'intochat.saved-lead-form',
-          name: 'Lead form',
-          description: 'Enter a lead',
-          kind: 'declarative',
-          uiEntry: 'app-saved-lead-form',
-        ),
-      ]);
-      expect(entries.single.launchKey, 'intochat.saved-lead-form');
-      expect(entries.single.title, 'Lead form');
-      expect(entries.single.subtitle, 'Enter a lead');
-    },
-  );
 }
