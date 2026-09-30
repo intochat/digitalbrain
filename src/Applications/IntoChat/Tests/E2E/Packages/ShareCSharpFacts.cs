@@ -53,7 +53,7 @@ public sealed class ShareCSharpFacts
             Source = "twitter", ConnectionId = "bob-twitter", Value = "test-token"
         }, new CallerContext
         {
-            PrincipalId = "bob", AccountId = "bob", WorkspaceId = "bob",
+            PrincipalId = "bob", AccountId = "bob", BrainId = "bob",
             Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp
         }, ct);
 

@@ -108,7 +108,7 @@ public sealed class ChaosChargeFacts
             {
                 PrincipalId = "principal",
                 AccountId = account,
-                WorkspaceId = workspace,
+                BrainId = workspace,
                 Kind = CallerKind.Assistant,
                 StampedBy = TrustedEdge.AuthenticatedHttp,
                 AppId = appId,

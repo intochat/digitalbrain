@@ -210,7 +210,7 @@ public sealed class AppDraftFacts
 
     private static void StampAlice() => CallerContextStamper.Stamp(new CallerContext
     {
-        PrincipalId = "alice", AccountId = "account-alice", WorkspaceId = "workspace-alice",
+        PrincipalId = "alice", AccountId = "account-alice", BrainId = "workspace-alice",
         Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp,
     });
 
