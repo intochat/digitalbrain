@@ -16,12 +16,11 @@ public sealed class GmailOAuthCallbackFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var stub = await TokenEndpointStub.StartAsync(ct);
-        var options = new GmailModuleOptions
-        {
-            PublicOrigin = stub.Origin,
-            TokenEndpoint = stub.TokenEndpoint,
-        };
-        await using var brain = await E2ETest.Create().WithModule<DigitalBrain.Sdk.Secrets.SecretsModule>().WithModule<GmailModule>(google => google.WithOptions(options))
+        await using var brain = await E2ETest.Create().WithModule<DigitalBrain.Sdk.Secrets.SecretsModule>().WithModule<GmailModule, GmailModuleOptions>(options =>
+            {
+                options.PublicOrigin = stub.Origin;
+                options.TokenEndpoint = stub.TokenEndpoint;
+            })
             .WithExecution(new()
             {
                 PrivateConfiguration = new Dictionary<string, string?>

@@ -13,7 +13,7 @@ public sealed class TabsHttpFacts
     public async Task GetMatchesSelect()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
+        await using var brain = await E2ETest.Create().WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
         await brain.Get<ITabs>(UiScope.Key("workspace-a", "pages")).Set(
             [new TabItem("a", "A", new UiChildRef("text", "about"))],

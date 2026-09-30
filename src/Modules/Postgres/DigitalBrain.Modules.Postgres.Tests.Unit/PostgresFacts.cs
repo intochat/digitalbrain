@@ -54,7 +54,7 @@ public sealed class PostgresFacts
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["DigitalBrain:Postgres:ConnectionName"] = "analytics",
+                ["DigitalBrain:Modules:PostgresModule:Options"] = """{"ConnectionName":"analytics"}""",
                 ["ConnectionStrings:analytics"] = "Host=localhost;Database=analytics;Username=reader",
                 ["ConnectionStrings:supabase"] = "Host=localhost;Database=supabase;Username=reader",
             }).Build();
@@ -150,7 +150,7 @@ public sealed class PostgresFacts
     }
 
     private static Task<UnitBrain> StartAsync(string connectionName = "postgres")
-        => UnitTest.Create().WithModule<PostgresModule>(module => module.WithConnection(connectionName))
+        => UnitTest.Create().WithModule<PostgresModule, PostgresModuleOptions>(module => module.WithConnection(connectionName))
             .ConfigureSilo(silo =>
             {
                 silo.Configuration[$"ConnectionStrings:{connectionName}"] = "Host=localhost;Database=sample;Username=reader";

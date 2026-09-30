@@ -17,7 +17,7 @@ public sealed class ExpanderHttpFacts
     public async Task ToggleHttpFlipsNeuronAndGet()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
+        await using var brain = await E2ETest.Create().WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
         var expander = brain.Get<IExpander>(UiScope.Key("workspace-a", "more"));
         await using var changed = await brain.Observe<ExpanderChanged>(expander, ct);

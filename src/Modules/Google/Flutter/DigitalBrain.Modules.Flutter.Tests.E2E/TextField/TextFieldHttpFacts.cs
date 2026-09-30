@@ -13,7 +13,7 @@ public sealed class TextFieldHttpFacts
     public async Task ScopedValueRouteWritesTheNeuronAndTheUnscopedReadIsGone()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
+        await using var brain = await E2ETest.Create().WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
         var field = brain.Get<ITextField>(UiScope.Key("workspace-a", "name"));
         await field.Configure("Name", "secret");

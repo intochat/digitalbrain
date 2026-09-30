@@ -61,9 +61,7 @@ public static class SupabaseHostingExtensions
                 return;
             }
 
-            builder.WithEnvironment($"ConnectionStrings__{_options.ConnectionName}", _connection)
-                .WithEnvironment("DigitalBrain__Supabase__Provider", SupabaseModule.ProviderName)
-                .WithEnvironment("DigitalBrain__Supabase__ConnectionName", _options.ConnectionName);
+            builder.WithEnvironment($"ConnectionStrings__{_options.ConnectionName}", _connection);
         }
     }
 }

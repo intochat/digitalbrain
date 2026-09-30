@@ -1,45 +1,26 @@
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Collections.Concurrent;
 
 namespace DigitalBrain.Core;
 
+// The AppHost under test runs inside the test process, so an override travels as an opaque token
+// that resolves to the test's option edits, which are applied to the AppHost's own baseline options.
 public static class CompositionOverrideTransport
 {
     public const string ConfigurationKey = "DigitalBrain:Testing:Overrides";
-    private const int MaximumBytes = 32 * 1024;
-    private static readonly JsonSerializerOptions Json = new() { UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow };
-    internal sealed record Entry(string Id, string Patch);
-    private sealed record Envelope(int Version, Entry[] Modules);
+    private static readonly ConcurrentDictionary<string, ModuleEdit[]> Published = new(StringComparer.Ordinal);
+    internal sealed record ModuleEdit(Type ModuleType, IReadOnlyList<Delegate> OptionEdits);
 
-    internal static string Write(Entry[] entries)
+    internal static string Publish(ModuleEdit[] edits)
     {
-        var json = JsonSerializer.Serialize(new Envelope(1, entries), Json);
-        ValidateSize(json);
-        return json;
+        var token = Guid.NewGuid().ToString("N");
+        Published[token] = edits;
+        return token;
     }
 
-    internal static Entry[] Read(string json)
+    internal static ModuleEdit[] Take(string token)
     {
-        ValidateSize(json);
-        Envelope envelope;
-        try { envelope = JsonSerializer.Deserialize<Envelope>(json, Json) ?? throw new JsonException(); }
-        catch (JsonException) { throw new ArgumentException("Invalid composition override envelope.", nameof(json)); }
-        if (envelope.Version != 1 || envelope.Modules is null)
-        { throw new ArgumentException("Unsupported composition override version or missing modules.", nameof(json)); }
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var entry in envelope.Modules)
-        {
-            if (entry is null || string.IsNullOrWhiteSpace(entry.Id) || entry.Patch is null || !seen.Add(entry.Id))
-            { throw new ArgumentException("Invalid or duplicate module override.", nameof(json)); }
-        }
-        return envelope.Modules;
-    }
-
-    private static void ValidateSize(string json)
-    {
-        ArgumentNullException.ThrowIfNull(json);
-        if (Encoding.UTF8.GetByteCount(json) > MaximumBytes)
-        { throw new ArgumentException("Composition overrides exceed the 32 KiB limit.", nameof(json)); }
+        ArgumentNullException.ThrowIfNull(token);
+        return Published.TryGetValue(token, out var edits) ? edits
+            : throw new ArgumentException("Unknown composition override token; overrides only reach an AppHost running in the test process.", nameof(token));
     }
 }

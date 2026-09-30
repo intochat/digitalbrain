@@ -4,7 +4,6 @@ using Orleans.Hosting;
 namespace DigitalBrain.Microsoft.Playwright;
 public sealed class PlaywrightModule : IModule
 {
-    public static ModuleDefinition Define() => new(typeof(PlaywrightModule), new Dictionary<string, string?>());
     public void Configure(ISiloBuilder silo) => silo.AddPlaywright();
 }
 public static class PlaywrightHosting

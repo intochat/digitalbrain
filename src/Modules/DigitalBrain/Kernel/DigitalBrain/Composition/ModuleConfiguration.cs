@@ -1,4 +1,4 @@
-using System.Reflection;
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Core;
@@ -15,58 +15,61 @@ public sealed class ModuleConfiguration<TModule> where TModule : class, IModule,
         ArgumentNullException.ThrowIfNull(configure);
         _draft.LocalServices.Add(configure);
     }
+}
 
-    public void ConfigureOptions<TOptions>(Action<TOptions> configure, params string[] assignedMembers) where TOptions : class, new()
+internal abstract class ModuleOptionsSlot
+{
+    public abstract Type OptionsType { get; }
+    public abstract ModuleDefinition Compile();
+    public abstract ModuleOptionsSlot Clone();
+    public abstract void Edit(Delegate configure);
+
+    public static ModuleOptionsSlot? For(Type moduleType)
     {
-        _ensureMutable();
-        ArgumentNullException.ThrowIfNull(configure);
-        var contract = _draft.RequireContract<TOptions>();
-        var copy = (TOptions)contract.Copy(_draft.Options!);
-        configure(copy);
-        // Validate the explicit-member contract, including assignments equal to defaults.
-        _ = contract.WriteOverride(copy, assignedMembers);
-        _draft.Options = contract.Copy(copy);
-        _draft.Assigned.UnionWith(assignedMembers);
+        var optionsType = moduleType.GetInterfaces()
+            .Where(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IModule<>))
+            .Select(i => i.GetGenericArguments()[0]).SingleOrDefault();
+        return optionsType is null ? null
+            : (ModuleOptionsSlot)Activator.CreateInstance(typeof(ModuleOptionsSlot<,>).MakeGenericType(moduleType, optionsType), [null])!;
+    }
+}
+
+internal sealed class ModuleOptionsSlot<TModule, TOptions> : ModuleOptionsSlot
+    where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
+{
+    private TOptions _options;
+    public ModuleOptionsSlot(TOptions? options) => _options = options ?? new TOptions();
+    public override Type OptionsType => typeof(TOptions);
+    public override ModuleDefinition Compile() => ModuleOptionsSerialization.Compile<TModule, TOptions>(_options);
+    public override ModuleOptionsSlot Clone() => new ModuleOptionsSlot<TModule, TOptions>(RoundTrip(_options));
+
+    public override void Edit(Delegate configure)
+    {
+        var working = RoundTrip(_options);
+        ((Action<TOptions>)configure)(working);
+        _options = RoundTrip(working);
     }
 
-    public void ReplaceOptions<TOptions>(TOptions options) where TOptions : class, new()
-    {
-        _ensureMutable();
-        var contract = _draft.RequireContract<TOptions>();
-        // Complete replacement is distinct from a member patch and is validated at compilation.
-        _draft.Options = contract.Copy(options);
-        _draft.Replace = true;
-    }
+    private static TOptions RoundTrip(TOptions options)
+        => JsonSerializer.Deserialize<TOptions>(JsonSerializer.Serialize(options))!;
 }
 
 internal sealed class ModuleDraft
 {
     public Type Type { get; }
-    public IModuleConfigurationContract? Contract { get; }
-    public object? Options { get; set; }
-    public HashSet<string> Assigned { get; } = new(StringComparer.Ordinal);
-    public bool Replace { get; set; }
+    public ModuleOptionsSlot? Options { get; private init; }
     public List<Action<IServiceCollection>> LocalServices { get; } = [];
 
     public ModuleDraft(Type type)
     {
         Type = type;
-        if (type.GetCustomAttribute<ModuleConfigurationAttribute>() is { } attribute)
-        {
-            Contract = Activator.CreateInstance(attribute.ContractType) as IModuleConfigurationContract
-                ?? throw new ArgumentException($"Invalid configuration contract for {type.Name}.");
-            if (Contract.ModuleType != type) { throw new ArgumentException($"Configuration contract belongs to another module: {type.Name}."); }
-            Options = Contract.CreateDefaults();
-        }
+        Options = ModuleOptionsSlot.For(type);
     }
 
-    public IModuleConfigurationContract RequireContract<TOptions>() => Contract is { } contract && contract.OptionsType == typeof(TOptions)
-        ? contract : throw new ArgumentException($"{Type.Name} does not accept {typeof(TOptions).Name}.");
-    public ModuleDefinition Compile() => Contract?.Compile(Options!) ?? new(Type);
+    public ModuleDefinition Compile() => Options?.Compile() ?? new(Type);
     public ModuleDraft Copy()
     {
-        var copy = new ModuleDraft(Type) { Options = Contract?.Copy(Options!), Replace = Replace };
-        copy.Assigned.UnionWith(Assigned);
+        var copy = new ModuleDraft(Type) { Options = Options?.Clone() };
         copy.LocalServices.AddRange(LocalServices);
         return copy;
     }

@@ -59,7 +59,7 @@ a frontend, so the module's own hosting call is the switch:
 ```csharp
 // HTTP only.
 await using var brain = await E2ETest.Create()
-    .WithModule<FlutterModule>(flutter => flutter.BackendOnly())
+    .WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
     .StartAsync(ct);
 var button = brain.Get<IButton>(UiScope.Key("workspace-a", "go"));
 await using var clicks = await brain.Observe<ButtonClicked>(button, ct);
@@ -69,7 +69,7 @@ await clicks.NextAsync(ct: ct);
 
 // Frontend: E2E opens the page itself.
 await using var app = await E2ETest.Create()
-    .WithModule<FlutterModule>(flutter => flutter.RunWebApp())
+    .WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp())
     .StartAsync(ct);
 await Assertions.Expect(app.Page.GetByText("Expected content")).ToBeVisibleAsync();
 ```

@@ -9,6 +9,25 @@ public sealed class E2ETestBuilder<TAppHost> where TAppHost : class
     private BrowserOptions _browser = new() { Headless = true };
     private bool _started;
 
+    public E2ETestBuilder<TAppHost> ConfigureModule<TModule, TOptions>(Action<TOptions> configureOptions)
+        where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
+    {
+        EnsureMutable();
+        ArgumentNullException.ThrowIfNull(configureOptions);
+        var browserAtDeclaration = _browser;
+        using var scope = BrowserConfiguration.Begin(_browser);
+        // The edit runs once here so ambient browser choices apply and a throwing edit fails at the call site;
+        // it runs again later against the AppHost's own options, where browser choices are already taken.
+        configureOptions(new TOptions());
+        _browser = scope.Options;
+        _overrides.ConfigureModule<TModule, TOptions>(options =>
+        {
+            using var discarded = BrowserConfiguration.Begin(browserAtDeclaration);
+            configureOptions(options);
+        });
+        return this;
+    }
+
     public E2ETestBuilder<TAppHost> ConfigureModule<TModule>(Action<ModuleConfiguration<TModule>> configure)
         where TModule : class, IModule, new()
     {

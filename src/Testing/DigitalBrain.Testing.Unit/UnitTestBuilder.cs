@@ -19,6 +19,14 @@ public sealed class UnitTestBuilder
         _composition.WithModule(configure);
         return this;
     }
+    public UnitTestBuilder WithModule<TModule, TOptions>(Action<TOptions>? configureOptions = null,
+        Action<ModuleConfiguration<TModule>>? configure = null)
+        where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
+    {
+        EnsureMutable();
+        _composition.WithModule(configureOptions, configure);
+        return this;
+    }
     public UnitTestBuilder RequireModules(IEnumerable<Type> modules)
     {
         EnsureMutable();
@@ -30,6 +38,13 @@ public sealed class UnitTestBuilder
     {
         EnsureMutable();
         _composition.ConfigureModule(configure);
+        return this;
+    }
+    public UnitTestBuilder ConfigureModule<TModule, TOptions>(Action<TOptions> configureOptions)
+        where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
+    {
+        EnsureMutable();
+        _composition.ConfigureModule<TModule, TOptions>(configureOptions);
         return this;
     }
     public UnitTestBuilder WithExecution(TestExecutionOptions execution)

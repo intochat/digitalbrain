@@ -14,7 +14,7 @@ public sealed class ButtonHttpFacts
     public async Task ClickPublishesClicked()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
+        await using var brain = await E2ETest.Create().WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
         var button = brain.Get<IButton>(UiScope.Key("workspace-a", "go"));
         await using var clicks = await brain.Observe<ButtonClicked>(button, ct);

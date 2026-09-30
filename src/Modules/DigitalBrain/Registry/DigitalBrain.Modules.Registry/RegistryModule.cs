@@ -1,5 +1,4 @@
 using DigitalBrain.Core;
-using DigitalBrain.Registry.Configuration;
 using DigitalBrain.Qdrant;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,12 +7,9 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Registry;
 
-[ModuleConfiguration(typeof(RegistryConfigurationContract))]
 public sealed class RegistryModule : IModule
 {
     public const string Key = IRegistry.Key;
-    public static ModuleDefinition Define() => new(typeof(RegistryModule));
-
     public void Configure(ISiloBuilder silo)
     {
         ArgumentNullException.ThrowIfNull(silo);

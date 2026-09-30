@@ -35,6 +35,25 @@ public static class ModuleOptionsSerialization
         return options;
     }
 
+    // The module list is the array under DigitalBrain:Modules; the per-module Options keys live beside its numeric entries.
+    public static string[] SelectedModuleNames(this IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        return configuration.GetSection("DigitalBrain:Modules").Get<string[]>() ?? [];
+    }
+
+    // Copies the bound options onto an instance the options system already created: every public read-write property.
+    public static void PopulateModuleOptions<TOptions>(this IConfiguration configuration, string moduleName, TOptions target)
+        where TOptions : class, IModuleOptions, new()
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        var bound = configuration.GetModuleOptions<TOptions>(moduleName);
+        foreach (var property in typeof(TOptions).GetProperties().Where(p => p.GetMethod is { IsPublic: true } && p.SetMethod is { IsPublic: true }))
+        {
+            property.SetValue(target, property.GetValue(bound));
+        }
+    }
+
     internal static bool IsOptionsKey(string key)
     {
         var segments = key.Split(':');
@@ -56,5 +75,5 @@ public static class ModuleOptionsSerialization
         }
     }
 
-    private static string OptionsKey(string moduleName) => $"DigitalBrain:Modules:{moduleName}{OptionsKeySuffix}";
+    public static string OptionsKey(string moduleName) => $"DigitalBrain:Modules:{moduleName}{OptionsKeySuffix}";
 }

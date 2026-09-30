@@ -28,10 +28,25 @@ public sealed class DigitalBrainBuilder
         return this;
     }
 
+    public DigitalBrainBuilder WithModule<TModule, TOptions>(Action<TOptions>? configureOptions = null)
+        where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
+    {
+        _composition.WithModule<TModule, TOptions>(configureOptions);
+        _hasDeclarations = true;
+        return this;
+    }
+
     public DigitalBrainBuilder ConfigureModule<TModule>(Action<ModuleConfiguration<TModule>> configure)
         where TModule : class, IModule, new()
     {
         _composition.ConfigureModule(configure);
+        return this;
+    }
+
+    public DigitalBrainBuilder ConfigureModule<TModule, TOptions>(Action<TOptions> configureOptions)
+        where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
+    {
+        _composition.ConfigureModule<TModule, TOptions>(configureOptions);
         return this;
     }
 

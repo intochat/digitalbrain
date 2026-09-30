@@ -13,7 +13,7 @@ public sealed class PersonHttpFacts
     public async Task GetMatchesSet()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
+        await using var brain = await E2ETest.Create().WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
         await brain.Get<IPerson>(UiScope.Key("workspace-a", "ada")).Set("Ada", "https://example.com/ada.png");
         var state = await brain.HttpClient.GetFromJsonAsync<PersonState>("/brains/workspace-a/ui/people/ada", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);

@@ -8,7 +8,7 @@ public sealed class E2EBoundaryFacts
     [Fact]
     public void BrowserOptionsStayOnTheBuilderAndOutsideTheOverrideEnvelope()
     {
-        var headed = E2ETest.For<E2EBoundaryFacts>().ConfigureModule<BoundaryModule>(_ =>
+        var headed = E2ETest.For<E2EBoundaryFacts>().ConfigureModule<BoundaryModule, BoundaryOptions>(_ =>
             BrowserConfiguration.Configure(browser => browser.Headed().SlowMo(75)));
         Assert.False(headed.BrowserOptions.Headless);
         Assert.Equal(75, headed.BrowserOptions.SlowMoMilliseconds);
@@ -63,16 +63,9 @@ public sealed class E2EBoundaryFacts
     }
 }
 
-[ModuleConfiguration(typeof(BoundaryContract))]
-public sealed class BoundaryModule : IModule
+public sealed class BoundaryModule : IModule<BoundaryOptions>
 {
     public void Configure(ISiloBuilder silo) { }
 }
 
-public sealed class BoundaryOptions { public string? Label { get; set; } }
-
-public sealed class BoundaryContract() : ModuleConfigurationContract<BoundaryModule, BoundaryOptions>("Label")
-{
-    protected override ModuleDefinition Compile(BoundaryOptions options)
-        => new(typeof(BoundaryModule), new Dictionary<string, string?> { ["Boundary:Label"] = options.Label });
-}
+public sealed class BoundaryOptions : IModuleOptions { public string? Label { get; set; } public void Validate() { } }

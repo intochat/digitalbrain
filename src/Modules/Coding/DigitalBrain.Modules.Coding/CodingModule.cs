@@ -1,40 +1,21 @@
 using DigitalBrain.Core;
 using DigitalBrain.Microsoft.DotNet;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
 
 namespace DigitalBrain.Coding;
 
-[ModuleConfiguration(typeof(CodingConfigurationContract))]
-public sealed class CodingModule : IModule
+public sealed class CodingModule : IModule<CodingModuleOptions>
 {
-    public const string ConfigurationRoot = CodingModuleOptions.SectionName;
-    public const string SolutionPathKey = CodingModuleOptions.SectionName + ":SolutionPath";
-    public const string WorkspaceKeyKey = CodingModuleOptions.SectionName + ":WorkspaceKey";
-    public const string TestProjectKey = CodingModuleOptions.SectionName + ":TestProject";
-
-    public static ModuleDefinition Define(CodingModuleOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        return new(typeof(CodingModule), new Dictionary<string, string?>
-        {
-            [SolutionPathKey] = options.SolutionPath,
-            [WorkspaceKeyKey] = options.WorkspaceKey,
-            [TestProjectKey] = options.TestProject,
-            [ConfigurationRoot + ":EditDeadline"] = options.EditDeadline.ToString("c", System.Globalization.CultureInfo.InvariantCulture),
-        });
-    }
-
     public void Configure(ISiloBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         var services = builder.Services;
         services.TryAddSingleton(TimeProvider.System);
         services.AddOptions<CodingModuleOptions>()
-            .BindConfiguration(CodingModuleOptions.SectionName)
-            .Validate(options => !string.IsNullOrWhiteSpace(options.WorkspaceKey), "Coding workspace key must not be empty.")
-            .Validate(options => options.EditDeadline > TimeSpan.Zero, "Coding edit deadline must be positive.")
+            .Configure<IConfiguration>((options, configuration) => configuration.PopulateModuleOptions(nameof(CodingModule), options))
             .ValidateOnStart();
         services.TryAddSingleton<IProcessRunner, ProcessRunner>();
         services.TryAddSingleton<GitRunner>();

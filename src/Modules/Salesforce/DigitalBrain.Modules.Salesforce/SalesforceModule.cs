@@ -7,27 +7,11 @@ using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Salesforce;
 
-[ModuleConfiguration(typeof(SalesforceConfigurationContract))]
-[ModuleHosting("DigitalBrain.Salesforce.Aspire.Hosting.SalesforceModuleHosting, DigitalBrain.Modules.Salesforce.Aspire.Hosting")]
-public sealed class SalesforceModule : IModule
+public sealed class SalesforceModule : IModule<SalesforceModuleOptions>
 {
     public const string OAuthConfigurationRoot = "DigitalBrain:Salesforce:OAuth";
-    public const string McpEndpointConfigurationKey = "DigitalBrain:Salesforce:Mcp:Endpoint";
-    public const string McpEndpointEnvironmentVariable = "DigitalBrain__Salesforce__Mcp__Endpoint";
 
     public static readonly Uri DefaultMcpEndpoint = new("https://api.salesforce.com/platform/mcp/v1/platform/sobject-all");
-
-    public static ModuleDefinition Define(SalesforceModuleOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        return new(typeof(SalesforceModule), new Dictionary<string, string?>
-        {
-            [McpEndpointConfigurationKey] = (options.McpEndpoint ?? DefaultMcpEndpoint).AbsoluteUri,
-            ["DigitalBrain:Salesforce:Hosting:HostMcp"] = options.HostMcp.ToString(),
-            ["DigitalBrain:Salesforce:Mcp:AllowLoopback"] = options.UseLocalMcp.ToString(),
-            ["DigitalBrain:Salesforce:Hosting:PublicOrigin"] = options.PublicOrigin?.AbsoluteUri ?? "",
-        });
-    }
 
     public void Configure(ISiloBuilder silo)
     {
@@ -43,8 +27,13 @@ public sealed class SalesforceModule : IModule
         services.TryAddSingleton<SalesforceTokenRefresh>();
         services.TryAddSingleton<SalesforceCredentialStore>();
         services.TryAddSingleton<SalesforceWriteAccess>();
+        var moduleOptions = silo.Configuration.GetModuleOptions<SalesforceModuleOptions>(nameof(SalesforceModule));
         services.AddOptions<SalesforceMcpOptions>()
-            .Bind(silo.Configuration.GetSection(SalesforceMcpOptions.SectionName))
+            .Configure(mcp =>
+            {
+                mcp.Endpoint = (moduleOptions.McpEndpoint ?? DefaultMcpEndpoint).AbsoluteUri;
+                mcp.AllowLoopback = moduleOptions.UseLocalMcp;
+            })
             .Validate(static options => { _ = options.ResolveEndpoint(); return true; })
             .ValidateOnStart();
         services.TryAddSingleton<ISalesforceProvider>(static services => new SalesforceMcpProvider(

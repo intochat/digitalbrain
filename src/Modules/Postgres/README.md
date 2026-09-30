@@ -23,7 +23,7 @@ Both Npgsql connection strings and `postgres://` / `postgresql://` URIs are supp
 
 To select a different connection name, configure the module with
 `module.WithConnection("analytics")` and supply `ConnectionStrings:analytics`.
-The corresponding public setting is `DigitalBrain:Postgres:ConnectionName`.
+The connection name travels as the module option `ConnectionName`.
 Missing or malformed connections fail startup validation. The `postgres` readiness
 health check probes connectivity. Registration is idempotent, and the module owns
 a keyed data source so it can coexist with Supabase and other database modules.
@@ -40,7 +40,7 @@ using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Postgres;
 
 var brain = builder.AddDigitalBrain("brain")
-    .WithModule<PostgresModule>(module => module.WithPostgres());
+    .WithModule<PostgresModule, PostgresModuleOptions>(module => module.WithPostgres());
 
 builder.AddProject<Projects.Api>("api").WithReference(brain);
 ```
@@ -52,7 +52,7 @@ and persistent container lifetime, matching ClickHouse's local hosting defaults.
 
 ```csharp
 var brain = builder.AddDigitalBrain("brain")
-    .WithModule<PostgresModule>(module => module.WithConnection("reporting").WithPostgres(options =>
+    .WithModule<PostgresModule, PostgresModuleOptions>(module => module.WithConnection("reporting").WithPostgres(options =>
     {
         options.DatabaseName = "analytics";
         options.PersistentStorage = false;

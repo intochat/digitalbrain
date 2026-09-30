@@ -24,7 +24,7 @@ public sealed class TraceBudgetFacts
         await using var collector = TestTelemetryCollector.Start();
         await using var model = await ScriptedModelServer.StartAsync(ct);
         await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<AIModule>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
+            .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
             .WithResourceEnvironment(OtlpEnvironment(collector))
             .StartAsync(ct);
 

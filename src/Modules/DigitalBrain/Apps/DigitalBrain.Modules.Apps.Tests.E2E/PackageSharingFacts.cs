@@ -23,7 +23,7 @@ public sealed class PackageSharingFacts
         try
         {
             await using var brain = await E2ETest.Create()
-                .WithModule<AspireModule>().WithModule<CSharpModule>(csharp => csharp.WithSandbox(RepositoryRoot())).WithModule<AppsModule>()
+                .WithModule<AspireModule>().WithModule<CSharpModule, CSharpOptions>(csharp => csharp.WithSandbox(RepositoryRoot())).WithModule<AppsModule>()
                 .StartAsync(ct);
 
             Caller.As("alice");

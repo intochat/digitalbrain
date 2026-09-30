@@ -18,7 +18,7 @@ public sealed class ReceiptJourneyFacts
         var ct = TestContext.Current.CancellationToken;
         await using var model = await ScriptedModelServer.StartAsync(ct);
         await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<AIModule>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
+            .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
             .StartAsync(ct);
         await LeadData.SeedAsync(brain, "Receipt run", ct);
 

@@ -6,7 +6,6 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.CustomerResearcher;
 
-[ModuleConfiguration(typeof(CustomerResearcherConfigurationContract))]
 public sealed class CustomerResearcherModule : IModule
 {
     public void Configure(ISiloBuilder silo)

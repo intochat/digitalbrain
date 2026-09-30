@@ -13,7 +13,7 @@ public sealed class SliderHttpFacts
     public async Task GetMatchesValue()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
+        await using var brain = await E2ETest.Create().WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
         var slider = brain.Get<ISlider>(UiScope.Key("workspace-a", "vol"));
         await slider.Configure(0, 10, 1);

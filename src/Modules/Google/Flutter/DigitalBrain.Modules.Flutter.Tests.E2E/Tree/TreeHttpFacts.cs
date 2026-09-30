@@ -13,7 +13,7 @@ public sealed class TreeHttpFacts
     public async Task GetMatchesSet()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
+        await using var brain = await E2ETest.Create().WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
         await brain.Get<ITree>(UiScope.Key("workspace-a", "fs")).Set([new TreeNode("root", null, "root")]);
         var state = await brain.HttpClient.GetFromJsonAsync<TreeState>("/brains/workspace-a/ui/trees/fs", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);

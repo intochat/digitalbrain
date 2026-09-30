@@ -33,7 +33,7 @@ public sealed class LocalAppsJourneyFacts
                 await File.WriteAllTextAsync(Path.Combine(downloads, "readme.txt"), "Local file fixture", ct);
             }
             await using var brain = await IntoChatE2ETest.Create()
-                .ConfigureModule<FlutterModule>(flutter => flutter.RunWebApp()).StartAsync(ct);
+                .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp()).StartAsync(ct);
             var page = brain.Page;
             page.SetDefaultTimeout(15000);
             Microsoft.Playwright.IRequest? saveRequest = null;

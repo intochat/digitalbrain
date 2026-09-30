@@ -6,11 +6,8 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Files;
 
-[ModuleConfiguration(typeof(FilesConfigurationContract))]
 public sealed class FilesModule : IModule
 {
-    public static ModuleDefinition Define() => new(typeof(FilesModule));
-
     public void Configure(ISiloBuilder silo)
     {
         ArgumentNullException.ThrowIfNull(silo);

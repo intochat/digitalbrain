@@ -3,6 +3,7 @@ using Azure.Identity;
 using DigitalBrain.Core;
 using DigitalBrain.Core.Enforcement;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
@@ -10,25 +11,15 @@ using Orleans.Hosting;
 namespace DigitalBrain.Microsoft.CSharp;
 
 [ModuleDeployment("DigitalBrain.Microsoft.CSharp.CSharpDeployment, DigitalBrain.Modules.Microsoft.CSharp.Deployment")]
-[ModuleConfiguration(typeof(CSharpConfigurationContract))]
-[ModuleHosting("DigitalBrain.Microsoft.CSharp.CSharpModuleHosting, DigitalBrain.Modules.Microsoft.CSharp.Aspire.Hosting")]
-public sealed class CSharpModule : IModule
+public sealed class CSharpModule : IModule<CSharpOptions>
 {
-    public static ModuleDefinition Define(CSharpOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        return new(typeof(CSharpModule), new Dictionary<string, string?>
-        {
-            [CSharpOptions.SectionName + ":SourceRoot"] = options.SourceRoot,
-        });
-    }
-
     public void Configure(ISiloBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
-        builder.Services.AddOptions<CSharpOptions>().BindConfiguration(CSharpOptions.SectionName).PostConfigure(options =>
+        builder.Services.AddOptions<CSharpOptions>()
+            .Configure<IConfiguration>((options, configuration) => configuration.PopulateModuleOptions(nameof(CSharpModule), options))
+            .BindConfiguration(CSharpOptions.SectionName).PostConfigure(options =>
         {
-            // Unset composition values arrive as empty strings, not nulls.
             if (string.IsNullOrWhiteSpace(options.SourceRoot)) { options.SourceRoot = FindRepositoryRoot(); }
         });
         builder.Services.AddCSharpAuthoring();

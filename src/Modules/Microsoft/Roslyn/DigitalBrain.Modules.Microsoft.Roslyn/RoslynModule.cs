@@ -1,11 +1,11 @@
 using DigitalBrain.Core;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
 
 namespace DigitalBrain.Microsoft.Roslyn;
 
-[ModuleConfiguration(typeof(RoslynConfigurationContract))]
 public sealed class RoslynModule : IModule
 {
     public void Configure(ISiloBuilder builder)
@@ -14,7 +14,7 @@ public sealed class RoslynModule : IModule
         var services = builder.Services;
         services.TryAddSingleton(TimeProvider.System);
         services.AddOptions<RoslynModuleOptions>()
-            .BindConfiguration(RoslynModuleOptions.SectionName)
+            .Configure<IConfiguration>(RoslynModuleOptions.ReadFromCodingOptions)
             .Validate(options => !string.IsNullOrWhiteSpace(options.WorkspaceKey), "Roslyn workspace key must not be empty.")
             .ValidateOnStart();
         services.TryAddSingleton<SolutionWorkspace>();

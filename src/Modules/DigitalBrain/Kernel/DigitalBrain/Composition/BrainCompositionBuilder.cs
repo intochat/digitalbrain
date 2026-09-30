@@ -8,12 +8,18 @@ public sealed class BrainCompositionBuilder
     public BrainCompositionBuilder WithModule<TModule>(Action<ModuleConfiguration<TModule>>? configure = null)
         where TModule : class, IModule, new()
     {
-        EnsureMutable();
-        if (_modules.ContainsKey(typeof(TModule)))
-        { throw new InvalidOperationException($"{typeof(TModule).Name} is already declared. Use ConfigureModule to change it."); }
-        var draft = new ModuleDraft(typeof(TModule));
+        Declare<TModule>(out var draft);
         configure?.Invoke(new(draft, EnsureMutable));
-        _modules.Add(typeof(TModule), draft);
+        return this;
+    }
+
+    public BrainCompositionBuilder WithModule<TModule, TOptions>(Action<TOptions>? configureOptions = null,
+        Action<ModuleConfiguration<TModule>>? configure = null)
+        where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
+    {
+        Declare<TModule>(out var draft);
+        if (configureOptions is not null) { draft.Options!.Edit(configureOptions); }
+        configure?.Invoke(new(draft, EnsureMutable));
         return this;
     }
 
@@ -32,10 +38,19 @@ public sealed class BrainCompositionBuilder
     {
         EnsureMutable();
         ArgumentNullException.ThrowIfNull(configure);
-        if (!_modules.TryGetValue(typeof(TModule), out var draft))
-        { throw new InvalidOperationException($"{typeof(TModule).Name} is not declared in this application."); }
-        var copy = draft.Copy();
+        var copy = RequireDeclared<TModule>().Copy();
         configure(new(copy, EnsureMutable));
+        _modules[typeof(TModule)] = copy;
+        return this;
+    }
+
+    public BrainCompositionBuilder ConfigureModule<TModule, TOptions>(Action<TOptions> configureOptions)
+        where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
+    {
+        EnsureMutable();
+        ArgumentNullException.ThrowIfNull(configureOptions);
+        var copy = RequireDeclared<TModule>().Copy();
+        copy.Options!.Edit(configureOptions);
         _modules[typeof(TModule)] = copy;
         return this;
     }
@@ -48,25 +63,40 @@ public sealed class BrainCompositionBuilder
         return _built = new(modules, _modules.Values.SelectMany(m => m.LocalServices).ToArray());
     }
 
-    public BrainCompositionBuilder ApplyOverrides(string envelope)
+    public BrainCompositionBuilder ApplyOverrides(string token)
     {
         EnsureMutable();
-        var entries = CompositionOverrideTransport.Read(envelope);
+        var edits = CompositionOverrideTransport.Take(token);
         var replacements = new Dictionary<Type, ModuleDraft>();
-        foreach (var entry in entries)
+        foreach (var edit in edits)
         {
-            var existing = _modules.Values.SingleOrDefault(m => m.Type.FullName == entry.Id)
-                ?? throw new ArgumentException("An override targets a module not declared by the application.", nameof(envelope));
+            var existing = _modules.TryGetValue(edit.ModuleType, out var declared) ? declared
+                : throw new ArgumentException("An override targets a module not declared by the application.", nameof(token));
             var draft = existing.Copy();
-            var contract = draft.Contract ?? throw new ArgumentException("This module has no configurable options.", nameof(envelope));
-            draft.Options = contract.ApplyOverride(draft.Options!, entry.Patch);
-            ModuleSettingsValidation.ValidatePublicSettings([draft.Compile()]);
+            foreach (var configure in edit.OptionEdits)
+            {
+                (draft.Options ?? throw new ArgumentException("This module has no configurable options.", nameof(token))).Edit(configure);
+            }
+            _ = draft.Compile();
             replacements.Add(draft.Type, draft);
         }
-        // An invalid envelope never leaves a partially overridden application.
+        // An invalid override never leaves a partially overridden application.
         foreach (var (type, draft) in replacements) { _modules[type] = draft; }
         return this;
     }
+
+    private void Declare<TModule>(out ModuleDraft draft) where TModule : class, IModule, new()
+    {
+        EnsureMutable();
+        if (_modules.ContainsKey(typeof(TModule)))
+        { throw new InvalidOperationException($"{typeof(TModule).Name} is already declared. Use ConfigureModule to change it."); }
+        draft = new ModuleDraft(typeof(TModule));
+        _modules.Add(typeof(TModule), draft);
+    }
+
+    private ModuleDraft RequireDeclared<TModule>()
+        => _modules.TryGetValue(typeof(TModule), out var draft) ? draft
+            : throw new InvalidOperationException($"{typeof(TModule).Name} is not declared in this application.");
 
     private void EnsureMutable()
     {

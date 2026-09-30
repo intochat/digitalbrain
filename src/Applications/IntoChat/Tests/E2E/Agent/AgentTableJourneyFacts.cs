@@ -26,8 +26,8 @@ public sealed class AgentTableJourneyFacts
         model.Sql = "select * from wide_customers order by id;";
         model.ExpectedValidationError = "it returns 62";
         await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<AIModule>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
-            .ConfigureModule<FlutterModule>(flutter => flutter.RunWebApp())
+            .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
+            .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp())
             .StartAsync(ct);
         await LeadData.SeedAsync(brain, "Beyond first page", ct);
         await LeadData.CreateWideCustomersAsync(brain, ct);
@@ -102,8 +102,8 @@ public sealed class AgentTableJourneyFacts
         model.RefineOperator = "eq";
         model.RefineValue = "London";
         await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<AIModule>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
-            .ConfigureModule<FlutterModule>(flutter => flutter.RunWebApp())
+            .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
+            .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp())
             .StartAsync(ct);
         // The scripted model discovers schema against public.leads, so it must exist.
         await LeadData.SeedAsync(brain, "Beyond first page", ct);

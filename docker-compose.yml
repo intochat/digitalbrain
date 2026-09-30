@@ -45,7 +45,7 @@ services:
       # DigitalBrain__Google__Gmail__OAuth__ClientId:
       # DigitalBrain__Google__Gmail__OAuth__ClientSecret:
       # DigitalBrain__Google__Gmail__OAuth__PublicOrigin: http://localhost:5080
-      # DigitalBrain__Salesforce__Mcp__Endpoint: https://api.salesforce.com/platform/mcp/v1/platform/sobject-all
+      # DigitalBrain__Modules__SalesforceModule__Options: '{"McpEndpoint":"https://api.salesforce.com/platform/mcp/v1/platform/sobject-all"}'
       # DigitalBrain__Salesforce__OAuth__ConsumerKey:
       # DigitalBrain__Salesforce__OAuth__ConsumerSecret:
       # DigitalBrain__Salesforce__OAuth__PublicOrigin: http://localhost:5080

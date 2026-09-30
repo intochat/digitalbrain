@@ -14,7 +14,7 @@ public sealed class FormHttpFacts
     public async Task GetReturnsTheSubmittedValues()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
+        await using var brain = await E2ETest.Create().WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
         var form = brain.Get<IForm>(UiScope.Key("workspace-a", "intake"));
         var defined = await form.Define(new("Customer intake",

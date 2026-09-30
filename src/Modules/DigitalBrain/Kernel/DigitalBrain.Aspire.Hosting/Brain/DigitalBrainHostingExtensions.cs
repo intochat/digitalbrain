@@ -89,17 +89,7 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(brain);
         ArgumentNullException.ThrowIfNull(moduleType);
         brain.AddModule(moduleType);
-        var hostingAttribute = moduleType.GetCustomAttribute<ModuleHostingAttribute>();
-        if (hostingAttribute is { } hosting)
-        {
-            var type = Type.GetType(hosting.TypeName, throwOnError: true)!;
-            if (Activator.CreateInstance(type) is not IDigitalBrainModuleHosting defaults)
-            {
-                throw new InvalidOperationException($"{hosting.TypeName} must implement {nameof(IDigitalBrainModuleHosting)}.");
-            }
-
-            defaults.Configure(brain);
-        }
+        if (ResolveModuleHosting(moduleType) is { } defaults) { defaults.Configure(brain); }
         var nodeName = DigitalBrainHostingNames.ForModule(moduleType);
         if (!brain.HasResource(nodeName))
         {
@@ -107,6 +97,18 @@ public static class DigitalBrainHostingExtensions
         }
 
         return brain;
+    }
+
+    // A module's hosting adapter lives in the sibling "<ModuleAssembly>.Aspire.Hosting" assembly (which references the
+    // module, so the module cannot name it) as the IDigitalBrainModuleHosting called "<ModuleTypeName>Hosting".
+    private static IDigitalBrainModuleHosting? ResolveModuleHosting(Type moduleType)
+    {
+        Assembly hostingAssembly;
+        try { hostingAssembly = Assembly.Load(moduleType.Assembly.GetName().Name + ".Aspire.Hosting"); }
+        catch (FileNotFoundException) { return null; }
+        var hostingType = hostingAssembly.GetTypes().SingleOrDefault(type =>
+            type is { IsAbstract: false } && typeof(IDigitalBrainModuleHosting).IsAssignableFrom(type) && type.Name == moduleType.Name + "Hosting");
+        return hostingType is null ? null : (IDigitalBrainModuleHosting)Activator.CreateInstance(hostingType)!;
     }
 
     public static IResourceBuilder<TResource> WithReference<TResource>(this IResourceBuilder<TResource> builder, DigitalBrainBuilder brain)

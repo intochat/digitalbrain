@@ -13,7 +13,7 @@ public sealed class SheetHttpFacts
     public async Task GetMatchesSet()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
+        await using var brain = await E2ETest.Create().WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
         await brain.Get<ISheet>(UiScope.Key("workspace-a", "budget")).Set("Budget", [new SheetCell(0, 0, "100")]);
         var state = await brain.HttpClient.GetFromJsonAsync<SheetState>("/brains/workspace-a/ui/sheets/budget", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);

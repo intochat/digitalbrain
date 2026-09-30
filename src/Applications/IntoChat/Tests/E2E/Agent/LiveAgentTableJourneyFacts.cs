@@ -18,8 +18,8 @@ public sealed class LiveAgentTableJourneyFacts
         Assert.False(string.IsNullOrWhiteSpace(key), "Live model verification requires an explicit API key.");
         var endpoint = new Uri(Environment.GetEnvironmentVariable("DIGITALBRAIN_E2E_MODEL_ENDPOINT") ?? "https://api.openai.com/v1/");
         await using var brain = await IntoChatE2ETest.Create(key!)
-            .ConfigureModule<AIModule>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, endpoint))
-            .ConfigureModule<FlutterModule>(flutter => flutter.RunWebApp())
+            .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, endpoint))
+            .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp())
             .StartAsync(ct);
         await LeadData.SeedAsync(brain, "Beyond first page", ct);
         var page = brain.Page;

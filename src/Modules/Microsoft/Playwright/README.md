@@ -1,7 +1,7 @@
 # Microsoft Playwright
 
 This module automates one existing desktop-owned WebView2 page per neuron. Register
-'PlaywrightModule.Define()' with the backend. It has no Aspire resource, browser
+'PlaywrightModule' with the backend. It has no Aspire resource, browser
 installation, browser launch, persisted endpoint, or customer-research logic.
 
 Attach with a loopback port and an unpredictable 32-hex session ID. The initial

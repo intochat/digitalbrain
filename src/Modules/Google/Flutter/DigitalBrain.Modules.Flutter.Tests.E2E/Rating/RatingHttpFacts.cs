@@ -13,7 +13,7 @@ public sealed class RatingHttpFacts
     public async Task GetMatchesSet()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
+        await using var brain = await E2ETest.Create().WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
         await brain.Get<IRating>(UiScope.Key("workspace-a", "stars")).Set(5, 4);
         var state = await brain.HttpClient.GetFromJsonAsync<RatingState>("/brains/workspace-a/ui/ratings/stars", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);

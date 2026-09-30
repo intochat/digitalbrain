@@ -1,4 +1,5 @@
 using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.AI.Aspire.Hosting;
@@ -7,7 +8,7 @@ public sealed class AIModuleHosting : IDigitalBrainModuleHosting
 {
     public void Configure(DigitalBrainBuilder brain)
         => AIHostingExtensions.ConfigureDeclaration(brain,
-            brain.GetModuleConfiguration<AIModule>().GetSection(AIOptions.SectionName).Get<AIOptions>() ?? new());
+            brain.GetModuleConfiguration<AIModule>().GetModuleOptions<AIOptions>(nameof(AIModule)));
 }
 
 public static partial class AIHostingExtensions

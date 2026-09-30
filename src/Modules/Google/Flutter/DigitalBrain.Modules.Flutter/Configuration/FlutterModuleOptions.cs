@@ -15,7 +15,23 @@ public sealed record FlutterHostingOptions
     public string? WorkingDirectory { get; init; }
     public bool ReleaseBuild { get; init; }
 }
-public sealed record FlutterModuleOptions
+public sealed record FlutterModuleOptions : IModuleOptions
 {
     public FlutterHostingOptions Hosting { get; set; } = new();
+
+    public FlutterModuleOptions RunWebApp() => WithHost(FlutterHostKind.Web);
+    public FlutterModuleOptions RunDesktopApp() => WithHost(FlutterHostKind.Window);
+    public FlutterModuleOptions BackendOnly() => WithHost(FlutterHostKind.None);
+    public FlutterModuleOptions AsReleaseBuild() { Hosting = Hosting with { ReleaseBuild = true }; return this; }
+    public FlutterModuleOptions AsDebugBuild() { Hosting = Hosting with { ReleaseBuild = false }; return this; }
+
+    public void Validate()
+    {
+        if (!Enum.IsDefined(Hosting.Kind)) { throw new ArgumentOutOfRangeException(nameof(Hosting), "Unknown Flutter host kind."); }
+        if (string.IsNullOrWhiteSpace(Hosting.ResourceName) || string.IsNullOrWhiteSpace(Hosting.ShellName)
+            || string.IsNullOrWhiteSpace(Hosting.ChatName))
+        { throw new ArgumentException("Flutter resource, shell and chat names must be specified."); }
+    }
+
+    private FlutterModuleOptions WithHost(FlutterHostKind kind) { Hosting = Hosting with { Kind = kind }; return this; }
 }

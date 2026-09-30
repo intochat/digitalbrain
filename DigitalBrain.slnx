@@ -54,7 +54,6 @@
   </Folder>
   <Folder Name="/Modules/Coding/">
     <Project Path="src/Modules/Coding/DigitalBrain.Modules.Coding.Tests.Unit/DigitalBrain.Modules.Coding.Tests.Unit.csproj" />
-    <Project Path="src/Modules/Coding/DigitalBrain.Modules.Coding.Aspire.Hosting/DigitalBrain.Modules.Coding.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/Coding/DigitalBrain.Modules.Coding/DigitalBrain.Modules.Coding.csproj" />
     <Project Path="src/Modules/Coding/DigitalBrain.Modules.Coding.Contracts/DigitalBrain.Modules.Coding.Contracts.csproj" />
   </Folder>

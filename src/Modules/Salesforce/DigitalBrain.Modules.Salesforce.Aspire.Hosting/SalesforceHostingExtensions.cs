@@ -6,21 +6,10 @@ namespace DigitalBrain.Salesforce.Aspire.Hosting;
 
 public static class SalesforceHostingExtensions
 {
-    public static DigitalBrainModuleBuilder<SalesforceModule> WithHostedMcp(
-        this DigitalBrainModuleBuilder<SalesforceModule> module, Action<SalesforceHostingOptions> configure)
-    {
-        ArgumentNullException.ThrowIfNull(module);
-        ArgumentNullException.ThrowIfNull(configure);
-        var options = new SalesforceHostingOptions();
-        configure(options);
-        return module.WithHostedMcp(options.Endpoint, options.PublicOrigin);
-    }
-
-    // Only the kernel receives these values. The endpoint defaults to the hosted sobject server;
-    // the public origin defaults to the kernel's own http endpoint.
+    // Only the kernel receives the OAuth parameters. The public origin defaults to the kernel's own http endpoint;
+    // the MCP endpoint is a module option.
     public static DigitalBrainModuleBuilder<SalesforceModule> WithHostedMcp(
         this DigitalBrainModuleBuilder<SalesforceModule> module,
-        Uri? endpoint = null,
         Uri? publicOrigin = null)
     {
         ArgumentNullException.ThrowIfNull(module);
@@ -30,7 +19,7 @@ public static class SalesforceHostingExtensions
             module.AddProjection(state);
         }
 
-        state.Enable(endpoint, publicOrigin);
+        state.Enable(publicOrigin);
         return module;
     }
 
@@ -41,15 +30,13 @@ public static class SalesforceHostingExtensions
         private const string OAuthRoot = SalesforceModule.OAuthConfigurationRoot;
 
         private bool _enabled;
-        private Uri? _endpoint;
         private Uri? _publicOrigin;
         private IResourceBuilder<ParameterResource>? _consumerKey;
         private IResourceBuilder<ParameterResource>? _consumerSecret;
 
-        internal void Enable(Uri? endpoint, Uri? publicOrigin)
+        internal void Enable(Uri? publicOrigin)
         {
             _enabled = true;
-            _endpoint = endpoint ?? _endpoint;
             _publicOrigin = publicOrigin ?? _publicOrigin;
         }
 
@@ -76,7 +63,6 @@ public static class SalesforceHostingExtensions
                 .WithParentRelationship(module);
 
             builder
-                .WithEnvironment(SalesforceModule.McpEndpointEnvironmentVariable, (_endpoint ?? SalesforceModule.DefaultMcpEndpoint).AbsoluteUri)
                 .WithEnvironment(EnvironmentKeys.For(OAuthRoot, "ConsumerKey"), _consumerKey)
                 .WithEnvironment(EnvironmentKeys.For(OAuthRoot, "ConsumerSecret"), _consumerSecret);
             if (_publicOrigin is { } origin)

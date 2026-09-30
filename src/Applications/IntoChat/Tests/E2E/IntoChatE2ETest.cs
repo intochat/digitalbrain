@@ -23,26 +23,25 @@ internal static class IntoChatE2ETest
 
     public static E2ETestBuilder<Projects.IntoChat_AppHost> Create(string modelApiKey = "fixture-key", Dictionary<string, string?>? privateConfiguration = null)
         => E2ETest.For<Projects.IntoChat_AppHost>()
-            .ConfigureModule<AIModule>(ai => ai.WithoutLocalModels().WithoutVoiceToText().WithoutWebSearch()
+            .ConfigureModule<AIModule, AIOptions>(ai => ai.WithoutLocalModels().WithoutVoiceToText().WithoutWebSearch()
                 .WithDefaultLlm<IGpt56Luna>().WithModelEndpoint(AiProvider.OpenAI, new(UnconfiguredProvider, "v1/")))
-            .ConfigureModule<QdrantModule>(qdrant => qdrant.ConfigureOptions<QdrantModuleOptions>(options => options.Host = false, "Host"))
-            .ConfigureModule<PostgresModule>(database => database.WithPostgres(options =>
+            .ConfigureModule<QdrantModule, QdrantModuleOptions>(qdrant => qdrant.Host = false)
+            .ConfigureModule<PostgresModule, PostgresModuleOptions>(database => database.WithPostgres(options =>
             {
                 options.DatabaseName = "customer-research";
                 options.PersistentStorage = false;
             }))
-            .ConfigureModule<ClickHouseModule>(database => database.WithClickHouse(options =>
+            .ConfigureModule<ClickHouseModule, ClickHouseModuleOptions>(database => database.WithClickHouse(options =>
             {
                 options.PersistentStorage = false;
                 options.WithSeed("leads");
             }))
-            .ConfigureModule<SupabaseModule>(database => database.WithPostgres())
-            .ConfigureModule<GmailModule>(gmail => gmail.WithTokenEndpoint(new(UnconfiguredProvider, "token")))
-            .ConfigureModule<SalesforceModule>(salesforce => salesforce.WithLocalMcp(new(UnconfiguredProvider, "mcp")))
-            .ConfigureModule<GitHubModule>(github => github.WithGitHubRepositories(new Dictionary<string, GitHubRepositoryDeclaration>()))
-            .ConfigureModule<CodingModule>(coding => coding.ConfigureOptions<CodingModuleOptions>(
-                options => options.SolutionPath = null, "SolutionPath"))
-            .ConfigureModule<FlutterModule>(flutter => flutter.BackendOnly())
+            .ConfigureModule<SupabaseModule, SupabaseModuleOptions>(database => database.WithPostgres())
+            .ConfigureModule<GmailModule, GmailModuleOptions>(gmail => gmail.WithTokenEndpoint(new(UnconfiguredProvider, "token")))
+            .ConfigureModule<SalesforceModule, SalesforceModuleOptions>(salesforce => salesforce.WithLocalMcp(new(UnconfiguredProvider, "mcp")))
+            .ConfigureModule<GitHubModule, GitHubModuleOptions>(github => github.WithGitHubRepositories(new Dictionary<string, GitHubRepositoryDeclaration>()))
+            .ConfigureModule<CodingModule, CodingModuleOptions>(coding => coding.SolutionPath = null)
+            .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .WithExecution(new()
             {
                 PrivateConfiguration = Merge(new Dictionary<string, string?>

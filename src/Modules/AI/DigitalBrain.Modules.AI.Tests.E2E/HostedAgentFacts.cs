@@ -17,15 +17,17 @@ public sealed class HostedAgentFacts
         deadline.CancelAfter(TimeSpan.FromMinutes(5));
         var ct = deadline.Token;
         using var endpoint = new Loopback();
-        var options = new AIOptions { Default = new() { Profile = "fixture" } };
-        options.ModelProfiles.Add("fixture", new AIModelProfileOptions
-        {
-            Provider = "OpenAI",
-            Model = "fixture-model",
-            Endpoint = endpoint.Url,
-            Capabilities = LlmCapabilities.None,
-        });
-        await using var brain = await E2ETest.Create().WithModule<AIModule>(m => m.WithOptions(options))
+        await using var brain = await E2ETest.Create().WithModule<AIModule, AIOptions>(options =>
+            {
+                options.Default.Profile = "fixture";
+                options.ModelProfiles.Add("fixture", new AIModelProfileOptions
+                {
+                    Provider = "OpenAI",
+                    Model = "fixture-model",
+                    Endpoint = endpoint.Url,
+                    Capabilities = LlmCapabilities.None,
+                });
+            })
             .WithExecution(new TestExecutionOptions
             {
                 PrivateConfiguration = new Dictionary<string, string?> { ["DigitalBrain:AI:OpenAI:ApiKey"] = "test-only" },

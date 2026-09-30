@@ -20,6 +20,27 @@ public sealed class E2ETestBuilder
         return this;
     }
 
+    public E2ETestBuilder WithModule<TModule, TOptions>(Action<TOptions>? configureOptions = null,
+        Action<ModuleConfiguration<TModule>>? configure = null)
+        where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
+    {
+        EnsureMutable();
+        using var scope = BrowserConfiguration.Begin(_browser);
+        _composition.WithModule(configureOptions, configure);
+        _browser = scope.Options;
+        return this;
+    }
+
+    public E2ETestBuilder ConfigureModule<TModule, TOptions>(Action<TOptions> configureOptions)
+        where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
+    {
+        EnsureMutable();
+        using var scope = BrowserConfiguration.Begin(_browser);
+        _composition.ConfigureModule<TModule, TOptions>(configureOptions);
+        _browser = scope.Options;
+        return this;
+    }
+
     public E2ETestBuilder ConfigureModule<TModule>(Action<ModuleConfiguration<TModule>> configure)
         where TModule : class, IModule, new()
     {

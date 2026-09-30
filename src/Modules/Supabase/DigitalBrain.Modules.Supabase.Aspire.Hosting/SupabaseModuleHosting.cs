@@ -1,6 +1,7 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Supabase.Aspire.Hosting;
@@ -9,8 +10,7 @@ public sealed class SupabaseModuleHosting : IDigitalBrainModuleHosting
 {
     public void Configure(DigitalBrainBuilder brain)
     {
-        var options = brain.GetModuleConfiguration<SupabaseModule>().GetSection(SupabaseModuleOptions.SectionName)
-            .Get<SupabaseModuleOptions>() ?? new();
+        var options = brain.GetModuleConfiguration<SupabaseModule>().GetModuleOptions<SupabaseModuleOptions>(nameof(SupabaseModule));
         var module = new DigitalBrainModuleBuilder<SupabaseModule>(brain);
         if (options.Hosting.Kind == SupabaseHostKind.External)
         {

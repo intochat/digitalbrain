@@ -1,16 +1,30 @@
+using System.Text.Json.Serialization;
+using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.ClickHouse;
 
-/// <summary>Public module settings. Credentials remain in the host's secret configuration.</summary>
-public sealed class ClickHouseModuleOptions
+public sealed class ClickHouseModuleOptions : IModuleOptions
 {
-    public const string SectionName = "DigitalBrain:ClickHouse";
-
     public string? Provider { get; set; }
     public string ConnectionName { get; set; } = ClickHouseRegistration.DefaultConnectionName;
+    [JsonIgnore]
     public string? ConnectionString { get; internal set; }
     public ClickHouseResourceOptions Hosting { get; set; } = new();
+
+    public ClickHouseModuleOptions WithClickHouse(Action<ClickHouseResourceOptions>? configure = null)
+    {
+        Provider = ClickHouseModule.DriverProviderName;
+        Hosting.Enabled = true;
+        configure?.Invoke(Hosting);
+        return this;
+    }
+
+    public void Validate()
+    {
+        if (Hosting.Seeds.Any(string.IsNullOrWhiteSpace))
+        { throw new ArgumentException("ClickHouse seed names must not be blank."); }
+    }
 
     internal void ResolveConnection(IConfiguration configuration)
     {

@@ -10,11 +10,10 @@ public sealed class CredentialFacts
     public void TypedApiKeysAreRejectedAndNeverEchoed()
     {
         const string secret = "must-not-appear-in-errors";
-        var options = new AIOptions { OpenAI = { ApiKey = secret } };
         var composition = Assert.Throws<ArgumentException>(() => new BrainCompositionBuilder()
-            .WithModule<AIModule>(ai => ai.WithOptions(options)).Build());
-        var overrides = Assert.Throws<ArgumentException>(() => new CompositionOverrides()
-            .ConfigureModule<AIModule>(ai => ai.WithOptions(options)).Serialize());
+            .WithModule<AIModule, AIOptions>(ai => ai.OpenAI.ApiKey = secret).Build());
+        var overrides = Assert.Throws<ArgumentException>(() => new BrainCompositionBuilder().WithModule<AIModule, AIOptions>()
+            .ApplyOverrides(new CompositionOverrides().ConfigureModule<AIModule, AIOptions>(ai => ai.OpenAI.ApiKey = secret).Serialize()));
         foreach (var error in new[] { composition, overrides })
         {
             Assert.Contains("private configuration", error.Message, StringComparison.OrdinalIgnoreCase);

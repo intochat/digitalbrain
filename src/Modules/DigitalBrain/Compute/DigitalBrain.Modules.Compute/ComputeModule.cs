@@ -13,11 +13,8 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Compute;
 
-[ModuleConfiguration(typeof(ComputeConfigurationContract))]
 public sealed class ComputeModule : IModule
 {
-    public static ModuleDefinition Define() => new(typeof(ComputeModule));
-
     public void Configure(ISiloBuilder silo)
     {
         ArgumentNullException.ThrowIfNull(silo);

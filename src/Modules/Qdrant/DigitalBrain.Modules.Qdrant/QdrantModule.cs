@@ -6,20 +6,9 @@ using Orleans.Hosting;
 namespace DigitalBrain.Qdrant;
 
 [ModuleDeployment("DigitalBrain.Qdrant.QdrantDeployment, DigitalBrain.Modules.Qdrant.Deployment")]
-[ModuleConfiguration(typeof(QdrantConfigurationContract))]
-[ModuleHosting("DigitalBrain.Qdrant.Aspire.Hosting.QdrantModuleHosting, DigitalBrain.Modules.Qdrant.Aspire.Hosting")]
-public sealed class QdrantModule : IModule
+public sealed class QdrantModule : IModule<QdrantModuleOptions>
 {
     public const string ConnectionName = "qdrant";
-
-    public static ModuleDefinition Define(QdrantModuleOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        return new(typeof(QdrantModule), new Dictionary<string, string?>
-        {
-            [QdrantModuleOptions.SectionName + ":Host"] = options.Host.ToString(),
-        });
-    }
 
     public static bool IsConnected(IConfiguration configuration)
         => !string.IsNullOrWhiteSpace(configuration.GetConnectionString(ConnectionName));
@@ -40,23 +29,15 @@ public sealed class QdrantModule : IModule
     }
 }
 
-public sealed class QdrantModuleOptions
+public sealed class QdrantModuleOptions : IModuleOptions
 {
-    public const string SectionName = "DigitalBrain:Qdrant";
-
     public bool Host { get; set; }
-}
 
-public sealed class QdrantConfigurationContract() : ModuleConfigurationContract<QdrantModule, QdrantModuleOptions>("Host")
-{
-    protected override ModuleDefinition Compile(QdrantModuleOptions options) => QdrantModule.Define(options);
-}
-
-public static class QdrantModuleConfiguration
-{
-    public static ModuleConfiguration<QdrantModule> WithHostedQdrant(this ModuleConfiguration<QdrantModule> module)
+    public QdrantModuleOptions WithHostedQdrant()
     {
-        module.ConfigureOptions<QdrantModuleOptions>(options => options.Host = true, "Host");
-        return module;
+        Host = true;
+        return this;
     }
+
+    public void Validate() { }
 }

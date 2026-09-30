@@ -1,6 +1,7 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Microsoft.CSharp;
@@ -11,7 +12,7 @@ public sealed class CSharpModuleHosting : IDigitalBrainModuleHosting
     public void Configure(DigitalBrainBuilder brain)
     {
         ArgumentNullException.ThrowIfNull(brain);
-        var options = brain.GetModuleConfiguration<CSharpModule>().GetSection(CSharpOptions.SectionName).Get<CSharpOptions>() ?? new();
+        var options = brain.GetModuleConfiguration<CSharpModule>().GetModuleOptions<CSharpOptions>(nameof(CSharpModule));
         // The same fallback the silo uses, so composing the module in a repository always declares
         // the sandbox; only a host without any repository (the session-pool path) has none.
         if (string.IsNullOrWhiteSpace(options.SourceRoot)) { options.SourceRoot = CSharpModule.FindRepositoryRoot(); }

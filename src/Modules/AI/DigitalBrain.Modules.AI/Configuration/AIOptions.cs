@@ -1,9 +1,11 @@
+using System.Text.Json.Serialization;
+using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.AI;
 
-public sealed class AIOptions
+public sealed class AIOptions : IModuleOptions
 {
     public const string SectionName = "DigitalBrain:AI";
     public AIDefaultOptions Default { get; set; } = new();
@@ -15,6 +17,7 @@ public sealed class AIOptions
     public OllamaOptions Ollama { get; set; } = new();
     public TavilyOptions Tavily { get; set; } = new();
     public AIHostingOptions Hosting { get; set; } = new();
+    [JsonObjectCreationHandling(JsonObjectCreationHandling.Populate)]
     public Dictionary<string, AIModelProfileOptions> ModelProfiles { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     internal AIProviderOptions Provider(AiProvider provider) => provider switch
@@ -27,18 +30,48 @@ public sealed class AIOptions
         _ => throw new NotSupportedException($"{provider} has no hosted provider settings."),
     };
 
+    public void Validate()
+    {
+        if (OpenAI.ApiKey is not null || Anthropic.ApiKey is not null || Google.ApiKey is not null
+            || XAI.ApiKey is not null || Ollama.ApiKey is not null || Tavily.ApiKey is not null)
+        {
+            throw new ArgumentException("API keys cannot be supplied in module declarations. Use private configuration or Aspire secret parameters instead.");
+        }
+        if (Hosting.Llms.Any(name => LLMModel.FindByMarkerName(name) is null))
+        { throw new ArgumentException("Unknown LLM marker in the module declaration."); }
+        if (Hosting.Embeddings.Any(name => EmbeddingModel.FindByMarkerName(name) is null))
+        { throw new ArgumentException("Unknown embedding marker in the module declaration."); }
+    }
+
+    // The declared topology and defaults arrive as the module's options; provider credentials and
+    // the keys hosting projects into the environment stay on the DigitalBrain:AI configuration path.
     internal static AIOptions Read(IConfiguration configuration)
     {
-        var options = configuration.GetSection(SectionName).Get<AIOptions>() ?? new();
+        var options = configuration.GetModuleOptions<AIOptions>(nameof(AIModule));
+        configuration.GetSection(SectionName).Bind(options);
         ProjectLegacyKeys(options, configuration);
         return options;
     }
 
     internal static void Register(IServiceCollection services)
     {
-        services.AddOptions<AIOptions>().BindConfiguration(SectionName)
-            .Configure<IConfiguration>(ProjectLegacyKeys);
+        services.AddOptions<AIOptions>().Configure<IConfiguration>((options, configuration) => options.CopyFrom(Read(configuration)));
         services.AddOptions<AIWorkspaceOptions>().BindConfiguration(AIWorkspaceOptions.SectionName);
+    }
+
+    private void CopyFrom(AIOptions source)
+    {
+        Default = source.Default;
+        Telemetry = source.Telemetry;
+        OpenAI = source.OpenAI;
+        Anthropic = source.Anthropic;
+        Google = source.Google;
+        XAI = source.XAI;
+        Ollama = source.Ollama;
+        Tavily = source.Tavily;
+        Hosting = source.Hosting;
+        ModelProfiles.Clear();
+        foreach (var (name, profile) in source.ModelProfiles) { ModelProfiles[name] = profile; }
     }
 
     // Model markers are open-ended child keys beside Endpoint, rather than under Models.
@@ -102,6 +135,7 @@ public class AIProviderOptions
 
 public sealed class OllamaOptions : AIProviderOptions
 {
+    [JsonObjectCreationHandling(JsonObjectCreationHandling.Populate)]
     public Dictionary<string, AIModelOptions> Models { get; } = new(StringComparer.OrdinalIgnoreCase);
 }
 

@@ -1,4 +1,5 @@
 using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Microsoft.GitHub;
@@ -7,8 +8,7 @@ public sealed class GitHubModuleHosting : IDigitalBrainModuleHosting
 {
     public void Configure(DigitalBrainBuilder brain)
     {
-        var repositories = brain.GetModuleConfiguration<GitHubModule>().GetSection("DigitalBrain:Microsoft:GitHub:Repositories")
-            .Get<Dictionary<string, GitHubRepositoryDeclaration>>() ?? [];
+        var repositories = brain.GetModuleConfiguration<GitHubModule>().GetModuleOptions<GitHubModuleOptions>(nameof(GitHubModule)).Repositories;
         var module = new DigitalBrainModuleBuilder<GitHubModule>(brain);
         foreach (var (id, repo) in repositories)
         {

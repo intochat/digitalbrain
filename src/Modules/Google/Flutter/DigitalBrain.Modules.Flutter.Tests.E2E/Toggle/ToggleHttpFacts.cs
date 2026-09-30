@@ -13,7 +13,7 @@ public sealed class ToggleHttpFacts
     public async Task GetMatchesSet()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
+        await using var brain = await E2ETest.Create().WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
         await brain.Get<IToggle>(UiScope.Key("workspace-a", "dark")).Set("Dark", true);
         var state = await brain.HttpClient.GetFromJsonAsync<ToggleState>("/brains/workspace-a/ui/toggles/dark", new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, ct);

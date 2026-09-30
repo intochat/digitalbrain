@@ -16,7 +16,7 @@ public sealed class WebBrowserHttpFacts
     public async Task NavigateUpdatesSnapshot()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
+        await using var brain = await E2ETest.Create().WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
         using var navigate = await brain.HttpClient.PostAsJsonAsync("/brains/workspace-a/ui/browsers/docs/navigate",
             new { uri = "https://learn.microsoft.com/", title = "Docs" }, ct);

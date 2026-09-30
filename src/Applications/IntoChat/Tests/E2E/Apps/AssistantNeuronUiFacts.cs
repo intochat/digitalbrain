@@ -14,7 +14,7 @@ public sealed class AssistantNeuronUiFacts
         var ct = TestContext.Current.CancellationToken;
         await using var model = await ScriptedModelServer.StartAsync(ct);
         await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<AIModule>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint)).StartAsync(ct);
+            .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint)).StartAsync(ct);
         await LeadData.SeedAsync(brain, "Neuron UI", ct);
         async Task<JsonElement> Open()
         {

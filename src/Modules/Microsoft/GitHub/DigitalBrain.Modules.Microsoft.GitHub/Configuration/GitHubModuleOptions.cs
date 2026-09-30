@@ -1,8 +1,27 @@
+using DigitalBrain.Core;
+
 namespace DigitalBrain.Microsoft.GitHub;
 
-public sealed class GitHubModuleOptions
+// The declared repositories reach the AppHost's hosting adapter, which projects the repository identity keys and
+// the private key and webhook secret parameters on the DigitalBrain:Microsoft:GitHub:Repositories configuration path.
+public sealed class GitHubModuleOptions : IModuleOptions
 {
     public Dictionary<string, GitHubRepositoryDeclaration> Repositories { get; set; } = new(StringComparer.Ordinal);
+
+    public GitHubModuleOptions WithGitHubRepositories(IReadOnlyDictionary<string, GitHubRepositoryDeclaration> repositories)
+    {
+        Repositories = new(repositories, StringComparer.Ordinal);
+        return this;
+    }
+
+    public void Validate()
+    {
+        foreach (var id in Repositories.Keys)
+        {
+            if (id.Length is 0 or > 80 || id.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '-'))
+            { throw new ArgumentException("Repository binding IDs must contain letters, numbers or hyphens."); }
+        }
+    }
 }
 
 public sealed class GitHubRepositoryDeclaration

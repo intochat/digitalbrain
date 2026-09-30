@@ -104,7 +104,7 @@ public sealed class GoldenJourneyFacts
         Assert.False(string.IsNullOrWhiteSpace(key), "Live model verification requires DIGITALBRAIN_E2E_MODEL_API_KEY.");
         var endpoint = new Uri(Environment.GetEnvironmentVariable("DIGITALBRAIN_E2E_MODEL_ENDPOINT") ?? "https://api.openai.com/v1/");
         return await IntoChatE2ETest.Create(key!)
-            .ConfigureModule<AIModule>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, endpoint))
+            .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, endpoint))
             .StartAsync(ct);
     }
 

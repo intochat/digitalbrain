@@ -1,6 +1,7 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
+using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Qdrant.Aspire.Hosting;
@@ -10,7 +11,7 @@ public sealed class QdrantModuleHosting : IDigitalBrainModuleHosting
     public void Configure(DigitalBrainBuilder brain)
     {
         ArgumentNullException.ThrowIfNull(brain);
-        var options = brain.GetModuleConfiguration<QdrantModule>().GetSection(QdrantModuleOptions.SectionName).Get<QdrantModuleOptions>() ?? new();
+        var options = brain.GetModuleConfiguration<QdrantModule>().GetModuleOptions<QdrantModuleOptions>(nameof(QdrantModule));
         if (!options.Host) { return; }
         var module = new DigitalBrainModuleBuilder<QdrantModule>(brain);
         var qdrant = brain.ApplicationBuilder.AddQdrant(QdrantModule.ConnectionName + "-server")

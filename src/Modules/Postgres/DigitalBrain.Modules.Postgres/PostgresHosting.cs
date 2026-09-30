@@ -1,4 +1,5 @@
 using DigitalBrain.AI.Agents;
+using DigitalBrain.Core;
 using DigitalBrain.Supabase;
 using DigitalBrain.Supabase.Windows;
 using Microsoft.Extensions.Configuration;
@@ -22,7 +23,7 @@ public static class PostgresHosting
         if (services.Any(descriptor => descriptor.ServiceType == typeof(PostgresRegistration))) { return silo; }
         services.AddSingleton<PostgresRegistration>();
         services.AddOptions<PostgresModuleOptions>()
-            .Bind(silo.Configuration.GetSection(PostgresModuleOptions.SectionName))
+            .Configure<IConfiguration>((options, configuration) => configuration.PopulateModuleOptions(nameof(PostgresModule), options))
             .Validate(options => !string.IsNullOrWhiteSpace(options.ConnectionName), "Postgres requires a connection name.")
             .Validate<IConfiguration>((options, configuration) => IsConnectionValid(configuration.GetConnectionString(options.ConnectionName)),
                 "Postgres requires a valid PostgreSQL URI or Npgsql connection string for its configured connection name.")

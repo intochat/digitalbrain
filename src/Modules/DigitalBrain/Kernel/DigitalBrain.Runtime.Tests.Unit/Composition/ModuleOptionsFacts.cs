@@ -56,6 +56,31 @@ public sealed class ModuleOptionsFacts
         ModuleSettingsValidation.ValidatePublicSettings([definition]);
     }
 
+    [Fact]
+    public void TheModuleListBindsBesideAnOptionsKeyUnderTheSameSection()
+    {
+        var options = ModuleOptionsSerialization.Compile<FakeModule, FakeOptions>(new() { Flag = true });
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(options.Configuration)
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["DigitalBrain:Modules:0"] = "First.Module, First",
+                ["DigitalBrain:Modules:1"] = "Second.Module, Second",
+            }).Build();
+        Assert.Equal(["First.Module, First", "Second.Module, Second"], configuration.SelectedModuleNames());
+        Assert.True(configuration.GetModuleOptions<FakeOptions>(nameof(FakeModule)).Flag);
+    }
+
+    [Fact]
+    public void PopulateCopiesBoundOptionsOntoAnExistingInstance()
+    {
+        var definition = ModuleOptionsSerialization.Compile<FakeModule, FakeOptions>(new() { Flag = true, Endpoint = new("https://x.example/") });
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(definition.Configuration).Build();
+        var target = new FakeOptions();
+        configuration.PopulateModuleOptions(nameof(FakeModule), target);
+        Assert.True(target.Flag);
+        Assert.Equal(new Uri("https://x.example/"), target.Endpoint);
+    }
+
     private sealed class LeakyOptions : IModuleOptions
     {
         public string ApiKey { get; set; } = "";

@@ -7,7 +7,6 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Assistant;
 
-[ModuleConfiguration(typeof(AssistantConfigurationContract))]
 public sealed class AssistantModule : IModule
 {
     public void Configure(ISiloBuilder silo)

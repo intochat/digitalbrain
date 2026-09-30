@@ -88,7 +88,7 @@ public sealed class ContentCaptureFacts
             };
             foreach (var (key, value) in environment) { primary[key] = value; }
             return IntoChatE2ETest.Create()
-                .ConfigureModule<AIModule>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
+                .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
                 .WithResourceEnvironment(primary)
                 .StartAsync(ct);
         }

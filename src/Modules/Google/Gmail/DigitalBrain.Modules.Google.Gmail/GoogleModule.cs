@@ -2,6 +2,7 @@ using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Core;
 using DigitalBrain.Sdk;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,23 +12,8 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Google.Gmail;
 
-[ModuleConfiguration(typeof(GmailConfigurationContract))]
-[ModuleHosting("DigitalBrain.Google.Gmail.GmailModuleHosting, DigitalBrain.Modules.Google.Gmail.Aspire.Hosting")]
-public sealed class GmailModule : IModule
+public sealed class GmailModule : IModule<GmailModuleOptions>
 {
-    public static ModuleDefinition Define(GmailModuleOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        if (options.PublicOrigin is { IsAbsoluteUri: false }) { throw new ArgumentException("Google PublicOrigin must be absolute.", nameof(options)); }
-        if (!options.TokenEndpoint.IsAbsoluteUri || options.TokenEndpoint.Scheme is not ("http" or "https"))
-        { throw new ArgumentException("Google token endpoint must be an absolute HTTP URL.", nameof(options)); }
-        return new(typeof(GmailModule), new Dictionary<string, string?>
-        {
-            [GmailOAuthConfigurationRoot + ":PublicOrigin"] = options.PublicOrigin?.AbsoluteUri ?? "",
-            [GmailOAuthConfigurationRoot + ":TokenEndpoint"] = options.TokenEndpoint.AbsoluteUri,
-            [GmailOAuthConfigurationRoot + ":HostGmail"] = options.HostGmail.ToString(),
-        });
-    }
     public const string GmailOAuthConfigurationRoot = "DigitalBrain:Google:Gmail:OAuth";
 
     public void Configure(ISiloBuilder silo)
@@ -36,7 +22,14 @@ public sealed class GmailModule : IModule
         var services = silo.Services;
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<TokenHandoff>();
-        services.AddOptions<GmailOAuthOptions>().Bind(silo.Configuration.GetSection(GmailOAuthOptions.SectionName));
+        var moduleOptions = silo.Configuration.GetModuleOptions<GmailModuleOptions>(nameof(GmailModule));
+        // ClientId and ClientSecret keep their private DigitalBrain:Google:Gmail:OAuth path; the declared origin and token endpoint arrive as module options.
+        services.AddOptions<GmailOAuthOptions>().Bind(silo.Configuration.GetSection(GmailOAuthOptions.SectionName))
+            .Configure(oauth =>
+            {
+                if (moduleOptions.PublicOrigin is { } origin) { oauth.PublicOrigin = origin.AbsoluteUri; }
+                oauth.TokenEndpoint = moduleOptions.TokenEndpoint.AbsoluteUri;
+            });
         services.TryAddSingleton(static services => new GmailOAuthConfiguration(services.GetRequiredService<IOptions<GmailOAuthOptions>>()));
         services.TryAddSingleton<GmailLogins>();
         services.AddSingleton<BrowserLogins>(s => s.GetRequiredService<GmailLogins>());

@@ -13,7 +13,7 @@ public sealed class TestAssemblyModuleFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create()
-            .WithModule<EndpointModule>(m => m.ConfigureOptions<EndpointOptions>(o => o.Endpoint = "http://127.0.0.1:8123/v1", "Endpoint"))
+            .WithModule<EndpointModule, EndpointOptions>(o => o.Endpoint = "http://127.0.0.1:8123/v1")
             .StartAsync(ct);
         Assert.Equal("http://127.0.0.1:8123/v1", await brain.HttpClient.GetStringAsync("/configured-endpoint", ct));
         Assert.NotEqual(Environment.ProcessId,
@@ -21,16 +21,15 @@ public sealed class TestAssemblyModuleFacts
     }
 }
 
-[ModuleConfiguration(typeof(EndpointContract))]
-public sealed class EndpointModule : IModule
+public sealed class EndpointModule : IModule<EndpointOptions>
 {
     public void Configure(Orleans.Hosting.ISiloBuilder silo) { }
     public void Configure(IEndpointRouteBuilder endpoints)
-        => endpoints.MapGet("/configured-endpoint", (IConfiguration configuration) => configuration["Example:Endpoint"] ?? "unset");
+        => endpoints.MapGet("/configured-endpoint",
+            (IConfiguration configuration) => configuration.GetModuleOptions<EndpointOptions>(nameof(EndpointModule)).Endpoint ?? "unset");
 }
-public sealed class EndpointOptions { public string? Endpoint { get; set; } }
-public sealed class EndpointContract() : ModuleConfigurationContract<EndpointModule, EndpointOptions>("Endpoint")
+public sealed class EndpointOptions : IModuleOptions
 {
-    protected override ModuleDefinition Compile(EndpointOptions options)
-        => new(typeof(EndpointModule), new Dictionary<string, string?> { ["Example:Endpoint"] = options.Endpoint });
+    public string? Endpoint { get; set; }
+    public void Validate() { }
 }

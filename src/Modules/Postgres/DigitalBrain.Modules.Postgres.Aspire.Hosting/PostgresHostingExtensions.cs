@@ -80,7 +80,6 @@ internal static class PostgresHostingExtensions
             {
                 builder.WithEnvironment($"ConnectionStrings__{_configuration.ConnectionName}", _connection);
             }
-            builder.WithEnvironment("DigitalBrain__Postgres__ConnectionName", _configuration.ConnectionName);
         }
     }
 }

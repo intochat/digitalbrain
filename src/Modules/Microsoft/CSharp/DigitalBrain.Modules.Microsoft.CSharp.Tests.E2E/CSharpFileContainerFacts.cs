@@ -42,7 +42,7 @@ public sealed class CSharpFileContainerFacts
         await using var brain = await E2ETest.Create()
             .WithModule<TimeModule>()
             .WithModule<AspireModule>()
-            .WithModule<CSharpModule>(csharp => csharp.WithSandbox(RepositoryRoot()))
+            .WithModule<CSharpModule, CSharpOptions>(csharp => csharp.WithSandbox(RepositoryRoot()))
             .StartAsync(ct);
         var aspire = brain.Get<IAspire>(new AspireOptions().ApplicationName);
         await using var sandboxStates = await brain.Observe<ResourceStateChanged>(aspire, ct);

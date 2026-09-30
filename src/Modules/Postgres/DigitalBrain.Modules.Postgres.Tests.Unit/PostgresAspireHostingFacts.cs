@@ -29,7 +29,7 @@ public sealed class PostgresAspireHostingFacts
         Assert.Equal(persistent, server.Annotations.OfType<ContainerLifetimeAnnotation>().Any(lifetime => lifetime.Lifetime == ContainerLifetime.Persistent));
         var environment = await EnvironmentOf(builder, consumer.Resource);
         Assert.Contains("ConnectionStrings__reporting", environment.Keys);
-        Assert.Equal("reporting", environment["DigitalBrain__Postgres__ConnectionName"]);
+        Assert.Contains("\"ConnectionName\":\"reporting\"", Assert.IsType<string>(environment["DigitalBrain__Modules__PostgresModule__Options"]));
     }
 
     [Fact]
@@ -38,7 +38,7 @@ public sealed class PostgresAspireHostingFacts
         var builder = CreateBuilder();
         builder.Configuration["ConnectionStrings:reporting"] = "Host=external;Database=analytics;Username=reader;Password=test-only";
         var brain = builder.AddDigitalBrain("brain", persistentStorage: false)
-            .WithModule<PostgresModule>(module => module.WithPostgres().WithConnection("reporting"));
+            .WithModule<PostgresModule, PostgresModuleOptions>(module => module.WithPostgres().WithConnection("reporting"));
         var consumer = builder.AddExecutable("consumer", "unused", ".").WithReference(brain);
 
         Assert.Empty(builder.Resources.OfType<PostgresServerResource>());
@@ -53,7 +53,7 @@ public sealed class PostgresAspireHostingFacts
     {
         var builder = CreateBuilder();
         var brain = builder.AddDigitalBrain("brain", persistentStorage: false)
-            .WithModule<PostgresModule>(module => module.WithConnection("reporting").WithPostgres(options =>
+            .WithModule<PostgresModule, PostgresModuleOptions>(module => module.WithConnection("reporting").WithPostgres(options =>
             {
                 options.DatabaseName = "analytics";
                 options.PersistentStorage = false;
@@ -81,18 +81,17 @@ public sealed class PostgresAspireHostingFacts
         builder.AddExecutable("consumer", "unused", ".").WithReference(brain);
         Assert.Single(builder.Resources.OfType<PostgresServerResource>());
         Assert.Single(builder.Resources.OfType<PostgresDatabaseResource>());
-        brain.GetModuleConfiguration<PostgresModule>()["DigitalBrain:Postgres:Hosting:DatabaseName"] = "different";
+        brain.GetModuleConfiguration<PostgresModule>()["DigitalBrain:Modules:PostgresModule:Options"] =
+            """{"ConnectionName":"reporting","Hosting":{"Enabled":true,"DatabaseName":"different","PersistentStorage":false}}""";
         Assert.Throws<InvalidOperationException>(() => hosting.Configure(brain));
         Assert.Single(builder.Resources.OfType<PostgresDatabaseResource>());
     }
 
     private static ModuleDefinition Definition(bool enabled, bool persistent)
-        => new(typeof(PostgresModule), new Dictionary<string, string?>
+        => ModuleOptionsSerialization.Compile<PostgresModule, PostgresModuleOptions>(new()
         {
-            ["DigitalBrain:Postgres:ConnectionName"] = "reporting",
-            ["DigitalBrain:Postgres:Hosting:Enabled"] = enabled.ToString(),
-            ["DigitalBrain:Postgres:Hosting:DatabaseName"] = "analytics",
-            ["DigitalBrain:Postgres:Hosting:PersistentStorage"] = persistent.ToString(),
+            ConnectionName = "reporting",
+            Hosting = new() { Enabled = enabled, DatabaseName = "analytics", PersistentStorage = persistent },
         });
 
     private static IDistributedApplicationBuilder CreateBuilder()

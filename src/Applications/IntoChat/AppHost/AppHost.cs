@@ -35,10 +35,9 @@ using DigitalBrain.Files;
 
 var builder = DistributedApplication.CreateBuilder(args);
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serviceId: "intochat")
-    .WithModule<AIModule>(ai =>
+    .WithModule<AIModule, AIOptions>(ai =>
     {
-        ai.ConfigureOptions<AIOptions>(options =>
-            options.Telemetry.EnableSensitiveData = true);
+        ai.Telemetry.EnableSensitiveData = true;
 
         ai.WithLlm<IGpt56Luna>()
             .WithDefaultLlm<IGemma4>()
@@ -46,21 +45,21 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serv
             .WithVoiceToText<IWhisperLargeV3Turbo>()
             .WithTavilySearch();
     })
-    .WithModule<QdrantModule>(qdrant => qdrant.WithHostedQdrant())
+    .WithModule<QdrantModule, QdrantModuleOptions>(qdrant => qdrant.WithHostedQdrant())
     .WithModule<MemoryModule>()
-    .WithModule<ClickHouseModule>(database => database.WithClickHouse(options => options.WithSeed("leads")))
-    .WithModule<SupabaseModule>(database => database.WithConnection("supabase"))
-    .WithModule<PostgresModule>(database => database.WithPostgres(options => options.DatabaseName = "customer-research"))
+    .WithModule<ClickHouseModule, ClickHouseModuleOptions>(database => database.WithClickHouse(options => options.WithSeed("leads")))
+    .WithModule<SupabaseModule, SupabaseModuleOptions>(database => database.WithConnection("supabase"))
+    .WithModule<PostgresModule, PostgresModuleOptions>(database => database.WithPostgres(options => options.DatabaseName = "customer-research"))
     .WithModule<PlaywrightModule>()
     .WithModule<TimeModule>()
     .WithModule<SecretsModule>()
     .WithModule<ConnectorModule>()
     .WithModule<IdentityModule>()
     .WithModule<FilesModule>()
-    .WithModule<GmailModule>(gmail => gmail.WithGmail())
-    .WithModule<SalesforceModule>(salesforce => salesforce.WithHostedMcp())
+    .WithModule<GmailModule, GmailModuleOptions>(gmail => gmail.WithGmail())
+    .WithModule<SalesforceModule, SalesforceModuleOptions>(salesforce => salesforce.WithHostedMcp())
     .WithModule<GitHubModule>()
-    .WithModule<FlutterModule>(flutter => flutter.RunDesktopApp())
+    .WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunDesktopApp())
     .WithModule<ComputeModule>()
     .WithModule<RegistryModule>()
     .WithModule<SpecsModule>()

@@ -15,7 +15,7 @@ public sealed class WorkspaceRestoreFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<FlutterModule>(flutter => flutter.RunWebApp()).StartAsync(ct);
+            .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp()).StartAsync(ct);
         const string marker = "Restored filtered row";
         await LeadData.SeedAsync(brain, marker, ct);
         var page = brain.Page;

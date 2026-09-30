@@ -93,9 +93,7 @@ public static class ClickHouseHostingExtensions
             // Waiting on the database resource covers server health and the CREATE DATABASE step.
             builder
                 .WithReference(_database, connectionName: ClickHouseRegistration.DefaultConnectionName)
-                .WithAnnotation(new WaitAnnotation(_database.Resource, WaitType.WaitUntilHealthy, exitCode: 0))
-                .WithEnvironment(EnvironmentKeys.For(ClickHouseModule.ConfigurationRoot, "Provider"), ClickHouseModule.DriverProviderName)
-                .WithEnvironment(EnvironmentKeys.For(ClickHouseModule.ConfigurationRoot, "ConnectionName"), ClickHouseRegistration.DefaultConnectionName);
+                .WithAnnotation(new WaitAnnotation(_database.Resource, WaitType.WaitUntilHealthy, exitCode: 0));
         }
     }
 }

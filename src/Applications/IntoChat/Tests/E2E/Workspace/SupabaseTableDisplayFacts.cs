@@ -14,7 +14,7 @@ public sealed class SupabaseTableDisplayFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<FlutterModule>(flutter => flutter.RunWebApp()).StartAsync(ct);
+            .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp()).StartAsync(ct);
         const string marker = "Beyond the first page";
         await LeadData.SeedAsync(brain, marker, ct);
         var page = brain.Page;
@@ -47,7 +47,7 @@ public sealed class SupabaseTableDisplayFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<FlutterModule>(flutter => flutter.RunWebApp()).StartAsync(ct);
+            .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp()).StartAsync(ct);
         await LeadData.SeedAsync(brain, "Beyond first page", ct);
         var page = brain.Page;
         await page.SetViewportSizeAsync(1600, 1000);

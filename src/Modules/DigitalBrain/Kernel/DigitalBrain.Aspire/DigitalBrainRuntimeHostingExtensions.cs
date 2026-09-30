@@ -69,7 +69,7 @@ public static class DigitalBrainRuntimeHostingExtensions
 
     private static IReadOnlyList<IModule> LoadModules(IConfiguration configuration)
     {
-        var names = configuration.GetSection("DigitalBrain:Modules").Get<string[]>() ?? [];
+        var names = configuration.SelectedModuleNames();
         var modules = new List<IModule>(names.Length);
         foreach (var name in names)
         {

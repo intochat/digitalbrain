@@ -1,33 +1,40 @@
 namespace DigitalBrain.Core;
 
-/// <summary>Explicit member overrides for modules already declared by an application.</summary>
+/// <summary>Option edits for modules already declared by an application, applied to that application's own options.</summary>
 public sealed class CompositionOverrides
 {
-    private readonly Dictionary<Type, ModuleDraft> _modules = [];
+    private readonly Dictionary<Type, List<Delegate>> _optionEdits = [];
+    private readonly HashSet<Type> _localServiceModules = [];
     private string? _serialized;
+
+    public CompositionOverrides ConfigureModule<TModule, TOptions>(Action<TOptions> configureOptions)
+        where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
+    {
+        EnsureMutable();
+        ArgumentNullException.ThrowIfNull(configureOptions);
+        if (!_optionEdits.TryGetValue(typeof(TModule), out var edits)) { _optionEdits[typeof(TModule)] = edits = []; }
+        edits.Add(configureOptions);
+        return this;
+    }
 
     public CompositionOverrides ConfigureModule<TModule>(Action<ModuleConfiguration<TModule>> configure)
         where TModule : class, IModule, new()
     {
         EnsureMutable();
         ArgumentNullException.ThrowIfNull(configure);
-        var draft = _modules.TryGetValue(typeof(TModule), out var previous) ? previous.Copy() : new(typeof(TModule));
+        var draft = new ModuleDraft(typeof(TModule));
         configure(new(draft, EnsureMutable));
-        _modules[typeof(TModule)] = draft;
+        if (draft.LocalServices.Count > 0) { _localServiceModules.Add(typeof(TModule)); }
         return this;
     }
 
     public string Serialize()
     {
         if (_serialized is not null) { return _serialized; }
-        return _serialized = CompositionOverrideTransport.Write(_modules.Values.Select(draft =>
-        {
-            if (draft.LocalServices.Count > 0)
-            { throw new NotSupportedException("Local service substitutions cannot cross process boundaries. Use a hosted provider or endpoint fixture."); }
-            var contract = draft.Contract ?? throw new InvalidOperationException($"{draft.Type.Name} has no configurable options.");
-            return new CompositionOverrideTransport.Entry(draft.Type.FullName!, draft.Replace
-                ? contract.WriteReplacement(draft.Options!) : contract.WriteOverride(draft.Options!, draft.Assigned));
-        }).ToArray());
+        if (_localServiceModules.Count > 0)
+        { throw new NotSupportedException("Local service substitutions cannot cross process boundaries. Use a hosted provider or endpoint fixture."); }
+        return _serialized = CompositionOverrideTransport.Publish(
+            [.. _optionEdits.Select(pair => new CompositionOverrideTransport.ModuleEdit(pair.Key, pair.Value))]);
     }
 
     private void EnsureMutable()

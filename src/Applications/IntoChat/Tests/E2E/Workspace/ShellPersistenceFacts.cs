@@ -48,7 +48,7 @@ public sealed class ShellPersistenceFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<FlutterModule>(flutter => flutter.RunWebApp()).StartAsync(ct);
+            .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp()).StartAsync(ct);
         var page = brain.Page;
         var id = await WorkspaceBrowser.CreateProjectAsync(page, "Cloud-only workspace");
         var durable = false;

@@ -10,11 +10,8 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Identity;
 
-[ModuleConfiguration(typeof(IdentityConfigurationContract))]
 public sealed class IdentityModule : IModule
 {
-    public static ModuleDefinition Define() => new(typeof(IdentityModule));
-
     public void Configure(ISiloBuilder silo)
     {
         ArgumentNullException.ThrowIfNull(silo);

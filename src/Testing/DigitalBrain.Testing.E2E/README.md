@@ -7,13 +7,13 @@ runs a frontend, so the same package covers HTTP-only and full browser scenarios
 ```csharp
 // HTTP only: no frontend process, no browser.
 await using var brain = await E2ETest.Create()
-    .WithModule<FlutterModule>(flutter => flutter.BackendOnly())
+    .WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
     .StartAsync(ct);
 using var response = await brain.HttpClient.PostAsJsonAsync("/brains/brain-a/ui/buttons/go/click", new { }, ct);
 
 // Frontend: E2E opens a page automatically.
 await using var app = await E2ETest.Create()
-    .WithModule<FlutterModule>(flutter => flutter.RunWebApp())
+    .WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp())
     .StartAsync(ct);
 await Assertions.Expect(app.Page.GetByText("Expected content")).ToBeVisibleAsync();
 ```

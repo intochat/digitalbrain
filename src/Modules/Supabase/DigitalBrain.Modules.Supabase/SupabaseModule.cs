@@ -11,25 +11,10 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Supabase;
 
-[ModuleConfiguration(typeof(SupabaseConfigurationContract))]
-[ModuleHosting("DigitalBrain.Supabase.Aspire.Hosting.SupabaseModuleHosting, DigitalBrain.Modules.Supabase.Aspire.Hosting")]
-public sealed class SupabaseModule : IModule
+public sealed class SupabaseModule : IModule<SupabaseModuleOptions>
 {
     public const string ConnectionName = "supabase";
     public const string ProviderName = "Npgsql";
-
-    public static ModuleDefinition Define(SupabaseModuleOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        ArgumentException.ThrowIfNullOrWhiteSpace(options.ConnectionName);
-        if (!Enum.IsDefined(options.Hosting.Kind)) { throw new ArgumentOutOfRangeException(nameof(options)); }
-        return new(typeof(SupabaseModule), new Dictionary<string, string?>
-        {
-            [SupabaseModuleOptions.SectionName + ":Provider"] = options.Provider,
-            [SupabaseModuleOptions.SectionName + ":ConnectionName"] = options.ConnectionName,
-            [SupabaseModuleOptions.SectionName + ":Hosting:Kind"] = options.Hosting.Kind.ToString(),
-        });
-    }
 
     public void Configure(IEndpointRouteBuilder endpoints)
     {
@@ -42,7 +27,7 @@ public sealed class SupabaseModule : IModule
         ArgumentNullException.ThrowIfNull(builder);
         var services = builder.Services;
         services.AddOptions<SupabaseModuleOptions>()
-            .Bind(builder.Configuration.GetSection(SupabaseModuleOptions.SectionName))
+            .Configure<IConfiguration>(static (options, configuration) => configuration.PopulateModuleOptions(nameof(SupabaseModule), options))
             .PostConfigure<IConfiguration>(static (options, configuration) => options.ResolveConnection(configuration))
             .Validate(static options => string.Equals(options.Provider, ProviderName, StringComparison.OrdinalIgnoreCase),
                 "Supabase requires the Npgsql provider.")

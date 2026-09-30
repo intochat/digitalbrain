@@ -22,7 +22,7 @@ public sealed class AgentWorkflowFacts
         var ct = TestContext.Current.CancellationToken;
         await using var model = await ScriptedModelServer.StartAsync(ct);
         await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<AIModule>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
+            .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
             .StartAsync(ct);
         await LeadData.SeedAsync(brain, "Beyond first page", ct);
         async Task<string> Ask(string run)
@@ -60,7 +60,7 @@ public sealed class AgentWorkflowFacts
         var ct = TestContext.Current.CancellationToken;
         await using var model = await ScriptedModelServer.StartAsync(ct);
         await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<AIModule>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
+            .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
             .StartAsync(ct);
         await LeadData.SeedAsync(brain, "Beyond first page", ct);
         model.Delay = TimeSpan.FromMinutes(1);
@@ -109,7 +109,7 @@ public sealed class AgentWorkflowFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var model = await ScriptedModelServer.StartAsync(ct);
-        await using var brain = await IntoChatE2ETest.Create().ConfigureModule<AIModule>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint)).StartAsync(ct);
+        await using var brain = await IntoChatE2ETest.Create().ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint)).StartAsync(ct);
         await using var connection = new NpgsqlConnection(await brain.Application.GetConnectionStringAsync("supabase-database", ct));
         await connection.OpenAsync(ct);
         await using var seed = new NpgsqlCommand("CREATE TABLE leads (id int, company text, email text, active boolean); INSERT INTO leads VALUES (1, 'Real company', 'real@example.test', true)", connection);

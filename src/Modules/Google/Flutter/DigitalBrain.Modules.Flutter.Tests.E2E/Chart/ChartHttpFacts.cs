@@ -17,7 +17,7 @@ public sealed class ChartHttpFacts
     public async Task RenderMatchesRead()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await E2ETest.Create().WithModule<FlutterModule>(flutter => flutter.BackendOnly())
+        await using var brain = await E2ETest.Create().WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
         var chart = brain.Get<IChart>(UiScope.Key("workspace-a", "btc"));
         await using var frames = await brain.Observe<ChartChanged>(chart, ct);
