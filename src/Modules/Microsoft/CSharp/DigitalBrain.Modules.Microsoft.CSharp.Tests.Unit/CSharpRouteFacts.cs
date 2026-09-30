@@ -12,11 +12,19 @@ public sealed class CSharpRouteFacts
     public void CSharpAuthoringIsServedOnlyUnderTheBrainRoute()
     {
         var (_, endpoints) = MapAuthoringRoutes();
-        var routes = endpoints.Select(endpoint => endpoint.RoutePattern.RawText!).ToArray();
+        var routes = endpoints.Select(endpoint => $"{string.Join(",", endpoint.Metadata.GetMetadata<HttpMethodMetadata>()!.HttpMethods)} {endpoint.RoutePattern.RawText}").Order(StringComparer.Ordinal).ToArray();
 
-        Assert.Contains("/brains/{brainId}/csharp/", routes);
-        Assert.Contains("/brains/{brainId}/csharp/{id}/share", routes);
-        Assert.All(routes, route => Assert.StartsWith("/brains/{brainId}/csharp", route));
+        Assert.Equal(
+            [
+                "DELETE /brains/{brainId}/csharp/{id}",
+                "GET /brains/{brainId}/csharp/",
+                "GET /brains/{brainId}/csharp/{id}",
+                "POST /brains/{brainId}/csharp/{id}/share",
+                "POST /brains/{brainId}/csharp/{id}/start",
+                "POST /brains/{brainId}/csharp/{id}/stop",
+                "PUT /brains/{brainId}/csharp/{id}",
+            ],
+            routes);
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using DigitalBrain.Contracts;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -10,10 +11,21 @@ public sealed class FilesRouteFacts
     [Fact]
     public void FilesAreServedOnlyUnderTheBrainRoute()
     {
-        var routes = MapFilesRoutes().Select(endpoint => endpoint.RoutePattern.RawText!).ToArray();
+        var routes = MapFilesRoutes().Select(endpoint => $"{string.Join(",", endpoint.Metadata.GetMetadata<HttpMethodMetadata>()!.HttpMethods)} {endpoint.RoutePattern.RawText}").Order(StringComparer.Ordinal).ToArray();
 
-        Assert.Contains("/brains/{brainId}/apps/files", routes);
-        Assert.All(routes, route => Assert.StartsWith("/brains/{brainId}/apps/", route));
+        Assert.Equal(
+            [
+                "GET /brains/{brainId}/apps/assets/{assetId}",
+                "GET /brains/{brainId}/apps/files",
+                "GET /brains/{brainId}/apps/images-ui",
+                "GET /brains/{brainId}/apps/images/{documentId}",
+                "POST /brains/{brainId}/apps/files/open",
+                "POST /brains/{brainId}/apps/files/upload",
+                "POST /brains/{brainId}/apps/images/{documentId}/edit",
+                "POST /brains/{brainId}/apps/images/{documentId}/prepare-save",
+                "POST /brains/{brainId}/apps/images/{documentId}/save/{operationId}",
+            ],
+            routes);
     }
 
     private static RouteEndpoint[] MapFilesRoutes()

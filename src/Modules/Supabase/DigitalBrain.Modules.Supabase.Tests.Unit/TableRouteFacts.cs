@@ -1,5 +1,6 @@
 using DigitalBrain.Contracts;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -17,8 +18,8 @@ public sealed class TableRouteFacts
         new SupabaseModule().Configure(app);
 
         var routes = app.DataSources.SelectMany(source => source.Endpoints)
-            .OfType<RouteEndpoint>().Select(endpoint => endpoint.RoutePattern.RawText!).ToArray();
+            .OfType<RouteEndpoint>().Select(endpoint => $"{string.Join(",", endpoint.Metadata.GetMetadata<HttpMethodMetadata>()!.HttpMethods)} {endpoint.RoutePattern.RawText}").Order(StringComparer.Ordinal).ToArray();
 
-        Assert.Equal(["/brains/{brainId}/tables/{tableId}", "/brains/{brainId}/tables/{tableId}/view"], routes.Order().ToArray());
+        Assert.Equal(["GET /brains/{brainId}/tables/{tableId}", "POST /brains/{brainId}/tables/{tableId}/view"], routes);
     }
 }

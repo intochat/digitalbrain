@@ -8,7 +8,7 @@ public sealed class QdrantFacts
     private static readonly Dictionary<string, string> Everything = [];
 
     [Fact]
-    public async Task SearchRanksByCosineWithinTheFilter()
+    public async Task TheFakeSearchRanksByCosineWithinTheFilter()
     {
         var ct = TestContext.Current.CancellationToken;
         var qdrant = new InMemoryQdrant();
@@ -24,7 +24,7 @@ public sealed class QdrantFacts
     }
 
     [Fact]
-    public async Task ReadsFromAMissingCollectionReturnNothing()
+    public async Task TheFakeReadsFromAMissingCollectionReturnNothing()
     {
         var ct = TestContext.Current.CancellationToken;
         var qdrant = new InMemoryQdrant();
@@ -36,7 +36,7 @@ public sealed class QdrantFacts
     }
 
     [Fact]
-    public async Task UpsertingTheSameKeyReplacesThePoint()
+    public async Task TheFakeReplacesThePointWhenTheSameKeyIsUpserted()
     {
         var ct = TestContext.Current.CancellationToken;
         var qdrant = new InMemoryQdrant();
@@ -48,7 +48,7 @@ public sealed class QdrantFacts
     }
 
     [Fact]
-    public async Task ScrollPagesThroughEveryPointOnce()
+    public async Task TheFakeScrollPagesThroughEveryPointOnce()
     {
         var ct = TestContext.Current.CancellationToken;
         var qdrant = new InMemoryQdrant();
@@ -69,7 +69,7 @@ public sealed class QdrantFacts
     }
 
     [Fact]
-    public async Task DeleteWhereRemovesOnlyMatchingPoints()
+    public async Task TheFakeDeleteWhereRemovesOnlyMatchingPoints()
     {
         var ct = TestContext.Current.CancellationToken;
         var qdrant = new InMemoryQdrant();

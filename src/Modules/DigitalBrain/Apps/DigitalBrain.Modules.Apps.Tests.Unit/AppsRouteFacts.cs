@@ -1,5 +1,6 @@
 using DigitalBrain.Contracts;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,10 +17,14 @@ public sealed class AppsRouteFacts
         new AppsModule().Configure(app);
 
         var routes = app.DataSources.SelectMany(source => source.Endpoints)
-            .OfType<RouteEndpoint>().Select(endpoint => endpoint.RoutePattern.RawText!).ToArray();
+            .OfType<RouteEndpoint>().Select(endpoint => $"{string.Join(",", endpoint.Metadata.GetMetadata<HttpMethodMetadata>()!.HttpMethods)} {endpoint.RoutePattern.RawText}").Order(StringComparer.Ordinal).ToArray();
 
-        Assert.Contains("/brains/{brainId}/apps/", routes);
-        Assert.Contains("/brains/{brainId}/apps/{appId}/consent/approve", routes);
-        Assert.All(routes, route => Assert.StartsWith("/brains/{brainId}/apps", route));
+        Assert.Equal(
+            [
+                "GET /brains/{brainId}/apps/",
+                "GET /brains/{brainId}/apps/{appId}/consent",
+                "POST /brains/{brainId}/apps/{appId}/consent/approve",
+            ],
+            routes);
     }
 }

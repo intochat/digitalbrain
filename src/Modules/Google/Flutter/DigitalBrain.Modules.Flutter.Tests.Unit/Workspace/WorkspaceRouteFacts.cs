@@ -2,6 +2,7 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Testing.Unit;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -18,13 +19,18 @@ public sealed class WorkspaceRouteFacts
         WorkspaceEndpoints.Map(app);
 
         var routes = app.DataSources.SelectMany(source => source.Endpoints)
-            .OfType<RouteEndpoint>().Select(endpoint => endpoint.RoutePattern.RawText!).ToArray();
+            .OfType<RouteEndpoint>().Select(endpoint => $"{string.Join(",", endpoint.Metadata.GetMetadata<HttpMethodMetadata>()!.HttpMethods)} {endpoint.RoutePattern.RawText}").Order(StringComparer.Ordinal).ToArray();
 
-        Assert.Contains("/brains/{brainId}/", routes);
-        Assert.Contains("/brains/{brainId}/windows/{windowId}/close", routes);
-        Assert.Contains("/brains/{brainId}/events", routes);
-        Assert.Contains("/brains/{brainId}/reports", routes);
-        Assert.All(routes, route => Assert.StartsWith("/brains/{brainId}", route));
+        Assert.Equal(
+            [
+                "GET /brains/{brainId}/",
+                "GET /brains/{brainId}/events",
+                "POST /brains/{brainId}/connected-sources",
+                "POST /brains/{brainId}/reports",
+                "POST /brains/{brainId}/windows/{windowId}/close",
+                "POST /brains/{brainId}/windows/{windowId}/reopen",
+            ],
+            routes);
     }
 
     [Fact]

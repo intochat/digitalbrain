@@ -2,6 +2,7 @@ using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Sdk;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -19,10 +20,14 @@ public sealed class SalesforceAccountFacts
         new SalesforceModule().Configure(app);
 
         var routes = app.DataSources.SelectMany(source => source.Endpoints)
-            .OfType<RouteEndpoint>().Select(endpoint => endpoint.RoutePattern.RawText!).ToArray();
+            .OfType<RouteEndpoint>().Select(endpoint => $"{string.Join(",", endpoint.Metadata.GetMetadata<HttpMethodMetadata>()!.HttpMethods)} {endpoint.RoutePattern.RawText}").Order(StringComparer.Ordinal).ToArray();
 
-        Assert.Contains("/brains/{brainId}/integrations/accounts/services/{provider}/start", routes);
-        Assert.All(routes, route => Assert.StartsWith("/brains/{brainId}/integrations/accounts/services", route));
+        Assert.Equal(
+            [
+                "GET /brains/{brainId}/integrations/accounts/services",
+                "POST /brains/{brainId}/integrations/accounts/services/{provider}/start",
+            ],
+            routes);
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using DigitalBrain.Contracts;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -16,8 +17,8 @@ public sealed class AppUiRouteFacts
         AppUiEndpoints.Map(app);
 
         var routes = app.DataSources.SelectMany(source => source.Endpoints)
-            .OfType<RouteEndpoint>().Select(endpoint => endpoint.RoutePattern.RawText!).ToArray();
+            .OfType<RouteEndpoint>().Select(endpoint => $"{string.Join(",", endpoint.Metadata.GetMetadata<HttpMethodMetadata>()!.HttpMethods)} {endpoint.RoutePattern.RawText}").Order(StringComparer.Ordinal).ToArray();
 
-        Assert.Equal(["/brains/{brainId}/apps/event", "/brains/{brainId}/apps/node"], routes.Order().ToArray());
+        Assert.Equal(["GET /brains/{brainId}/apps/node", "POST /brains/{brainId}/apps/event"], routes);
     }
 }
