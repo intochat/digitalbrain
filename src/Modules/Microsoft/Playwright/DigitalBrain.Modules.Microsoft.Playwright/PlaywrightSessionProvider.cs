@@ -112,11 +112,14 @@ public sealed class PlaywrightSessionProvider : IBrowserSessionProvider
         private readonly CancellationTokenSource _lifetime = new();
         private readonly HttpClient _http = new(new SocketsHttpHandler
         {
-            AllowAutoRedirect = false, UseProxy = false, UseCookies = false,
+            AllowAutoRedirect = false,
+            UseProxy = false,
+            UseCookies = false,
             AutomaticDecompression = DecompressionMethods.All,
             ConnectTimeout = TimeSpan.FromSeconds(10),
             ConnectCallback = PublicBrowserNetwork.ConnectPublicAsync,
-        }) { Timeout = TimeSpan.FromSeconds(20) };
+        })
+        { Timeout = TimeSpan.FromSeconds(20) };
         private int _disposed;
         private BrowserActivityBudget _budget = new();
         private string? _title;
@@ -227,7 +230,7 @@ public sealed class PlaywrightSessionProvider : IBrowserSessionProvider
             try
             {
                 if (route.Request.Method is not ("GET" or "HEAD") || !budget.TryRequest())
-                    { throw new InvalidOperationException("Only bounded read-only browsing is supported."); }
+                { throw new InvalidOperationException("Only bounded read-only browsing is supported."); }
                 var uri = PublicBrowserNetwork.PublicUri(route.Request.Url);
                 for (var redirects = 0; redirects < 9; redirects++)
                 {
@@ -248,15 +251,19 @@ public sealed class PlaywrightSessionProvider : IBrowserSessionProvider
                             // A normal Navigate resolves redirects first. Click/server-dependent redirects expose a
                             // truthful intermediate page with a validated link for the next visible navigation.
                             var url = WebUtility.HtmlEncode(uri.AbsoluteUri);
-                            await route.FulfillAsync(new() { Status = 200, ContentType = "text/html",
-                                Body = $"<!doctype html><title>Continue to website</title><p>This website redirects to <a href=\"{url}\">{url}</a>.</p>" }).ConfigureAwait(false);
+                            await route.FulfillAsync(new()
+                            {
+                                Status = 200,
+                                ContentType = "text/html",
+                                Body = $"<!doctype html><title>Continue to website</title><p>This website redirects to <a href=\"{url}\">{url}</a>.</p>"
+                            }).ConfigureAwait(false);
                             return;
                         }
                         continue;
                     }
                     if (response.Content.Headers.ContentLength > 8 * 1024 * 1024
                         || response.Content.Headers.ContentDisposition?.DispositionType.Equals("attachment", StringComparison.OrdinalIgnoreCase) == true)
-                        { throw new InvalidOperationException("Downloads and oversized resources are disabled."); }
+                    { throw new InvalidOperationException("Downloads and oversized resources are disabled."); }
                     await using var stream = await response.Content.ReadAsStreamAsync(_lifetime.Token).ConfigureAwait(false);
                     using var body = new MemoryStream();
                     var buffer = new byte[16 * 1024];
@@ -264,7 +271,7 @@ public sealed class PlaywrightSessionProvider : IBrowserSessionProvider
                     while ((count = await stream.ReadAsync(buffer, _lifetime.Token).ConfigureAwait(false)) > 0)
                     {
                         if (body.Length + count > 8 * 1024 * 1024 || !budget.TryReceive(count))
-                            { throw new InvalidOperationException("Browser response limit exceeded."); }
+                        { throw new InvalidOperationException("Browser response limit exceeded."); }
                         body.Write(buffer, 0, count);
                     }
                     var headers = response.Headers.Concat(response.Content.Headers)

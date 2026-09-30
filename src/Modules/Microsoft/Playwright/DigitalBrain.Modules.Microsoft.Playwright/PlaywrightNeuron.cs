@@ -1,6 +1,7 @@
 using DigitalBrain.Core;
 using Orleans.Concurrency;
 namespace DigitalBrain.Microsoft.Playwright;
+
 [GrainType("playwright"), Reentrant]
 internal sealed class PlaywrightNeuron(IBrowserSessionProvider provider) : Neuron, IPlaywright
 {

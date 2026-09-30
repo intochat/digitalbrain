@@ -11,7 +11,8 @@ class GrantSummary {
     appId: json['appId'] as String? ?? '',
     semanticTypeId: json['semanticTypeId'] as String? ?? '',
     mode: _mode(json['mode']),
-    grantedAt: DateTime.tryParse(json['grantedAt'] as String? ?? '') ?? DateTime(0),
+    grantedAt:
+        DateTime.tryParse(json['grantedAt'] as String? ?? '') ?? DateTime(0),
   );
 
   /// The server sends the mode as a number (`GrantMode`); accept a name too, for tolerating a

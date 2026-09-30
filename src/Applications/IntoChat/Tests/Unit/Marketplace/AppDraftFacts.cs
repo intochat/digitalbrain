@@ -199,7 +199,11 @@ public sealed class AppDraftFacts
 
     private static string Authored(string spec) => System.Text.Json.JsonSerializer.Serialize(new
     {
-        name = "shouter", title = "Shouter", description = "Shouts back.", runtime = "prompt", spec,
+        name = "shouter",
+        title = "Shouter",
+        description = "Shouts back.",
+        runtime = "prompt",
+        spec,
     });
 
     private static string Built(string testsMarker, string systemPrompt) => System.Text.Json.JsonSerializer.Serialize(new
@@ -210,8 +214,11 @@ public sealed class AppDraftFacts
 
     private static void StampAlice() => CallerContextStamper.Stamp(new CallerContext
     {
-        PrincipalId = "alice", AccountId = "account-alice", BrainId = "workspace-alice",
-        Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp,
+        PrincipalId = "alice",
+        AccountId = "account-alice",
+        BrainId = "workspace-alice",
+        Kind = CallerKind.User,
+        StampedBy = TrustedEdge.AuthenticatedHttp,
     });
 
     private static Task<UnitBrain> StartAsync(CancellationToken ct, DigitalBrain.Apps.ITestScriptRunner? runner = null, bool canRun = true) => UnitTest.Create()

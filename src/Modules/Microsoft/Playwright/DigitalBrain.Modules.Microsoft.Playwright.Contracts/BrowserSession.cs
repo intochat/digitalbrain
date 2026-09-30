@@ -1,4 +1,5 @@
 namespace DigitalBrain.Microsoft.Playwright;
+
 [GenerateSerializer, Alias("playwright.attachment")]
 public sealed record BrowserAttachment([property: Id(0)] int Port, [property: Id(1)] string SessionId);
 [GenerateSerializer, Alias("playwright.session")]

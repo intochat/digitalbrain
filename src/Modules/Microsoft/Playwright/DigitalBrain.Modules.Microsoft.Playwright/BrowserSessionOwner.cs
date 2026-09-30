@@ -13,7 +13,7 @@ public sealed class BrowserSessionOwner(IBrowserSessionProvider provider) : IAsy
         ArgumentNullException.ThrowIfNull(attachment);
         if (attachment.Port is < 1 or > 65535 || attachment.SessionId?.Length != 32
             || !attachment.SessionId.All(char.IsAsciiHexDigit))
-            { throw new ArgumentException("A loopback port and 32 hex character session marker are required.", nameof(attachment)); }
+        { throw new ArgumentException("A loopback port and 32 hex character session marker are required.", nameof(attachment)); }
         ct.ThrowIfCancellationRequested();
         Lease next;
         Lease? previous;

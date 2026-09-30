@@ -34,7 +34,9 @@ public sealed class ContentCaptureFacts
         await LeadData.SeedAsync(brain, "Capture", ct);
         using var response = await brain.HttpClient.PostAsJsonAsync("/agent", new
         {
-            brainId = "capture", threadId = "capture", runId = "capture-run",
+            brainId = "capture",
+            threadId = "capture",
+            runId = "capture-run",
             messages = new[] { new { role = "user", content = OrdinaryContent } },
         }, ct);
         Assert.Contains("RUN_FINISHED", await response.Content.ReadAsStringAsync(ct));

@@ -1,4 +1,5 @@
 namespace DigitalBrain.Microsoft.Playwright;
+
 public interface IBrowserSessionProvider
 {
     Task<IBrowserPageSession> AttachAsync(BrowserAttachment attachment, CancellationToken ct);

@@ -30,7 +30,10 @@ internal sealed class ShellStateNeuron([PersistentState("head", DigitalBrainName
         var old = state.State;
         state.State = new()
         {
-            Root = root, Revision = old.Revision + 1, LastOperation = operationId, LastDigest = digest
+            Root = root,
+            Revision = old.Revision + 1,
+            LastOperation = operationId,
+            LastDigest = digest
         };
         try { await state.WriteStateAsync(); } catch { state.State = old; throw; }
         return await Read();

@@ -92,7 +92,8 @@ internal sealed partial class AssistantNeuron
                         var first = history.Turns.FirstOrDefault() is { } firstTurn ? DisplayUserText(firstTurn.UserText) : null;
                         var restored = new AssistantThread
                         {
-                            Id = value!, Title = first is null ? "Conversation" : first[..Math.Min(60, first.Length)],
+                            Id = value!,
+                            Title = first is null ? "Conversation" : first[..Math.Min(60, first.Length)],
                             Messages = history.Turns.SelectMany(turn => new[]
                             {
                                 new ChatEntry(turn.RunId + "-user", ChatRole.User, DisplayUserText(turn.UserText)),
@@ -144,7 +145,10 @@ internal sealed partial class AssistantNeuron
         {
             await ChangeThread(id, thread => thread with
             {
-                Draft = "", Error = null, Status = "Thinking…", TurnId = run,
+                Draft = "",
+                Error = null,
+                Status = "Thinking…",
+                TurnId = run,
                 Title = thread.Messages.Count == 0 ? message[..Math.Min(60, message.Length)] : thread.Title,
                 Messages = [.. thread.Messages.TakeLast(998), new(run + "-user", ChatRole.User, message), new(run + "-reply", ChatRole.Assistant, "")],
             });
@@ -214,7 +218,9 @@ internal sealed partial class AssistantNeuron
             {
                 Threads = next.Threads.Select(thread => thread with
                 {
-                    Messages = thread.Messages.ToArray(), Receipts = thread.Receipts.ToArray(), Results = thread.Results.ToArray(),
+                    Messages = thread.Messages.ToArray(),
+                    Receipts = thread.Receipts.ToArray(),
+                    Results = thread.Results.ToArray(),
                 }).ToArray(),
             };
             await Save(next, new AssistantConfigured(Key));
@@ -239,8 +245,14 @@ internal sealed partial class AssistantNeuron
             if (result.TryGetProperty("isError", out var failed) && failed.ValueKind == JsonValueKind.True) { return null; }
             if (Text("windowId") is { } window)
             {
-                return JsonSerializer.Serialize(new { id = window, windowId = window, remoteManaged = true,
-                    kind = Text("formId") is null ? Text("kind") ?? "table" : "surface", title = Text("title") ?? "Result" });
+                return JsonSerializer.Serialize(new
+                {
+                    id = window,
+                    windowId = window,
+                    remoteManaged = true,
+                    kind = Text("formId") is null ? Text("kind") ?? "table" : "surface",
+                    title = Text("title") ?? "Result"
+                });
             }
             if (Text("id") is not null && Text("kind") is "table" or "chart" or "graph" or "diagram" or "brain" or "image" or "document" or "surface")
             { return result.GetRawText(); }

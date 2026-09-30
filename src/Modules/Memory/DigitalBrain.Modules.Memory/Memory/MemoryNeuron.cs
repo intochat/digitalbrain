@@ -51,7 +51,8 @@ internal sealed class MemoryNeuron(TimeProvider time,
         foreach (var id in previous.Pages) { count += await Page(note.Namespace, previous.Generation, id).Count(); }
         var next = new MemoryNamespace
         {
-            Generation = checked(previous.Generation + 1), IndexPurgePending = true,
+            Generation = checked(previous.Generation + 1),
+            IndexPurgePending = true,
             RetiredPages = new(previous.RetiredPages) { [previous.Generation] = previous.Pages },
         };
         await Save(Current with { Namespaces = new(Current.Namespaces) { [note.Namespace] = next }, ForgottenCount = Current.ForgottenCount + (int)Math.Min(count, int.MaxValue), LastChangedAt = time.GetUtcNow() });

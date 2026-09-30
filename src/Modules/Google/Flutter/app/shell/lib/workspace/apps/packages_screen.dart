@@ -128,7 +128,8 @@ class _PackagesScreenState extends State<PackagesScreen> {
         ..addEntries([
           for (var index = 0; index < ids.length; index++)
             MapEntry(ids[index], [
-              for (final file in (_map(reads[index])['files'] as List? ?? const []))
+              for (final file
+                  in (_map(reads[index])['files'] as List? ?? const []))
                 if (file is Map) Map<String, dynamic>.from(file),
             ]),
         ]);
@@ -202,11 +203,8 @@ class _PackagesScreenState extends State<PackagesScreen> {
 
   void _openSpec(String id, String title) => Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (_) => AppSpecScreen(
-        packageId: id,
-        title: title,
-        request: widget.request,
-      ),
+      builder: (_) =>
+          AppSpecScreen(packageId: id, title: title, request: widget.request),
     ),
   );
 
@@ -260,9 +258,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
             Padding(padding: const EdgeInsets.all(12), child: Text(_notice!)),
           Expanded(
             child: _listings.isEmpty && _drafts.isEmpty && !_busy
-                ? const Center(
-                    child: Text('No one has published an app yet.'),
-                  )
+                ? const Center(child: Text('No one has published an app yet.'))
                 : ListView(
                     padding: const EdgeInsets.all(12),
                     children: [
@@ -439,7 +435,8 @@ class _PackagesScreenState extends State<PackagesScreen> {
                 ],
               ),
             ],
-            for (final turn in _discussions[id] ?? const <Map<String, dynamic>>[])
+            for (final turn
+                in _discussions[id] ?? const <Map<String, dynamic>>[])
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text.rich(

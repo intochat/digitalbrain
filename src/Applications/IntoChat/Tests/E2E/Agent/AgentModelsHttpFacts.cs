@@ -38,7 +38,9 @@ public sealed class AgentModelsHttpFacts
 
         using var rejected = await brain.HttpClient.PostAsJsonAsync("/agent", new
         {
-            brainId = "model-validation", threadId = "thread", runId = "unknown-model",
+            brainId = "model-validation",
+            threadId = "thread",
+            runId = "unknown-model",
             modelProfile = "profile:does-not-exist",
             messages = new[] { new { role = "user", content = "Hello" } },
         }, ct);

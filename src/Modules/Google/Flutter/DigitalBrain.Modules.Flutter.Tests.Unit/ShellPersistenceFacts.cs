@@ -14,7 +14,8 @@ public sealed class ShellPersistenceFacts
         var snapshot = JsonNode.Parse(EmptySnapshot)!;
         snapshot["messages"] = new JsonArray(Enumerable.Range(0, 1000).Select(i => (JsonNode?)new JsonObject
         {
-            ["id"] = i, ["text"] = new string('x', 900),
+            ["id"] = i,
+            ["text"] = new string('x', 900),
             ["metadata"] = new JsonObject { ["model"] = "assistant", ["usage"] = new JsonObject { ["tokens"] = i } }
         }).ToArray());
         var parts = new System.Collections.Concurrent.ConcurrentDictionary<string, string>();

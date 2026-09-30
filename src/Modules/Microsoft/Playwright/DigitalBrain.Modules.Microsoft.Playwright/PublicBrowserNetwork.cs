@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 namespace DigitalBrain.Microsoft.Playwright;
+
 internal static class PublicBrowserNetwork
 {
     internal static Uri PublicUri(string url)
@@ -17,7 +18,7 @@ internal static class PublicBrowserNetwork
             || host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase)
             || !host.Contains('.', StringComparison.Ordinal) && !IPAddress.TryParse(host, out _)
             || IPAddress.TryParse(host, out var address) && !IsPublic(address))
-            { throw new ArgumentException("Private network addresses are unavailable.", nameof(url)); }
+        { throw new ArgumentException("Private network addresses are unavailable.", nameof(url)); }
         return uri;
     }
 

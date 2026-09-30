@@ -6,13 +6,19 @@ void main() {
     expect(RendererRegistry.uiKinds.length, 32);
     for (final kind in RendererRegistry.uiKinds) {
       final entry = RendererRegistry.uiEntry(kind);
-      expect(entry.isFallback, !RendererRegistry.dedicatedUiKinds.contains(kind));
+      expect(
+        entry.isFallback,
+        !RendererRegistry.dedicatedUiKinds.contains(kind),
+      );
       expect(entry.kind.isEmpty, isFalse);
     }
     expect(RendererRegistry.fieldKinds.length, 12);
     for (final kind in RendererRegistry.fieldKinds) {
       final entry = RendererRegistry.fieldEntry(kind);
-      expect(entry.isFallback, !RendererRegistry.dedicatedFieldKinds.contains(kind));
+      expect(
+        entry.isFallback,
+        !RendererRegistry.dedicatedFieldKinds.contains(kind),
+      );
       expect(entry.kind.isEmpty, isFalse);
     }
   });
@@ -22,10 +28,7 @@ void main() {
     expect(RendererRegistry.fieldFallbackKinds, isNotEmpty);
     for (final kind in RendererRegistry.uiFallbackKinds) {
       expect(RendererRegistry.uiEntry(kind).kind, RendererRegistry.fallback);
-      expect(
-        RendererRegistry.uiEntry(kind).surface,
-        RendererSurface.fallback,
-      );
+      expect(RendererRegistry.uiEntry(kind).surface, RendererSurface.fallback);
     }
   });
 
@@ -44,8 +47,17 @@ void main() {
   test('dedicated UI and field kinds keep their own renderer', () {
     expect(RendererRegistry.uiEntry('card').surface, RendererSurface.dedicated);
     expect(RendererRegistry.uiEntry('form').surface, RendererSurface.dedicated);
-    expect(RendererRegistry.fieldEntry('Date').surface, RendererSurface.dedicated);
-    expect(RendererRegistry.fieldEntry('Secret').surface, RendererSurface.dedicated);
-    expect(RendererRegistry.fieldEntry('Reference').surface, RendererSurface.fallback);
+    expect(
+      RendererRegistry.fieldEntry('Date').surface,
+      RendererSurface.dedicated,
+    );
+    expect(
+      RendererRegistry.fieldEntry('Secret').surface,
+      RendererSurface.dedicated,
+    );
+    expect(
+      RendererRegistry.fieldEntry('Reference').surface,
+      RendererSurface.fallback,
+    );
   });
 }

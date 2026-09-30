@@ -13,8 +13,11 @@ public sealed class CapabilityFacts
 {
     private static readonly CallerContext Caller = new()
     {
-        PrincipalId = "owner-1", AccountId = "owner-1", BrainId = "brain-1",
-        Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp,
+        PrincipalId = "owner-1",
+        AccountId = "owner-1",
+        BrainId = "brain-1",
+        Kind = CallerKind.User,
+        StampedBy = TrustedEdge.AuthenticatedHttp,
     };
 
     [Fact]

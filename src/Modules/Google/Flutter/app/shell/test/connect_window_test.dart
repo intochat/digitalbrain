@@ -6,7 +6,9 @@ void main() {
   testWidgets('masks the pasted value and never echoes it', (tester) async {
     final harness = _Harness();
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: ConnectWindow(request: harness.request))),
+      MaterialApp(
+        home: Scaffold(body: ConnectWindow(request: harness.request)),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -44,7 +46,9 @@ void main() {
         {'id': 'db', 'integrationId': 'supabase', 'status': 'Expired'},
       ];
     await tester.pumpWidget(
-      MaterialApp(home: Scaffold(body: ConnectWindow(request: harness.request))),
+      MaterialApp(
+        home: Scaffold(body: ConnectWindow(request: harness.request)),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -73,7 +77,11 @@ final class _Harness {
         return records;
       case 'connect':
         records = [
-          {'id': body!['connectionId'], 'integrationId': body['integrationId'], 'status': 'Connected'},
+          {
+            'id': body!['connectionId'],
+            'integrationId': body['integrationId'],
+            'status': 'Connected',
+          },
         ];
         return records.single;
       case 'disconnect':

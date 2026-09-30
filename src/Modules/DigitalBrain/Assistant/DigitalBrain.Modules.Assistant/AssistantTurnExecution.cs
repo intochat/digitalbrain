@@ -188,9 +188,14 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
                         previewCompute = projection?.PreviewCompute,
                         modelUsage = (projection?.ModelUsage ?? intent.Usage.OfType<TokenUsageEntry>()).Select(entry => new
                         {
-                            provider = entry.Provider, model = entry.Model, inputTokens = entry.InputTokens,
-                            cachedInputTokens = entry.CachedInputTokens, reasoningTokens = entry.ReasoningTokens,
-                            outputTokens = entry.OutputTokens, totalTokens = entry.TotalTokens, usageReported = entry.UsageReported,
+                            provider = entry.Provider,
+                            model = entry.Model,
+                            inputTokens = entry.InputTokens,
+                            cachedInputTokens = entry.CachedInputTokens,
+                            reasoningTokens = entry.ReasoningTokens,
+                            outputTokens = entry.OutputTokens,
+                            totalTokens = entry.TotalTokens,
+                            usageReported = entry.UsageReported,
                         }),
                         outcome = receipt.Outcome.ToString(),
                         summary = receipt.Summary,

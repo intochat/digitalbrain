@@ -53,7 +53,9 @@ class _CreateAppScreenState extends State<CreateAppScreen> {
     super.initState();
     // Reopening an existing draft picks up where the person left off.
     if (widget.draftId != null) {
-      unawaited(_perform('Loading the draft…', () => widget.request('GET', _path)));
+      unawaited(
+        _perform('Loading the draft…', () => widget.request('GET', _path)),
+      );
     }
   }
 
@@ -65,7 +67,10 @@ class _CreateAppScreenState extends State<CreateAppScreen> {
     super.dispose();
   }
 
-  Future<void> _perform(String activity, Future<dynamic> Function() call) async {
+  Future<void> _perform(
+    String activity,
+    Future<dynamic> Function() call,
+  ) async {
     if (_busy) return;
     setState(() {
       _busy = true;
@@ -169,7 +174,10 @@ class _CreateAppScreenState extends State<CreateAppScreen> {
                 decoration: const InputDecoration(border: OutlineInputBorder()),
               )
             else
-              AppSpecView(spec: specText, run: verification.isEmpty ? null : _map(verification['run'])),
+              AppSpecView(
+                spec: specText,
+                run: verification.isEmpty ? null : _map(verification['run']),
+              ),
             Wrap(
               spacing: 8,
               children: [

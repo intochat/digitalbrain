@@ -20,7 +20,8 @@ class AppSpecView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final verdicts = {
-      for (final scenario in _list(run?['scenarios'])) '${scenario['name']}': scenario,
+      for (final scenario in _list(run?['scenarios']))
+        '${scenario['name']}': scenario,
     };
     final children = <Widget>[];
     for (final rawLine in spec.split('\n')) {
@@ -75,7 +76,10 @@ class AppSpecView extends StatelessWidget {
         children.add(const SizedBox(height: 8));
       }
     }
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: children);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
+    );
   }
 }
 

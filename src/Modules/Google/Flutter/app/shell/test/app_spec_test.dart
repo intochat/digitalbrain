@@ -91,7 +91,9 @@ void main() {
       };
     }
 
-    await tester.pumpWidget(MaterialApp(home: CreateAppScreen(request: request)));
+    await tester.pumpWidget(
+      MaterialApp(home: CreateAppScreen(request: request)),
+    );
     await tester.enterText(
       find.byKey(const ValueKey('describe-app')),
       'Shout back whatever I say',

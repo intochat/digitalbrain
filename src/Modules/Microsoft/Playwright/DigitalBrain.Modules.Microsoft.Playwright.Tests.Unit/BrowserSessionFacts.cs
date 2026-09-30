@@ -1,5 +1,6 @@
 using DigitalBrain.Microsoft.Playwright;
 namespace DigitalBrain.Modules.Microsoft.Playwright.Tests.Unit;
+
 public sealed class BrowserSessionFacts
 {
     [Fact]

@@ -112,7 +112,7 @@ public sealed class AssistantStreamFacts
         await runner.Cancelled.Task.WaitAsync(TimeSpan.FromSeconds(15), ct);
         var deadline = DateTime.UtcNow.AddSeconds(10);
         while ((await app.ReadConversation("one", ct)).ActiveRunId is not null && DateTime.UtcNow < deadline)
-            { await Task.Delay(20, ct); }
+        { await Task.Delay(20, ct); }
         Assert.Null((await app.ReadConversation("one", ct)).ActiveRunId);
         Assert.Empty((await app.ReadConversation("one", ct)).Turns);
         Assert.Contains(await Collect(app, new("one", "next", "hello", "owner"), ct), item => Type(item) == "RUN_FINISHED");
@@ -152,7 +152,7 @@ public sealed class AssistantStreamFacts
         var context = new StepContext("stream-tooleventsan/applications/assistant", brain.Grains, brain.SiloServices, ct);
         var events = await Collect(App(context), new("one", "tools", "tools", "owner"), ct);
         foreach (var type in new[] { "TOOL_CALL_START", "TOOL_CALL_ARGS", "TOOL_CALL_END", "TOOL_CALL_RESULT", "UI_CARD", "RECEIPT" })
-            { Assert.Single(events, item => Type(item) == type); }
+        { Assert.Single(events, item => Type(item) == type); }
         Assert.Equal("table", events.Single(item => Type(item) == "UI_CARD").GetProperty("card").GetProperty("kind").GetString());
         var receipt = events.Single(item => Type(item) == "RECEIPT");
         Assert.Equal("Succeeded", receipt.GetProperty("outcome").GetString());

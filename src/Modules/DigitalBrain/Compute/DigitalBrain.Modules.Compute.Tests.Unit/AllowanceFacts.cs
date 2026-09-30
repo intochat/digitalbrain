@@ -95,7 +95,8 @@ public sealed class AllowanceFacts
     public void AThisChatAllowanceNeedsTheMatchingConversation()
     {
         var scoped = AllowanceOf("scoped", "ws-1", ApprovalLevel.PerOperation, AllowanceScope.ThisChat, 5m,
-            operation: "Render") with { ConversationId = "chat-1" };
+            operation: "Render") with
+        { ConversationId = "chat-1" };
 
         Assert.True(AllowanceRules.Evaluate(Paid("account", "ws-1", "chat-1", 1m, operation: "Render"), Snapshot([scoped]), Now).Decision.Allowed);
         Assert.Equal(CallDenial.MissingAllowance,
@@ -106,7 +107,8 @@ public sealed class AllowanceFacts
     public void InstallConsentMonthlyLimitResetsNextMonth()
     {
         var consent = AllowanceOf("consent", "ws-1", ApprovalLevel.InstallConsent, AllowanceScope.Always, 0m,
-            appId: "app-1") with { MonthlyLimitCompute = 10m };
+            appId: "app-1") with
+        { MonthlyLimitCompute = 10m };
         var lastMonth = new AllowanceReservation
         {
             ReservationId = "res-old",

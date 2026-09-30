@@ -15,8 +15,12 @@ public sealed class ResearchFacts
     [Fact]
     public void EvidenceMustComeFromObservedOfficialPages()
     {
-        var json = JsonSerializer.SerializeToElement(new {
-            status = "found", companyName = "Acme", website = "https://acme.example/", email = "invented@acme.example",
+        var json = JsonSerializer.SerializeToElement(new
+        {
+            status = "found",
+            companyName = "Acme",
+            website = "https://acme.example/",
+            email = "invented@acme.example",
             evidence = new[] {
                 new { field = "companyName", url = "https://acme.example/", quote = "Acme" },
                 new { field = "website", url = "https://acme.example/", quote = "Acme" },
@@ -31,7 +35,10 @@ public sealed class ResearchFacts
         const string observedText = "Acme headquarters: Amsterdam, The Netherlands. Email one@acme.example";
         var multipleEmails = CompanyResearchAgent.Validate(JsonSerializer.SerializeToElement(new
         {
-            status = "found", companyName = "Acme", website = "https://acme.example/", location = "Amsterdam, The Netherlands",
+            status = "found",
+            companyName = "Acme",
+            website = "https://acme.example/",
+            location = "Amsterdam, The Netherlands",
             email = "one@acme.example;two@acme.example",
         }), [new("https://acme.example/contact", "Acme", observedText, [])]);
         Assert.Equal("Amsterdam, The Netherlands", multipleEmails.Company!.Location);
@@ -118,7 +125,8 @@ public sealed class ResearchFacts
     }
 
     private static Task<UnitBrain> Start(Control control) => UnitTest.Create().WithModule<CustomerResearcherModule>().RequireModules([typeof(DigitalBrain.Apps.AppsModule), typeof(DigitalBrain.AI.AIModule), typeof(DigitalBrain.Flutter.FlutterModule), typeof(DigitalBrain.Microsoft.Playwright.PlaywrightModule), typeof(DigitalBrain.Postgres.PostgresModule)])
-        .ConfigureSilo(silo => {
+        .ConfigureSilo(silo =>
+        {
             silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=test;Username=test";
             silo.Services.AddSingleton<ICompanyResearchAgent>(control).AddSingleton<ICompanyResearchStore>(control)
                 .AddSingleton<IBrowserSessionProvider>(control)

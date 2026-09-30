@@ -20,8 +20,11 @@ public sealed class NeuronStoreFacts
         Assert.Empty(await ledger.ReadAsync("account", ct));
         var appended = await ledger.AppendAsync(new LedgerEntry
         {
-            AccountId = "account", IdempotencyKey = "charge", Kind = LedgerKind.WalletCharge,
-            Amount = 10, OccurredAt = DateTimeOffset.UnixEpoch,
+            AccountId = "account",
+            IdempotencyKey = "charge",
+            Kind = LedgerKind.WalletCharge,
+            Amount = 10,
+            OccurredAt = DateTimeOffset.UnixEpoch,
         }, ct);
         Assert.Equal(LedgerAppend.Inserted, appended);
         Assert.Equal(10m, Assert.Single(await ledger.ReadAsync("account", ct)).Amount);

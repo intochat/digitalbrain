@@ -31,10 +31,7 @@ class ConsentSheetView extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              'Add ${sheet.name}?',
-              style: theme.textTheme.headlineSmall,
-            ),
+            Text('Add ${sheet.name}?', style: theme.textTheme.headlineSmall),
             const SizedBox(height: 6),
             Text(sheet.descriptionForPeople, style: theme.textTheme.bodyMedium),
             if (sheet.examples.isNotEmpty) ...[
@@ -149,9 +146,8 @@ class _SectionTitle extends StatelessWidget {
     padding: const EdgeInsets.only(bottom: 6),
     child: Text(
       text,
-      style: Theme.of(
-        context,
-      ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+      style: Theme.of(context).textTheme.titleSmall
+          ?.copyWith(fontWeight: FontWeight.w600),
     ),
   );
 }

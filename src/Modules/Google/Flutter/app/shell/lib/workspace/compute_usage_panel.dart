@@ -300,8 +300,11 @@ class _ComputeUsagePanelState extends State<ComputeUsagePanel> {
                     'trailingText': usageAmountLabel(item),
                   },
               ],
-              emptyLabel: _busy ? 'Loading usage…' : _error != null
-                  ? 'Usage history is unavailable.' : 'No usage recorded yet.',
+              emptyLabel: _busy
+                  ? 'Loading usage…'
+                  : _error != null
+                  ? 'Usage history is unavailable.'
+                  : 'No usage recorded yet.',
               error: _error,
               onRetry: _busy ? null : () => unawaited(_load(more: _retryMore)),
               onActivate: (row) => setState(

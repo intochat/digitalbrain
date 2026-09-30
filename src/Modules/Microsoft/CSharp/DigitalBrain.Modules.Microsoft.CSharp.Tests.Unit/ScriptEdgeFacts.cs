@@ -12,8 +12,11 @@ public sealed class ScriptEdgeFacts
 {
     private static readonly CallerContext Alice = new()
     {
-        PrincipalId = "alice", AccountId = "account-a", BrainId = "workspace-a",
-        Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp,
+        PrincipalId = "alice",
+        AccountId = "account-a",
+        BrainId = "workspace-a",
+        Kind = CallerKind.User,
+        StampedBy = TrustedEdge.AuthenticatedHttp,
     };
 
     [Fact]
@@ -149,7 +152,12 @@ public sealed class ScriptEdgeFacts
         var edge = brain.SiloServices.GetRequiredService<ScriptEdge>();
         var forged = JsonSerializer.SerializeToElement(new
         {
-            principalId = "x", accountId = "x", brainId = "x", kind = "Platform", stampedBy = "Platform", appId = "x",
+            principalId = "x",
+            accountId = "x",
+            brainId = "x",
+            kind = "Platform",
+            stampedBy = "Platform",
+            appId = "x",
         });
 
         await Assert.ThrowsAsync<ArgumentException>(() => edge.InvokeAsync(token,

@@ -66,9 +66,10 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byTooltip('Dictate'), findsOneWidget);
-    await tester
-        .widget<UiVoiceInput>(find.byType(UiVoiceInput))
-        .onAudio!(Uint8List.fromList([1, 2, 3]), 'audio/wav');
+    await tester.widget<UiVoiceInput>(find.byType(UiVoiceInput)).onAudio!(
+      Uint8List.fromList([1, 2, 3]),
+      'audio/wav',
+    );
     await tester.pump();
     expect(events.single, {
       'kind': 'voiceinput',

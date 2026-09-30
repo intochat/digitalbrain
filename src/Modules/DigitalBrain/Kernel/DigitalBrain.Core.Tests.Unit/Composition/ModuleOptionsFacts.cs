@@ -38,7 +38,7 @@ public sealed class ModuleOptionsFacts
         Assert.Throws<ArgumentException>(() =>
             ModuleOptionsSerialization.Compile<FakeModule, FakeOptions>(new() { Endpoint = new Uri("/relative", UriKind.Relative) }));
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-            { ["DigitalBrain:Modules:FakeModule:Options"] = """{"Endpoint":"/relative"}""" }).Build();
+        { ["DigitalBrain:Modules:FakeModule:Options"] = """{"Endpoint":"/relative"}""" }).Build();
         Assert.Throws<ArgumentException>(() => configuration.GetModuleOptions<FakeOptions>(nameof(FakeModule)));
     }
 
@@ -105,7 +105,7 @@ public sealed class ModuleOptionsFacts
         foreach (var json in new[] { "null", "{bad" })
         {
             var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-                { ["DigitalBrain:Modules:FakeModule:Options"] = json }).Build();
+            { ["DigitalBrain:Modules:FakeModule:Options"] = json }).Build();
             var failure = Assert.Throws<InvalidOperationException>(() => configuration.GetModuleOptions<FakeOptions>(nameof(FakeModule)));
             Assert.Contains(nameof(FakeModule), failure.Message);
         }

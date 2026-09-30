@@ -15,10 +15,13 @@ public sealed class AppFacts
         Caller.As("alice");
         var package = brain.Get<IPackage>(Researcher.ToString());
         var content = PackageSamples.Researcher("Research");
-        var withAccount = content with { Manifest = content.Manifest with
+        var withAccount = content with
         {
-            Accounts = [new PackageAccount("twitter", "twitter", "Account to watch")]
-        } };
+            Manifest = content.Manifest with
+            {
+                Accounts = [new PackageAccount("twitter", "twitter", "Account to watch")]
+            }
+        };
         var revision = await package.Commit(brain.Commit(null, withAccount, "Add account slot"));
         await package.Publish(new(Guid.NewGuid(), revision.Id));
         Caller.Clear();
@@ -45,14 +48,20 @@ public sealed class AppFacts
         Caller.As("alice");
         var package = brain.Get<IPackage>(Researcher.ToString());
         var source = PackageSamples.Researcher("Research");
-        var first = await package.Commit(brain.Commit(null, source with { Manifest = source.Manifest with
+        var first = await package.Commit(brain.Commit(null, source with
         {
-            Accounts = [new PackageAccount("twitter", "twitter", "Watch")]
-        } }, "First"));
-        var second = await package.Commit(brain.Commit(first.Id, source with { Manifest = source.Manifest with
+            Manifest = source.Manifest with
+            {
+                Accounts = [new PackageAccount("twitter", "twitter", "Watch")]
+            }
+        }, "First"));
+        var second = await package.Commit(brain.Commit(first.Id, source with
         {
-            Accounts = [new PackageAccount("twitter", "twitter", "Watch"), new PackageAccount("notify", "notification", "Notify")]
-        } }, "Second"));
+            Manifest = source.Manifest with
+            {
+                Accounts = [new PackageAccount("twitter", "twitter", "Watch"), new PackageAccount("notify", "notification", "Notify")]
+            }
+        }, "Second"));
         Caller.Clear();
         var app = brain.Get<IApp>(Key());
         var installed = await app.Install(new(Guid.NewGuid(), new(Researcher, first.Id), new Dictionary<string, string>(),

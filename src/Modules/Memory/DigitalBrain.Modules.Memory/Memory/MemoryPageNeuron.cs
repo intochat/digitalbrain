@@ -19,7 +19,8 @@ internal sealed class MemoryPageNeuron([PersistentState("entries", DigitalBrainN
         deleted.Remove(entry.Key);
         await Save(store.State with
         {
-            Entries = new(store.State.Entries) { [entry.Key] = entry }, Deleted = deleted,
+            Entries = new(store.State.Entries) { [entry.Key] = entry },
+            Deleted = deleted,
             Pending = new(store.State.Pending) { entry.Key },
         });
         return true;

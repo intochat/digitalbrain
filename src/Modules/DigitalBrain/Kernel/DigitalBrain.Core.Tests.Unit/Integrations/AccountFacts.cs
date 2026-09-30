@@ -236,7 +236,10 @@ public sealed class AccountFacts : IDisposable
         var scope = BrainScope.Create("alice", "one");
         static IntegrationAccount Account(string id, string workspace, string owner) => new()
         {
-            Id = id, IntegrationId = "gmail", WorkspaceId = workspace, Status = AccountStatus.Connected,
+            Id = id,
+            IntegrationId = "gmail",
+            WorkspaceId = workspace,
+            Status = AccountStatus.Connected,
             Credential = SecretRef.For(owner, id, id, true),
         };
         var result = ScopedAccounts.Visible(scope, [Account("new", "one", "alice"), Account("wrong-workspace", "two", "alice")]);

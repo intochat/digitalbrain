@@ -103,7 +103,10 @@ final class UiFormPart extends UiPart {
     final fields = raw is List
         ? raw
               .whereType<Map>()
-              .map((field) => UiFormField.fromJson(Map<String, dynamic>.from(field)))
+              .map(
+                (field) =>
+                    UiFormField.fromJson(Map<String, dynamic>.from(field)),
+              )
               .toList(growable: false)
         : const <UiFormField>[];
     return UiFormPart(
@@ -304,7 +307,10 @@ final class UiCardPart extends UiPart {
       title: metadata['title'] as String? ?? '',
       body: metadata['body'] as String? ?? '',
       fields: fields,
-      children: (metadata['children'] as List? ?? []).whereType<Map>().map((c) => (kind: c['kind'] as String, name: c['name'] as String)).toList(),
+      children: (metadata['children'] as List? ?? [])
+          .whereType<Map>()
+          .map((c) => (kind: c['kind'] as String, name: c['name'] as String))
+          .toList(),
     );
   }
 
@@ -313,7 +319,9 @@ final class UiCardPart extends UiPart {
     'kind': kindName,
     'title': title,
     'body': body,
-    'children': [for (final c in children) {'kind':c.kind,'name':c.name}],
+    'children': [
+      for (final c in children) {'kind': c.kind, 'name': c.name},
+    ],
     'fields': [
       for (final f in fields) {'label': f.label, 'value': f.value},
     ],

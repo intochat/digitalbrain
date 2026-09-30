@@ -256,10 +256,16 @@ internal sealed class App(
     // Settings are a set: the same keys sent in another order are the same command.
     private static string CommandHash(object request) => PackageHash.Of(request switch
     {
-        InstallApp install => install with { Settings = new SortedDictionary<string, string>(install.Settings.ToDictionary(), StringComparer.Ordinal),
-            Accounts = new SortedDictionary<string, string>((install.Accounts ?? new Dictionary<string, string>()).ToDictionary(), StringComparer.Ordinal) },
-        ConfigureApp configure => configure with { Settings = new SortedDictionary<string, string>(configure.Settings.ToDictionary(), StringComparer.Ordinal),
-            Accounts = new SortedDictionary<string, string>((configure.Accounts ?? new Dictionary<string, string>()).ToDictionary(), StringComparer.Ordinal) },
+        InstallApp install => install with
+        {
+            Settings = new SortedDictionary<string, string>(install.Settings.ToDictionary(), StringComparer.Ordinal),
+            Accounts = new SortedDictionary<string, string>((install.Accounts ?? new Dictionary<string, string>()).ToDictionary(), StringComparer.Ordinal)
+        },
+        ConfigureApp configure => configure with
+        {
+            Settings = new SortedDictionary<string, string>(configure.Settings.ToDictionary(), StringComparer.Ordinal),
+            Accounts = new SortedDictionary<string, string>((configure.Accounts ?? new Dictionary<string, string>()).ToDictionary(), StringComparer.Ordinal)
+        },
         UpgradeApp upgrade => upgrade with { Accounts = new SortedDictionary<string, string>((upgrade.Accounts ?? new Dictionary<string, string>()).ToDictionary(), StringComparer.Ordinal) },
         _ => request,
     });

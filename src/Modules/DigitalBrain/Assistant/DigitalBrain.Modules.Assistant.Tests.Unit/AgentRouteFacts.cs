@@ -82,8 +82,11 @@ public sealed class AgentRouteFacts
         http.Request.Headers.Authorization = "Basic credentials";
         CallerContextStamper.Stamp(new CallerContext
         {
-            PrincipalId = principal, AccountId = principal, BrainId = stampedBrain,
-            Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp,
+            PrincipalId = principal,
+            AccountId = principal,
+            BrainId = stampedBrain,
+            Kind = CallerKind.User,
+            StampedBy = TrustedEdge.AuthenticatedHttp,
         });
         return await AgentEndpoints.ResolveBodyBrain(http, bodyBrain);
     }

@@ -20,7 +20,9 @@ internal static class ComputeEndpoints
                 chargedCompute = await brain.Get<IWallet>(accountId).ReadChargedAsync(cancellationToken: ct),
                 settledCompute = await ledger.ReadSettledAsync(cancellationToken: ct),
                 reservedCompute = await ledger.ReadReservedAsync(cancellationToken: ct),
-                limits.LimitCompute, limits.SpentCompute, limits.HardStopped,
+                limits.LimitCompute,
+                limits.SpentCompute,
+                limits.HardStopped,
             });
         });
         endpoints.MapGet("/compute/limits", async (IDigitalBrain brain, CancellationToken ct) =>

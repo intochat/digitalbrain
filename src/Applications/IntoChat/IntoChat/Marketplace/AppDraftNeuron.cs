@@ -124,8 +124,14 @@ internal sealed class AppDraftNeuron(
             }
             await Persist(draft with
             {
-                Name = package.Name, Title = authored.Title, Description = authored.Description, Runtime = authored.Runtime,
-                Spec = authored.Spec, Status = AppDraftStatus.Drafted, Attempts = [], Error = "",
+                Name = package.Name,
+                Title = authored.Title,
+                Description = authored.Description,
+                Runtime = authored.Runtime,
+                Spec = authored.Spec,
+                Status = AppDraftStatus.Drafted,
+                Attempts = [],
+                Error = "",
             });
             return await Read();
         }

@@ -74,8 +74,11 @@ public sealed class CrossWorkspaceFacts
 
         await brain.Get<DigitalBrain.Compute.IWallet>(aliceMember.AccountId).ChargeAsync(new DigitalBrain.Compute.LedgerEntry
         {
-            AccountId = aliceMember.AccountId, IdempotencyKey = "private-charge", Kind = DigitalBrain.Compute.LedgerKind.WalletCharge,
-            Amount = 7m, OccurredAt = DateTimeOffset.UtcNow,
+            AccountId = aliceMember.AccountId,
+            IdempotencyKey = "private-charge",
+            Kind = DigitalBrain.Compute.LedgerKind.WalletCharge,
+            Amount = 7m,
+            OccurredAt = DateTimeOffset.UtcNow,
         }, ct);
         using var aliceSummary = JsonDocument.Parse(await alice.GetStringAsync("/compute/summary", ct));
         using var bobSummary = JsonDocument.Parse(await bob.GetStringAsync("/compute/summary", ct));

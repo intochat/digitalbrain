@@ -19,8 +19,8 @@ void main() {
           title: const Text('Customer Researcher browser smoke test'),
         ),
         body: EmbeddedBrowser(
-            onConnect: (port, sessionId) async {
-              await File(output).parent.create(recursive: true);
+          onConnect: (port, sessionId) async {
+            await File(output).parent.create(recursive: true);
             await File(
               output,
             ).writeAsString(jsonEncode({'port': port, 'sessionId': sessionId}));

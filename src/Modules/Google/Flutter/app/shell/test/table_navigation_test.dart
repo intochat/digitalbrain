@@ -12,8 +12,7 @@ void main() {
       final controller = UiTableController(
         workspace: 'w',
         snapshot: TableSnapshot.fromJson(tableJson(1, 'First page company')),
-        read: (_, _, {offset = 0, limit = 25}) async =>
-            TableSnapshot.fromJson({
+        read: (_, _, {offset = 0, limit = 25}) async => TableSnapshot.fromJson({
           ...tableJson(
             1,
             offset == 0 ? 'First page company' : 'Next page company',

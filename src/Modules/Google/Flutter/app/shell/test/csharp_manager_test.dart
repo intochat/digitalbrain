@@ -104,9 +104,7 @@ void main() {
     expect(field('csharp-source').controller!.text, 'mine');
   });
 
-  testWidgets('start is disabled when the host has no sandbox', (
-    tester,
-  ) async {
+  testWidgets('start is disabled when the host has no sandbox', (tester) async {
     await tester.pumpWidget(
       host(detailView(fileView(status: 0), canRun: false)),
     );

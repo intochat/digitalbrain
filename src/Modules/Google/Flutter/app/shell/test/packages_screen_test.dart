@@ -109,9 +109,7 @@ void main() {
 
     expect(
       server.calls,
-      contains(
-        'POST /brains/workspace-bob/packages/alice/researcher/upgrade',
-      ),
+      contains('POST /brains/workspace-bob/packages/alice/researcher/upgrade'),
     );
     expect(
       find.byKey(const ValueKey('upgrade-alice/researcher')),

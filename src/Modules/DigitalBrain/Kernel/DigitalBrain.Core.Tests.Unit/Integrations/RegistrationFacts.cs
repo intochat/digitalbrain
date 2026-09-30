@@ -399,8 +399,11 @@ public sealed class RegistrationFacts
 
     private static CallerContext Http(string principal) => new()
     {
-        PrincipalId = principal, AccountId = principal, BrainId = principal,
-        Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp,
+        PrincipalId = principal,
+        AccountId = principal,
+        BrainId = principal,
+        Kind = CallerKind.User,
+        StampedBy = TrustedEdge.AuthenticatedHttp,
     };
 
     [Fact]
