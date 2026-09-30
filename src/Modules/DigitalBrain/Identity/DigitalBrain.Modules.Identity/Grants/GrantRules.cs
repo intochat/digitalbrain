@@ -14,7 +14,7 @@ public static class GrantRules
         grants ??= [];
 
         var caller = request.Caller;
-        if (member is not null && !string.Equals(member.WorkspaceId, caller.BrainId, StringComparison.Ordinal))
+        if (member is not null && !string.Equals(member.BrainId, caller.BrainId, StringComparison.Ordinal))
         {
             return CallDecision.Deny(CallDenial.OutsideWorkspace, "The principal is not a member of this workspace.");
         }

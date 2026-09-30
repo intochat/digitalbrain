@@ -50,7 +50,7 @@ public sealed class GrantFacts
     public void UserAccessInsideItsOwnWorkspaceNeedsNoGrant()
     {
         var request = Request(CallerKind.User, null, "ws-1", "person.birthDate");
-        var member = new Member { PrincipalId = "owner", AccountId = "a", WorkspaceId = "ws-1", Role = MemberRole.Owner, DisplayName = "Owner", JoinedAt = Now };
+        var member = new Member { PrincipalId = "owner", AccountId = "a", BrainId = "ws-1", Role = MemberRole.Owner, DisplayName = "Owner", JoinedAt = Now };
         Assert.Null(GrantRules.Evaluate(request, member, []));
     }
 
@@ -58,7 +58,7 @@ public sealed class GrantFacts
     public void AMemberOfAnotherWorkspaceIsDenied()
     {
         var request = Request(CallerKind.User, null, "ws-1", "person.birthDate");
-        var member = new Member { PrincipalId = "owner", AccountId = "a", WorkspaceId = "ws-2", Role = MemberRole.Owner, DisplayName = "Owner", JoinedAt = Now };
+        var member = new Member { PrincipalId = "owner", AccountId = "a", BrainId = "ws-2", Role = MemberRole.Owner, DisplayName = "Owner", JoinedAt = Now };
         Assert.Equal(CallDenial.OutsideWorkspace, GrantRules.Evaluate(request, member, [])!.Denial);
     }
 
@@ -66,7 +66,7 @@ public sealed class GrantFacts
     public async Task TheStageFetchesMembershipAndGrantsThenAppliesTheRules()
     {
         var stage = new GrantCallFilterStage(new FakePolicy(
-            new Member { PrincipalId = "owner", AccountId = "a", WorkspaceId = "ws-1", Role = MemberRole.Owner, DisplayName = "Owner", JoinedAt = Now },
+            new Member { PrincipalId = "owner", AccountId = "a", BrainId = "ws-1", Role = MemberRole.Owner, DisplayName = "Owner", JoinedAt = Now },
             [Grant(GrantMode.Always, "person.birthDate", "app-1", "ws-2")]));
         var request = Request(CallerKind.App, "app-1", "ws-1", "person.birthDate");
         var decision = await stage.EvaluateAsync(request, TestContext.Current.CancellationToken);

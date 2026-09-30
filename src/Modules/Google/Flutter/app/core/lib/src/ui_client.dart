@@ -87,7 +87,7 @@ final class DigitalBrainUiClient {
   void _useSession(Map<String, dynamic> session) {
     principalId = session['principalId'] as String;
     accountId = session['accountId'] as String;
-    defaultWorkspaceId = session['workspaceId'] as String;
+    defaultWorkspaceId = session['brainId'] as String;
     workspaceIdentity = '$principalId|$accountId';
   }
 
@@ -120,11 +120,11 @@ final class DigitalBrainUiClient {
   Future<String> createWorkspace() async {
     final response = await _request(
       'POST',
-      '/identity/workspaces',
+      '/identity/brains',
       body: const {},
       timeout: const Duration(seconds: 15),
     );
-    return (jsonDecode(response.body) as Map<String, dynamic>)['workspaceId']
+    return (jsonDecode(response.body) as Map<String, dynamic>)['brainId']
         as String;
   }
 

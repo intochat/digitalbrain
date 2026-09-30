@@ -81,47 +81,46 @@ internal sealed class IdentityDirectoryNeuron : Neuron<IdentityDirectoryState>, 
         return Task.FromResult(Snapshot.Members.FirstOrDefault(member => string.Equals(member.PrincipalId, principalId, StringComparison.Ordinal)));
     }
 
-    public Task<bool> CanAccessAsync(string principalId, string workspaceId, CancellationToken cancellationToken = default)
+    public Task<bool> CanAccessAsync(string principalId, string brainId, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (string.IsNullOrWhiteSpace(principalId) || string.IsNullOrWhiteSpace(workspaceId))
+        if (string.IsNullOrWhiteSpace(principalId) || string.IsNullOrWhiteSpace(brainId))
         {
             return Task.FromResult(false);
         }
 
         return Task.FromResult(Snapshot.Members.Any(member =>
             string.Equals(member.PrincipalId, principalId, StringComparison.Ordinal)
-            && string.Equals(member.WorkspaceId, workspaceId, StringComparison.Ordinal)));
+            && string.Equals(member.BrainId, brainId, StringComparison.Ordinal)));
     }
 
-    public async Task<Member> ShareWorkspaceAsync(string accountId, string workspaceId, string principalId, string displayName, MemberRole role, CancellationToken cancellationToken = default)
+    public async Task<Member> ShareBrainAsync(string accountId, string brainId, string principalId, string displayName, MemberRole role, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var next = Snapshot;
         var existing = next.Members.FirstOrDefault(member =>
             string.Equals(member.AccountId, accountId, StringComparison.Ordinal)
             && string.Equals(member.PrincipalId, principalId, StringComparison.Ordinal)
-            && string.Equals(member.WorkspaceId, workspaceId, StringComparison.Ordinal));
+            && string.Equals(member.BrainId, brainId, StringComparison.Ordinal));
         if (existing is not null)
         {
             return existing;
         }
 
-        var member = NewMember(accountId, workspaceId, principalId, displayName, role);
+        var member = NewMember(accountId, brainId, principalId, displayName, role);
         next.Members.Add(member);
         await _store.WriteStateAsync();
-        await EstablishBrainAsync(member);
         return member;
     }
 
     private Task EstablishBrainAsync(Member member) =>
-        GrainFactory.GetGrain<IBrain>(BrainScope.Create(member.AccountId, member.WorkspaceId).Id)
-            .Establish(new(member.WorkspaceId, member.AccountId));
+        GrainFactory.GetGrain<IBrain>(BrainScope.Create(member.AccountId, member.BrainId).Id)
+            .Establish(new(member.BrainId, member.AccountId));
 
-    private static Member NewMember(string accountId, string workspaceId, string principalId, string displayName, MemberRole role) => new()
+    private static Member NewMember(string accountId, string brainId, string principalId, string displayName, MemberRole role) => new()
     {
         AccountId = accountId,
-        WorkspaceId = workspaceId,
+        BrainId = brainId,
         PrincipalId = principalId,
         DisplayName = displayName,
         Role = role,

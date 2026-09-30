@@ -21,7 +21,7 @@ internal static class People
             new { principalId = principal, displayName = principal, password = principal + "-password-123" }, Json, ct);
         Assert.Equal(HttpStatusCode.OK, registered.StatusCode);
         var member = await registered.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(Json, ct);
-        return new(client, member!.WorkspaceId);
+        return new(client, member!.BrainId);
     }
 
     public static async Task<JsonElement> Send(HttpClient client, HttpMethod method, string path, object? body, CancellationToken ct)

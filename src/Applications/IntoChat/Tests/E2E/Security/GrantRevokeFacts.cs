@@ -27,7 +27,7 @@ public sealed class GrantRevokeFacts
         Assert.Equal(HttpStatusCode.OK, bobLogin.StatusCode);
 
         var member = await aliceLogin.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(ct);
-        var workspace = member!.WorkspaceId;
+        var workspace = member!.BrainId;
         using var create = await alice.PostAsJsonAsync(
             $"/workspaces/{workspace}/grants",
             new { appId = "app-1", semanticTypeId = "person.birthDate", mode = 2, workspaceId = workspace },

@@ -35,7 +35,7 @@ void main() {
                 jsonEncode({
                   'principalId': principal,
                   'accountId': '$principal-account',
-                  'workspaceId': '$principal-home',
+                  'brainId': '$principal-home',
                 }),
                 200,
               );

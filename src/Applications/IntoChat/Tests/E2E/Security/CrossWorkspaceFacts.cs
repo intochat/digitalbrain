@@ -49,8 +49,8 @@ public sealed class CrossWorkspaceFacts
 
         var aliceMember = await aliceLogin.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(Json, ct);
         var bobMember = await bobLogin.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(Json, ct);
-        var aliceWorkspace = aliceMember!.WorkspaceId;
-        var bobWorkspace = bobMember!.WorkspaceId;
+        var aliceWorkspace = aliceMember!.BrainId;
+        var bobWorkspace = bobMember!.BrainId;
 
         // Bob reaches his own workspace but is forbidden from Alice's scoped value and app node.
         using var ownUi = await bob.GetAsync($"/workspaces/{bobWorkspace}/ui/sliders/volume", ct);

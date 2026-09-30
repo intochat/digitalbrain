@@ -16,7 +16,7 @@ public sealed record Member
 {
     [Id(0)] public required string PrincipalId { get; init; }
     [Id(1)] public required string AccountId { get; init; }
-    [Id(2)] public required string WorkspaceId { get; init; }
+    [Id(2)] public required string BrainId { get; init; }
     [Id(3)] public required MemberRole Role { get; init; }
     [Id(4)] public required string DisplayName { get; init; }
     [Id(5)] public DateTimeOffset JoinedAt { get; init; }
@@ -43,11 +43,11 @@ public interface IIdentityDirectory : IGrainWithStringKey
 
     Task<Member?> FindMemberAsync(string principalId, CancellationToken cancellationToken = default);
 
-    // A principal may reach a workspace only when it holds a member record for it, whether it owns
-    // the account or the workspace was shared with it.
-    Task<bool> CanAccessAsync(string principalId, string workspaceId, CancellationToken cancellationToken = default);
+    // A principal may reach a brain only when it holds a member record for it, whether it owns
+    // the account or the brain was shared with it.
+    Task<bool> CanAccessAsync(string principalId, string brainId, CancellationToken cancellationToken = default);
 
-    Task<Member> ShareWorkspaceAsync(string accountId, string workspaceId, string principalId, string displayName, MemberRole role, CancellationToken cancellationToken = default);
+    Task<Member> ShareBrainAsync(string accountId, string brainId, string principalId, string displayName, MemberRole role, CancellationToken cancellationToken = default);
 }
 
 // Stable grain keys for the identity directory and per-workspace grant store.

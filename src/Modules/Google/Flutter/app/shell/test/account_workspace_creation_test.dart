@@ -21,7 +21,7 @@ void main() {
       final client = DigitalBrainUiClient(
         baseUri: Uri.parse('http://kernel'),
         httpClient: MockClient((request) async {
-          if (request.url.path == '/identity/workspaces') {
+          if (request.url.path == '/identity/brains') {
             requested = true;
             expect(request.method, 'POST');
             return response.future;
@@ -53,7 +53,7 @@ void main() {
       expect(requested, isTrue);
       expect(store.projects, hasLength(1));
       response.complete(
-        http.Response('{"workspaceId":"server-owned-workspace"}', 200),
+        http.Response('{"brainId":"server-owned-workspace"}', 200),
       );
       await tester.pumpAndSettle();
       expect(store.currentProject.id, 'server-owned-workspace');

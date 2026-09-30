@@ -17,7 +17,7 @@ public sealed class CrossWorkspaceFacts
         {
             PrincipalId = "owner",
             AccountId = "account-1",
-            WorkspaceId = "workspace-b",
+            BrainId = "workspace-b",
             Role = MemberRole.Owner,
             DisplayName = "Owner",
             JoinedAt = DateTimeOffset.UtcNow,

@@ -107,8 +107,8 @@ public static class AccountSession
             if (!string.IsNullOrWhiteSpace(principalId))
             {
                 var accountId = context.User.FindFirst("intochat.account")?.Value ?? principalId;
-                var claimWorkspace = context.User.FindFirst("intochat.workspace")?.Value;
-                return Build(principalId, accountId, context, claimWorkspace);
+                var claimBrain = context.User.FindFirst("intochat.brain")?.Value;
+                return Build(principalId, accountId, context, claimBrain);
             }
         }
 
@@ -126,17 +126,21 @@ public static class AccountSession
         return Build(owner ? DefaultLogin : credential.Username, owner ? DefaultLogin : credential.Username, context);
     }
 
-    private static CallerContext Build(string principalId, string accountId, HttpContext context, string? claimWorkspace = null)
+    private static CallerContext Build(string principalId, string accountId, HttpContext context, string? claimBrain = null)
     {
-        var workspaceId = context.Request.RouteValues.TryGetValue("workspaceId", out var routeWorkspace)
-            && routeWorkspace is string { Length: > 0 } value
-                ? value
-                : claimWorkspace is { Length: > 0 } ? claimWorkspace : DefaultLogin;
+        var brainId = context.Request.RouteValues.TryGetValue("brainId", out var routeBrain)
+            && routeBrain is string { Length: > 0 } brainValue
+                ? brainValue
+                // workspaceId fallback dies with the last /workspaces route (transition only)
+                : context.Request.RouteValues.TryGetValue("workspaceId", out var routeWorkspace)
+                    && routeWorkspace is string { Length: > 0 } workspaceValue
+                        ? workspaceValue
+                        : claimBrain is { Length: > 0 } ? claimBrain : DefaultLogin;
         return new CallerContext
         {
             PrincipalId = principalId,
             AccountId = accountId,
-            BrainId = workspaceId,
+            BrainId = brainId,
             Kind = CallerKind.User,
             StampedBy = TrustedEdge.AuthenticatedHttp,
         };
