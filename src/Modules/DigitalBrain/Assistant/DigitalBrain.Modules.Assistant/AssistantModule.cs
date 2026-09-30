@@ -20,5 +20,6 @@ public sealed class AssistantModule : IModule
     {
         ArgumentNullException.ThrowIfNull(endpoints);
         ComputeUsageEndpoints.Map(endpoints);
+        AssistantEndpoints.Map(endpoints);
     }
 }

@@ -1,15 +1,10 @@
 using System.Text.Json;
-using DigitalBrain.Identity.Configuration;
 using DigitalBrain.Contracts;
 using DigitalBrain.Apps;
-using DigitalBrain.Assistant;
 using DigitalBrain.Flutter;
 using DigitalBrain.Core.Enforcement;
 using IntoChat.Marketplace;
 using IntoChat.Packages;
-using IntoChat.Workspace;
-using Microsoft.Extensions.Options;
-using DigitalBrain.Identity;
 
 namespace IntoChat.Apps;
 
@@ -17,24 +12,10 @@ internal static class BuiltInAppEndpoints
 {
     public static void MapBuiltInApps(this IEndpointRouteBuilder routes)
     {
-        var apps = routes.MapGroup("/workspaces/{workspaceId}/built-in")
-            .AddEndpointFilter(BrainAccessFilter.EnforceAsync);
-        apps.MapPost("/activate", async (string workspaceId, IDigitalBrain brain, IOptions<BasicAuthOptions> auth) =>
-        {
-            await brain.Get<IAssistant>(AssistantSurface.Key(WorkspaceScope.Current(auth.Value, workspaceId).Id)).Activate();
-            return Results.NoContent();
-        });
-        apps.MapPost("/{appId}/open", async (string workspaceId, string appId, IDigitalBrain brain, PackageService packages, IOptions<BasicAuthOptions> auth) =>
-        {
-            var key = WorkspaceScope.Current(auth.Value, workspaceId).Id;
-            if (appId == "assistant")
-            {
-                var window = await brain.Get<IAssistant>(AssistantSurface.Key(key)).OpenWindow();
-                return Results.Ok(new { id = window.Id, title = window.Title, kind = "surface", surface = window.Surface });
-            }
-            if (appId == "settings") { return await OpenSettings(workspaceId, brain, packages); }
-            return Results.NotFound();
-        });
+        // moves with PackageService: the assistant built-in routes already live in the Assistant module.
+        var apps = BrainRoutes.Group(routes, "/built-in");
+        apps.MapPost("/settings/open", async (IDigitalBrain brain, PackageService packages) =>
+            await OpenSettings(BrainScope.CurrentId(), brain, packages));
     }
 
     // Settings is the shipped settings package: installed on first open, then asked for its surface

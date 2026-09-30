@@ -8,7 +8,6 @@ using DigitalBrain.Sdk;
 using IntoChat;
 using IntoChat.Agent;
 using IntoChat.Apps;
-using IntoChat.Applications;
 using IntoChat.ServiceDefaults;
 using IntoChat.Workspace;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -52,6 +51,5 @@ app.MapWorkspaceConnections();
 app.MapWorkspaceVoice();
 app.MapLocalApps();
 app.MapBuiltInApps();
-app.MapApplications();
 
 app.Run();

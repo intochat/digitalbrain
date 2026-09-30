@@ -9,7 +9,7 @@ namespace DigitalBrain.Assistant.Tests;
 public sealed class AssistantRouteFacts
 {
     [Fact]
-    public void ComputeUsageIsServedUnderTheBrainRoute()
+    public void ComputeUsageAndAssistantApplicationsAreServedUnderTheBrainRoute()
     {
         var builder = WebApplication.CreateBuilder();
         builder.Services.AddSingleton(typeof(IDigitalBrain), _ => null!);
@@ -21,6 +21,10 @@ public sealed class AssistantRouteFacts
             .OfType<RouteEndpoint>().Select(endpoint => endpoint.RoutePattern.RawText!).ToArray();
 
         Assert.Contains("/brains/{brainId}/compute/usage", routes);
+        Assert.Contains("/brains/{brainId}/applications/assistant/open", routes);
+        Assert.Contains("/brains/{brainId}/applications/assistant/start", routes);
+        Assert.Contains("/brains/{brainId}/built-in/activate", routes);
+        Assert.Contains("/brains/{brainId}/built-in/assistant/open", routes);
         Assert.All(routes, route => Assert.StartsWith("/brains/{brainId}/", route));
     }
 }
