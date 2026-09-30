@@ -44,6 +44,7 @@
     <Project Path="src/Modules/DigitalBrain/Kernel/DigitalBrain.Deployment.Tests/DigitalBrain.Deployment.Tests.csproj" />
     <Project Path="src/Modules/DigitalBrain/Kernel/DigitalBrain.Deployment/DigitalBrain.Deployment.csproj" />
     <Project Path="src/Modules/DigitalBrain/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Kernel/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
   </Folder>
   <Folder Name="/Modules/ClickHouse/">
     <Project Path="src/Modules/ClickHouse/DigitalBrain.Modules.ClickHouse.Tests.Unit/DigitalBrain.Modules.ClickHouse.Tests.Unit.csproj" />

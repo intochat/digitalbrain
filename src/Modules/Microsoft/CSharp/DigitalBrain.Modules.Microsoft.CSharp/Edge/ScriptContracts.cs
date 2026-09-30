@@ -8,6 +8,7 @@ namespace DigitalBrain.Microsoft.CSharp;
 internal sealed class ScriptContracts(IEnumerable<Assembly> assemblies)
 {
     private readonly IReadOnlyDictionary<string, Type> _contracts = assemblies
+        .Where(assembly => !PlatformAssemblyAttribute.IsPlatform(assembly))
         .SelectMany(assembly => assembly.GetExportedTypes())
         .Where(type => type.IsInterface && typeof(INeuron).IsAssignableFrom(type) && type != typeof(INeuron))
         .Where(type => !PlatformOnlyAttribute.AppliesTo(type))

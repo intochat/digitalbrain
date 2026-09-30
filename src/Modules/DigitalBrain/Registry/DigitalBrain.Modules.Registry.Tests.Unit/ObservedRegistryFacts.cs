@@ -39,6 +39,18 @@ public sealed class ObservedRegistryFacts
     }
 
     [Fact]
+    public async Task TheWholePlatformAssemblyContributesNoNeuronTypesToTheCatalog()
+    {
+        await using var brain = await UnitTest.Create().WithModule<RegistryModule>().WithModule<DigitalBrain.Sdk.Integrations.IntegrationsModule>()
+            .WithModule<DigitalBrain.Sdk.Secrets.SecretsModule>().StartAsync(TestContext.Current.CancellationToken);
+        var types = await brain.Get<IRegistry>(RegistryModule.Key).Types();
+
+        var platformAssembly = typeof(DigitalBrain.Sdk.Integrations.IntegrationsModule).Assembly;
+        var platformContracts = platformAssembly.GetExportedTypes().Where(type => type.IsInterface).Select(type => type.FullName);
+        Assert.DoesNotContain(types, type => platformContracts.Contains(type.Contract));
+    }
+
+    [Fact]
     public async Task ObservationsTrackActivationDeactivationAndSurviveRegistryReactivation()
     {
         var ct = TestContext.Current.CancellationToken;

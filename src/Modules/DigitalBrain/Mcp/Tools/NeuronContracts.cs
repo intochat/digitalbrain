@@ -10,6 +10,7 @@ public sealed class NeuronContracts
     public NeuronContracts(IEnumerable<Assembly> assemblies)
     {
         _contracts = assemblies
+            .Where(assembly => !PlatformAssemblyAttribute.IsPlatform(assembly))
             .SelectMany(assembly => assembly.GetExportedTypes())
             .Where(type => type.IsInterface && type != typeof(INeuron) && typeof(INeuron).IsAssignableFrom(type) && !PlatformOnlyAttribute.AppliesTo(type))
             .ToDictionary(type => type.FullName!, StringComparer.Ordinal);

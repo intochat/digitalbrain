@@ -8,7 +8,8 @@ public sealed class PlatformOnlyAttribute : Attribute
     public static bool AppliesTo(Type contract)
     {
         ArgumentNullException.ThrowIfNull(contract);
-        return contract.IsDefined(typeof(PlatformOnlyAttribute), inherit: false)
+        return PlatformAssemblyAttribute.IsPlatform(contract.Assembly)
+            || contract.IsDefined(typeof(PlatformOnlyAttribute), inherit: false)
             || contract.GetInterfaces().Any(inherited => inherited.IsDefined(typeof(PlatformOnlyAttribute), inherit: false));
     }
 }

@@ -357,6 +357,17 @@ public sealed class RegistrationFacts
     }
 
     [Fact]
+    public void EveryPublicNeuronContractInThePlatformAssemblyIsPlatformOnlyByAssemblyIdentity()
+    {
+        var platform = typeof(IIntegrationRegistration).Assembly;
+
+        Assert.True(PlatformAssemblyAttribute.IsPlatform(platform));
+        Assert.False(PlatformAssemblyAttribute.IsPlatform(typeof(IntegrationDefinition).Assembly));
+        Assert.All(platform.GetExportedTypes().Where(type => type.IsInterface && typeof(INeuron).IsAssignableFrom(type)),
+            contract => Assert.True(PlatformOnlyAttribute.AppliesTo(contract)));
+    }
+
+    [Fact]
     public void TheVaultOwnerCannotBeAPrincipalId()
     {
         Assert.DoesNotMatch("^[a-z0-9][a-z0-9-]*$", IntegrationVault.Owner);

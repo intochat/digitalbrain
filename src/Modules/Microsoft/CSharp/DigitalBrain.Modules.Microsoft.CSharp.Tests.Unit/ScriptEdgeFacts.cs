@@ -107,6 +107,29 @@ public sealed class ScriptEdgeFacts
     }
 
     [Fact]
+    public void TheWholePlatformAssemblyContributesNoScriptContractsEvenWithoutAttributesOnTheTypes()
+    {
+        var platform = typeof(DigitalBrain.Sdk.Integrations.IntegrationsModule).Assembly;
+        Assert.True(DigitalBrain.Contracts.PlatformAssemblyAttribute.IsPlatform(platform));
+        var contracts = new ScriptContracts([platform]);
+
+        foreach (var neuronContract in platform.GetExportedTypes().Where(type => type.IsInterface && typeof(DigitalBrain.Contracts.INeuron).IsAssignableFrom(type)))
+        {
+            Assert.Throws<ArgumentException>(() => contracts.Find(neuronContract.FullName!));
+            Assert.True(DigitalBrain.Contracts.PlatformOnlyAttribute.AppliesTo(neuronContract));
+        }
+    }
+
+    [Fact]
+    public void ThePlatformAssemblyIsNeverAContractsAssemblyOfAComposedModule()
+    {
+        var inventory = new DigitalBrain.Core.ModuleInventory([typeof(DigitalBrain.Sdk.Integrations.IntegrationsModule), typeof(DigitalBrain.Sdk.Secrets.SecretsModule)]);
+
+        Assert.DoesNotContain(typeof(DigitalBrain.Sdk.Integrations.IntegrationsModule).Assembly, inventory.ContractAssemblies());
+        Assert.Empty(DigitalBrain.Core.ModuleInventory.ContractAssembliesOf(typeof(DigitalBrain.Sdk.Secrets.SecretsModule).Assembly));
+    }
+
+    [Fact]
     public void TheIntegrationRegistrationContractIsAbsentFromTheScriptCatalogBecauseReleaseReliesOnThat()
     {
         var contracts = new ScriptContracts([typeof(DigitalBrain.Sdk.Integrations.IIntegrationRegistration).Assembly]);
