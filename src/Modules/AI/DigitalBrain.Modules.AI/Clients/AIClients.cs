@@ -154,7 +154,7 @@ internal static class AIClients
         => LLMModel.All.FirstOrDefault(model => Factories[model.Provider].IsConfigured(configuration, credentials))
             ?? throw new InvalidOperationException(
                 "No LLM provider is configured. Register a provider through POST /integrations/{id}/registration "
-                + $"(or seed DigitalBrain:Integrations:openai:ApiKey), supply an Ollama endpoint, or pin {DefaultModelKey}.");
+                + $"(or seed just DigitalBrain:Integrations:openai:ApiKey; the endpoint defaults to the provider's hosted one), supply an Ollama endpoint, or pin {DefaultModelKey}.");
 
     private static IEmbeddingGenerator<string, Embedding<float>> DefaultEmbeddingGenerator(IServiceProvider provider)
     {

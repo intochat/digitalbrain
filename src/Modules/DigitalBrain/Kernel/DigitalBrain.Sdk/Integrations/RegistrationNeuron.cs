@@ -38,7 +38,8 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
     public async Task<RegistrationSnapshot> SeedIfUnconfigured(ConfigureRegistration request)
     {
         RefuseAppCalls();
-        return SnapshotOf(Snapshot).Status == RegistrationStatus.Unconfigured
+        // A cleared registration was an operator's decision; seeds only ever fill virgin state.
+        return SnapshotOf(Snapshot).Status == RegistrationStatus.Unconfigured && Snapshot.Revision == 0
             ? await Apply(request)
             : SnapshotOf(Snapshot);
     }
@@ -68,7 +69,7 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
         foreach (var (field, value) in values)
         {
             next.References[field] = await vault.Set(PlatformCaller(), IntegrationVault.SecretName(Definition.Id, field), $"{Definition.Id} {field}", value);
-            if (Definition.SettingFields.Contains(field, StringComparer.Ordinal))
+            if (Definition.IsSetting(field))
             {
                 next.Settings[field] = value;
             }
@@ -150,9 +151,9 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
 
     private RegistrationSnapshot SnapshotOf(RegistrationState state)
     {
-        var missing = Definition.AllFields.Where(field => !state.References.ContainsKey(field)).ToArray();
+        var missing = Definition.RequiredFields.Where(field => !state.References.ContainsKey(field)).ToArray();
         var status = missing.Length == 0 ? RegistrationStatus.Ready
-            : missing.Length == Definition.AllFields.Count ? RegistrationStatus.Unconfigured
+            : state.References.Count == 0 ? RegistrationStatus.Unconfigured
             : RegistrationStatus.Partial;
         return new RegistrationSnapshot { IntegrationId = Definition.Id, Status = status, MissingFields = missing, Settings = new(state.Settings, StringComparer.Ordinal), Revision = state.Revision };
     }

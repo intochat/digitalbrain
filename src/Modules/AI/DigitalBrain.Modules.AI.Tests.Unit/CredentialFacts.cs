@@ -33,7 +33,7 @@ public sealed class CredentialFacts
         Assert.False(factory.IsConfigured(new AIOptions(), credentials));
         Assert.Equal("openai", unavailable.Integration);
         Assert.Equal("Unconfigured", unavailable.Status);
-        Assert.Equal(["ApiKey", "Endpoint"], unavailable.Missing);
+        Assert.Equal(["ApiKey"], unavailable.Missing);
         Assert.DoesNotContain("Exception", unavailable.Message);
     }
 
@@ -88,6 +88,26 @@ public sealed class CredentialFacts
         Assert.Equal("https://api.anthropic.com", anthropic.Settings["Endpoint"]);
         Assert.Equal(RegistrationStatus.Ready, tavily.Status);
         Assert.Equal(RegistrationStatus.Unconfigured, (await brain.Get<IIntegrationRegistration>("integration/openai").Read()).Status);
+    }
+
+    [Fact]
+    public async Task SeedingOnlyTheApiKeyIsReadyAndTheDefaultEndpointIsUsed()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create()
+            .WithRegistrations(new TestExecutionOptions
+            {
+                PrivateConfiguration = new Dictionary<string, string?> { ["DigitalBrain:Integrations:openai:ApiKey"] = Canary },
+            })
+            .WithModule<AIModule>().StartAsync(ct);
+
+        var snapshot = await brain.Get<IIntegrationRegistration>("integration/openai").Read();
+        var credentials = brain.SiloServices.GetRequiredService<IAiCredentials>();
+        using var client = new OpenAIProviderFactory().CreateChatClient("test-model", new AIOptions(), credentials);
+
+        Assert.Equal(RegistrationStatus.Ready, snapshot.Status);
+        Assert.DoesNotContain("Endpoint", snapshot.Settings.Keys);
+        Assert.Equal(AiIntegrations.DefaultEndpointOf(AiProvider.OpenAI), ((ChatClientMetadata)client.GetService(typeof(ChatClientMetadata))!).ProviderUri!.ToString());
     }
 
     [Fact]

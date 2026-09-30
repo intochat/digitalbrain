@@ -38,5 +38,5 @@ internal static class AiIntegrations
     internal static AiProvider[] KeyedProviders { get; } = [AiProvider.OpenAI, AiProvider.Anthropic, AiProvider.Google, AiProvider.XAI];
 
     private static IntegrationDefinition Provider(string id, string displayName)
-        => IntegrationDefinition.For(id, displayName).RequiresSecret(ApiKeyField).RequiresSetting(EndpointField);
+        => IntegrationDefinition.For(id, displayName).RequiresSecret(ApiKeyField).OffersSetting(EndpointField);
 }

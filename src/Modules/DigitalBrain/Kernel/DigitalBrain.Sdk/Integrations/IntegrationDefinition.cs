@@ -22,8 +22,17 @@ public sealed record IntegrationDefinition(string Id, string DisplayName, string
 
     public IntegrationDefinition RequiresSetting(string field) => this with { SettingFields = [.. SettingFields, Checked(field)] };
 
+    // Optional settings never block Ready; the integration falls back to its own default at the point of use.
+    public string[] OptionalSettingFields { get; init; } = [];
+
+    public IntegrationDefinition OffersSetting(string field) => this with { OptionalSettingFields = [.. OptionalSettingFields, Checked(field)] };
+
     // Secrets first, then settings; the order missing fields are reported in.
-    public IReadOnlyList<string> AllFields => [.. SecretFields, .. SettingFields];
+    public IReadOnlyList<string> RequiredFields => [.. SecretFields, .. SettingFields];
+
+    public IReadOnlyList<string> AllFields => [.. RequiredFields, .. OptionalSettingFields];
+
+    public bool IsSetting(string field) => SettingFields.Contains(field, StringComparer.Ordinal) || OptionalSettingFields.Contains(field, StringComparer.Ordinal);
 
     private string Checked(string field)
     {

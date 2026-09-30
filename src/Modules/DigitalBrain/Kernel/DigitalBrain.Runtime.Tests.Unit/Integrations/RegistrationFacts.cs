@@ -78,6 +78,22 @@ public sealed class RegistrationFacts
     }
 
     [Fact]
+    public async Task SeedingAfterAnOperatorClearedEveryFieldIsANoOp()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartAsync(ct);
+        var google = Registration(brain, "google");
+        await google.Configure(Values(("ClientId", Canary)));
+        var cleared = await google.Clear("ClientId");
+
+        var seeded = await google.SeedIfUnconfigured(Values(("ClientId", OtherCanary)));
+
+        Assert.Equal(RegistrationStatus.Unconfigured, seeded.Status);
+        Assert.Equal(cleared.Revision, seeded.Revision);
+        Assert.Equal(RegistrationStatus.Unconfigured, (await google.Read()).Status);
+    }
+
+    [Fact]
     public async Task APartialConfigurationReportsMissingFieldNamesOnly()
     {
         var ct = TestContext.Current.CancellationToken;
