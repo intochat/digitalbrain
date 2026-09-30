@@ -3,7 +3,7 @@ using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Testing.Unit;
 using Xunit;
 
-namespace DigitalBrain.Tests.Brain;
+namespace DigitalBrain.Runtime.Tests.Unit.Brain;
 
 public sealed class BrainFacts
 {

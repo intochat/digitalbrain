@@ -6,7 +6,7 @@ using Xunit;
 
 namespace DigitalBrain.Modules.Identity.Tests.Unit;
 
-public sealed class BrainFacts
+public sealed class BrainEstablishmentFacts
 {
     [Fact]
     public async Task RegisteringAMemberEstablishesTheirBrainNeuron()
@@ -22,8 +22,9 @@ public sealed class BrainFacts
     }
 
     [Fact]
-    public async Task EstablishIsIdempotent()
+    public async Task EstablishIsIdempotentWithIdentityComposed()
     {
+        // Covers Identity-composed path; Core-level test exists separately in BrainFacts.cs
         var ct = TestContext.Current.CancellationToken;
         await using var host = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
         var neuron = host.Get<IBrain>(BrainScope.Create("acct", "personal").Id);
