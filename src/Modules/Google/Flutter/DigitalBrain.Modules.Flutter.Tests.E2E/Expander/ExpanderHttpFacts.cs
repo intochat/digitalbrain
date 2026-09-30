@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Expander;
 using DigitalBrain.Flutter.Expander.Signals;
@@ -19,7 +20,7 @@ public sealed class ExpanderHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        var expander = brain.Get<IExpander>(UiScope.Key("workspace-a", "more"));
+        var expander = brain.Get<IExpander>(UiScope.Key(BrainScope.Create("owner", "workspace-a").Id, "more"));
         await using var changed = await brain.Observe<ExpanderChanged>(expander, ct);
 
         using var collapsed = await brain.HttpClient.PostAsJsonAsync("/brains/workspace-a/ui/expanders/more",

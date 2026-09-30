@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.TextField;
 using DigitalBrain.Testing;
@@ -15,7 +16,7 @@ public sealed class TextFieldHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        var field = brain.Get<ITextField>(UiScope.Key("workspace-a", "name"));
+        var field = brain.Get<ITextField>(UiScope.Key(BrainScope.Create("owner", "workspace-a").Id, "name"));
         await field.Configure("Name", "secret");
 
         using var set = await brain.HttpClient.PostAsJsonAsync("/brains/workspace-a/ui/textfields/name/value", new { value = "Ada" }, ct);

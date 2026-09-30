@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Button;
 using DigitalBrain.Flutter.Button.Signals;
@@ -16,7 +17,7 @@ public sealed class ButtonHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        var button = brain.Get<IButton>(UiScope.Key("workspace-a", "go"));
+        var button = brain.Get<IButton>(UiScope.Key(BrainScope.Create("owner", "workspace-a").Id, "go"));
         await using var clicks = await brain.Observe<ButtonClicked>(button, ct);
         using var set = await brain.HttpClient.PostAsJsonAsync("/brains/workspace-a/ui/buttons/go/set", new { label = "Open", action = "navigate:docs" }, ct);
         Assert.Equal(HttpStatusCode.Accepted, set.StatusCode);

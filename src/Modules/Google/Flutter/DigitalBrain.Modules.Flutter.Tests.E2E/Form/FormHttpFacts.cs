@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using DigitalBrain.Contracts.Types;
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Form;
 using DigitalBrain.Testing;
@@ -16,7 +17,7 @@ public sealed class FormHttpFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await E2ETest.Create().WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .StartAsync(ct);
-        var form = brain.Get<IForm>(UiScope.Key("workspace-a", "intake"));
+        var form = brain.Get<IForm>(UiScope.Key(BrainScope.Create("owner", "workspace-a").Id, "intake"));
         var defined = await form.Define(new("Customer intake",
         [
             new("name", "Name", FieldKind.PlainText, true),
