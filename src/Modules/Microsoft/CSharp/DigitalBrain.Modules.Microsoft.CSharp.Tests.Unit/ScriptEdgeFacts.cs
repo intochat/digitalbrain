@@ -107,6 +107,15 @@ public sealed class ScriptEdgeFacts
     }
 
     [Fact]
+    public void TheIntegrationRegistrationContractIsAbsentFromTheScriptCatalogBecauseReleaseReliesOnThat()
+    {
+        var contracts = new ScriptContracts([typeof(DigitalBrain.Sdk.Integrations.IIntegrationRegistration).Assembly]);
+
+        Assert.True(DigitalBrain.Contracts.PlatformOnlyAttribute.AppliesTo(typeof(DigitalBrain.Sdk.Integrations.IIntegrationRegistration)));
+        Assert.Throws<ArgumentException>(() => contracts.Find(typeof(DigitalBrain.Sdk.Integrations.IIntegrationRegistration).FullName!));
+    }
+
+    [Fact]
     public async Task TheEdgeRefusesToInvokeAPlatformOnlyContractWithAForgedPlatformCaller()
     {
         var ct = TestContext.Current.CancellationToken;

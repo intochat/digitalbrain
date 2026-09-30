@@ -1,6 +1,6 @@
 namespace DigitalBrain.Aspire.Hosting;
 
-// "DigitalBrain:Google:Gmail:OAuth" + "ClientId" -> DigitalBrain__Google__Gmail__OAuth__ClientId,
+// "DigitalBrain:Integrations:gmail" + "ClientId" -> DigitalBrain__Integrations__gmail__ClientId,
 // the same key the module reads back through IConfiguration.
 public static class EnvironmentKeys
 {

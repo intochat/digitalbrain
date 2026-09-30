@@ -29,6 +29,16 @@ public sealed class ObservedRegistryFacts
     }
 
     [Fact]
+    public async Task TheIntegrationRegistrationContractIsExcludedFromTheNeuronTypeCatalog()
+    {
+        await using var brain = await UnitTest.Create().WithModule<RegistryModule>().WithModule<DigitalBrain.Sdk.Integrations.IntegrationsModule>()
+            .StartAsync(TestContext.Current.CancellationToken);
+        var types = await brain.Get<IRegistry>(RegistryModule.Key).Types();
+
+        Assert.DoesNotContain(types, type => type.Id == "integration.registration" || type.Contract == typeof(DigitalBrain.Sdk.Integrations.IIntegrationRegistration).FullName);
+    }
+
+    [Fact]
     public async Task ObservationsTrackActivationDeactivationAndSurviveRegistryReactivation()
     {
         var ct = TestContext.Current.CancellationToken;

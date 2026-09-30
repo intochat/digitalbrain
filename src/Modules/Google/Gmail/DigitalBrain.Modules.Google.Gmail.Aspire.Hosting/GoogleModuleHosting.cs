@@ -9,6 +9,6 @@ public sealed class GmailModuleHosting : IDigitalBrainModuleHosting
     public void Configure(DigitalBrainBuilder brain)
     {
         var options = brain.GetModuleConfiguration<GmailModule>().GetModuleOptions<GmailModuleOptions>(nameof(GmailModule));
-        if (options.HostGmail) { new DigitalBrainModuleBuilder<GmailModule>(brain).WithGmail(options.PublicOrigin); }
+        if (options.HostGmail) { new DigitalBrainModuleBuilder<GmailModule>(brain).WithGmail(); }
     }
 }
