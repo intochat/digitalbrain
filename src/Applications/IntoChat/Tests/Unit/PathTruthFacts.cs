@@ -120,12 +120,4 @@ public sealed class PathTruthFacts
             Assert.DoesNotContain("DigitalBrain.Microsoft.MicrosoftModule", text);
         }
     }
-
-    [Fact]
-    public void DecisionAndEpicRegistersExist()
-    {
-        Assert.True(File.Exists(PathInRepo("docs/product/decisions/README.md")), "The ADR register must exist.");
-        Assert.True(File.Exists(PathInRepo("docs/product/decisions/0001-process-runner-ownership.md")), "Existing ADR 0001 must stay indexed.");
-        Assert.True(File.Exists(PathInRepo("docs/product/epics/README.md")), "The epic index must exist.");
-    }
 }

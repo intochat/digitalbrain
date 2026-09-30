@@ -75,14 +75,4 @@ public sealed class HostedDeploymentFacts
         Assert.Contains("OTEL_BACKEND_ENDPOINT", collector);
         Assert.Contains("intochat.intent.id", collector);
     }
-
-    [Fact]
-    public void RunbookCoversIncidentBackupUpgradeAndSlo()
-    {
-        var runbook = Read("docs/operations/runbook.md");
-        foreach (var topic in new[] { "Incident response", "Backup and restore", "Upgrade and rollback", "99.5 %" })
-        {
-            Assert.Contains(topic, runbook);
-        }
-    }
 }

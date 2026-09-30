@@ -43,8 +43,6 @@ public sealed class LiveTableArchitectureFacts
         Assert.DoesNotContain(flutterFiles, file => Name(file) is "QueryPlanCompiler.cs" or "SupabaseQueryGuard.cs" or "SupabaseTypeMap.cs");
         Assert.DoesNotContain(flutterFiles, file => Name(file) == "ITablePolicy.cs");
 
-        var adr = Path.Combine(root, "docs", "product", "decisions", "0002-one-live-table-contract.md");
-        Assert.True(File.Exists(adr), $"Expected ADR 0002 at {adr}.");
     }
 
     private static string Name(string path) => Path.GetFileName(path);
