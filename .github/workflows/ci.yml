@@ -38,22 +38,22 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: Restore dependencies
-        run: dotnet restore DigitalBrain.slnx
+        run: dotnet restore DigitalBrain.slnx -v quiet
 
       - name: Format code
         run: dotnet format whitespace DigitalBrain.slnx --verify-no-changes --no-restore --verbosity minimal
 
       - name: Build solution
-        run: dotnet build DigitalBrain.slnx -c Release --no-restore -p:CodeGraphRefresh=false
+        run: dotnet build DigitalBrain.slnx -c Release --no-restore -v quiet -p:CodeGraphRefresh=false
 
       - name: Build the sample C# file app
-        run: dotnet build src/Modules/Microsoft/CSharp/Samples/timer-report.cs -c Release -p:CodeGraphRefresh=false
+        run: dotnet build src/Modules/Microsoft/CSharp/Samples/timer-report.cs -c Release -v quiet -p:CodeGraphRefresh=false
 
       - name: Validate NuGet packages
-        run: dotnet pack DigitalBrain.slnx -c Release --no-build -o artifacts
+        run: dotnet pack DigitalBrain.slnx -c Release --no-build -v quiet -o artifacts
 
       - name: Test
-        run: dotnet test DigitalBrain.slnx -c Release --no-build
+        run: dotnet test DigitalBrain.slnx -c Release --no-build -v quiet
 
   flutter-web-build:
     name: Flutter analyze and web build

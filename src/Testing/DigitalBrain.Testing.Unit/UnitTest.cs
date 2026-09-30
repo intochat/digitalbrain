@@ -24,7 +24,7 @@ public static class UnitTest
         builder.Options.ConfigureFileLogging = false;
         builder.ConfigureHost(host =>
         {
-            host.Logging.SetMinimumLevel(LogLevel.Warning);
+            host.Configuration.AddInMemoryCollection(TestLogging.QuietDefaults);
             foreach (var definition in modules)
             {
                 host.Configuration.AddInMemoryCollection(definition.Configuration);

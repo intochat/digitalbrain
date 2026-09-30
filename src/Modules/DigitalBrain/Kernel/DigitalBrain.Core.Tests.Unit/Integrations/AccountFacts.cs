@@ -196,6 +196,7 @@ public sealed class AccountFacts : IDisposable
     public void CapabilitiesAreServedUnderTheBrainScopedIntegrationsRoute()
     {
         var builder = WebApplication.CreateBuilder();
+        DigitalBrain.Testing.TestLogging.Apply(builder.Configuration);
         builder.Services.AddSingleton(typeof(IGrainFactory), _ => null!);
         IEndpointRouteBuilder app = builder.Build();
         new IntegrationsModule().Configure(app);
@@ -210,6 +211,7 @@ public sealed class AccountFacts : IDisposable
     public void AccountsAreServedOnlyUnderTheBrainScopedAccountsRoute()
     {
         var builder = WebApplication.CreateBuilder();
+        DigitalBrain.Testing.TestLogging.Apply(builder.Configuration);
         builder.Services.AddSingleton(typeof(IGrainFactory), _ => null!);
         IEndpointRouteBuilder app = builder.Build();
         new IntegrationsModule().Configure(app);

@@ -16,10 +16,12 @@ internal sealed partial class DotNetScriptLauncher : IScriptLauncher
             RedirectStandardError = true,
             UseShellExecute = false,
         };
-        foreach (var argument in (string[])["run", "app.cs", "-p:ArtifactsPath=" + Path.Combine(workDirectory, "artifacts")])
+        foreach (var argument in (string[])["run", "--verbosity", "quiet", "app.cs", "-p:ArtifactsPath=" + Path.Combine(workDirectory, "artifacts")])
         {
             start.ArgumentList.Add(argument);
         }
+        start.Environment["Logging__LogLevel__Default"] = "Warning";
+        start.Environment["Logging__LogLevel__Microsoft"] = "Warning";
         foreach (var (name, value) in environment) { start.Environment[name] = value; }
         var process = new Process { StartInfo = start, EnableRaisingEvents = true };
         process.OutputDataReceived += (_, line) => { if (line.Data is not null) { output(line.Data); } };

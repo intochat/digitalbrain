@@ -51,6 +51,7 @@ public sealed class BrainRoutesFacts
     private static async Task<(int Status, bool HandlerRan)> Invoke(string brainId, bool authorized, bool stamped)
     {
         var builder = WebApplication.CreateBuilder();
+        DigitalBrain.Testing.TestLogging.Apply(builder.Configuration);
         builder.Services.AddSingleton<IBrainAccess, DenyEveryone>();
         IEndpointRouteBuilder app = builder.Build();
         var handlerRan = false;

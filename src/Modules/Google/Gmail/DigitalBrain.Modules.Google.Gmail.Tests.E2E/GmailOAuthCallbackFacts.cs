@@ -52,6 +52,7 @@ internal sealed class TokenEndpointStub(WebApplication app, Uri origin, Uri toke
     public static async Task<TokenEndpointStub> StartAsync(CancellationToken cancellationToken)
     {
         var builder = WebApplication.CreateBuilder();
+        DigitalBrain.Testing.TestLogging.Apply(builder.Configuration);
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         var app = builder.Build();
         app.MapPost("/token", () => Results.Json(new

@@ -56,6 +56,7 @@ public sealed class CSharpRouteFacts
     private static (WebApplication App, RouteEndpoint[] Endpoints) MapAuthoringRoutes(params (string Key, string Value)[] settings)
     {
         var builder = WebApplication.CreateBuilder();
+        DigitalBrain.Testing.TestLogging.Apply(builder.Configuration);
         builder.Configuration.AddInMemoryCollection(settings.Select(setting => new KeyValuePair<string, string?>(setting.Key, setting.Value)));
         builder.Services.AddSingleton(new ScopedCSharpTools(null!, null!, null, "scope", canRun: false));
         builder.Services.AddSingleton(new CSharpSharing(null!, null!));
