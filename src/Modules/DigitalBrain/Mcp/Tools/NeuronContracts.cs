@@ -9,6 +9,7 @@ public sealed class NeuronContracts
 
     public NeuronContracts(IEnumerable<Assembly> assemblies)
     {
+        // Double filter (assembly + per-type) is deliberate defense-in-depth: credential-bearing contracts protected at both levels.
         _contracts = assemblies
             .Where(assembly => !PlatformAssemblyAttribute.IsPlatform(assembly))
             .SelectMany(assembly => assembly.GetExportedTypes())

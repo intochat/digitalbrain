@@ -368,6 +368,25 @@ public sealed class RegistrationFacts
     }
 
     [Fact]
+    public void EveryExportedNeuronContractInSdkIsEitherPlatformOnlyOrExplicitlyAllowed()
+    {
+        var sdk = typeof(ISecrets).Assembly;
+        var scriptSafeAllowList = new[] { nameof(IIntegrationRegistration) };
+
+        var exported = sdk.GetExportedTypes()
+            .Where(type => type.IsInterface && typeof(INeuron).IsAssignableFrom(type))
+            .ToArray();
+
+        Assert.All(exported, contract =>
+        {
+            var isPlatformOnly = PlatformOnlyAttribute.AppliesTo(contract);
+            var isAllowed = scriptSafeAllowList.Contains(contract.Name);
+            Assert.True(isPlatformOnly || isAllowed,
+                $"{contract.Name} must be either [PlatformOnly] (via PlatformOnlyAttribute.AppliesTo) or in the script-safe allow-list.");
+        });
+    }
+
+    [Fact]
     public void TheVaultOwnerCannotBeAPrincipalId()
     {
         Assert.DoesNotMatch("^[a-z0-9][a-z0-9-]*$", IntegrationVault.Owner);
