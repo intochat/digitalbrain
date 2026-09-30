@@ -14,6 +14,7 @@ public sealed class AssistantModule : IModule
     {
         ArgumentNullException.ThrowIfNull(silo);
         silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IAgentToolFactory, WorkspaceFormTools>());
+        silo.Services.TryAddSingleton<PackageService>();
     }
 
     public void Configure(IEndpointRouteBuilder endpoints)
@@ -21,5 +22,9 @@ public sealed class AssistantModule : IModule
         ArgumentNullException.ThrowIfNull(endpoints);
         ComputeUsageEndpoints.Map(endpoints);
         AssistantEndpoints.Map(endpoints);
+        AgentEndpoints.Map(endpoints);
+        PackageEndpoints.Map(endpoints);
+        AgentEndpoints.Map(endpoints);
+        PackageEndpoints.Map(endpoints);
     }
 }

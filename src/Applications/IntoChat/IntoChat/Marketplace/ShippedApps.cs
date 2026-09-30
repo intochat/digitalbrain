@@ -9,7 +9,7 @@ internal sealed record ShippedApp(PackageId Package, PackageContent Content);
 
 internal static class ShippedApps
 {
-    public const string Publisher = "intochat";
+    public const string Publisher = DigitalBrain.Assistant.ShippedPublisher.Id;
     private const string ResourcePrefix = "IntoChat.ShippedApps/";
     private const string ManifestFile = "app.json";
     private const string ScriptFile = "app.cs";

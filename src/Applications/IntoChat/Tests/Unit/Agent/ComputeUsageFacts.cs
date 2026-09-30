@@ -2,7 +2,6 @@ using DigitalBrain.Assistant;
 using DigitalBrain.AI.Metering;
 using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
-using IntoChat.Agent;
 using Xunit;
 
 namespace IntoChat.Tests;

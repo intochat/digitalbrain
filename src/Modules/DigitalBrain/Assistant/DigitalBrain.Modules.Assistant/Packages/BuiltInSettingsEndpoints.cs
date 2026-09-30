@@ -3,32 +3,36 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Apps;
 using DigitalBrain.Flutter;
 using DigitalBrain.Core.Enforcement;
-using IntoChat.Marketplace;
-using IntoChat.Packages;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
 
-namespace IntoChat.Apps;
+namespace DigitalBrain.Assistant;
 
-internal static class BuiltInAppEndpoints
+public static class ShippedPublisher
 {
-    public static void MapBuiltInApps(this IEndpointRouteBuilder routes)
+    public const string Id = "intochat";
+}
+
+internal static class BuiltInSettingsEndpoints
+{
+    public static void Map(IEndpointRouteBuilder endpoints)
     {
-        // moves with PackageService: the assistant built-in routes already live in the Assistant module.
-        var apps = BrainRoutes.Group(routes, "/built-in");
-        apps.MapPost("/settings/open", async (IDigitalBrain brain, PackageService packages) =>
-            await OpenSettings(BrainScope.CurrentId(), brain, packages));
+        var builtIn = BrainRoutes.Group(endpoints, "/built-in");
+        builtIn.MapPost("/settings/open", async (IDigitalBrain brain, PackageService packages) => await OpenSettings(brain, packages));
     }
 
     // Settings is the shipped settings package: installed on first open, then asked for its surface
     // and preferences, answered in the shape the shell renders.
-    private static async Task<IResult> OpenSettings(string workspaceId, IDigitalBrain brain, PackageService packages)
+    private static async Task<IResult> OpenSettings(IDigitalBrain brain, PackageService packages)
     {
-        var package = PackageId.Create(ShippedApps.Publisher, "settings");
-        var app = brain.Get<IApp>(packages.AppKey(workspaceId, package));
+        var package = PackageId.Create(ShippedPublisher.Id, "settings");
+        var app = brain.Get<IApp>(InstalledPackages.AppKey(package));
         var snapshot = await app.Read();
         if (snapshot.Status != AppStatus.Installed)
         {
             // A concurrent open may have installed it first; that outcome is the one we wanted.
-            try { await packages.Install(workspaceId, package, new InstallPackageRequest()); }
+            try { await packages.Install(package, new InstallPackageRequest()); }
             catch (InvalidOperationException)
             {
                 if ((await app.Read()).Status != AppStatus.Installed) { throw; }
@@ -37,14 +41,14 @@ internal static class BuiltInAppEndpoints
         else if (snapshot.Revision is { } installed
             && (await packages.Read(package)).Published is { } published && installed.Revision != published)
         {
-            await packages.Upgrade(workspaceId, package, new UpgradePackageRequest());
+            await packages.Upgrade(package, new UpgradePackageRequest());
         }
-        var invocation = await packages.Invoke(workspaceId, package, new InvokePackageRequest("open", ""));
+        var invocation = await packages.Invoke(package, new InvokePackageRequest("open", ""));
         var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
         while (invocation.Status == InvocationStatus.Pending && DateTimeOffset.UtcNow < deadline)
         {
             await Task.Delay(200);
-            invocation = await packages.ReadInvocation(workspaceId, package, invocation.Id);
+            invocation = await packages.ReadInvocation(package, invocation.Id);
         }
         if (invocation.Status != InvocationStatus.Completed || invocation.Output is null)
         {

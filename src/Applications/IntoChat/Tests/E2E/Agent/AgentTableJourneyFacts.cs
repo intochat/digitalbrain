@@ -1,12 +1,11 @@
+using DigitalBrain.Assistant;
 using System.Text.Json;
 using Aspire.Hosting.Testing;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Workspace;
-using IntoChat.Agent;
 using IntoChat.Tests.E2E.Workspace;
-using IntoChat.Workspace;
 using Microsoft.Playwright;
 using Npgsql;
 using DigitalBrain.Identity;
@@ -57,7 +56,7 @@ public sealed class AgentTableJourneyFacts
             await Assertions.Expect(page.GetByText("Response stopped.", new() { Exact = true })).ToBeVisibleAsync();
             using var input = JsonDocument.Parse(request.PostData!);
             var threadId = input.RootElement.GetProperty("threadId").GetString()!;
-            var conversation = brain.Get<IAgent>(AgentEndpoints.ConversationKey(WorkspaceScope.Create("owner", projectId).Id, threadId));
+            var conversation = brain.Get<IAgent>(AssistantConversations.Key(WorkspaceScope.Create("owner", projectId).Id, threadId));
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
             deadline.CancelAfter(TimeSpan.FromSeconds(30));
             while ((await conversation.ReadConversation(ct)).ActiveRunId is not null) { await Task.Delay(100, deadline.Token); }

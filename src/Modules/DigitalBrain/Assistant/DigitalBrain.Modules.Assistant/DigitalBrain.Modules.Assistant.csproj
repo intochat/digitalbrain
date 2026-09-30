@@ -5,10 +5,12 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Assistant.Tests.Unit" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Modules.Assistant.Contracts/DigitalBrain.Modules.Assistant.Contracts.csproj" />
     <ProjectReference Include="../../Apps/DigitalBrain.Modules.Apps/DigitalBrain.Modules.Apps.csproj" />
+    <ProjectReference Include="../../Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="../../../Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp/DigitalBrain.Modules.Microsoft.CSharp.csproj" />
     <ProjectReference Include="../../Compute/DigitalBrain.Modules.Compute/DigitalBrain.Modules.Compute.csproj" />
     <ProjectReference Include="../../../AI/DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj" />

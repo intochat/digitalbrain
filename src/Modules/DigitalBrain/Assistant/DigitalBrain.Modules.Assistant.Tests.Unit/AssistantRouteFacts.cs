@@ -14,6 +14,7 @@ public sealed class AssistantRouteFacts
         var builder = WebApplication.CreateBuilder();
         builder.Services.AddSingleton(typeof(IDigitalBrain), _ => null!);
         builder.Services.AddSingleton(typeof(IUsageStore), _ => null!);
+        builder.Services.AddSingleton(typeof(PackageService), _ => null!);
         IEndpointRouteBuilder app = builder.Build();
         new AssistantModule().Configure(app);
 
@@ -25,6 +26,6 @@ public sealed class AssistantRouteFacts
         Assert.Contains("/brains/{brainId}/applications/assistant/start", routes);
         Assert.Contains("/brains/{brainId}/built-in/activate", routes);
         Assert.Contains("/brains/{brainId}/built-in/assistant/open", routes);
-        Assert.All(routes, route => Assert.StartsWith("/brains/{brainId}/", route));
+        Assert.All(routes.Where(route => !route.StartsWith("/ai/", StringComparison.Ordinal) && route != "/agent" && !route.StartsWith("/packages", StringComparison.Ordinal)), route => Assert.StartsWith("/brains/{brainId}/", route));
     }
 }

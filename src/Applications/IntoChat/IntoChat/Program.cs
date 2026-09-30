@@ -1,4 +1,3 @@
-using IntoChat.Packages;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Aspire;
 using DigitalBrain.Compute;
@@ -6,10 +5,8 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Sdk;
 using IntoChat;
-using IntoChat.Agent;
-using IntoChat.Apps;
+using IntoChat.Marketplace;
 using IntoChat.ServiceDefaults;
-using IntoChat.Workspace;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using DigitalBrain.Identity;
 
@@ -18,7 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddIntoChatOptions();
 builder.AddServiceDefaults();
 builder.AddDigitalBrain();
-builder.AddPackages();
+builder.AddMarketplace();
 builder.AddKernelCors();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -43,12 +40,7 @@ app.MapDefaultEndpoints();
 // Developer mode is a server setting, so a client cannot grant itself the C# console.
 app.MapGet("/session/capabilities", static (IConfiguration configuration) =>
     Results.Ok(new { developerMode = AgentToolPolicy.DeveloperModeEnabled(configuration["IntoChat:DeveloperMode"]) }));
-app.MapPackages();
 app.MapDigitalBrainModules();
-app.MapWorkspaceDataEndpoints();
-app.MapWorkspaceAgent();
-app.MapWorkspaceConnections();
-app.MapWorkspaceVoice();
-app.MapBuiltInApps();
+app.MapMarketplace();
 
 app.Run();

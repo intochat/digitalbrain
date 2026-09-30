@@ -1,20 +1,15 @@
-using DigitalBrain.Identity.Configuration;
 using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.Sdk.Connectors;
-using IntoChat.Workspace;
-using Microsoft.Extensions.Options;
-using DigitalBrain.Identity;
 
-namespace IntoChat.Packages;
+namespace DigitalBrain.Assistant;
 
 // Packages are written by the signed-in principal; the package neuron enforces ownership from the
-// stamped caller. Installed apps are keyed inside the caller's workspace scope.
+// stamped caller. Installed apps are keyed inside the caller's brain scope.
 internal sealed class PackageService(
     IDigitalBrain brain,
-    IOptions<BasicAuthOptions> auth,
     CSharpToolService files)
 {
     public Task<IReadOnlyList<PackageListing>> List() => brain.Get<IPackageDirectory>(PackageDirectory.Key).List();
@@ -68,15 +63,15 @@ internal sealed class PackageService(
         return await Package(id).Publish(new(request.OperationId ?? Guid.NewGuid(), revision));
     }
 
-    public async Task<InstalledPackageView> ReadApp(string workspaceId, PackageId id) => await View(await App(workspaceId, id).Read());
+    public async Task<InstalledPackageView> ReadApp(PackageId id) => await View(await App(id).Read());
 
-    public async Task<PackageAccountOptions> AccountOptions(string workspaceId, PackageId id, string? revisionId)
+    public async Task<PackageAccountOptions> AccountOptions(PackageId id, string? revisionId)
     {
         var revision = await Resolve(new(id.Owner, id.Name, revisionId), preferPublished: true);
         var declared = (await Package(id).ReadRevision(revision.Revision)).Content.Manifest.Accounts ?? [];
-        var scope = WorkspaceScope.Current(auth.Value, workspaceId);
+        var scope = CurrentScope();
         var owner = CallerContextStamper.Require().PrincipalId;
-        var available = WorkspaceConnectionRecords.Combine(scope, owner,
+        var available = ScopedConnectorRecords.Combine(scope, owner,
             await brain.Get<IConnectors>(scope.Id).List(), await brain.Get<IConnectors>(owner).List());
         return new(revision.Revision, declared.Select(slot => new PackageAccountSlot(slot.Name, slot.Source, slot.Description,
             available.Where(account => account.Source == slot.Source && account.Status == ConnectorStatus.Connected)
@@ -84,57 +79,57 @@ internal sealed class PackageService(
                 .Select(account => new PackageAccountChoice(account.Id, account.Credential.Label)).ToArray())).ToArray());
     }
 
-    public async Task<InstalledPackageView> Install(string workspaceId, PackageId id, InstallPackageRequest request)
+    public async Task<InstalledPackageView> Install(PackageId id, InstallPackageRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
         var revision = await Resolve(new(id.Owner, id.Name, request.Revision), preferPublished: true);
         await RequireActivation(revision);
-        await ValidateAccounts(workspaceId, revision, request.Accounts ?? []);
-        var app = App(workspaceId, id);
+        await ValidateAccounts(revision, request.Accounts ?? []);
+        var app = App(id);
         return await View(await app.Install(new(request.OperationId ?? Guid.NewGuid(), revision, request.Settings ?? [], request.Accounts ?? [])));
     }
 
-    public async Task<InstalledPackageView> Configure(string workspaceId, PackageId id, ConfigurePackageRequest request)
+    public async Task<InstalledPackageView> Configure(PackageId id, ConfigurePackageRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var app = App(workspaceId, id);
+        var app = App(id);
         var existing = await app.Read();
         await RequireActivation(existing.Revision ?? throw new InvalidOperationException("The package is not installed."));
         var selected = new Dictionary<string, string>(existing.Accounts ?? new Dictionary<string, string>());
         foreach (var (slot, account) in request.Accounts ?? []) { selected[slot] = account; }
-        await ValidateAccounts(workspaceId, existing.Revision ?? throw new InvalidOperationException("The package is not installed."), selected);
+        await ValidateAccounts(existing.Revision ?? throw new InvalidOperationException("The package is not installed."), selected);
         return await View(await app.Configure(new(request.OperationId ?? Guid.NewGuid(), request.Settings ?? [], request.Accounts ?? [])));
     }
 
-    public async Task<InstalledPackageView> Upgrade(string workspaceId, PackageId id, UpgradePackageRequest request)
+    public async Task<InstalledPackageView> Upgrade(PackageId id, UpgradePackageRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
         var revision = await Resolve(new(id.Owner, id.Name, request.Revision), preferPublished: true);
         await RequireActivation(revision);
-        var existing = (await App(workspaceId, id).Read()).Accounts ?? new Dictionary<string, string>();
+        var existing = (await App(id).Read()).Accounts ?? new Dictionary<string, string>();
         var selected = new Dictionary<string, string>(existing);
         foreach (var (slot, account) in request.Accounts ?? []) { selected[slot] = account; }
         // Slots removed by the new revision are discarded before validation.
         var declared = (await Package(revision.Package).ReadRevision(revision.Revision)).Content.Manifest.Accounts ?? [];
         selected = selected.Where(pair => declared.Any(slot => slot.Name == pair.Key)).ToDictionary();
-        await ValidateAccounts(workspaceId, revision, selected);
-        var app = App(workspaceId, id);
+        await ValidateAccounts(revision, selected);
+        var app = App(id);
         return await View(await app.Upgrade(new(request.OperationId ?? Guid.NewGuid(), revision, selected)));
     }
 
-    public async Task<InstalledPackageView> Uninstall(string workspaceId, PackageId id)
+    public async Task<InstalledPackageView> Uninstall(PackageId id)
     {
-        var app = App(workspaceId, id);
+        var app = App(id);
         return await View(await app.Uninstall(new(Guid.NewGuid())));
     }
 
-    public Task<AppInvocation> Invoke(string workspaceId, PackageId id, InvokePackageRequest request)
+    public Task<AppInvocation> Invoke(PackageId id, InvokePackageRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return App(workspaceId, id).Invoke(new(request.InvocationId ?? Guid.NewGuid(), request.Operation, request.Input));
+        return App(id).Invoke(new(request.InvocationId ?? Guid.NewGuid(), request.Operation, request.Input));
     }
 
-    public Task<AppInvocation> ReadInvocation(string workspaceId, PackageId id, Guid invocationId) => App(workspaceId, id).ReadInvocation(invocationId);
+    public Task<AppInvocation> ReadInvocation(PackageId id, Guid invocationId) => App(id).ReadInvocation(invocationId);
 
     private async Task<InstalledPackageView> View(AppSnapshot snapshot)
     {
@@ -159,17 +154,21 @@ internal sealed class PackageService(
 
     private IPackage Package(PackageId id) => brain.Get<IPackage>(id.ToString());
 
-    public string AppKey(string workspaceId, PackageId id) => WorkspaceScope.Current(auth.Value, workspaceId).Id + "/packages/" + id;
+    private static BrainScope CurrentScope()
+    {
+        var caller = CallerContextStamper.Require();
+        return BrainScope.Create(caller.AccountId, caller.BrainId);
+    }
 
-    private IApp App(string workspaceId, PackageId id) => brain.Get<IApp>(AppKey(workspaceId, id));
+    private IApp App(PackageId id) => brain.Get<IApp>(InstalledPackages.AppKey(id));
 
-    private async Task ValidateAccounts(string workspaceId, PackageRevisionRef revision, IReadOnlyDictionary<string, string> selected)
+    private async Task ValidateAccounts(PackageRevisionRef revision, IReadOnlyDictionary<string, string> selected)
     {
         var declared = (await Package(revision.Package).ReadRevision(revision.Revision)).Content.Manifest.Accounts ?? [];
         if (declared.Count == 0 && selected.Count == 0) { return; }
-        var scope = WorkspaceScope.Current(auth.Value, workspaceId);
+        var scope = CurrentScope();
         var owner = CallerContextStamper.Require().PrincipalId;
-        var available = WorkspaceConnectionRecords.Combine(scope, owner,
+        var available = ScopedConnectorRecords.Combine(scope, owner,
             await brain.Get<IConnectors>(scope.Id).List(), await brain.Get<IConnectors>(owner).List());
         foreach (var slot in declared)
         {

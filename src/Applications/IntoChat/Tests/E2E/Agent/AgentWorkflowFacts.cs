@@ -7,9 +7,7 @@ using DigitalBrain.AI.Agents;
 using DigitalBrain.AI.Metering;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Workspace;
-using IntoChat.Agent;
 using IntoChat.Tests.E2E.Workspace;
-using IntoChat.Workspace;
 using Npgsql;
 using DigitalBrain.Identity;
 
@@ -44,7 +42,7 @@ public sealed class AgentWorkflowFacts
         // The endpoint still flushes the failed intent's usage in one durable batch.
         Assert.NotEmpty((await brain.Get<IIntentUsage>(ComputeUsageEndpoints.IntentId(WorkspaceScope.Create("owner", "failures").Id, "thread", "invalid")).ReadAsync(ct)).Entries);
         // P1.2: a failed run keeps its turn in the conversation history.
-        var failedAgent = brain.Get<IAgent>(AgentEndpoints.ConversationKey(WorkspaceScope.Create("owner", "failures").Id, "thread"));
+        var failedAgent = brain.Get<IAgent>(AssistantConversations.Key(WorkspaceScope.Create("owner", "failures").Id, "thread"));
         Assert.Contains((await failedAgent.ReadConversation(ct)).Turns, turn => turn.RunId == "invalid");
         model.Sql = "select company from leads";
         model.BeforeTable = token => LeadData.DropAsync(brain, token);
@@ -75,7 +73,7 @@ public sealed class AgentWorkflowFacts
         Assert.DoesNotContain("RUN_FINISHED", duplicateStream);
         response.Dispose();
         var scope = WorkspaceScope.Create("owner", "cancel").Id;
-        var conversation = brain.Get<IAgent>(AgentEndpoints.ConversationKey(scope, "thread"));
+        var conversation = brain.Get<IAgent>(AssistantConversations.Key(scope, "thread"));
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(TimeSpan.FromSeconds(30));
         while ((await conversation.ReadConversation(ct)).ActiveRunId is not null) { await Task.Delay(100, deadline.Token); }

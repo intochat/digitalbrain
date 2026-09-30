@@ -4,7 +4,6 @@ using Aspire.Hosting;
 using Aspire.Hosting.Testing;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Supabase.Tables;
-using IntoChat.Workspace;
 using Npgsql;
 using DigitalBrain.Identity;
 

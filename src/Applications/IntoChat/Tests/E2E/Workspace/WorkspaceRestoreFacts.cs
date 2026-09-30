@@ -2,7 +2,6 @@ using System.Text.Json;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Supabase.Tables;
-using IntoChat.Workspace;
 using Microsoft.Playwright;
 using DigitalBrain.Identity;
 
