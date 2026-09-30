@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart'
     show WorkspaceSnapshot;
@@ -11,10 +10,6 @@ import 'package:digitalbrain_ui/digitalbrain_ui.dart' show FirstRunState;
 abstract interface class WorkspacePersistence {
   Future<String?> read();
   Future<void> write(String value);
-}
-
-abstract interface class WorkspaceImportRecovery {
-  void useServerVersion();
 }
 
 class WorkspaceSaveConflict implements Exception {
@@ -30,18 +25,6 @@ class MemoryWorkspacePersistence implements WorkspacePersistence {
   Future<void> write(String value) async {
     _value = value;
   }
-}
-
-class PreferencesWorkspacePersistence implements WorkspacePersistence {
-  PreferencesWorkspacePersistence({this.key = 'intocaht.workspace.v1'});
-  final String key;
-  final SharedPreferencesAsync _preferences = SharedPreferencesAsync();
-  @override
-  Future<String?> read() => _preferences.getString(key);
-  @override
-  Future<void> write(String value) => Future.error(
-    UnsupportedError('Legacy workspace preferences are read-only.'),
-  );
 }
 
 class WorkspaceAgent {
@@ -346,7 +329,6 @@ class WorkspaceStore extends ChangeNotifier {
   String? persistenceError;
   bool loaded = false;
   bool loadFailed = false;
-  bool get canUseServerVersion => _persistence is WorkspaceImportRecovery;
 
   bool _developerMode = false;
 
@@ -615,11 +597,8 @@ class WorkspaceStore extends ChangeNotifier {
   Future<void> flush() => _writes;
 
   /// Explicit user-requested reload; callers warn before discarding local edits.
-  Future<void> reload({bool useServerVersion = false}) async {
+  Future<void> reload() async {
     await flush();
-    if (useServerVersion && _persistence is WorkspaceImportRecovery) {
-      (_persistence as WorkspaceImportRecovery).useServerVersion();
-    }
     loaded = false;
     remoteRevisions.clear();
     _startupWindows.clear();

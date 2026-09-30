@@ -7,26 +7,13 @@ import 'workspace_store.dart';
 
 /// A disposable client projection. The server partitions this transport snapshot
 /// into scoped neurons; no application state is written to device preferences.
-final class NeuronWorkspacePersistence
-    implements WorkspacePersistence, WorkspaceImportRecovery {
-  NeuronWorkspacePersistence({
-    required this.client,
-    this.legacy,
-    this.legacyKey = '',
-  });
+final class NeuronWorkspacePersistence implements WorkspacePersistence {
+  NeuronWorkspacePersistence({required this.client});
 
   final DigitalBrainUiClient client;
-  final WorkspacePersistence? legacy;
-  final String legacyKey;
   int? _revision;
   bool _conflicted = false;
   Map<String, dynamic>? _pending;
-  bool _skipLegacy = false;
-
-  @override
-  void useServerVersion() {
-    _skipLegacy = true;
-  }
 
   Future<Map<String, dynamic>> _request(
     String method,
@@ -40,30 +27,7 @@ final class NeuronWorkspacePersistence
   Future<String?> read() async {
     // Do not silently rebase unsaved writes onto a newer server revision.
     _revision = null;
-    var state = await _request('GET', '/shell/state');
-    final raw = _skipLegacy ? null : await legacy?.read();
-    if (raw != null) {
-      final snapshot = jsonDecode(raw);
-      if (snapshot is! Map ||
-          snapshot['version'] != 1 ||
-          snapshot['projects'] is! List) {
-        throw const FormatException(
-          'Legacy workspace cannot be imported. Its source has been retained.',
-        );
-      }
-      final imported = await _request('POST', '/shell/import', {
-        'expectedRevision': state['revision'],
-        'operationId': const Uuid().v5(Namespace.url.value, '$legacyKey:$raw'),
-        'snapshot': snapshot,
-      });
-      state = await _request('GET', '/shell/state');
-      if (state['revision'] != imported['revision'] ||
-          _canonical(state['snapshot']) != _canonical(imported['snapshot'])) {
-        throw StateError(
-          'Imported workspace could not be verified. Retry loading; the original remains available.',
-        );
-      }
-    }
+    final state = await _request('GET', '/shell/state');
     _revision = state['revision'] as int;
     _conflicted = false;
     _pending = null;

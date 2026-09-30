@@ -32,7 +32,7 @@ internal sealed class ComputePartNeuron([PersistentState("part", DigitalBrainNam
 internal sealed class ComputeRecordsState
 {
     [Id(0)] public string? Root { get; set; }
-    [Id(1)] public bool LegacyImported { get; set; }
+    // [Id(1)] retired (LegacyImported); never reuse
 }
 
 [GenerateSerializer]
@@ -71,7 +71,7 @@ internal sealed class ComputeRecordsNeuron(
             root = await tree.Set(root, next);
             changed++;
         }
-        if (changed > 0) { await Save(new() { Root = root, LegacyImported = state.State.LegacyImported }); }
+        if (changed > 0) { await Save(new() { Root = root }); }
         return changed;
     }
 

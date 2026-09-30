@@ -44,10 +44,8 @@ internal static class AccountEndpoints
         group.MapGet("", async (IGrainFactory grains, IEnumerable<IExternalAccount> external, CancellationToken cancellationToken) =>
         {
             var scope = CurrentScope();
-            var owner = CallerContextStamper.Require().PrincipalId;
-            var rows = ScopedAccounts.Combine(scope, owner,
-                await grains.GetGrain<IIntegrationAccounts>(scope.Id).List(cancellationToken),
-                await grains.GetGrain<IIntegrationAccounts>(owner).List(cancellationToken)).Select(Project).ToList();
+            var rows = ScopedAccounts.Visible(scope, await grains.GetGrain<IIntegrationAccounts>(scope.Id).List(cancellationToken))
+                .Select(Project).ToList();
             foreach (var account in external)
             {
                 if (await account.ReadAsync(grains, cancellationToken) is { } row) { rows.Add(row); }
@@ -80,7 +78,7 @@ internal static class AccountEndpoints
             if (string.IsNullOrWhiteSpace(input.ConnectionId)) { return Results.BadRequest(); }
             if (external.FirstOrDefault(account => account.ConnectionId == input.ConnectionId) is { } oauth)
             { return await oauth.ReadAsync(grains, cancellationToken) is { } row ? Results.Ok(row) : Results.NotFound(); }
-            try { return Results.Ok(Project(await (await RegistryFor(grains, input.ConnectionId, cancellationToken)).Probe(input.ConnectionId, cancellationToken))); }
+            try { return Results.Ok(Project(await Registry(grains).Probe(input.ConnectionId, cancellationToken))); }
             catch (AccountNotConfiguredException) { return Results.NotFound(); }
         });
 
@@ -93,7 +91,7 @@ internal static class AccountEndpoints
                 return Results.Ok();
             }
 
-            await (await RegistryFor(grains, input.ConnectionId, cancellationToken)).Disconnect(input.ConnectionId, cancellationToken);
+            await Registry(grains).Disconnect(input.ConnectionId, cancellationToken);
             return Results.Ok();
         });
     }
@@ -104,15 +102,7 @@ internal static class AccountEndpoints
         return BrainScope.Create(caller.AccountId, caller.BrainId);
     }
 
-    private static async Task<IIntegrationAccounts> RegistryFor(IGrainFactory grains, string connectionId, CancellationToken cancellationToken)
-    {
-        var scope = CurrentScope();
-        var current = grains.GetGrain<IIntegrationAccounts>(scope.Id);
-        if ((await current.List(cancellationToken)).Any(account => account.Id == connectionId)) { return current; }
-        var owner = CallerContextStamper.Require().PrincipalId;
-        var legacy = grains.GetGrain<IIntegrationAccounts>(owner);
-        return ScopedAccounts.Combine(scope, owner, [], await legacy.List(cancellationToken)).Any(account => account.Id == connectionId) ? legacy : current;
-    }
+    private static IIntegrationAccounts Registry(IGrainFactory grains) => grains.GetGrain<IIntegrationAccounts>(CurrentScope().Id);
 
     private static AccountRow Project(IntegrationAccount account)
         => new(account.Id, account.IntegrationId, Status(account.Status), account.LastProbedAt);

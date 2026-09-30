@@ -12,7 +12,7 @@ namespace DigitalBrain.Tests;
 public sealed class NeuronStoreFacts
 {
     [Fact]
-    public async Task ANewAccountReadsAndWritesWithoutALegacySource()
+    public async Task ANewAccountReadsAndWrites()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);

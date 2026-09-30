@@ -11,44 +11,6 @@ public sealed class SecretsFacts
     private const string Canary = "canary-secret-7f3a91";
 
     [Fact]
-    public async Task ActivationRewrapsLegacyKeyAndFailedPersistenceRetainsOriginal()
-    {
-        var legacy = new KeyVaultKeyWrapper(new FakeKeyVault());
-        var state = new SecretsState { Owner = Owner };
-        var reference = new SecretsStore(legacy).Set(state, "api.key", "API key", Canary);
-        var original = state.WrappedOwnerKey;
-        var storage = new MigrationState(state) { FailWrite = true };
-        var portable = new DataProtectionKeyWrapper(new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider());
-        await Assert.ThrowsAsync<IOException>(() => new SecretsNeuron(storage, portable).OnActivateAsync(TestContext.Current.CancellationToken));
-        Assert.Equal(original, state.WrappedOwnerKey);
-        storage.FailWrite = false;
-        var migrated = new SecretsNeuron(storage, portable);
-        await migrated.OnActivateAsync(TestContext.Current.CancellationToken);
-        Assert.StartsWith("dp2:", state.WrappedOwnerKey, StringComparison.Ordinal);
-        Assert.Equal(Canary, new SecretsStore(portable).Resolve(state, reference));
-        Assert.Equal(1, storage.Writes);
-        await migrated.OnActivateAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(1, storage.Writes);
-    }
-
-    private sealed class MigrationState(SecretsState state) : Orleans.Runtime.IPersistentState<SecretsState>
-    {
-        public SecretsState State { get; set; } = state;
-        public string Etag => "test";
-        public bool RecordExists => true;
-        public bool FailWrite { get; set; }
-        public int Writes { get; private set; }
-        public Task ReadStateAsync() => Task.CompletedTask;
-        public Task ClearStateAsync() => Task.CompletedTask;
-        public Task WriteStateAsync()
-        {
-            if (FailWrite) { throw new IOException("Injected migration failure."); }
-            Writes++;
-            return Task.CompletedTask;
-        }
-    }
-
-    [Fact]
     public void StoresCiphertextAndResolvesByReference()
     {
         var state = new SecretsState { Owner = Owner };

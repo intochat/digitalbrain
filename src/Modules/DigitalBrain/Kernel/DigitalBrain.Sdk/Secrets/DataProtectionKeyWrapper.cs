@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.DataProtection;
 
 namespace DigitalBrain.Sdk.Secrets;
@@ -12,10 +13,6 @@ public sealed class DataProtectionKeyWrapper(IDataProtectionProvider provider) :
     {
         if (wrapped.StartsWith(Prefix, StringComparison.Ordinal))
         { return _protector.Unprotect(Convert.FromBase64String(wrapped[Prefix.Length..])); }
-        // Read-only migration adapters. Never create another DPAPI or fake-vault record.
-        if (wrapped.StartsWith("kv1:", StringComparison.Ordinal))
-        { return Convert.FromBase64String(wrapped[4..]); }
-        return new DpapiKeyWrapper().Unwrap(wrapped);
+        throw new CryptographicException("Owner key is not wrapped by the data-protection key ring.");
     }
-    public static bool NeedsMigration(string wrapped) => !wrapped.StartsWith(Prefix, StringComparison.Ordinal);
 }

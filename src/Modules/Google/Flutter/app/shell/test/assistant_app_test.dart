@@ -59,15 +59,9 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     final store = WorkspaceStore(persistence: MemoryWorkspacePersistence());
     var opened = 0;
-    Map<String, dynamic>? legacy;
     final client = DigitalBrainUiClient(
       baseUri: Uri.parse('http://test'),
       httpClient: MockClient((request) async {
-        if (request.url.path.endsWith('/start')) {
-          legacy =
-              (jsonDecode(request.body) as Map)['legacy']
-                  as Map<String, dynamic>?;
-        }
         if (request.url.path.endsWith('/open')) {
           final id = 'window-${++opened}';
           return http.Response(
@@ -92,7 +86,6 @@ void main() {
       WorkspaceApp(store: store, programmingClient: client),
     );
     await tester.pumpAndSettle();
-    expect(legacy?['id'], store.currentProject.id);
     for (var i = 0; i < 2; i++) {
       tester
           .widget<WorkspaceIslands>(find.byType(WorkspaceIslands))

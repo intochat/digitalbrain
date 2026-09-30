@@ -17,8 +17,6 @@ internal static class AssistantEndpoints
         {
             var appKey = AssistantSurface.Key(BrainScope.CurrentId());
             await brain.Get<IAssistant>(appKey).Activate();
-            if (input.ValueKind == JsonValueKind.Object && input.TryGetProperty("legacy", out var legacy))
-            { await brain.Get<IAssistant>(appKey).RestoreLegacy(legacy.GetRawText()); }
             return Results.Ok(new { surface = new { kind = UIVocabulary.SurfaceType, name = UiParts.NameOf(appKey, "surface") } });
         });
         assistant.MapPost("/open", async (OpenAssistantInput? input, IDigitalBrain brain) =>

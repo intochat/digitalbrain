@@ -29,20 +29,6 @@ internal sealed partial class AssistantStreamSteps
             Assert.Equal("table-result", table.RootElement.GetProperty("windowId").GetString());
             Assert.True(table.RootElement.GetProperty("remoteManaged").GetBoolean());
         });
-        Step("a retired model profile does not prevent reopening", "A restored unavailable model remains visible as a disabled option.", async context =>
-        {
-            var ui = await StartUi(context);
-            await App(context).RestoreLegacy("""
-                {"selectedConversationId":"old","conversations":[{"id":"old","threadId":"retired-model-thread","title":"","draft":"Keep this","modelProfile":"profile:retired"}]}
-                """);
-            await context.Grains.GetGrain<IAssistant>(context.Subject).Activate();
-            await ui.AssertExplicitControls();
-            await ui.WaitForDraft("Keep this");
-            var models = await ui.Select(AssistantSurface.ModelPart).Read();
-            Assert.Equal("profile:retired", models.Selected);
-            Assert.False(Assert.Single(models.Options, model => model.Id == "profile:retired").Enabled);
-            Assert.All((await ui.Select(AssistantSurface.ThreadsPart).Read()).Options, option => Assert.False(string.IsNullOrWhiteSpace(option.Label)));
-        });
         Step("a bound file input adds attachment content to the draft", "A generic file capture reaches the app without submitting a turn.", async context =>
         {
             var ui = await StartUi(context);
@@ -104,35 +90,6 @@ internal sealed partial class AssistantStreamSteps
             await ui.Submit("hello");
             await ui.Until(state => state.Messages.Any(message => message.Text == "Hello world") && state.TurnId is null, context.CancellationToken);
         });
-        Step("legacy conversation restoration preserves server history and new drafts", "Import old UI state once and prefer durable conversation turns.", async context =>
-        {
-            var ui = await StartUi(context);
-            await Collect(App(context), new("saved-thread", "saved-run", "hello", "owner"), context.CancellationToken);
-            const string legacy = """
-                {"selectedConversationId":"local-id","conversations":[
-                  {"id":"local-id","threadId":"saved-thread","title":"Saved conversation","draft":"old draft","modelProfile":"preset:IGpt56Luna","messages":[{"id":"stale","role":"assistant","text":"stale client reply"}]},
-                  {"id":"local-only","threadId":"local-thread","title":"Local conversation","draft":"local draft","messages":[{"id":"local-message","role":"user","text":"local-only message"}]}
-                ]}
-                """;
-            await App(context).RestoreLegacy(legacy);
-            var restored = await ui.Read();
-            Assert.Equal("saved-thread", restored.Id);
-            Assert.Equal("old draft", restored.Draft);
-            Assert.Equal("preset:IGpt56Luna", restored.ModelProfile);
-            Assert.Contains((await App(context).Read()).Threads, thread => thread.Id == "saved-thread" && thread.Title == "Saved conversation");
-            Assert.Contains(restored.Messages, message => message.Text == "Hello world");
-            Assert.DoesNotContain(restored.Messages, message => message.Text == "stale client reply");
-            await ui.Input("new authoritative draft");
-            await ui.Until(state => state.Draft == "new authoritative draft", context.CancellationToken);
-            await App(context).RestoreLegacy(legacy);
-            await App(context).Activate();
-            Assert.Equal("new authoritative draft", (await ui.Read()).Draft);
-            Assert.Equal(2, (await App(context).Read()).Threads.Count);
-            await ui.Select(AssistantSurface.ThreadsPart).Choose("local-thread");
-            var local = await ui.Until(state => state.Id == "local-thread", context.CancellationToken);
-            Assert.Equal("local draft", local.Draft);
-            Assert.Equal("local-only message", Assert.Single(local.Messages).Text);
-        });
         Step("tool window handles without UI metadata become result cards", "Production form and table results expose durable reopen handles.", async context =>
         {
             var ui = await StartUi(context);
@@ -184,11 +141,8 @@ internal sealed partial class AssistantStreamSteps
             const string prompt = "Show customers\n\n[Conversation agent: private-artifact-context SECRET-CONTEXT]";
             await Collect(App(context), new("legacy-thread", "old-run", prompt, "owner"), context.CancellationToken);
             await Collect(App(context), new("other-thread", "other-run", prompt, "owner"), context.CancellationToken);
-            const string legacy = """
-                {"selectedConversationId":"old","conversations":[{"id":"old","threadId":"legacy-thread","title":"Show customers\n\n[Conversation agent: private-artifact-context SECRET-CONTEXT]"}]}
-                """;
-            await App(context).RestoreLegacy(legacy);
-            var restored = await ui.Read();
+            await App(context).Act("conversation", "legacy-thread");
+            var restored = await ui.Until(state => state.Id == "legacy-thread", context.CancellationToken);
             Assert.Equal("Show customers", restored.Messages.Single(message => message.Role == ChatRole.User).Text);
             Assert.Equal("Show customers", (await App(context).Read()).Threads.Single(thread => thread.Id == "legacy-thread").Title);
             Assert.DoesNotContain("SECRET-CONTEXT", System.Text.Json.JsonSerializer.Serialize(restored));

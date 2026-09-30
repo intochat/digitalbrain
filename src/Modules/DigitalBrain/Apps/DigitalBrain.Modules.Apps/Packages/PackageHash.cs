@@ -8,29 +8,16 @@ internal static class PackageHash
     private static readonly JsonSerializerOptions Canonical = new(JsonSerializerDefaults.Web);
 
     // Spelled out field by field so a revision id never changes when contract types gain members.
-    // Revisions made before apps had a runtime or files keep the ids they were committed with.
-    public static string Revision(IReadOnlyList<string> parents, PackageContent content) => content.Manifest.RuntimeName == PackageManifest.CSharpRuntime && content.Files is null or { Count: 0 }
-        ? Legacy(parents, content)
-        : Of(new
-        {
-            parents,
-            title = content.Manifest.Title,
-            description = content.Manifest.Description,
-            operations = content.Manifest.Operations.Select(operation => new[] { operation.Name, operation.Description }),
-            settings = content.Manifest.Settings.Select(setting => new[] { setting.Name, setting.Description, setting.DefaultValue }),
-            runtime = content.Manifest.RuntimeName,
-            source = content.Source,
-            files = new SortedDictionary<string, string>(content.Files?.ToDictionary() ?? [], StringComparer.Ordinal),
-        });
-
-    private static string Legacy(IReadOnlyList<string> parents, PackageContent content) => Of(new
+    public static string Revision(IReadOnlyList<string> parents, PackageContent content) => Of(new
     {
         parents,
         title = content.Manifest.Title,
         description = content.Manifest.Description,
         operations = content.Manifest.Operations.Select(operation => new[] { operation.Name, operation.Description }),
         settings = content.Manifest.Settings.Select(setting => new[] { setting.Name, setting.Description, setting.DefaultValue }),
+        runtime = content.Manifest.RuntimeName,
         source = content.Source,
+        files = new SortedDictionary<string, string>(content.Files?.ToDictionary() ?? [], StringComparer.Ordinal),
     });
 
     public static string Of<T>(T value) => Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(value, Canonical)));

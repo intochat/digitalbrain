@@ -16,56 +16,6 @@ internal sealed partial class AssistantNeuron
     private readonly SemaphoreSlim _changes = new(1);
     private readonly SemaphoreSlim _presentation = new(1);
 
-    public async Task RestoreLegacy(string projectJson)
-    {
-        if (Snapshot.LegacyRestored) { return; }
-        using var document = JsonDocument.Parse(projectJson);
-        var project = document.RootElement;
-        if (!project.TryGetProperty("conversations", out var conversations) || conversations.ValueKind != JsonValueKind.Array) { return; }
-        var restored = new List<AssistantThread>();
-        string? selected = null;
-        var previousSelection = JsonText(project, "selectedConversationId");
-        foreach (var item in conversations.EnumerateArray().Take(200))
-        {
-            var id = JsonText(item, "threadId") ?? JsonText(item, "id");
-            if (id is null) { continue; }
-            var history = await ReadConversation(id);
-            var messages = history.Turns.SelectMany(turn => new[]
-            {
-                new ChatEntry(turn.RunId + "-user", ChatRole.User, DisplayUserText(turn.UserText)),
-                new ChatEntry(turn.RunId + "-reply", ChatRole.Assistant, turn.AssistantText),
-            }).TakeLast(1000).ToArray();
-            if (messages.Length == 0 && item.TryGetProperty("messages", out var saved) && saved.ValueKind == JsonValueKind.Array)
-            {
-                messages = saved.EnumerateArray().Where(entry => JsonText(entry, "text") is not null
-                    && (JsonText(entry, "role") is null or "user" or "assistant")).TakeLast(1000)
-                    .Select(entry => new ChatEntry(JsonText(entry, "id") ?? Guid.NewGuid().ToString("N"),
-                        (JsonText(entry, "role") ?? JsonText(entry, "authorId")) is "user" or "you" ? ChatRole.User : ChatRole.Assistant,
-                        (JsonText(entry, "role") ?? JsonText(entry, "authorId")) is "user" or "you" ? DisplayUserText(JsonText(entry, "text")!) : JsonText(entry, "text")!)).ToArray();
-            }
-            restored.Add(new()
-            {
-                Id = id, Title = DisplayUserText(JsonText(item, "title") ?? "Conversation"), Draft = Bounded(JsonText(item, "draft") ?? ""),
-                ModelProfile = JsonText(item, "modelProfile"), Messages = messages,
-            });
-            if (JsonText(item, "id") == previousSelection) { selected = id; }
-        }
-        await Change(state =>
-        {
-            if (state.LegacyRestored) { return state; }
-            var existing = state.Threads.Where(thread => thread.Messages.Count > 0 || thread.Draft.Length > 0 || _running.ContainsKey(thread.Id)).ToList();
-            var added = restored.Where(thread => existing.All(current => current.Id != thread.Id)).DistinctBy(thread => thread.Id).ToList();
-            var merged = existing.Concat(added).ToArray();
-            return state with
-            {
-                LegacyRestored = true, Threads = merged.Length == 0 ? state.Threads : merged,
-                SelectedThread = existing.Any(thread => thread.Id == state.SelectedThread) ? state.SelectedThread
-                    : merged.FirstOrDefault(thread => thread.Id == selected)?.Id ?? merged.FirstOrDefault()?.Id ?? state.SelectedThread,
-            };
-        });
-        await Present();
-    }
-
     private static string? JsonText(JsonElement item, string key) => item.ValueKind == JsonValueKind.Object
         && item.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 

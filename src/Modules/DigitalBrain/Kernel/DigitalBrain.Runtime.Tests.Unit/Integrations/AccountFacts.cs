@@ -228,7 +228,7 @@ public sealed class AccountFacts : IDisposable
         => Assert.Equal(expected, AccountEndpoints.Status(status));
 
     [Fact]
-    public void PackageAccountsIncludeScopedCredentialsAndOnlyOwnedLegacyRecords()
+    public void PackageAccountsIncludeOnlyRecordsFiledUnderTheBrain()
     {
         var scope = BrainScope.Create("alice", "one");
         static IntegrationAccount Account(string id, string workspace, string owner) => new()
@@ -236,10 +236,8 @@ public sealed class AccountFacts : IDisposable
             Id = id, IntegrationId = "gmail", WorkspaceId = workspace, Status = AccountStatus.Connected,
             Credential = SecretRef.For(owner, id, id, true),
         };
-        var result = ScopedAccounts.Combine(scope, "alice",
-            [Account("new", "one", "alice"), Account("wrong-workspace", "two", "alice")],
-            [Account("legacy", "alice", "alice"), Account("foreign", "alice", "bob")]);
-        Assert.Equal(["new", "legacy"], result.Select(account => account.Id));
+        var result = ScopedAccounts.Visible(scope, [Account("new", "one", "alice"), Account("wrong-workspace", "two", "alice")]);
+        Assert.Equal(["new"], result.Select(account => account.Id));
     }
 
     private static Task<UnitBrain> StartAsync(CancellationToken cancellationToken)

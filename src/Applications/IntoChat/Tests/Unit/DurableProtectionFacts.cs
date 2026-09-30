@@ -33,16 +33,14 @@ public sealed class DurableProtectionFacts
         Assert.Throws<InvalidOperationException>(() => BlobProtectionKeys.ValidateProductionRing(plain.GetAllElements()));
     }
     [Fact]
-    public void FreshHostCanReadKeysAndLegacyOwnerKeyCanBeRewrapped()
+    public void FreshHostCanReadWrappedOwnerKeysAndUnrelatedHostCannot()
     {
         var ring = new TestKeyRing();
         using var first = Host(ring);
         var firstKeys = new DataProtectionKeyWrapper(first.GetRequiredService<IDataProtectionProvider>());
         var key = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
-        var legacy = "kv1:" + Convert.ToBase64String(key);
-        Assert.True(DataProtectionKeyWrapper.NeedsMigration(legacy));
-        var wrapped = firstKeys.Wrap(firstKeys.Unwrap(legacy));
-        Assert.False(DataProtectionKeyWrapper.NeedsMigration(wrapped));
+        var wrapped = firstKeys.Wrap(key);
+        Assert.StartsWith("dp2:", wrapped, StringComparison.Ordinal);
         Assert.DoesNotContain(Convert.ToBase64String(key), wrapped, StringComparison.Ordinal);
         using var second = Host(ring);
         Assert.Equal(key, new DataProtectionKeyWrapper(second.GetRequiredService<IDataProtectionProvider>()).Unwrap(wrapped));

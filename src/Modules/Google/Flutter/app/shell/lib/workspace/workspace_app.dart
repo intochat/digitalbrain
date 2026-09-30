@@ -246,7 +246,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       _ready = false;
       _reloadGeneration++;
     });
-    await store.reload(useServerVersion: true);
+    await store.reload();
     if (mounted) await _load();
   }
 
@@ -787,7 +787,6 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
               workspace: store.currentProject.id,
               onActivate: (result) => _accept(result),
               application: 'assistant',
-              startArguments: {'legacy': store.currentProject.toJson()},
             );
       if (mobile) {
         return Column(
@@ -903,11 +902,6 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
                             },
                             child: const Text('Retry loading'),
                           ),
-                          if (store.canUseServerVersion)
-                            TextButton(
-                              onPressed: () => _reloadSavedState(context),
-                              child: const Text('Use server version'),
-                            ),
                         ],
                       )
                     : const CircularProgressIndicator(),

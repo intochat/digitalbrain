@@ -48,9 +48,6 @@ internal sealed class AssistantSteps : StepLibrary
             var conversation = await Assistant(context).Conversation(args.Text(0));
             var turns = (await conversation.ReadConversation(context.CancellationToken)).Turns;
             if (turns.Count != 1 || turns[0].AssistantText != args.Text(1)) { throw new StepFailedException("The saved turn is missing or duplicated."); }
-            var legacy = context.Grains.GetGrain<IAgent>(AssistantConversations.Key(context.Subject.Split("/applications/")[0], args.Text(0)));
-            if ((await legacy.ReadConversation(context.CancellationToken)).Turns.Count != 1)
-            { throw new StepFailedException("Existing conversation identity was not preserved."); }
         });
         Step("conversation {string} is empty", "New threads do not inherit another thread's history.", async (context, args) =>
         {

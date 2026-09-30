@@ -70,9 +70,7 @@ internal sealed class PackageService(
         var revision = await Resolve(new(id.Owner, id.Name, revisionId), preferPublished: true);
         var declared = (await Package(id).ReadRevision(revision.Revision)).Content.Manifest.Accounts ?? [];
         var scope = CurrentScope();
-        var owner = CallerContextStamper.Require().PrincipalId;
-        var available = ScopedAccounts.Combine(scope, owner,
-            await brain.Get<IIntegrationAccounts>(scope.Id).List(), await brain.Get<IIntegrationAccounts>(owner).List());
+        var available = ScopedAccounts.Visible(scope, await brain.Get<IIntegrationAccounts>(scope.Id).List());
         return new(revision.Revision, declared.Select(slot => new PackageAccountSlot(slot.Name, slot.Source, slot.Description,
             available.Where(account => account.IntegrationId == slot.Source && account.Status == AccountStatus.Connected)
                 .OrderBy(account => account.Id, StringComparer.Ordinal)
@@ -167,9 +165,7 @@ internal sealed class PackageService(
         var declared = (await Package(revision.Package).ReadRevision(revision.Revision)).Content.Manifest.Accounts ?? [];
         if (declared.Count == 0 && selected.Count == 0) { return; }
         var scope = CurrentScope();
-        var owner = CallerContextStamper.Require().PrincipalId;
-        var available = ScopedAccounts.Combine(scope, owner,
-            await brain.Get<IIntegrationAccounts>(scope.Id).List(), await brain.Get<IIntegrationAccounts>(owner).List());
+        var available = ScopedAccounts.Visible(scope, await brain.Get<IIntegrationAccounts>(scope.Id).List());
         foreach (var slot in declared)
         {
             if (!selected.TryGetValue(slot.Name, out var id) || string.IsNullOrWhiteSpace(id))

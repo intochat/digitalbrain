@@ -13,7 +13,6 @@ public interface IAssistant : INeuron, IUiEventHandler
     [ReadOnly] Task<AssistantState> Read();
     Task<AssistantWindow> OpenWindow(string? draft = null, string? title = null);
     Task SetDraft(string draft);
-    Task RestoreLegacy(string projectJson);
     [OneWay] Task Act(string action, string? value);
     Task<AssistantTranscriptionResult> Transcribe(string? base64, CancellationToken ct = default);
     [AlwaysInterleave, ResponseTimeout("00:10:00")] IAsyncEnumerable<string> Run(AssistantRun request, CancellationToken ct = default);
@@ -35,7 +34,7 @@ public sealed record AssistantState
     [Id(2)] public string SelectedThread { get; init; } = "";
     [Id(3)] public IReadOnlyList<AssistantThread> Threads { get; init; } = [];
     [Id(4)] public string Owner { get; init; } = "";
-    [Id(5)] public bool LegacyRestored { get; init; }
+    // [Id(5)] retired (LegacyRestored); never reuse
 }
 
 [GenerateSerializer, Alias("apps.assistant-activated")]

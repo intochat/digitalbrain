@@ -34,12 +34,6 @@ Feature: App-owned assistant turn stream
   Scenario: App launches create independent workspace windows
     Then two assistant windows have independent conversation state
 
-  Scenario: Legacy conversations migrate once without overwriting authoritative state
-    Then legacy conversation restoration preserves server history and new drafts
-
-  Scenario: Removed model profiles do not break restored windows
-    Then a retired model profile does not prevent reopening
-
   Scenario: Production tool handles become reopenable result cards
     Then tool window handles without UI metadata become result cards
 

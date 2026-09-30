@@ -35,34 +35,6 @@ void main() {
     },
   );
   test(
-    'explicit server recovery bypasses malformed legacy without changing it',
-    () async {
-      final server = _ShellServer();
-      final original = WorkspaceStore(
-        persistence: NeuronWorkspacePersistence(client: server.client),
-      );
-      await original.load();
-      original.currentConversation.draft = 'Server draft';
-      await original.save();
-      final legacy = _Legacy('{malformed');
-      final recovering = WorkspaceStore(
-        persistence: NeuronWorkspacePersistence(
-          client: server.client,
-          legacy: legacy,
-        ),
-      );
-      await recovering.load();
-      expect(recovering.loadFailed, isTrue);
-      await recovering.reload(useServerVersion: true);
-      expect(recovering.loadFailed, isFalse);
-      expect(recovering.currentConversation.draft, 'Server draft');
-      expect(legacy.value, '{malformed');
-      expect(legacy.writes, 0);
-      recovering.dispose();
-      original.dispose();
-    },
-  );
-  test(
     'retry cannot rebase a stale snapshot after another client writes',
     () async {
       final server = _ShellServer();
@@ -157,31 +129,6 @@ void main() {
     },
   );
 
-  test('legacy import is verified and its source is never written', () async {
-    final server = _ShellServer();
-    final legacyStore = WorkspaceStore(persistence: MemoryPersistence());
-    legacyStore.currentConversation.draft = 'Old draft';
-    final raw = jsonEncode(legacyStore.toJson());
-    final legacy = _Legacy(raw);
-    final persistence = NeuronWorkspacePersistence(
-      client: server.client,
-      legacy: legacy,
-      legacyKey: 'account-scope',
-    );
-    final imported = jsonDecode((await persistence.read())!);
-    expect(imported['projects'][0]['conversations'][0]['draft'], 'Old draft');
-    expect(legacy.writes, 0);
-    final revision = server.revision;
-    await NeuronWorkspacePersistence(
-      client: server.client,
-      legacy: legacy,
-      legacyKey: 'account-scope',
-    ).read();
-    expect(server.revision, revision);
-    expect(legacy.value, raw);
-    legacyStore.dispose();
-  });
-
   test('ambiguous successful write retries its original operation before latest state', () async {
     final server = _ShellServer();
     final store = WorkspaceStore(
@@ -250,18 +197,6 @@ void main() {
       store.dispose();
     },
   );
-}
-
-class _Legacy extends MemoryPersistence {
-  _Legacy(String raw) {
-    value = raw;
-  }
-  int writes = 0;
-  @override
-  Future<void> write(String value) async {
-    writes++;
-    throw StateError('Read only');
-  }
 }
 
 class _StartupClient extends FirstRunClient {

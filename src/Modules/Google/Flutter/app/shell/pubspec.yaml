@@ -22,7 +22,6 @@ dependencies:
   provider: ^6.1.5+1
   web: ^1.1.1
   url_launcher: ^6.3.2
-  shared_preferences: ^2.5.5
   file_picker: ^8.3.7
   markdraw: ^0.2.0
   archive: ^4.0.7
