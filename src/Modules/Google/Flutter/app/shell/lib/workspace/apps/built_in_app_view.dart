@@ -61,7 +61,7 @@ class _BuiltInAppViewState extends State<BuiltInAppView> {
       }
       final result = await widget.client.jsonRequest(
         'POST',
-        '/workspaces/${Uri.encodeComponent(widget.workspaceId)}/built-in/${Uri.encodeComponent(widget.appId)}/open',
+        '/brains/${Uri.encodeComponent(widget.workspaceId)}/built-in/${Uri.encodeComponent(widget.appId)}/open',
         <String, dynamic>{},
       );
       if (!mounted || generation != _generation) return;

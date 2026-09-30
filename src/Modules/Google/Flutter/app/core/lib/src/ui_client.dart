@@ -82,12 +82,12 @@ final class DigitalBrainUiClient {
   String workspaceIdentity;
   String? principalId;
   String? accountId;
-  String? defaultWorkspaceId;
+  String? defaultBrainId;
 
   void _useSession(Map<String, dynamic> session) {
     principalId = session['principalId'] as String;
     accountId = session['accountId'] as String;
-    defaultWorkspaceId = session['brainId'] as String;
+    defaultBrainId = session['brainId'] as String;
     workspaceIdentity = '$principalId|$accountId';
   }
 
@@ -159,7 +159,7 @@ final class DigitalBrainUiClient {
   Future<List<TableSummary>> listTables(String workspace) async {
     final body = await _tableRequest(
       'GET',
-      '/workspaces/${Uri.encodeComponent(workspace)}/ui/tables',
+      '/brains/${Uri.encodeComponent(workspace)}/ui/tables',
     );
     return (body as List)
         .map(
@@ -173,7 +173,7 @@ final class DigitalBrainUiClient {
   Future<List<AppManifestSummary>> listApps(String workspace) async {
     final body = await _tableRequest(
       'GET',
-      '/workspaces/${Uri.encodeComponent(workspace)}/apps',
+      '/brains/${Uri.encodeComponent(workspace)}/apps',
     );
     return (body as List)
         .map(
@@ -193,7 +193,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'GET',
-        '/workspaces/${Uri.encodeComponent(workspace)}/ui/tables/${Uri.encodeComponent(id)}?offset=$offset&limit=$limit',
+        '/brains/${Uri.encodeComponent(workspace)}/ui/tables/${Uri.encodeComponent(id)}?offset=$offset&limit=$limit',
       ) as Map,
     ),
   );
@@ -207,7 +207,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'POST',
-        '/workspaces/${Uri.encodeComponent(workspace)}/ui/tables',
+        '/brains/${Uri.encodeComponent(workspace)}/ui/tables',
         body: {
           'title': title,
           'columns': columns.map((x) => x.toJson()).toList(),
@@ -225,7 +225,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'POST',
-        '/workspaces/${Uri.encodeComponent(workspace)}/ui/tables/${Uri.encodeComponent(id)}/view',
+        '/brains/${Uri.encodeComponent(workspace)}/ui/tables/${Uri.encodeComponent(id)}/view',
         body: update.toJson(),
       ) as Map,
     ),
@@ -239,7 +239,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'POST',
-        '/workspaces/${Uri.encodeComponent(workspaceId)}/connected-sources',
+        '/brains/${Uri.encodeComponent(workspaceId)}/connected-sources',
         body: {'sources': sources},
       ) as Map,
     ),
@@ -252,7 +252,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'GET',
-        '/workspaces/${Uri.encodeComponent(workspaceId)}',
+        '/brains/${Uri.encodeComponent(workspaceId)}',
         cancelled: cancelled,
       ) as Map,
     ),
@@ -266,7 +266,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'POST',
-        '/workspaces/${Uri.encodeComponent(workspaceId)}/windows/${Uri.encodeComponent(windowId)}/close',
+        '/brains/${Uri.encodeComponent(workspaceId)}/windows/${Uri.encodeComponent(windowId)}/close',
         body: {'expectedRevision': revision},
       ) as Map,
     ),
@@ -280,7 +280,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'POST',
-        '/workspaces/${Uri.encodeComponent(workspaceId)}/windows/${Uri.encodeComponent(windowId)}/reopen',
+        '/brains/${Uri.encodeComponent(workspaceId)}/windows/${Uri.encodeComponent(windowId)}/reopen',
         body: {'operationId': _uuid.v4(), 'expectedRevision': revision},
       ) as Map,
     ),
@@ -292,7 +292,7 @@ final class DigitalBrainUiClient {
   }) async {
     await _tableRequest(
       'POST',
-      '/workspaces/${Uri.encodeComponent(workspaceId)}/reports',
+      '/brains/${Uri.encodeComponent(workspaceId)}/reports',
       body: {'intentId': intentId, 'message': message},
     );
   }
@@ -307,7 +307,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'GET',
-        '/workspaces/${Uri.encodeComponent(workspaceId)}/tables/${Uri.encodeComponent(tableId)}?offset=$offset&limit=$limit',
+        '/brains/${Uri.encodeComponent(workspaceId)}/tables/${Uri.encodeComponent(tableId)}?offset=$offset&limit=$limit',
         cancelled: cancelled,
       ) as Map,
     ),
@@ -322,7 +322,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'POST',
-        '/workspaces/${Uri.encodeComponent(workspaceId)}/tables/${Uri.encodeComponent(tableId)}/view',
+        '/brains/${Uri.encodeComponent(workspaceId)}/tables/${Uri.encodeComponent(tableId)}/view',
         body: update.toJson(),
         cancelled: cancelled,
       ) as Map,
@@ -339,7 +339,7 @@ final class DigitalBrainUiClient {
           final request = http.AbortableRequest(
             'GET',
             baseUri.resolve(
-              '/workspaces/${Uri.encodeComponent(workspaceId)}/events',
+              '/brains/${Uri.encodeComponent(workspaceId)}/events',
             ),
             abortTrigger: abort.future,
           )..headers['accept'] = 'text/event-stream';
@@ -443,7 +443,7 @@ final class DigitalBrainUiClient {
   ) async {
     final result = await _tableRequest(
       'POST',
-      '/workspaces/${Uri.encodeComponent(workspaceId)}/voice',
+      '/brains/${Uri.encodeComponent(workspaceId)}/voice',
       body: {'audio': base64Encode(audio)},
       timeout: const Duration(minutes: 3),
     );
@@ -457,7 +457,7 @@ final class DigitalBrainUiClient {
   ) async => Map<String, dynamic>.from(
     await _tableRequest(
       'GET',
-      '/workspaces/${Uri.encodeComponent(workspaceId)}/conversations/${Uri.encodeComponent(threadId)}',
+      '/brains/${Uri.encodeComponent(workspaceId)}/conversations/${Uri.encodeComponent(threadId)}',
     ) as Map,
   );
 
@@ -488,7 +488,7 @@ final class DigitalBrainUiClient {
                 })
                 ..body = jsonEncode({
                   'threadId': threadId,
-                  'workspaceId': workspaceId,
+                  'brainId': workspaceId,
                   'runId': runId,
                   'parentRunId': ?parentRunId,
                   'modelProfile': ?modelProfile,
@@ -610,7 +610,7 @@ final class DigitalBrainUiClient {
       Map<String, dynamic>.from(
         await _tableRequest(
           'GET',
-          '/workspaces/${Uri.encodeComponent(workspaceId)}/compute/usage?$query',
+          '/brains/${Uri.encodeComponent(workspaceId)}/compute/usage?$query',
         ) as Map,
       ),
     );
@@ -639,7 +639,7 @@ final class DigitalBrainUiClient {
   ) async {
     final response = await _request(
       'GET',
-      '/workspaces/${Uri.encodeComponent(workspace)}/ui/$collection/${Uri.encodeComponent(name)}',
+      '/brains/${Uri.encodeComponent(workspace)}/ui/$collection/${Uri.encodeComponent(name)}',
       timeout: const Duration(seconds: 10),
     );
     return jsonDecode(response.body) as Map<String, dynamic>;
@@ -713,7 +713,7 @@ final class DigitalBrainUiClient {
   }) async {
     final response = await _request(
       body == null ? 'GET' : 'POST',
-      '/workspaces/${Uri.encodeComponent(workspace)}/apps/$path',
+      '/brains/${Uri.encodeComponent(workspace)}/apps/$path',
       body: body,
       timeout: const Duration(seconds: 30),
     );
@@ -730,7 +730,7 @@ final class DigitalBrainUiClient {
     try {
       final result = await _tableRequest(
         method,
-        '/workspaces/${Uri.encodeComponent(workspace)}/csharp${path.isEmpty ? '' : '/$path'}',
+        '/brains/${Uri.encodeComponent(workspace)}/csharp${path.isEmpty ? '' : '/$path'}',
         body: body,
         // Starting builds the app inside a .NET SDK container, which can take minutes.
         timeout: const Duration(minutes: 3),
@@ -774,7 +774,7 @@ final class DigitalBrainUiClient {
     Map<String, Object?>? body,
   }) => jsonRequest(
     body == null ? 'GET' : 'POST',
-    '/workspaces/${Uri.encodeComponent(workspaceId)}/connections/services${path.isEmpty ? '' : '/$path'}',
+    '/brains/${Uri.encodeComponent(workspaceId)}/connections/services${path.isEmpty ? '' : '/$path'}',
     body,
   );
 
@@ -784,7 +784,7 @@ final class DigitalBrainUiClient {
     Map<String, Object?>? body,
   }) => jsonRequest(
     body == null ? 'GET' : 'POST',
-    '/workspaces/${Uri.encodeComponent(workspaceId)}/connections${path.isEmpty ? '' : '/$path'}',
+    '/brains/${Uri.encodeComponent(workspaceId)}/connections${path.isEmpty ? '' : '/$path'}',
     body,
   );
 
@@ -810,7 +810,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'GET',
-        '/workspaces/${Uri.encodeComponent(workspace)}/apps/${Uri.encodeComponent(appId)}/consent',
+        '/brains/${Uri.encodeComponent(workspace)}/apps/${Uri.encodeComponent(appId)}/consent',
       ) as Map,
     ),
   );
@@ -823,7 +823,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'POST',
-        '/workspaces/${Uri.encodeComponent(workspace)}/apps/${Uri.encodeComponent(appId)}/consent/approve',
+        '/brains/${Uri.encodeComponent(workspace)}/apps/${Uri.encodeComponent(appId)}/consent/approve',
         body: const <String, Object?>{},
       ) as Map,
     ),
@@ -833,7 +833,7 @@ final class DigitalBrainUiClient {
   Future<List<GrantSummary>> listGrants(String workspace) async {
     final response = await _request(
       'GET',
-      '/workspaces/${Uri.encodeComponent(workspace)}/grants',
+      '/brains/${Uri.encodeComponent(workspace)}/grants',
       timeout: const Duration(seconds: 30),
     );
     return [
@@ -851,7 +851,7 @@ final class DigitalBrainUiClient {
   }) async {
     await _request(
       'POST',
-      '/workspaces/${Uri.encodeComponent(workspace)}/grants/revoke',
+      '/brains/${Uri.encodeComponent(workspace)}/grants/revoke',
       body: {
         'appId': appId,
         'semanticTypeId': semanticTypeId,
@@ -870,7 +870,7 @@ final class DigitalBrainUiClient {
   Future<Uint8List> appAsset(String workspace, String assetId) async {
     final response = await _request(
       'GET',
-      '/workspaces/${Uri.encodeComponent(workspace)}/apps/assets/${Uri.encodeComponent(assetId)}',
+      '/brains/${Uri.encodeComponent(workspace)}/apps/assets/${Uri.encodeComponent(assetId)}',
       timeout: const Duration(seconds: 30),
     );
     return response.bodyBytes;
@@ -885,7 +885,7 @@ final class DigitalBrainUiClient {
     final request = http.Request(
       'POST',
       baseUri.resolve(
-        '/workspaces/${Uri.encodeComponent(workspace)}/apps/images/$documentId/save/$operationId',
+        '/brains/${Uri.encodeComponent(workspace)}/apps/images/$documentId/save/$operationId',
       ),
     );
     request.headers['content-type'] = 'image/png';

@@ -107,7 +107,7 @@ class WorkspaceClient extends http.BaseClient {
     open = isOpen;
     events.add(
       utf8.encode(
-        'data: ${jsonEncode({'workspaceId': workspace, 'revision': revision})}\n\n',
+        'data: ${jsonEncode({'brainId': workspace, 'revision': revision})}\n\n',
       ),
     );
   }

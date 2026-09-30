@@ -20,7 +20,7 @@ void main() {
       final client = DigitalBrainUiClient(
         baseUri: Uri.parse('http://kernel'),
         httpClient: api,
-      )..defaultWorkspaceId = 'default';
+      )..defaultBrainId = 'default';
       // No preferences plugin is registered: production startup must never read it.
       await tester.pumpWidget(WorkspaceApp(programmingClient: client));
       await tester.pumpAndSettle();

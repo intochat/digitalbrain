@@ -26,7 +26,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       server.calls,
-      contains('POST /workspaces/workspace-bob/packages/alice/researcher'),
+      contains('POST /brains/workspace-bob/packages/alice/researcher'),
     );
     expect(
       find.byKey(const ValueKey('uninstall-alice/researcher')),
@@ -110,7 +110,7 @@ void main() {
     expect(
       server.calls,
       contains(
-        'POST /workspaces/workspace-bob/packages/alice/researcher/upgrade',
+        'POST /brains/workspace-bob/packages/alice/researcher/upgrade',
       ),
     );
     expect(
@@ -180,7 +180,7 @@ class _FakePackagesServer {
 
   Future<dynamic> request(String method, String path, [Object? body]) async {
     calls.add('$method $path');
-    const app = '/workspaces/workspace-bob/packages/alice/researcher';
+    const app = '/brains/workspace-bob/packages/alice/researcher';
     if (method == 'GET' && path == '/packages/drafts') return <Object>[];
     if (method == 'GET' && path == '/packages') {
       return [

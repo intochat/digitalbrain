@@ -31,7 +31,7 @@ class _ApplicationSurfaceState extends State<ApplicationSurface> {
   Future<Map<String, dynamic>> _start() async {
     final result = await widget.client.jsonRequest(
       'POST',
-      '/workspaces/${Uri.encodeComponent(widget.workspace)}/applications/'
+      '/brains/${Uri.encodeComponent(widget.workspace)}/applications/'
           '${Uri.encodeComponent(widget.application)}/start',
       widget.startArguments,
     );

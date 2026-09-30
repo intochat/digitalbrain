@@ -51,5 +51,5 @@ final class WorkspaceRevision {
   final String workspaceId;
   final int revision;
   factory WorkspaceRevision.fromJson(Map<String, dynamic> json) =>
-      WorkspaceRevision(json['workspaceId'] as String, json['revision'] as int);
+      WorkspaceRevision(json['brainId'] as String, json['revision'] as int);
 }

@@ -57,7 +57,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
   }
 
   String _appPath(String id) =>
-      '/workspaces/${Uri.encodeComponent(widget.workspaceId)}/packages/${id.split('/').map(Uri.encodeComponent).join('/')}';
+      '/brains/${Uri.encodeComponent(widget.workspaceId)}/packages/${id.split('/').map(Uri.encodeComponent).join('/')}';
 
   @override
   void initState() {

@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 /// A surface composed entirely from generic declared primitives.
 Map<String, dynamic>? applicationResponse(http.BaseRequest request) {
   final segments = request.url.pathSegments;
-  if (segments.length < 2 || segments.first != 'workspaces') return null;
+  if (segments.length < 2 || segments.first != 'brains') return null;
   final root = '${segments[1]}/applications/assistant';
   if (request.url.path.endsWith('/applications/assistant/start')) {
     return {

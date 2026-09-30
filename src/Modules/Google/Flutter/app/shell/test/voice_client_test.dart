@@ -14,7 +14,7 @@ void main() {
         baseUri: Uri.parse('http://test'),
         httpClient: MockClient((request) async {
           expect(request.method, 'POST');
-          expect(request.url.path, '/workspaces/project/voice');
+          expect(request.url.path, '/brains/project/voice');
           expect(
             base64Decode((jsonDecode(request.body) as Map)['audio'] as String),
             [1, 2, 3],

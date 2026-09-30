@@ -181,7 +181,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       return;
     }
     if (store.projects.isEmpty) {
-      final owned = widget.programmingClient?.defaultWorkspaceId;
+      final owned = widget.programmingClient?.defaultBrainId;
       if (owned == null) {
         store.createProject('Personal');
       } else {
@@ -1123,7 +1123,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     try {
       final result = await client.jsonRequest(
         'POST',
-        '/workspaces/${Uri.encodeComponent(project.id)}/applications/${Uri.encodeComponent(application)}/open',
+        '/brains/${Uri.encodeComponent(project.id)}/applications/${Uri.encodeComponent(application)}/open',
         arguments,
       );
       if (!mounted) return;
