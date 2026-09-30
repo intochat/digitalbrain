@@ -10,6 +10,7 @@ public sealed class BuiltInAppRoutesFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await IntoChatE2ETest.StartAsync(ct);
+        await IntoChatE2ETest.WaitUntilShippedAsync(brain, "intochat/settings", ct);
 
         using var activated = await brain.HttpClient.PostAsync("/brains/personal/built-in/activate", null, ct);
         using var settings = await brain.HttpClient.PostAsync("/brains/personal/built-in/settings/open", null, ct);

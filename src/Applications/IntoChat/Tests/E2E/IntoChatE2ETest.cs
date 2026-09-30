@@ -1,4 +1,5 @@
 using DigitalBrain.AI;
+using DigitalBrain.Apps;
 using DigitalBrain.AI.OpenAI;
 using DigitalBrain.ClickHouse;
 using DigitalBrain.Coding;
@@ -19,6 +20,18 @@ internal static class IntoChatE2ETest
     private static readonly Uri UnconfiguredProvider = new("http://127.0.0.1:1/");
 
     public static Task<E2EBrain> StartAsync(CancellationToken ct) => Create().StartAsync(ct);
+
+    // The host ships its first-party apps in the background after it is healthy; a fact that opens
+    // one has to wait until that package is published.
+    public static async Task WaitUntilShippedAsync(E2EBrain brain, string package, CancellationToken ct)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromMinutes(4));
+        while ((await brain.Get<IPackage>(package).Read()).Published is null)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1), timeout.Token);
+        }
+    }
 
     public static E2ETestBuilder<Projects.IntoChat_AppHost> Create(string modelApiKey = "fixture-key", Dictionary<string, string?>? privateConfiguration = null)
         => E2ETest.For<Projects.IntoChat_AppHost>()
