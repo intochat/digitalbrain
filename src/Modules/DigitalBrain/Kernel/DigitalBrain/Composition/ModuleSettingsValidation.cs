@@ -13,10 +13,13 @@ public static class ModuleSettingsValidation
                 || key.StartsWith("DigitalBrain:Testing:", StringComparison.OrdinalIgnoreCase)
                 || key.StartsWith("DigitalBrain:Modules:", StringComparison.OrdinalIgnoreCase))
             { throw new ArgumentException("Module configuration cannot override host-owned settings.", nameof(modules)); }
-            if (key.Contains("Secret", StringComparison.OrdinalIgnoreCase) || key.EndsWith("Password", StringComparison.OrdinalIgnoreCase)
-                || key.EndsWith("ApiKey", StringComparison.OrdinalIgnoreCase) || key.EndsWith("PrivateKeyPem", StringComparison.OrdinalIgnoreCase)
-                || key.EndsWith("AccessToken", StringComparison.OrdinalIgnoreCase) || key.EndsWith("RefreshToken", StringComparison.OrdinalIgnoreCase))
+            if (IsCredentialName(key))
             { throw new ArgumentException("Credentials require private configuration transport.", nameof(modules)); }
         }
     }
+
+    internal static bool IsCredentialName(string name) =>
+        name.Contains("Secret", StringComparison.OrdinalIgnoreCase) || name.EndsWith("Password", StringComparison.OrdinalIgnoreCase)
+        || name.EndsWith("ApiKey", StringComparison.OrdinalIgnoreCase) || name.EndsWith("PrivateKeyPem", StringComparison.OrdinalIgnoreCase)
+        || name.EndsWith("AccessToken", StringComparison.OrdinalIgnoreCase) || name.EndsWith("RefreshToken", StringComparison.OrdinalIgnoreCase);
 }

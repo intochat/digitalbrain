@@ -39,7 +39,7 @@ public sealed class ModuleOptionsFacts
             ModuleOptionsSerialization.Compile<FakeModule, FakeOptions>(new() { Endpoint = new Uri("/relative", UriKind.Relative) }));
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
             { ["DigitalBrain:Modules:FakeModule:Options"] = """{"Endpoint":"/relative"}""" }).Build();
-        Assert.ThrowsAny<Exception>(() => configuration.GetModuleOptions<FakeOptions>(nameof(FakeModule)));
+        Assert.Throws<ArgumentException>(() => configuration.GetModuleOptions<FakeOptions>(nameof(FakeModule)));
     }
 
     [Fact]
@@ -54,5 +54,47 @@ public sealed class ModuleOptionsFacts
     {
         var definition = ModuleOptionsSerialization.Compile<FakeModule, FakeOptions>(new());
         ModuleSettingsValidation.ValidatePublicSettings([definition]);
+    }
+
+    private sealed class LeakyOptions : IModuleOptions
+    {
+        public string ApiKey { get; set; } = "";
+        public void Validate() { }
+    }
+
+    private sealed class LeakyModule : IModule<LeakyOptions>
+    {
+        public void Configure(ISiloBuilder silo) { }
+    }
+
+    [Fact]
+    public void CredentialShapedOptionPropertiesAreRefusedAtCompile()
+    {
+        var refusal = Assert.Throws<ArgumentException>(() => ModuleOptionsSerialization.Compile<LeakyModule, LeakyOptions>(new()));
+        Assert.Contains("integrations registration", refusal.Message);
+    }
+
+    [Fact]
+    public void BindRefusesLiteralJsonNullAndMalformedJson()
+    {
+        foreach (var json in new[] { "null", "{bad" })
+        {
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+                { ["DigitalBrain:Modules:FakeModule:Options"] = json }).Build();
+            var failure = Assert.Throws<InvalidOperationException>(() => configuration.GetModuleOptions<FakeOptions>(nameof(FakeModule)));
+            Assert.Contains(nameof(FakeModule), failure.Message);
+        }
+    }
+
+    [Theory]
+    [InlineData("DigitalBrain:Modules:0:Options")]
+    [InlineData("DigitalBrain:Modules:Options")]
+    [InlineData("DigitalBrain:Modules:A:B:Options")]
+    [InlineData("DigitalBrain:Modules:X:Options:Sub")]
+    [InlineData("DigitalBrain:Modules:A__B:Options")]
+    public void OnlyTheExactOptionsKeyShapeIsExemptFromHostOwnedSettings(string key)
+    {
+        var definition = new ModuleDefinition(typeof(FakeModule), new Dictionary<string, string?> { [key] = "{}" });
+        Assert.Throws<ArgumentException>(() => ModuleSettingsValidation.ValidatePublicSettings([definition]));
     }
 }
