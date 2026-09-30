@@ -37,7 +37,7 @@ public static class GmailHostingExtensions
         DigitalBrainBuilder brain,
         IResourceBuilder<DigitalBrainModuleResource> module) : DigitalBrainModuleProjection
     {
-        private const string Root = GmailModule.GmailOAuthConfigurationRoot;
+        private const string Root = "DigitalBrain:Integrations:gmail";
 
         private bool _enabled;
         private Uri? _publicOrigin;

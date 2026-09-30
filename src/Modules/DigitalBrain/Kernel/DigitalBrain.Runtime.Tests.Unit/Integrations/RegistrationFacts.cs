@@ -68,11 +68,13 @@ public sealed class RegistrationFacts
         Assert.Equal(RegistrationStatus.Ready, signal.Status);
 
         Assert.Equal(
-            ["IntegrationId", "MissingFields", "Status"],
+            ["IntegrationId", "MissingFields", "Settings", "Status"],
             typeof(RegistrationSnapshot).GetProperties().Select(property => property.Name).Order().ToArray());
         Assert.DoesNotContain(Canary, JsonSerializer.Serialize(snapshot), StringComparison.Ordinal);
         Assert.DoesNotContain(Canary, JsonSerializer.Serialize(signal), StringComparison.Ordinal);
         Assert.DoesNotContain(Canary, JsonSerializer.Serialize(await registration.Read()), StringComparison.Ordinal);
+        Assert.Equal(new Dictionary<string, string> { ["RedirectPath"] = "/callback" }, snapshot.Settings);
+        Assert.Equal(snapshot.Settings, (await registration.Read()).Settings);
     }
 
     [Fact]
@@ -277,7 +279,7 @@ public sealed class RegistrationFacts
     }
 
     [Fact]
-    public async Task RegistrationWritesAndReleaseRefuseAnAppStampedAmbientCallerEvenWithAForgedPlatformParameter()
+    public async Task RegistrationWritesRefuseAnAppStampedAmbientCallerEvenWithAForgedPlatformParameter()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await StartAsync(ct);
@@ -291,13 +293,44 @@ public sealed class RegistrationFacts
             await Assert.ThrowsAsync<InvalidOperationException>(() => registration.Configure(Values(("ApiKey", OtherCanary))));
             await Assert.ThrowsAsync<InvalidOperationException>(() => registration.Clear("ApiKey"));
             await Assert.ThrowsAsync<InvalidOperationException>(() => registration.SeedIfUnconfigured(Values(("ApiKey", OtherCanary))));
-            await Assert.ThrowsAsync<InvalidOperationException>(
-                () => registration.Release(Caller(CallerKind.Platform, TrustedEdge.Platform)));
         }
         finally { Orleans.Runtime.RequestContext.Clear(); }
 
         var released = await registration.Release(Caller(CallerKind.Platform, TrustedEdge.Platform));
         Assert.Equal(Canary, released.Values["ApiKey"]);
+    }
+
+    [Fact]
+    public async Task ReleaseSucceedsUnderAnAppStampedAmbientContextWhenTheParameterIsProperPlatform()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartAsync(ct);
+        var registration = Registration(brain, "openai");
+        await registration.Configure(Values(("ApiKey", Canary)));
+
+        Core.Enforcement.CallerContextStamper.Stamp(Caller(CallerKind.App, TrustedEdge.AppProxy));
+        try
+        {
+            var released = await registration.Release(Caller(CallerKind.Platform, TrustedEdge.Platform));
+            Assert.Equal(Canary, released.Values["ApiKey"]);
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => registration.Release(Caller(CallerKind.App, TrustedEdge.AppProxy)));
+        }
+        finally { Orleans.Runtime.RequestContext.Clear(); }
+    }
+
+    [Fact]
+    public async Task SettingValuesAreVisibleInTheSnapshotAndClearingRemovesThem()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartAsync(ct);
+        var registration = Registration(brain, "google");
+
+        var configured = await registration.Configure(Values(("ClientId", Canary), ("RedirectPath", "/here")));
+
+        Assert.Equal(new Dictionary<string, string> { ["RedirectPath"] = "/here" }, configured.Settings);
+        Assert.DoesNotContain(Canary, JsonSerializer.Serialize(configured), StringComparison.Ordinal);
+        Assert.Empty((await registration.Clear("RedirectPath")).Settings);
     }
 
     [Fact]

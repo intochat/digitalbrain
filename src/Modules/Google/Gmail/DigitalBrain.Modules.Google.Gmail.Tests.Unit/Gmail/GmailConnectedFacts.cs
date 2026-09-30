@@ -29,5 +29,5 @@ internal sealed class FakeGmailTokens : IGmailTokenExchange
         => throw new NotSupportedException();
 
     public Task<GmailTokenGrant> ExchangeAuthorizationCodeAsync(string authorizationCode, CancellationToken cancellationToken)
-        => Task.FromResult(new GmailTokenGrant("access-token", "refresh-token", GmailOAuthConfiguration.ReadScope, 3600, "user@gmail.com"));
+        => Task.FromResult(new GmailTokenGrant("access-token", "refresh-token", GmailScopes.Read, 3600, "user@gmail.com"));
 }

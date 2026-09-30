@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace DigitalBrain.Google.Gmail;
 
-internal sealed class GmailTokenExchange(GmailOAuthConfiguration configuration) : IGmailTokenExchange, IDisposable
+internal sealed class GmailTokenExchange(GmailRegistration registration, GmailModuleOptions options) : IGmailTokenExchange, IDisposable
 {
     private readonly HttpClient _oauth = new(new HttpClientHandler { AllowAutoRedirect = false })
     { Timeout = TimeSpan.FromSeconds(30), MaxResponseContentBufferSize = 65536 };
@@ -11,25 +11,25 @@ internal sealed class GmailTokenExchange(GmailOAuthConfiguration configuration) 
     public async Task<GmailTokenGrant> ExchangeAuthorizationCodeAsync(string authorizationCode, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(authorizationCode);
-        configuration.RequireConfigured();
-        using var response = await _oauth.PostAsync(configuration.TokenEndpoint, new FormUrlEncodedContent(new Dictionary<string, string>
+        var credentials = await registration.ReleaseAsync().ConfigureAwait(false);
+        using var response = await _oauth.PostAsync(options.TokenEndpoint, new FormUrlEncodedContent(new Dictionary<string, string>
         {
-            ["client_id"] = configuration.ClientId,
-            ["client_secret"] = configuration.ClientSecret,
+            ["client_id"] = credentials.ClientId,
+            ["client_secret"] = credentials.ClientSecret,
             ["code"] = authorizationCode,
             ["grant_type"] = "authorization_code",
-            ["redirect_uri"] = new Uri(configuration.PublicOrigin, "google/gmail/oauth/callback").AbsoluteUri,
+            ["redirect_uri"] = new Uri(credentials.PublicOrigin, "google/gmail/oauth/callback").AbsoluteUri,
         }), cancellationToken).ConfigureAwait(false);
         return await ReadGrantAsync(response, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<GmailTokenGrant> ExchangeAsync(string refreshToken, CancellationToken cancellationToken)
     {
-        configuration.RequireConfigured();
-        using var response = await _oauth.PostAsync(configuration.TokenEndpoint, new FormUrlEncodedContent(new Dictionary<string, string>
+        var credentials = await registration.ReleaseAsync().ConfigureAwait(false);
+        using var response = await _oauth.PostAsync(options.TokenEndpoint, new FormUrlEncodedContent(new Dictionary<string, string>
         {
-            ["client_id"] = configuration.ClientId,
-            ["client_secret"] = configuration.ClientSecret,
+            ["client_id"] = credentials.ClientId,
+            ["client_secret"] = credentials.ClientSecret,
             ["refresh_token"] = refreshToken,
             ["grant_type"] = "refresh_token",
         }), cancellationToken).ConfigureAwait(false);

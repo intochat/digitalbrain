@@ -1,6 +1,7 @@
 using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Core;
 using DigitalBrain.Sdk;
+using DigitalBrain.Sdk.Integrations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Http;
@@ -14,7 +15,10 @@ namespace DigitalBrain.Google.Gmail;
 
 public sealed class GmailModule : IModule<GmailModuleOptions>
 {
-    public const string GmailOAuthConfigurationRoot = "DigitalBrain:Google:Gmail:OAuth";
+    public static IntegrationDefinition Integration { get; } = IntegrationDefinition.For("gmail", "Gmail")
+        .RequiresSecret("ClientId")
+        .RequiresSecret("ClientSecret")
+        .RequiresSetting("PublicOrigin");
 
     public void Configure(ISiloBuilder silo)
     {
@@ -22,15 +26,8 @@ public sealed class GmailModule : IModule<GmailModuleOptions>
         var services = silo.Services;
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<TokenHandoff>();
-        var moduleOptions = silo.Configuration.GetModuleOptions<GmailModuleOptions>(nameof(GmailModule));
-        // ClientId and ClientSecret keep their private DigitalBrain:Google:Gmail:OAuth path; the declared origin and token endpoint arrive as module options.
-        services.AddOptions<GmailOAuthOptions>().Bind(silo.Configuration.GetSection(GmailOAuthOptions.SectionName))
-            .Configure(oauth =>
-            {
-                if (moduleOptions.PublicOrigin is { } origin) { oauth.PublicOrigin = origin.AbsoluteUri; }
-                oauth.TokenEndpoint = moduleOptions.TokenEndpoint.AbsoluteUri;
-            });
-        services.TryAddSingleton(static services => new GmailOAuthConfiguration(services.GetRequiredService<IOptions<GmailOAuthOptions>>()));
+        services.TryAddSingleton(silo.Configuration.GetModuleOptions<GmailModuleOptions>(nameof(GmailModule)));
+        services.TryAddSingleton<GmailRegistration>();
         services.TryAddSingleton<GmailLogins>();
         services.AddSingleton<BrowserLogins>(s => s.GetRequiredService<GmailLogins>());
         services.TryAddSingleton<IGmailTokenExchange, GmailTokenExchange>();
@@ -49,11 +46,16 @@ public sealed class GmailModule : IModule<GmailModuleOptions>
             await grains.GetGrain<IGmail>(push.EmailAddress).AcceptWatchPush(push);
             return Results.Accepted();
         });
-        endpoints.MapGet("/google/gmail/oauth/callback", async (string? code, IGrainFactory grains) =>
+        endpoints.MapGet("/google/gmail/oauth/callback", async (string? code, GmailRegistration registration, IGrainFactory grains) =>
         {
             if (string.IsNullOrWhiteSpace(code))
             {
                 return Results.BadRequest();
+            }
+
+            if (GmailRegistration.Explain(await registration.ReadAsync()) is { } unavailable)
+            {
+                return Results.Json(unavailable, statusCode: StatusCodes.Status409Conflict);
             }
 
             var owner = DigitalBrain.Core.Enforcement.CallerContextStamper.TryGet(out var caller)

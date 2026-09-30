@@ -11,6 +11,9 @@ public abstract class BrowserLogins(BrowserLoginDefinition definition)
     // Null until the operator has supplied the provider's OAuth client; no login can start before.
     protected abstract Uri? PublicOrigin { get; }
 
+    // What an unavailable login can tell the caller (a serializable explanation); null keeps the generic setup page.
+    public virtual Task<object?> DescribeUnavailabilityAsync() => Task.FromResult<object?>(null);
+
     internal Uri? ConfiguredOrigin => PublicOrigin;
 
     public bool IsConfigured => PublicOrigin is not null;

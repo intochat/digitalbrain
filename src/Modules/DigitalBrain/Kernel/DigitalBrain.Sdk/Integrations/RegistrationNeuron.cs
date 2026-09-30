@@ -64,10 +64,14 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
         }
 
         var vault = _grains.GetGrain<ISecrets>(IntegrationVault.Owner);
-        var next = new RegistrationState { References = new(Snapshot.References, StringComparer.Ordinal) };
+        var next = CopyOf(Snapshot);
         foreach (var (field, value) in values)
         {
             next.References[field] = await vault.Set(PlatformCaller(), IntegrationVault.SecretName(Definition.Id, field), $"{Definition.Id} {field}", value);
+            if (Definition.SettingFields.Contains(field, StringComparer.Ordinal))
+            {
+                next.Settings[field] = value;
+            }
         }
 
         var snapshot = SnapshotOf(next);
@@ -88,8 +92,9 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
             return SnapshotOf(Snapshot);
         }
 
-        var next = new RegistrationState { References = new(Snapshot.References, StringComparer.Ordinal) };
+        var next = CopyOf(Snapshot);
         next.References.Remove(field);
+        next.Settings.Remove(field);
         await _grains.GetGrain<ISecrets>(IntegrationVault.Owner).Remove(PlatformCaller(), IntegrationVault.SecretName(Definition.Id, field));
         var snapshot = SnapshotOf(next);
         await Save(next, new RegistrationChanged(Definition.Id, snapshot.Status));
@@ -98,7 +103,7 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
 
     public async Task<ReleasedRegistration> Release(CallerContext caller)
     {
-        RefuseAppCalls();
+        // Release is unreachable from scripts ([PlatformOnly]); an app-stamped ambient context is a platform call chain, not an app caller.
         // Values leave only to trusted platform code: a module's own grain call stamped by the Platform
         // edge. Users and assistants (authenticated HTTP), installed apps (app proxy) and the scheduler
         // never qualify, so no HTTP route or script can obtain a provider credential.
@@ -134,13 +139,19 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
         }
     }
 
+    private static RegistrationState CopyOf(RegistrationState state) => new()
+    {
+        References = new(state.References, StringComparer.Ordinal),
+        Settings = new(state.Settings, StringComparer.Ordinal),
+    };
+
     private RegistrationSnapshot SnapshotOf(RegistrationState state)
     {
         var missing = Definition.AllFields.Where(field => !state.References.ContainsKey(field)).ToArray();
         var status = missing.Length == 0 ? RegistrationStatus.Ready
             : missing.Length == Definition.AllFields.Count ? RegistrationStatus.Unconfigured
             : RegistrationStatus.Partial;
-        return new RegistrationSnapshot { IntegrationId = Definition.Id, Status = status, MissingFields = missing };
+        return new RegistrationSnapshot { IntegrationId = Definition.Id, Status = status, MissingFields = missing, Settings = new(state.Settings, StringComparer.Ordinal) };
     }
 
     private IntegrationDefinition Resolve()

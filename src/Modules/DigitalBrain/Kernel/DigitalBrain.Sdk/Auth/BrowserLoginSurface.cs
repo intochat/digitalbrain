@@ -29,6 +29,13 @@ public sealed class BrowserLoginSurface(BrowserLogins logins) : IHttpSurface
             Redact(context);
             if (logins.ConfiguredOrigin is not { } origin)
             {
+                if (await logins.DescribeUnavailabilityAsync().ConfigureAwait(false) is { } explanation)
+                {
+                    context.Response.StatusCode = StatusCodes.Status409Conflict;
+                    await context.Response.WriteAsJsonAsync(explanation, explanation.GetType()).ConfigureAwait(false);
+                    return;
+                }
+
                 await LoginPage.WriteAsync(context, $"{definition.DisplayName} setup is incomplete",
                     "Configure the provider's OAuth client privately in Aspire, then ask again in DigitalBrain.", 503).ConfigureAwait(false);
                 return;
