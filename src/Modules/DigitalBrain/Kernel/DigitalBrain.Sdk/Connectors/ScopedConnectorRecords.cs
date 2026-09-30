@@ -1,12 +1,12 @@
 using DigitalBrain.Core.Enforcement;
-using DigitalBrain.Sdk.Connectors;
-using DigitalBrain.Identity;
 
-namespace IntoChat.Workspace;
+namespace DigitalBrain.Sdk.Connectors;
 
-internal static class WorkspaceConnectionRecords
+public static class ScopedConnectorRecords
 {
-    internal static ConnectorRecord[] Combine(BrainScope scope, string principal, ConnectorRecord[] current, ConnectorRecord[] legacy)
+    // A brain sees the records filed under it, plus the owner's own legacy records filed under the
+    // account; a legacy record whose credential belongs to someone else is never shown.
+    public static ConnectorRecord[] Combine(BrainScope scope, string principal, ConnectorRecord[] current, ConnectorRecord[] legacy)
         => [.. current.Where(record => record.WorkspaceId == scope.Name || record.WorkspaceId == scope.Id)
             .Concat(legacy.Where(record => (record.WorkspaceId == scope.Id || record.WorkspaceId == principal)
                 && OwnedBy(record, principal)))

@@ -1,5 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.Sdk;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
@@ -50,5 +51,11 @@ public sealed class SalesforceModule : IModule
             services.GetRequiredService<IOptions<SalesforceMcpOptions>>().Value.ResolveEndpoint()));
         services.AddSingleton<IHttpSurface>(static services => new BrowserLoginSurface(services.GetRequiredService<SalesforceLogins>()));
         services.AddSalesforceAuthentication(SalesforceLogins.LoginDefinition);
+    }
+
+    public void Configure(IEndpointRouteBuilder endpoints)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        ConnectionsEndpoints.Map(endpoints);
     }
 }
