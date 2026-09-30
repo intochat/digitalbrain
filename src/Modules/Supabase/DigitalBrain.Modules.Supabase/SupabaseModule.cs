@@ -1,6 +1,7 @@
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Core;
 using DigitalBrain.Supabase.Windows;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -28,6 +29,12 @@ public sealed class SupabaseModule : IModule
             [SupabaseModuleOptions.SectionName + ":ConnectionName"] = options.ConnectionName,
             [SupabaseModuleOptions.SectionName + ":Hosting:Kind"] = options.Hosting.Kind.ToString(),
         });
+    }
+
+    public void Configure(IEndpointRouteBuilder endpoints)
+    {
+        ArgumentNullException.ThrowIfNull(endpoints);
+        TableEndpoints.Map(endpoints);
     }
 
     public void Configure(ISiloBuilder builder)
