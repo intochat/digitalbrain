@@ -20,6 +20,8 @@ internal sealed class ScriptEdge(RunTokens tokens, ScriptContracts contracts, IG
         ArgumentNullException.ThrowIfNull(invocation);
         var (claims, owner) = await AuthorizeAsync(token).ConfigureAwait(false);
         var contract = contracts.Find(invocation.Contract);
+        // The catalog already omits platform-only contracts; refuse here too, whatever the catalog holds.
+        if (PlatformOnlyAttribute.AppliesTo(contract)) { throw new ArgumentException($"{contract.Name} is not a neuron contract scripts may call."); }
         var method = contract.GetMethods().Concat(contract.GetInterfaces().SelectMany(inherited => inherited.GetMethods()))
             .Where(candidate => candidate.Name == invocation.Method && !ObserverMethods.Contains(candidate.Name))
             .SingleOrDefault(candidate => candidate.GetParameters().Count(IsArgument) == invocation.Arguments.Length)
@@ -53,7 +55,9 @@ internal sealed class ScriptEdge(RunTokens tokens, ScriptContracts contracts, IG
     public async Task<IAsyncEnumerable<string>> OpenSignalsAsync(string? token, string contract, string key, string signal, CancellationToken cancellationToken)
     {
         var (claims, owner) = await AuthorizeAsync(token).ConfigureAwait(false);
-        if (grains.GetGrain(contracts.Find(contract), key) is not INeuron source) { throw new ArgumentException($"{contract} is not a neuron."); }
+        var signalContract = contracts.Find(contract);
+        if (PlatformOnlyAttribute.AppliesTo(signalContract)) { throw new ArgumentException($"{contract} is not a neuron contract scripts may call."); }
+        if (grains.GetGrain(signalContract, key) is not INeuron source) { throw new ArgumentException($"{contract} is not a neuron."); }
         Stamp(owner, claims);
         var file = grains.GetGrain<ICSharpFileEdge>(claims.File);
         await file.Subscribed(claims.Run, source.GetGrainId().ToString(), signal).ConfigureAwait(false);

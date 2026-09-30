@@ -10,6 +10,7 @@ internal sealed class ScriptContracts(IEnumerable<Assembly> assemblies)
     private readonly IReadOnlyDictionary<string, Type> _contracts = assemblies
         .SelectMany(assembly => assembly.GetExportedTypes())
         .Where(type => type.IsInterface && typeof(INeuron).IsAssignableFrom(type) && type != typeof(INeuron))
+        .Where(type => !PlatformOnlyAttribute.AppliesTo(type))
         .ToDictionary(type => type.FullName!, StringComparer.Ordinal);
 
     public Type Find(string name) => _contracts.TryGetValue(name, out var contract)

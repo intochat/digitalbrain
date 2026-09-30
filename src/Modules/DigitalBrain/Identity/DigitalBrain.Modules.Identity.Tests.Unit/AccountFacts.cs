@@ -35,6 +35,17 @@ public sealed class AccountFacts
     }
 
     [Fact]
+    public async Task ReservedPlatformNamesCannotBeRegistered()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        var directory = brain.Get<IIdentityDirectory>(IdentityGrains.Directory);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => directory.RegisterAsync("integrations", "correct-password", "Intruder", ct));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => directory.RegisterAsync("owner", "correct-password", "Intruder", ct));
+    }
+
+    [Fact]
     public async Task PasswordAuthenticationSeparatesAccountsAndRejectsImpersonation()
     {
         var ct = TestContext.Current.CancellationToken;

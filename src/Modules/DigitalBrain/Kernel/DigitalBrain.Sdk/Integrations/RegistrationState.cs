@@ -11,7 +11,8 @@ internal sealed class RegistrationState
 
 internal static class IntegrationVault
 {
-    public const string Owner = "integrations";
+    // ":" cannot occur in a principal id (^[a-z0-9][a-z0-9-]*$), so no account can claim this vault.
+    public const string Owner = ":integrations";
     public const string GrainKeyPrefix = "integration/";
     public const string CallerAppId = "integration.registration";
 

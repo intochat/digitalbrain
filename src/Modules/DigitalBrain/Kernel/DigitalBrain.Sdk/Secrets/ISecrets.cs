@@ -7,6 +7,7 @@ namespace DigitalBrain.Sdk.Secrets;
 // Keep the existing Orleans identity so stored credentials remain addressable.
 [Orleans.Metadata.DefaultGrainType("vault")]
 [Alias("vault")]
+[PlatformOnly]
 public interface ISecrets : INeuron
 {
     Task<SecretRef> Set(CallerContext caller, string name, string label, string value, CancellationToken cancellationToken = default);

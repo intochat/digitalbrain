@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Contracts.Types;
 using DigitalBrain.Core;
@@ -261,13 +262,65 @@ public sealed class RegistrationFacts
     }
 
     [Fact]
-    public void OnlyAnOwnerRoleMayWriteARegistration()
+    public void OnlyTheDeploymentOperatorMayWriteARegistration()
     {
-        Assert.True(IntegrationOwnerGate.Allows(Principal("Owner")));
-        Assert.False(IntegrationOwnerGate.Allows(Principal("Member")));
-        Assert.False(IntegrationOwnerGate.Allows(new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Role, "Owner")]))));
-        Assert.False(IntegrationOwnerGate.Allows(new ClaimsPrincipal()));
+        var basic = Config(("DigitalBrain:Auth:Username", "ops"), ("DigitalBrain:Auth:Password", "a-long-operator-password"));
+        var open = Config();
+
+        Assert.True(IntegrationOperatorGate.Allows(Http("ops"), basic));
+        Assert.False(IntegrationOperatorGate.Allows(Http("someone-else"), basic));
+        Assert.False(IntegrationOperatorGate.Allows(Http("owner"), basic));
+        Assert.True(IntegrationOperatorGate.Allows(Http("owner"), open));
+        Assert.False(IntegrationOperatorGate.Allows(Http("cookie-owner-of-another-account"), open));
+        Assert.False(IntegrationOperatorGate.Allows(Http("ops") with { Kind = CallerKind.App, StampedBy = TrustedEdge.AppProxy }, basic));
+        Assert.False(IntegrationOperatorGate.Allows(null, open));
     }
+
+    [Fact]
+    public async Task RegistrationWritesAndReleaseRefuseAnAppStampedAmbientCallerEvenWithAForgedPlatformParameter()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartAsync(ct);
+        var registration = Registration(brain, "openai");
+        await registration.Configure(Values(("ApiKey", Canary)));
+        var script = Caller(CallerKind.App, TrustedEdge.AppProxy);
+
+        Core.Enforcement.CallerContextStamper.Stamp(script);
+        try
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() => registration.Configure(Values(("ApiKey", OtherCanary))));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => registration.Clear("ApiKey"));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => registration.SeedIfUnconfigured(Values(("ApiKey", OtherCanary))));
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => registration.Release(Caller(CallerKind.Platform, TrustedEdge.Platform)));
+        }
+        finally { Orleans.Runtime.RequestContext.Clear(); }
+
+        var released = await registration.Release(Caller(CallerKind.Platform, TrustedEdge.Platform));
+        Assert.Equal(Canary, released.Values["ApiKey"]);
+    }
+
+    [Fact]
+    public void TheVaultAndRegistrationContractsAreMarkedPlatformOnly()
+    {
+        Assert.True(PlatformOnlyAttribute.AppliesTo(typeof(ISecrets)));
+        Assert.True(PlatformOnlyAttribute.AppliesTo(typeof(IIntegrationRegistration)));
+    }
+
+    [Fact]
+    public void TheVaultOwnerCannotBeAPrincipalId()
+    {
+        Assert.DoesNotMatch("^[a-z0-9][a-z0-9-]*$", IntegrationVault.Owner);
+    }
+
+    private static IConfiguration Config(params (string Key, string Value)[] values)
+        => new ConfigurationBuilder().AddInMemoryCollection(values.ToDictionary(pair => pair.Key, pair => (string?)pair.Value)).Build();
+
+    private static CallerContext Http(string principal) => new()
+    {
+        PrincipalId = principal, AccountId = principal, BrainId = principal,
+        Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp,
+    };
 
     [Fact]
     public void DefinitionsAreDiscoveredFromModuleTypesAndZeroDefinitionsIsFine()

@@ -96,6 +96,38 @@ public sealed class ScriptEdgeFacts
     }
 
     [Fact]
+    public void PlatformOnlyContractsAreNotInTheScriptCatalog()
+    {
+        var contracts = new ScriptContracts([typeof(IPinger).Assembly, typeof(DigitalBrain.Sdk.Secrets.ISecrets).Assembly]);
+
+        Assert.Equal(typeof(IPinger), contracts.Find(typeof(IPinger).FullName!));
+        Assert.Throws<ArgumentException>(() => contracts.Find(typeof(DigitalBrain.Sdk.Secrets.ISecrets).FullName!));
+        Assert.Throws<ArgumentException>(() => contracts.Find(typeof(DigitalBrain.Sdk.Integrations.IIntegrationRegistration).FullName!));
+        Assert.Throws<ArgumentException>(() => contracts.Find(typeof(IPlatformOnlyPinger).FullName!));
+    }
+
+    [Fact]
+    public async Task TheEdgeRefusesToInvokeAPlatformOnlyContractWithAForgedPlatformCaller()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sandbox = new FakeSandbox();
+        await using var brain = await SandboxBrain.StartAsync(sandbox, ct, silo => silo.Services.AddSingleton(
+            new ScriptContracts([typeof(IPinger).Assembly, typeof(DigitalBrain.Sdk.Secrets.ISecrets).Assembly])));
+        var token = await StartAsAlice(brain, sandbox, "workspace-a/attacker", ct);
+        var edge = brain.SiloServices.GetRequiredService<ScriptEdge>();
+        var forged = JsonSerializer.SerializeToElement(new
+        {
+            principalId = "x", accountId = "x", brainId = "x", kind = "Platform", stampedBy = "Platform", appId = "x",
+        });
+
+        await Assert.ThrowsAsync<ArgumentException>(() => edge.InvokeAsync(token,
+            new ScriptInvocation(typeof(DigitalBrain.Sdk.Integrations.IIntegrationRegistration).FullName!, "integration/openai", "Release", [forged]), ct));
+        await Assert.ThrowsAsync<ArgumentException>(() => edge.InvokeAsync(token,
+            new ScriptInvocation(typeof(DigitalBrain.Sdk.Secrets.ISecrets).FullName!, "owner", "Resolve", [forged, forged]), ct));
+        await Assert.ThrowsAsync<ArgumentException>(() => edge.OpenSignalsAsync(token, typeof(IPlatformOnlyPinger).FullName!, "x", "Pinged", ct));
+    }
+
+    [Fact]
     public async Task SignalsPublishedBetweenRunsArriveWhenTheNextRunSubscribes()
     {
         var ct = TestContext.Current.CancellationToken;

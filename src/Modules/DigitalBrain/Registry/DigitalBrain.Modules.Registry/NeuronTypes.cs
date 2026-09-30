@@ -24,7 +24,8 @@ internal sealed class NeuronTypes(ModuleInventory modules)
                         .Where(type => typeof(Signal).IsAssignableFrom(type) && type != typeof(Signal) && !type.IsAbstract)
                         .ToArray();
                     foreach (var contract in contracts.GetExportedTypes()
-                        .Where(type => type.IsInterface && type != typeof(INeuron) && typeof(INeuron).IsAssignableFrom(type)))
+                        .Where(type => type.IsInterface && type != typeof(INeuron) && typeof(INeuron).IsAssignableFrom(type)
+                            && !PlatformOnlyAttribute.AppliesTo(type)))
                     {
                         var id = contract.GetCustomAttribute<AliasAttribute>()?.Alias;
                         if (string.IsNullOrWhiteSpace(id)) { throw new InvalidOperationException($"Public neuron contract {contract.FullName} requires an Orleans alias."); }

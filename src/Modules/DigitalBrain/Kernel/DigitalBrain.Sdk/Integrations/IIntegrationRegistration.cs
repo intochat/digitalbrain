@@ -15,6 +15,7 @@ public enum RegistrationStatus
 // Key: "integration/{id}". One deployment-level provider registration (a Google OAuth app, an AI key);
 // every value lives in the vault and never appears in state, snapshots or signals.
 [Alias("integration.registration")]
+[PlatformOnly]
 [Orleans.Metadata.DefaultGrainType("integration.registration")]
 public interface IIntegrationRegistration : INeuron
 {
@@ -24,6 +25,9 @@ public interface IIntegrationRegistration : INeuron
     Task<RegistrationSnapshot> Configure(ConfigureRegistration request);
 
     Task<RegistrationSnapshot> Clear(string field);
+
+    // Checks and writes atomically inside the grain: applies only while the registration is Unconfigured.
+    Task<RegistrationSnapshot> SeedIfUnconfigured(ConfigureRegistration request);
 
     Task<ReleasedRegistration> Release(CallerContext caller);
 }

@@ -42,12 +42,7 @@ internal sealed class RegistrationSeeder(
         }
 
         var registration = grains.GetGrain<IIntegrationRegistration>(IntegrationVault.GrainKeyPrefix + definition.Id);
-        if ((await registration.Read()).Status != RegistrationStatus.Unconfigured)
-        {
-            return;
-        }
-
-        await registration.Configure(new ConfigureRegistration { Values = values });
-        logger.LogInformation("Seeded integration {IntegrationId} with {FieldCount} fields.", definition.Id, values.Count);
+        var after = await registration.SeedIfUnconfigured(new ConfigureRegistration { Values = values });
+        logger.LogInformation("Integration {IntegrationId} is {Status} after seeding.", definition.Id, after.Status);
     }
 }

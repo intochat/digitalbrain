@@ -31,6 +31,20 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
 
     public async Task<RegistrationSnapshot> Configure(ConfigureRegistration request)
     {
+        RefuseAppCalls();
+        return await Apply(request);
+    }
+
+    public async Task<RegistrationSnapshot> SeedIfUnconfigured(ConfigureRegistration request)
+    {
+        RefuseAppCalls();
+        return SnapshotOf(Snapshot).Status == RegistrationStatus.Unconfigured
+            ? await Apply(request)
+            : SnapshotOf(Snapshot);
+    }
+
+    private async Task<RegistrationSnapshot> Apply(ConfigureRegistration request)
+    {
         ArgumentNullException.ThrowIfNull(request);
         var values = request.Values;
         if (values is null || values.Count == 0)
@@ -63,6 +77,7 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
 
     public async Task<RegistrationSnapshot> Clear(string field)
     {
+        RefuseAppCalls();
         if (field is null || !Definition.AllFields.Contains(field, StringComparer.Ordinal))
         {
             throw new ArgumentException($"The field is not part of this integration; it accepts: {string.Join(", ", Definition.AllFields)}.");
@@ -83,6 +98,7 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
 
     public async Task<ReleasedRegistration> Release(CallerContext caller)
     {
+        RefuseAppCalls();
         // Values leave only to trusted platform code: a module's own grain call stamped by the Platform
         // edge. Users and assistants (authenticated HTTP), installed apps (app proxy) and the scheduler
         // never qualify, so no HTTP route or script can obtain a provider credential.
@@ -106,6 +122,16 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
         }
 
         return new ReleasedRegistration { Values = values };
+    }
+
+    // Scripts run under an App stamp; nothing an installed app does may touch a provider registration,
+    // whatever parameters it passes. Platform HTTP paths carry User and startup work carries no stamp.
+    private static void RefuseAppCalls()
+    {
+        if (CallerContextStamper.TryGet(out var ambient) && (ambient.Kind == CallerKind.App || ambient.StampedBy == TrustedEdge.AppProxy))
+        {
+            throw new InvalidOperationException("Installed apps cannot use provider registrations.");
+        }
     }
 
     private RegistrationSnapshot SnapshotOf(RegistrationState state)

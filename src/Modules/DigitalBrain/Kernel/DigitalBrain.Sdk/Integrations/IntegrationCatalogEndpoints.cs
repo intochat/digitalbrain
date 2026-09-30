@@ -1,9 +1,10 @@
-using System.Security.Claims;
+using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Sdk.Integrations;
 
@@ -28,14 +29,23 @@ internal static class IntegrationCatalog
     }
 }
 
-// Writing a deployment-wide provider registration takes the Owner role from the signed-in session.
-internal static class IntegrationOwnerGate
+internal static class IntegrationOperatorGate
 {
-    // Identity signs sessions in with ClaimTypes.Role = MemberRole.Owner.ToString(); the Sdk cannot
-    // reference the Identity contracts, so the role name is matched here.
-    public const string OwnerRole = "Owner";
+    // Mirrors Identity's single-operator login; the Sdk cannot reference Identity.
+    private const string OpenPostureLogin = "owner";
 
-    public static bool Allows(ClaimsPrincipal user) => user.Identity?.IsAuthenticated == true && user.IsInRole(OwnerRole);
+    // Deployment registrations belong to the operator; a per-account Owner role is not that.
+    public static bool Allows(CallerContext? caller, IConfiguration configuration)
+    {
+        if (caller is null || caller.Kind != CallerKind.User || caller.StampedBy != TrustedEdge.AuthenticatedHttp)
+        {
+            return false;
+        }
+
+        var username = configuration["DigitalBrain:Auth:Username"];
+        var hasCredential = !string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(configuration["DigitalBrain:Auth:Password"]);
+        return string.Equals(caller.PrincipalId, hasCredential ? username : OpenPostureLogin, StringComparison.Ordinal);
+    }
 }
 
 internal static class IntegrationCatalogEndpoints
@@ -50,10 +60,10 @@ internal static class IntegrationCatalogEndpoints
         group.MapGet("", async ([FromServices] IReadOnlyList<IntegrationDefinition> definitions, [FromServices] IGrainFactory grains, CancellationToken cancellationToken) =>
             Results.Ok(await IntegrationCatalog.ListAsync(definitions, grains, cancellationToken)));
 
-        group.MapPost("/{id}/registration", async (string id, ConfigureRegistrationInput body, HttpContext http,
+        group.MapPost("/{id}/registration", async (string id, ConfigureRegistrationInput body, [FromServices] IConfiguration configuration,
             [FromServices] IReadOnlyList<IntegrationDefinition> definitions, [FromServices] IGrainFactory grains) =>
         {
-            if (!IntegrationOwnerGate.Allows(http.User)) { return Results.StatusCode(StatusCodes.Status403Forbidden); }
+            if (!IntegrationOperatorGate.Allows(CallerContextStamper.TryGet(out var caller) ? caller : null, configuration)) { return Results.StatusCode(StatusCodes.Status403Forbidden); }
             if (!definitions.Any(definition => definition.Id == id)) { return Results.NotFound(); }
             try
             {
@@ -66,10 +76,10 @@ internal static class IntegrationCatalogEndpoints
             }
         });
 
-        group.MapDelete("/{id}/registration/{field}", async (string id, string field, HttpContext http,
+        group.MapDelete("/{id}/registration/{field}", async (string id, string field, [FromServices] IConfiguration configuration,
             [FromServices] IReadOnlyList<IntegrationDefinition> definitions, [FromServices] IGrainFactory grains) =>
         {
-            if (!IntegrationOwnerGate.Allows(http.User)) { return Results.StatusCode(StatusCodes.Status403Forbidden); }
+            if (!IntegrationOperatorGate.Allows(CallerContextStamper.TryGet(out var caller) ? caller : null, configuration)) { return Results.StatusCode(StatusCodes.Status403Forbidden); }
             if (!definitions.Any(definition => definition.Id == id)) { return Results.NotFound(); }
             try
             {

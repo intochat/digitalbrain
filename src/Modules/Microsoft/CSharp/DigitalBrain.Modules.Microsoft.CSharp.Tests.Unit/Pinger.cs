@@ -13,6 +13,12 @@ public interface IPinger : INeuron
     Task<string> Caller();
 }
 
+[PlatformOnly]
+public interface IPlatformOnlyPinger : INeuron
+{
+    Task Ping(int number);
+}
+
 [GenerateSerializer, Alias("tests.csharp.pinged")]
 public sealed record Pinged([property: Id(0)] int Number) : Signal;
 

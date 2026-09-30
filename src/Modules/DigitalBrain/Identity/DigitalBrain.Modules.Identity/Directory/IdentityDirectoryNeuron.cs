@@ -33,7 +33,7 @@ internal sealed class IdentityDirectoryNeuron : Neuron<IdentityDirectoryState>, 
         {
             throw new ArgumentException("Use a password between 12 and 256 characters.");
         }
-        if (principalId == "owner" || Snapshot.Members.Any(m => m.PrincipalId == principalId))
+        if (principalId is "owner" or "integrations" || Snapshot.Members.Any(m => m.PrincipalId == principalId))
         {
             throw new InvalidOperationException("That username is unavailable.");
         }
