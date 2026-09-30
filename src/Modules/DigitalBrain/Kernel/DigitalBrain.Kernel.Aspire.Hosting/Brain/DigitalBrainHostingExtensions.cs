@@ -52,6 +52,7 @@ public static class DigitalBrainHostingExtensions
             .AddAzureStorage(DigitalBrainNames.Storage)
             .RunAsEmulator(emulator =>
             {
+                emulator.WithArgs("--silent");
                 if (persist) { emulator.WithLifetime(ContainerLifetime.Persistent); }
                 if (dataVolume is not null) { emulator.WithDataVolume(dataVolume); }
                 else if (persist) { emulator.WithDataVolume(); }

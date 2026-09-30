@@ -73,12 +73,26 @@ public sealed class AspireTestSession : IAsyncDisposable
             // values out of command-line arguments and public composition envelopes.
             builder.Configuration.AddInMemoryCollection(options.PrivateConfiguration
                 .Where(pair => pair.Key.StartsWith("Parameters:", StringComparison.OrdinalIgnoreCase)));
+            // Aspire forwards every resource's console output under "<AppHost>.Resources.<resource>"; config rules beat SetMinimumLevel.
+            builder.Configuration.AddInMemoryCollection(TestLogging.QuietDefaults);
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"Logging:LogLevel:{builder.Environment.ApplicationName}.Resources"] = "Warning",
+            });
             builder.Services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
             stage = "topology";
             declareTopology?.Invoke(builder);
             var hosts = SiloHosts.Find(builder.Resources);
             if (hosts.Count == 0)
             { throw new InvalidOperationException("The AppHost must reference the brain from at least one resource with an http endpoint."); }
+            foreach (var resource in builder.Resources.Where(r => r is ProjectResource or ExecutableResource))
+            {
+                resource.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
+                {
+                    foreach (var (key, value) in TestLogging.QuietDefaults)
+                    { context.EnvironmentVariables[key.Replace(":", "__")] = value!; }
+                }));
+            }
             foreach (var resource in hosts)
             {
                 if (privateSettings is not null)
@@ -86,11 +100,6 @@ public sealed class AspireTestSession : IAsyncDisposable
                     resource.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
                         context.EnvironmentVariables["DigitalBrain__Testing__PrivateConfiguration"] = privateSettings.FilePath));
                 }
-                resource.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
-                {
-                    foreach (var (key, value) in TestLogging.QuietDefaults)
-                    { context.EnvironmentVariables[key.Replace(":", "__")] = value!; }
-                }));
                 if (options.ResourceEnvironment.Count > 0)
                 {
                     resource.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
