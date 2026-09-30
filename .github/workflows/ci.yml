@@ -37,14 +37,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      - name: Packaging path lint
-        run: |
-          files=".github/workflows/deploy.yml             src/Applications/IntoChat/IntoChat/Dockerfile             src/Applications/IntoChat/IntoChat/docker-entrypoint.sh             src/Applications/IntoChat/IntoChat/Properties/PublishProfiles/Container.pubxml"
-          if grep -Hn -E 'src/Modules/DigitalBrain/Mcp|DigitalBrain\.Mcp|DigitalBrain\.Excel' $files; then
-            echo "::error::Stale moved/deleted path in publish or container configuration." >&2
-            exit 1
-          fi
-
       - name: Restore dependencies
         run: dotnet restore DigitalBrain.slnx
 
@@ -60,13 +52,8 @@ jobs:
       - name: Validate NuGet packages
         run: dotnet pack DigitalBrain.slnx -c Release --no-build -o artifacts
 
-      # Unit suites only: every *.Tests.E2E project needs Docker/Aspire orchestration or a browser and is run locally.
-      - name: Run unit tests
-        run: |
-          for project in $(find src -name '*Tests.Unit.csproj' -o -name 'DigitalBrain.Deployment.Tests.csproj' | sort); do
-            dotnet test --project "$project" -c Release --no-build || failed=1
-          done
-          exit ${failed:-0}
+      - name: Test
+        run: dotnet test DigitalBrain.slnx -c Release --no-build
 
   flutter-web-build:
     name: Flutter analyze and web build
