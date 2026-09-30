@@ -19,6 +19,7 @@ public sealed class AppUiRouteFacts
         var routes = app.DataSources.SelectMany(source => source.Endpoints)
             .OfType<RouteEndpoint>().Select(endpoint => $"{string.Join(",", endpoint.Metadata.GetMetadata<HttpMethodMetadata>()!.HttpMethods)} {endpoint.RoutePattern.RawText}").Order(StringComparer.Ordinal).ToArray();
 
+        Assert.All(routes, route => Assert.Contains(" /brains/{brainId}/", route));
         Assert.Equal(["GET /brains/{brainId}/apps/node", "POST /brains/{brainId}/apps/event"], routes);
     }
 }

@@ -40,7 +40,7 @@ internal static class UiKitEndpoints
         UiHttp.MapGet<ISurface, SurfaceState>(endpoints, "surfaces", neuron => neuron.Read());
         UiHttp.MapGet<ILayout, LayoutState>(endpoints, "layouts", neuron => neuron.Read());
         UiHttp.MapGet<ICollectionView, CollectionState>(endpoints, "collections", neuron => neuron.Read());
-        UiHttp.MapGet<IImageCanvas, ImageCanvasState>(endpoints, "imagecanvass", neuron => neuron.Read());
+        UiHttp.MapGet<IImageCanvas, ImageCanvasState>(endpoints, "imagecanvases", neuron => neuron.Read());
         UiHttp.MapGet<IButton, ButtonState>(endpoints, "buttons", neuron => neuron.Read());
         UiHttp.MapPost(endpoints, "buttons/{name}/set", async (string name, ButtonSet body, IGrainFactory grains, CancellationToken ct) =>
         {
