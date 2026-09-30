@@ -45,6 +45,7 @@ public sealed class CanarySecretFacts
         Assert.Equal(System.Net.HttpStatusCode.OK, seeded.StatusCode);
         var seedBody = await seeded.Content.ReadAsStringAsync(ct);
         Assert.DoesNotContain(Canary, seedBody, StringComparison.Ordinal);
+        Assert.Contains("secret://", seedBody, StringComparison.Ordinal);
 
         await WaitForAsync(() => collector.Snapshot().Count > 0, ct);
         await Task.Delay(TimeSpan.FromSeconds(3), ct);
