@@ -4,11 +4,11 @@ using System.Text.Json;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Microsoft.CSharp;
 
-namespace IntoChat.Tests.E2E.Packages;
+namespace DigitalBrain.Modules.Apps.Tests.E2E;
 
 // Alice writes a C# app and shares it with one request; the package carries its code and account
 // slots, never Alice's settings, and Bob's install runs it with his own account.
-public sealed class ShareCSharpFacts(IntoChatHostFixture host)
+public sealed class ShareCSharpFacts(ReferenceBrainFixture host)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
