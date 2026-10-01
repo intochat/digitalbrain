@@ -4,8 +4,8 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Metering;
-using IntoChat.Tests.E2E.Agent;
-using IntoChat.Tests.E2E.Workspace;
+using DigitalBrain.Testing.E2E.Agent;
+using DigitalBrain.Testing.E2E.Workspace;
 using DigitalBrain.Identity;
 
 namespace IntoChat.Tests.E2E.Receipts;

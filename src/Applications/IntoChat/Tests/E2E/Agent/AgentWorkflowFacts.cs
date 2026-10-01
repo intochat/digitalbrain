@@ -8,7 +8,7 @@ using DigitalBrain.AI.Agents;
 using DigitalBrain.AI.Metering;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Workspace;
-using IntoChat.Tests.E2E.Workspace;
+using DigitalBrain.Testing.E2E.Workspace;
 using Npgsql;
 using DigitalBrain.Identity;
 

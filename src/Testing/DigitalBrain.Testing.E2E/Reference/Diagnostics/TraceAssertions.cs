@@ -1,6 +1,6 @@
-namespace IntoChat.Tests.E2E.Diagnostics;
+namespace DigitalBrain.Testing.E2E.Diagnostics;
 
-internal static class TraceAssertions
+public static class TraceAssertions
 {
     public static string TextOf(CapturedSpan span)
         => string.Join("\n", span.Attributes.Select(pair => pair.Key + "=" + pair.Value));

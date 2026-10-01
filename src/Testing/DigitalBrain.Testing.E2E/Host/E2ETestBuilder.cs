@@ -78,6 +78,25 @@ public sealed class E2ETestBuilder
         return this;
     }
 
+    public E2ETestBuilder WithStartupTimeout(TimeSpan timeout)
+    {
+        EnsureMutable();
+        TestExecutionOptions.ValidateTimeout(timeout);
+        _execution = _execution with { StartupTimeout = timeout };
+        return this;
+    }
+
+
+    public E2ETestBuilder WithResourceEnvironment(IReadOnlyDictionary<string, string> environment)
+    {
+        EnsureMutable();
+        ArgumentNullException.ThrowIfNull(environment);
+        var merged = new Dictionary<string, string>(_execution.ResourceEnvironment, StringComparer.Ordinal);
+        foreach (var (key, value) in environment) { merged[key] = value; }
+        _execution = _execution with { ResourceEnvironment = merged };
+        return this;
+    }
+
     internal BrainComposition BuildComposition()
     {
         var composition = _composition.Build();

@@ -1,8 +1,8 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using DigitalBrain.AI;
-using IntoChat.Tests.E2E.Agent;
-using IntoChat.Tests.E2E.Workspace;
+using DigitalBrain.Testing.E2E.Agent;
+using DigitalBrain.Testing.E2E.Workspace;
 
 namespace IntoChat.Tests.E2E.Apps;
 

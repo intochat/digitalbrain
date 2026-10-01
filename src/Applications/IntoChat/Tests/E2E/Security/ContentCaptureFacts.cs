@@ -1,10 +1,10 @@
-using static IntoChat.Tests.E2E.Diagnostics.TraceAssertions;
+using static DigitalBrain.Testing.E2E.Diagnostics.TraceAssertions;
 using System.Net.Http.Json;
 using DigitalBrain.AI;
 using DigitalBrain.Testing.E2E;
-using IntoChat.Tests.E2E.Agent;
-using IntoChat.Tests.E2E.Diagnostics;
-using IntoChat.Tests.E2E.Workspace;
+using DigitalBrain.Testing.E2E.Agent;
+using DigitalBrain.Testing.E2E.Diagnostics;
+using DigitalBrain.Testing.E2E.Workspace;
 
 namespace IntoChat.Tests.E2E.Security;
 
@@ -81,4 +81,6 @@ public sealed class ContentCaptureFacts
         }
     }
 }
+
+
 

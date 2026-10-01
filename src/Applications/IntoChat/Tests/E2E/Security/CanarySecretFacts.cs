@@ -1,8 +1,8 @@
-using static IntoChat.Tests.E2E.Diagnostics.TraceAssertions;
+using static DigitalBrain.Testing.E2E.Diagnostics.TraceAssertions;
 using System.Net.Http.Json;
 using System.Text.Json;
 using DigitalBrain.Testing.E2E;
-using IntoChat.Tests.E2E.Diagnostics;
+using DigitalBrain.Testing.E2E.Diagnostics;
 
 namespace IntoChat.Tests.E2E.Security;
 
@@ -115,5 +115,7 @@ public sealed class CanarySecretFacts(IntoChatHostFixture host)
 
 
 }
+
+
 
 

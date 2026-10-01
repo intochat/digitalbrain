@@ -1,9 +1,9 @@
-using static IntoChat.Tests.E2E.Diagnostics.TraceAssertions;
+using static DigitalBrain.Testing.E2E.Diagnostics.TraceAssertions;
 using System.Net.Http.Json;
 using Aspire.Hosting;
 using Aspire.Hosting.Testing;
 using DigitalBrain.AI;
-using IntoChat.Tests.E2E.Agent;
+using DigitalBrain.Testing.E2E.Agent;
 using Npgsql;
 
 namespace IntoChat.Tests.E2E.Diagnostics;

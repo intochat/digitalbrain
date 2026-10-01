@@ -2,7 +2,7 @@ using DigitalBrain.Core.Enforcement;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using DigitalBrain.Flutter;
-using IntoChat.Tests.E2E.Workspace;
+using DigitalBrain.Testing.E2E.Workspace;
 using Microsoft.Playwright;
 
 namespace IntoChat.Tests.E2E.LocalApps;

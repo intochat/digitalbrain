@@ -1,11 +1,11 @@
 using System.Globalization;
 
-namespace IntoChat.Tests.E2E.Diagnostics;
+namespace DigitalBrain.Testing.E2E.Diagnostics;
 
 // Minimal OTLP/HTTP protobuf reader for the fields the trace budget and the capture facts need: span
 // identity, name, instrumentation scope, string attributes, and GenAI log bodies. It deliberately
 // ignores everything else on the wire.
-internal static class OtlpTraceParser
+public static class OtlpTraceParser
 {
     public static IReadOnlyList<CapturedSpan> Parse(byte[] body)
     {
@@ -224,7 +224,7 @@ internal static class OtlpTraceParser
     private readonly record struct ProtoField(int Number, int WireType, byte[] Bytes, ulong Varint);
 }
 
-internal sealed record CapturedSpan(string Name, string Scope, string TraceId, string SpanId, string? ParentSpanId,
+public sealed record CapturedSpan(string Name, string Scope, string TraceId, string SpanId, string? ParentSpanId,
     int Kind, DateTimeOffset ReceivedAt, IReadOnlyDictionary<string, string> Attributes);
 
-internal sealed record CapturedLog(string Body, IReadOnlyDictionary<string, string> Attributes);
+public sealed record CapturedLog(string Body, IReadOnlyDictionary<string, string> Attributes);

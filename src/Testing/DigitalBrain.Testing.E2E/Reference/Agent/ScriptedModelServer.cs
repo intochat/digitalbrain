@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
-namespace IntoChat.Tests.E2E.Agent;
+namespace DigitalBrain.Testing.E2E.Agent;
 
 // Exercises the production OpenAI adapter. This fixture owns no application services.
 public sealed partial class ScriptedModelServer : IAsyncDisposable

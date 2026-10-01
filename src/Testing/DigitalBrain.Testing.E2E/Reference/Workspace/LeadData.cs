@@ -1,9 +1,9 @@
 using Aspire.Hosting.Testing;
 using Npgsql;
 
-namespace IntoChat.Tests.E2E.Workspace;
+namespace DigitalBrain.Testing.E2E.Workspace;
 
-internal static class LeadData
+public static class LeadData
 {
     public static async Task CreateWideCustomersAsync(E2EBrain brain, CancellationToken ct)
     {

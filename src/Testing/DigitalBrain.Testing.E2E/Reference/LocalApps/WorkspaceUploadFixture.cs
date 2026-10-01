@@ -1,8 +1,8 @@
-namespace IntoChat.Tests.E2E.LocalApps;
+namespace DigitalBrain.Testing.E2E.LocalApps;
 
-internal static class WorkspaceUploadFixture
+public static class WorkspaceUploadFixture
 {
-    internal static async Task Upload(HttpClient http, string workspaceId, params IEnumerable<string> images)
+    public static async Task Upload(HttpClient http, string workspaceId, params IEnumerable<string> images)
     {
         foreach (var image in images)
         {

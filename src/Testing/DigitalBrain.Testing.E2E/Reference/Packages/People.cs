@@ -3,10 +3,10 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using DigitalBrain.Identity;
 
-namespace IntoChat.Tests.E2E.Packages;
+namespace DigitalBrain.Testing.E2E.Packages;
 
 // Registered accounts talking to the product routes with their own cookie sessions.
-internal static class People
+public static class People
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 

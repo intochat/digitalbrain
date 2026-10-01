@@ -1,8 +1,8 @@
 using Microsoft.Playwright;
 
-namespace IntoChat.Tests.E2E.Workspace;
+namespace DigitalBrain.Testing.E2E.Workspace;
 
-internal static class WorkspaceBrowser
+public static class WorkspaceBrowser
 {
     public static async Task<string> CreateProjectAsync(IPage page, string title)
     {

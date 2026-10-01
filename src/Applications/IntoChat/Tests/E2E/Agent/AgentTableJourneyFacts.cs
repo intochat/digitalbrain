@@ -7,7 +7,7 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Workspace;
-using IntoChat.Tests.E2E.Workspace;
+using DigitalBrain.Testing.E2E.Workspace;
 using Microsoft.Playwright;
 using Npgsql;
 using DigitalBrain.Identity;
