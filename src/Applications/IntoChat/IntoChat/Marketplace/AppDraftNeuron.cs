@@ -1,4 +1,3 @@
-using DigitalBrain.Microsoft.CSharp;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.AI;
@@ -15,7 +14,7 @@ internal sealed class AppDraftNeuron(
     [PersistentState("intochat.app-draft", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<AppDraftState> store,
     IConfiguration configuration,
     ILogger<AppDraftNeuron> logger,
-    CSharpToolService? csharp = null)
+    IScriptSandbox? csharp = null)
     : Neuron<AppDraftState>(store), IAppDraft
 {
     private const int MaxAuthorRetries = 2;
@@ -196,9 +195,9 @@ internal sealed class AppDraftNeuron(
                 BuilderTools.SearchContracts => JsonSerializer.Serialize(
                     await BuilderTools.Search(GrainFactory, Parse<BuilderTools.SearchArguments>(call.ArgumentsJson).Query), Json),
                 BuilderTools.ReadContracts => JsonSerializer.Serialize(
-                    await Require(csharp?.Discovery).Read(Parse<BuilderTools.ReadArguments>(call.ArgumentsJson).Modules ?? []), Json),
+                    await Require(csharp).ReadContracts(Parse<BuilderTools.ReadArguments>(call.ArgumentsJson).Modules ?? [], CancellationToken.None), Json),
                 BuilderTools.CheckCSharp => JsonSerializer.Serialize(
-                    Require(csharp?.Check).Check(Parse<BuilderTools.CheckArguments>(call.ArgumentsJson).Files ?? new Dictionary<string, string>()), Json),
+                    Require(csharp).Check(Parse<BuilderTools.CheckArguments>(call.ArgumentsJson).Files ?? new Dictionary<string, string>()), Json),
                 _ => throw new ArgumentException($"Unknown tool '{call.Name}'."),
             };
         }

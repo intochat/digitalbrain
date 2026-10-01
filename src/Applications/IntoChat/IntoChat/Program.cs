@@ -39,8 +39,8 @@ app.UseModuleHttpSurfaces();
 app.UseAuthentication();
 app.UseAccountSession();
 app.MapDefaultEndpoints();
-app.MapGet("/session/capabilities", static (IEnumerable<IAgentToolFactory> factories) =>
-    Results.Ok(new { developerMode = factories.Any(factory => factory is DigitalBrain.Microsoft.CSharp.CSharpAgentTools) }));
+app.MapGet("/session/capabilities", static (IServiceProvider services) =>
+    Results.Ok(new { developerMode = services.GetService<DigitalBrain.Apps.IScriptSandbox>()?.CanRun == true }));
 app.MapDigitalBrainModules();
 app.MapMarketplace();
 

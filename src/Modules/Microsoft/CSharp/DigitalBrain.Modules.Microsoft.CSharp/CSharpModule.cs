@@ -24,6 +24,7 @@ public sealed class CSharpModule : IModule<CSharpOptions>
         builder.Services.AddOptions<CSharpDeploymentSettings>().BindConfiguration(CSharpDeploymentSettings.SectionName);
         builder.Services.TryAddSingleton<CSharpCatalogStore>();
         builder.Services.TryAddSingleton<CSharpToolService>();
+        builder.Services.TryAddSingleton<DigitalBrain.Apps.IScriptSandbox, CSharpScriptSandbox>();
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.TryAddSingleton<RunTokens>();
         builder.Services.TryAddSingleton<ScriptRunEnvironment>();

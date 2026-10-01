@@ -10,6 +10,7 @@ public static class CSharpAuthoringHosting
     {
         services.TryAddSingleton<CSharpCatalogStore>();
         services.TryAddSingleton<CSharpToolService>();
+        services.TryAddSingleton<DigitalBrain.Apps.IScriptSandbox, CSharpScriptSandbox>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IAgentToolFactory, CSharpAgentTools>());
         return services;
     }

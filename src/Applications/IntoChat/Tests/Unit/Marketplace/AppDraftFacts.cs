@@ -221,6 +221,7 @@ public sealed class AppDraftFacts
                 silo.Services.AddSingleton<CSharpScriptCheck>();
             }
             silo.Services.AddSingleton<CSharpToolService>();
+            silo.Services.AddSingleton<IScriptSandbox, CSharpScriptSandbox>();
         })
         .StartAsync(ct);
 }

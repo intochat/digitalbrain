@@ -1,4 +1,3 @@
-using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.AI.GroupChat;
 using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
@@ -15,7 +14,7 @@ internal sealed record AppSpecView(
     string? Tests,
     AppVerification? Verification);
 
-internal sealed class MarketplaceService(IDigitalBrain brain, CSharpToolService csharp)
+internal sealed class MarketplaceService(IDigitalBrain brain, IScriptSandbox? csharp = null)
 {
     public const string SandboxMissing = "This host has no C# sandbox, and verifying an app runs its tests as one. Compose CSharpModule where the brain can run scripts.";
 
@@ -24,7 +23,7 @@ internal sealed class MarketplaceService(IDigitalBrain brain, CSharpToolService 
     {
         var content = (await brain.Get<IPackage>(revision.Package.ToString()).ReadRevision(revision.Revision)).Content;
         var runsScripts = content.Manifest.RuntimeName == PackageManifest.CSharpRuntime || content.File(PackageContent.TestsPath) is not null;
-        if (runsScripts && !csharp.CanRun) { throw new InvalidOperationException(SandboxMissing); }
+        if (runsScripts && csharp?.CanRun != true) { throw new InvalidOperationException(SandboxMissing); }
     }
 
     public async Task<AppSpecView> Spec(PackageId id, string? revisionId)
