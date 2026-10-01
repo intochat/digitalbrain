@@ -8,7 +8,6 @@
     <InternalsVisibleTo Include="DigitalBrain.Testing.E2E" />
     <!-- The script edge speaks the same protocol records as the client. -->
     <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.CSharp" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit" />
   </ItemGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

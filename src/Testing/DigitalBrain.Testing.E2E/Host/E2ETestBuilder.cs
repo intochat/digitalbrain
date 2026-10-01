@@ -97,7 +97,7 @@ public sealed class E2ETestBuilder
         return this;
     }
 
-    internal BrainComposition BuildComposition()
+    public BrainComposition BuildComposition()
     {
         var composition = _composition.Build();
         if (composition.RequiresLocalServices)

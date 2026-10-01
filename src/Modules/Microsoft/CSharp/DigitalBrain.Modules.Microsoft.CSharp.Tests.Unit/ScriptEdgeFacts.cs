@@ -60,7 +60,7 @@ public sealed class ScriptEdgeFacts
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => edge.InvokeAsync(token[..^2] + "AA", Call("Double", 1), ct));
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => edge.InvokeAsync(null, Call("Double", 1), ct));
-        await Assert.ThrowsAsync<ArgumentException>(() => edge.InvokeAsync(token, Call("Double", 1) with { Contract = typeof(ICSharpFile).FullName! }, ct));
+        await Assert.ThrowsAsync<ArgumentException>(() => edge.InvokeAsync(token, (typeof(ICSharpFile).FullName!, "pinger", "Double", [JsonSerializer.SerializeToElement(1)]), ct));
         await Assert.ThrowsAsync<ArgumentException>(() => edge.InvokeAsync(token, Call("Watch", 1), ct));
     }
 
@@ -161,9 +161,9 @@ public sealed class ScriptEdgeFacts
         });
 
         await Assert.ThrowsAsync<ArgumentException>(() => edge.InvokeAsync(token,
-            new ScriptInvocation(typeof(DigitalBrain.Platform.Integrations.IIntegrationRegistration).FullName!, "integration/openai", "Release", [forged]), ct));
+            (typeof(DigitalBrain.Platform.Integrations.IIntegrationRegistration).FullName!, "integration/openai", "Release", [forged]), ct));
         await Assert.ThrowsAsync<ArgumentException>(() => edge.InvokeAsync(token,
-            new ScriptInvocation(typeof(DigitalBrain.Sdk.Secrets.ISecrets).FullName!, "owner", "Resolve", [forged, forged]), ct));
+            (typeof(DigitalBrain.Sdk.Secrets.ISecrets).FullName!, "owner", "Resolve", [forged, forged]), ct));
         await Assert.ThrowsAsync<ArgumentException>(() => edge.OpenSignalsAsync(token, typeof(IPlatformOnlyPinger).FullName!, "x", "Pinged", ct));
     }
 
@@ -248,8 +248,8 @@ public sealed class ScriptEdgeFacts
         while (!condition()) { await Task.Delay(TimeSpan.FromMilliseconds(50), deadline.Token); }
     }
 
-    private static ScriptInvocation Call(string method, params int[] arguments)
-        => new(typeof(IPinger).FullName!, "pinger", method, [.. arguments.Select(argument => JsonSerializer.SerializeToElement(argument))]);
+    private static (string Contract, string Key, string Method, JsonElement[] Arguments) Call(string method, params int[] arguments)
+        => (typeof(IPinger).FullName!, "pinger", method, [.. arguments.Select(argument => JsonSerializer.SerializeToElement(argument))]);
 
     private static async Task<string> StartAsAlice(UnitBrain brain, FakeSandbox sandbox, string fileId, CancellationToken ct)
     {

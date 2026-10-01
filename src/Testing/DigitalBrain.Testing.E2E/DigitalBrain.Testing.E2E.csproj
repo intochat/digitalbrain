@@ -15,7 +15,6 @@
     <PackageReference Include="Microsoft.Playwright" />
   </ItemGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="IntoChat.Tests.E2E" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Testing/DigitalBrain.Testing.csproj" />

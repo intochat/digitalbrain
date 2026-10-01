@@ -15,9 +15,8 @@ internal sealed class ScriptEdge(RunTokens tokens, ScriptContracts contracts, IG
 {
     private static readonly HashSet<string> ObserverMethods = [nameof(INeuron.Watch), nameof(INeuron.Unwatch)];
 
-    public async Task<JsonElement?> InvokeAsync(string? token, ScriptInvocation invocation, CancellationToken cancellationToken)
+    public async Task<JsonElement?> InvokeAsync(string? token, (string Contract, string Key, string Method, JsonElement[] Arguments) invocation, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(invocation);
         var (claims, owner) = await AuthorizeAsync(token).ConfigureAwait(false);
         var contract = contracts.Find(invocation.Contract);
         // The catalog already omits platform-only contracts; refuse here too, whatever the catalog holds.
