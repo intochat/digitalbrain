@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Http;
-namespace DigitalBrain.Apps;
+namespace DigitalBrain.Sdk.Http;
 
-public static class PackageRouteGuard
+public static class ModuleRouteGuard
 {
     public static async ValueTask<object?> Guard(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {

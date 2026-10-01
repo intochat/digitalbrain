@@ -1,3 +1,4 @@
+using DigitalBrain.Sdk.Http;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
@@ -13,7 +14,7 @@ internal static class MarketplaceEndpoints
 {
     public static void MapMarketplace(this IEndpointRouteBuilder routes)
     {
-        var packages = routes.MapGroup("/packages").AddEndpointFilter(PackageRouteGuard.Guard);
+        var packages = routes.MapGroup("/packages").AddEndpointFilter(ModuleRouteGuard.Guard);
         packages.MapGet("/drafts", (IDigitalBrain brain)
             => brain.Get<IAppDrafts>(CallerContextStamper.Require().PrincipalId).List());
         packages.MapPost("/drafts/{id}", (string id, DraftRequest request, IDigitalBrain brain)
@@ -29,7 +30,7 @@ internal static class MarketplaceEndpoints
         packages.MapPost("/{owner}/{name}/verify", (string owner, string name, string? revision, MarketplaceService marketplace)
             => marketplace.Verify(PackageId.Create(owner, name), revision));
 
-        var installed = BrainRoutes.Group(routes, "/packages/{owner}/{name}").AddEndpointFilter(PackageRouteGuard.Guard);
+        var installed = BrainRoutes.Group(routes, "/packages/{owner}/{name}").AddEndpointFilter(ModuleRouteGuard.Guard);
         installed.MapGet("/invocations/{invocationId:guid}/discussion", (string owner, string name, Guid invocationId, MarketplaceService marketplace)
             => marketplace.Discussion(InstalledPackages.AppKey(PackageId.Create(owner, name)), invocationId));
     }

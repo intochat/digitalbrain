@@ -10,7 +10,7 @@ namespace DigitalBrain.Assistant;
 // stamped caller. Installed apps are keyed inside the caller's brain scope.
 internal sealed class PackageService(
     IDigitalBrain brain,
-    CSharpToolService files)
+    IScriptSandbox files)
 {
     public Task<IReadOnlyList<PackageListing>> List() => brain.Get<IPackageDirectory>(PackageDirectory.Key).List();
 
@@ -158,7 +158,7 @@ internal sealed class PackageService(
         return BrainScope.Create(caller.AccountId, caller.BrainId);
     }
 
-    private IApp App(PackageId id) => brain.Get<IApp>(InstalledPackages.AppKey(id));
+    private IApp App(PackageId id) => brain.Get<IApp>(BrainScope.CurrentId() + "/packages/" + id);
 
     private async Task ValidateAccounts(PackageRevisionRef revision, IReadOnlyDictionary<string, string> selected)
     {

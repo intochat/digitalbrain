@@ -1,3 +1,4 @@
+using DigitalBrain.Sdk.Http;
 using DigitalBrain.Apps;
 using DigitalBrain.Core.Enforcement;
 using Microsoft.AspNetCore.Builder;
@@ -10,7 +11,7 @@ internal static class PackageEndpoints
 {
     public static void MapAuthoring(IEndpointRouteBuilder endpoints)
     {
-        var registry = endpoints.MapGroup("/packages").AddEndpointFilter(PackageRouteGuard.Guard);
+        var registry = endpoints.MapGroup("/packages").AddEndpointFilter(ModuleRouteGuard.Guard);
         registry.MapGet("", (PackageService service) => service.List());
         registry.MapGet("/{owner}/{name}", (string owner, string name, PackageService service) => service.Read(PackageId.Create(owner, name)));
         registry.MapGet("/{owner}/{name}/revisions/{revision}", (string owner, string name, string revision, PackageService service)
@@ -34,7 +35,7 @@ internal static class PackageEndpoints
 
     public static void Map(IEndpointRouteBuilder endpoints)
     {
-        var installed = BrainRoutes.Group(endpoints, "/packages/{owner}/{name}").AddEndpointFilter(PackageRouteGuard.Guard);
+        var installed = BrainRoutes.Group(endpoints, "/packages/{owner}/{name}").AddEndpointFilter(ModuleRouteGuard.Guard);
         installed.MapGet("", (string owner, string name, PackageService service)
             => service.ReadApp(PackageId.Create(owner, name)));
         installed.MapGet("/accounts", (string owner, string name, string? revision, PackageService service)

@@ -77,7 +77,7 @@ internal sealed partial class AssistantNeuron
                     break;
                 case "model":
                     var model = string.IsNullOrEmpty(value) ? null : value;
-                    new AssistantTurnExecution(services, GrainFactory).Models.Select(model);
+                    await new AssistantTurnExecution(services, GrainFactory).SelectModel(model);
                     await ChangeThread(id, thread => thread with { ModelProfile = model, Error = null });
                     break;
                 case "new-conversation":

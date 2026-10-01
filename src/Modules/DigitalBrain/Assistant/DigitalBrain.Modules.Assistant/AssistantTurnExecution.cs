@@ -21,8 +21,10 @@ namespace DigitalBrain.Assistant;
 public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFactory grains)
 {
     private AssistantOptions Options => services.GetRequiredService<IOptions<AssistantOptions>>().Value;
-    public AgentModelCatalog Models => new(services.GetRequiredService<ModelProfiles>(),
-        services.GetRequiredService<IOptionsMonitor<AIOptions>>(), services.GetRequiredService<IOptions<AssistantOptions>>());
+    private IAgentExecution Execution => grains.GetGrain<IAgentExecution>("assistant");
+    public Task<ModelCatalog> Models() => Execution.Models(Options.Model);
+    public Task<AgentModelSelection?> SelectModel(string? id) => Execution.SelectModel(id, Options.Model);
+
 
     public async IAsyncEnumerable<string> Run(string workspace, AssistantRun input,
         Func<string?, Task<AgentDefinition>> define, [EnumeratorCancellation] CancellationToken ct)
@@ -32,7 +34,7 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
         { throw new ArgumentException("A valid thread, run and message of at most 32000 characters are required."); }
         var agent = grains.GetGrain<IAgent>(AssistantConversations.Key(workspace, input.ThreadId));
         var snapshot = await agent.ReadConversation(ct);
-        var prepared = PrepareTurn(snapshot, input, Models);
+        var prepared = await PrepareTurn(snapshot, input, id => Execution.SelectModel(id, Options.Model));
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var events = Channel.CreateBounded<string>(new BoundedChannelOptions(64) { SingleReader = true, SingleWriter = true });
         var execution = Produce();
@@ -61,10 +63,11 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
         PreparedTurn prepared, Func<string?, Task<AgentDefinition>> define, Func<object, Task> Emit, CancellationToken ct)
     {
         var configuration = Options;
-        var runner = services.GetRequiredService<IAgentTurnRunner>();
         var priceBook = services.GetRequiredService<IPriceBook>();
         var usage = services.GetRequiredService<IIntentUsageSink>();
         var usageId = AssistantUsage.IntentId(workspace, input.ThreadId, input.RunId);
+        IAsyncEnumerable<AgentTurnEvent> Run(AgentTurnRequest request, CancellationToken token)
+            => Execution.Run(request, usageId, token);
         using var intent = IntentContext.Begin(usageId, workspace);
         var userText = input.Message;
         // Only the request that actually opened the active run may complete or interrupt it.
@@ -104,7 +107,7 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
                     var text = new StringBuilder();
                     var results = new List<string>();
                     var definition = await define(state.Summary);
-                    var queryError = await RunModel(workspace, usageId, userText, definition, state, messageId, configuration, runner, Emit, text, results, activity, ct, prepared.Model);
+                    var queryError = await RunModel(workspace, usageId, userText, definition, state, messageId, configuration, Run, Emit, text, results, activity, ct, prepared.Model);
                     if (queryError is not null) { throw new AssistantQueryException(queryError); }
                     await agent.CompleteConversation(new(input.RunId, userText, text.ToString(), results), ct);
                     ownsRun = false;
@@ -154,8 +157,8 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
                 {
                     var tokens = await grains.GetGrain<IIntentUsage>(usageId).ReadAsync(CancellationToken.None);
                     projection = AssistantUsage.Create(usageId, AgentReceipts.Create(priceBook, intent, activity, outcome, tokens.Entries), priceBook, tokens.Entries);
-                    await services.GetRequiredService<IUsageStore>().AppendAsync(input.Owner, workspace, usageId,
-                        JsonSerializer.Serialize(projection), CancellationToken.None, usageRevision);
+                    await grains.GetGrain<IComputeUsage>(input.Owner).Append(workspace, usageId,
+                        JsonSerializer.Serialize(projection), usageRevision, CancellationToken.None);
                 }
                 catch (Exception error)
                 { services.GetRequiredService<ILoggerFactory>().CreateLogger("Assistant").LogWarning(error, "Workspace compute history write failed"); }
@@ -201,7 +204,7 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
         }
     }
 
-    public static PreparedTurn PrepareTurn(AgentConversationState snapshot, AssistantRun input, AgentModelCatalog catalog)
+    public static async Task<PreparedTurn> PrepareTurn(AgentConversationState snapshot, AssistantRun input, Func<string?, Task<AgentModelSelection?>> select)
     {
         var replay = snapshot.Turns.SingleOrDefault(turn => turn.RunId == input.RunId);
         if (replay is not null)
@@ -210,20 +213,20 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
             return new(replay, null);
         }
         // Validation precedes BeginConversation: rejected choices never open or fail a turn.
-        return new(null, catalog.Select(input.ModelProfile));
+        return new(null, await select(input.ModelProfile));
     }
 
     public sealed record PreparedTurn(AgentConversationTurn? Replay, AgentModelSelection? Model);
 
     public static async Task<string?> RunModel(string scope, string run, string message, AgentDefinition definition,
         AgentConversationState state, string messageId, AssistantOptions configuration,
-        IAgentTurnRunner runner, Func<object, Task> emit, StringBuilder text, List<string> results, IntentActivity activity, CancellationToken ct, AgentModelSelection? modelSelection = null)
+        Func<AgentTurnRequest, CancellationToken, IAsyncEnumerable<AgentTurnEvent>> runner, Func<object, Task> emit, StringBuilder text, List<string> results, IntentActivity activity, CancellationToken ct, AgentModelSelection? modelSelection = null)
     {
         var finished = false;
         string? queryError = null;
         var model = modelSelection ?? (configuration.Model is { Length: > 0 } modelName ? new AgentModelSelection(Model: modelName) : null);
-        await foreach (var item in runner.RunAsync(new("workspace-assistant", run, scope, state.Turns, message, model,
-            definition.Instructions, AgentToolPolicy.ForDatabase(definition.Tools, message), ContextProviders: definition.ContextProviders), ct))
+        await foreach (var item in runner(new("workspace-assistant", run, scope, state.Turns, message, model,
+            definition.Instructions, AssistantToolPolicy.ForDatabase(definition.Tools, message), ContextProviders: definition.ContextProviders), ct))
         {
             switch (item)
             {

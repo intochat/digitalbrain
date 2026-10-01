@@ -17,7 +17,7 @@ public static class AssistantDefinition
     {
         DisplayName = options?.DisplayName ?? "Workspace assistant",
         Instructions = NeuronInstructions + "\n" + Shared + (authoringTools.Contains("csharp_contracts") ? DeveloperGuidance : ProductGuidance) + "\n" + options?.Instructions,
-        Tools = AgentToolPolicy.SelectTools(authoringTools, appTools, message: message),
+        Tools = AssistantToolPolicy.SelectTools(authoringTools, appTools, message: message),
     };
 
     private static string ReadInstructions()
