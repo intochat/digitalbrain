@@ -56,14 +56,14 @@ in-memory provider alone could not verify them.
 `PostgresWriteTableFacts` adds real-grain tests with an in-memory table provider, plus
 a live fact accepting either gate above. Its customer-research example uses only
 `IPostgresTable`, retaining the business columns and JSON evidence while replacing the
-caller-supplied workspace column with enforced table ownership. The existing compiled
-store remains available to its current consumers.
+caller-supplied workspace column with enforced table ownership. The compiled
+CustomerResearcher module and its store were since removed: the shipped
+customer-researcher package writes through `IPostgresTable` from its behavior script.
 
 Run tests per project:
 
 ```powershell
 dotnet test src/Modules/Postgres/DigitalBrain.Modules.Postgres.Tests.Unit
-dotnet test src/Modules/DigitalBrain/CustomerResearcher/DigitalBrain.Modules.CustomerResearcher.Tests.Unit
 ```
 
 The requested `docs/superpowers/specs/2026-09-29-programmable-brain-vision-design.md`

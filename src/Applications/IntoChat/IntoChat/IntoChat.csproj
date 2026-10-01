@@ -14,7 +14,6 @@
   <ItemGroup>
     <ProjectReference Include="../ServiceDefaults/IntoChat.ServiceDefaults.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Assistant/DigitalBrain.Modules.Assistant/DigitalBrain.Modules.Assistant.csproj" />
-    <ProjectReference Include="../../../Modules/DigitalBrain/CustomerResearcher/DigitalBrain.Modules.CustomerResearcher/DigitalBrain.Modules.CustomerResearcher.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/DigitalBrain.Kernel.Aspire/DigitalBrain.Kernel.Aspire.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
