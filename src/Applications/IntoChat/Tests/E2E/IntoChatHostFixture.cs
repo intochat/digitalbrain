@@ -9,8 +9,12 @@ namespace IntoChat.Tests.E2E;
 // composition plus the web shell, a scripted model endpoint, an OTLP collector, and the shipped
 // apps published through the real gate. Facts isolate through their lease's WorkspaceId and
 // fact-owned neuron ids; only a fact that needs a different composition boots its own host.
-public sealed class IntoChatHostFixture : SharedBrainFixture
+public sealed class IntoChatHostFixture : SharedBrainFixture, IAsyncLifetime
 {
+    // xUnit initializes the assembly fixture before any fact runs, so the boot (web shell
+    // compile, shipped-app verification) never counts against a fact's timeout.
+    public async ValueTask InitializeAsync() => await WarmUpAsync();
+
     public static readonly string[] ShippedPackages =
         ["intochat/assistant", "intochat/customer-researcher", "intochat/group-chat", "intochat/settings", "intochat/word-count"];
 

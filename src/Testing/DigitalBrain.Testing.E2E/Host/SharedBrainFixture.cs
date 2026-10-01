@@ -10,6 +10,10 @@ public abstract class SharedBrainFixture : IAsyncDisposable
 
     protected abstract Task<E2EBrain> StartHostAsync(CancellationToken cancellationToken);
 
+    // Boots the host eagerly, outside any fact's own timeout — a test framework's fixture
+    // initialization is the natural place to pay a boot that can take several minutes on CI.
+    public async ValueTask WarmUpAsync() => await _host.Value.ConfigureAwait(false);
+
     public async Task<E2EBrain> LeaseAsync(CancellationToken cancellationToken = default)
     {
         var host = await _host.Value.WaitAsync(cancellationToken).ConfigureAwait(false);
