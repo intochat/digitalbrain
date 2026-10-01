@@ -1,6 +1,6 @@
 using Azure.Storage.Blobs;
 using DigitalBrain.Contracts;
-using DigitalBrain.Sdk.Identity;
+using DigitalBrain.Identity.Configuration;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

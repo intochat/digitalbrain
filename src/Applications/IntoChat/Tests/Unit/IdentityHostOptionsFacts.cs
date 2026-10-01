@@ -1,20 +1,22 @@
-using DigitalBrain.Sdk.Identity;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Configuration;
 
 namespace IntoChat.Tests.Unit;
 
 public sealed class IdentityHostOptionsFacts
 {
-    [Fact]
-    public void TheHostPreservesItsCookieAndPersistedProtectionIdentity()
+    [Theory]
+    [InlineData(null, "intochat.session")]
+    [InlineData("deployment.session", "deployment.session")]
+    public void DeploymentConfigurationOverridesThePackagedHostDefaults(string? cookieOverride, string expectedCookie)
     {
-        var services = new ServiceCollection();
-        services.AddIntoChatOptions();
-        using var provider = services.BuildServiceProvider();
-        var options = provider.GetRequiredService<IOptions<IdentityHostOptions>>().Value;
-        Assert.Equal("intochat.session", options.CookieName);
-        Assert.Equal("IntoChat.v1", options.ProtectionApplicationName);
-        Assert.Equal("intochat-protection-v1", options.ProtectionContainerName);
+        using var configuration = new ConfigurationManager();
+        configuration.AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"));
+        if (cookieOverride is not null)
+        {
+            configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["DigitalBrain:Identity:CookieName"] = cookieOverride });
+        }
+        Assert.Equal(expectedCookie, configuration["DigitalBrain:Identity:CookieName"]);
+        Assert.Equal("IntoChat.v1", configuration["DigitalBrain:Identity:ProtectionApplicationName"]);
+        Assert.Equal(IntoChatConfiguration.ProtectionContainerName, configuration["DigitalBrain:Identity:ProtectionContainerName"]);
     }
 }

@@ -4,10 +4,12 @@ using System.Text;
 using System.Text.Json;
 using DigitalBrain.Contracts;
 using DigitalBrain.Identity;
-using DigitalBrain.Sdk.Identity;
+using DigitalBrain.Identity.Configuration;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -15,6 +17,21 @@ namespace DigitalBrain.Core.Tests.Unit.Identity;
 
 public sealed class IdentityHostingFacts
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void DeploymentCookieOverridesHostDefaultsRegardlessOfWhenIdentityIsRegistered(bool registerFirst)
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["DigitalBrain:Identity:CookieName"] = "host.session" });
+        if (registerFirst) { builder.Services.AddIdentity(); }
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { ["DigitalBrain:Identity:CookieName"] = "deployment.session" });
+        if (!registerFirst) { builder.Services.AddIdentity(); }
+        using var provider = builder.Services.BuildServiceProvider();
+        Assert.Equal("deployment.session", provider.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
+            .Get(CookieAuthenticationDefaults.AuthenticationScheme).Cookie.Name);
+    }
+
     [Fact]
     public void TheHostProtectionIdentityOverridesTheWebApplicationsDefault()
     {

@@ -1,4 +1,4 @@
-namespace DigitalBrain.Sdk.Identity;
+namespace DigitalBrain.Identity.Configuration;
 
 public sealed class IdentityHostOptions
 {

@@ -12,7 +12,7 @@ var referenceComposition = builder.Configuration.GetValue<bool>("DigitalBrain:Te
 if (referenceComposition)
 {
     builder.AddReferenceTelemetry();
-    builder.Services.Configure<DigitalBrain.Sdk.Identity.IdentityHostOptions>(options => options.CookieName = "digitalbrain.reference.session");
+    builder.Configuration["DigitalBrain:Identity:CookieName"] ??= "digitalbrain.reference.session";
 }
 foreach (var moduleTypeName in builder.Configuration.GetSection("DigitalBrain:Modules").Get<string[]>() ?? [])
 {

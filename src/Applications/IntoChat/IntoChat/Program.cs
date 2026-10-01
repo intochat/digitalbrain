@@ -11,7 +11,6 @@ using IntoChat.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddIntoChatOptions();
 builder.AddServiceDefaults();
 builder.AddDigitalBrainRuntime();
 builder.Services.Configure<AssistantOptions>(options =>
