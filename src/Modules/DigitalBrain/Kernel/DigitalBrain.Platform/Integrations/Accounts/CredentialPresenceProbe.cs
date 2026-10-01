@@ -1,3 +1,4 @@
+using DigitalBrain.Sdk.Integrations.Accounts;
 namespace DigitalBrain.Platform.Integrations.Accounts;
 
 internal sealed class CredentialPresenceProbe : IAccountProbe

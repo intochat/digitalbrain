@@ -1,3 +1,4 @@
+using DigitalBrain.Sdk.Integrations;
 using DigitalBrain.Contracts.Signals;
 using System.ComponentModel;
 using DigitalBrain.Contracts;
@@ -35,7 +36,7 @@ public sealed class ObservedRegistryFacts
             .StartAsync(TestContext.Current.CancellationToken);
         var types = await brain.Get<IRegistry>(RegistryModule.Key).Types();
 
-        Assert.DoesNotContain(types, type => type.Id == "integration.registration" || type.Contract == typeof(DigitalBrain.Platform.Integrations.IIntegrationRegistration).FullName);
+        Assert.DoesNotContain(types, type => type.Id == "integration.registration" || type.Contract == typeof(DigitalBrain.Sdk.Integrations.IIntegrationRegistration).FullName);
     }
 
     [Fact]
