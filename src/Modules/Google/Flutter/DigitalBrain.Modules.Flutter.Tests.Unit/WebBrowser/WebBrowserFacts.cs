@@ -62,6 +62,105 @@ public sealed class WebBrowserFacts
     }
 
     [Fact]
+    public async Task Failed_detachment_does_not_announce_disconnection_and_can_be_retried()
+    {
+        var provider = new Provider();
+        await using var brain = await Start(provider);
+        var browser = brain.Get<IWebBrowser>("research/browser");
+        await browser.Configure("research/driver", "research/status");
+        var connector = brain.Get<IWebBrowserConnector>("research/browser");
+        var handler = brain.Get<IPrimitiveTestHandler>("handler");
+        await brain.Get<IUiBinding>("research/browser").Bind(handler);
+        await connector.Connect(12345, Session);
+        var page = Assert.Single(provider.Pages);
+        page.FailDispose = true;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => connector.Disconnect(Session));
+
+        Assert.Equal("Ready", (await brain.Get<IText>("research/status").Read()).Markdown);
+        Assert.IsType<BrowserConnected>(Assert.Single(await handler.Events()));
+        page.FailDispose = false;
+        await connector.Disconnect(Session);
+        Assert.Equal("Browser disconnected", (await brain.Get<IText>("research/status").Read()).Markdown);
+        Assert.Single((await handler.Events()).OfType<BrowserDisconnected>());
+    }
+
+    [Fact]
+    public async Task A_pending_detach_cannot_announce_disconnection_or_overwrite_a_replacement_session()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var provider = new Provider();
+        await using var brain = await Start(provider);
+        var browser = brain.Get<IWebBrowser>("research/browser");
+        await browser.Configure("research/driver", "research/status");
+        var connector = brain.Get<IWebBrowserConnector>("research/browser");
+        var handler = brain.Get<IPrimitiveTestHandler>("handler");
+        await brain.Get<IUiBinding>("research/browser").Bind(handler);
+        await connector.Connect(12345, Session);
+        var page = Assert.Single(provider.Pages);
+        page.PendingDispose = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var disconnect = connector.Disconnect(Session);
+        await page.DisposeStarted.Task.WaitAsync(TimeSpan.FromSeconds(10), ct);
+        try
+        {
+            Assert.Equal("Ready", (await brain.Get<IText>("research/status").Read()).Markdown);
+            Assert.IsType<BrowserConnected>(Assert.Single(await handler.Events()));
+            var repeatedDisconnect = connector.Disconnect(Session);
+            await browser.Read();
+            Assert.False(repeatedDisconnect.IsCompleted);
+            var replacement = connector.Connect(12345, new string('b', 32));
+            // Read is a scheduling barrier on the reentrant browser grain.
+            await browser.Read();
+            page.PendingDispose.SetResult();
+            await Task.WhenAll(disconnect, repeatedDisconnect, replacement).WaitAsync(TimeSpan.FromSeconds(10), ct);
+            Assert.Equal("Ready", (await brain.Get<IText>("research/status").Read()).Markdown);
+            Assert.DoesNotContain(await handler.Events(), signal => signal is BrowserDisconnected);
+            Assert.True((await brain.Get<IPlaywright>("research/driver").Read()).Ready);
+        }
+        finally { page.PendingDispose.TrySetResult(); }
+    }
+
+    [Fact]
+    public async Task Deactivation_detaches_without_changing_status_or_dispatching_ui_events()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var provider = new Provider();
+        await using var brain = await Start(provider);
+        var browser = brain.Get<IWebBrowser>("research/browser");
+        await browser.Configure("research/driver", "research/status");
+        var handler = brain.Get<IPrimitiveTestHandler>("handler");
+        await brain.Get<IUiBinding>("research/browser").Bind(handler);
+        await brain.Get<IWebBrowserConnector>("research/browser").Connect(12345, Session);
+        await brain.Get<IText>("research/status").Set("Researching…");
+
+        await brain.DeactivateAsync(browser, ct);
+
+        Assert.True(Assert.Single(provider.Pages).Disposed);
+        Assert.Equal("Researching…", (await brain.Get<IText>("research/status").Read()).Markdown);
+        Assert.IsType<BrowserConnected>(Assert.Single(await handler.Events()));
+    }
+
+    [Fact]
+    public async Task Failed_cleanup_during_deactivation_does_not_dispatch_a_disconnect()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var provider = new Provider();
+        await using var brain = await Start(provider);
+        var browser = brain.Get<IWebBrowser>("research/browser");
+        await browser.Configure("research/driver", "research/status");
+        var handler = brain.Get<IPrimitiveTestHandler>("handler");
+        await brain.Get<IUiBinding>("research/browser").Bind(handler);
+        await brain.Get<IWebBrowserConnector>("research/browser").Connect(12345, Session);
+        Assert.Single(provider.Pages).FailDispose = true;
+
+        await brain.DeactivateAsync(browser, ct);
+
+        Assert.Equal("Ready", (await brain.Get<IText>("research/status").Read()).Markdown);
+        Assert.IsType<BrowserConnected>(Assert.Single(await handler.Events()));
+        await browser.Read();
+    }
+
+    [Fact]
     public async Task Recomposition_and_rebinding_do_not_replace_a_live_session_or_reset_status()
     {
         var provider = new Provider();
@@ -146,7 +245,7 @@ public sealed class WebBrowserFacts
         var disconnect = connector.Disconnect(Session);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(10));
-        while ((await brain.Get<IText>("research/status").Read()).Markdown != "Browser disconnected")
+        while ((await brain.Get<IPlaywright>("research/driver").Read()).SessionId is not null)
         { await Task.Delay(20, timeout.Token); }
         var page = new Page();
         provider.Pending.SetResult(page);
@@ -214,6 +313,9 @@ public sealed class WebBrowserFacts
     }
     private sealed class Page : IBrowserPageSession
     {
+        public bool FailDispose { get; set; }
+        public TaskCompletionSource? PendingDispose { get; set; }
+        public TaskCompletionSource DisposeStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool Disposed { get; private set; }
         public bool Connected => !Disposed;
         public string? Url => "https://example.com";
@@ -222,6 +324,12 @@ public sealed class WebBrowserFacts
         public Task<BrowserObservation> NavigateAsync(string url, CancellationToken ct) => SnapshotAsync(ct);
         public Task<BrowserObservation> ClickAsync(string selector, CancellationToken ct) => SnapshotAsync(ct);
         public Task<BrowserObservation> FillAsync(string selector, string value, CancellationToken ct) => SnapshotAsync(ct);
-        public ValueTask DisposeAsync() { Disposed = true; return ValueTask.CompletedTask; }
+        public async ValueTask DisposeAsync()
+        {
+            DisposeStarted.TrySetResult();
+            if (FailDispose) { throw new InvalidOperationException("Detachment failed."); }
+            if (PendingDispose is { } pending) { await pending.Task; }
+            Disposed = true;
+        }
     }
 }

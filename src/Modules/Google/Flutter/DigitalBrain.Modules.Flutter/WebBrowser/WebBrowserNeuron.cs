@@ -27,6 +27,7 @@ internal sealed class WebBrowserNeuron(
     private bool _ready;
     private long _generation;
     private Task? _connecting;
+    private Task? _disconnecting;
     private string DriverKey => binding.State.PlaywrightKey ?? this.GetPrimaryKeyString();
     private IPlaywright Driver => GrainFactory.GetGrain<IPlaywright>(DriverKey);
 
@@ -55,6 +56,7 @@ internal sealed class WebBrowserNeuron(
     private async Task Attach(int port, string sessionId)
     {
         var generation = ++_generation;
+        _disconnecting = null;
         var repeated = _session == sessionId && _port == port;
         _session = sessionId;
         _port = port;
@@ -92,18 +94,24 @@ internal sealed class WebBrowserNeuron(
     {
         ValidateSession(sessionId);
         if (_session != sessionId) { return; }
+        var disconnecting = _disconnecting ??= Detach(sessionId);
+        try { await disconnecting; }
+        finally { if (_disconnecting == disconnecting) { _disconnecting = null; } }
+    }
+
+    private async Task Detach(string sessionId)
+    {
         var generation = ++_generation;
-        var driver = Driver;
+        _connecting = null;
+        await Driver.Detach(sessionId);
+        if (generation != _generation) { return; }
         _session = null;
         _port = 0;
         _ready = false;
-        _connecting = null;
         DelayDeactivation(TimeSpan.Zero);
-        var detach = driver.Detach(sessionId);
         await Status("Browser disconnected");
         if (generation == _generation)
         { await Announce(new BrowserDisconnected(this.GetPrimaryKeyString(), sessionId)); }
-        await detach;
     }
 
     private Task Status(string value) => binding.State.StatusTextName is { } name
@@ -117,7 +125,14 @@ internal sealed class WebBrowserNeuron(
 
     public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
-        if (_session is { } session) { await Disconnect(session); }
+        if (_session is { } session)
+        {
+            try { await Driver.Detach(session, cancellationToken).WaitAsync(cancellationToken); }
+            catch (Exception)
+            {
+                // Cleanup is best effort: the driver or silo may already be stopping.
+            }
+        }
         await base.OnDeactivateAsync(reason, cancellationToken);
     }
 
