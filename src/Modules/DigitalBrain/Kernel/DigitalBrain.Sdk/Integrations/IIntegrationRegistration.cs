@@ -3,6 +3,7 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using Orleans.Concurrency;
 
+// SDK contracts retain their original namespace and wire identities for compatibility.
 namespace DigitalBrain.Platform.Integrations;
 
 public enum RegistrationStatus

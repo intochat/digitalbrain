@@ -15,6 +15,5 @@
     <ProjectReference Include="../DigitalBrain.Modules.Microsoft.GitHub.Contracts/DigitalBrain.Modules.Microsoft.GitHub.Contracts.csproj" />
     <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
-    <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
   </ItemGroup>
 </Project>

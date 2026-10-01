@@ -361,7 +361,7 @@ public sealed class RegistrationFacts
     [Fact]
     public void EveryPublicNeuronContractInThePlatformAssemblyIsPlatformOnlyByAssemblyIdentity()
     {
-        var platform = typeof(IIntegrationRegistration).Assembly;
+        var platform = typeof(IntegrationDiscovery).Assembly;
 
         Assert.True(PlatformAssemblyAttribute.IsPlatform(platform));
         Assert.False(PlatformAssemblyAttribute.IsPlatform(typeof(IntegrationDefinition).Assembly));

@@ -1,3 +1,4 @@
+// SDK contracts retain their original namespace and wire identities for compatibility.
 namespace DigitalBrain.Platform.Integrations.Accounts;
 
 public enum AccountProbeOutcome
