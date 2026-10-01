@@ -15,6 +15,7 @@ internal sealed partial class DotNetScriptLauncher : IScriptLauncher
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
+            CreateNoWindow = true,
         };
         foreach (var argument in (string[])["run", "--verbosity", "quiet", "app.cs", "-p:ArtifactsPath=" + Path.Combine(workDirectory, "artifacts")])
         {
