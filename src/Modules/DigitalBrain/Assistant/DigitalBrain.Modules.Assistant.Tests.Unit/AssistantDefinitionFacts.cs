@@ -9,7 +9,8 @@ public sealed class AssistantDefinitionFacts
     {
         var definition = AssistantDefinition.For([], [], options: new AssistantOptions
         {
-            DisplayName = "Example assistant", Instructions = "Look for results in the installed research package.",
+            DisplayName = "Example assistant",
+            Instructions = "Look for results in the installed research package.",
         });
         Assert.Equal("Example assistant", definition.DisplayName);
         Assert.Contains("Look for results in the installed research package.", definition.Instructions);
