@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using DigitalBrain.Contracts;
 
 namespace DigitalBrain.Platform.Secrets;
 
@@ -8,7 +9,7 @@ public static class MasterKeyServiceCollectionExtensions
     {
         services.AddOptions<MasterKeyOptions>().BindConfiguration(MasterKeyOptions.SectionName)
             .Validate(options => !string.IsNullOrWhiteSpace(options.MasterKey),
-                MasterKeyWrapper.MissingMasterKeyMessage)
+                $"Configure {DigitalBrainNames.MasterKeyConfigurationKey} via the {DigitalBrainNames.MasterKeyEnvironmentVariable} environment secret before starting the host.")
             .ValidateOnStart();
         services.AddSingleton<IKeyWrapper, MasterKeyWrapper>();
         return services;

@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
-using DigitalBrain.Contracts;
 
 namespace DigitalBrain.Platform.Secrets;
 
@@ -10,17 +9,12 @@ public sealed class MasterKeyWrapper : IKeyWrapper
     private const string Prefix = "mk3:";
     private const int NonceSize = 12;
     private const int TagSize = 16;
-    internal static readonly string MissingMasterKeyMessage =
-        $"Configure {DigitalBrainNames.MasterKeyConfigurationKey} via the {DigitalBrainNames.MasterKeyEnvironmentVariable} environment secret before starting the host.";
     private readonly byte[] _key;
 
     public MasterKeyWrapper(IOptions<MasterKeyOptions> options)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(options.Value.MasterKey);
         var masterKey = options.Value.MasterKey;
-        if (string.IsNullOrWhiteSpace(masterKey))
-        {
-            throw new InvalidOperationException(MissingMasterKeyMessage);
-        }
         _key = HKDF.DeriveKey(HashAlgorithmName.SHA256, Encoding.UTF8.GetBytes(masterKey), 32,
             info: "DigitalBrain.OwnerKeys.v3"u8.ToArray());
     }

@@ -20,7 +20,6 @@ internal sealed class SecretRecord
     [Id(3)] public string Label { get; set; } = "";
     [Id(4)] public bool IsSet { get; set; }
     [Id(5)] public string SealedValue { get; set; } = "";
-    // Legacy two-key records only; new credentials never write this field.
-    [Id(6)] public string SealedCredentialKey { get; set; } = "";
+    // [Id(6)] retired (SealedCredentialKey); never reuse
     [Id(7)] public string SealedSecret { get; set; } = "";
 }

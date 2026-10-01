@@ -93,6 +93,7 @@ public sealed class DigitalBrainBuilder
         IResourceBuilder<AzureBlobStorageResource> grainState)
     {
         ArgumentNullException.ThrowIfNull(orleans);
+        ArgumentNullException.ThrowIfNull(storage);
         ArgumentNullException.ThrowIfNull(grainState);
         Orleans = orleans;
         Storage = storage;

@@ -36,11 +36,6 @@ internal sealed class SecretsStore(IKeyWrapper keys)
             throw new InvalidOperationException("The secret is not present.");
         }
 
-        if (!string.IsNullOrEmpty(record.SealedCredentialKey))
-        {
-            throw new InvalidOperationException("This credential predates the master-key store and must be re-entered by its owner.");
-        }
-
         var ownerKey = keys.Unwrap(state.WrappedOwnerKey);
         return SecretCipher.Open(ownerKey, record.SealedSecret);
     }

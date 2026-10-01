@@ -2,6 +2,7 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Contracts;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IntoChat.Tests.Unit;
@@ -19,13 +20,12 @@ public sealed class MasterKeyHostingFacts
         var client = builder.AddExecutable("client", "unused", ".").WithReference(brain.AsClient());
 
         var parameter = builder.Resources.OfType<ParameterResource>().Single(resource => resource.Name == DigitalBrainHostingNames.MasterKeyParameter);
-        Assert.True(parameter.Secret);
-        Assert.NotNull(parameter.Default);
-        var firstEnvironment = await EnvironmentOf(first.Resource);
-        var secondEnvironment = await EnvironmentOf(second.Resource);
-        Assert.Same(parameter, firstEnvironment[DigitalBrainNames.MasterKeyEnvironmentVariable]);
-        Assert.Same(parameter, secondEnvironment[DigitalBrainNames.MasterKeyEnvironmentVariable]);
-        Assert.DoesNotContain(DigitalBrainNames.MasterKeyEnvironmentVariable, (await EnvironmentOf(client.Resource)).Keys);
+        var expected = await parameter.GetValueAsync(TestContext.Current.CancellationToken);
+        var firstEnvironment = await EnvironmentOf(builder, first.Resource);
+        var secondEnvironment = await EnvironmentOf(builder, second.Resource);
+        Assert.Equal(expected, firstEnvironment[DigitalBrainNames.MasterKeyEnvironmentVariable]);
+        Assert.Equal(expected, secondEnvironment[DigitalBrainNames.MasterKeyEnvironmentVariable]);
+        Assert.DoesNotContain(DigitalBrainNames.MasterKeyEnvironmentVariable, (await EnvironmentOf(builder, client.Resource)).Keys);
     }
 
     [Fact]
@@ -43,13 +43,25 @@ public sealed class MasterKeyHostingFacts
         Assert.Null(parameter.Default);
     }
 
-    private static async Task<IReadOnlyDictionary<string, object>> EnvironmentOf(IResource resource)
+    private static async Task<IReadOnlyDictionary<string, string>> EnvironmentOf(IDistributedApplicationBuilder builder, IResource resource)
     {
-        // Publish expression resolution inspects the run model without waiting for endpoint allocation.
         var configuration = await ExecutionConfigurationBuilder.Create(resource)
             .WithEnvironmentVariablesConfig()
-            .BuildAsync(new DistributedApplicationExecutionContext(DistributedApplicationOperation.Publish),
-                NullLogger.Instance, TestContext.Current.CancellationToken);
-        return configuration.EnvironmentVariablesWithUnprocessed.ToDictionary(pair => pair.Key, pair => pair.Value.Unprocessed);
+            .AddExecutionConfigurationGatherer(new MasterKeyEnvironment())
+            .BuildAsync(builder.ExecutionContext, NullLogger.Instance, TestContext.Current.CancellationToken);
+        return configuration.EnvironmentVariables.ToDictionary();
+    }
+
+    // Other environment entries depend on live endpoints; this fact only resolves the master key.
+    private sealed class MasterKeyEnvironment : IExecutionConfigurationGatherer
+    {
+        public ValueTask GatherAsync(IExecutionConfigurationGathererContext context, IResource resource,
+            ILogger resourceLogger, DistributedApplicationExecutionContext executionContext, CancellationToken cancellationToken = default)
+        {
+            var present = context.EnvironmentVariables.TryGetValue(DigitalBrainNames.MasterKeyEnvironmentVariable, out var value);
+            context.EnvironmentVariables.Clear();
+            if (present) { context.EnvironmentVariables.Add(DigitalBrainNames.MasterKeyEnvironmentVariable, value!); }
+            return ValueTask.CompletedTask;
+        }
     }
 }

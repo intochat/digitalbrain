@@ -58,26 +58,6 @@ public sealed class SecretsFacts
         => new(new MasterKeyWrapper(Options.Create(new MasterKeyOptions { MasterKey = masterKey })));
 
     [Fact]
-    public void A_legacy_two_key_credential_requires_the_owner_to_re_enter_it()
-    {
-        var state = new SecretsState { Owner = Owner, WrappedOwnerKey = "dp2:old-owner-key" };
-        var record = new SecretRecord
-        {
-            IsSecret = true,
-            IsSet = true,
-            SealedCredentialKey = "legacy-sealed-credential-key",
-            SealedSecret = "legacy-sealed-secret",
-        };
-        state.Fields["api.key"] = record;
-        var reference = DigitalBrain.Contracts.Types.SecretRef.For(Owner, "api.key", "API key", true);
-        var error = Assert.Throws<InvalidOperationException>(() => MasterKeyStore("first master key").Resolve(state, reference));
-        Assert.Contains("predates the master-key store", error.Message, StringComparison.Ordinal);
-        Assert.Contains("re-enter", error.Message, StringComparison.Ordinal);
-        Assert.Equal("legacy-sealed-credential-key", record.SealedCredentialKey);
-        Assert.Equal("legacy-sealed-secret", record.SealedSecret);
-    }
-
-    [Fact]
     public async Task UserCannotResolveThroughGrain()
     {
         var ct = TestContext.Current.CancellationToken;

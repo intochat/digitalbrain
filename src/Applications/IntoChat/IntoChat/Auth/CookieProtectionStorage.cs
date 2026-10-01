@@ -20,15 +20,10 @@ public static class CookieProtectionStorage
     }
 
     // DeploymentKit substitutes storage endpoints but does not execute Aspire's container provisioning.
-    private sealed class ContainerStartup(BlobContainerClient container) : IHostedLifecycleService
+    private sealed class ContainerStartup(BlobContainerClient container) : IHostedService
     {
-        private Task? _creation;
-        public Task StartingAsync(CancellationToken cancellationToken)
-            => _creation ??= container.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
-        public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task StartedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task StoppingAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task StartAsync(CancellationToken cancellationToken)
+            => container.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
         public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task StoppedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }
