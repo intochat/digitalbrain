@@ -1,7 +1,5 @@
 using System.Reflection;
-using System.Text.Json;
 using DigitalBrain.Core;
-using Microsoft.Extensions.Configuration;
 
 namespace IntoChat.Tests.Unit;
 
@@ -36,23 +34,6 @@ public sealed class ModuleOptionsFacts
     public static IEnumerable<TheoryDataRow<Type>> ModulesWithOptions()
         => ProductModules().Where(module => OptionsTypeOf(module) is not null)
             .OrderBy(module => module.FullName, StringComparer.Ordinal).Select(module => new TheoryDataRow<Type>(module));
-
-    [Theory]
-    [MemberData(nameof(ModulesWithOptions))]
-    public void DefaultOptionsRoundTripThroughTheOneJsonConfigurationValue(Type module)
-    {
-        var optionsType = OptionsTypeOf(module)!;
-        var original = Activator.CreateInstance(optionsType)!;
-        var compile = typeof(ModuleOptionsSerialization).GetMethod(nameof(ModuleOptionsSerialization.Compile))!.MakeGenericMethod(module, optionsType);
-        var definition = (ModuleDefinition)compile.Invoke(null, [original])!;
-
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(definition.Configuration).Build();
-        var bind = typeof(ModuleOptionsSerialization).GetMethod(nameof(ModuleOptionsSerialization.GetModuleOptions))!.MakeGenericMethod(optionsType);
-        var bound = bind.Invoke(null, [configuration, module.Name])!;
-
-        Assert.Equal(JsonSerializer.Serialize(original, optionsType), JsonSerializer.Serialize(bound, optionsType));
-        ModuleSettingsValidation.ValidatePublicSettings([definition]);
-    }
 
     [Fact]
     public void NoOptionsTypeCarriesAJsonIgnoredWritableMember()

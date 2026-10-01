@@ -52,9 +52,17 @@ public sealed class PathTruthFacts
     public void ContainerModuleListsAgreeAndResolve()
     {
         const string prefix = "DigitalBrain__Modules__";
-        var docker = Regex.Matches(Read("src/Applications/IntoChat/IntoChat/Dockerfile"),
-                "DigitalBrain__Modules__(\\d+)=\"([^\"]+)\"")
-            .Select(match => (Index: int.Parse(match.Groups[1].Value), Module: match.Groups[2].Value)).ToArray();
+        var docker = Read("src/Applications/IntoChat/IntoChat/Dockerfile").Split('\n')
+            .Where(line => line.Contains(prefix, StringComparison.Ordinal))
+            .Select(line =>
+            {
+                var assignment = line.Trim().TrimEnd('\\').Trim();
+                if (assignment.StartsWith("ENV ", StringComparison.Ordinal)) { assignment = assignment[4..].Trim(); }
+                var match = Regex.Match(assignment, "^DigitalBrain__Modules__(\\d+)=\"([^\"]*)\"$");
+                Assert.True(match.Success, $"Malformed module assignment: {line}");
+                Assert.NotEmpty(match.Groups[2].Value);
+                return (Index: int.Parse(match.Groups[1].Value), Module: match.Groups[2].Value);
+            }).ToArray();
         var profile = XDocument.Load(PathInRepo("src/Applications/IntoChat/IntoChat/Properties/PublishProfiles/Container.pubxml"))
             .Descendants("ContainerEnvironmentVariable")
             .Where(entry => entry.Attribute("Include")!.Value.StartsWith(prefix, StringComparison.Ordinal))
