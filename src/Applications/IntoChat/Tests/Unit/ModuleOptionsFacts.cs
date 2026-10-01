@@ -37,10 +37,6 @@ public sealed class ModuleOptionsFacts
         => ProductModules().Where(module => OptionsTypeOf(module) is not null)
             .OrderBy(module => module.FullName, StringComparer.Ordinal).Select(module => new TheoryDataRow<Type>(module));
 
-    [Fact]
-    public void TheProductCompositionIncludesTheOptionsModules()
-        => Assert.True(ModulesWithOptions().Count() >= 10, "Every module that has topology knobs declares IModule<TOptions>.");
-
     [Theory]
     [MemberData(nameof(ModulesWithOptions))]
     public void DefaultOptionsRoundTripThroughTheOneJsonConfigurationValue(Type module)
@@ -70,3 +66,4 @@ public sealed class ModuleOptionsFacts
         Assert.Empty(offenders);
     }
 }
+

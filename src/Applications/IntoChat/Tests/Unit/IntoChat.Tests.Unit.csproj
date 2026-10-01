@@ -7,7 +7,7 @@
     <ProjectReference Include="../../IntoChat/IntoChat.csproj" />
     <ProjectReference Include="../../../../Modules/DigitalBrain/Kernel/DigitalBrain.Kernel.Aspire.Hosting/DigitalBrain.Kernel.Aspire.Hosting.csproj" />
     <ProjectReference Include="../../../../Modules/DigitalBrain/Compute/DigitalBrain.Modules.Compute/DigitalBrain.Modules.Compute.csproj" />
-    <Compile Include="../E2E/Diagnostics/OtlpTraceParser.cs" Link="Diagnostics/OtlpTraceParser.cs" />
     <ProjectReference Include="../../../../Modules/DigitalBrain/Mcp/DigitalBrain.Mcp.csproj" />
   </ItemGroup>
 </Project>
+
