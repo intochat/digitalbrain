@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <IsPackable>true</IsPackable>
     <Description>Shared PostgreSQL query and live-table engine for database connectors.</Description>
     <RootNamespace>DigitalBrain.Supabase</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
