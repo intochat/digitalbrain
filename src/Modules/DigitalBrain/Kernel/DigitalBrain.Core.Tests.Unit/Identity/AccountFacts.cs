@@ -2,7 +2,7 @@ using DigitalBrain.Identity;
 using DigitalBrain.Testing.Unit;
 using Xunit;
 
-namespace DigitalBrain.Modules.Identity.Tests.Unit;
+namespace DigitalBrain.Core.Tests.Unit.Identity;
 
 public sealed class AccountFacts
 {

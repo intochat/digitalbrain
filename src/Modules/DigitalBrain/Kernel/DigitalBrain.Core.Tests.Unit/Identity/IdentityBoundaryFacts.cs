@@ -1,6 +1,7 @@
 using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Identity;
 
-namespace DigitalBrain.Identity.Tests.Unit;
+namespace DigitalBrain.Core.Tests.Unit.Identity;
 
 public sealed class IdentityBoundaryFacts
 {

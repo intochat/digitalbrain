@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using DigitalBrain.Identity;
 
-namespace DigitalBrain.Modules.Identity.Tests.E2E;
+namespace DigitalBrain.Core.Tests.E2E.Identity;
 
 // The grants list and revoke routes at the HTTP edge are scoped to the caller's workspace.
 // Enforcement of a grant on a call is covered by Identity's GrantFacts.

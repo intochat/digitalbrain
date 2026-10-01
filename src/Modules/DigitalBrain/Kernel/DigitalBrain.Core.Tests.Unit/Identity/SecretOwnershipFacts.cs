@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Modules.Identity.Tests.Unit;
+namespace DigitalBrain.Core.Tests.Unit.Identity;
 
 public sealed class SecretOwnershipFacts
 {

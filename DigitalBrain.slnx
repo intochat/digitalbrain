@@ -110,10 +110,6 @@
     <Project Path="src/Modules/Files/DigitalBrain.Modules.Files.Contracts/DigitalBrain.Modules.Files.Contracts.csproj" />
     <Project Path="src/Modules/Files/DigitalBrain.Modules.Files/DigitalBrain.Modules.Files.csproj" />
   </Folder>
-  <Folder Name="/Modules/DigitalBrain/Identity/">
-    <Project Path="src/Modules/DigitalBrain/Identity/DigitalBrain.Modules.Identity.Tests.E2E/DigitalBrain.Modules.Identity.Tests.E2E.csproj" />
-    <Project Path="src/Modules/DigitalBrain/Identity/DigitalBrain.Modules.Identity.Tests.Unit/DigitalBrain.Modules.Identity.Tests.Unit.csproj" />
-  </Folder>
   <Folder Name="/Modules/Postgres/">
     <Project Path="src/Modules/Postgres/DigitalBrain.Modules.Postgres.Aspire.Hosting/DigitalBrain.Modules.Postgres.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/Postgres/DigitalBrain.Modules.Postgres.Contracts/DigitalBrain.Modules.Postgres.Contracts.csproj" />

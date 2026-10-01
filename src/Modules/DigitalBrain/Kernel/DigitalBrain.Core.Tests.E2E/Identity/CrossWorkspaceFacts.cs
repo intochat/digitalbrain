@@ -6,7 +6,7 @@ using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Slider;
 using DigitalBrain.Identity;
 
-namespace DigitalBrain.Modules.Identity.Tests.E2E;
+namespace DigitalBrain.Core.Tests.E2E.Identity;
 
 public sealed class CrossWorkspaceFacts(ReferenceBrainFixture host)
 {

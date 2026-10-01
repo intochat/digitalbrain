@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Xunit;
 
-namespace DigitalBrain.Modules.Identity.Tests.Unit;
+namespace DigitalBrain.Core.Tests.Unit.Identity;
 
 public sealed class GrantFacts
 {

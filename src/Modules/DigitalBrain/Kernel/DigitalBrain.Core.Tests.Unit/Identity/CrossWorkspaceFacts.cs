@@ -4,7 +4,7 @@ using DigitalBrain.Identity;
 using DigitalBrain.Identity.Grants;
 using Xunit;
 
-namespace DigitalBrain.Modules.Identity.Tests.Unit;
+namespace DigitalBrain.Core.Tests.Unit.Identity;
 
 // A caller that claims a workspace it is not a member of is denied by the single call filter.
 // This exercises the same pipeline the neurons run, with the grant stage in place.

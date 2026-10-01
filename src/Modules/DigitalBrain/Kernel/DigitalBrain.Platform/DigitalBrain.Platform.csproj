@@ -6,7 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Core.Tests.Unit" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Identity.Tests.Unit" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
     <ProjectReference Include="../DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
