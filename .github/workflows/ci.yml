@@ -65,6 +65,23 @@ jobs:
         working-directory: src/Modules/Google/Flutter/app
         run: flutter pub get --enforce-lockfile
 
+      # The shared E2E host compiles the shell at boot; warming the release web build here, with
+      # its incremental caches kept across runs, turns that in-test compile into minutes.
+      - name: Cache the shell web build
+        uses: actions/cache@v6
+        with:
+          path: |
+            src/Modules/Google/Flutter/app/**/.dart_tool
+            src/Modules/Google/Flutter/app/shell/build
+          key: ${{ runner.os }}-fluttershell-${{ hashFiles('src/Modules/Google/Flutter/app/pubspec.lock') }}-${{ hashFiles('src/Modules/Google/Flutter/app/**/lib/**') }}
+          restore-keys: |
+            ${{ runner.os }}-fluttershell-${{ hashFiles('src/Modules/Google/Flutter/app/pubspec.lock') }}-
+            ${{ runner.os }}-fluttershell-
+
+      - name: Warm the shell web build
+        working-directory: src/Modules/Google/Flutter/app/shell
+        run: flutter build web --release
+
       - name: Install Playwright browser and system dependencies
         run: pwsh src/Applications/IntoChat/Tests/E2E/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
 
