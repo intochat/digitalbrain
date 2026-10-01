@@ -95,6 +95,36 @@ public sealed class PostgresAspireHostingFacts
             DigitalBrainHostingExtensions.FindModuleHosting(typeof(SupabaseLookalikeModule), typeof(PostgresModuleHosting).Assembly));
     }
 
+    [Fact]
+    public async Task HostedPostgresInRunModePassesTheAdminConnectionToTheBrain()
+    {
+        var builder = CreateBuilder();
+        var brain = builder.AddDigitalBrain("brain", persistentStorage: false);
+        brain.AddModules([Definition(enabled: true, persistent: false)]);
+        var consumer = builder.AddExecutable("consumer", "unused", ".").WithReference(brain);
+        var environment = await EnvironmentOf(builder, consumer.Resource);
+        Assert.Contains("DigitalBrain__Capacity__Postgres__AdminConnection", environment.Keys);
+    }
+
+    [Fact]
+    public async Task HostedPostgresInPublishModeEmitsTheSecretConnectionParameterInstead()
+    {
+        var builder = CreatePublishBuilder();
+        builder.Configuration["Parameters:postgres-connection"] = "Host=azure;Database=digitalbrain;Username=app;Password=test-only";
+        var brain = builder.AddDigitalBrain("brain", persistentStorage: false);
+        brain.AddModules([Definition(enabled: true, persistent: false)]);
+        var consumer = builder.AddExecutable("consumer", "unused", ".").WithReference(brain);
+
+        Assert.Empty(builder.Resources.OfType<PostgresServerResource>());
+        var environment = await EnvironmentOf(builder, consumer.Resource);
+        var connection = Assert.IsType<ParameterResource>(environment["ConnectionStrings__reporting"]);
+        Assert.True(connection.Secret);
+        Assert.DoesNotContain("DigitalBrain__Capacity__Postgres__AdminConnection", environment.Keys);
+    }
+
+    private static IDistributedApplicationBuilder CreatePublishBuilder()
+        => DistributedApplication.CreateBuilder(new DistributedApplicationOptions { Args = ["--publisher", "manifest"], DisableDashboard = true });
+
     private sealed class SupabaseLookalikeModule;
 
     private static ModuleDefinition Definition(bool enabled, bool persistent)
