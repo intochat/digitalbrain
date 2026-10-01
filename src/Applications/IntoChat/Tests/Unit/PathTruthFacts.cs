@@ -65,7 +65,6 @@ public sealed class PathTruthFacts
         [
             ".github/workflows/deploy.yml",
             "src/Applications/IntoChat/IntoChat/Dockerfile",
-            "src/Applications/IntoChat/IntoChat/docker-entrypoint.sh",
             "src/Applications/IntoChat/IntoChat/Properties/PublishProfiles/Container.pubxml",
         ];
         foreach (var file in files)

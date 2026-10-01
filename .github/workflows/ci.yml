@@ -90,6 +90,11 @@ jobs:
       - name: Prime the C# sandbox image build cache
         run: docker build src/Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Sandbox
 
+      # Scripts restore inside the sandbox against its named NuGet volume; seeding it from the
+      # host's packages (already restored for the solution) removes every in-sandbox download.
+      - name: Seed the sandbox NuGet volume
+        run: docker run --rm -v digitalbrain-csharp-nuget:/root/.nuget/packages -v $HOME/.nuget/packages:/seed:ro alpine sh -c "cp -a /seed/. /root/.nuget/packages/"
+
       # One module at a time: the shared E2E host compiles the web shell and the sandbox
       # E2E builds containers; running them beside other suites starves both on a small runner.
       - name: Test

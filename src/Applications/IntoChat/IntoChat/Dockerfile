@@ -39,10 +39,10 @@ FROM mcr.microsoft.com/dotnet/aspnet:11.0.0-rc.1 AS final
 WORKDIR /app
 
 COPY --from=build /out/silo /app/silo
-COPY --chmod=755 src/Applications/IntoChat/IntoChat/docker-entrypoint.sh /app/docker-entrypoint.sh
 
 # Product module set matching the product AppHost profile (no developer modules).
 ENV ASPNETCORE_ENVIRONMENT=Production \
+    ASPNETCORE_URLS=http://0.0.0.0:8080 \
     DOTNET_EnableDiagnostics=0 \
     IntoChat__Hosted__Enabled=true \
     DigitalBrain__Standalone=true \
@@ -67,4 +67,4 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
 EXPOSE 8080
 
 USER $APP_UID
-ENTRYPOINT ["/app/docker-entrypoint.sh"]
+ENTRYPOINT ["dotnet", "/app/silo/IntoChat.dll"]
