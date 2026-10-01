@@ -1,5 +1,6 @@
 using System.Xml.Linq;
 using System.Text.RegularExpressions;
+using System.Text.Json;
 
 namespace IntoChat.Tests.Unit;
 
@@ -46,6 +47,14 @@ public sealed class PathTruthFacts
             }
         }
         Assert.Empty(broken);
+    }
+
+    [Fact]
+    public void TheBrowserModuleSelectedByTheAppHostShipsWithTheRuntime()
+    {
+        using var dependencies = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "IntoChat.deps.json")));
+        Assert.Contains(dependencies.RootElement.GetProperty("libraries").EnumerateObject(),
+            library => library.Name.StartsWith("DigitalBrain.Modules.Microsoft.Playwright/", StringComparison.Ordinal));
     }
 
     [Fact]
