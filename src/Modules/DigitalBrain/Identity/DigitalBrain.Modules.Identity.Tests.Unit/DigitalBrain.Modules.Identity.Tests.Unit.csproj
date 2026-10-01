@@ -4,7 +4,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
-    <ProjectReference Include="../DigitalBrain.Modules.Identity/DigitalBrain.Modules.Identity.csproj" />
     <ProjectReference Include="../../Kernel/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
   </ItemGroup>
 </Project>

@@ -20,8 +20,9 @@ public sealed class SecretOwnershipFacts
         await using var brain = await UnitTest.Create().StartAsync(ct);
         var builder = WebApplication.CreateBuilder();
         builder.Services.AddSingleton(brain.Grains);
+        builder.Services.AddSingleton<DigitalBrain.Contracts.IDigitalBrain>(brain);
         await using var app = builder.Build();
-        new SecretsModule().Configure(app);
+        DigitalBrain.Platform.PlatformHosting.MapDigitalBrainPlatform(app);
         var endpoint = ((IEndpointRouteBuilder)app).DataSources.SelectMany(source => source.Endpoints)
             .OfType<RouteEndpoint>().Single(route => route.RoutePattern.RawText == "/secrets/{owner}");
         CallerContextStamper.Stamp(new CallerContext

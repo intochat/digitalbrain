@@ -6,8 +6,7 @@ namespace DigitalBrain.Platform.Capacity;
 
 public static class CapacityServiceCollectionExtensions
 {
-    // Idempotent: any module needing capacity calls this; the ring-law migration will move the
-    // call into the kernel so the facet stands up unconditionally.
+    // The brain registers this facet once, independently of module composition.
     public static IServiceCollection AddCapacity(this IServiceCollection services)
     {
         services.TryAddSingleton<ICapacity, CapacityResolver>();

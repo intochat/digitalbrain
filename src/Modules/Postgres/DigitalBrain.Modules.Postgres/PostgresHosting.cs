@@ -1,6 +1,5 @@
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Core;
-using DigitalBrain.Platform.Capacity;
 using DigitalBrain.Sdk.Capacity;
 using DigitalBrain.Supabase;
 using DigitalBrain.Supabase.Windows;
@@ -36,7 +35,6 @@ public static class PostgresHosting
             var connection = provider.GetRequiredService<IConfiguration>().GetConnectionString(options.ConnectionName)!;
             return NpgsqlDataSource.Create(PostgresConnectionSettings.Parse(connection).ConnectionString);
         });
-        services.AddCapacity();
         services.TryAddSingleton<IPostgresSourceRegistry, PostgresSourceRegistry>();
         services.AddSingleton<ICapacityConfiguredSource>(provider =>
             new PostgresConfiguredSource(active: provider.GetRequiredService<IConfiguration>()[PostgresCapacityKind.AdminConnectionKey] is null));

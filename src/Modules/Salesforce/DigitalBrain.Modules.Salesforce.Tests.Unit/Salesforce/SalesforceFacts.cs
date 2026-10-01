@@ -171,7 +171,7 @@ public sealed class SalesforceFacts
     private static async Task<Fixture> StartAsync(FakeSalesforceProvider provider, FakeTokenExchange? exchange, CancellationToken cancellationToken)
     {
         var handoff = new TokenHandoff(TimeProvider.System);
-        var brain = await UnitTest.Create().WithModule<SecretsModule>().WithModule<SalesforceModule>()
+        var brain = await UnitTest.Create().WithModule<SalesforceModule>()
             .ConfigureSilo(silo =>
             {
                 silo.Services.AddSingleton<ISalesforceProvider>(provider);

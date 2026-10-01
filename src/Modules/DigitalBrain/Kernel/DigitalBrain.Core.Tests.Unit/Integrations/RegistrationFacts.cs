@@ -409,9 +409,9 @@ public sealed class RegistrationFacts
     [Fact]
     public void DefinitionsAreDiscoveredFromModuleTypesAndZeroDefinitionsIsFine()
     {
-        Assert.Empty(IntegrationDiscovery.Collect([typeof(SecretsModule)]));
+        Assert.Empty(IntegrationDiscovery.Collect([typeof(DigitalBrain.Platform.PlatformHosting)]));
 
-        var found = IntegrationDiscovery.Collect([typeof(FakeGoogleModule), typeof(FakeAiModule), typeof(SecretsModule)]);
+        var found = IntegrationDiscovery.Collect([typeof(FakeGoogleModule), typeof(FakeAiModule), typeof(DigitalBrain.Platform.PlatformHosting)]);
 
         Assert.Equal(["anthropic", "google", "openai"], found.Select(definition => definition.Id).Order().ToArray());
         Assert.Throws<InvalidOperationException>(
@@ -431,8 +431,6 @@ public sealed class RegistrationFacts
     private static Task<UnitBrain> StartAsync(CancellationToken cancellationToken, IReadOnlyDictionary<string, string?>? configuration = null)
         => UnitTest.Create()
             .WithExecution(new TestExecutionOptions { PrivateConfiguration = configuration ?? new Dictionary<string, string?>() })
-            .WithModule<IntegrationsModule>()
-            .WithModule<SecretsModule>()
             .WithModule<FakeGoogleModule>()
             .WithModule<FakeAiModule>()
             .StartAsync(cancellationToken);

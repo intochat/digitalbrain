@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Accounts, workspace members and app grants.</Description>
+    <Description>Compatibility type forwards for identity contracts now supplied by DigitalBrain.Sdk.</Description>
     <RootNamespace>DigitalBrain.Identity</RootNamespace>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>

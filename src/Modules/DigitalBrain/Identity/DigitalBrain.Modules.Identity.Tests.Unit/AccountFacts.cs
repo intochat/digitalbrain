@@ -10,7 +10,7 @@ public sealed class AccountFacts
     public async Task CreatingAWorkspaceUsesAuthenticatedOwnershipAndDeniesOutsiders()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        await using var brain = await UnitTest.Create().StartAsync(ct);
         var directory = brain.Get<IIdentityDirectory>(IdentityGrains.Directory);
         var owner = await directory.RegisterAsync("alice", "correct-password", "Alice", ct);
         var http = new Microsoft.AspNetCore.Http.DefaultHttpContext();
@@ -38,7 +38,7 @@ public sealed class AccountFacts
     public async Task ReservedPlatformNamesCannotBeRegistered()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        await using var brain = await UnitTest.Create().StartAsync(ct);
         var directory = brain.Get<IIdentityDirectory>(IdentityGrains.Directory);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => directory.RegisterAsync("integrations", "correct-password", "Intruder", ct));
@@ -49,7 +49,7 @@ public sealed class AccountFacts
     public async Task EachRegistrationGetsItsOwnAccountAndBrain()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        await using var brain = await UnitTest.Create().StartAsync(ct);
         var directory = brain.Get<IIdentityDirectory>(IdentityGrains.Directory);
         var first = await directory.RegisterAsync("alice", "correct-password", "Alice", ct);
         var second = await directory.RegisterAsync("bob", "another-password", "Bob", ct);
@@ -62,7 +62,7 @@ public sealed class AccountFacts
     public async Task OnlyTheCorrectPasswordAuthenticatesAnExistingAccount()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        await using var brain = await UnitTest.Create().StartAsync(ct);
         var directory = brain.Get<IIdentityDirectory>(IdentityGrains.Directory);
         var alice = await directory.RegisterAsync("alice", "correct-password", "Alice", ct);
         Assert.Null(await directory.AuthenticateAsync("alice", "wrong-password", ct));
@@ -75,7 +75,7 @@ public sealed class AccountFacts
     public async Task RegistrationRefusesWeakPasswordsAndTakenNames()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        await using var brain = await UnitTest.Create().StartAsync(ct);
         var directory = brain.Get<IIdentityDirectory>(IdentityGrains.Directory);
         await directory.RegisterAsync("alice", "correct-password", "Alice", ct);
         await Assert.ThrowsAsync<ArgumentException>(() => directory.RegisterAsync("weak", "short", "Weak", ct));
@@ -86,7 +86,7 @@ public sealed class AccountFacts
     public async Task CanAccessAnswersOnlyForOwnedOrSharedWorkspaces()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        await using var brain = await UnitTest.Create().StartAsync(ct);
         var directory = brain.Get<IIdentityDirectory>(IdentityGrains.Directory);
         var owner = await directory.RegisterAsync("alice", "correct-password", "Alice", ct);
         await directory.RegisterAsync("bob", "another-password", "Bob", ct);

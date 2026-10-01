@@ -12,7 +12,7 @@ public sealed class BrainEstablishmentFacts
     public async Task RegisteringAMemberEstablishesTheirBrainNeuron()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        await using var brain = await UnitTest.Create().StartAsync(ct);
         var directory = brain.Get<IIdentityDirectory>(IdentityGrains.Directory);
         var member = await directory.RegisterAsync("alice", "correct-password", "Alice", ct);
         // renamed to BrainId in the identity rename task
@@ -26,7 +26,7 @@ public sealed class BrainEstablishmentFacts
     {
         // Covers Identity-composed path; Core-level test exists separately in BrainFacts.cs
         var ct = TestContext.Current.CancellationToken;
-        await using var host = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        await using var host = await UnitTest.Create().StartAsync(ct);
         var neuron = host.Get<IBrain>(BrainScope.Create("acct", "personal").Id);
         var first = await neuron.Establish(new("personal", "acct"));
         var second = await neuron.Establish(new("personal", "acct"));

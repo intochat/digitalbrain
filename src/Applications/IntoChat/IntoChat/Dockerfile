@@ -51,18 +51,15 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     DigitalBrain__Modules__2="DigitalBrain.ClickHouse.ClickHouseModule, DigitalBrain.Modules.ClickHouse" \
     DigitalBrain__Modules__3="DigitalBrain.Supabase.SupabaseModule, DigitalBrain.Modules.Supabase" \
     DigitalBrain__Modules__4="DigitalBrain.Time.TimeModule, DigitalBrain.Modules.Time" \
-    DigitalBrain__Modules__5="DigitalBrain.Platform.Secrets.SecretsModule, DigitalBrain.Platform" \
-    DigitalBrain__Modules__6="DigitalBrain.Platform.Integrations.IntegrationsModule, DigitalBrain.Platform" \
-    DigitalBrain__Modules__7="DigitalBrain.Identity.IdentityModule, DigitalBrain.Modules.Identity" \
-    DigitalBrain__Modules__8="DigitalBrain.Google.Gmail.GmailModule, DigitalBrain.Modules.Google.Gmail" \
-    DigitalBrain__Modules__9="DigitalBrain.Salesforce.SalesforceModule, DigitalBrain.Modules.Salesforce" \
-    DigitalBrain__Modules__10="DigitalBrain.Microsoft.GitHub.GitHubModule, DigitalBrain.Modules.Microsoft.GitHub" \
-    DigitalBrain__Modules__11="DigitalBrain.Flutter.FlutterModule, DigitalBrain.Modules.Flutter" \
-    DigitalBrain__Modules__12="DigitalBrain.Compute.ComputeModule, DigitalBrain.Modules.Compute" \
-    DigitalBrain__Modules__13="DigitalBrain.Registry.RegistryModule, DigitalBrain.Modules.Registry" \
-    DigitalBrain__Modules__14="DigitalBrain.Apps.AppsModule, DigitalBrain.Modules.Apps" \
-    DigitalBrain__Modules__15="DigitalBrain.Qdrant.QdrantModule, DigitalBrain.Modules.Qdrant" \
-    DigitalBrain__Modules__16="DigitalBrain.Files.FilesModule, DigitalBrain.Modules.Files"
+    DigitalBrain__Modules__5="DigitalBrain.Google.Gmail.GmailModule, DigitalBrain.Modules.Google.Gmail" \
+    DigitalBrain__Modules__6="DigitalBrain.Salesforce.SalesforceModule, DigitalBrain.Modules.Salesforce" \
+    DigitalBrain__Modules__7="DigitalBrain.Microsoft.GitHub.GitHubModule, DigitalBrain.Modules.Microsoft.GitHub" \
+    DigitalBrain__Modules__8="DigitalBrain.Flutter.FlutterModule, DigitalBrain.Modules.Flutter" \
+    DigitalBrain__Modules__9="DigitalBrain.Compute.ComputeModule, DigitalBrain.Modules.Compute" \
+    DigitalBrain__Modules__10="DigitalBrain.Registry.RegistryModule, DigitalBrain.Modules.Registry" \
+    DigitalBrain__Modules__11="DigitalBrain.Apps.AppsModule, DigitalBrain.Modules.Apps" \
+    DigitalBrain__Modules__12="DigitalBrain.Qdrant.QdrantModule, DigitalBrain.Modules.Qdrant" \
+    DigitalBrain__Modules__13="DigitalBrain.Files.FilesModule, DigitalBrain.Modules.Files"
 
 EXPOSE 8080
 

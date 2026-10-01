@@ -61,7 +61,7 @@ public static class GrantRules
         ];
     }
 
-    private static bool IsGranted(CallerContext caller, string semanticTypeId, IReadOnlyList<Grant> grants)
+    internal static bool IsGranted(CallerContext caller, string semanticTypeId, IReadOnlyList<Grant> grants)
         => grants.Any(grant => !grant.Revoked
             && string.Equals(grant.WorkspaceId, caller.BrainId, StringComparison.Ordinal)
             && string.Equals(grant.AppId, caller.AppId, StringComparison.Ordinal)

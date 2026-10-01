@@ -13,7 +13,7 @@ public sealed class GmailConnectedFacts
     public async Task AuthorizationCodePublishesGmailConnected()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<SecretsModule>().WithModule<GmailModule>()
+        await using var brain = await UnitTest.Create().WithModule<GmailModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IGmailTokenExchange>(new FakeGmailTokens()))
             .StartAsync(ct);
         var gmail = brain.Get<IGmail>("gmail");

@@ -37,8 +37,6 @@ public sealed class GmailOAuthCallbackFacts
 
     private static Task<E2EBrain> StartAsync(TokenEndpointStub stub, CancellationToken ct, Dictionary<string, string?> seeded)
         => E2ETest.Create()
-            .WithModule<DigitalBrain.Platform.Secrets.SecretsModule>()
-            .WithModule<DigitalBrain.Platform.Integrations.IntegrationsModule>()
             .WithModule<GmailModule, GmailModuleOptions>(options => options.TokenEndpoint = stub.TokenEndpoint)
             .WithExecution(new() { PrivateConfiguration = seeded })
             .StartAsync(ct);

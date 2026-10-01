@@ -114,7 +114,7 @@ public sealed class GrantFacts
     public async Task RevokingAOnceGrantEmptiesTheStoreAndTheNextReadLooksMissing()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        await using var brain = await UnitTest.Create().StartAsync(ct);
         var store = brain.Get<IGrantStore>(IdentityGrains.Grants("ws-1"));
         await store.GrantAsync(Grant(GrantMode.Once, "person.birthDate", "app-1", "ws-1"), ct);
         Assert.Single(await store.ListAsync(ct));
@@ -132,7 +132,7 @@ public sealed class GrantFacts
     public async Task TheStoreConsumePathSpendsOnlyTheOnceGrantsItIsGiven()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        await using var brain = await UnitTest.Create().StartAsync(ct);
         var store = brain.Get<IGrantStore>(IdentityGrains.Grants("ws-1"));
         var onceBirthDate = Grant(GrantMode.Once, "person.birthDate", "app-1", "ws-1");
         var onceEmail = Grant(GrantMode.Once, "person.email", "app-1", "ws-1");
@@ -157,7 +157,7 @@ public sealed class GrantFacts
     public async Task GrantStoreGrantsRevokesAndRelists()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        await using var brain = await UnitTest.Create().StartAsync(ct);
         var store = brain.Get<IGrantStore>(IdentityGrains.Grants("ws-1"));
         await store.GrantAsync(Grant(GrantMode.Always, "person.birthDate", "app-1", "ws-1"), ct);
         Assert.Single(await store.ListAsync(ct));
@@ -169,7 +169,7 @@ public sealed class GrantFacts
     public async Task RevokingOneModeKeepsTheOthersAndARevokedValueLooksEmpty()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<IdentityModule>().StartAsync(ct);
+        await using var brain = await UnitTest.Create().StartAsync(ct);
         var store = brain.Get<IGrantStore>(IdentityGrains.Grants("ws-1"));
         await store.GrantAsync(Grant(GrantMode.Always, "person.birthDate", "app-1", "ws-1"), ct);
         await store.GrantAsync(Grant(GrantMode.ThisChat, "person.birthDate", "app-1", "ws-1") with { ConversationId = "chat-1" }, ct);

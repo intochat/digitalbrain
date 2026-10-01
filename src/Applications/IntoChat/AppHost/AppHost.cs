@@ -15,7 +15,6 @@ using DigitalBrain.Core;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google.Gmail;
-using DigitalBrain.Identity;
 using DigitalBrain.Memory;
 using DigitalBrain.Qdrant;
 using DigitalBrain.Microsoft.Aspire;
@@ -23,9 +22,7 @@ using DigitalBrain.Microsoft.GitHub;
 using DigitalBrain.Compute;
 using DigitalBrain.Registry;
 using DigitalBrain.Sdk.Integrations;
-using DigitalBrain.Platform.Integrations;
 using DigitalBrain.Sdk.Secrets;
-using DigitalBrain.Platform.Secrets;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 using DigitalBrain.Time;
@@ -51,9 +48,6 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serv
     .WithModule<PostgresModule, PostgresModuleOptions>(database => database.WithPostgres(options => options.DatabaseName = "digitalbrain"))
     .WithModule<PlaywrightModule>()
     .WithModule<TimeModule>()
-    .WithModule<SecretsModule>()
-    .WithModule<IntegrationsModule>()
-    .WithModule<IdentityModule>()
     .WithModule<FilesModule>()
     .WithModule<GmailModule, GmailModuleOptions>(gmail => gmail.WithGmail())
     .WithModule<SalesforceModule, SalesforceModuleOptions>(salesforce => salesforce.WithHostedMcp())

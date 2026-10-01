@@ -73,6 +73,8 @@ public sealed class PathTruthFacts
         Assert.NotEmpty(profile);
         Assert.Equal(docker.Length, docker.Select(entry => entry.Index).Distinct().Count());
         Assert.Equal(profile.Length, profile.Select(entry => entry.Index).Distinct().Count());
+        Assert.Equal(Enumerable.Range(0, docker.Length), docker.Select(entry => entry.Index).Order());
+        Assert.Equal(Enumerable.Range(0, profile.Length), profile.Select(entry => entry.Index).Order());
         Assert.Equal(docker.Length, docker.Select(entry => entry.Module).Distinct().Count());
         Assert.Equal(profile.Length, profile.Select(entry => entry.Module).Distinct().Count());
         Assert.Equal(docker.Select(entry => entry.Module).Order(StringComparer.Ordinal),
@@ -81,6 +83,8 @@ public sealed class PathTruthFacts
         {
             var type = Type.GetType(entry.Module, throwOnError: true)!;
             Assert.True(typeof(DigitalBrain.Core.IModule).IsAssignableFrom(type));
+            Assert.False(DigitalBrain.Contracts.PlatformAssemblyAttribute.IsPlatform(type.Assembly));
+            Assert.DoesNotContain(type.Assembly.GetReferencedAssemblies(), reference => reference.Name == "DigitalBrain.Platform");
             Assert.DoesNotContain(type.Namespace, new[] { "DigitalBrain.Microsoft.Aspire", "DigitalBrain.Microsoft.CSharp" });
         });
     }

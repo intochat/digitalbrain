@@ -112,7 +112,7 @@ public sealed class ScriptEdgeFacts
     [Fact]
     public void TheWholePlatformAssemblyContributesNoScriptContractsEvenWithoutAttributesOnTheTypes()
     {
-        var platform = typeof(DigitalBrain.Platform.Integrations.IntegrationsModule).Assembly;
+        var platform = typeof(DigitalBrain.Platform.PlatformHosting).Assembly;
         Assert.True(DigitalBrain.Contracts.PlatformAssemblyAttribute.IsPlatform(platform));
         var contracts = new ScriptContracts([platform]);
 
@@ -126,10 +126,10 @@ public sealed class ScriptEdgeFacts
     [Fact]
     public void ThePlatformAssemblyIsNeverAContractsAssemblyOfAComposedModule()
     {
-        var inventory = new DigitalBrain.Core.ModuleInventory([typeof(DigitalBrain.Platform.Integrations.IntegrationsModule), typeof(DigitalBrain.Platform.Secrets.SecretsModule)]);
+        var inventory = new DigitalBrain.Core.ModuleInventory([typeof(DigitalBrain.Platform.PlatformHosting)]);
 
-        Assert.DoesNotContain(typeof(DigitalBrain.Platform.Integrations.IntegrationsModule).Assembly, inventory.ContractAssemblies());
-        Assert.Empty(DigitalBrain.Core.ModuleInventory.ContractAssembliesOf(typeof(DigitalBrain.Platform.Secrets.SecretsModule).Assembly));
+        Assert.DoesNotContain(typeof(DigitalBrain.Platform.PlatformHosting).Assembly, inventory.ContractAssemblies());
+        Assert.Empty(DigitalBrain.Core.ModuleInventory.ContractAssembliesOf(typeof(DigitalBrain.Platform.PlatformHosting).Assembly));
     }
 
     [Fact]

@@ -63,7 +63,6 @@ else
         });
         await next(context);
     });
-    app.MapGet("/identity/session", () => Results.NoContent());
 }
 app.MapDigitalBrainModules();
 app.MapHealthChecks(ModuleHostEndpoints.Health);

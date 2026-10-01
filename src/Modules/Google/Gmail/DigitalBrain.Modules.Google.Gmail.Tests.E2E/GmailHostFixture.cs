@@ -13,8 +13,6 @@ public sealed class GmailHostFixture : SharedBrainFixture
     {
         var stub = await _tokenEndpoint.Value;
         return await E2ETest.Create()
-            .WithModule<DigitalBrain.Platform.Secrets.SecretsModule>()
-            .WithModule<DigitalBrain.Platform.Integrations.IntegrationsModule>()
             .WithModule<GmailModule, GmailModuleOptions>(options => options.TokenEndpoint = stub.TokenEndpoint)
             .WithExecution(new() { PrivateConfiguration = ConfiguredRegistration(stub) })
             .StartAsync(cancellationToken);

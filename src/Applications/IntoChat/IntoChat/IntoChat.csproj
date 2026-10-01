@@ -19,7 +19,6 @@
     <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
     <ProjectReference Include="../../../Modules/Time/DigitalBrain.Modules.Time/DigitalBrain.Modules.Time.csproj" />
-    <ProjectReference Include="../../../Modules/DigitalBrain/Identity/DigitalBrain.Modules.Identity/DigitalBrain.Modules.Identity.csproj" />
     <ProjectReference Include="../../../Modules/Files/DigitalBrain.Modules.Files/DigitalBrain.Modules.Files.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Compute/DigitalBrain.Modules.Compute.Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Compute/DigitalBrain.Modules.Compute/DigitalBrain.Modules.Compute.csproj" />
