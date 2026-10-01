@@ -2,7 +2,7 @@ using DigitalBrain.CustomerResearcher;
 using System.Text.Json;
 using DigitalBrain.AI;
 using DigitalBrain.Flutter.Text;
-using DigitalBrain.Flutter.WebBrowser.Signals;
+using DigitalBrain.Flutter.WebBrowser;
 using DigitalBrain.Microsoft.Playwright;
 using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,6 +12,33 @@ namespace DigitalBrain.Modules.CustomerResearcher.Tests.Unit;
 
 public sealed class ResearchFacts
 {
+    [Fact]
+    public async Task Composing_and_connecting_the_window_reaches_ready_without_app_lifecycle_events()
+    {
+        await using var brain = await Start(new Control());
+        var key = CustomerResearcherSurface.Key("workspace-a") + "/window";
+        var app = brain.Get<ICustomerResearcher>(key);
+        await app.Activate();
+        Assert.Equal("Waiting for browser…", await Status(brain, "workspace-a"));
+        await brain.Get<IWebBrowserConnector>(key + "/browser").Connect(12345, new string('a', 32));
+        Assert.Equal("Ready", await Status(brain, "workspace-a"));
+        Assert.True((await brain.Get<IPlaywright>(key + "/browser").Read()).Ready);
+        await app.Activate();
+        Assert.Equal("Ready", await Status(brain, "workspace-a"));
+    }
+
+    [Fact]
+    public async Task Research_without_a_browser_renders_the_not_connected_status()
+    {
+        var control = new Control();
+        await using var brain = await Start(control);
+        var app = brain.Get<ICustomerResearcher>(CustomerResearcherSurface.Key("workspace-a") + "/window");
+        await app.Research("Acme");
+        await Until(async () => await Status(brain, "workspace-a") == new BrowserNotConnectedException().Message);
+        Assert.Empty(control.Saves);
+        Assert.False(control.Started.Task.IsCompleted);
+    }
+
     [Fact]
     public void EvidenceMustComeFromObservedOfficialPages()
     {
@@ -109,8 +136,8 @@ public sealed class ResearchFacts
         control.Block = null;
         if (disconnect)
         {
-            await app.HandleUiEvent(new BrowserDisconnected(CustomerResearcherSurface.Key("workspace-a") + "/window/browser", new string('a', 32)));
-            await Until(async () => await Status(brain, "workspace-a") == "Browser disconnected");
+            await brain.Get<IWebBrowserConnector>(CustomerResearcherSurface.Key("workspace-a") + "/window/browser").Disconnect(new string('a', 32));
+
         }
         else
         {
@@ -120,7 +147,7 @@ public sealed class ResearchFacts
         blocked.SetResult();
         // A roundtrip through the grain after the old continuation settles verifies final presentation.
         await Until(async () => { await Task.Yield(); return control.Completed; });
-        Assert.Equal(disconnect ? "Browser disconnected" : "Saved: New", await Status(brain, "workspace-a"));
+        await Until(async () => await Status(brain, "workspace-a") == (disconnect ? new BrowserNotConnectedException().Message : "Saved: New"));
         Assert.Equal(disconnect ? 0 : 1, control.Saves.Count);
     }
 
@@ -137,8 +164,8 @@ public sealed class ResearchFacts
     {
         var key = CustomerResearcherSurface.Key(workspace) + "/window";
         var app = brain.Get<ICustomerResearcher>(key);
-        await app.HandleUiEvent(new BrowserConnected(key + "/browser", 12345, new string('a', 32)));
-        await Until(async () => await Status(brain, workspace) == "Ready");
+        await brain.Get<IWebBrowserConnector>(key + "/browser").Connect(12345, new string('a', 32));
+        Assert.True((await brain.Get<IPlaywright>(key + "/browser").Read()).Ready);
         return app;
     }
     private static async Task<string> Status(UnitBrain brain, string workspace) =>

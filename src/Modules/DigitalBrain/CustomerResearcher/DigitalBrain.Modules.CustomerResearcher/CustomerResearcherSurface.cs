@@ -2,8 +2,8 @@ using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Button;
 using DigitalBrain.Flutter.Layout;
 using DigitalBrain.Flutter.Surface;
-using DigitalBrain.Flutter.Text;
 using DigitalBrain.Flutter.TextField;
+using DigitalBrain.Flutter.WebBrowser;
 
 namespace DigitalBrain.CustomerResearcher;
 
@@ -24,13 +24,12 @@ public static class CustomerResearcherSurface
         await Bind("research");
         await grains.GetGrain<IButton>(Name("stop")).Set("Stop", "stop");
         await Bind("stop");
-        await grains.GetGrain<IText>(Name("status")).Set("Waiting for browser…");
         var toolbar = grains.GetGrain<ILayout>(Name("toolbar"));
         await toolbar.Set(new("row",
             [Ref(UIVocabulary.TextFieldType, "company"), Ref(UIVocabulary.ButtonType, "research"), Ref(UIVocabulary.ButtonType, "stop"), Ref(UIVocabulary.TextType, "status")],
             Extents: [0, 110, 80, 280]), (await toolbar.Read()).Revision);
 
-        await Bind("browser");
+        await grains.GetGrain<IWebBrowser>(Name("browser")).Configure(Name("browser"), Name("status"));
         var main = grains.GetGrain<ILayout>(Name("main"));
         await main.Set(new("column",
             [Ref(UIVocabulary.LayoutType, "toolbar"), Ref(UIVocabulary.WebBrowserType, "browser")],
