@@ -12,9 +12,9 @@ using DigitalBrain.Testing.E2E.Workspace;
 using Npgsql;
 using DigitalBrain.Identity;
 
-namespace IntoChat.Tests.E2E.Agent;
+namespace DigitalBrain.Modules.Assistant.Tests.E2E;
 
-public sealed class AgentWorkflowFacts(IntoChatHostFixture host) : BrainFact(host)
+public sealed class AgentWorkflowFacts(ReferenceBrainFixture host) : BrainFact(host)
 {
     [Fact(Timeout = 240_000)]
     public async Task EmptyQueryIsRealAndFailedToolsNeverReportSuccess()

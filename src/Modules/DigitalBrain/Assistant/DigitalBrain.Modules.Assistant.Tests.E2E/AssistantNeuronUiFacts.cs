@@ -4,9 +4,9 @@ using DigitalBrain.AI;
 using DigitalBrain.Testing.E2E.Agent;
 using DigitalBrain.Testing.E2E.Workspace;
 
-namespace IntoChat.Tests.E2E.Apps;
+namespace DigitalBrain.Modules.Assistant.Tests.E2E;
 
-public sealed class AssistantNeuronUiFacts(IntoChatHostFixture host) : BrainFact(host)
+public sealed class AssistantNeuronUiFacts(ReferenceBrainFixture host) : BrainFact(host)
 {
     [Fact(Timeout = 180_000)]
     public async Task OpeningAssistantCreatesIndependentPrimitiveWindowsAndBoundButtonsExecuteTurns()

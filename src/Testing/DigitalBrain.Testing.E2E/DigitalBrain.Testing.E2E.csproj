@@ -27,6 +27,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Build/DigitalBrain.Testing.E2E.targets" Pack="true" PackagePath="buildTransitive/" />
+    <Compile Remove="Build/ModuleBuilderFactory.cs" />
+    <None Include="Build/ModuleBuilderFactory.cs" Pack="true" PackagePath="buildTransitive/" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../Modules/AI/DigitalBrain.Modules.AI.Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />

@@ -8,9 +8,9 @@ using DigitalBrain.Testing.E2E.Agent;
 using DigitalBrain.Testing.E2E.Workspace;
 using DigitalBrain.Identity;
 
-namespace IntoChat.Tests.E2E.Receipts;
+namespace DigitalBrain.Modules.Assistant.Tests.E2E;
 
-public sealed class ReceiptJourneyFacts(IntoChatHostFixture host) : BrainFact(host)
+public sealed class ReceiptJourneyFacts(ReferenceBrainFixture host) : BrainFact(host)
 {
     [Fact(Timeout = 240_000)]
     public async Task EveryIntentEmitsAShadowPricedReceiptFromDurableUsage()

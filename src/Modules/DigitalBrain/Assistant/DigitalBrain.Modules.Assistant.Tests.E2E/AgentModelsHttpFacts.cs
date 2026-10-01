@@ -4,7 +4,7 @@ using System.Text;
 using System.Text.Json;
 using DigitalBrain.AI.Agents;
 
-namespace IntoChat.Tests.E2E.Agent;
+namespace DigitalBrain.Modules.Assistant.Tests.E2E;
 
 public sealed class AgentModelsHttpFacts
 {
@@ -13,7 +13,7 @@ public sealed class AgentModelsHttpFacts
     {
         var ct = TestContext.Current.CancellationToken;
         const string apiKey = "model-catalog-secret-canary";
-        await using var brain = await IntoChatE2ETest.Create(modelApiKey: apiKey)
+        await using var brain = await ReferenceBrain.Create(modelApiKey: apiKey)
             .WithResourceEnvironment(new Dictionary<string, string>
             {
                 ["DigitalBrain__Auth__Username"] = "owner",

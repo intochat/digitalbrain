@@ -12,9 +12,9 @@ using Microsoft.Playwright;
 using Npgsql;
 using DigitalBrain.Identity;
 
-namespace IntoChat.Tests.E2E.Agent;
+namespace DigitalBrain.Modules.Assistant.Tests.E2E;
 
-public sealed class AgentTableJourneyFacts(IntoChatHostFixture host) : BrainFact(host)
+public sealed class AgentTableJourneyFacts(ReferenceBrainFixture host) : BrainFact(host)
 {
     [Fact(Timeout = 300_000)]
     public async Task UserRequestOpensTableAndRecoversAfterCancellationAndFailure()

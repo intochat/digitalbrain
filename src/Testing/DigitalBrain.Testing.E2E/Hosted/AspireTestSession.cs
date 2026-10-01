@@ -41,8 +41,17 @@ public sealed class AspireTestSession : IAsyncDisposable
         Action<IDistributedApplicationTestingBuilder> declareTopology, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(declareTopology);
-        return StartCoreAsync(_ => Task.FromResult(DistributedApplicationTestingBuilder.Create([])),
+        return StartCoreAsync(_ => Task.FromResult(CreateModuleBuilder()),
             declareTopology, identity, options, cancellationToken);
+    }
+
+    private static IDistributedApplicationTestingBuilder CreateModuleBuilder()
+    {
+        // Aspire discovers its metadata on the caller stack. The build-transitive factory is
+        // compiled into the consuming assembly, even when an assembly fixture starts the host.
+        var factory = System.Reflection.Assembly.GetEntryAssembly()!
+            .GetType("DigitalBrain.Testing.Generated.ModuleBuilderFactory", throwOnError: true)!;
+        return (IDistributedApplicationTestingBuilder)factory.GetMethod("Create")!.Invoke(null, null)!;
     }
 
     private static async Task<AspireTestSession> StartCoreAsync(
@@ -59,8 +68,7 @@ public sealed class AspireTestSession : IAsyncDisposable
         var stage = "builder";
         try
         {
-            // Aspire's module builder discovers AppHost metadata from the caller stack.
-            // Create it before the first asynchronous file write can detach that stack.
+            // Module hosts explicitly use the consuming test assembly's Aspire metadata.
             var builder = await createBuilder(ct).ConfigureAwait(false);
             lifetime.Own("builder", builder);
             PrivateTestConfiguration? privateSettings = null;
