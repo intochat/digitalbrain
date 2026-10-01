@@ -28,6 +28,9 @@ public sealed class IntoChatHostFixture : SharedBrainFixture
             .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, _model.Endpoint))
             .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp())
             .WithBrowser(new() { PrimarySession = false })
+            // The one shared boot compiles the web shell; a cold CI runner needs well over the
+            // default three minutes.
+            .WithStartupTimeout(TimeSpan.FromMinutes(12))
             .WithResourceEnvironment(new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["OTEL_EXPORTER_OTLP_ENDPOINT"] = _collector.Endpoint.AbsoluteUri,

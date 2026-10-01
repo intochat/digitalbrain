@@ -68,6 +68,11 @@ jobs:
       - name: Install Playwright browser and system dependencies
         run: pwsh src/Applications/IntoChat/Tests/E2E/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
 
+      # One deterministic build primes the docker layer cache, so the sandbox the E2E hosts
+      # start on demand comes up in seconds instead of spending its test budget on the build.
+      - name: Prime the C# sandbox image build cache
+        run: docker build src/Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Sandbox
+
       - name: Test
         run: dotnet test DigitalBrain.slnx -c Release --no-build -v quiet
         env:

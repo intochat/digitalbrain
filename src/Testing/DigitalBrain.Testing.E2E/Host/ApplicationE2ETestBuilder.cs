@@ -37,6 +37,16 @@ public sealed class E2ETestBuilder<TAppHost> where TAppHost : class
         _browser = scope.Options;
         return this;
     }
+    // A startup budget for hosts whose resources compile at start (a CI runner building the
+    // web shell needs more than the default); merges into the composition's execution options.
+    public E2ETestBuilder<TAppHost> WithStartupTimeout(TimeSpan timeout)
+    {
+        EnsureMutable();
+        TestExecutionOptions.ValidateTimeout(timeout);
+        _execution = _execution with { StartupTimeout = timeout };
+        return this;
+    }
+
     public E2ETestBuilder<TAppHost> WithExecution(TestExecutionOptions execution)
     {
         EnsureMutable();
