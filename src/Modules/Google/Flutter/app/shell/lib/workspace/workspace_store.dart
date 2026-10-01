@@ -358,7 +358,8 @@ class WorkspaceStore extends ChangeNotifier {
     String? openedWindowId,
   }) {
     if (snapshot.revision < (remoteRevisions[project.id] ?? -1)) return;
-    final startupSnapshot = loaded &&
+    final startupSnapshot =
+        loaded &&
         !remoteRevisions.containsKey(project.id) &&
         _projectsAtLoad.contains(project.id);
     remoteRevisions[project.id] = snapshot.revision;
