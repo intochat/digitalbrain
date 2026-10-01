@@ -9,7 +9,7 @@
     <InternalsVisibleTo Include="DigitalBrain.Modules.Files.Tests.Unit" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.Files.Tests.E2E" />
     <ProjectReference Include="../DigitalBrain.Modules.Files.Contracts/DigitalBrain.Modules.Files.Contracts.csproj" />
-    <ProjectReference Include="../../DigitalBrain/Identity/DigitalBrain.Modules.Identity/DigitalBrain.Modules.Identity.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
   </ItemGroup>
 </Project>
