@@ -55,7 +55,7 @@ public sealed class E2EBrain : IDigitalBrain, ITrackedBrain
     internal async Task StartBrowserAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (_session.BrowserEndpoint is not null)
+        if (_session.BrowserEndpoint is not null && _options.PrimarySession)
         { _primaryBrowser = await OpenBrowserAsync(cancellationToken).ConfigureAwait(false); }
         cancellationToken.ThrowIfCancellationRequested();
     }
@@ -98,6 +98,8 @@ public sealed class E2EBrain : IDigitalBrain, ITrackedBrain
             var page = await context.NewPageAsync().ConfigureAwait(false);
             session.Page = page;
             page.SetDefaultTimeout((float)_options.AssertionTimeout.TotalMilliseconds);
+            // Playwright's Expect() has its own 5s default, separate from the page timeout.
+            Assertions.SetDefaultExpectTimeout((float)_options.AssertionTimeout.TotalMilliseconds);
             stage = "browser-readiness";
             await PreparePageAsync(page, endpoint, _session.BrowserReadySelector, Remaining, deadline.Token).ConfigureAwait(false);
             deadline.Token.ThrowIfCancellationRequested();

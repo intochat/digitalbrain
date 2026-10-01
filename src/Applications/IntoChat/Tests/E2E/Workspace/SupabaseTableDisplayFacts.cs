@@ -7,19 +7,18 @@ using DigitalBrain.Identity;
 
 namespace IntoChat.Tests.E2E.Workspace;
 
-public sealed class SupabaseTableDisplayFacts
+public sealed class SupabaseTableDisplayFacts(IntoChatHostFixture host) : BrainFact(host)
 {
     [Fact(Timeout = 300_000)]
     public async Task DatabaseTableAppearsAndFilterFindsRowsBeyondTheFirstPage()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp()).StartAsync(ct);
+        var brain = Brain;
         const string marker = "Beyond the first page";
         await LeadData.SeedAsync(brain, marker, ct);
-        var page = brain.Page;
+        var page = await OpenPageAsync(ct);
         await page.SetViewportSizeAsync(1600, 1000);
-        var projectId = await WorkspaceBrowser.CreateProjectAsync(page, "Data workspace");
+        var projectId = await WorkspaceBrowser.CreateProjectAsync(page, "Display data workspace");
         var workspace = brain.Get<IWorkspace>(BrainScope.Create("owner", projectId).Id);
         var table = brain.Get<ISupabaseTable>("active-leads");
         var snapshot = await table.CreateFromQuery(new("Active leads", "select id, company, email from leads where active order by id"));
@@ -46,12 +45,11 @@ public sealed class SupabaseTableDisplayFacts
     public async Task EmptyResultsAndUnavailableSourceAreShownWithoutInventedRows()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp()).StartAsync(ct);
+        var brain = Brain;
         await LeadData.SeedAsync(brain, "Beyond first page", ct);
-        var page = brain.Page;
+        var page = await OpenPageAsync(ct);
         await page.SetViewportSizeAsync(1600, 1000);
-        var projectId = await WorkspaceBrowser.CreateProjectAsync(page, "Unavailable data");
+        var projectId = await WorkspaceBrowser.CreateProjectAsync(page, "Display unavailable data");
         var workspace = brain.Get<IWorkspace>(BrainScope.Create("owner", projectId).Id);
         var table = brain.Get<ISupabaseTable>("empty-leads");
         var snapshot = await table.CreateFromQuery(new("Empty leads", "select id, company, email from leads where false"));

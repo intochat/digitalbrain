@@ -11,7 +11,7 @@ internal sealed class AnthropicProviderFactory : ApiKeyProviderFactory
         => new AnthropicClient
         {
             ApiKey = ReleaseApiKey(credentials),
-            BaseUrl = EndpointOf(credentials, endpoint).OriginalString,
+            BaseUrl = EndpointOf(configuration, credentials, endpoint).OriginalString,
             Timeout = TimeSpan.FromMinutes(5),
         }.AsIChatClient(model);
 

@@ -39,8 +39,8 @@ behaviors/*.cs   the implementation: one script per concern (plus legacy single 
 ```
 
 - **Spec is the program.** The Author agent turns a request into `app.spec.md`; the Builder agent
-  compiles it into `tests.cs` and behaviors (`AppDraft` in IntoChat.Marketplace, prompts in
-  `Marketplace/AgentPrompts.cs`). The LLM is a compiler, never a runtime interpreter: no model sits in the
+  compiles it into `tests.cs` and behaviors (`AppDraft` in DigitalBrain.Apps, prompts in
+  `Apps/Authoring/AgentPrompts.cs`). The LLM is a compiler, never a runtime interpreter: no model sits in the
   publish gate or the signal path. There is no step vocabulary or sentence grammar — **the type
   system is the grammar**: a scenario is expressible exactly when its test compiles against the
   installed contracts (`ScriptContracts` exposes the composed modules' contracts assemblies).
@@ -87,8 +87,8 @@ renderable palette v1 / UiPart; run-token tightening.
   `dotnet test src/<path-to-test-project>`. After changes: build, run the relevant unit suites,
   and smoke with `aspire run` from `src/Applications/IntoChat/AppHost` (all resources Healthy).
   Skip the 18-minute IntoChat E2E; unit suites + aspire run are the bar.
-- `src/Applications/IntoChat/Tests/Unit` has 3 known pre-existing failures (HostedDeployment ×2,
-  PathTruth) — not yours to fix in passing.
+- `src/Applications/IntoChat/Tests/Unit` covers host composition and wiring; module behavior
+  belongs in the module's test project. Packaging manifests are checked as one parsed module set.
 - Flutter shell: `flutter analyze` and `flutter test` from `src/Modules/Google/Flutter/app/shell`.
   Wire-shape changes in C# records must be mirrored in the Dart screens in the same change.
 - Persisted grain state: append `[Id(n)]`, never renumber; use concrete arrays, not interface

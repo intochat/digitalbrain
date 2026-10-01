@@ -89,11 +89,14 @@ public sealed class DigitalBrainBuilder
 
     internal void AttachRuntime(
         OrleansService orleans,
+        IResourceBuilder<AzureStorageResource> storage,
         IResourceBuilder<AzureBlobStorageResource> grainState)
     {
         ArgumentNullException.ThrowIfNull(orleans);
+        ArgumentNullException.ThrowIfNull(storage);
         ArgumentNullException.ThrowIfNull(grainState);
         Orleans = orleans;
+        Storage = storage;
         GrainState = grainState;
     }
 
@@ -104,6 +107,8 @@ public sealed class DigitalBrainBuilder
     public IResourceBuilder<DigitalBrainResource> Resource { get; }
 
     internal IResourceBuilder<AzureBlobStorageResource> GrainState { get; private set; }
+
+    internal IResourceBuilder<AzureStorageResource> Storage { get; private set; } = null!;
 
     internal OrleansService Orleans { get; private set; }
 

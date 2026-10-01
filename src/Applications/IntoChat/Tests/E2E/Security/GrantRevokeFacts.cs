@@ -7,7 +7,6 @@ namespace IntoChat.Tests.E2E.Security;
 
 // The grants list and revoke routes at the HTTP edge are scoped to the caller's workspace.
 // Enforcement of a grant on a call is covered by Identity's GrantFacts.
-[Collection(IntoChatHostCollection.Name)]
 public sealed class GrantRevokeFacts(IntoChatHostFixture host)
 {
     [Fact(Timeout = 300_000)]
@@ -17,19 +16,11 @@ public sealed class GrantRevokeFacts(IntoChatHostFixture host)
         await using var brain = await host.LeaseAsync(ct);
         var suffix = Guid.NewGuid().ToString("N")[..8];
 
-        using var alice = CookieClient(brain.HttpClient);
-        using var bob = CookieClient(brain.HttpClient);
-        using var aliceLogin = await alice.PostAsJsonAsync(
-            "/identity/register",
-            new { principalId = "alice-" + suffix, displayName = "Alice", password = "alice-password-123" }, ct);
-        Assert.Equal(HttpStatusCode.OK, aliceLogin.StatusCode);
-        using var bobLogin = await bob.PostAsJsonAsync(
-            "/identity/register",
-            new { principalId = "bob-" + suffix, displayName = "Bob", password = "bob-password-123" }, ct);
-        Assert.Equal(HttpStatusCode.OK, bobLogin.StatusCode);
-
-        var member = await aliceLogin.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(ct);
-        var workspace = member!.BrainId;
+        using var alicePerson = await IntoChat.Tests.E2E.Packages.People.SignedIn(brain.HttpClient, "alice-" + suffix, ct);
+        using var bobPerson = await IntoChat.Tests.E2E.Packages.People.SignedIn(brain.HttpClient, "bob-" + suffix, ct);
+        var alice = alicePerson.Client;
+        var bob = bobPerson.Client;
+        var workspace = alicePerson.Workspace;
         using var create = await alice.PostAsJsonAsync(
             $"/brains/{workspace}/grants",
             new { appId = "app-1", semanticTypeId = "person.birthDate", mode = 2, workspaceId = workspace },
@@ -56,9 +47,5 @@ public sealed class GrantRevokeFacts(IntoChatHostFixture host)
         Assert.Empty(JsonSerializer.Deserialize<JsonElement[]>(await emptied.Content.ReadAsStringAsync(ct))!);
     }
 
-    private static HttpClient CookieClient(HttpClient origin)
-    {
-        var handler = new SocketsHttpHandler { UseCookies = true, CookieContainer = new CookieContainer() };
-        return new HttpClient(handler) { BaseAddress = origin.BaseAddress };
-    }
 }
+

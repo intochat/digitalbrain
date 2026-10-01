@@ -1,7 +1,6 @@
 using Azure.Core;
 using Azure.Identity;
 using DigitalBrain.Core;
-using DigitalBrain.Core.Enforcement;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,9 +22,9 @@ public sealed class CSharpModule : IModule<CSharpOptions>
             if (string.IsNullOrWhiteSpace(options.SourceRoot)) { options.SourceRoot = FindRepositoryRoot(); }
         });
         builder.Services.AddOptions<CSharpDeploymentSettings>().BindConfiguration(CSharpDeploymentSettings.SectionName);
-        builder.Services.AddCSharpAuthoring();
-        builder.Services.TryAddSingleton<CSharpSharing>();
-        builder.Services.TryAddScoped(provider => provider.GetRequiredService<CSharpToolService>().ForScope(BrainScope.CurrentId()));
+        builder.Services.TryAddSingleton<CSharpCatalogStore>();
+        builder.Services.TryAddSingleton<CSharpToolService>();
+        builder.Services.TryAddSingleton<DigitalBrain.Apps.IScriptSandbox, CSharpScriptSandbox>();
         builder.Services.TryAddSingleton(TimeProvider.System);
         builder.Services.TryAddSingleton<RunTokens>();
         builder.Services.TryAddSingleton<ScriptRunEnvironment>();
@@ -47,7 +46,6 @@ public sealed class CSharpModule : IModule<CSharpOptions>
     {
         ArgumentNullException.ThrowIfNull(endpoints);
         endpoints.MapScriptEdge();
-        CSharpAuthoringEndpoints.Map(endpoints);
     }
 
     public static string? FindRepositoryRoot()

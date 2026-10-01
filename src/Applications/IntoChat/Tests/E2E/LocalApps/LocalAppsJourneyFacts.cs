@@ -7,7 +7,7 @@ using Microsoft.Playwright;
 
 namespace IntoChat.Tests.E2E.LocalApps;
 
-public sealed class LocalAppsJourneyFacts
+public sealed class LocalAppsJourneyFacts(IntoChatHostFixture host) : BrainFact(host)
 {
     [Fact(Timeout = 300_000)]
     public async Task DownloadsImageCanBeDrawnCroppedAndSavedWithoutChangingOriginal()
@@ -32,9 +32,8 @@ public sealed class LocalAppsJourneyFacts
                 await File.WriteAllBytesAsync(Path.Combine(downloads, "Second.png"), source, ct);
                 await File.WriteAllTextAsync(Path.Combine(downloads, "readme.txt"), "Local file fixture", ct);
             }
-            await using var brain = await IntoChatE2ETest.Create()
-                .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp()).StartAsync(ct);
-            var page = brain.Page;
+            var brain = Brain;
+            var page = await OpenPageAsync(ct);
             page.SetDefaultTimeout(15000);
             Microsoft.Playwright.IRequest? saveRequest = null;
             page.Request += (_, request) => { if (request.Method == "POST" && request.Url.Contains("/save/", StringComparison.Ordinal)) { saveRequest = request; } };
@@ -125,7 +124,6 @@ public sealed class LocalAppsJourneyFacts
             {
                 // Both documents are at revision zero; changing tabs must still reload the composition.
                 await page.GetByRole(AriaRole.Button, new() { Name = "Files", Exact = true }).ClickAsync();
-                await page.GetByRole(AriaRole.Button, new() { Name = "Open Import from host Downloads", Exact = true }).ClickAsync();
                 await page.GetByRole(AriaRole.Button, new() { Name = "Open Second.png", Exact = true }).ClickAsync();
                 await Assertions.Expect(editor.GetByText("120 × 80", new() { Exact = true })).ToBeVisibleAsync();
                 await Assertions.Expect(editor).ToHaveCountAsync(1);

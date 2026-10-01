@@ -3,20 +3,22 @@ using DigitalBrain.AI.Agents;
 using DigitalBrain.Aspire;
 using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Sdk;
 using IntoChat;
-using IntoChat.Marketplace;
+using DigitalBrain.Apps;
+using DigitalBrain.Assistant;
 using IntoChat.ServiceDefaults;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using DigitalBrain.Identity;
+using DigitalBrain.Platform.Secrets;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddIntoChatOptions();
 builder.AddServiceDefaults();
 builder.AddDigitalBrainRuntime();
-builder.AddMarketplace();
+builder.Services.AddShippedApps(typeof(Program).Assembly, "IntoChat.ShippedApps/", publisher: "intochat");
+builder.Services.Configure<BuiltInSettingsOptions>(options => options.Package = PackageId.Create("intochat", "settings"));
 builder.AddKernelCors();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -29,7 +31,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Events.OnRedirectToLogin = context => { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; };
         options.Events.OnRedirectToAccessDenied = context => { context.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; };
     });
-builder.AddDurableProtection();
+builder.Services.AddMasterKeyWrapper();
+builder.Services.AddCookieProtection();
 
 var app = builder.Build();
 
@@ -38,10 +41,10 @@ app.UseModuleHttpSurfaces();
 app.UseAuthentication();
 app.UseAccountSession();
 app.MapDefaultEndpoints();
-// Developer mode is a server setting, so a client cannot grant itself the C# console.
-app.MapGet("/session/capabilities", static (IConfiguration configuration) =>
-    Results.Ok(new { developerMode = DeveloperMode.IsEnabled(configuration) }));
+app.MapGet("/session/capabilities", static (IServiceProvider services) =>
+    Results.Ok(new { developerMode = services.GetService<DigitalBrain.Apps.IScriptSandbox>()?.CanRun == true }));
 app.MapDigitalBrainModules();
-app.MapMarketplace();
+
 
 app.Run();
+

@@ -11,7 +11,6 @@ using DigitalBrain.CustomerResearcher;
 using DigitalBrain.Specs;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.ClickHouse;
-using DigitalBrain.Coding;
 using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.Core;
 using DigitalBrain.Flutter;
@@ -22,8 +21,6 @@ using DigitalBrain.Memory;
 using DigitalBrain.Qdrant;
 using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.GitHub;
-using DigitalBrain.Microsoft.DotNet;
-using DigitalBrain.Microsoft.Roslyn;
 using DigitalBrain.Compute;
 using DigitalBrain.Registry;
 using DigitalBrain.Sdk.Integrations;
@@ -34,6 +31,7 @@ using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 using DigitalBrain.Time;
 using DigitalBrain.Files;
+using IntoChat;
 
 var builder = DistributedApplication.CreateBuilder(args);
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serviceId: "intochat")
@@ -69,13 +67,14 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serv
     .WithModule<AssistantModule>()
     .WithModule<CustomerResearcherModule>()
     .WithModule<AspireModule>()
-    .WithModule<RoslynModule>()
-    .WithModule<DotNetModule>()
-    .WithModule<CodingModule>()
-    .WithModule<CSharpModule>();
+    .WithModule<CSharpModule>()
+    .WithModule<CSharpAuthoringModule>();
+
+var cookieProtection = digitalBrain.AddBlobContainer(CookieProtectionStorage.ContainerName);
 
 var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.IntoChat)
     .WithReference(digitalBrain)
+    .WaitFor(cookieProtection)
     .WithHttpEndpoint(
         port: ProductSurfaceResources.UiHttpPort,
         name: "http",

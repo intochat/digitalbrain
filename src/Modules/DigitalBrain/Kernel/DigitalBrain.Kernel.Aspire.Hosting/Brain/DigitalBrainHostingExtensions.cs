@@ -1,6 +1,7 @@
 using System.Reflection;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Azure;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
@@ -10,6 +11,13 @@ namespace DigitalBrain.Aspire.Hosting;
 
 public static class DigitalBrainHostingExtensions
 {
+    public static IResourceBuilder<AzureBlobStorageContainerResource> AddBlobContainer(this DigitalBrainBuilder brain, string name)
+    {
+        ArgumentNullException.ThrowIfNull(brain);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return brain.Storage.AddBlobContainer(name);
+    }
+
     public static DigitalBrainBuilder AddModules(this DigitalBrainBuilder brain, IReadOnlyList<ModuleDefinition> modules)
     {
         var resolved = ModuleComposition.Resolve(modules);
@@ -30,6 +38,12 @@ public static class DigitalBrainHostingExtensions
         }
     }
 
+    private sealed class MasterKeyProjection(IResourceBuilder<ParameterResource> masterKey) : DigitalBrainModuleProjection
+    {
+        public override void Apply<TResource>(IResourceBuilder<TResource> builder)
+            => builder.WithEnvironment(DigitalBrainNames.MasterKeyEnvironmentVariable, masterKey);
+    }
+
     public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name, bool persistentStorage = true, string? dataVolume = null, string? serviceId = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -47,6 +61,10 @@ public static class DigitalBrainHostingExtensions
                 Properties = [new(CustomResourceKnownProperties.Source, "DigitalBrain modules")],
             });
         var brain = new DigitalBrainBuilder(builder, name, resource);
+        var masterKey = builder.ExecutionContext.IsRunMode
+            ? builder.AddParameter(DigitalBrainHostingNames.MasterKeyParameter, new GenerateParameterDefault { MinLength = 32 }, secret: true, persist: true)
+            : builder.AddParameter(DigitalBrainHostingNames.MasterKeyParameter, secret: true);
+        brain.AddProjection(new MasterKeyProjection(masterKey));
         var kernel = brain.GetOrAddModuleNode(DigitalBrainHostingNames.Kernel);
         var storage = builder
             .AddAzureStorage(DigitalBrainNames.Storage)
@@ -76,7 +94,7 @@ public static class DigitalBrainHostingExtensions
             .WithGrainStorage(DigitalBrainNames.DefaultGrainStorage, grainState)
             .WithClusterId(clusterId)
             .WithServiceId(resolvedServiceId);
-        brain.AttachRuntime(orleans, grainState);
+        brain.AttachRuntime(orleans, storage, grainState);
 
         brain.RequireHealthyBeforeStart(storage.Resource);
         brain.RequireHealthyBeforeStart(clustering.Resource);

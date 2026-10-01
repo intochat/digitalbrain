@@ -31,7 +31,7 @@ internal sealed partial class AssistantNeuron(
     private string Workspace => Key.Split("/applications/")[0];
     public async IAsyncEnumerable<string> Run(AssistantRun request, [EnumeratorCancellation] CancellationToken ct = default)
     {
-        await foreach (var item in new AssistantTurnExecution(services, GrainFactory).Run(Workspace, request, (mode, summary) => DefineTurnForRequest(mode, summary, request.Message), ct))
+        await foreach (var item in new AssistantTurnExecution(services, GrainFactory).Run(Workspace, request, summary => DefineTurnForRequest(summary, request.Message), ct))
         { yield return item; }
     }
 
@@ -51,16 +51,16 @@ internal sealed partial class AssistantNeuron(
         return Task.FromResult(GrainFactory.GetGrain<IAgent>(AssistantConversations.Key(Workspace, threadId)));
     }
 
-    public Task<AgentDefinition> DefineTurn(bool developerMode, string? summary) => DefineTurnForRequest(developerMode, summary, null);
+    public Task<AgentDefinition> DefineTurn(string? summary) => DefineTurnForRequest(summary, null);
 
-    private async Task<AgentDefinition> DefineTurnForRequest(bool developerMode, string? summary, string? message)
+    private async Task<AgentDefinition> DefineTurnForRequest(string? summary, string? message)
     {
         var appTools = await new AgentToolSelection(GrainFactory).ResolveAsync(Workspace, CancellationToken.None);
         var registered = services.GetServices<IAgentToolFactory>()
             .SelectMany(factory => factory.Create(() => throw new InvalidOperationException("No tool call is active.")))
             .Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
-        developerMode &= registered.Contains("csharp_contracts");
-        var definition = Snapshot.Definition ?? AssistantDefinition.For(developerMode, appTools, message);
+        var authoringTools = registered.Where(AgentToolPolicy.IsCSharpTool).ToArray();
+        var definition = Snapshot.Definition ?? AssistantDefinition.For(authoringTools, appTools, message);
         if (Snapshot.Definition is null)
         {
             var native = services.GetService<NativeTools>();

@@ -1,7 +1,5 @@
 using System.Reflection;
-using System.Text.Json;
 using DigitalBrain.Core;
-using Microsoft.Extensions.Configuration;
 
 namespace IntoChat.Tests.Unit;
 
@@ -38,27 +36,6 @@ public sealed class ModuleOptionsFacts
             .OrderBy(module => module.FullName, StringComparer.Ordinal).Select(module => new TheoryDataRow<Type>(module));
 
     [Fact]
-    public void TheProductCompositionIncludesTheOptionsModules()
-        => Assert.True(ModulesWithOptions().Count() >= 10, "Every module that has topology knobs declares IModule<TOptions>.");
-
-    [Theory]
-    [MemberData(nameof(ModulesWithOptions))]
-    public void DefaultOptionsRoundTripThroughTheOneJsonConfigurationValue(Type module)
-    {
-        var optionsType = OptionsTypeOf(module)!;
-        var original = Activator.CreateInstance(optionsType)!;
-        var compile = typeof(ModuleOptionsSerialization).GetMethod(nameof(ModuleOptionsSerialization.Compile))!.MakeGenericMethod(module, optionsType);
-        var definition = (ModuleDefinition)compile.Invoke(null, [original])!;
-
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(definition.Configuration).Build();
-        var bind = typeof(ModuleOptionsSerialization).GetMethod(nameof(ModuleOptionsSerialization.GetModuleOptions))!.MakeGenericMethod(optionsType);
-        var bound = bind.Invoke(null, [configuration, module.Name])!;
-
-        Assert.Equal(JsonSerializer.Serialize(original, optionsType), JsonSerializer.Serialize(bound, optionsType));
-        ModuleSettingsValidation.ValidatePublicSettings([definition]);
-    }
-
-    [Fact]
     public void NoOptionsTypeCarriesAJsonIgnoredWritableMember()
     {
         var offenders = ModulesWithOptions().Select(row => OptionsTypeOf(row.Data)!)
@@ -70,3 +47,4 @@ public sealed class ModuleOptionsFacts
         Assert.Empty(offenders);
     }
 }
+

@@ -8,7 +8,6 @@ namespace IntoChat.Tests.E2E.Packages;
 
 // Alice writes a C# app and shares it with one request; the package carries its code and account
 // slots, never Alice's settings, and Bob's install runs it with his own account.
-[Collection(IntoChatHostCollection.Name)]
 public sealed class ShareCSharpFacts(IntoChatHostFixture host)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);

@@ -29,28 +29,17 @@ public sealed class CSharpRouteFacts
     }
 
     [Fact]
-    public async Task CSharpAuthoringIsNotFoundWhenDeveloperModeIsOff()
+    public void ExecutionCompositionDoesNotMapCSharpAuthoringRoutes()
     {
-        Assert.Equal(StatusCodes.Status404NotFound, await ListStatus(("DigitalBrain:DeveloperMode", "false")));
-    }
-
-    [Fact]
-    public async Task CSharpAuthoringIsNotFoundWhenDeveloperModeIsUnparseable()
-    {
-        Assert.Equal(StatusCodes.Status404NotFound, await ListStatus(("DigitalBrain:DeveloperMode", "maybe")));
-    }
-
-    private static async Task<int> ListStatus(params (string Key, string Value)[] settings)
-    {
-        var (app, endpoints) = MapAuthoringRoutes(settings);
-        var list = endpoints.Single(route => route.RoutePattern.RawText == "/brains/{brainId}/csharp/"
-            && route.Metadata.GetMetadata<HttpMethodMetadata>()!.HttpMethods.Contains("GET"));
-        var context = new DefaultHttpContext { RequestServices = app.Services };
-        context.Request.RouteValues["brainId"] = "brain-1";
-
-        await list.RequestDelegate!(context);
-
-        return context.Response.StatusCode;
+        var builder = WebApplication.CreateBuilder();
+        DigitalBrain.Testing.TestLogging.Apply(builder.Configuration);
+        builder.Services.AddSingleton<ScriptEdge>(_ => null!);
+        builder.Services.AddSingleton(new ScopedCSharpTools(null!, null!, null, "scope", canRun: false));
+        builder.Services.AddSingleton(new CSharpSharing(null!, null!));
+        var app = builder.Build();
+        new CSharpModule().Configure(app);
+        var routes = ((IEndpointRouteBuilder)app).DataSources.SelectMany(source => source.Endpoints).OfType<RouteEndpoint>();
+        Assert.DoesNotContain(routes, route => route.RoutePattern.RawText!.Contains("/csharp", StringComparison.Ordinal));
     }
 
     private static (WebApplication App, RouteEndpoint[] Endpoints) MapAuthoringRoutes(params (string Key, string Value)[] settings)
@@ -61,7 +50,7 @@ public sealed class CSharpRouteFacts
         builder.Services.AddSingleton(new ScopedCSharpTools(null!, null!, null, "scope", canRun: false));
         builder.Services.AddSingleton(new CSharpSharing(null!, null!));
         var app = builder.Build();
-        CSharpAuthoringEndpoints.Map(app);
+        new CSharpAuthoringModule().Configure(app);
         return (app, ((IEndpointRouteBuilder)app).DataSources.SelectMany(source => source.Endpoints).OfType<RouteEndpoint>().ToArray());
     }
 }

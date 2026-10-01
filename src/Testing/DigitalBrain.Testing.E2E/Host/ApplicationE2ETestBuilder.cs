@@ -9,6 +9,13 @@ public sealed class E2ETestBuilder<TAppHost> where TAppHost : class
     private BrowserOptions _browser = new() { Headless = true };
     private bool _started;
 
+    public E2ETestBuilder<TAppHost> WithoutModule<TModule>() where TModule : class, IModule, new()
+    {
+        EnsureMutable();
+        _overrides.WithoutModule<TModule>();
+        return this;
+    }
+
     public E2ETestBuilder<TAppHost> ConfigureModule<TModule, TOptions>(Action<TOptions> configureOptions)
         where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
     {
@@ -37,6 +44,16 @@ public sealed class E2ETestBuilder<TAppHost> where TAppHost : class
         _browser = scope.Options;
         return this;
     }
+    // A startup budget for hosts whose resources compile at start (a CI runner building the
+    // web shell needs more than the default); merges into the composition's execution options.
+    public E2ETestBuilder<TAppHost> WithStartupTimeout(TimeSpan timeout)
+    {
+        EnsureMutable();
+        TestExecutionOptions.ValidateTimeout(timeout);
+        _execution = _execution with { StartupTimeout = timeout };
+        return this;
+    }
+
     public E2ETestBuilder<TAppHost> WithExecution(TestExecutionOptions execution)
     {
         EnsureMutable();
@@ -46,12 +63,15 @@ public sealed class E2ETestBuilder<TAppHost> where TAppHost : class
     }
 
     // Adds environment variables to the primary application resource, for test-only wiring such as
-    // pointing the OTLP exporter at a collector owned by the test process.
+    // pointing the OTLP exporter at a collector owned by the test process. Later calls merge over
+    // earlier ones, so a composition's defaults survive a fact adding its own variables.
     public E2ETestBuilder<TAppHost> WithResourceEnvironment(IReadOnlyDictionary<string, string> environment)
     {
         EnsureMutable();
         ArgumentNullException.ThrowIfNull(environment);
-        _execution = _execution with { ResourceEnvironment = environment };
+        var merged = new Dictionary<string, string>(_execution.ResourceEnvironment, StringComparer.Ordinal);
+        foreach (var (key, value) in environment) { merged[key] = value; }
+        _execution = _execution with { ResourceEnvironment = merged };
         return this;
     }
     public E2ETestBuilder<TAppHost> WithBrowser(BrowserOptions browser)

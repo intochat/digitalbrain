@@ -282,7 +282,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
     );
   }
 
-  // Numeric values of IntoChat.Marketplace.AppDraftStatus on the wire.
+  // Numeric values of DigitalBrain.Apps.AppDraftStatus on the wire.
   static const _draftStatusLabels = [
     'New',
     'Scenarios written',

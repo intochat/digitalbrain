@@ -66,13 +66,14 @@ public sealed class CSharpFileContainerFacts
             Assert.Contains("error CS0103", await broken.ReadLogs(500, ct), StringComparison.Ordinal);
             await broken.Stop(ct);
 
-            // Losing the sandbox loses every run in it; the reconcile starts the sandbox and the listener again.
+            // Losing the sandbox loses every run in it. The script registered a durable
+            // grain-side subscription, so the file waits idle between runs; the next signal
+            // wakes a fresh run, which starts the sandbox again on demand.
             await aspire.StopResource(CSharpSandbox.ResourceName, ct);
-            await Until(listener, snapshot => snapshot.Status == CSharpFileStatus.Restarting, ct);
-            await Until(listener, snapshot => snapshot.Status == CSharpFileStatus.Running, ct);
-            await Logs(listener, "script ready", ct);
+            await Until(listener, snapshot => snapshot.Status != CSharpFileStatus.Running, ct);
 
             await brain.Get<ITimer>(timerId).Start(TimeSpan.Zero);
+            await Logs(listener, "script ready", ct);
             await Logs(listener, "script tick " + timerId, ct);
             var finished = await Until(listener, snapshot => snapshot.Status == CSharpFileStatus.Exited, ct);
             Assert.Equal(0, finished.ExitCode);
@@ -101,8 +102,15 @@ public sealed class CSharpFileContainerFacts
         var logs = "";
         try
         {
-            while (!(logs = await file.ReadLogs(500, ct)).Contains(expected, StringComparison.Ordinal))
-            { await Task.Delay(TimeSpan.FromSeconds(1), ct); }
+            while (true)
+            {
+                // A waking file holds its activation while the sandbox cold-starts, so a read
+                // can exceed the response timeout without anything being wrong yet.
+                try { logs = await file.ReadLogs(500, ct); }
+                catch (TimeoutException) { }
+                if (logs.Contains(expected, StringComparison.Ordinal)) { return; }
+                await Task.Delay(TimeSpan.FromSeconds(1), ct);
+            }
         }
         catch (OperationCanceledException error)
         { throw new TimeoutException($"'{expected}' never appeared. Logs:{Environment.NewLine}{logs}", error); }
@@ -112,8 +120,12 @@ public sealed class CSharpFileContainerFacts
     {
         while (true)
         {
-            var snapshot = await file.Read(ct);
-            if (reached(snapshot)) { return snapshot; }
+            try
+            {
+                var snapshot = await file.Read(ct);
+                if (reached(snapshot)) { return snapshot; }
+            }
+            catch (TimeoutException) { /* The file is busy waking a run; keep polling. */ }
             await Task.Delay(TimeSpan.FromMilliseconds(500), ct);
         }
     }

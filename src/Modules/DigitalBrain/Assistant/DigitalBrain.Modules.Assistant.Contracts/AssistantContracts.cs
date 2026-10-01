@@ -20,7 +20,7 @@ public interface IAssistant : INeuron, IUiEventHandler
     Task<ModelCatalog> Models();
     Task Configure(AgentDefinition definition);
     Task<IAgent> Conversation(string threadId);
-    Task<AgentDefinition> DefineTurn(bool developerMode, string? summary);
+    Task<AgentDefinition> DefineTurn(string? summary);
     // One-way, so the chat or voice input that announced the request is free to take the reply.
     [OneWay] Task Answer(string message);
     [OneWay] Task Hear(byte[] audio, string mimeType);

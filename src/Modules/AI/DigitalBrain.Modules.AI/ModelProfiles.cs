@@ -93,7 +93,8 @@ public sealed class ModelProfiles(IServiceProvider services, IOptionsMonitor<AIO
         }
         endpoint = Endpoint(endpoint ?? (provider == AiProvider.Ollama
             ? Clean(configuration.Ollama.Endpoint)
-            : Clean(Credentials.Setting(AiIntegrations.IdOf(provider), AiIntegrations.EndpointField))), provider);
+            : Clean(Credentials.Setting(AiIntegrations.IdOf(provider), AiIntegrations.EndpointField))
+                ?? Clean(configuration.Provider(provider).Endpoint)), provider);
         var capabilities = declared ?? preset?.Capabilities ?? LlmCapabilities.None;
         if ((capabilities & ~(LlmCapabilities.Tools | LlmCapabilities.Vision | LlmCapabilities.StructuredOutput)) != 0)
         {

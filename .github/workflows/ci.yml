@@ -4,7 +4,7 @@ on:
   push:
     branches: [master]
   pull_request:
-    branches: [master]
+    branches: [master, 'refactor/**']
 
 permissions:
   contents: read
@@ -21,7 +21,7 @@ jobs:
   dotnet-build-test:
     name: .NET build and test
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
 
@@ -52,16 +52,56 @@ jobs:
       - name: Validate NuGet packages
         run: dotnet pack DigitalBrain.slnx -c Release --no-build -v quiet -o artifacts
 
-      # One deterministic image build before the parallel AppHost sessions race to
-      # request it; every E2E web host then serves this cached image in seconds.
-      - name: Build the shell web image
-        run: docker build -f src/Modules/Google/Flutter/app/shell/Dockerfile src/Modules/Google/Flutter/app
+      # The one shared E2E host (IntoChatHostFixture) serves the web shell, so the suite
+      # compiles Flutter once per run and drives it with Playwright.
+      - name: Install Flutter for the shared E2E web host
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.2'
+          cache: true
 
+      - name: Resolve Flutter workspace
+        working-directory: src/Modules/Google/Flutter/app
+        run: flutter pub get --enforce-lockfile
+
+      # The shared E2E host compiles the shell at boot; warming the release web build here, with
+      # its incremental caches kept across runs, turns that in-test compile into minutes.
+      - name: Cache the shell web build
+        uses: actions/cache@v6
+        with:
+          path: |
+            src/Modules/Google/Flutter/app/**/.dart_tool
+            src/Modules/Google/Flutter/app/shell/build
+          key: ${{ runner.os }}-fluttershell-${{ hashFiles('src/Modules/Google/Flutter/app/pubspec.lock') }}-${{ hashFiles('src/Modules/Google/Flutter/app/**/lib/**') }}
+          restore-keys: |
+            ${{ runner.os }}-fluttershell-${{ hashFiles('src/Modules/Google/Flutter/app/pubspec.lock') }}-
+            ${{ runner.os }}-fluttershell-
+
+      - name: Warm the shell web build
+        working-directory: src/Modules/Google/Flutter/app/shell
+        run: flutter build web --release
+
+      - name: Install Playwright browser and system dependencies
+        run: pwsh src/Applications/IntoChat/Tests/E2E/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
+
+      # One deterministic build primes the docker layer cache, so the sandbox the E2E hosts
+      # start on demand comes up in seconds instead of spending its test budget on the build.
+      - name: Prime the C# sandbox image build cache
+        run: docker build src/Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Sandbox
+
+      # Scripts restore inside the sandbox against its named NuGet volume; seeding it from the
+      # host's packages (already restored for the solution) removes every in-sandbox download.
+      - name: Seed the sandbox NuGet volume
+        run: docker run --rm -v digitalbrain-csharp-nuget:/root/.nuget/packages -v $HOME/.nuget/packages:/seed:ro alpine sh -c "cp -a /seed/. /root/.nuget/packages/"
+
+      # One module at a time: the shared E2E host compiles the web shell and the sandbox
+      # E2E builds containers; running them beside other suites starves both on a small runner.
       - name: Test
-        run: dotnet test DigitalBrain.slnx -c Release --no-build -v quiet
+        run: dotnet test DigitalBrain.slnx -c Release --no-build -v quiet --max-parallel-test-modules 1
         env:
-          # No Flutter SDK on this runner: E2E web hosts serve the containerized bundle.
-          DigitalBrain__Flutter__Hosting__WebContainer: 'true'
+          DIGITALBRAIN_E2E_LIVE_MODEL: '0'
+          DIGITALBRAIN_E2E_HEADED: '0'
 
   flutter-web-build:
     name: Flutter analyze and web build

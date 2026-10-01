@@ -93,7 +93,7 @@ public sealed class AgentToolFacts
     [Fact]
     public void ExplicitComparisonKeepsBothSourcesWithInstalledApps()
     {
-        var tools = AgentToolPolicy.SelectTools(false, [], ["run_customer_researcher"], message: "Compare Postgres and Supabase");
+        var tools = AgentToolPolicy.SelectTools([], ["run_customer_researcher"], message: "Compare Postgres and Supabase");
         Assert.Contains("postgres_schema", tools);
         Assert.Contains("show_postgres_query_table", tools);
         Assert.Contains("supabase_schema", tools);
@@ -107,7 +107,7 @@ public sealed class AgentToolFacts
     [InlineData("Show data from Supabase", "supabase_schema", "postgres_schema")]
     public void ExplicitDatabaseExcludesTheOtherDatabaseTools(string message, string expected, string forbidden)
     {
-        var tools = AgentToolPolicy.SelectTools(developerMode: false, [], message: message);
+        var tools = AgentToolPolicy.SelectTools([], message: message);
         Assert.Contains(expected, tools);
         Assert.DoesNotContain(forbidden, tools);
     }
@@ -121,8 +121,7 @@ public sealed class AgentToolFacts
     [Fact]
     public void DefaultAllowlistIsTheEightProductToolsAndExcludesCSharpTools()
     {
-        var selected = AgentToolPolicy.SelectTools(developerMode: false,
-            ["csharp_contracts", "csharp_write", "csharp_run"]);
+        var selected = AgentToolPolicy.SelectTools([]);
         Assert.Equal(
             ["table_read", "table_refine", "show_form", "show_view",
              "supabase_schema", "show_supabase_query_table", "postgres_schema", "show_postgres_query_table"],
@@ -133,7 +132,7 @@ public sealed class AgentToolFacts
     [Fact]
     public void RelevantAppToolsJoinTheCoreAndNoneOfThemExceedTheCap()
     {
-        var selected = AgentToolPolicy.SelectTools(developerMode: false, [],
+        var selected = AgentToolPolicy.SelectTools([],
             ["propose_app", "run_leadgenerator"]);
         Assert.True(selected.Count <= AgentToolPolicy.MaxDefaultTools);
         Assert.DoesNotContain("find_capability", selected);
@@ -145,7 +144,7 @@ public sealed class AgentToolFacts
     [Fact]
     public void ATableIntentKeepsTheGenericTableToolsWhenAnAppIsRelevant()
     {
-        var selected = AgentToolPolicy.SelectTools(developerMode: false, [],
+        var selected = AgentToolPolicy.SelectTools([],
             ["propose_app"], tableIntent: true);
         Assert.Contains("supabase_schema", selected);
         Assert.Contains("show_supabase_query_table", selected);
@@ -154,34 +153,18 @@ public sealed class AgentToolFacts
     [Fact]
     public void ManyRelevantAppToolsStillFitTheCap()
     {
-        var selected = AgentToolPolicy.SelectTools(developerMode: false, [],
+        var selected = AgentToolPolicy.SelectTools([],
             ["propose_app", "run_leadgenerator", "plan_background_removal", "run_background_removal", "extra_app_tool"]);
         Assert.Equal(AgentToolPolicy.MaxDefaultTools, selected.Count);
         Assert.Equal(selected.Count, selected.Distinct(StringComparer.Ordinal).Count());
     }
 
     [Fact]
-    public void ExplicitDeveloperModeIncludesCSharpTools()
+    public void RegisteredAuthoringToolsJoinTheProductTools()
     {
         string[] developerTools = ["csharp_contracts", "csharp_write", "csharp_run"];
-        var selected = AgentToolPolicy.SelectTools(developerMode: true, developerTools);
+        var selected = AgentToolPolicy.SelectTools(developerTools);
         Assert.Equal(AgentToolPolicy.ProductTools.Concat(developerTools), selected);
-    }
-
-    [Fact]
-    public void DeveloperModeOffRefusesCSharpAuthoringWithOneLinePhase1Fallback()
-    {
-        var fallback = AgentToolPolicy.UnsupportedCSharpAuthoring(developerMode: false, "write C# code that saves invoices");
-        Assert.NotNull(fallback);
-        Assert.Equal(AgentToolPolicy.CSharpAuthoringFallback, fallback);
-        Assert.Contains("Phase 1", fallback!);
-        Assert.DoesNotContain('\n', fallback!);
-    }
-
-    [Fact]
-    public void DeveloperModeOffStillAnswersOrdinaryTableRequests()
-    {
-        Assert.Null(AgentToolPolicy.UnsupportedCSharpAuthoring(developerMode: false, "show me all customers"));
     }
 
     [Fact]

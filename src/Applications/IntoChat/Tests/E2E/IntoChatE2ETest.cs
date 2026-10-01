@@ -2,7 +2,6 @@ using DigitalBrain.AI;
 using DigitalBrain.Apps;
 using DigitalBrain.AI.OpenAI;
 using DigitalBrain.ClickHouse;
-using DigitalBrain.Coding;
 using DigitalBrain.Flutter;
 using DigitalBrain.Google.Gmail;
 using DigitalBrain.Microsoft.Aspire;
@@ -23,12 +22,22 @@ internal static class IntoChatE2ETest
 
     // The host ships its first-party apps in the background after it is healthy; a fact that opens
     // one has to wait until that package is published.
-    public static async Task WaitUntilShippedAsync(E2EBrain brain, string package, CancellationToken ct)
+    public static async Task WaitUntilShippedAsync(E2EBrain brain, string package, CancellationToken ct, TimeSpan? budget = null)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(TimeSpan.FromMinutes(4));
-        while ((await brain.Get<IPackage>(package).Read()).Published is null)
+        timeout.CancelAfter(budget ?? TimeSpan.FromMinutes(4));
+        while (true)
         {
+            var snapshot = await brain.Get<IPackage>(package).Read();
+            if (snapshot.Published is not null) { return; }
+            // A red verification never publishes; failing with its verdicts beats a silent timeout.
+            if (snapshot.Head is { } head
+                && await brain.Get<IAppVerification>(IAppVerification.Key(new(PackageId.Parse(package), head))).Read()
+                    is { Green: false } verification)
+            {
+                throw new InvalidOperationException($"{package}@{head} failed verification (exit {verification.Run.ExitCode}): "
+                    + string.Join("; ", verification.Run.Scenarios.Select(scenario => $"{scenario.Name}={(scenario.Passed ? "pass" : "FAIL " + scenario.Message)}")));
+            }
             await Task.Delay(TimeSpan.FromSeconds(1), timeout.Token);
         }
     }
@@ -52,10 +61,15 @@ internal static class IntoChatE2ETest
             .ConfigureModule<GmailModule, GmailModuleOptions>(gmail => gmail.WithTokenEndpoint(new(UnconfiguredProvider, "token")))
             .ConfigureModule<SalesforceModule, SalesforceModuleOptions>(salesforce => salesforce.WithLocalMcp(new(UnconfiguredProvider, "mcp")))
             .ConfigureModule<GitHubModule, GitHubModuleOptions>(github => github.WithGitHubRepositories(new Dictionary<string, GitHubRepositoryDeclaration>()))
-            .ConfigureModule<CodingModule, CodingModuleOptions>(coding => coding.SolutionPath = null)
             .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .WithExecution(new()
             {
+                // Shipping verifies five packages through real sandbox scripts. Only the shared
+                // host (IntoChatHostFixture) pays that once; private hosts opt out by default.
+                ResourceEnvironment = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["DigitalBrain__Apps__ShipOnStartup"] = "false",
+                },
                 PrivateConfiguration = Merge(new Dictionary<string, string?>
                 {
                     ["Parameters:openai-api-key"] = modelApiKey,

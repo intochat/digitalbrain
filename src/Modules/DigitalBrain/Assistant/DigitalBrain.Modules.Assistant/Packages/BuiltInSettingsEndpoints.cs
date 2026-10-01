@@ -6,27 +6,27 @@ using DigitalBrain.Core.Enforcement;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Assistant;
-
-public static class ShippedPublisher
-{
-    public const string Id = "intochat";
-}
 
 internal static class BuiltInSettingsEndpoints
 {
     public static void Map(IEndpointRouteBuilder endpoints)
     {
         var builtIn = BrainRoutes.Group(endpoints, "/built-in");
-        builtIn.MapPost("/settings/open", async (IDigitalBrain brain, PackageService packages) => await OpenSettings(brain, packages));
+        builtIn.MapPost("/settings/open", async (IDigitalBrain brain, PackageService packages, IOptions<BuiltInSettingsOptions> options)
+            => await OpenSettings(brain, packages, options.Value));
     }
 
     // Settings is the shipped settings package: installed on first open, then asked for its surface
     // and preferences, answered in the shape the shell renders.
-    private static async Task<IResult> OpenSettings(IDigitalBrain brain, PackageService packages)
+    internal static async Task<IResult> OpenSettings(IDigitalBrain brain, PackageService packages, BuiltInSettingsOptions options)
     {
-        var package = PackageId.Create(ShippedPublisher.Id, "settings");
+        if (options.Package is not { } package)
+        {
+            return Results.Json(new { error = "This host has no built-in settings package configured." }, statusCode: 503);
+        }
         var app = brain.Get<IApp>(InstalledPackages.AppKey(package));
         var snapshot = await app.Read();
         if (snapshot.Status != AppStatus.Installed)
@@ -63,3 +63,4 @@ internal static class BuiltInSettingsEndpoints
         });
     }
 }
+

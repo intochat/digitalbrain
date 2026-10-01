@@ -7,8 +7,6 @@ public static class AgentToolPolicy
 {
     public const int MaxDefaultTools = 8;
     public const string CSharpToolPrefix = "csharp_";
-    public const string CSharpAuthoringFallback =
-        "Writing C# apps isn't supported outside developer mode yet; it arrives in Phase 1.";
 
     public static readonly IReadOnlyList<string> CoreTools =
         ["table_read", "table_refine", "show_form", "show_view"];
@@ -19,17 +17,17 @@ public static class AgentToolPolicy
     // The static product list is the core plus the generic live-table pair, used when no app is relevant.
     public static readonly IReadOnlyList<string> ProductTools = [.. CoreTools, .. TableTools];
 
-    public static IReadOnlyList<string> SelectTools(bool developerMode, IReadOnlyList<string> developerTools,
+    public static IReadOnlyList<string> SelectTools(IReadOnlyList<string> authoringTools,
         IReadOnlyList<string>? appTools = null, bool tableIntent = false, string? message = null)
     {
-        ArgumentNullException.ThrowIfNull(developerTools);
+        ArgumentNullException.ThrowIfNull(authoringTools);
         var selected = new List<string>(CoreTools);
         var relevant = appTools ?? [];
         if (relevant.Count == 0 || tableIntent || System.Text.RegularExpressions.Regex.IsMatch(message ?? "", @"\b(?:postgres(?:ql)?|supabase)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
         { selected.AddRange(ForDatabase(TableTools, message)); }
         selected.AddRange(relevant);
         var product = selected.Distinct(StringComparer.Ordinal).Take(MaxDefaultTools).ToList();
-        if (developerMode) { product.AddRange(developerTools); }
+        product.AddRange(authoringTools);
         return product;
     }
 
@@ -56,21 +54,4 @@ public static class AgentToolPolicy
         return name.StartsWith(CSharpToolPrefix, StringComparison.Ordinal);
     }
 
-    // Returns the one-line fallback when the owner explicitly disabled developer mode and
-    // asked for C# authoring; the caller must not reach the model in that case.
-    public static string? UnsupportedCSharpAuthoring(bool developerMode, string message) =>
-        !developerMode && RequestsCSharpAuthoring(message) ? CSharpAuthoringFallback : null;
-
-    public static bool RequestsCSharpAuthoring(string message)
-    {
-        if (string.IsNullOrWhiteSpace(message)) { return false; }
-        var csharp = message.Contains("c#", StringComparison.OrdinalIgnoreCase)
-            || message.Contains("csharp", StringComparison.OrdinalIgnoreCase);
-        return csharp
-            && (message.Contains("author", StringComparison.OrdinalIgnoreCase)
-                || message.Contains("code", StringComparison.OrdinalIgnoreCase)
-                || message.Contains("compile", StringComparison.OrdinalIgnoreCase)
-                || message.Contains("program", StringComparison.OrdinalIgnoreCase)
-                || message.Contains("deploy", StringComparison.OrdinalIgnoreCase));
-    }
 }

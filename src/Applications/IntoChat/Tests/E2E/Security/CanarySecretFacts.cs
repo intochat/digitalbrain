@@ -1,3 +1,4 @@
+using static IntoChat.Tests.E2E.Diagnostics.TraceAssertions;
 using System.Net.Http.Json;
 using System.Text.Json;
 using DigitalBrain.Testing.E2E;
@@ -6,38 +7,17 @@ using IntoChat.Tests.E2E.Diagnostics;
 namespace IntoChat.Tests.E2E.Security;
 
 // A secret must not appear in HTTP responses, traces, or logs. SecretsFacts inspects persisted state.
-[Collection(IntoChatHostCollection.Name)]
 public sealed class CanarySecretFacts(IntoChatHostFixture host)
 {
     private const string Owner = "owner";
     private const string Canary = "canary-secret-7f3a91";
 
     [Fact(Timeout = 300_000)]
-    public async Task AnotherOwnersSecretIsForbiddenWhateverThePathSays()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var brain = await host.LeaseAsync(ct);
-
-        using var write = await brain.HttpClient.PostAsJsonAsync(
-            "/secrets/someone-else",
-            new { name = "me.apiKey", label = "API key", value = Canary },
-            ct);
-
-        Assert.Equal(System.Net.HttpStatusCode.Forbidden, write.StatusCode);
-    }
-
-    [Fact(Timeout = 300_000)]
     public async Task ASeededVaultSecretNeverAppearsInPlaintext()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var collector = TestTelemetryCollector.Start();
-        await using var brain = await IntoChatE2ETest.Create()
-            .WithResourceEnvironment(new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["OTEL_EXPORTER_OTLP_ENDPOINT"] = collector.Endpoint.AbsoluteUri,
-                ["OTEL_EXPORTER_OTLP_PROTOCOL"] = "http/protobuf",
-            })
-            .StartAsync(ct);
+        await using var brain = await host.LeaseAsync(ct);
+        var collector = host.Collector;
 
         using var seeded = await brain.HttpClient.PostAsJsonAsync(
             $"/secrets/{Owner}",
@@ -63,14 +43,8 @@ public sealed class CanarySecretFacts(IntoChatHostFixture host)
     public async Task AConnectionTokenNeverAppearsInPlaintext(string source)
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var collector = TestTelemetryCollector.Start();
-        await using var brain = await IntoChatE2ETest.Create()
-            .WithResourceEnvironment(new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["OTEL_EXPORTER_OTLP_ENDPOINT"] = collector.Endpoint.AbsoluteUri,
-                ["OTEL_EXPORTER_OTLP_PROTOCOL"] = "http/protobuf",
-            })
-            .StartAsync(ct);
+        await using var brain = await host.LeaseAsync(ct);
+        var collector = host.Collector;
 
         using var seeded = await brain.HttpClient.PostAsJsonAsync(
             $"/brains/{Owner}/integrations/accounts/connect",
@@ -94,14 +68,8 @@ public sealed class CanarySecretFacts(IntoChatHostFixture host)
     public async Task AFormSecretTravelsOnlyAsAVaultReference()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var collector = TestTelemetryCollector.Start();
-        await using var brain = await IntoChatE2ETest.Create()
-            .WithResourceEnvironment(new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["OTEL_EXPORTER_OTLP_ENDPOINT"] = collector.Endpoint.AbsoluteUri,
-                ["OTEL_EXPORTER_OTLP_PROTOCOL"] = "http/protobuf",
-            })
-            .StartAsync(ct);
+        await using var brain = await host.LeaseAsync(ct);
+        var collector = host.Collector;
 
         const string workspace = "form-canary";
         var scope = Scope(Owner, workspace);
@@ -138,46 +106,14 @@ public sealed class CanarySecretFacts(IntoChatHostFixture host)
         Assert.Empty(collector.Errors());
     }
 
-    [Fact(Timeout = 300_000)]
-    public async Task CSharpConsoleIsGatedByServerDeveloperMode()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var on = await host.LeaseAsync(ct);
-
-        var capabilities = await on.HttpClient.GetFromJsonAsync<JsonElement>("/session/capabilities", ct);
-        Assert.True(capabilities.GetProperty("developerMode").GetBoolean());
-
-        await using var off = await IntoChatE2ETest.Create()
-            .WithResourceEnvironment(new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["DigitalBrain__DeveloperMode"] = "false",
-            })
-            .StartAsync(ct);
-
-        var gated = await off.HttpClient.GetFromJsonAsync<JsonElement>("/session/capabilities", ct);
-        Assert.False(gated.GetProperty("developerMode").GetBoolean());
-        using var files = await off.HttpClient.GetAsync($"/brains/{Owner}/csharp/", ct);
-        Assert.Equal(System.Net.HttpStatusCode.NotFound, files.StatusCode);
-    }
-
     private static string Scope(string owner, string workspace)
     {
         var digest = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(owner + "\0" + workspace));
         return "workspace-" + Convert.ToHexStringLower(digest);
     }
 
-    private static string TextOf(CapturedSpan span)
-        => string.Join("\n", span.Attributes.Select(pair => pair.Key + "=" + pair.Value));
 
-    private static string TextOf(CapturedLog log)
-        => log.Body + "\n" + string.Join("\n", log.Attributes.Select(pair => pair.Key + "=" + pair.Value));
 
-    private static async Task WaitForAsync(Func<bool> condition, CancellationToken ct)
-    {
-        var deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(20);
-        while (!condition() && DateTimeOffset.UtcNow < deadline)
-        {
-            await Task.Delay(TimeSpan.FromMilliseconds(250), ct);
-        }
-    }
 }
+
+

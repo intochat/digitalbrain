@@ -8,7 +8,7 @@ public static class CompositionOverrideTransport
 {
     public const string ConfigurationKey = "DigitalBrain:Testing:Overrides";
     private static readonly ConcurrentDictionary<string, ModuleEdit[]> Published = new(StringComparer.Ordinal);
-    internal sealed record ModuleEdit(Type ModuleType, IReadOnlyList<Delegate> OptionEdits);
+    internal sealed record ModuleEdit(Type ModuleType, IReadOnlyList<Delegate> OptionEdits, bool Omit = false);
 
     internal static string Publish(ModuleEdit[] edits)
     {

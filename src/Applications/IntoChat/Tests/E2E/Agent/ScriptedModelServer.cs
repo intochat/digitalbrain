@@ -11,11 +11,13 @@ namespace IntoChat.Tests.E2E.Agent;
 // Exercises the production OpenAI adapter. This fixture owns no application services.
 public sealed partial class ScriptedModelServer : IAsyncDisposable
 {
+    private const string DefaultSql = "select id, company, email from public.leads where active = true order by id";
+
     private readonly WebApplication _app;
     private readonly ConcurrentQueue<JsonElement> _requests = new();
     private int _completed;
     public ConcurrentQueue<string> Errors { get; } = new();
-    public string Sql { get; set; } = "select id, company, email from public.leads where active = true order by id";
+    public string Sql { get; set; } = DefaultSql;
     public string? RepairSql { get; set; }
     public int RepairCount { get; private set; }
     public string? ExpectedValidationError { get; set; }
@@ -28,8 +30,30 @@ public sealed partial class ScriptedModelServer : IAsyncDisposable
     public int? LastReadFilteredRows { get; private set; }
     public string? LastReadAggregate { get; private set; }
     public bool Refined { get; private set; }
-    public TaskCompletionSource ToolRequested { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    public TaskCompletionSource Completed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource ToolRequested { get; private set; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public TaskCompletionSource Completed { get; private set; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    // One server outlives the shared host; every fact starts from the same script and counters.
+    public void Reset()
+    {
+        Sql = DefaultSql;
+        RepairSql = null;
+        RepairCount = 0;
+        ExpectedValidationError = null;
+        Delay = TimeSpan.Zero;
+        BeforeTable = null;
+        RefineColumn = null;
+        RefineOperator = "eq";
+        RefineValue = null;
+        LastReadFilteredRows = null;
+        LastReadAggregate = null;
+        Refined = false;
+        ToolRequested = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Completed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        _requests.Clear();
+        _completed = 0;
+        Errors.Clear();
+    }
     private ScriptedModelServer(WebApplication app) { _app = app; }
     public Uri Endpoint => new(new Uri(_app.Urls.Single()), "/v1/");
     public IReadOnlyList<JsonElement> Requests => _requests.ToArray();

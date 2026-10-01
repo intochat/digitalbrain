@@ -10,5 +10,6 @@ namespace DigitalBrain.Apps;
 public interface IAppRuntime
 {
     string Name { get; }
+    string AuthoringDescription { get; }
     Task<string> Answer(AppRuntimeRequest request, CancellationToken cancellationToken);
 }

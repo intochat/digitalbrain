@@ -348,6 +348,9 @@ class WorkspaceStore extends ChangeNotifier {
   onRemoteWindowAction;
   final Map<String, int> remoteRevisions = {};
   final Map<String, Set<String>> _startupWindows = {};
+  // Projects restored from the saved shell state. Only their windows count as "stale" on the
+  // first reconcile; a workspace created in this session shows remotely opened windows live.
+  final Set<String> _projectsAtLoad = {};
 
   void reconcileWorkspace(
     WorkspaceProject project,
@@ -355,7 +358,10 @@ class WorkspaceStore extends ChangeNotifier {
     String? openedWindowId,
   }) {
     if (snapshot.revision < (remoteRevisions[project.id] ?? -1)) return;
-    final startupSnapshot = loaded && !remoteRevisions.containsKey(project.id);
+    final startupSnapshot =
+        loaded &&
+        !remoteRevisions.containsKey(project.id) &&
+        _projectsAtLoad.contains(project.id);
     remoteRevisions[project.id] = snapshot.revision;
     _firstRun[project.id] = snapshot.firstRun == null
         ? null
@@ -541,6 +547,9 @@ class WorkspaceStore extends ChangeNotifier {
       loadFailed = true;
       persistenceError = 'Saved workspace could not be loaded. Existing saved data has not been replaced. Retry loading before saving.';
     }
+    _projectsAtLoad
+      ..clear()
+      ..addAll(projects.map((project) => project.id));
     loaded = true;
     _notify();
   }
@@ -602,6 +611,7 @@ class WorkspaceStore extends ChangeNotifier {
     loaded = false;
     remoteRevisions.clear();
     _startupWindows.clear();
+    _projectsAtLoad.clear();
     _firstRun.clear();
     await load();
   }

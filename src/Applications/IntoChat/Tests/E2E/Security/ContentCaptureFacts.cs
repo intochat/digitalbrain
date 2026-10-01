@@ -1,3 +1,4 @@
+using static IntoChat.Tests.E2E.Diagnostics.TraceAssertions;
 using System.Net.Http.Json;
 using DigitalBrain.AI;
 using DigitalBrain.Testing.E2E;
@@ -57,25 +58,9 @@ public sealed class ContentCaptureFacts
         Assert.Empty(collector.Errors());
     }
 
-    private static bool IsGenAiSpan(CapturedSpan span)
-        => span.Scope.StartsWith("DigitalBrain.AI", StringComparison.Ordinal)
-            || span.Scope.StartsWith("Microsoft.Extensions.AI", StringComparison.Ordinal)
-            || span.Scope.StartsWith("Experimental.Microsoft.Extensions.AI", StringComparison.Ordinal);
 
-    private static string TextOf(CapturedSpan span)
-        => string.Join("\n", span.Attributes.Select(pair => pair.Key + "=" + pair.Value));
 
-    private static string TextOf(CapturedLog log)
-        => log.Body + "\n" + string.Join("\n", log.Attributes.Select(pair => pair.Key + "=" + pair.Value));
 
-    private static async Task WaitForAsync(Func<bool> condition, CancellationToken ct)
-    {
-        var deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(20);
-        while (!condition() && DateTimeOffset.UtcNow < deadline)
-        {
-            await Task.Delay(TimeSpan.FromMilliseconds(250), ct);
-        }
-    }
 
     private static class CaptureTest
     {
@@ -96,3 +81,4 @@ public sealed class ContentCaptureFacts
         }
     }
 }
+

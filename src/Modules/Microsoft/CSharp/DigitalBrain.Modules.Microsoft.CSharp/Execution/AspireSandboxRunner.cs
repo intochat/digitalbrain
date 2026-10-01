@@ -9,6 +9,7 @@ namespace DigitalBrain.Microsoft.CSharp;
 internal sealed class AspireSandboxRunner(HttpClient http, IGrainFactory grains, IDigitalBrain brain, IOptions<CSharpOptions> options) : ICSharpRunner
 {
     internal static readonly TimeSpan SandboxStartTimeout = TimeSpan.FromMinutes(4);
+    internal static readonly TimeSpan InspectProbeTimeout = TimeSpan.FromSeconds(10);
     private static readonly HashSet<string> StoppedStates = new(["NotStarted", "Exited", "Finished", "FailedToStart", "Unknown"], StringComparer.Ordinal);
 
     private readonly SandboxRunsApi _api = new(http, static _ => ValueTask.FromResult<string?>(null));
@@ -25,9 +26,18 @@ internal sealed class AspireSandboxRunner(HttpClient http, IGrainFactory grains,
     }
 
     public async Task<CSharpRunState> InspectAsync(string owner, string runId, CancellationToken cancellationToken)
-        => runId.Length > 0 && await FindSandboxAsync(cancellationToken).ConfigureAwait(false) is { } sandbox
-            ? await _api.InspectAsync(sandbox, "", runId, cancellationToken).ConfigureAwait(false)
-            : CSharpRunState.Stopped;
+    {
+        if (runId.Length == 0 || await FindSandboxAsync(cancellationToken).ConfigureAwait(false) is not { } sandbox)
+        { return CSharpRunState.Stopped; }
+        // A stopped container does not surface as a state change on every runtime, and the
+        // endpoint proxy can keep accepting connections for a backend that is gone, so an
+        // unreachable or unresponsive sandbox counts as the run being lost, within a bounded probe.
+        using var probe = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        probe.CancelAfter(InspectProbeTimeout);
+        try { return await _api.InspectAsync(sandbox, "", runId, probe.Token).ConfigureAwait(false); }
+        catch (HttpRequestException) { return CSharpRunState.Stopped; }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { return CSharpRunState.Stopped; }
+    }
 
     public async Task<string> LogsAsync(string owner, string runId, int tail, CancellationToken cancellationToken)
         => runId.Length > 0 && await FindSandboxAsync(cancellationToken).ConfigureAwait(false) is { } sandbox

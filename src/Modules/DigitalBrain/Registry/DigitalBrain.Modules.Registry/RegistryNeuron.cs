@@ -9,6 +9,10 @@ namespace DigitalBrain.Registry;
 internal interface IRegistryObserver : IGrainWithStringKey
 {
     Task Observe(NeuronActivity activity);
+    // Activity arrives in bursts (every activation in an intent); one call and one state write
+    // per burst keeps the registry's bookkeeping out of the intent's span and storage budget.
+    [Alias("ObserveBatch")]
+    Task ObserveBatch(NeuronActivity[] activities);
 }
 
 [GenerateSerializer, Alias("registry.state")]
@@ -36,21 +40,35 @@ internal sealed class RegistryNeuron(NeuronTypes types, NeuronTypeSearch search,
             .OrderBy(instance => instance.Id, StringComparer.Ordinal).Skip(skip).Take(Math.Min(take, 1000))]);
     }
 
-    public async Task Observe(NeuronActivity activity)
+    public Task Observe(NeuronActivity activity)
     {
         ArgumentNullException.ThrowIfNull(activity);
-        ArgumentException.ThrowIfNullOrWhiteSpace(activity.NeuronId);
+        return ObserveBatch([activity]);
+    }
+
+    public async Task ObserveBatch(NeuronActivity[] activities)
+    {
+        ArgumentNullException.ThrowIfNull(activities);
         var previous = store.State;
-        previous.Instances.TryGetValue(activity.NeuronId, out var existing);
-        var active = activity is NeuronActivated;
-        if (existing is not null && (activity.ObservedAt < existing.LastSeenAt
-            || (active && activity.ActivationId == existing.ActivationId && !existing.LastKnownActive)
-            || (!active && activity.ActivationId != existing.ActivationId)
-            || (activity.ActivationId == existing.ActivationId && activity.ObservedAt == existing.LastSeenAt && existing.LastKnownActive == active)))
-        { return; }
-        var next = new NeuronInstance(activity.NeuronId, activity.Key, activity.TypeIds, activity.ActivationId,
-            existing?.FirstSeenAt ?? activity.ObservedAt, activity.ObservedAt, active);
-        store.State = previous with { Instances = new(previous.Instances, StringComparer.Ordinal) { [next.Id] = next } };
+        var instances = new Dictionary<string, NeuronInstance>(previous.Instances, StringComparer.Ordinal);
+        var changed = false;
+        foreach (var activity in activities)
+        {
+            ArgumentNullException.ThrowIfNull(activity);
+            ArgumentException.ThrowIfNullOrWhiteSpace(activity.NeuronId);
+            instances.TryGetValue(activity.NeuronId, out var existing);
+            var active = activity is NeuronActivated;
+            if (existing is not null && (activity.ObservedAt < existing.LastSeenAt
+                || (active && activity.ActivationId == existing.ActivationId && !existing.LastKnownActive)
+                || (!active && activity.ActivationId != existing.ActivationId)
+                || (activity.ActivationId == existing.ActivationId && activity.ObservedAt == existing.LastSeenAt && existing.LastKnownActive == active)))
+            { continue; }
+            instances[activity.NeuronId] = new NeuronInstance(activity.NeuronId, activity.Key, activity.TypeIds, activity.ActivationId,
+                existing?.FirstSeenAt ?? activity.ObservedAt, activity.ObservedAt, active);
+            changed = true;
+        }
+        if (!changed) { return; }
+        store.State = previous with { Instances = instances };
         try { await store.WriteStateAsync(); }
         catch { store.State = previous; throw; }
     }

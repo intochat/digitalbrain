@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Client" />
+    <PackageReference Include="Azure.Extensions.AspNetCore.DataProtection.Blobs" />
     <InternalsVisibleTo Include="IntoChat.Tests.E2E" />
     <InternalsVisibleTo Include="IntoChat.Tests.Unit" />
   </ItemGroup>
@@ -35,9 +36,6 @@
     <ProjectReference Include="../../../Modules/Salesforce/DigitalBrain.Modules.Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
     <ProjectReference Include="../../../Modules/Microsoft/GitHub/DigitalBrain.Modules.Microsoft.GitHub/DigitalBrain.Modules.Microsoft.GitHub.csproj" />
     <ProjectReference Include="../../../Modules/Microsoft/Aspire/DigitalBrain.Modules.Microsoft.Aspire/DigitalBrain.Modules.Microsoft.Aspire.csproj" />
-    <ProjectReference Include="../../../Modules/Coding/DigitalBrain.Modules.Coding/DigitalBrain.Modules.Coding.csproj" />
-    <ProjectReference Include="../../../Modules/Microsoft/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.csproj" />
-    <ProjectReference Include="../../../Modules/Microsoft/DotNet/DigitalBrain.Modules.Microsoft.DotNet/DigitalBrain.Modules.Microsoft.DotNet.csproj" />
     <ProjectReference Include="../../../Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp/DigitalBrain.Modules.Microsoft.CSharp.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Registry/DigitalBrain.Modules.Registry/DigitalBrain.Modules.Registry.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps/DigitalBrain.Modules.Apps.csproj" />

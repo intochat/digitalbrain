@@ -68,10 +68,12 @@ public sealed class BrainCompositionBuilder
         EnsureMutable();
         var edits = CompositionOverrideTransport.Take(token);
         var replacements = new Dictionary<Type, ModuleDraft>();
+        var omitted = new HashSet<Type>();
         foreach (var edit in edits)
         {
             var existing = _modules.TryGetValue(edit.ModuleType, out var declared) ? declared
                 : throw new ArgumentException("An override targets a module not declared by the application.", nameof(token));
+            if (edit.Omit) { omitted.Add(edit.ModuleType); continue; }
             var draft = existing.Copy();
             foreach (var configure in edit.OptionEdits)
             {
@@ -81,6 +83,7 @@ public sealed class BrainCompositionBuilder
             replacements.Add(draft.Type, draft);
         }
         // An invalid override never leaves a partially overridden application.
+        foreach (var type in omitted) { _modules.Remove(type); }
         foreach (var (type, draft) in replacements) { _modules[type] = draft; }
         return this;
     }
