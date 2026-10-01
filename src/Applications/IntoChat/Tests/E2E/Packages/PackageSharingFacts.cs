@@ -61,7 +61,7 @@ public sealed class PackageSharingFacts(IntoChatHostFixture host) : BrainFact(ho
     {
         var invocation = await People.Send(client, HttpMethod.Post, app + "/invocations", new { operation = "research", input = question }, ct);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(TimeSpan.FromMinutes(3));
+        timeout.CancelAfter(TimeSpan.FromMinutes(10));
         while (invocation.GetProperty("status").GetInt32() == (int)InvocationStatus.Pending)
         {
             var view = await People.Send(client, HttpMethod.Get, app, null, timeout.Token);

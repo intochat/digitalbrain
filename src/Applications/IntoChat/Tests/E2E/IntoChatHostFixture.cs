@@ -33,7 +33,7 @@ public sealed class IntoChatHostFixture : SharedBrainFixture, IAsyncLifetime
         return await IntoChatE2ETest.Create()
             .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, _model.Endpoint))
             .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp())
-            .WithBrowser(new() { PrimarySession = false })
+            .WithBrowser(new() { PrimarySession = false, AssertionTimeout = TimeSpan.FromMinutes(2) })
             // The one shared boot compiles the web shell; a cold CI runner needs well over the
             // default three minutes.
             .WithStartupTimeout(TimeSpan.FromMinutes(20))

@@ -27,8 +27,18 @@ internal static class IntoChatE2ETest
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(budget ?? TimeSpan.FromMinutes(4));
-        while ((await brain.Get<IPackage>(package).Read()).Published is null)
+        while (true)
         {
+            var snapshot = await brain.Get<IPackage>(package).Read();
+            if (snapshot.Published is not null) { return; }
+            // A red verification never publishes; failing with its verdicts beats a silent timeout.
+            if (snapshot.Head is { } head
+                && await brain.Get<IAppVerification>(IAppVerification.Key(new(PackageId.Parse(package), head))).Read()
+                    is { Green: false } verification)
+            {
+                throw new InvalidOperationException($"{package}@{head} failed verification (exit {verification.Run.ExitCode}): "
+                    + string.Join("; ", verification.Run.Scenarios.Select(scenario => $"{scenario.Name}={(scenario.Passed ? "pass" : "FAIL " + scenario.Message)}")));
+            }
             await Task.Delay(TimeSpan.FromSeconds(1), timeout.Token);
         }
     }
