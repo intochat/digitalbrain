@@ -23,10 +23,10 @@ internal static class IntoChatE2ETest
 
     // The host ships its first-party apps in the background after it is healthy; a fact that opens
     // one has to wait until that package is published.
-    public static async Task WaitUntilShippedAsync(E2EBrain brain, string package, CancellationToken ct)
+    public static async Task WaitUntilShippedAsync(E2EBrain brain, string package, CancellationToken ct, TimeSpan? budget = null)
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(TimeSpan.FromMinutes(4));
+        timeout.CancelAfter(budget ?? TimeSpan.FromMinutes(4));
         while ((await brain.Get<IPackage>(package).Read()).Published is null)
         {
             await Task.Delay(TimeSpan.FromSeconds(1), timeout.Token);

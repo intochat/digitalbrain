@@ -45,9 +45,13 @@ public sealed class IntoChatHostFixture : SharedBrainFixture, IAsyncLifetime
         try
         {
             // Shipping is serial in the publisher; waiting here keeps the sandbox quiet while
-            // facts run and lets any fact use a shipped app without its own wait.
+            // facts run and lets any fact use a shipped app without its own wait. The first
+            // package pays the sandbox's cold start and in-sandbox restore, which on a CI runner
+            // takes far longer than the per-fact default.
+            using var shipping = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            shipping.CancelAfter(TimeSpan.FromMinutes(25));
             foreach (var package in ShippedPackages)
-            { await IntoChatE2ETest.WaitUntilShippedAsync(brain, package, cancellationToken); }
+            { await IntoChatE2ETest.WaitUntilShippedAsync(brain, package, shipping.Token, TimeSpan.FromMinutes(25)); }
         }
         catch
         {
