@@ -34,6 +34,9 @@ using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 using DigitalBrain.Time;
 using DigitalBrain.Files;
+using Aspire.Hosting.Azure;
+using DigitalBrain.Contracts;
+using IntoChat;
 
 var builder = DistributedApplication.CreateBuilder(args);
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serviceId: "intochat")
@@ -74,8 +77,13 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serv
     .WithModule<CodingModule>()
     .WithModule<CSharpModule>();
 
+var storage = builder.CreateResourceBuilder(builder.Resources.OfType<AzureStorageResource>()
+    .Single(resource => resource.Name == DigitalBrainNames.Storage));
+var cookieProtection = storage.AddBlobContainer(CookieProtectionStorage.ContainerName);
+
 var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.IntoChat)
     .WithReference(digitalBrain)
+    .WaitFor(cookieProtection)
     .WithHttpEndpoint(
         port: ProductSurfaceResources.UiHttpPort,
         name: "http",

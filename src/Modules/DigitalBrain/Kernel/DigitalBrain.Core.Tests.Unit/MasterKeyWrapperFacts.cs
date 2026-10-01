@@ -1,6 +1,10 @@
 using System.Security.Cryptography;
 using DigitalBrain.Platform.Secrets;
+using DigitalBrain.Contracts;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace DigitalBrain.Core.Tests.Unit;
@@ -13,6 +17,7 @@ public sealed class MasterKeyWrapperFacts
         var key = RandomNumberGenerator.GetBytes(32);
         var wrapped = Wrapper("first master key").Wrap(key);
         Assert.StartsWith("mk3:", wrapped, StringComparison.Ordinal);
+        Assert.DoesNotContain(Convert.ToBase64String(key), wrapped, StringComparison.Ordinal);
         Assert.Equal(key, Wrapper("first master key").Unwrap(wrapped));
     }
 
@@ -44,14 +49,17 @@ public sealed class MasterKeyWrapperFacts
     [InlineData(null)]
     [InlineData("")]
     [InlineData(" ")]
-    public void A_missing_master_key_fails_with_an_actionable_message(string? masterKey)
+    public async Task A_production_host_rejects_a_blank_master_key_at_startup_with_the_operator_configuration_names(string? masterKey)
     {
-        var error = Assert.Throws<InvalidOperationException>(() => Wrapper(masterKey));
-        Assert.Contains("DigitalBrain:MasterKey", error.Message, StringComparison.Ordinal);
-        Assert.Contains("DigitalBrain__MasterKey", error.Message, StringComparison.Ordinal);
+        using var host = new HostBuilder().UseEnvironment(Environments.Production)
+            .ConfigureAppConfiguration(configuration => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?> { [DigitalBrainNames.MasterKeyConfigurationKey] = masterKey }))
+            .ConfigureServices(services => services.AddMasterKeyWrapper())
+            .Build();
+        var error = await Assert.ThrowsAsync<OptionsValidationException>(() => host.StartAsync(TestContext.Current.CancellationToken));
+        Assert.Contains(DigitalBrainNames.MasterKeyConfigurationKey, error.Message, StringComparison.Ordinal);
+        Assert.Contains(DigitalBrainNames.MasterKeyEnvironmentVariable, error.Message, StringComparison.Ordinal);
     }
 
-    private static MasterKeyWrapper Wrapper(string? masterKey) => new(new ConfigurationBuilder()
-        .AddInMemoryCollection(new Dictionary<string, string?> { ["DigitalBrain:MasterKey"] = masterKey })
-        .Build());
+    private static MasterKeyWrapper Wrapper(string masterKey) => new(Options.Create(new MasterKeyOptions { MasterKey = masterKey }));
 }

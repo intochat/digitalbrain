@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Platform.Secrets;
 
@@ -11,11 +11,9 @@ public sealed class MasterKeyWrapper : IKeyWrapper
     private const int TagSize = 16;
     private readonly byte[] _key;
 
-    public MasterKeyWrapper(IConfiguration configuration)
+    public MasterKeyWrapper(IOptions<MasterKeyOptions> options)
     {
-        var masterKey = configuration["DigitalBrain:MasterKey"];
-        if (string.IsNullOrWhiteSpace(masterKey))
-        { throw new InvalidOperationException("Configure DigitalBrain:MasterKey via the DigitalBrain__MasterKey environment secret before starting IntoChat."); }
+        var masterKey = options.Value.MasterKey;
         _key = HKDF.DeriveKey(HashAlgorithmName.SHA256, Encoding.UTF8.GetBytes(masterKey), 32,
             info: "DigitalBrain.OwnerKeys.v3"u8.ToArray());
     }

@@ -37,14 +37,7 @@ internal sealed class SecretsStore(IKeyWrapper keys)
         }
 
         var ownerKey = keys.Unwrap(state.WrappedOwnerKey);
-        if (string.IsNullOrEmpty(record.SealedCredentialKey))
-        {
-            return SecretCipher.Open(ownerKey, record.SealedSecret);
-        }
-
-        // Secrets saved by MyData used a second key for each credential.
-        var credentialKey = Convert.FromBase64String(SecretCipher.Open(ownerKey, record.SealedCredentialKey));
-        return SecretCipher.Open(credentialKey, record.SealedSecret);
+        return SecretCipher.Open(ownerKey, record.SealedSecret);
     }
 
     private byte[] OwnerKey(SecretsState state)

@@ -33,7 +33,7 @@ public static class DigitalBrainHostingExtensions
     private sealed class MasterKeyProjection(IResourceBuilder<ParameterResource> masterKey) : DigitalBrainModuleProjection
     {
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
-            => builder.WithEnvironment("DigitalBrain__MasterKey", masterKey);
+            => builder.WithEnvironment(DigitalBrainNames.MasterKeyEnvironmentVariable, masterKey);
     }
 
     public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name, bool persistentStorage = true, string? dataVolume = null, string? serviceId = null)
@@ -54,8 +54,8 @@ public static class DigitalBrainHostingExtensions
             });
         var brain = new DigitalBrainBuilder(builder, name, resource);
         var masterKey = builder.ExecutionContext.IsRunMode
-            ? builder.AddParameter("digitalbrain-master-key", new GenerateParameterDefault { MinLength = 32 }, secret: true, persist: true)
-            : builder.AddParameter("digitalbrain-master-key", secret: true);
+            ? builder.AddParameter(DigitalBrainHostingNames.MasterKeyParameter, new GenerateParameterDefault { MinLength = 32 }, secret: true, persist: true)
+            : builder.AddParameter(DigitalBrainHostingNames.MasterKeyParameter, secret: true);
         brain.AddProjection(new MasterKeyProjection(masterKey));
         var kernel = brain.GetOrAddModuleNode(DigitalBrainHostingNames.Kernel);
         var storage = builder

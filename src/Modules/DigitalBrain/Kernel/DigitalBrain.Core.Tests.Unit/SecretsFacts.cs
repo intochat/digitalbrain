@@ -3,6 +3,8 @@ using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Sdk.Secrets;
 using DigitalBrain.Platform.Secrets;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
 using Xunit;
 
 namespace DigitalBrain.Core.Tests.Unit;
@@ -36,30 +38,24 @@ public sealed class SecretsFacts
     }
 
     [Fact]
-    public void ResolvesSecretsWrittenByThePreviousVault()
+    public void The_master_key_store_resolves_a_secret_it_has_set()
     {
-        var keys = new KeyVaultKeyWrapper(new FakeKeyVault());
-        var ownerKey = SecretCipher.NewKey();
-        var credentialKey = SecretCipher.NewKey();
-        var state = new SecretsState
-        {
-            Owner = Owner,
-            WrappedOwnerKey = keys.Wrap(ownerKey),
-            Fields = new Dictionary<string, SecretRecord>
-            {
-                ["api.key"] = new()
-                {
-                    FieldPath = "api.key",
-                    IsSecret = true,
-                    SealedCredentialKey = SecretCipher.Seal(ownerKey, Convert.ToBase64String(credentialKey)),
-                    SealedSecret = SecretCipher.Seal(credentialKey, Canary),
-                },
-            },
-        };
-
-        var reference = DigitalBrain.Contracts.Types.SecretRef.For(Owner, "api.key", "API key", true);
-        Assert.Equal(Canary, new SecretsStore(keys).Resolve(state, reference));
+        var state = new SecretsState { Owner = Owner };
+        var store = MasterKeyStore("first master key");
+        var reference = store.Set(state, "api.key", "API key", Canary);
+        Assert.Equal(Canary, store.Resolve(state, reference));
     }
+
+    [Fact]
+    public void A_store_with_a_different_master_key_cannot_resolve_the_same_state()
+    {
+        var state = new SecretsState { Owner = Owner };
+        var reference = MasterKeyStore("first master key").Set(state, "api.key", "API key", Canary);
+        Assert.ThrowsAny<CryptographicException>(() => MasterKeyStore("different master key").Resolve(state, reference));
+    }
+
+    private static SecretsStore MasterKeyStore(string masterKey)
+        => new(new MasterKeyWrapper(Options.Create(new MasterKeyOptions { MasterKey = masterKey })));
 
     [Fact]
     public async Task UserCannotResolveThroughGrain()
