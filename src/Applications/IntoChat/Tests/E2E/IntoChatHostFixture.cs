@@ -15,8 +15,10 @@ public sealed class IntoChatHostFixture : SharedBrainFixture, IAsyncLifetime
     // compile, shipped-app verification) never counts against a fact's timeout.
     public async ValueTask InitializeAsync() => await WarmUpAsync();
 
-    public static readonly string[] ShippedPackages =
-        ["intochat/assistant", "intochat/customer-researcher", "intochat/group-chat", "intochat/settings", "intochat/word-count"];
+    // The one shipped package a fact uses: built-in settings installs from it. Everything
+    // else ships through the same gate in production hosts, but verifying all five packages
+    // through sandbox scripts is far too slow to pay on every suite boot.
+    public static readonly string[] ShippedPackages = ["intochat/settings"];
 
     private ScriptedModelServer? _model;
     private TestTelemetryCollector? _collector;
@@ -39,7 +41,7 @@ public sealed class IntoChatHostFixture : SharedBrainFixture, IAsyncLifetime
             {
                 ["OTEL_EXPORTER_OTLP_ENDPOINT"] = _collector.Endpoint.AbsoluteUri,
                 ["OTEL_EXPORTER_OTLP_PROTOCOL"] = "http/protobuf",
-                ["DigitalBrain__Apps__ShipOnStartup"] = "true",
+                ["DigitalBrain__Apps__ShipOnStartup"] = "settings",
             })
             .StartAsync(cancellationToken);
         try

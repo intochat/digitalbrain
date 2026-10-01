@@ -11,15 +11,17 @@ namespace IntoChat.Marketplace;
 // its failing steps are visible on its spec page.
 internal sealed class ShippedAppPublisher(IDigitalBrain brain, MarketplaceService marketplace, IHostApplicationLifetime lifetime, IConfiguration configuration, ILogger<ShippedAppPublisher> logger) : BackgroundService
 {
-    // Verifying every shipped app runs real sandbox scripts; a test host that exercises none of
-    // them turns shipping off and shares one shipped host instead.
+    // Verifying a shipped app runs real sandbox scripts. A test host declares what it needs:
+    // "true" (default) ships everything, "false" nothing, and a comma-separated list of package
+    // names ships only those.
     public const string ShipOnStartupKey = "DigitalBrain:Apps:ShipOnStartup";
 
     private static readonly JsonSerializerOptions CanonicalJson = new(JsonSerializerDefaults.Web);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (!configuration.GetValue(ShipOnStartupKey, true))
+        var selection = Selection(configuration[ShipOnStartupKey]);
+        if (selection is { Count: 0 })
         {
             logger.LogInformation("Shipped apps stay unpublished: {Key} is off.", ShipOnStartupKey);
             return;
@@ -41,6 +43,7 @@ internal sealed class ShippedAppPublisher(IDigitalBrain brain, MarketplaceServic
         foreach (var app in ShippedApps.Load())
         {
             if (stoppingToken.IsCancellationRequested) { return; }
+            if (selection is not null && !selection.Contains(app.Package.Name)) { continue; }
             try { await Ship(app); }
             catch (Exception error) when (error is not OperationCanceledException)
             { logger.LogError(error, "Shipping {Package} failed.", app.Package); }
@@ -77,6 +80,14 @@ internal sealed class ShippedAppPublisher(IDigitalBrain brain, MarketplaceServic
             logger.LogInformation("Published {Package}@{Revision}.", app.Package, revisionId);
         }
     }
+
+    // null means every package; an empty set means none.
+    private static HashSet<string>? Selection(string? configured) => configured?.Trim().ToLowerInvariant() switch
+    {
+        null or "" or "true" => null,
+        "false" => [],
+        var names => [.. names.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)],
+    };
 
     private static bool Same(PackageContent left, PackageContent right) => Canonical(left) == Canonical(right);
 
