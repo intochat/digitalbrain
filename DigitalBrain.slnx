@@ -53,11 +53,6 @@
     <Project Path="src/Modules/ClickHouse/DigitalBrain.Modules.ClickHouse.Deployment/DigitalBrain.Modules.ClickHouse.Deployment.csproj" />
     <Project Path="src/Modules/ClickHouse/DigitalBrain.Modules.ClickHouse.Contracts/DigitalBrain.Modules.ClickHouse.Contracts.csproj" />
   </Folder>
-  <Folder Name="/Modules/Coding/">
-    <Project Path="src/Modules/Coding/DigitalBrain.Modules.Coding.Tests.Unit/DigitalBrain.Modules.Coding.Tests.Unit.csproj" />
-    <Project Path="src/Modules/Coding/DigitalBrain.Modules.Coding/DigitalBrain.Modules.Coding.csproj" />
-    <Project Path="src/Modules/Coding/DigitalBrain.Modules.Coding.Contracts/DigitalBrain.Modules.Coding.Contracts.csproj" />
-  </Folder>
   <Folder Name="/Modules/Google/" />
   <Folder Name="/Modules/Google/Flutter/">
     <Project Path="src/Modules/Google/Flutter/DigitalBrain.Modules.Flutter.Testing/DigitalBrain.Modules.Flutter.Testing.csproj" />
@@ -101,21 +96,11 @@
     <Project Path="src/Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Sandbox/DigitalBrain.Modules.Microsoft.CSharp.Sandbox.csproj" />
     <Project Path="src/Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Contracts/DigitalBrain.Modules.Microsoft.CSharp.Contracts.csproj" />
   </Folder>
-  <Folder Name="/Modules/Microsoft/DotNet/">
-    <Project Path="src/Modules/Microsoft/DotNet/DigitalBrain.Modules.Microsoft.DotNet.Tests.Unit/DigitalBrain.Modules.Microsoft.DotNet.Tests.Unit.csproj" />
-    <Project Path="src/Modules/Microsoft/DotNet/DigitalBrain.Modules.Microsoft.DotNet/DigitalBrain.Modules.Microsoft.DotNet.csproj" />
-    <Project Path="src/Modules/Microsoft/DotNet/DigitalBrain.Modules.Microsoft.DotNet.Contracts/DigitalBrain.Modules.Microsoft.DotNet.Contracts.csproj" />
-  </Folder>
   <Folder Name="/Modules/Microsoft/GitHub/">
     <Project Path="src/Modules/Microsoft/GitHub/DigitalBrain.Modules.Microsoft.GitHub.Tests.Unit/DigitalBrain.Modules.Microsoft.GitHub.Tests.Unit.csproj" />
     <Project Path="src/Modules/Microsoft/GitHub/DigitalBrain.Modules.Microsoft.GitHub.Aspire.Hosting/DigitalBrain.Modules.Microsoft.GitHub.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/Microsoft/GitHub/DigitalBrain.Modules.Microsoft.GitHub/DigitalBrain.Modules.Microsoft.GitHub.csproj" />
     <Project Path="src/Modules/Microsoft/GitHub/DigitalBrain.Modules.Microsoft.GitHub.Contracts/DigitalBrain.Modules.Microsoft.GitHub.Contracts.csproj" />
-  </Folder>
-  <Folder Name="/Modules/Microsoft/Roslyn/">
-    <Project Path="src/Modules/Microsoft/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.Tests.Unit/DigitalBrain.Modules.Microsoft.Roslyn.Tests.Unit.csproj" />
-    <Project Path="src/Modules/Microsoft/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.csproj" />
-    <Project Path="src/Modules/Microsoft/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.Contracts/DigitalBrain.Modules.Microsoft.Roslyn.Contracts.csproj" />
   </Folder>
   <Folder Name="/Modules/Salesforce/">
     <Project Path="src/Modules/Salesforce/DigitalBrain.Modules.Salesforce.Tests.Unit/DigitalBrain.Modules.Salesforce.Tests.Unit.csproj" />

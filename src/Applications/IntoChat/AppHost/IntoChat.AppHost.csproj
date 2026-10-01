@@ -29,9 +29,6 @@
     <ProjectReference Include="../../../Modules/Salesforce/DigitalBrain.Modules.Salesforce.Aspire.Hosting/DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Microsoft/GitHub/DigitalBrain.Modules.Microsoft.GitHub.Aspire.Hosting/DigitalBrain.Modules.Microsoft.GitHub.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Microsoft/Aspire/DigitalBrain.Modules.Microsoft.Aspire.Aspire.Hosting/DigitalBrain.Modules.Microsoft.Aspire.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/Coding/DigitalBrain.Modules.Coding/DigitalBrain.Modules.Coding.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/Microsoft/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/Microsoft/DotNet/DigitalBrain.Modules.Microsoft.DotNet/DigitalBrain.Modules.Microsoft.DotNet.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="../../../Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Aspire.Hosting/DigitalBrain.Modules.Microsoft.CSharp.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
   <ItemGroup>

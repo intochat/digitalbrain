@@ -94,9 +94,6 @@ public sealed class PathTruthFacts
         string[] developerOnly =
         [
             "DigitalBrain.Microsoft.Aspire.AspireModule",
-            "DigitalBrain.Microsoft.Roslyn.RoslynModule",
-            "DigitalBrain.Microsoft.DotNet.DotNetModule",
-            "DigitalBrain.Coding.CodingModule",
             "DigitalBrain.Microsoft.CSharp.CSharpModule",
         ];
         foreach (var file in new[]

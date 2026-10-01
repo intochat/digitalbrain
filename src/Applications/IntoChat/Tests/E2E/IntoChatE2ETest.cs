@@ -2,7 +2,6 @@ using DigitalBrain.AI;
 using DigitalBrain.Apps;
 using DigitalBrain.AI.OpenAI;
 using DigitalBrain.ClickHouse;
-using DigitalBrain.Coding;
 using DigitalBrain.Flutter;
 using DigitalBrain.Google.Gmail;
 using DigitalBrain.Microsoft.Aspire;
@@ -62,7 +61,6 @@ internal static class IntoChatE2ETest
             .ConfigureModule<GmailModule, GmailModuleOptions>(gmail => gmail.WithTokenEndpoint(new(UnconfiguredProvider, "token")))
             .ConfigureModule<SalesforceModule, SalesforceModuleOptions>(salesforce => salesforce.WithLocalMcp(new(UnconfiguredProvider, "mcp")))
             .ConfigureModule<GitHubModule, GitHubModuleOptions>(github => github.WithGitHubRepositories(new Dictionary<string, GitHubRepositoryDeclaration>()))
-            .ConfigureModule<CodingModule, CodingModuleOptions>(coding => coding.SolutionPath = null)
             .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .WithExecution(new()
             {

@@ -1,7 +1,7 @@
 namespace IntoChat.Tests.Unit;
 
 // P0.1 trash-register guard: the dead server/client code named in the plan stays deleted, the
-// duplicate process runner stays consolidated, and the demo behaviors stay out of the product host.
+// demo behaviors stay out of the product host.
 public sealed class HygieneFacts
 {
     private static readonly string RepositoryRoot = FindRepositoryRoot();
@@ -67,15 +67,6 @@ public sealed class HygieneFacts
         var gitignore = Read(".gitignore");
         Assert.DoesNotContain("Reqnroll", gitignore, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("*.feature.cs", gitignore);
-    }
-
-    [Fact]
-    public void DuplicateProcessRunnerIsConsolidated()
-    {
-        Assert.False(File.Exists(PathInRepo("src/Modules/Coding/DigitalBrain.Modules.Coding/ProcessRunner.cs")), "The duplicate Coding process runner must be deleted.");
-        Assert.False(File.Exists(PathInRepo("src/Modules/Coding/DigitalBrain.Modules.Coding/IProcessRunner.cs")), "The duplicate Coding process-runner interface must be deleted.");
-        Assert.False(File.Exists(PathInRepo("src/Modules/Coding/DigitalBrain.Modules.Coding/ProcessResult.cs")), "The duplicate Coding process-result type must be deleted.");
-        Assert.True(File.Exists(PathInRepo("src/Modules/Microsoft/DotNet/DigitalBrain.Modules.Microsoft.DotNet/Process/ProcessRunner.cs")), "The single shared process runner must remain under the DotNet module.");
     }
 
     [Fact]
