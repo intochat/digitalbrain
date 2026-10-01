@@ -1,0 +1,7 @@
+# Keep the shell image's build context to sources: local build output and tool state
+# here would bust the docker layer cache on every run without changing the bundle.
+**/build/
+**/.dart_tool/
+**/windows/
+**/.idea/
+**/*.iml

@@ -79,7 +79,7 @@ internal static class FlutterHostLaunch
             deviceTarget);
     }
 
-    private static string? ResolveWebPackageDirectory(string packageRoot)
+    internal static string? ResolveWebPackageDirectory(string packageRoot)
     {
         if (HasWebMarkers(packageRoot))
         {
