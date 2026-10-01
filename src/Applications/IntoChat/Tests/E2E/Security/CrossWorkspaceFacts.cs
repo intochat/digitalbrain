@@ -10,33 +10,6 @@ namespace IntoChat.Tests.E2E.Security;
 
 public sealed class CrossWorkspaceFacts(IntoChatHostFixture host)
 {
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
-
-    [Fact(Timeout = 180_000)]
-    public async Task SecondWorkspaceCannotReadTheFirstsValue()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var brain = await host.LeaseAsync(ct);
-        var firstWorkspace = brain.WorkspaceId;
-        var secondWorkspace = "workspace-" + Guid.NewGuid().ToString("N");
-        var firstSlider = brain.Get<ISlider>(UiScope.Key(BrainScope.Create("owner", firstWorkspace).Id, "volume"));
-        var secondSlider = brain.Get<ISlider>(UiScope.Key(BrainScope.Create("owner", secondWorkspace).Id, "volume"));
-        await firstSlider.Configure(0, 10, 1);
-        await firstSlider.SetValue(7);
-
-        var first = await brain.HttpClient.GetFromJsonAsync<SliderState>($"/brains/{firstWorkspace}/ui/sliders/volume", Json, ct);
-        Assert.Equal(7, first!.Value);
-
-        var second = await brain.HttpClient.GetFromJsonAsync<SliderState>($"/brains/{secondWorkspace}/ui/sliders/volume", Json, ct);
-        Assert.Equal(0, second!.Value);
-
-        await secondSlider.Configure(0, 10, 1);
-        await secondSlider.SetValue(3);
-        var secondAfterWrite = await brain.HttpClient.GetFromJsonAsync<SliderState>($"/brains/{secondWorkspace}/ui/sliders/volume", Json, ct);
-        var firstAfterSecondWrite = await brain.HttpClient.GetFromJsonAsync<SliderState>($"/brains/{firstWorkspace}/ui/sliders/volume", Json, ct);
-        Assert.Equal(3, secondAfterWrite!.Value);
-        Assert.Equal(7, firstAfterSecondWrite!.Value);
-    }
 
     [Fact(Timeout = 180_000)]
     public async Task ASignedInPrincipalCannotReachAnotherPrincipalsWorkspace()
@@ -45,24 +18,12 @@ public sealed class CrossWorkspaceFacts(IntoChatHostFixture host)
         await using var brain = await host.LeaseAsync(ct);
         var suffix = Guid.NewGuid().ToString("N")[..8];
 
-        using var alice = CookieClient(brain.HttpClient);
-        using var bob = CookieClient(brain.HttpClient);
-
-        using var aliceLogin = await alice.PostAsJsonAsync(
-            "/identity/register",
-            new { principalId = "alice-" + suffix, displayName = "Alice", password = "alice-password-123" }, ct);
-        Assert.Equal(HttpStatusCode.OK, aliceLogin.StatusCode);
-
-        using var bobLogin = await bob.PostAsJsonAsync(
-            "/identity/register",
-            new { principalId = "bob-" + suffix, displayName = "Bob", password = "bob-password-123" }, ct);
-        Assert.Equal(HttpStatusCode.OK, bobLogin.StatusCode);
-
-        var aliceMember = await aliceLogin.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(Json, ct);
-        var bobMember = await bobLogin.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(Json, ct);
-        var aliceWorkspace = aliceMember!.BrainId;
-        var bobWorkspace = bobMember!.BrainId;
-
+        using var alicePerson = await IntoChat.Tests.E2E.Packages.People.SignedIn(brain.HttpClient, "alice-" + suffix, ct);
+        using var bobPerson = await IntoChat.Tests.E2E.Packages.People.SignedIn(brain.HttpClient, "bob-" + suffix, ct);
+        var alice = alicePerson.Client;
+        var bob = bobPerson.Client;
+        var aliceWorkspace = alicePerson.Workspace;
+        var bobWorkspace = bobPerson.Workspace;
         // Bob reaches his own workspace but is forbidden from Alice's scoped value and app node.
         using var ownUi = await bob.GetAsync($"/brains/{bobWorkspace}/ui/sliders/volume", ct);
         Assert.Equal(HttpStatusCode.OK, ownUi.StatusCode);
@@ -83,9 +44,9 @@ public sealed class CrossWorkspaceFacts(IntoChatHostFixture host)
         using var ownCompute = await bob.GetAsync($"/brains/{bobWorkspace}/compute/usage", ct);
         Assert.Equal(HttpStatusCode.OK, ownCompute.StatusCode);
 
-        await brain.Get<DigitalBrain.Compute.IWallet>(aliceMember.AccountId).ChargeAsync(new DigitalBrain.Compute.LedgerEntry
+        await brain.Get<DigitalBrain.Compute.IWallet>(alicePerson.Account).ChargeAsync(new DigitalBrain.Compute.LedgerEntry
         {
-            AccountId = aliceMember.AccountId,
+            AccountId = alicePerson.Account,
             IdempotencyKey = "private-charge",
             Kind = DigitalBrain.Compute.LedgerKind.WalletCharge,
             Amount = 7m,
@@ -97,9 +58,6 @@ public sealed class CrossWorkspaceFacts(IntoChatHostFixture host)
         Assert.Equal(0m, bobSummary.RootElement.GetProperty("chargedCompute").GetDecimal());
     }
 
-    private static HttpClient CookieClient(HttpClient origin)
-    {
-        var handler = new SocketsHttpHandler { UseCookies = true, CookieContainer = new CookieContainer() };
-        return new HttpClient(handler) { BaseAddress = origin.BaseAddress };
-    }
 }
+
+

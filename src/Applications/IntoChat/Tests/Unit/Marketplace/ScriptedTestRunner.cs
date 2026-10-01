@@ -7,7 +7,7 @@ namespace IntoChat.Tests.Unit.Marketplace;
 // "runs" instantly with that marker's verdicts.
 internal sealed class ScriptedTestRunner : ITestScriptRunner
 {
-    public static ConcurrentDictionary<string, (int ExitCode, string Logs)> BySourceMarker { get; } = new(StringComparer.Ordinal);
+    public ConcurrentDictionary<string, (int ExitCode, string Logs)> BySourceMarker { get; } = new(StringComparer.Ordinal);
 
     public Task<AppTestRun> RunAsync(PackageRevisionRef revision, string tests, CancellationToken cancellationToken)
     {
@@ -35,3 +35,4 @@ internal sealed class ScriptedTestRunner : ITestScriptRunner
         return [.. verdicts];
     }
 }
+

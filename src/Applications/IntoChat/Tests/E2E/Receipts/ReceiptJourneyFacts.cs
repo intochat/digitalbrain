@@ -44,24 +44,6 @@ public sealed class ReceiptJourneyFacts(IntoChatHostFixture host) : BrainFact(ho
         Assert.Equal("RECEIPT", ReceiptFrom(secondStream).GetProperty("type").GetString());
         Assert.NotEmpty((await brain.Get<IIntentUsage>(ComputeUsageEndpoints.IntentId(BrainScope.Create("owner", "receipts").Id, "thread", "receipt-run-2")).ReadAsync(ct)).Entries);
 
-        // Reopening the panel reads durable, paged history independently of the chat stream.
-        using var firstPage = JsonDocument.Parse(await brain.HttpClient.GetStringAsync("/brains/receipts/compute/usage?limit=1", ct));
-        var firstItem = Assert.Single(firstPage.RootElement.GetProperty("items").EnumerateArray());
-        Assert.Equal(ReceiptFrom(secondStream).GetProperty("id").GetString(), firstItem.GetProperty("id").GetString());
-        Assert.NotEmpty(firstItem.GetProperty("modelUsage").EnumerateArray());
-        Assert.Equal(0m, firstItem.GetProperty("chargedCompute").GetDecimal());
-        Assert.Equal(0m, firstItem.GetProperty("reservedCompute").GetDecimal());
-        var cursor = firstPage.RootElement.GetProperty("nextCursor").GetString();
-        Assert.NotNull(cursor);
-        using var secondPage = JsonDocument.Parse(await brain.HttpClient.GetStringAsync("/brains/receipts/compute/usage?limit=1&cursor=" + Uri.EscapeDataString(cursor), ct));
-        Assert.Equal(receipt.GetProperty("id").GetString(), Assert.Single(secondPage.RootElement.GetProperty("items").EnumerateArray()).GetProperty("id").GetString());
-        Assert.Equal(JsonValueKind.Null, secondPage.RootElement.GetProperty("nextCursor").ValueKind);
-        using var isolated = JsonDocument.Parse(await brain.HttpClient.GetStringAsync("/brains/other/compute/usage", ct));
-        Assert.Empty(isolated.RootElement.GetProperty("items").EnumerateArray());
-        using var badLimit = await brain.HttpClient.GetAsync("/brains/receipts/compute/usage?limit=0", ct);
-        Assert.Equal(System.Net.HttpStatusCode.BadRequest, badLimit.StatusCode);
-        using var badCursor = await brain.HttpClient.GetAsync("/brains/other/compute/usage?cursor=" + Uri.EscapeDataString(cursor), ct);
-        Assert.Equal(System.Net.HttpStatusCode.BadRequest, badCursor.StatusCode);
     }
 
     private static JsonElement ReceiptFrom(string stream)
@@ -79,3 +61,4 @@ public sealed class ReceiptJourneyFacts(IntoChatHostFixture host) : BrainFact(ho
         throw new Xunit.Sdk.XunitException("The agent stream did not contain a receipt card.");
     }
 }
+

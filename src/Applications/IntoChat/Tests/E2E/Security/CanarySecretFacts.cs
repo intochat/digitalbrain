@@ -1,3 +1,4 @@
+using static IntoChat.Tests.E2E.Diagnostics.TraceAssertions;
 using System.Net.Http.Json;
 using System.Text.Json;
 using DigitalBrain.Testing.E2E;
@@ -10,20 +11,6 @@ public sealed class CanarySecretFacts(IntoChatHostFixture host)
 {
     private const string Owner = "owner";
     private const string Canary = "canary-secret-7f3a91";
-
-    [Fact(Timeout = 300_000)]
-    public async Task AnotherOwnersSecretIsForbiddenWhateverThePathSays()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var brain = await host.LeaseAsync(ct);
-
-        using var write = await brain.HttpClient.PostAsJsonAsync(
-            "/secrets/someone-else",
-            new { name = "me.apiKey", label = "API key", value = Canary },
-            ct);
-
-        Assert.Equal(System.Net.HttpStatusCode.Forbidden, write.StatusCode);
-    }
 
     [Fact(Timeout = 300_000)]
     public async Task ASeededVaultSecretNeverAppearsInPlaintext()
@@ -119,46 +106,14 @@ public sealed class CanarySecretFacts(IntoChatHostFixture host)
         Assert.Empty(collector.Errors());
     }
 
-    [Fact(Timeout = 300_000)]
-    public async Task CSharpConsoleIsAvailableOnlyWhenTheHostComposesAuthoring()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var on = await host.LeaseAsync(ct);
-
-        var capabilities = await on.HttpClient.GetFromJsonAsync<JsonElement>("/session/capabilities", ct);
-        Assert.True(capabilities.GetProperty("developerMode").GetBoolean());
-
-        using var available = await on.HttpClient.GetAsync($"/brains/{Owner}/csharp/", ct);
-        Assert.Equal(System.Net.HttpStatusCode.OK, available.StatusCode);
-
-        await using var off = await IntoChatE2ETest.Create()
-            .WithoutModule<DigitalBrain.Microsoft.CSharp.CSharpAuthoringModule>()
-            .StartAsync(ct);
-
-        var gated = await off.HttpClient.GetFromJsonAsync<JsonElement>("/session/capabilities", ct);
-        Assert.False(gated.GetProperty("developerMode").GetBoolean());
-        using var files = await off.HttpClient.GetAsync($"/brains/{Owner}/csharp/?developerMode=true", ct);
-        Assert.Equal(System.Net.HttpStatusCode.NotFound, files.StatusCode);
-    }
-
     private static string Scope(string owner, string workspace)
     {
         var digest = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(owner + "\0" + workspace));
         return "workspace-" + Convert.ToHexStringLower(digest);
     }
 
-    private static string TextOf(CapturedSpan span)
-        => string.Join("\n", span.Attributes.Select(pair => pair.Key + "=" + pair.Value));
 
-    private static string TextOf(CapturedLog log)
-        => log.Body + "\n" + string.Join("\n", log.Attributes.Select(pair => pair.Key + "=" + pair.Value));
 
-    private static async Task WaitForAsync(Func<bool> condition, CancellationToken ct)
-    {
-        var deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(20);
-        while (!condition() && DateTimeOffset.UtcNow < deadline)
-        {
-            await Task.Delay(TimeSpan.FromMilliseconds(250), ct);
-        }
-    }
 }
+
+

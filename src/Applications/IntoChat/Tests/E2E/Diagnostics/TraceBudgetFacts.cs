@@ -1,3 +1,4 @@
+using static IntoChat.Tests.E2E.Diagnostics.TraceAssertions;
 using System.Net.Http.Json;
 using Aspire.Hosting;
 using Aspire.Hosting.Testing;
@@ -109,22 +110,10 @@ public sealed class TraceBudgetFacts
         ["OTEL_EXPORTER_OTLP_PROTOCOL"] = "http/protobuf",
     };
 
-    private static async Task WaitForAsync(Func<bool> condition, TimeSpan timeout, CancellationToken ct)
-    {
-        var deadline = DateTimeOffset.UtcNow + timeout;
-        while (!condition() && DateTimeOffset.UtcNow < deadline)
-        {
-            await Task.Delay(TimeSpan.FromMilliseconds(250), ct);
-        }
-    }
 
     private static string Describe(IEnumerable<CapturedSpan> spans)
         => string.Join("; ", spans.Select(span => $"{span.Scope}:{span.Name}[kind={span.Kind}]"));
 
-    private static bool IsGenAiSpan(CapturedSpan span)
-        => span.Scope.StartsWith("DigitalBrain.AI", StringComparison.Ordinal)
-            || span.Scope.StartsWith("Microsoft.Extensions.AI", StringComparison.Ordinal)
-            || span.Scope.StartsWith("Experimental.Microsoft.Extensions.AI", StringComparison.Ordinal);
 
     // Renders the intent's spans as a parent/child tree so a budget failure shows where the
     // spans come from, not just a flat count.
@@ -151,3 +140,4 @@ public sealed class TraceBudgetFacts
         return $"J1 span tree ({total} total; {perScope}):\n" + string.Join("\n", lines);
     }
 }
+

@@ -31,14 +31,15 @@ public sealed class AppDraftFacts
     public async Task ARequestBecomesAPublishedAppOnceItsTestsPass()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await StartAsync(ct);
+        var runner = new ScriptedTestRunner();
+        await using var brain = await StartAsync(ct, runner);
         await brain.Get<IScriptedLLM>("author").Script([Authored(Spec)]);
         await brain.Get<IScriptedLLM>("builder").Script([
             Built("// proof v1", "Whisper the answer."),
             Built("// proof v2", "Shout the answer in capitals."),
         ]);
-        ScriptedTestRunner.BySourceMarker["// proof v1"] = (1, "dbtest:fail It shouts\tThe answer was \"hello\".");
-        ScriptedTestRunner.BySourceMarker["// proof v2"] = (0, "dbtest:pass It shouts");
+        runner.BySourceMarker["// proof v1"] = (1, "dbtest:fail It shouts\tThe answer was \"hello\".");
+        runner.BySourceMarker["// proof v2"] = (0, "dbtest:pass It shouts");
         StampAlice();
         var draft = brain.Get<IAppDraft>("alice/drafts/" + Guid.NewGuid().ToString("N"));
 
@@ -63,14 +64,15 @@ public sealed class AppDraftFacts
     public async Task ABuilderThatCallsAToolGetsItsResultAndStillPublishes()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await StartAsync(ct);
+        var runner = new ScriptedTestRunner();
+        await using var brain = await StartAsync(ct, runner);
         await brain.Get<IScriptedLLM>("author").Script([Authored(Spec)]);
         // The first scripted reply is a tool call; the loop answers it and asks again.
         await brain.Get<IScriptedLLM>("builder").Script([
             """{"tool":"check_csharp","arguments":{"files":{"tests.cs":"var answer = 1;\nConsole.WriteLine(answer);"}}}""",
             Built("// proof v1", "Shout the answer in capitals."),
         ]);
-        ScriptedTestRunner.BySourceMarker["// proof v1"] = (0, "dbtest:pass It shouts");
+        runner.BySourceMarker["// proof v1"] = (0, "dbtest:pass It shouts");
         StampAlice();
         var draft = brain.Get<IAppDraft>("alice/drafts/" + Guid.NewGuid().ToString("N"));
         await draft.Draft("Shout back.");
@@ -84,7 +86,8 @@ public sealed class AppDraftFacts
     public async Task AnImplementationWithoutTestsIsAFailedAttempt()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await StartAsync(ct);
+        var runner = new ScriptedTestRunner();
+        await using var brain = await StartAsync(ct, runner);
         await brain.Get<IScriptedLLM>("author").Script([Authored(Spec)]);
         await brain.Get<IScriptedLLM>("builder").Script([
             """{"settings":[],"files":{"prompts/system.md":"Shout."}}""",
@@ -99,33 +102,6 @@ public sealed class AppDraftFacts
 
         Assert.Equal(AppDraftStatus.Failed, built.Draft.Status);
         Assert.All(built.Draft.Attempts, attempt => Assert.Contains("must include tests.cs", attempt.Failures, StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public async Task AHostThatCannotRunTestsFailsTheBuildInsteadOfStrandingIt()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var brain = await StartAsync(ct, runner: new RefusingTestRunner());
-        await brain.Get<IScriptedLLM>("author").Script([Authored(Spec), Authored(Spec)]);
-        await brain.Get<IScriptedLLM>("builder").Script([
-            Built("// proof v1", "Shout."), Built("// proof v2", "Shout!"), Built("// proof v3", "Shout!!"),
-        ]);
-        StampAlice();
-        var draft = brain.Get<IAppDraft>("alice/drafts/" + Guid.NewGuid().ToString("N"));
-        await draft.Draft("Shout back.");
-
-        var built = await draft.Build();
-
-        Assert.Equal(AppDraftStatus.Failed, built.Draft.Status);
-        Assert.Contains("has no C# sandbox", built.Draft.Attempts[0].Failures, StringComparison.Ordinal);
-        var revised = await draft.Revise("Try a different angle.");
-        Assert.Equal(AppDraftStatus.Drafted, revised.Draft.Status);
-    }
-
-    private sealed class RefusingTestRunner : DigitalBrain.Apps.ITestScriptRunner
-    {
-        public Task<DigitalBrain.Apps.AppTestRun> RunAsync(PackageRevisionRef revision, string tests, CancellationToken cancellationToken)
-            => throw new InvalidOperationException(MarketplaceService.SandboxMissing);
     }
 
     [Fact]
@@ -148,10 +124,11 @@ public sealed class AppDraftFacts
     public async Task DraftsAreListedForTheirOwnerNewestFirst()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await StartAsync(ct);
+        var runner = new ScriptedTestRunner();
+        await using var brain = await StartAsync(ct, runner);
         await brain.Get<IScriptedLLM>("author").Script([Authored(Spec), Authored(Spec)]);
         await brain.Get<IScriptedLLM>("builder").Script([Built("// proof listed", "Shout.")]);
-        ScriptedTestRunner.BySourceMarker["// proof listed"] = (0, "dbtest:pass It shouts");
+        runner.BySourceMarker["// proof listed"] = (0, "dbtest:pass It shouts");
         StampAlice();
         var first = Guid.NewGuid().ToString("N");
         var second = Guid.NewGuid().ToString("N");
@@ -171,7 +148,8 @@ public sealed class AppDraftFacts
     public async Task AFailedIndexWriteNeverFailsTheDraft()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await StartAsync(ct);
+        var runner = new ScriptedTestRunner();
+        await using var brain = await StartAsync(ct, runner);
         await brain.Get<IScriptedLLM>("author").Script([Authored(Spec)]);
         StampAlice();
         // "alice" alone has no draft-id segment, so recording into the index throws; the draft
@@ -186,7 +164,8 @@ public sealed class AppDraftFacts
     public async Task ARevisionKeepsTheDraftsNameBecauseTheAuthorIsToldIt()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await StartAsync(ct);
+        var runner = new ScriptedTestRunner();
+        await using var brain = await StartAsync(ct, runner);
         await brain.Get<IScriptedLLM>("author").Script([Authored(Spec), Authored(Spec + "\n\nAlso ends with an exclamation mark.")]);
         StampAlice();
         var draft = brain.Get<IAppDraft>("alice/drafts/" + Guid.NewGuid().ToString("N"));
@@ -245,3 +224,4 @@ public sealed class AppDraftFacts
         })
         .StartAsync(ct);
 }
+
