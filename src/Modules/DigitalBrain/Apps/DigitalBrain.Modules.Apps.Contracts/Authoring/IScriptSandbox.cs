@@ -3,6 +3,7 @@ namespace DigitalBrain.Apps;
 public interface IScriptSandbox
 {
     bool CanRun { get; }
+    string AuthoringDescription { get; }
     Task<ScriptContractCatalog> ReadContracts(IReadOnlyList<string> modules, CancellationToken cancellationToken);
     ScriptCompilationCheck Check(IReadOnlyDictionary<string, string> files);
 }

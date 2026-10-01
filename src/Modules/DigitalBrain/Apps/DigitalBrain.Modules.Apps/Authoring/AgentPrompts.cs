@@ -22,21 +22,12 @@ internal static class AgentPrompts
           stand-in model (say so in the scenario: "with the scripted model replying ..."), so the tests can
           script it. A scenario needing a live model is documentation, not a test: mark its heading with
           "(live)" and keep it out of the checkable set.
-        - Choose the runtime that fits:
-          - "prompt": one model answers with a system prompt. Setting "Model" chooses the model.
-          - "group-chat": two or more models discuss the question in turns and agree on one answer.
-            Setting "{Participant}Model" chooses each participant's model, "MaxRounds" limits the rounds.
-            In every round each participant speaks once, in order, starting with the first. From round 2 on,
-            a round in which every reply starts with "AGREE" ends the discussion as agreed; otherwise it
-            ends after MaxRounds rounds. Then the first participant speaks once more to write the final
-            answer, which is the app's answer.
-          - "csharp": exact logic (calculations, parsing, formatting, reacting to signals) in C# scripts.
         - The app has one operation, "ask".
         - Model settings take this brain's model names, such as "IGpt56Luna" or "IGemma4".
 
         Reply with JSON only, no prose and no code fences:
         {"name": "lowercase-words-with-hyphens", "title": "Short title", "description": "One sentence for people.",
-         "runtime": "prompt|group-chat|csharp", "spec": "...full Markdown spec..."}
+         "runtime": "<registered runtime name>", "spec": "...full Markdown spec..."}
         """;
 
     public const string Builder = """
@@ -52,35 +43,12 @@ internal static class AgentPrompts
           behavior before answering, and fix every error it reports; a file that does not compile
           cannot pass the gate.
 
-        Runtimes and what they need:
-        - "prompt": file "prompts/system.md" with the system prompt. Settings: "Model" (default "IGemma4").
-        - "group-chat": file "groupchat.json" shaped
-          {"brief": "prompts/brief.md", "participants": [{"name": "Luna", "instructions": "prompts/luna.md"}, ...]}
-          plus every prompt file it names. Settings: "{Name}Model" for each participant (defaults "IGpt56Luna"
-          for the first, "IGemma4" for the others) and "MaxRounds" (default "3"). The first participant opens
-          and writes the final answer. A round ends the discussion when every speaker starts with AGREE.
-        - "csharp": one C# file-based app per concern under "files" as "behaviors/<name>.cs" (a single
-          behavior is fine). Each behavior answers invocations or reacts to signals through the brain
-          client. The invocation-answering shape (change only the Answer function, keep the #:project line):
-            #:project /brain/src/Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps.Contracts/DigitalBrain.Modules.Apps.Contracts.csproj
-            using DigitalBrain.Apps;
-            using DigitalBrain.Apps.Signals;
-
-            await using var brain = await DigitalBrainClient.ConnectAsync(args);
-            var app = brain.Get<IApp>(brain.Setting("App")!);
-            await using var invocations = await brain.SubscribeAsync<AppInvoked>(app, brain.Stopping);
-            foreach (var missed in await app.Pending()) { await app.Respond(Answer(missed.Id, missed.Input)); }
-            await foreach (var invoked in invocations.ReadAllAsync(brain.Stopping)) { await app.Respond(Answer(invoked.InvocationId, invoked.Input)); }
-
-            static AppResponse Answer(Guid invocationId, string input) => new(invocationId, /* the answer */ input, null);
-          Settings are read with brain.Setting("Name").
-
         The tests, always, as file "tests.cs": a C# file-based app that installs the app fresh per scenario,
         drives it through contracts, and reports one line per scenario. Use exactly this skeleton and add
         one Scenario call per spec scenario (skip scenarios marked "(live)"):
 
-            #:project /brain/src/Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps.Contracts/DigitalBrain.Modules.Apps.Contracts.csproj
-            #:project /brain/src/Modules/AI/DigitalBrain.Modules.AI.Contracts/DigitalBrain.Modules.AI.Contracts.csproj
+            // Copy the needed #:project directives from read_contracts.
+            // Copy the needed #:project directives from read_contracts.
             using DigitalBrain.Apps;
 
             await using var brain = await DigitalBrainClient.ConnectAsync(args);
@@ -138,8 +106,6 @@ internal static class AgentPrompts
           replies in order, and pointing a model setting at it:
           app.Configure(new ConfigureApp(Guid.NewGuid(), new Dictionary<string, string> { ["Model"] = "scripted/" + scope + "/<name>" })).
           Prompts() returns everything the scripted model was told, for "was told" checks.
-        - A group-chat app's discussion for an invocation is at brain.Get<IGroupChat>($"{scope}/app/chat/{invocationId:N}")
-          (using DigitalBrain.AI.GroupChat): Read() gives its turns, rounds and agreement.
         - Never call a live model in tests; the gate must be deterministic.
 
         Every setting a scenario changes must be declared. Setting names are letters and digits.
@@ -151,4 +117,5 @@ internal static class AgentPrompts
          "files": {"tests.cs": "...", "prompts/system.md": "..."}, "source": ""}
         """;
 }
+
 

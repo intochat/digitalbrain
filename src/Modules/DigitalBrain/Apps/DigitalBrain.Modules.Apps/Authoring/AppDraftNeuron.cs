@@ -16,6 +16,7 @@ internal sealed class AppDraftNeuron(
     [PersistentState("intochat.app-draft", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<AppDraftState> store,
     IConfiguration configuration,
     ILogger<AppDraftNeuron> logger,
+    IEnumerable<IAppRuntime> runtimes,
     IScriptSandbox? csharp = null)
     : Neuron<AppDraftState>(store), IAppDraft
 {
@@ -23,7 +24,6 @@ internal sealed class AppDraftNeuron(
     private const int MaxBuildAttempts = 3;
     private const int MaxBuilderRounds = 12;
     private const int MaxRequestLength = 4000;
-    private static readonly string[] ConfigurationRuntimes = [GroupChatRuntime.RuntimeName, "prompt"];
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     private string DraftId => this.GetPrimaryKeyString();
@@ -31,7 +31,11 @@ internal sealed class AppDraftNeuron(
     private string AuthorModel => configuration["IntoChat:Apps:AuthorModel"] ?? nameof(IGpt56Luna);
     private string BuilderModel => configuration["IntoChat:Apps:BuilderModel"] ?? nameof(IGpt56Luna);
     // A csharp app is only offered where this host may run it.
-    private string[] Runtimes => csharp?.CanRun == true ? [PackageManifest.CSharpRuntime, .. ConfigurationRuntimes] : ConfigurationRuntimes;
+    private string[] Runtimes => csharp?.CanRun == true
+        ? [PackageManifest.CSharpRuntime, .. runtimes.Select(runtime => runtime.Name).Distinct(StringComparer.Ordinal)]
+        : [.. runtimes.Select(runtime => runtime.Name).Distinct(StringComparer.Ordinal)];
+    private string RuntimeDescriptions => string.Join("\n\n", runtimes.Select(runtime => runtime.AuthoringDescription)
+        .Concat(csharp?.CanRun == true ? [csharp.AuthoringDescription] : []));
 
     public async Task<AppDraftView> Draft(string request)
     {
@@ -114,7 +118,7 @@ internal sealed class AppDraftNeuron(
             PackageId package;
             try
             {
-                authored = Parse<AuthoredApp>(await ModelAddress.Complete(GrainFactory, AuthorModel, AgentPrompts.Author, prompt));
+                authored = Parse<AuthoredApp>(await ModelAddress.Complete(GrainFactory, AuthorModel, AgentPrompts.Author + "\n\n" + RuntimeDescriptions, prompt));
                 if (!Runtimes.Contains(authored.Runtime)) { throw new InvalidDataException($"'{authored.Runtime}' is not one of the runtimes {string.Join(", ", Runtimes)}."); }
                 package = PackageId.Create(Owner, authored.Name);
             }
@@ -169,7 +173,7 @@ internal sealed class AppDraftNeuron(
         var model = ModelAddress.Resolve(GrainFactory, BuilderModel);
         var messages = new List<AiMessage>
         {
-            new("system", [new AiText(AgentPrompts.Builder)]),
+            new("system", [new AiText(AgentPrompts.Builder + "\n\n" + RuntimeDescriptions)]),
             new("user", [new AiText(task)]),
         };
         for (var round = 0; round < MaxBuilderRounds; round++)

@@ -15,6 +15,13 @@ public sealed class GroupChatRuntime(IGrainFactory grains) : IAppRuntime
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     public string Name => RuntimeName;
+    public string AuthoringDescription => """
+        "group-chat": models discuss in rounds and the first participant writes the final answer.
+        File groupchat.json: {"brief":"prompts/brief.md","participants":[{"name":"Luna","instructions":"prompts/luna.md"}]}.
+        Include every named prompt file. Declare a "{Name}Model" setting for each participant,
+        default IGpt56Luna for the first and IGemma4 for others; "MaxRounds" defaults to "3".
+        In each round everyone speaks once in order. From round 2, all replies starting with AGREE end discussion.
+        """ + $"\nFor discussion assertions use IGroupChat at {ChatKey("{scope}/app", Guid.Empty).Replace(Guid.Empty.ToString("N"), "{invocationId:N}", StringComparison.Ordinal)} and Read() for turns, rounds and agreement.";
 
     public static string ChatKey(string appKey, Guid invocationId) => $"{appKey}/chat/{invocationId:N}";
 
@@ -46,6 +53,7 @@ public sealed class PromptRuntime(IGrainFactory grains) : IAppRuntime
     private const string SystemPrompt = "prompts/system.md";
 
     public string Name => "prompt";
+    public string AuthoringDescription => "\"prompt\": one model answers with file prompts/system.md. Declare setting Model (default IGemma4).";
 
     public async Task<string> Answer(AppRuntimeRequest request, CancellationToken cancellationToken)
     {

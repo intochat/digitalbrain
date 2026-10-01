@@ -15,6 +15,27 @@ namespace DigitalBrain.Modules.Apps.Tests.Unit;
 // once its tests run green.
 public sealed class AppDraftFacts
 {
+    [Fact]
+    public async Task ARegisteredRuntimeCanBeAuthoredFromItsOwnDescription()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartAsync(ct, runtime: new DescribedRuntime());
+        await brain.Get<IScriptedLLM>("author").Script([Authored(Spec).Replace("\"prompt\"", "\"test-echo\"", StringComparison.Ordinal)]);
+        StampAlice();
+        var draft = brain.Get<IAppDraft>("alice/drafts/" + Guid.NewGuid().ToString("N"));
+        var result = await draft.Draft("Echo my message.");
+        Assert.Equal("test-echo", result.Draft.Runtime);
+        Assert.Contains(DescribedRuntime.Description, Assert.Single(await brain.Get<IScriptedLLM>("author").Prompts()), StringComparison.Ordinal);
+    }
+
+    private sealed class DescribedRuntime : IAppRuntime
+    {
+        public const string Description = "test-echo answers input without settings or files.";
+        public string Name => "test-echo";
+        public string AuthoringDescription => Description;
+        public Task<string> Answer(AppRuntimeRequest request, CancellationToken cancellationToken) => Task.FromResult(request.Input);
+    }
+
     private const string Spec = """
         # Shouter
 
@@ -121,6 +142,8 @@ public sealed class AppDraftFacts
 
         Assert.Equal(AppDraftStatus.Drafted, (await draft.Read()).Draft.Status);
         Assert.Empty(await brain.Get<IScriptedLLM>("builder").Prompts());
+        Assert.DoesNotContain("csharp uses sandbox contracts.",
+            Assert.Single(await brain.Get<IScriptedLLM>("author").Prompts()), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -203,11 +226,12 @@ public sealed class AppDraftFacts
         StampedBy = TrustedEdge.AuthenticatedHttp,
     });
 
-    private static Task<UnitBrain> StartAsync(CancellationToken ct, DigitalBrain.Apps.ITestScriptRunner? runner = null, bool canRun = true) => UnitTest.Create()
+    private static Task<UnitBrain> StartAsync(CancellationToken ct, DigitalBrain.Apps.ITestScriptRunner? runner = null, bool canRun = true, IAppRuntime? runtime = null) => UnitTest.Create()
         .WithModule<AIModule>()
         .WithModule<AppsModule>()
         .ConfigureSilo(silo =>
         {
+            if (runtime is not null) { silo.Services.AddSingleton(runtime); }
             silo.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["IntoChat:Apps:AuthorModel"] = IScriptedLLM.ModelPrefix + "author",
@@ -220,6 +244,7 @@ public sealed class AppDraftFacts
     private sealed class DraftSandbox(bool canRun) : IScriptSandbox
     {
         public bool CanRun => canRun;
+        public string AuthoringDescription => "csharp uses sandbox contracts.";
         public Task<ScriptContractCatalog> ReadContracts(IReadOnlyList<string> modules, CancellationToken cancellationToken)
             => Task.FromResult(new ScriptContractCatalog([], [], ""));
         public ScriptCompilationCheck Check(IReadOnlyDictionary<string, string> files) => new(true, []);

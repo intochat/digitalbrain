@@ -125,6 +125,7 @@ public sealed class AppVerificationFacts
 
     private sealed class EchoRuntime : IAppRuntime
     {
+        public string AuthoringDescription => "Echoes the input.";
         public string Name => "echo";
 
         public Task<string> Answer(AppRuntimeRequest request, CancellationToken cancellationToken)
