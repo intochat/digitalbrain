@@ -487,6 +487,12 @@ class _PinnedEditor extends StatefulWidget {
 class _PinnedEditorState extends State<_PinnedEditor> {
   late Widget _child = widget.builder();
   @override
+  void reassemble() {
+    super.reassemble();
+    _child = widget.builder();
+  }
+
+  @override
   void didUpdateWidget(_PinnedEditor old) {
     super.didUpdateWidget(old);
     if (old.token != widget.token) _child = widget.builder();

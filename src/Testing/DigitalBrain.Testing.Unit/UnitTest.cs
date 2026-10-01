@@ -1,3 +1,4 @@
+using DigitalBrain.Client;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
@@ -23,7 +24,7 @@ public static class UnitTest
         builder.Options.ConfigureFileLogging = false;
         builder.ConfigureHost(host =>
         {
-            host.Logging.SetMinimumLevel(LogLevel.Warning);
+            host.Configuration.AddInMemoryCollection(TestLogging.QuietDefaults);
             foreach (var definition in modules)
             {
                 host.Configuration.AddInMemoryCollection(definition.Configuration);
@@ -32,7 +33,7 @@ public static class UnitTest
         });
         builder.ConfigureSilo((_, silo) =>
         {
-            silo.AddDigitalBrain();
+            silo.AddDigitalBrain(modules.Select(module => module.ModuleType));
             foreach (var module in modules) { module.Configure(silo); }
             silo.AddMemoryGrainStorage("Default");
             if (options.UseReminders) { silo.UseInMemoryReminderService(); }

@@ -4,11 +4,7 @@ internal static class ProductSurfaceResources
 
     public const string IntoChat = "IntoChat";
 
-    public const string ProfileKey = "IntoChat:Profile";
-
-    public const string DeveloperProfile = "developer";
-
-    public const string ProductProfile = "product";
-
     public const int UiHttpPort = 5080;
+
+    public const int McpHttpPort = 5081;
 }

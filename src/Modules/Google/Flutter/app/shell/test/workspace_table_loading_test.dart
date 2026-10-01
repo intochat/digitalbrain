@@ -47,6 +47,11 @@ void main() {
     for (var i = 0; i < 5; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
+    // Saved windows start closed; explicitly reopen the table to exercise loading.
+    store.openArtifact('window');
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
     api.tableReady.complete();
     for (var i = 0; i < 5; i++) {
@@ -82,6 +87,8 @@ void main() {
         ),
       ),
     );
+    await tester.pumpAndSettle();
+    store.openArtifact('window');
     await tester.pumpAndSettle();
     expect(find.byType(UiDataTable), findsOneWidget);
     final region = find.byWidgetPredicate(

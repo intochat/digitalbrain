@@ -1,24 +1,30 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart'
     show WorkspaceSnapshot;
+import 'package:digitalbrain_ui/digitalbrain_ui.dart' show FirstRunState;
 
 abstract interface class WorkspacePersistence {
   Future<String?> read();
   Future<void> write(String value);
 }
 
-class PreferencesWorkspacePersistence implements WorkspacePersistence {
-  PreferencesWorkspacePersistence({this.key = 'intocaht.workspace.v1'});
-  final String key;
-  final SharedPreferencesAsync _preferences = SharedPreferencesAsync();
+class WorkspaceSaveConflict implements Exception {
+  const WorkspaceSaveConflict();
+}
+
+/// Offline shells are intentionally ephemeral and never write application data.
+class MemoryWorkspacePersistence implements WorkspacePersistence {
+  String? _value;
   @override
-  Future<String?> read() => _preferences.getString(key);
+  Future<String?> read() async => _value;
   @override
-  Future<void> write(String value) => _preferences.setString(key, value);
+  Future<void> write(String value) async {
+    _value = value;
+  }
 }
 
 class WorkspaceAgent {
@@ -74,7 +80,7 @@ class WorkspaceArtifact {
   String title;
   String kind;
   String content;
-  final bool remoteManaged;
+  bool remoteManaged;
   Map<String, dynamic> data;
   Map<String, dynamic> editorState;
   Map<String, dynamic> get viewState => editorState;
@@ -121,6 +127,7 @@ class WorkspaceConversation {
     required this.id,
     required this.title,
     this.selectedAgentId = 'intocaht',
+    this.modelProfile,
     this.draft = '',
     Set<String>? attachedArtifactIds,
     List<Map<String, dynamic>>? messages,
@@ -131,6 +138,7 @@ class WorkspaceConversation {
   final String id;
   String title;
   String selectedAgentId;
+  String? modelProfile;
   String draft;
   String? threadId;
   String? parentRunId;
@@ -140,6 +148,7 @@ class WorkspaceConversation {
     'id': id,
     'title': title,
     'selectedAgentId': selectedAgentId,
+    'modelProfile': modelProfile,
     'draft': draft,
     'attachedArtifactIds': attachedArtifactIds.toList(),
     'messages': messages,
@@ -151,6 +160,7 @@ class WorkspaceConversation {
         id: json['id'] as String,
         title: _text(json['title'], 'New conversation'),
         selectedAgentId: _text(json['selectedAgentId'], 'intocaht'),
+        modelProfile: json['modelProfile'] as String?,
         draft: _text(json['draft'], ''),
         attachedArtifactIds: _strings(json['attachedArtifactIds']).toSet(),
         messages: (json['messages'] as List? ?? []).map(_map).toList(),
@@ -274,6 +284,7 @@ class WorkspaceProject {
 }
 
 class WorkspacePreferences {
+  String? defaultModelProfile;
   String displayName = '';
   String role = '';
   String theme = 'dark';
@@ -282,6 +293,7 @@ class WorkspacePreferences {
   bool reducedMotion = false;
   bool compactDensity = false;
   Map<String, dynamic> toJson() => {
+    'defaultModelProfile': defaultModelProfile,
     'displayName': displayName,
     'role': role,
     'theme': theme,
@@ -293,6 +305,7 @@ class WorkspacePreferences {
   WorkspacePreferences();
   factory WorkspacePreferences.fromJson(Map<String, dynamic> json) =>
       WorkspacePreferences()
+        ..defaultModelProfile = json['defaultModelProfile'] as String?
         ..displayName = _text(json['displayName'], '')
         ..role = _text(json['role'], '')
         ..theme = _text(json['theme'], 'dark')
@@ -302,11 +315,11 @@ class WorkspacePreferences {
         ..compactDensity = json['compactDensity'] == true;
 }
 
-/// Local, non-secret project state. Call save after changing a mutable record.
+/// In-memory project projection. Call save after changing a mutable record.
 /// Writes are serialized so an older snapshot cannot overwrite a newer one.
 class WorkspaceStore extends ChangeNotifier {
   WorkspaceStore({WorkspacePersistence? persistence, bool seedProject = true})
-    : _persistence = persistence ?? PreferencesWorkspacePersistence() {
+    : _persistence = persistence ?? MemoryWorkspacePersistence() {
     if (seedProject) _seed();
   }
   final WorkspacePersistence _persistence;
@@ -315,18 +328,63 @@ class WorkspaceStore extends ChangeNotifier {
   String selectedProjectId = '';
   String? persistenceError;
   bool loaded = false;
+  bool loadFailed = false;
+
+  bool _developerMode = false;
+
+  /// Server-owned; never persisted locally so a client cannot switch it on.
+  bool get developerMode => _developerMode;
+  set developerMode(bool value) {
+    if (_developerMode == value) return;
+    _developerMode = value;
+    _notify();
+  }
+
+  final Map<String, FirstRunState?> _firstRun = {};
+
+  /// Non-null while the selected workspace has never opened a window; drives the first-run view.
+  FirstRunState? get firstRun => _firstRun[selectedProjectId];
   void Function(String workspaceId, String windowId, bool open)?
   onRemoteWindowAction;
   final Map<String, int> remoteRevisions = {};
+  final Map<String, Set<String>> _startupWindows = {};
+  // Projects restored from the saved shell state. Only their windows count as "stale" on the
+  // first reconcile; a workspace created in this session shows remotely opened windows live.
+  final Set<String> _projectsAtLoad = {};
 
   void reconcileWorkspace(
     WorkspaceProject project,
-    WorkspaceSnapshot snapshot,
-  ) {
+    WorkspaceSnapshot snapshot, {
+    String? openedWindowId,
+  }) {
     if (snapshot.revision < (remoteRevisions[project.id] ?? -1)) return;
+    final startupSnapshot =
+        loaded &&
+        !remoteRevisions.containsKey(project.id) &&
+        _projectsAtLoad.contains(project.id);
     remoteRevisions[project.id] = snapshot.revision;
+    _firstRun[project.id] = snapshot.firstRun == null
+        ? null
+        : FirstRunState.fromMetadata(snapshot.firstRun);
     final layout = project.presentation;
+    if (startupSnapshot) {
+      _startupWindows[project.id] = snapshot.windows
+          .where((window) => window.isOpen)
+          .map((window) => window.id)
+          .toSet();
+    }
+    final suppressed = _startupWindows[project.id];
+    suppressed?.remove(openedWindowId);
+    suppressed?.retainAll(
+      snapshot.windows.where((w) => w.isOpen).map((w) => w.id),
+    );
     for (final window in snapshot.windows) {
+      final builtIn = window.id == 'app-files' || window.id == 'app-images';
+      final kind = window.kind == 'table'
+          ? 'table'
+          : builtIn
+          ? 'app'
+          : 'surface';
       var artifact = project.artifacts
           .where((a) => a.id == window.id)
           .firstOrNull;
@@ -334,16 +392,28 @@ class WorkspaceStore extends ChangeNotifier {
         artifact = WorkspaceArtifact(
           id: window.id,
           title: window.title,
-          kind: window.surface == null ? 'table' : 'app',
+          kind: kind,
           remoteManaged: true,
-          data: window.surface == null
-              ? {'tableId': window.tableId}
-              : {'app': window.id == 'app-files' ? 'files' : 'images'},
+          data: window.kind == 'table'
+              ? {'tableId': window.neuronId}
+              : builtIn
+              ? {'app': window.id == 'app-files' ? 'files' : 'images'}
+              : {
+                  'surface': {'kind': window.kind, 'name': window.neuronId},
+                },
         );
         project.artifacts.add(artifact);
       }
-      if (window.surface != null && window.id == 'app-images') {
-        final name = window.surface!['name'] as String;
+      artifact.remoteManaged = true;
+      artifact.kind = kind;
+      if (kind == 'surface') {
+        artifact.data = {
+          ...artifact.data,
+          'surface': {'kind': window.kind, 'name': window.neuronId},
+        };
+      }
+      if (window.kind != 'table' && window.id == 'app-images') {
+        final name = window.neuronId;
         final parts = name.split('/images/');
         if (parts.length == 2) {
           final documentId = parts.last.split('/').first;
@@ -360,7 +430,7 @@ class WorkspaceStore extends ChangeNotifier {
         }
       }
       artifact.title = window.title;
-      if (window.isOpen) {
+      if (window.isOpen && !(suppressed?.contains(window.id) ?? false)) {
         if (!layout.openArtifactIds.contains(window.id)) {
           layout.openArtifactIds.add(window.id);
           layout.windowModes.putIfAbsent(window.id, () => 'floating');
@@ -390,6 +460,9 @@ class WorkspaceStore extends ChangeNotifier {
 
   bool _disposed = false;
   Future<void> _writes = Future.value();
+  String? _pendingSnapshot;
+  Completer<void>? _pendingSave;
+  bool _writeRunning = false;
   WorkspaceProject get currentProject => projects.firstWhere(
     (p) => p.id == selectedProjectId,
     orElse: () => projects.first,
@@ -417,6 +490,7 @@ class WorkspaceStore extends ChangeNotifier {
 
   Future<void> load() async {
     if (loaded) return;
+    loadFailed = false;
     try {
       final raw = await _persistence.read();
       if (raw != null) {
@@ -433,6 +507,16 @@ class WorkspaceStore extends ChangeNotifier {
               WorkspaceConversation(id: _id(), title: 'New conversation'),
             );
           }
+          // The assistant is now the main application surface, not a saved artifact.
+          project.artifacts.removeWhere(
+            (artifact) =>
+                artifact.kind == 'app' && artifact.data['app'] == 'assistant',
+          );
+          if (!project.conversations.any(
+            (c) => c.id == project.selectedConversationId,
+          )) {
+            project.selectedConversationId = project.conversations.first.id;
+          }
           final ids = project.artifacts.map((a) => a.id).toSet();
           for (final c in project.conversations) {
             c.attachedArtifactIds.retainAll(ids);
@@ -443,6 +527,11 @@ class WorkspaceStore extends ChangeNotifier {
           project.presentation.minimizedArtifactIds.retainAll(
             project.presentation.openArtifactIds,
           );
+          // Reopen saved work explicitly; do not restore stale windows into the dock.
+          project.presentation.openArtifactIds.clear();
+          project.presentation.minimizedArtifactIds.clear();
+          project.presentation.activeArtifactId = null;
+          project.presentation.chatCollapsed = false;
         }
         projects
           ..clear()
@@ -453,9 +542,14 @@ class WorkspaceStore extends ChangeNotifier {
         );
         settings = WorkspacePreferences.fromJson(_map(json['settings']));
       }
+      persistenceError = null;
     } catch (_) {
-      persistenceError = 'Saved workspace could not be loaded. Existing saved data has not been replaced.';
+      loadFailed = true;
+      persistenceError = 'Saved workspace could not be loaded. Existing saved data has not been replaced. Retry loading before saving.';
     }
+    _projectsAtLoad
+      ..clear()
+      ..addAll(projects.map((project) => project.id));
     loaded = true;
     _notify();
   }
@@ -471,23 +565,60 @@ class WorkspaceStore extends ChangeNotifier {
   }
 
   Future<void> save() {
-    final snapshot = jsonEncode(toJson());
+    if (loadFailed) {
+      _notify();
+      return Future.value();
+    }
+    _pendingSnapshot = jsonEncode(toJson());
+    // All callers queued behind an in-flight write await the latest snapshot.
+    // The in-flight caller keeps its own completion and is never delayed by
+    // later edits. flush observes the newest completion available when called.
+    final completion = _pendingSave ??= Completer<void>();
+    _writes = completion.future;
     _notify();
-    _writes = _writes.then((_) async {
+    if (!_writeRunning) {
+      _writeRunning = true;
+      unawaited(_drainWrites());
+    }
+    return completion.future;
+  }
+
+  Future<void> _drainWrites() async {
+    while (_pendingSnapshot != null) {
+      final snapshot = _pendingSnapshot!;
+      final completion = _pendingSave!;
+      _pendingSnapshot = null;
+      _pendingSave = null;
       try {
         await _persistence.write(snapshot);
         persistenceError = null;
+      } on WorkspaceSaveConflict {
+        persistenceError = 'Saved work changed in another session. Your changes remain open and unsaved. Reload saved state only after preserving your changes.';
       } catch (_) {
-        persistenceError = 'Changes could not be saved on this device. Your work remains open; retry saving.';
+        persistenceError = 'Changes could not be saved to the server. Your work remains open and unsaved; retry saving.';
       }
       _notify();
-    });
-    return _writes;
+      completion.complete();
+    }
+    _writeRunning = false;
   }
 
   Future<void> flush() => _writes;
+
+  /// Explicit user-requested reload; callers warn before discarding local edits.
+  Future<void> reload() async {
+    await flush();
+    loaded = false;
+    remoteRevisions.clear();
+    _startupWindows.clear();
+    _projectsAtLoad.clear();
+    _firstRun.clear();
+    await load();
+  }
+
   WorkspaceProject createProject(
     String title, {
+    String? id,
     String agentId = 'intocaht',
     String draft = '',
   }) {
@@ -498,9 +629,10 @@ class WorkspaceStore extends ChangeNotifier {
           ? agentId
           : 'intocaht',
       draft: draft,
+      modelProfile: settings.defaultModelProfile,
     );
     final p = WorkspaceProject(
-      id: _id(),
+      id: id ?? _id(),
       title: title.trim().isEmpty ? 'Untitled project' : title.trim(),
       conversations: [c],
       selectedConversationId: c.id,
@@ -521,6 +653,7 @@ class WorkspaceStore extends ChangeNotifier {
   WorkspaceConversation createConversation({String? title}) {
     final c = WorkspaceConversation(
       id: _id(),
+      modelProfile: settings.defaultModelProfile,
       title: title?.trim().isNotEmpty == true
           ? title!.trim()
           : 'New conversation',
@@ -563,8 +696,11 @@ class WorkspaceStore extends ChangeNotifier {
   }
 
   WorkspaceArtifact launchLocalApp(String app) {
-    if (!['files', 'images', 'behaviors'].contains(app)) {
+    if (!['files', 'images', 'csharp'].contains(app)) {
       throw ArgumentError('Application not implemented.');
+    }
+    if (app == 'csharp' && !_developerMode) {
+      throw ArgumentError('C# files are available in developer mode only.');
     }
     final id = 'app-$app';
     final artifact =
@@ -573,7 +709,7 @@ class WorkspaceStore extends ChangeNotifier {
           id: id,
           title: switch (app) {
             'files' => 'Files',
-            'behaviors' => 'Behaviors',
+            'csharp' => 'C# files',
             _ => 'Image Editor',
           },
           kind: 'app',
@@ -616,8 +752,11 @@ class WorkspaceStore extends ChangeNotifier {
 
   void openArtifact(String id, {String? placement}) {
     if (currentProject.artifacts.any((a) => a.id == id && a.remoteManaged)) {
-      onRemoteWindowAction?.call(currentProject.id, id, true);
-      return;
+      _startupWindows[currentProject.id]?.remove(id);
+      if (!currentProject.presentation.openArtifactIds.contains(id)) {
+        onRemoteWindowAction?.call(currentProject.id, id, true);
+        return;
+      }
     }
     if (!currentProject.artifacts.any((a) => a.id == id)) return;
     final p = currentProject.presentation;

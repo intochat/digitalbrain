@@ -16,6 +16,10 @@
       "command": "cmd",
       "args": ["/c", "npx", "-y", "@upstash/context7-mcp@latest"]
     },
+    "digitalbrain-mcp": {
+      "type": "http",
+      "url": "http://localhost:5081/mcp"
+    },
     "codegraph": {
       "command": "cmd",
       "args": [

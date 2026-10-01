@@ -1,0 +1,12 @@
+{
+  "name": "assistant",
+  "title": "Assistant",
+  "description": "A helpful assistant that answers your question in a few clear sentences.",
+  "runtime": "prompt",
+  "operations": [
+    { "name": "ask", "description": "Ask the assistant anything." }
+  ],
+  "settings": [
+    { "name": "Model", "description": "The model that answers.", "default": "IGemma4" }
+  ]
+}

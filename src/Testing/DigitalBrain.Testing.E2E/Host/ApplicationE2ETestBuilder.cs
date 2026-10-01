@@ -7,9 +7,33 @@ public sealed class E2ETestBuilder<TAppHost> where TAppHost : class
     private readonly CompositionOverrides _overrides = new();
     private TestExecutionOptions _execution = new();
     private BrowserOptions _browser = new() { Headless = true };
-    private string? _executionRootKey;
-    private TestExecutionRoot? _executionRoot;
     private bool _started;
+
+    public E2ETestBuilder<TAppHost> WithoutModule<TModule>() where TModule : class, IModule, new()
+    {
+        EnsureMutable();
+        _overrides.WithoutModule<TModule>();
+        return this;
+    }
+
+    public E2ETestBuilder<TAppHost> ConfigureModule<TModule, TOptions>(Action<TOptions> configureOptions)
+        where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
+    {
+        EnsureMutable();
+        ArgumentNullException.ThrowIfNull(configureOptions);
+        var browserAtDeclaration = _browser;
+        using var scope = BrowserConfiguration.Begin(_browser);
+        // The edit runs once here so ambient browser choices apply and a throwing edit fails at the call site;
+        // it runs again later against the AppHost's own options, where browser choices are already taken.
+        configureOptions(new TOptions());
+        _browser = scope.Options;
+        _overrides.ConfigureModule<TModule, TOptions>(options =>
+        {
+            using var discarded = BrowserConfiguration.Begin(browserAtDeclaration);
+            configureOptions(options);
+        });
+        return this;
+    }
 
     public E2ETestBuilder<TAppHost> ConfigureModule<TModule>(Action<ModuleConfiguration<TModule>> configure)
         where TModule : class, IModule, new()
@@ -20,6 +44,16 @@ public sealed class E2ETestBuilder<TAppHost> where TAppHost : class
         _browser = scope.Options;
         return this;
     }
+    // A startup budget for hosts whose resources compile at start (a CI runner building the
+    // web shell needs more than the default); merges into the composition's execution options.
+    public E2ETestBuilder<TAppHost> WithStartupTimeout(TimeSpan timeout)
+    {
+        EnsureMutable();
+        TestExecutionOptions.ValidateTimeout(timeout);
+        _execution = _execution with { StartupTimeout = timeout };
+        return this;
+    }
+
     public E2ETestBuilder<TAppHost> WithExecution(TestExecutionOptions execution)
     {
         EnsureMutable();
@@ -28,15 +62,16 @@ public sealed class E2ETestBuilder<TAppHost> where TAppHost : class
         return this;
     }
 
-    /// <summary>
-    /// Adds environment variables to the primary application resource, for test-only wiring such
-    /// as pointing the OTLP exporter at a collector owned by the test process.
-    /// </summary>
+    // Adds environment variables to the primary application resource, for test-only wiring such as
+    // pointing the OTLP exporter at a collector owned by the test process. Later calls merge over
+    // earlier ones, so a composition's defaults survive a fact adding its own variables.
     public E2ETestBuilder<TAppHost> WithResourceEnvironment(IReadOnlyDictionary<string, string> environment)
     {
         EnsureMutable();
         ArgumentNullException.ThrowIfNull(environment);
-        _execution = _execution with { ResourceEnvironment = environment };
+        var merged = new Dictionary<string, string>(_execution.ResourceEnvironment, StringComparer.Ordinal);
+        foreach (var (key, value) in environment) { merged[key] = value; }
+        _execution = _execution with { ResourceEnvironment = merged };
         return this;
     }
     public E2ETestBuilder<TAppHost> WithBrowser(BrowserOptions browser)
@@ -47,39 +82,15 @@ public sealed class E2ETestBuilder<TAppHost> where TAppHost : class
         return this;
     }
 
-    /// <summary>
-    /// Gives the AppHost a unique per-run root for a configuration key (for example the behavior
-    /// authoring root), so a test never shares the developer's persisted execution directories.
-    /// </summary>
-    public E2ETestBuilder<TAppHost> WithExecutionRoot(string configurationKey)
-    {
-        EnsureMutable();
-        ArgumentException.ThrowIfNullOrWhiteSpace(configurationKey);
-        _executionRootKey = configurationKey;
-        return this;
-    }
-
     public Task<E2EBrain> StartAsync(CancellationToken cancellationToken = default)
     {
         EnsureMutable();
         var overrides = SerializeOverrides();
-        var executionRoot = AcquireExecutionRoot();
         _started = true;
-        return E2ETest.StartAsync<TAppHost>(overrides, _execution, _browser, executionRoot, cancellationToken);
+        return E2ETest.StartAsync<TAppHost>(overrides, _execution, _browser, cancellationToken);
     }
     internal string SerializeOverrides() => _overrides.Serialize();
     internal BrowserOptions BrowserOptions => _browser;
-    internal TestExecutionRoot? ExecutionRoot => _executionRoot;
-
-    internal IReadOnlyList<string> HostArguments(string identity)
-    {
-        EnsureMutable();
-        return E2ETest.ComposeHostArguments(SerializeOverrides(), identity, AcquireExecutionRoot());
-    }
-
-    private TestExecutionRoot? AcquireExecutionRoot()
-        => _executionRootKey is null ? null : _executionRoot ??= TestExecutionRoot.Create(_executionRootKey);
-
     private void EnsureMutable()
     {
         if (_started) { throw new InvalidOperationException("A test builder starts one session. Create another builder for a new session."); }

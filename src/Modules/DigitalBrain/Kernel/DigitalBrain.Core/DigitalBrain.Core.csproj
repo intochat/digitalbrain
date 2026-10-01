@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>true</IsPackable><Description>Typed neurons and live subscriptions on Orleans.</Description></PropertyGroup>
+  <ItemGroup><PackageReference Include="Microsoft.Orleans.Server" /></ItemGroup>
+  <ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../DigitalBrain.Client/DigitalBrain.Client.csproj" /></ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="DigitalBrain.Core.Tests.Unit" /></ItemGroup>
+</Project>

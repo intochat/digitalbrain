@@ -19,11 +19,11 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
-    <ProjectReference Include="../../Modules/DigitalBrain/Behaviors/Runtime/DigitalBrain.Behavior.csproj" />
-    <ProjectReference Include="../../Modules/Google/Flutter/Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
-    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
-    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/Aspire/DigitalBrain.Aspire.csproj" />
-    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/Sdk/DigitalBrain.Sdk.csproj" />
+    <ProjectReference Include="../../Modules/Google/Flutter/DigitalBrain.Modules.Flutter.Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Kernel.Aspire.Hosting/DigitalBrain.Kernel.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Kernel.Aspire/DigitalBrain.Kernel.Aspire.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Build/DigitalBrain.Testing.E2E.targets" Pack="true" PackagePath="buildTransitive/" />

@@ -1,4 +1,4 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.5.3">
+<Project Sdk="Aspire.AppHost.Sdk/13.6.0">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <AspireUseCliBundle>true</AspireUseCliBundle>
@@ -7,25 +7,32 @@
     <DisableMSBuildAssemblyCopyCheck>true</DisableMSBuildAssemblyCopyCheck>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Behaviors/DigitalBrain.Behaviors.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../IntoChat/IntoChat.csproj" />
-    <ProjectReference Include="../../../Modules/Time/Time/DigitalBrain.Modules.Time.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/Google/Gmail/Gmail/DigitalBrain.Modules.Google.Gmail.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/Google/Flutter/Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/DigitalBrain.Kernel.Aspire.Hosting/DigitalBrain.Kernel.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../IntoChat/IntoChat.csproj" ReferenceOutputAssembly="true" Private="true" ExcludeAssets="none" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Mcp/DigitalBrain.Mcp.csproj" />
+    <ProjectReference Include="../../../Modules/Time/DigitalBrain.Modules.Time/DigitalBrain.Modules.Time.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Compute/DigitalBrain.Modules.Compute/DigitalBrain.Modules.Compute.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps/DigitalBrain.Modules.Apps.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Assistant/DigitalBrain.Modules.Assistant/DigitalBrain.Modules.Assistant.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/CustomerResearcher/DigitalBrain.Modules.CustomerResearcher/DigitalBrain.Modules.CustomerResearcher.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Specs/DigitalBrain.Modules.Specs/DigitalBrain.Modules.Specs.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/DigitalBrain/Registry/DigitalBrain.Modules.Registry/DigitalBrain.Modules.Registry.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Google/Gmail/DigitalBrain.Modules.Google.Gmail/DigitalBrain.Modules.Google.Gmail.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Google/Flutter/DigitalBrain.Modules.Flutter.Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../../Modules/AI/Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/Qdrant/Aspire.Hosting/DigitalBrain.Modules.Qdrant.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/ClickHouse/Aspire.Hosting/DigitalBrain.Modules.ClickHouse.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/Supabase/Aspire.Hosting/DigitalBrain.Modules.Supabase.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/Google/Gmail/Aspire.Hosting/DigitalBrain.Modules.Google.Gmail.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/Salesforce/Aspire.Hosting/DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/Microsoft/GitHub/Aspire.Hosting/DigitalBrain.Modules.Microsoft.GitHub.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/Microsoft/Aspire/Aspire.Hosting/DigitalBrain.Modules.Microsoft.Aspire.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/Coding/Coding/DigitalBrain.Modules.Coding.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/Microsoft/Roslyn/Roslyn/DigitalBrain.Modules.Microsoft.Roslyn.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/Microsoft/DotNet/DotNet/DigitalBrain.Modules.Microsoft.DotNet.csproj" IsAspireProjectResource="false" />
-    <ProjectReference Include="../../../Modules/DigitalBrain/Behaviors/Aspire.Hosting/DigitalBrain.Modules.Behavior.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/AI/DigitalBrain.Modules.AI.Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Qdrant/DigitalBrain.Modules.Qdrant.Aspire.Hosting/DigitalBrain.Modules.Qdrant.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/ClickHouse/DigitalBrain.Modules.ClickHouse.Aspire.Hosting/DigitalBrain.Modules.ClickHouse.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Supabase/DigitalBrain.Modules.Supabase.Aspire.Hosting/DigitalBrain.Modules.Supabase.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Google/Gmail/DigitalBrain.Modules.Google.Gmail.Aspire.Hosting/DigitalBrain.Modules.Google.Gmail.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Salesforce/DigitalBrain.Modules.Salesforce.Aspire.Hosting/DigitalBrain.Modules.Salesforce.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Microsoft/GitHub/DigitalBrain.Modules.Microsoft.GitHub.Aspire.Hosting/DigitalBrain.Modules.Microsoft.GitHub.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Microsoft/Aspire/DigitalBrain.Modules.Microsoft.Aspire.Aspire.Hosting/DigitalBrain.Modules.Microsoft.Aspire.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Aspire.Hosting/DigitalBrain.Modules.Microsoft.CSharp.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../Modules/Postgres/DigitalBrain.Modules.Postgres.Aspire.Hosting/DigitalBrain.Modules.Postgres.Aspire.Hosting.csproj" IsAspireProjectResource="false" />
+    <ProjectReference Include="../../../Modules/Microsoft/Playwright/DigitalBrain.Modules.Microsoft.Playwright/DigitalBrain.Modules.Microsoft.Playwright.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
 </Project>

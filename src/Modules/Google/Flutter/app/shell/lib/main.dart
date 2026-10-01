@@ -25,6 +25,10 @@ Future<void> main() async {
     _semantics = SemanticsBinding.instance.ensureSemantics();
   }
 
+  // A containerized bundle learns the kernel URL from same-origin config.json;
+  // bundles with baked defines skip the fetch inside loadServedConfig.
+  await DigitalBrainHostEnv.loadServedConfig();
+
   final chat = DigitalBrainHostEnv.resolveChat();
   // Capture the deep link before the authentication gate builds its Navigator.
   final initialLocation = Uri.parse(
@@ -35,8 +39,9 @@ Future<void> main() async {
   // kernel accepted before any stream opens.
   runApp(
     BrainSessionGate(
-      builder: (client, status) => buildShell(
+      builder: (client, status, switchAccount) => buildShell(
         chat: chat,
+        onSwitchAccount: switchAccount,
         edge: client,
         statusMessage: status,
         initialLocation: initialLocation,
@@ -52,6 +57,7 @@ Widget buildShell({
   String? statusMessage,
   WorkspaceStore? workspaceStore,
   Uri? initialLocation,
+  Future<void> Function()? onSwitchAccount,
 }) {
   final scope = base64Url.encode(
     utf8.encode(
@@ -62,13 +68,12 @@ Widget buildShell({
   );
   return WorkspaceApp(
     key: ValueKey(scope),
+    onSwitchAccount: onSwitchAccount,
     persistenceKey: 'intocaht.workspace.v1.$scope',
     store: workspaceStore,
     initialLocation: initialLocation,
     kernelBaseUri: edge?.baseUri,
     programmingClient: edge,
-    onRun: edge?.runAgent,
-    onSalesforceConnected: edge?.salesforceConnected,
     onReadTable: edge?.readTable,
     onUpdateTableView: edge?.updateTableView,
     onListTables: edge?.listTables,

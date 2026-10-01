@@ -142,6 +142,15 @@ class _AppSurfaceHostState extends State<AppSurfaceHost> {
         widget.workspace,
         'node?${Uri(queryParameters: {'kind': kind, 'name': name}).query}',
       );
+  Future<String?> saveSecret(String fieldName, String value) async {
+    final result = await widget.client.storeSecret(
+      'form.$fieldName',
+      fieldName,
+      value,
+    );
+    return result['reference'] as String?;
+  }
+
   Future<void> dispatch(Map<String, dynamic> event) async {
     try {
       if (event['kind'] == 'tabs' && editing) return;
@@ -305,6 +314,9 @@ class _AppSurfaceHostState extends State<AppSurfaceHost> {
     ).showSnackBar(SnackBar(content: Text('Saved ${result['file']['name']}')));
   }
 
+  Future<void> relay(Map<String, dynamic> event) =>
+      widget.client.appRequest(widget.workspace, 'event', body: event);
+
   @override
   Widget build(BuildContext context) {
     final renderedDocument = document;
@@ -354,6 +366,7 @@ class _AppSurfaceHostState extends State<AppSurfaceHost> {
                       : nodeRevision,
                   onActivate: activateItem,
                   onAction: dispatch,
+                  secretSaver: saveSecret,
                   enabled: !editing && !loading,
                   imageBuilder: (definition) =>
                       renderedBytes == null ||

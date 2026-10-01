@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>The credential ring: secrets, integration registrations and accounts. Scripts can never see this assembly.</Description>
+    <RootNamespace>DigitalBrain.Platform</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Core.Tests.Unit" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <ProjectReference Include="../DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
+  </ItemGroup>
+</Project>

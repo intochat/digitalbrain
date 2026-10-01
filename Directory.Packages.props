@@ -2,13 +2,14 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
-    <AspireVersion>13.5.3</AspireVersion>
+    <AspireVersion>13.6.0</AspireVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Octokit" Version="14.0.0" />
     <PackageVersion Include="Octokit.Webhooks" Version="4.2.0" />
     <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
     <PackageVersion Include="ModelContextProtocol.Core" Version="2.2.0" />
+    <PackageVersion Include="BouncyCastle.Cryptography" Version="2.7.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="11.0.0-rc.1.26425.128" />
     <PackageVersion Include="Microsoft.Build.Locator" Version="1.11.2" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.9.0" />
@@ -16,21 +17,28 @@
     <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="5.9.0" />
   </ItemGroup>
   <ItemGroup>
-    <PackageVersion Include="Aspire.Hosting" Version="13.5.3" />
-    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.5.3" />
-    <PackageVersion Include="Aspire.Hosting.Testing" Version="13.5.3" />
-    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.5.3" />
-    <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.5.3" />
-    <PackageVersion Include="Aspire.Hosting.Qdrant" Version="13.5.3" />
+    <PackageVersion Include="Aspire.Hosting" Version="13.6.0" />
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.6.0" />
+    <PackageVersion Include="Aspire.Hosting.Testing" Version="13.6.0" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.6.0" />
+    <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.6.0" />
+    <PackageVersion Include="Aspire.Hosting.Qdrant" Version="13.6.0" />
     <PackageVersion Include="Aspire.Hosting.ClickHouse" Version="13.5.3" />
-    <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.5.3" />
-    <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.5.3" />
+    <PackageVersion Include="Aspire.Azure.Data.Tables" Version="13.6.0" />
+    <PackageVersion Include="Aspire.Azure.Storage.Blobs" Version="13.6.0" />
     <PackageVersion Include="Azure.Storage.Blobs" Version="12.29.2" />
+    <PackageVersion Include="Azure.Extensions.AspNetCore.DataProtection.Blobs" Version="1.5.4" />
     <PackageVersion Include="Qdrant.Client" Version="1.19.0" />
     <PackageVersion Include="ClickHouse.Driver" Version="1.4.0" />
     <PackageVersion Include="Npgsql" Version="10.0.3" />
-    <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.5.1-beta.748" />
+    <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.6.0-beta.910" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="11.0.0-rc.1.26425.128" />
+    <PackageVersion Include="Azure.Identity" Version="1.21.0" />
+    <PackageVersion Include="DeploymentKit" Version="1.0.0-preview.3" />
+    <PackageVersion Include="Pulumi" Version="3.114.0" />
+    <PackageVersion Include="Pulumi.AzureNative" Version="3.28.0" />
+    <PackageVersion Include="Pulumi.Random" Version="4.21.2" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="11.0.0-rc.1.26425.128" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="11.0.0-rc.1.26425.128" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.9.0" />
     <PackageVersion Include="Microsoft.Extensions.AI" Version="10.9.0" />

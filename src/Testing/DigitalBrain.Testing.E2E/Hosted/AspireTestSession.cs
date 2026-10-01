@@ -1,3 +1,4 @@
+using DigitalBrain.Client;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
@@ -31,24 +32,23 @@ public sealed class AspireTestSession : IAsyncDisposable
     public TestSessionLifetime Lifetime => _lifetime;
 
     public static Task<AspireTestSession> StartAsync<TAppHost>(
-        IReadOnlyList<string> args, string identity, TestExecutionOptions options, TestExecutionRoot? executionRoot,
-        CancellationToken cancellationToken)
+        IReadOnlyList<string> args, string identity, TestExecutionOptions options, CancellationToken cancellationToken)
         where TAppHost : class
         => StartCoreAsync(ct => DistributedApplicationTestingBuilder.CreateAsync<TAppHost>([.. args], ct),
-            declareTopology: null, identity, options, executionRoot, cancellationToken);
+            declareTopology: null, identity, options, cancellationToken);
 
     public static Task<AspireTestSession> StartAsync(string identity, TestExecutionOptions options,
         Action<IDistributedApplicationTestingBuilder> declareTopology, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(declareTopology);
         return StartCoreAsync(_ => Task.FromResult(DistributedApplicationTestingBuilder.Create([])),
-            declareTopology, identity, options, executionRoot: null, cancellationToken);
+            declareTopology, identity, options, cancellationToken);
     }
 
     private static async Task<AspireTestSession> StartCoreAsync(
         Func<CancellationToken, Task<IDistributedApplicationTestingBuilder>> createBuilder,
         Action<IDistributedApplicationTestingBuilder>? declareTopology,
-        string identity, TestExecutionOptions options, TestExecutionRoot? executionRoot, CancellationToken cancellationToken)
+        string identity, TestExecutionOptions options, CancellationToken cancellationToken)
     {
         options.Validate();
         cancellationToken.ThrowIfCancellationRequested();
@@ -56,8 +56,6 @@ public sealed class AspireTestSession : IAsyncDisposable
         deadline.CancelAfter(options.StartupTimeout);
         var ct = deadline.Token;
         var lifetime = new TestSessionLifetime(options);
-        // Owned before the host so its directory outlives every child process and is deleted last.
-        if (executionRoot is not null) { lifetime.Own("execution-root", executionRoot); }
         var stage = "builder";
         try
         {
@@ -75,25 +73,49 @@ public sealed class AspireTestSession : IAsyncDisposable
             // values out of command-line arguments and public composition envelopes.
             builder.Configuration.AddInMemoryCollection(options.PrivateConfiguration
                 .Where(pair => pair.Key.StartsWith("Parameters:", StringComparison.OrdinalIgnoreCase)));
+            // Aspire forwards every resource's console output under "<AppHost>.Resources.<resource>"; config rules beat SetMinimumLevel.
+            builder.Configuration.AddInMemoryCollection(TestLogging.QuietDefaults);
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"Logging:LogLevel:{builder.Environment.ApplicationName}.Resources"] = "Warning",
+            });
             builder.Services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
             stage = "topology";
             declareTopology?.Invoke(builder);
-            var primary = builder.Resources.Where(r => r.Annotations.OfType<BrainEndpointAnnotation>().Any()).ToArray();
-            if (primary.Length != 1) { throw new InvalidOperationException("The AppHost must declare exactly one primary brain HTTP endpoint."); }
-            var resource = primary[0];
-            if (privateSettings is not null)
-            {
-                resource.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
-                    context.EnvironmentVariables["DigitalBrain__Testing__PrivateConfiguration"] = privateSettings.FilePath));
-            }
-            if (options.ResourceEnvironment.Count > 0)
+            var hosts = SiloHosts.Find(builder.Resources);
+            if (hosts.Count == 0)
+            { throw new InvalidOperationException("The AppHost must reference the brain from at least one resource with an http endpoint."); }
+            foreach (var resource in builder.Resources.Where(r => r is ProjectResource or ExecutableResource))
             {
                 resource.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
                 {
-                    foreach (var (key, value) in options.ResourceEnvironment) { context.EnvironmentVariables[key] = value; }
+                    foreach (var (key, value) in TestLogging.QuietDefaults)
+                    { context.EnvironmentVariables[key.Replace(":", "__")] = value!; }
                 }));
             }
-            var endpoint = resource.Annotations.OfType<BrainEndpointAnnotation>().Single();
+            foreach (var resource in hosts)
+            {
+                if (privateSettings is not null)
+                {
+                    resource.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
+                        context.EnvironmentVariables["DigitalBrain__Testing__PrivateConfiguration"] = privateSettings.FilePath));
+                }
+                if (options.ResourceEnvironment.Count > 0)
+                {
+                    resource.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
+                    {
+                        foreach (var (key, value) in options.ResourceEnvironment) { context.EnvironmentVariables[key] = value; }
+                    }));
+                }
+                // The AppHost publishes a fixed port. A testing builder also copies launchSettings ports,
+                // so clear both or every session binds the same endpoint.
+                foreach (var http in resource.Annotations.OfType<EndpointAnnotation>())
+                {
+                    if (!string.Equals(http.Name, SiloHosts.HttpEndpointName, StringComparison.Ordinal)) { continue; }
+                    http.Port = null;
+                    http.TargetPort = null;
+                }
+            }
             stage = "build";
             var app = await builder.BuildAsync(ct).ConfigureAwait(false);
             lifetime.Own("application", app);
@@ -101,7 +123,8 @@ public sealed class AspireTestSession : IAsyncDisposable
             stage = "start";
             await app.StartAsync(ct).ConfigureAwait(false);
             stage = "readiness";
-            await app.ResourceNotifications.WaitForResourceHealthyAsync(resource.Name, ct).ConfigureAwait(false);
+            foreach (var host in hosts)
+            { await app.ResourceNotifications.WaitForResourceHealthyAsync(host.Name, ct).ConfigureAwait(false); }
             var browser = builder.Resources.SelectMany(r => r.Annotations.OfType<BrainBrowserAnnotation>()
                 .Select(a => (r.Name, a.Endpoint, a.Path, a.ReadySelector))).ToArray();
             if (browser.Length > 1) { throw new InvalidOperationException("The AppHost declares multiple primary browser endpoints."); }
@@ -117,7 +140,7 @@ public sealed class AspireTestSession : IAsyncDisposable
             stage = "client";
             await session.ConnectAsync(ct).ConfigureAwait(false);
             lifetime.Own("client", new AsyncAction(session.ReleaseClientAsync));
-            session.HttpClient = app.CreateHttpClient(resource.Name, endpoint.Endpoint);
+            session.HttpClient = app.CreateHttpClient(hosts[0].Name, SiloHosts.HttpEndpointName);
             lifetime.Own("http", new AsyncAction(() => { session.HttpClient.Dispose(); return ValueTask.CompletedTask; }));
             return session;
         }

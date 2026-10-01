@@ -1,28 +1,28 @@
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Supabase.Tables;
-using IntoChat.Workspace;
 using Microsoft.Playwright;
+using DigitalBrain.Identity;
 
 namespace IntoChat.Tests.E2E.Workspace;
 
-public sealed class SupabaseTableDisplayFacts
+public sealed class SupabaseTableDisplayFacts(IntoChatHostFixture host) : BrainFact(host)
 {
     [Fact(Timeout = 300_000)]
     public async Task DatabaseTableAppearsAndFilterFindsRowsBeyondTheFirstPage()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<FlutterModule>(flutter => flutter.RunWebApp()).StartAsync(ct);
+        var brain = Brain;
         const string marker = "Beyond the first page";
         await LeadData.SeedAsync(brain, marker, ct);
-        var page = brain.Page;
+        var page = await OpenPageAsync(ct);
         await page.SetViewportSizeAsync(1600, 1000);
-        var projectId = await WorkspaceBrowser.CreateProjectAsync(page, "Data workspace");
-        var workspace = brain.Get<IWorkspace>(WorkspaceScope.Create("owner", projectId).Id);
+        var projectId = await WorkspaceBrowser.CreateProjectAsync(page, "Display data workspace");
+        var workspace = brain.Get<IWorkspace>(BrainScope.Create("owner", projectId).Id);
         var table = brain.Get<ISupabaseTable>("active-leads");
         var snapshot = await table.CreateFromQuery(new("Active leads", "select id, company, email from leads where active order by id"));
-        await workspace.Open(new("show-leads", "leads-window", "Active leads", new(snapshot.Id), (await workspace.Read()).Revision));
+        await workspace.Open(new("show-leads", "leads-window", "Active leads", WindowReference.Table(snapshot.Id), (await workspace.Read()).Revision));
 
         var window = page.GetByRole(AriaRole.Region, new() { Name = "Active leads", Exact = true });
         await Assertions.Expect(window).ToBeVisibleAsync();
@@ -45,16 +45,15 @@ public sealed class SupabaseTableDisplayFacts
     public async Task EmptyResultsAndUnavailableSourceAreShownWithoutInventedRows()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<FlutterModule>(flutter => flutter.RunWebApp()).StartAsync(ct);
+        var brain = Brain;
         await LeadData.SeedAsync(brain, "Beyond first page", ct);
-        var page = brain.Page;
+        var page = await OpenPageAsync(ct);
         await page.SetViewportSizeAsync(1600, 1000);
-        var projectId = await WorkspaceBrowser.CreateProjectAsync(page, "Unavailable data");
-        var workspace = brain.Get<IWorkspace>(WorkspaceScope.Create("owner", projectId).Id);
+        var projectId = await WorkspaceBrowser.CreateProjectAsync(page, "Display unavailable data");
+        var workspace = brain.Get<IWorkspace>(BrainScope.Create("owner", projectId).Id);
         var table = brain.Get<ISupabaseTable>("empty-leads");
         var snapshot = await table.CreateFromQuery(new("Empty leads", "select id, company, email from leads where false"));
-        await workspace.Open(new("show-empty", "empty-window", "Empty leads", new(snapshot.Id), (await workspace.Read()).Revision));
+        await workspace.Open(new("show-empty", "empty-window", "Empty leads", WindowReference.Table(snapshot.Id), (await workspace.Read()).Revision));
         var window = page.GetByRole(AriaRole.Region, new() { Name = "Empty leads", Exact = true });
         await Assertions.Expect(window.GetByText("No rows match these filters.", new() { Exact = true })).ToBeVisibleAsync();
         await Assertions.Expect(window.GetByText("Company 1", new() { Exact = true })).ToHaveCountAsync(0);

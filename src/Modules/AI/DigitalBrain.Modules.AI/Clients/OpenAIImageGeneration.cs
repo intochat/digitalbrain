@@ -1,0 +1,41 @@
+using System.ClientModel;
+using OpenAI;
+using OpenAI.Images;
+
+namespace DigitalBrain.AI;
+
+internal sealed class OpenAIImageGeneration(ImageModel model, IAiCredentials credentials) : IImageGeneration, IConditionallyAvailable
+{
+    public bool IsAvailable => credentials.IsReady(AiIntegrations.IdOf(model.Provider));
+
+    public async Task<GeneratedUiImage> GenerateAsync(string prompt, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(prompt);
+
+        var apiKey = await credentials.ReleaseSecretAsync(AiIntegrations.IdOf(model.Provider), AiIntegrations.ApiKeyField, cancellationToken).ConfigureAwait(false);
+
+        var client = new OpenAIClient(new ApiKeyCredential(apiKey)).GetImageClient(model.Id);
+        var image = await client.GenerateImageAsync(
+            prompt,
+            OptionsFor(model),
+            cancellationToken).ConfigureAwait(false);
+
+        var bytes = image.Value.ImageBytes
+            ?? throw new InvalidOperationException(
+                $"{model.DisplayName} returned no image bytes. A model that answers with a URL must set "
+                + $"{nameof(ImageModel.AcceptsResponseFormat)} so bytes are requested explicitly.");
+
+        return new GeneratedUiImage(bytes.ToArray(), model.MediaType, model.Id);
+    }
+
+    // Asking gpt-image-1 for a response format is HTTP 400 unknown_parameter: it
+    // always answers with base64. Only models that accept the option get it.
+    internal static ImageGenerationOptions OptionsFor(ImageModel model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+
+        return model.AcceptsResponseFormat
+            ? new ImageGenerationOptions { ResponseFormat = GeneratedImageFormat.Bytes }
+            : new ImageGenerationOptions();
+    }
+}

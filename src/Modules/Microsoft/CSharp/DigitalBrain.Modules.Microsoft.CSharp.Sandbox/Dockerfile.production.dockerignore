@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/.dart_tool/
+**/build/
+**/TestResults/
+**/Tests/
+.git/
+artifacts/
+src/Applications/
+src/Testing/
+src/Modules/Google/Flutter/app/

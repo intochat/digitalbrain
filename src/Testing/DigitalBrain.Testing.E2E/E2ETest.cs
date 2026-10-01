@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Core;
 
 namespace DigitalBrain.Testing.E2E;
@@ -9,33 +10,34 @@ public static class E2ETest
     public static E2ETestBuilder<TAppHost> For<TAppHost>() where TAppHost : class => new();
 
     internal static async Task<E2EBrain> StartAsync<TAppHost>(string overrides, TestExecutionOptions options,
-        BrowserOptions browserOptions, TestExecutionRoot? executionRoot, CancellationToken cancellationToken) where TAppHost : class
+        BrowserOptions browserOptions, CancellationToken cancellationToken) where TAppHost : class
     {
         cancellationToken.ThrowIfCancellationRequested();
         options.Validate();
         var browser = Resolve(browserOptions);
         var identity = NewIdentity();
-        var args = ComposeHostArguments(overrides, identity, executionRoot);
-        var session = await AspireTestSession.StartAsync<TAppHost>(args, identity, WithArtifacts(options, identity), executionRoot, cancellationToken).ConfigureAwait(false);
+        var args = ComposeHostArguments(overrides, identity);
+        var session = await AspireTestSession.StartAsync<TAppHost>(args, identity, WithArtifacts(options, identity), cancellationToken).ConfigureAwait(false);
         return await ReadyAsync(new E2EBrain(session, browser), brain => brain.StartBrowserAsync(cancellationToken)).ConfigureAwait(false);
     }
 
-    internal static IReadOnlyList<string> ComposeHostArguments(string overrides, string identity, TestExecutionRoot? executionRoot)
-    {
-        List<string> args = ["DigitalBrain:Testing:Enabled=true", $"Orleans:ClusterId={identity}",
-            $"{CompositionOverrideTransport.ConfigurationKey}={overrides}"];
-        if (executionRoot is not null) { args.Add(executionRoot.Argument); }
-        return args;
-    }
+    private static IReadOnlyList<string> ComposeHostArguments(string overrides, string identity)
+        =>
+        [
+            "DigitalBrain:Testing:Enabled=true",
+            $"{DigitalBrainHostingNames.PersistentStorageKey}=false",
+            $"Orleans:ClusterId={identity}",
+            $"{CompositionOverrideTransport.ConfigurationKey}={overrides}",
+        ];
 
     internal static async Task<E2EBrain> StartModulesAsync(IReadOnlyList<ModuleDefinition> modules,
-        TestExecutionOptions options, BrowserOptions browserOptions, CancellationToken cancellationToken)
+        TestExecutionOptions options, BrowserOptions browserOptions, string? durableStorageKey, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         options.Validate();
         var browser = Resolve(browserOptions);
         var identity = NewIdentity();
-        var session = await ModuleTestHost.StartAsync(modules, WithArtifacts(options, identity), identity, cancellationToken).ConfigureAwait(false);
+        var session = await ModuleTestHost.StartAsync(modules, WithArtifacts(options, identity), identity, durableStorageKey, cancellationToken).ConfigureAwait(false);
         return await ReadyAsync(new E2EBrain(session, browser), brain => brain.StartBrowserAsync(cancellationToken)).ConfigureAwait(false);
     }
 

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- The Dockerfile builds this project alone, outside the repository's Directory.Build.props,
+       so everything it needs is stated here and it takes no package or project references. -->
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>Sandbox host: compiles and runs single-file C# apps it receives over HTTP.</Description>
+    <RootNamespace>DigitalBrain.Microsoft.CSharp.Sandbox</RootNamespace>
+    <!-- The source-generated kill() import sends SIGTERM so dotnet run can stop the script gracefully. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit" />
+  </ItemGroup>
+</Project>

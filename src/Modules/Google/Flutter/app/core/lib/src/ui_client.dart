@@ -8,8 +8,17 @@ import 'package:uuid/uuid.dart';
 import 'agent_events.dart';
 import 'basic_credentials.dart';
 import 'cookie_http_client.dart';
+import 'session_http_client_io.dart'
+    if (dart.library.html) 'session_http_client_web.dart'
+    as transport;
 import 'host_environment.dart';
+import 'models/app_manifest.dart';
 import 'models/brain_models.dart';
+import 'models/consent_sheet.dart';
+import 'models/compute_usage.dart';
+import 'models/model_catalog.dart';
+import 'models/grant_summary.dart';
+import 'models/session_capabilities.dart';
 import 'models/table_models.dart';
 import 'models/workspace_models.dart';
 
@@ -27,7 +36,7 @@ final class DigitalBrainUiClient {
        _http = httpClient is CookieHttpClient
            ? httpClient
            : CookieHttpClient(
-               httpClient ?? http.Client(),
+               httpClient ?? transport.createSessionHttpClient(),
                credentials: credentials,
              ),
        _ownsClient = httpClient == null;
@@ -70,17 +79,83 @@ final class DigitalBrainUiClient {
   final Uri baseUri;
 
   /// Non-secret scope for local workspace preferences; never includes credentials.
-  final String workspaceIdentity;
+  String workspaceIdentity;
+  String? principalId;
+  String? accountId;
+  String? defaultBrainId;
+
+  void _useSession(Map<String, dynamic> session) {
+    principalId = session['principalId'] as String;
+    accountId = session['accountId'] as String;
+    defaultBrainId = session['brainId'] as String;
+    workspaceIdentity = '$principalId|$accountId';
+  }
+
+  Future<void> readSession() async {
+    final response = await _request(
+      'GET',
+      '/identity/session',
+      timeout: const Duration(seconds: 10),
+    );
+    if (response.statusCode == 200 && response.body.isNotEmpty) {
+      _useSession(jsonDecode(response.body) as Map<String, dynamic>);
+    }
+  }
+
+  Future<void> signIn(
+    String username,
+    String password, {
+    bool register = false,
+  }) async {
+    final response = await _request(
+      'POST',
+      register ? '/identity/register' : '/identity/login',
+      body: {'principalId': username, 'password': password},
+      timeout: const Duration(seconds: 15),
+    );
+    _useSession(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
+  /// Creates an owned workspace; clients never choose or claim an existing id.
+  Future<String> createWorkspace() async {
+    final response = await _request(
+      'POST',
+      '/identity/brains',
+      body: const {},
+      timeout: const Duration(seconds: 15),
+    );
+    return (jsonDecode(response.body) as Map<String, dynamic>)['brainId']
+        as String;
+  }
+
+  Future<void> signOut() async {
+    await _request(
+      'POST',
+      '/identity/logout',
+      timeout: const Duration(seconds: 10),
+    );
+  }
+
   final CookieHttpClient _http;
   final bool _ownsClient;
 
-  Future<bool> salesforceConnected() async =>
-      (await _tableRequest('GET', '/agent/connections/salesforce')
-          as Map)['connected'] ==
-      true;
+  /// Server-owned capabilities; the shell hides developer-only surfaces when this is off.
+  Future<SessionCapabilities> readCapabilities() async {
+    final response = await _request(
+      'GET',
+      '/session/capabilities',
+      timeout: const Duration(seconds: 10),
+    );
+    return SessionCapabilities.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
 
-  Future<List<TableSummary>> listTables() async {
-    final body = await _tableRequest('GET', '/ui/tables');
+  Future<List<TableSummary>> listTables(String workspace) async {
+    final body = await _tableRequest(
+      'GET',
+      '/brains/${Uri.encodeComponent(workspace)}/ui/tables',
+    );
     return (body as List)
         .map(
           (item) =>
@@ -89,7 +164,23 @@ final class DigitalBrainUiClient {
         .toList();
   }
 
+  /// The launcher reads installed manifests; the shell never hard-codes apps.
+  Future<List<AppManifestSummary>> listApps(String workspace) async {
+    final body = await _tableRequest(
+      'GET',
+      '/brains/${Uri.encodeComponent(workspace)}/apps',
+    );
+    return (body as List)
+        .map(
+          (item) => AppManifestSummary.fromJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
+        .toList();
+  }
+
   Future<TableSnapshot> readTable(
+    String workspace,
     String id, {
     int offset = 0,
     int limit = 50,
@@ -97,12 +188,13 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'GET',
-        '/ui/tables/${Uri.encodeComponent(id)}?offset=$offset&limit=$limit',
+        '/brains/${Uri.encodeComponent(workspace)}/ui/tables/${Uri.encodeComponent(id)}?offset=$offset&limit=$limit',
       ) as Map,
     ),
   );
 
-  Future<TableSnapshot> createTable({
+  Future<TableSnapshot> createTable(
+    String workspace, {
     required String title,
     required List<TableColumn> columns,
     required List<TableRowData> rows,
@@ -110,7 +202,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'POST',
-        '/ui/tables',
+        '/brains/${Uri.encodeComponent(workspace)}/ui/tables',
         body: {
           'title': title,
           'columns': columns.map((x) => x.toJson()).toList(),
@@ -121,14 +213,29 @@ final class DigitalBrainUiClient {
   );
 
   Future<TableSnapshot> updateTableView(
+    String workspace,
     String id,
     TableViewUpdate update,
   ) async => TableSnapshot.fromJson(
     Map<String, dynamic>.from(
       await _tableRequest(
-        'PUT',
-        '/ui/tables/${Uri.encodeComponent(id)}/view',
+        'POST',
+        '/brains/${Uri.encodeComponent(workspace)}/ui/tables/${Uri.encodeComponent(id)}/view',
         body: update.toJson(),
+      ) as Map,
+    ),
+  );
+
+  /// Declares which sources a workspace is connected to; the first-run prompts follow them.
+  Future<WorkspaceSnapshot> setConnectedSources(
+    String workspaceId,
+    List<String> sources,
+  ) async => WorkspaceSnapshot.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'POST',
+        '/brains/${Uri.encodeComponent(workspaceId)}/connected-sources',
+        body: {'sources': sources},
       ) as Map,
     ),
   );
@@ -140,7 +247,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'GET',
-        '/workspaces/${Uri.encodeComponent(workspaceId)}',
+        '/brains/${Uri.encodeComponent(workspaceId)}',
         cancelled: cancelled,
       ) as Map,
     ),
@@ -154,7 +261,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'POST',
-        '/workspaces/${Uri.encodeComponent(workspaceId)}/windows/${Uri.encodeComponent(windowId)}/close',
+        '/brains/${Uri.encodeComponent(workspaceId)}/windows/${Uri.encodeComponent(windowId)}/close',
         body: {'expectedRevision': revision},
       ) as Map,
     ),
@@ -168,11 +275,22 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'POST',
-        '/workspaces/${Uri.encodeComponent(workspaceId)}/windows/${Uri.encodeComponent(windowId)}/reopen',
+        '/brains/${Uri.encodeComponent(workspaceId)}/windows/${Uri.encodeComponent(windowId)}/reopen',
         body: {'operationId': _uuid.v4(), 'expectedRevision': revision},
       ) as Map,
     ),
   );
+  Future<void> reportProblem({
+    required String workspaceId,
+    required String intentId,
+    required String message,
+  }) async {
+    await _tableRequest(
+      'POST',
+      '/brains/${Uri.encodeComponent(workspaceId)}/reports',
+      body: {'intentId': intentId, 'message': message},
+    );
+  }
 
   Future<TableSnapshot> readWorkspaceTable(
     String workspaceId,
@@ -184,7 +302,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'GET',
-        '/workspaces/${Uri.encodeComponent(workspaceId)}/tables/${Uri.encodeComponent(tableId)}?offset=$offset&limit=$limit',
+        '/brains/${Uri.encodeComponent(workspaceId)}/tables/${Uri.encodeComponent(tableId)}?offset=$offset&limit=$limit',
         cancelled: cancelled,
       ) as Map,
     ),
@@ -199,7 +317,7 @@ final class DigitalBrainUiClient {
     Map<String, dynamic>.from(
       await _tableRequest(
         'POST',
-        '/workspaces/${Uri.encodeComponent(workspaceId)}/tables/${Uri.encodeComponent(tableId)}/view',
+        '/brains/${Uri.encodeComponent(workspaceId)}/tables/${Uri.encodeComponent(tableId)}/view',
         body: update.toJson(),
         cancelled: cancelled,
       ) as Map,
@@ -216,7 +334,7 @@ final class DigitalBrainUiClient {
           final request = http.AbortableRequest(
             'GET',
             baseUri.resolve(
-              '/workspaces/${Uri.encodeComponent(workspaceId)}/events',
+              '/brains/${Uri.encodeComponent(workspaceId)}/events',
             ),
             abortTrigger: abort.future,
           )..headers['accept'] = 'text/event-stream';
@@ -313,14 +431,28 @@ final class DigitalBrainUiClient {
     return response.body.isEmpty ? null : jsonDecode(response.body);
   }
 
-  /// Sends only the new user message; the server owns conversation history.
+  /// Transcribes a recording into editable draft text without sending a chat turn.
+  Future<String> transcribeWorkspaceAudio(
+    String workspaceId,
+    Uint8List audio,
+  ) async {
+    final result = await _tableRequest(
+      'POST',
+      '/brains/${Uri.encodeComponent(workspaceId)}/voice',
+      body: {'audio': base64Encode(audio)},
+      timeout: const Duration(minutes: 3),
+    );
+    return (result as Map)['text'] as String;
+  }
+
+  /// Reads the server-owned conversation history.
   Future<Map<String, dynamic>> readWorkspaceConversation(
     String workspaceId,
     String threadId,
   ) async => Map<String, dynamic>.from(
     await _tableRequest(
       'GET',
-      '/workspaces/${Uri.encodeComponent(workspaceId)}/conversations/${Uri.encodeComponent(threadId)}',
+      '/brains/${Uri.encodeComponent(workspaceId)}/conversations/${Uri.encodeComponent(threadId)}',
     ) as Map,
   );
 
@@ -330,6 +462,7 @@ final class DigitalBrainUiClient {
     required String threadId,
     required String runId,
     String? parentRunId,
+    String? modelProfile,
     required String text,
   }) {
     final abort = Completer<void>();
@@ -350,9 +483,10 @@ final class DigitalBrainUiClient {
                 })
                 ..body = jsonEncode({
                   'threadId': threadId,
-                  'workspaceId': workspaceId,
+                  'brainId': workspaceId,
                   'runId': runId,
                   'parentRunId': ?parentRunId,
+                  'modelProfile': ?modelProfile,
                   'messages': [
                     {'id': _uuid.v4(), 'role': 'user', 'content': text},
                   ],
@@ -367,7 +501,15 @@ final class DigitalBrainUiClient {
             return;
           }
           if (response.statusCode != 200) {
-            await response.stream.listen(null).cancel();
+            final failure = await http.Response.fromStream(response);
+            try {
+              final payload = jsonDecode(failure.body);
+              if (payload is Map && payload['code'] == 'MODEL_UNAVAILABLE') {
+                throw const ModelUnavailableException();
+              }
+            } on FormatException {
+              // Non-JSON infrastructure failures retain the status-only message.
+            }
             throw StateError('Agent request failed (${response.statusCode}).');
           }
           incoming = decodeAgentEvents(response.stream).listen(
@@ -448,26 +590,47 @@ final class DigitalBrainUiClient {
     return controller.stream;
   }
 
-  Future<List<String>> readInbox() async {
-    final response = await _request(
-      'GET',
-      '/ui/inbox',
-      timeout: const Duration(seconds: 10),
+  Future<ComputeUsagePage> readComputeUsage(
+    String workspaceId, {
+    String? cursor,
+    int limit = 20,
+  }) async {
+    final query = Uri(queryParameters: {'limit': '$limit', 'cursor': ?cursor})
+        .query;
+    return ComputeUsagePage.fromJson(
+      Map<String, dynamic>.from(
+        await _tableRequest(
+          'GET',
+          '/brains/${Uri.encodeComponent(workspaceId)}/compute/usage?$query',
+        ) as Map,
+      ),
     );
-    final decoded = jsonDecode(response.body);
-    if (decoded is! List) {
-      return const [];
-    }
-    return [
-      for (final item in decoded)
-        if (item is String) item,
-    ];
   }
 
-  Future<Map<String, dynamic>> readUi(String collection, String name) async {
+  Future<ComputeAccountSummary> readComputeSummary() async =>
+      ComputeAccountSummary.fromJson(
+        Map<String, dynamic>.from(
+          await _tableRequest('GET', '/compute/summary') as Map,
+        ),
+      );
+
+  Future<Map<String, dynamic>> readComputeLimits() async {
     final response = await _request(
       'GET',
-      '/ui/$collection/${Uri.encodeComponent(name)}',
+      '/compute/limits',
+      timeout: const Duration(seconds: 10),
+    );
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> readUi(
+    String workspace,
+    String collection,
+    String name,
+  ) async {
+    final response = await _request(
+      'GET',
+      '/brains/${Uri.encodeComponent(workspace)}/ui/$collection/${Uri.encodeComponent(name)}',
       timeout: const Duration(seconds: 10),
     );
     return jsonDecode(response.body) as Map<String, dynamic>;
@@ -524,8 +687,11 @@ final class DigitalBrainUiClient {
             },
           );
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError(
-        '$method $path failed: ${response.statusCode} ${response.body}',
+      throw UiRequestException(
+        method,
+        path,
+        response.statusCode,
+        response.body,
       );
     }
     return response;
@@ -538,22 +704,47 @@ final class DigitalBrainUiClient {
   }) async {
     final response = await _request(
       body == null ? 'GET' : 'POST',
-      '/workspaces/${Uri.encodeComponent(workspace)}/apps/$path',
+      '/brains/${Uri.encodeComponent(workspace)}/apps/$path',
       body: body,
       timeout: const Duration(seconds: 30),
     );
     return Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
-  Future<Map<String, dynamic>> behaviorRequest(
+  /// Calls the developer-mode C# file API; [path] is relative to `/csharp` (empty for the list).
+  Future<Map<String, dynamic>> csharpRequest(
     String workspace,
+    String method,
     String path, {
     Map<String, Object?>? body,
   }) async {
+    try {
+      final result = await _tableRequest(
+        method,
+        '/brains/${Uri.encodeComponent(workspace)}/csharp${path.isEmpty ? '' : '/$path'}',
+        body: body,
+        // Starting builds the app inside a .NET SDK container, which can take minutes.
+        timeout: const Duration(minutes: 3),
+      );
+      return result is Map ? Map<String, dynamic>.from(result) : {};
+    } on TableRequestException catch (error) {
+      throw CSharpFileRequestException(error.statusCode, error.message);
+    }
+  }
+
+  Future<Map<String, dynamic>> storeSecret(
+    String name,
+    String label,
+    String value,
+  ) async {
+    final owner = principalId;
+    if (owner == null) {
+      throw StateError('Sign in before storing a secret.');
+    }
     final response = await _request(
-      body == null ? 'GET' : 'POST',
-      '/workspaces/${Uri.encodeComponent(workspace)}/behaviors/$path',
-      body: body,
+      'POST',
+      '/secrets/${Uri.encodeComponent(owner)}',
+      body: {'name': name, 'label': label, 'value': value},
       timeout: const Duration(seconds: 30),
     );
     return response.body.isEmpty
@@ -561,10 +752,102 @@ final class DigitalBrainUiClient {
         : Map<String, dynamic>.from(jsonDecode(response.body) as Map);
   }
 
+  Future<ChatModelCatalog> readModelCatalog() async =>
+      ChatModelCatalog.fromJson(
+        Map<String, dynamic>.from(
+          await jsonRequest('GET', '/ai/models') as Map,
+        ),
+      );
+
+  Future<Object?> serviceConnectionsRequest(
+    String workspaceId,
+    String path, {
+    Map<String, Object?>? body,
+  }) => jsonRequest(
+    body == null ? 'GET' : 'POST',
+    '/brains/${Uri.encodeComponent(workspaceId)}/integrations/accounts/services${path.isEmpty ? '' : '/$path'}',
+    body,
+  );
+
+  Future<Object?> workspaceConnectionsRequest(
+    String workspaceId,
+    String path, {
+    Map<String, Object?>? body,
+  }) => jsonRequest(
+    body == null ? 'GET' : 'POST',
+    '/brains/${Uri.encodeComponent(workspaceId)}/integrations/accounts${path.isEmpty ? '' : '/$path'}',
+    body,
+  );
+
+  /// The consent sheet for an app before it is installed.
+  Future<ConsentSheet> consentSheet(
+    String workspace,
+    String appId,
+  ) async => ConsentSheet.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'GET',
+        '/brains/${Uri.encodeComponent(workspace)}/apps/${Uri.encodeComponent(appId)}/consent',
+      ) as Map,
+    ),
+  );
+
+  /// Records approval of an app's consent sheet; the manifest installs in the same step.
+  Future<ConsentSheet> approveConsent(
+    String workspace,
+    String appId,
+  ) async => ConsentSheet.fromJson(
+    Map<String, dynamic>.from(
+      await _tableRequest(
+        'POST',
+        '/brains/${Uri.encodeComponent(workspace)}/apps/${Uri.encodeComponent(appId)}/consent/approve',
+        body: const <String, Object?>{},
+      ) as Map,
+    ),
+  );
+
+  /// The live grants an owner has given to apps in this workspace.
+  Future<List<GrantSummary>> listGrants(String workspace) async {
+    final response = await _request(
+      'GET',
+      '/brains/${Uri.encodeComponent(workspace)}/grants',
+      timeout: const Duration(seconds: 30),
+    );
+    return [
+      for (final item in jsonDecode(response.body) as List)
+        GrantSummary.fromJson(Map<String, dynamic>.from(item as Map)),
+    ];
+  }
+
+  /// Revokes one (app, semantic type, mode) grant so its value looks missing again.
+  Future<void> revokeGrant(
+    String workspace, {
+    required String appId,
+    required String semanticTypeId,
+    required String mode,
+  }) async {
+    await _request(
+      'POST',
+      '/brains/${Uri.encodeComponent(workspace)}/grants/revoke',
+      body: {
+        'appId': appId,
+        'semanticTypeId': semanticTypeId,
+        'mode': _grantModeValue(mode),
+      },
+      timeout: const Duration(seconds: 30),
+    );
+  }
+
+  static Object _grantModeValue(String mode) => switch (mode) {
+    'Once' => 0,
+    'ThisChat' => 1,
+    _ => 2,
+  };
+
   Future<Uint8List> appAsset(String workspace, String assetId) async {
     final response = await _request(
       'GET',
-      '/workspaces/${Uri.encodeComponent(workspace)}/apps/assets/${Uri.encodeComponent(assetId)}',
+      '/brains/${Uri.encodeComponent(workspace)}/apps/assets/${Uri.encodeComponent(assetId)}',
       timeout: const Duration(seconds: 30),
     );
     return response.bodyBytes;
@@ -579,7 +862,7 @@ final class DigitalBrainUiClient {
     final request = http.Request(
       'POST',
       baseUri.resolve(
-        '/workspaces/${Uri.encodeComponent(workspace)}/apps/images/$documentId/save/$operationId',
+        '/brains/${Uri.encodeComponent(workspace)}/apps/images/$documentId/save/$operationId',
       ),
     );
     request.headers['content-type'] = 'image/png';
@@ -598,4 +881,40 @@ final class DigitalBrainUiClient {
       _http.close();
     }
   }
+
+  Future<dynamic> jsonRequest(
+    String method,
+    String path, [
+    Object? body,
+  ]) async {
+    final response = await _request(
+      method,
+      path,
+      body: body == null ? null : Map<String, Object?>.from(body as Map),
+      timeout: const Duration(seconds: 30),
+    );
+    return response.body.isEmpty ? null : jsonDecode(response.body);
+  }
+}
+
+/// Includes status without requiring callers to parse server error text.
+final class UiRequestException extends StateError {
+  UiRequestException(String method, String path, this.statusCode, String body)
+    : super('$method $path failed: $statusCode $body');
+  final int statusCode;
+}
+
+final class ModelUnavailableException implements Exception {
+  const ModelUnavailableException();
+  @override
+  String toString() =>
+      'This model is no longer available. Choose another model beside the composer.';
+}
+
+final class CSharpFileRequestException implements Exception {
+  const CSharpFileRequestException(this.statusCode, this.message);
+  final int statusCode;
+  final String message;
+  @override
+  String toString() => 'C# file request failed ($statusCode): $message';
 }

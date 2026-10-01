@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Aspire AppHost neuron contracts: resource state, commands and state signals.</Description>
+    <RootNamespace>DigitalBrain.Microsoft.Aspire</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
+  </ItemGroup>
+</Project>

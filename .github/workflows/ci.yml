@@ -4,7 +4,7 @@ on:
   push:
     branches: [master]
   pull_request:
-    branches: [master]
+    branches: [master, 'refactor/**']
 
 permissions:
   contents: read
@@ -19,9 +19,9 @@ env:
 
 jobs:
   dotnet-build-test:
-    name: .NET build and module tests
+    name: .NET build and test
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
 
@@ -37,86 +37,24 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
-      - name: Docs and packaging path lint
-        run: |
-          files=".github/workflows/deploy.yml \
-            src/Applications/IntoChat/IntoChat/Dockerfile \
-            src/Applications/IntoChat/IntoChat/docker-entrypoint.sh \
-            src/Applications/IntoChat/IntoChat/Properties/PublishProfiles/Container.pubxml \
-            README.md CONTEXT.md continuation.md"
-          if grep -Hn -E 'src/Modules/DigitalBrain/Mcp|DigitalBrain\.Mcp|DigitalBrain\.Excel' $files; then
-            echo "::error::Stale moved/deleted path in CI, publish, container or status docs." >&2
-            exit 1
-          fi
-
       - name: Restore dependencies
-        run: dotnet restore DigitalBrain.slnx
+        run: dotnet restore DigitalBrain.slnx -v quiet
 
       - name: Format code
         run: dotnet format whitespace DigitalBrain.slnx --verify-no-changes --no-restore --verbosity minimal
 
       - name: Build solution
-        run: dotnet build DigitalBrain.slnx -c Release --no-restore -p:CodeGraphRefresh=false
+        run: dotnet build DigitalBrain.slnx -c Release --no-restore -v quiet -p:CodeGraphRefresh=false
 
-      - name: Build the behavior file app
-        run: dotnet build src/Behaviors/timer-report.cs -c Release -p:CodeGraphRefresh=false
+      - name: Build the sample C# file app
+        run: dotnet build src/Modules/Microsoft/CSharp/Samples/timer-report.cs -c Release -v quiet -p:CodeGraphRefresh=false
 
       - name: Validate NuGet packages
-        run: dotnet pack DigitalBrain.slnx -c Release --no-build -o artifacts
+        run: dotnet pack DigitalBrain.slnx -c Release --no-build -v quiet -o artifacts
 
-      - name: Run module tests
-        run: dotnet test --test-modules '**/bin/Release/net11.0/DigitalBrain.*Tests.*.dll' --max-parallel-test-modules 3 --ignore-exit-code 8
-        env:
-          DIGITALBRAIN_E2E_LIVE_MODEL: '0'
-          DIGITALBRAIN_E2E_HEADED: '0'
-
-      - name: Run IntoChat unit tests
-        run: dotnet test --project src/Applications/IntoChat/Tests/Unit/IntoChat.Tests.Unit.csproj -c Release --no-build --ignore-exit-code 8
-        env:
-          DIGITALBRAIN_E2E_LIVE_MODEL: '0'
-          DIGITALBRAIN_E2E_HEADED: '0'
-
-  intochat-e2e:
-    name: IntoChat E2E (${{ matrix.name }})
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Agent table
-            filter: --filter-class '*AgentTableJourneyFacts'
-            browser: true
-          - name: Agent workflow
-            filter: --filter-class '*AgentWorkflowFacts' '*LiveAgentTableJourneyFacts'
-            browser: false
-          - name: Workspace table
-            filter: --filter-class '*SupabaseTableDisplayFacts'
-            browser: true
-          - name: Workspace state
-            filter: --filter-class '*WorkspaceRestoreFacts' '*WorkspaceDataFacts'
-            browser: true
-          - name: Security
-            filter: --filter-namespace IntoChat.Tests.E2E.Security
-            browser: false
-          - name: LocalApps
-            filter: --filter-namespace IntoChat.Tests.E2E.LocalApps
-            browser: true
-          - name: Diagnostics
-            filter: --filter-namespace IntoChat.Tests.E2E.Diagnostics
-            browser: false
-          - name: Composition
-            filter: --filter-namespace IntoChat.Tests.E2E.Composition
-            browser: false
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-dotnet@v6
-        with:
-          global-json-file: global.json
-
-      - name: Install Flutter for browser scenarios
-        if: matrix.browser
+      # The one shared E2E host (IntoChatHostFixture) serves the web shell, so the suite
+      # compiles Flutter once per run and drives it with Playwright.
+      - name: Install Flutter for the shared E2E web host
         uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -124,27 +62,43 @@ jobs:
           cache: true
 
       - name: Resolve Flutter workspace
-        if: matrix.browser
         working-directory: src/Modules/Google/Flutter/app
         run: flutter pub get --enforce-lockfile
 
-      - name: Cache NuGet packages
+      # The shared E2E host compiles the shell at boot; warming the release web build here, with
+      # its incremental caches kept across runs, turns that in-test compile into minutes.
+      - name: Cache the shell web build
         uses: actions/cache@v6
         with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', 'Directory.Packages.props', 'global.json') }}
+          path: |
+            src/Modules/Google/Flutter/app/**/.dart_tool
+            src/Modules/Google/Flutter/app/shell/build
+          key: ${{ runner.os }}-fluttershell-${{ hashFiles('src/Modules/Google/Flutter/app/pubspec.lock') }}-${{ hashFiles('src/Modules/Google/Flutter/app/**/lib/**') }}
           restore-keys: |
-            ${{ runner.os }}-nuget-
+            ${{ runner.os }}-fluttershell-${{ hashFiles('src/Modules/Google/Flutter/app/pubspec.lock') }}-
+            ${{ runner.os }}-fluttershell-
 
-      - name: Build E2E project
-        run: dotnet build src/Applications/IntoChat/Tests/E2E/IntoChat.Tests.E2E.csproj -c Release -p:CodeGraphRefresh=false
+      - name: Warm the shell web build
+        working-directory: src/Modules/Google/Flutter/app/shell
+        run: flutter build web --release
 
-      - name: Install browser and system dependencies
-        if: matrix.browser
+      - name: Install Playwright browser and system dependencies
         run: pwsh src/Applications/IntoChat/Tests/E2E/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
 
-      - name: Run ${{ matrix.name }} scenarios
-        run: dotnet test --project src/Applications/IntoChat/Tests/E2E/IntoChat.Tests.E2E.csproj -c Release --no-build ${{ matrix.filter }} --ignore-exit-code 8
+      # One deterministic build primes the docker layer cache, so the sandbox the E2E hosts
+      # start on demand comes up in seconds instead of spending its test budget on the build.
+      - name: Prime the C# sandbox image build cache
+        run: docker build src/Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Sandbox
+
+      # Scripts restore inside the sandbox against its named NuGet volume; seeding it from the
+      # host's packages (already restored for the solution) removes every in-sandbox download.
+      - name: Seed the sandbox NuGet volume
+        run: docker run --rm -v digitalbrain-csharp-nuget:/root/.nuget/packages -v $HOME/.nuget/packages:/seed:ro alpine sh -c "cp -a /seed/. /root/.nuget/packages/"
+
+      # One module at a time: the shared E2E host compiles the web shell and the sandbox
+      # E2E builds containers; running them beside other suites starves both on a small runner.
+      - name: Test
+        run: dotnet test DigitalBrain.slnx -c Release --no-build -v quiet --max-parallel-test-modules 1
         env:
           DIGITALBRAIN_E2E_LIVE_MODEL: '0'
           DIGITALBRAIN_E2E_HEADED: '0'
@@ -173,7 +127,7 @@ jobs:
         working-directory: src/Modules/Google/Flutter/app
         run: dart format --output=none --set-exit-if-changed core ui shell
 
-      - name: Analyze core, ui and shell
+      - name: Analyze Flutter packages
         working-directory: src/Modules/Google/Flutter/app
         run: |
           (cd core && dart analyze --fatal-infos)

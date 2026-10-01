@@ -7,6 +7,7 @@ public sealed class E2ETestBuilder
     private readonly BrainCompositionBuilder _composition = new();
     private TestExecutionOptions _execution = new();
     private BrowserOptions _browser = new() { Headless = true };
+    private string? _durableStorageKey;
     private bool _started;
 
     public E2ETestBuilder WithModule<TModule>(Action<ModuleConfiguration<TModule>>? configure = null)
@@ -15,6 +16,27 @@ public sealed class E2ETestBuilder
         EnsureMutable();
         using var scope = BrowserConfiguration.Begin(_browser);
         _composition.WithModule(configure);
+        _browser = scope.Options;
+        return this;
+    }
+
+    public E2ETestBuilder WithModule<TModule, TOptions>(Action<TOptions>? configureOptions = null,
+        Action<ModuleConfiguration<TModule>>? configure = null)
+        where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
+    {
+        EnsureMutable();
+        using var scope = BrowserConfiguration.Begin(_browser);
+        _composition.WithModule(configureOptions, configure);
+        _browser = scope.Options;
+        return this;
+    }
+
+    public E2ETestBuilder ConfigureModule<TModule, TOptions>(Action<TOptions> configureOptions)
+        where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
+    {
+        EnsureMutable();
+        using var scope = BrowserConfiguration.Begin(_browser);
+        _composition.ConfigureModule<TModule, TOptions>(configureOptions);
         _browser = scope.Options;
         return this;
     }
@@ -45,6 +67,17 @@ public sealed class E2ETestBuilder
         return this;
     }
 
+    // Keeps the cluster storage data volume across host restarts within one test, so a host that
+    // is killed and started again reads the persisted grain state. Every host of the same test
+    // passes the same key; the volume is removed when the test process exits.
+    public E2ETestBuilder WithDurableStorage(string key)
+    {
+        EnsureMutable();
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        _durableStorageKey = DurableStorageVolume.Acquire(key);
+        return this;
+    }
+
     internal BrainComposition BuildComposition()
     {
         var composition = _composition.Build();
@@ -58,7 +91,7 @@ public sealed class E2ETestBuilder
         EnsureMutable();
         var composition = BuildComposition();
         _started = true;
-        return E2ETest.StartModulesAsync(composition.Modules, _execution, _browser, cancellationToken);
+        return E2ETest.StartModulesAsync(composition.Modules, _execution, _browser, _durableStorageKey, cancellationToken);
     }
 
     private void EnsureMutable()

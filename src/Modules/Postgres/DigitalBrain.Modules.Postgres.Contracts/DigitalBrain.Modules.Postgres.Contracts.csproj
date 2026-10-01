@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Postgres module contracts: read-only queries, schema reads and connection status.</Description>
+    <RootNamespace>DigitalBrain.Postgres</RootNamespace>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
+  </ItemGroup>
+</Project>

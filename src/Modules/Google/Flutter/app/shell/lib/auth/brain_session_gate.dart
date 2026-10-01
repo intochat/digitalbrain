@@ -13,6 +13,7 @@ import 'login_screen.dart';
 typedef ShellBuilder = Widget Function(
   DigitalBrainUiClient? client,
   String? statusMessage,
+  Future<void> Function() switchAccount,
 );
 
 /// Creates a client for the given credentials, or throws if the kernel
@@ -44,7 +45,7 @@ final class BrainSessionGate extends StatefulWidget {
   State<BrainSessionGate> createState() => _BrainSessionGateState();
 }
 
-enum _Phase { probing, login, ready }
+enum _Phase { probing, login, ready, logoutFailed }
 
 final class _BrainSessionGateState extends State<BrainSessionGate> {
   _Phase _phase = _Phase.probing;
@@ -103,6 +104,18 @@ final class _BrainSessionGateState extends State<BrainSessionGate> {
       return 'Sign in failed. Check the username and password.';
     }
 
+    try {
+      await client.readSession();
+    } on Object {
+      client.close();
+      if (mounted) {
+        setState(() {
+          _phase = _Phase.login;
+          _loginError = 'Could not load your account. Please sign in again.';
+        });
+      }
+      return 'Could not load your account. Please sign in again.';
+    }
     if (credentials != null) {
       store.writeStoredCredentials(credentials);
     }
@@ -122,24 +135,114 @@ final class _BrainSessionGateState extends State<BrainSessionGate> {
     });
   }
 
-  Future<String?> _signIn(String username, String password) {
+  Future<String?> _signIn(
+    String username,
+    String password, {
+    bool register = false,
+  }) async {
     _lastUsername = username;
-    return _attempt(BasicCredentials(username: username, password: password));
+    final client = widget.createClient(null);
+    try {
+      await client.signIn(username, password, register: register);
+      store.clearStoredCredentials();
+      _enterShell(client, null);
+      return null;
+    } on Object {
+      client.close();
+      if (!register) {
+        // The bootstrap administrator can still use the configured Basic credential.
+        final basic = widget.createClient(
+          BasicCredentials(username: username, password: password),
+        );
+        try {
+          if (await basic.checkAuth()) {
+            // An open local server also answers true: only accept Basic if anonymous access is denied.
+            final anonymous = widget.createClient(null);
+            final gated = !(await anonymous.checkAuth());
+            anonymous.close();
+            if (gated) {
+              store.writeStoredCredentials(
+                BasicCredentials(username: username, password: password),
+              );
+              _enterShell(basic, null);
+              return null;
+            }
+          }
+        } on Object {
+          /* Show the same authentication error. */
+        }
+        basic.close();
+      }
+      return register
+          ? 'Account creation failed. Use a unique lowercase username and a password of at least 12 characters.'
+          : 'Sign in failed. Check the username and password.';
+    }
+  }
+
+  Future<void> _switchAccount() async {
+    final previous = _client;
+    setState(() {
+      _phase = _Phase.probing;
+      _client = null;
+    });
+    // Remove the shell and cancel its subscriptions before replacing the cookie.
+    await WidgetsBinding.instance.endOfFrame;
+    try {
+      await previous?.signOut();
+      store.clearStoredCredentials();
+      previous?.close();
+      if (mounted) {
+        setState(() {
+          _phase = _Phase.login;
+          _loginError = null;
+        });
+      }
+    } on Object {
+      if (mounted) {
+        setState(() {
+          _phase = _Phase.logoutFailed;
+          _client = previous;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _client?.close();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     if (_phase == _Phase.ready) {
-      return widget.builder(_client, _statusMessage);
+      return widget.builder(_client, _statusMessage, _switchAccount);
     }
 
     return MaterialApp(
       title: 'IntoChat',
       debugShowCheckedModeBanner: false,
       theme: UiTheme.dark(),
-      home: _phase == _Phase.login
+      home: _phase == _Phase.logoutFailed
+          ? Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Could not end the session.'),
+                    TextButton(
+                      onPressed: _switchAccount,
+                      child: const Text('Retry sign out'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : _phase == _Phase.login
           ? LoginScreen(
               onSubmit: _signIn,
+              onRegister: (username, password) =>
+                  _signIn(username, password, register: true),
               initialUsername: _lastUsername,
               errorMessage: _loginError,
             )

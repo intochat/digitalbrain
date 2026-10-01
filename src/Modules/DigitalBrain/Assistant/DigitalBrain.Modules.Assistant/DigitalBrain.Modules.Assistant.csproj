@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>The workspace assistant: chat, voice and agent turns over the AI and Flutter modules.</Description>
+    <RootNamespace>DigitalBrain.Assistant</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Assistant.Tests.Unit" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../DigitalBrain.Modules.Assistant.Contracts/DigitalBrain.Modules.Assistant.Contracts.csproj" />
+    <ProjectReference Include="../../Apps/DigitalBrain.Modules.Apps/DigitalBrain.Modules.Apps.csproj" />
+    <ProjectReference Include="../../Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
+    <ProjectReference Include="../../../Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp/DigitalBrain.Modules.Microsoft.CSharp.csproj" />
+    <ProjectReference Include="../../Compute/DigitalBrain.Modules.Compute/DigitalBrain.Modules.Compute.csproj" />
+    <ProjectReference Include="../../../AI/DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj" />
+    <ProjectReference Include="../../../Google/Flutter/DigitalBrain.Modules.Flutter/DigitalBrain.Modules.Flutter.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="instructions.md" LogicalName="instructions.md" />
+  </ItemGroup>
+</Project>

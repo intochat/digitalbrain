@@ -1,18 +1,18 @@
 using DigitalBrain.AI;
+using DigitalBrain.Apps;
 using DigitalBrain.AI.OpenAI;
 using DigitalBrain.ClickHouse;
-using DigitalBrain.Coding;
 using DigitalBrain.Flutter;
 using DigitalBrain.Google.Gmail;
-using DigitalBrain.Qdrant;
 using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.GitHub;
+using DigitalBrain.Postgres;
+using DigitalBrain.Qdrant;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 
 namespace IntoChat.Tests.E2E;
 
-/// <summary>Overrides for the real application graph. Scenarios own data and protocol fixtures.</summary>
 internal static class IntoChatE2ETest
 {
     // Port 1 is deliberately unserved: unused provider calls fail instead of reaching live services.
@@ -20,27 +20,56 @@ internal static class IntoChatE2ETest
 
     public static Task<E2EBrain> StartAsync(CancellationToken ct) => Create().StartAsync(ct);
 
+    // The host ships its first-party apps in the background after it is healthy; a fact that opens
+    // one has to wait until that package is published.
+    public static async Task WaitUntilShippedAsync(E2EBrain brain, string package, CancellationToken ct, TimeSpan? budget = null)
+    {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(budget ?? TimeSpan.FromMinutes(4));
+        while (true)
+        {
+            var snapshot = await brain.Get<IPackage>(package).Read();
+            if (snapshot.Published is not null) { return; }
+            // A red verification never publishes; failing with its verdicts beats a silent timeout.
+            if (snapshot.Head is { } head
+                && await brain.Get<IAppVerification>(IAppVerification.Key(new(PackageId.Parse(package), head))).Read()
+                    is { Green: false } verification)
+            {
+                throw new InvalidOperationException($"{package}@{head} failed verification (exit {verification.Run.ExitCode}): "
+                    + string.Join("; ", verification.Run.Scenarios.Select(scenario => $"{scenario.Name}={(scenario.Passed ? "pass" : "FAIL " + scenario.Message)}")));
+            }
+            await Task.Delay(TimeSpan.FromSeconds(1), timeout.Token);
+        }
+    }
+
     public static E2ETestBuilder<Projects.IntoChat_AppHost> Create(string modelApiKey = "fixture-key", Dictionary<string, string?>? privateConfiguration = null)
         => E2ETest.For<Projects.IntoChat_AppHost>()
-            .WithExecutionRoot("IntoChat:BehaviorAuthoring:Root")
-            .ConfigureModule<AIModule>(ai => ai.WithoutLocalModels().WithoutVoiceToText().WithoutWebSearch()
+            .ConfigureModule<AIModule, AIOptions>(ai => ai.WithoutLocalModels().WithoutVoiceToText().WithoutWebSearch()
                 .WithDefaultLlm<IGpt56Luna>().WithModelEndpoint(AiProvider.OpenAI, new(UnconfiguredProvider, "v1/")))
-            .ConfigureModule<QdrantModule>(qdrant => qdrant.WithQdrant())
-            .ConfigureModule<ClickHouseModule>(database => database.WithClickHouse(options =>
+            .ConfigureModule<QdrantModule, QdrantModuleOptions>(qdrant => qdrant.Host = false)
+            .ConfigureModule<PostgresModule, PostgresModuleOptions>(database => database.WithPostgres(options =>
+            {
+                options.DatabaseName = "customer-research";
+                options.PersistentStorage = false;
+            }))
+            .ConfigureModule<ClickHouseModule, ClickHouseModuleOptions>(database => database.WithClickHouse(options =>
             {
                 options.PersistentStorage = false;
                 options.WithSeed("leads");
             }))
-            .ConfigureModule<SupabaseModule>(database => database.WithPostgres())
-            .ConfigureModule<GmailModule>(gmail => gmail.WithTokenEndpoint(new(UnconfiguredProvider, "token")))
-            .ConfigureModule<SalesforceModule>(salesforce => salesforce.WithLocalMcp(new(UnconfiguredProvider, "mcp")))
-            .ConfigureModule<AspireModule>(aspire => aspire.WithoutAspire())
-            .ConfigureModule<GitHubModule>(github => github.WithGitHubRepositories(new Dictionary<string, GitHubRepositoryDeclaration>()))
-            .ConfigureModule<CodingModule>(coding => coding.ConfigureOptions<CodingModuleOptions>(
-                options => options.SolutionPath = null, "SolutionPath"))
-            .ConfigureModule<FlutterModule>(flutter => flutter.BackendOnly())
+            .ConfigureModule<SupabaseModule, SupabaseModuleOptions>(database => database.WithPostgres())
+            .ConfigureModule<GmailModule, GmailModuleOptions>(gmail => gmail.WithTokenEndpoint(new(UnconfiguredProvider, "token")))
+            .ConfigureModule<SalesforceModule, SalesforceModuleOptions>(salesforce => salesforce.WithLocalMcp(new(UnconfiguredProvider, "mcp")))
+            .ConfigureModule<GitHubModule, GitHubModuleOptions>(github => github.WithGitHubRepositories(new Dictionary<string, GitHubRepositoryDeclaration>()))
+            .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .WithExecution(new()
             {
+                // Shipping verifies five packages through real sandbox scripts. Only the shared
+                // host (IntoChatHostFixture) pays that once; private hosts opt out by default.
+                ResourceEnvironment = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["DigitalBrain__Apps__ShipOnStartup"] = "false",
+                },
                 PrivateConfiguration = Merge(new Dictionary<string, string?>
                 {
                     ["Parameters:openai-api-key"] = modelApiKey,

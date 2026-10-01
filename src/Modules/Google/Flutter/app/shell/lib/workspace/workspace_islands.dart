@@ -1,23 +1,32 @@
 import 'dart:ui';
 
+import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/material.dart';
 
+import 'app_launcher.dart';
 import 'workspace_store.dart';
 
 class WorkspaceIslands extends StatelessWidget {
   const WorkspaceIslands({
     super.key,
     required this.store,
+    this.apps = const [],
     required this.onLaunch,
     required this.onRestore,
     required this.onNewWorkspace,
     required this.onSavedWork,
     required this.onSearch,
     required this.onSettings,
+    this.onCompute,
+    this.onSwitchAccount,
+    this.onPackages,
   });
   final WorkspaceStore store;
+  final List<AppManifestSummary> apps;
   final ValueChanged<String> onLaunch, onRestore;
   final VoidCallback onNewWorkspace, onSavedWork, onSearch, onSettings;
+  final VoidCallback? onCompute;
+  final VoidCallback? onSwitchAccount, onPackages;
   Widget island(BuildContext context, Widget child) => ClipRRect(
     borderRadius: BorderRadius.circular(19),
     child: BackdropFilter(
@@ -48,7 +57,8 @@ class WorkspaceIslands extends StatelessWidget {
   IconData appIcon(String kind) => switch (kind) {
     'files' => Icons.folder_outlined,
     'images' => Icons.tune,
-    'behaviors' => Icons.account_tree_outlined,
+    'csharp' => Icons.code,
+    'assistant' => Icons.assistant_outlined,
     'table' => Icons.table_chart_outlined,
     _ => Icons.web_asset_outlined,
   };
@@ -129,7 +139,7 @@ class WorkspaceIslands extends StatelessWidget {
           ],
         ),
       );
-      final apps = island(
+      final assistantIsland = island(
         context,
         Row(
           mainAxisSize: MainAxisSize.min,
@@ -202,36 +212,52 @@ class WorkspaceIslands extends StatelessWidget {
               tooltip: 'Applications',
               position: PopupMenuPosition.over,
               icon: const Icon(Icons.apps_rounded, size: 23),
-              onSelected: onLaunch,
+              onSelected: (value) {
+                if (value == 'manage-packages') {
+                  onPackages?.call();
+                } else {
+                  onLaunch(value);
+                }
+              },
               itemBuilder: (_) => [
-                const PopupMenuItem(
-                  value: 'files',
-                  child: ListTile(
-                    leading: Icon(Icons.folder_outlined),
-                    title: Text('Files'),
-                    subtitle: Text('On this computer'),
-                    contentPadding: EdgeInsets.zero,
+                for (final entry in [
+                  ...launcherEntries(apps),
+                  assistantLauncherEntry,
+                  customerResearcherLauncherEntry,
+                ])
+                  PopupMenuItem(
+                    value: entry.launchKey,
+                    child: ListTile(
+                      leading: Icon(entry.icon),
+                      title: Text(entry.title),
+                      subtitle: Text(entry.subtitle),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
-                ),
-                const PopupMenuItem(
-                  value: 'images',
-                  child: ListTile(
-                    leading: Icon(Icons.tune),
-                    title: Text('Image Editor'),
-                    subtitle: Text('Draw, crop and export'),
-                    contentPadding: EdgeInsets.zero,
+                if (store.developerMode) ...[
+                  const PopupMenuDivider(),
+                  PopupMenuItem(
+                    value: csharpLauncherEntry.launchKey,
+                    child: ListTile(
+                      leading: Icon(csharpLauncherEntry.icon),
+                      title: Text(csharpLauncherEntry.title),
+                      subtitle: Text(csharpLauncherEntry.subtitle),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
-                ),
-                const PopupMenuDivider(),
-                const PopupMenuItem(
-                  value: 'behaviors',
-                  child: ListTile(
-                    leading: Icon(Icons.account_tree_outlined),
-                    title: Text('Behaviors'),
-                    subtitle: Text('Create and manage automations'),
-                    contentPadding: EdgeInsets.zero,
+                ],
+                if (onPackages != null) ...[
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    value: 'manage-packages',
+                    child: ListTile(
+                      leading: Icon(Icons.extension_outlined),
+                      title: Text('Packages'),
+                      subtitle: Text('Browse and manage packages'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
             IconButton(
@@ -247,12 +273,11 @@ class WorkspaceIslands extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10),
-              child: Text(
-                'Compute —',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-              ),
+            IconButton(
+              key: const Key('compute-usage-button'),
+              tooltip: 'Compute',
+              onPressed: onCompute,
+              icon: const Icon(Icons.speed_outlined, size: 18),
             ),
             if (!narrow)
               IconButton(
@@ -274,6 +299,10 @@ class WorkspaceIslands extends StatelessWidget {
                 ),
               ),
               onSelected: (value) {
+                if (value == 'switch-account') {
+                  onSwitchAccount?.call();
+                  return;
+                }
                 if (value == 'settings') {
                   onSettings();
                   return;
@@ -297,6 +326,15 @@ class WorkspaceIslands extends StatelessWidget {
                   ),
                 ),
                 const PopupMenuDivider(),
+                if (onSwitchAccount != null)
+                  const PopupMenuItem(
+                    value: 'switch-account',
+                    child: ListTile(
+                      leading: Icon(Icons.switch_account_outlined),
+                      title: Text('Switch account'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
                 PopupMenuItem(
                   value: 'dock',
                   child: Text(
@@ -330,7 +368,7 @@ class WorkspaceIslands extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  child: apps,
+                  child: assistantIsland,
                 ),
               ),
             ),

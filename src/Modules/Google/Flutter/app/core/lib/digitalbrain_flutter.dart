@@ -1,7 +1,13 @@
 export 'src/agent_events.dart';
 export 'src/basic_credentials.dart';
 export 'src/host_environment.dart';
+export 'src/models/app_manifest.dart';
 export 'src/models/brain_models.dart';
+export 'src/models/consent_sheet.dart';
+export 'src/models/compute_usage.dart';
+export 'src/models/model_catalog.dart';
+export 'src/models/grant_summary.dart';
+export 'src/models/session_capabilities.dart';
 export 'src/models/table_models.dart';
 export 'src/models/workspace_models.dart';
 export 'src/ui_client.dart';

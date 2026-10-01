@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
+    <ProjectReference Include="../DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
+    <ProjectReference Include="../DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
+    <ProjectReference Include="../DigitalBrain.Kernel.Aspire.Hosting/DigitalBrain.Kernel.Aspire.Hosting.csproj" />
+  </ItemGroup>
+</Project>
+

@@ -1,4 +1,6 @@
+using DigitalBrain.Client;
 using DigitalBrain.Core;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Hosting;
 
@@ -17,11 +19,32 @@ public sealed class UnitTestBuilder
         _composition.WithModule(configure);
         return this;
     }
+    public UnitTestBuilder WithModule<TModule, TOptions>(Action<TOptions>? configureOptions = null,
+        Action<ModuleConfiguration<TModule>>? configure = null)
+        where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
+    {
+        EnsureMutable();
+        _composition.WithModule(configureOptions, configure);
+        return this;
+    }
+    public UnitTestBuilder RequireModules(IEnumerable<Type> modules)
+    {
+        EnsureMutable();
+        _composition.RequireModules(modules);
+        return this;
+    }
     public UnitTestBuilder ConfigureModule<TModule>(Action<ModuleConfiguration<TModule>> configure)
         where TModule : class, IModule, new()
     {
         EnsureMutable();
         _composition.ConfigureModule(configure);
+        return this;
+    }
+    public UnitTestBuilder ConfigureModule<TModule, TOptions>(Action<TOptions> configureOptions)
+        where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
+    {
+        EnsureMutable();
+        _composition.ConfigureModule<TModule, TOptions>(configureOptions);
         return this;
     }
     public UnitTestBuilder WithExecution(TestExecutionOptions execution)
@@ -42,6 +65,18 @@ public sealed class UnitTestBuilder
         EnsureMutable();
         _options = _options with { ConfigureClient = _options.ConfigureClient + configure };
         return this;
+    }
+    // Short leases and renewals so subscription expiry and reactivation show up within a test's timeout.
+    public UnitTestBuilder WithFastSubscriptions(int bufferCapacity = 256)
+    {
+        static void Shorten(BrainOptions options)
+        {
+            options.ObserverLease = TimeSpan.FromSeconds(2);
+            options.RenewEvery = TimeSpan.FromMilliseconds(200);
+            options.OperationTimeout = TimeSpan.FromMilliseconds(500);
+        }
+        return ConfigureSilo(silo => silo.Services.Configure<BrainOptions>(Shorten))
+            .ConfigureClient(client => client.Services.Configure<BrainOptions>(options => { Shorten(options); options.BufferCapacity = bufferCapacity; }));
     }
     public UnitTestBuilder WithReminders()
     {

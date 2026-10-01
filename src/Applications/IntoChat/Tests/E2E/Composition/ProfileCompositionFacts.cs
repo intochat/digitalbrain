@@ -2,37 +2,22 @@ using Aspire.Hosting.Testing;
 
 namespace IntoChat.Tests.E2E.Composition;
 
-/// <summary>
-/// P0.3 profile guard. The AppHost composes developer-only modules (Aspire project path, Roslyn,
-/// DotNet, Coding, Behavior) only in the developer profile; the product profile keeps user-path
-/// modules. This builds the real AppHost model without starting any resource.
-/// </summary>
+// Builds the real AppHost model without starting any resource. Aspire, Roslyn, DotNet, Coding,
+// and CSharp are composed for every profile.
 public sealed class ProfileCompositionFacts
 {
-    private static readonly string[] DeveloperOnlyModules = ["Aspire", "Roslyn", "DotNet", "Coding", "Behavior"];
+    private static readonly string[] ToolingModules = ["Aspire", "Roslyn", "DotNet", "Coding", "CSharp"];
 
     private static readonly string[] UserPathModules =
-        ["AI", "Qdrant", "ClickHouse", "Supabase", "Time", "Gmail", "Salesforce", "GitHub", "Flutter"];
+        ["AI", "Memory", "ClickHouse", "Supabase", "Time", "Gmail", "Salesforce", "GitHub", "Flutter"];
 
-    [Fact]
-    public async Task DeveloperProfileComposesDeveloperOnlyModules()
+    [Theory]
+    [InlineData("developer")]
+    [InlineData("product")]
+    public async Task EveryProfileComposesToolingAndUserPathModules(string profile)
     {
-        var names = await ResourceNames(["IntoChat:Profile=developer"], TestContext.Current.CancellationToken);
-        foreach (var module in DeveloperOnlyModules) { Assert.Contains(module, names); }
-        foreach (var module in UserPathModules) { Assert.Contains(module, names); }
-    }
-
-    [Fact]
-    public async Task ProductProfileComposesOnlyUserPathModules()
-    {
-        var names = await ResourceNames(["IntoChat:Profile=product"], TestContext.Current.CancellationToken);
-        foreach (var module in DeveloperOnlyModules) { Assert.DoesNotContain(module, names); }
-        foreach (var module in UserPathModules) { Assert.Contains(module, names); }
-    }
-
-    private static async Task<string[]> ResourceNames(string[] args, CancellationToken cancellationToken)
-    {
-        var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.IntoChat_AppHost>(args, cancellationToken);
-        return appHost.Resources.Select(resource => resource.Name).ToArray();
+        var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.IntoChat_AppHost>([$"IntoChat:Profile={profile}"], TestContext.Current.CancellationToken);
+        var names = appHost.Resources.Select(resource => resource.Name).ToArray();
+        foreach (var module in ToolingModules.Concat(UserPathModules)) { Assert.Contains(module, names); }
     }
 }

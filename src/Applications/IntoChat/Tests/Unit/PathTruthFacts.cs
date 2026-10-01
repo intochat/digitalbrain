@@ -1,6 +1,7 @@
 using System.Xml.Linq;
+using System.Text.RegularExpressions;
 
-namespace IntoChat.Tests;
+namespace IntoChat.Tests.Unit;
 
 public sealed class PathTruthFacts
 {
@@ -48,84 +49,39 @@ public sealed class PathTruthFacts
     }
 
     [Fact]
-    public void FlutterContractsAreReferencedAtTheirMovedGooglePath()
+    public void ContainerModuleListsAgreeAndResolve()
     {
-        var coding = Read("src/Modules/Coding/Tests/Unit/DigitalBrain.Modules.Coding.Tests.Unit.csproj");
-        Assert.Contains("Google/Flutter/Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj", coding);
-        Assert.DoesNotContain("Modules/Flutter/Contracts", coding);
-    }
-
-    [Fact]
-    public void CiAndDeployUseTheMovedFlutterWorkspace()
-    {
-        foreach (var workflow in new[] { ".github/workflows/ci.yml", ".github/workflows/deploy.yml" })
-        {
-            var text = Read(workflow);
-            Assert.Contains("src/Modules/Google/Flutter", text);
-            Assert.DoesNotContain("src/Modules/Flutter", text);
-        }
-    }
-
-    [Fact]
-    public void KernelMcpIsGoneFromEveryPackagingPath()
-    {
-        string[] files =
-        [
-            ".github/workflows/deploy.yml",
-            "src/Applications/IntoChat/IntoChat/Dockerfile",
-            "src/Applications/IntoChat/IntoChat/docker-entrypoint.sh",
-            "src/Applications/IntoChat/IntoChat/Properties/PublishProfiles/Container.pubxml",
-        ];
-        foreach (var file in files)
-        {
-            var text = Read(file);
-            Assert.DoesNotContain("DigitalBrain.Mcp", text);
-            Assert.DoesNotContain("src/Modules/DigitalBrain/Mcp", text);
-        }
-    }
-
-    [Fact]
-    public void ContainerModuleListsMatchTheLiveAppHostChain()
-    {
-        string[] live =
-        [
-            "DigitalBrain.AI.AIModule, DigitalBrain.Modules.AI",
-            "DigitalBrain.Qdrant.QdrantModule, DigitalBrain.Modules.Qdrant",
-            "DigitalBrain.ClickHouse.ClickHouseModule, DigitalBrain.Modules.ClickHouse",
-            "DigitalBrain.Supabase.SupabaseModule, DigitalBrain.Modules.Supabase",
-            "DigitalBrain.Time.TimeModule, DigitalBrain.Modules.Time",
-            "DigitalBrain.Google.Gmail.GmailModule, DigitalBrain.Modules.Google.Gmail",
-            "DigitalBrain.Salesforce.SalesforceModule, DigitalBrain.Modules.Salesforce",
-            "DigitalBrain.Microsoft.Aspire.AspireModule, DigitalBrain.Modules.Microsoft.Aspire",
-            "DigitalBrain.Microsoft.GitHub.GitHubModule, DigitalBrain.Modules.Microsoft.GitHub",
-            "DigitalBrain.Microsoft.Roslyn.RoslynModule, DigitalBrain.Modules.Microsoft.Roslyn",
-            "DigitalBrain.Microsoft.DotNet.DotNetModule, DigitalBrain.Modules.Microsoft.DotNet",
-            "DigitalBrain.Coding.CodingModule, DigitalBrain.Modules.Coding",
-            "DigitalBrain.Behavior.BehaviorModule, DigitalBrain.Modules.Behavior",
-            "DigitalBrain.Flutter.FlutterModule, DigitalBrain.Modules.Flutter",
-        ];
-        foreach (var file in new[]
-        {
-            "src/Applications/IntoChat/IntoChat/Dockerfile",
-            "src/Applications/IntoChat/IntoChat/Properties/PublishProfiles/Container.pubxml",
-        })
-        {
-            var text = Read(file);
-            foreach (var module in live)
+        const string prefix = "DigitalBrain__Modules__";
+        var docker = Read("src/Applications/IntoChat/IntoChat/Dockerfile").Split('\n')
+            .Where(line => line.Contains(prefix, StringComparison.Ordinal))
+            .Select(line =>
             {
-                Assert.Contains(module, text);
-            }
-            Assert.DoesNotContain("Excel", text);
-            Assert.DoesNotContain("DigitalBrain.Google.GoogleModule", text);
-            Assert.DoesNotContain("DigitalBrain.Microsoft.MicrosoftModule", text);
-        }
-    }
+                var assignment = line.Trim().TrimEnd('\\').Trim();
+                if (assignment.StartsWith("ENV ", StringComparison.Ordinal)) { assignment = assignment[4..].Trim(); }
+                var match = Regex.Match(assignment, "^DigitalBrain__Modules__(\\d+)=\"([^\"]*)\"$");
+                Assert.True(match.Success, $"Malformed module assignment: {line}");
+                Assert.NotEmpty(match.Groups[2].Value);
+                return (Index: int.Parse(match.Groups[1].Value), Module: match.Groups[2].Value);
+            }).ToArray();
+        var profile = XDocument.Load(PathInRepo("src/Applications/IntoChat/IntoChat/Properties/PublishProfiles/Container.pubxml"))
+            .Descendants("ContainerEnvironmentVariable")
+            .Where(entry => entry.Attribute("Include")!.Value.StartsWith(prefix, StringComparison.Ordinal))
+            .Select(entry => (Index: int.Parse(entry.Attribute("Include")!.Value[prefix.Length..]),
+                Module: entry.Attribute("Value")!.Value)).ToArray();
 
-    [Fact]
-    public void DecisionAndEpicRegistersExist()
-    {
-        Assert.True(File.Exists(PathInRepo("docs/product/decisions/README.md")), "The ADR register must exist.");
-        Assert.True(File.Exists(PathInRepo("docs/product/decisions/0001-process-runner-ownership.md")), "Existing ADR 0001 must stay indexed.");
-        Assert.True(File.Exists(PathInRepo("docs/product/epics/README.md")), "The epic index must exist.");
+        Assert.NotEmpty(docker);
+        Assert.NotEmpty(profile);
+        Assert.Equal(docker.Length, docker.Select(entry => entry.Index).Distinct().Count());
+        Assert.Equal(profile.Length, profile.Select(entry => entry.Index).Distinct().Count());
+        Assert.Equal(docker.Length, docker.Select(entry => entry.Module).Distinct().Count());
+        Assert.Equal(profile.Length, profile.Select(entry => entry.Module).Distinct().Count());
+        Assert.Equal(docker.Select(entry => entry.Module).Order(StringComparer.Ordinal),
+            profile.Select(entry => entry.Module).Order(StringComparer.Ordinal));
+        Assert.All(docker.Concat(profile), entry =>
+        {
+            var type = Type.GetType(entry.Module, throwOnError: true)!;
+            Assert.True(typeof(DigitalBrain.Core.IModule).IsAssignableFrom(type));
+            Assert.DoesNotContain(type.Namespace, new[] { "DigitalBrain.Microsoft.Aspire", "DigitalBrain.Microsoft.CSharp" });
+        });
     }
 }

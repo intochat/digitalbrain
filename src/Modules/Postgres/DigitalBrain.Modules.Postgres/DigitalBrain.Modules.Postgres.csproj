@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Read-only PostgreSQL queries, schema discovery and connection status.</Description>
+    <RootNamespace>DigitalBrain.Postgres</RootNamespace>
+    <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Supabase/DigitalBrain.Modules.Supabase/DigitalBrain.Modules.Supabase.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Npgsql" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Postgres.Tests.Unit" />
+    <ProjectReference Include="../DigitalBrain.Modules.Postgres.Contracts/DigitalBrain.Modules.Postgres.Contracts.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
+  </ItemGroup>
+</Project>

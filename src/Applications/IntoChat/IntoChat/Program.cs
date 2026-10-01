@@ -1,42 +1,50 @@
+using DigitalBrain.Core;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Aspire;
+using DigitalBrain.Compute;
+using DigitalBrain.Contracts;
 using DigitalBrain.Sdk;
 using IntoChat;
-using IntoChat.Agent;
-using IntoChat.Apps;
-using IntoChat.LocalFiles;
+using DigitalBrain.Apps;
+using DigitalBrain.Assistant;
 using IntoChat.ServiceDefaults;
-using IntoChat.Workspace;
-using Orleans.Dashboard;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using DigitalBrain.Identity;
+using DigitalBrain.Platform.Secrets;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddIntoChatOptions();
 builder.AddServiceDefaults();
-builder.AddDigitalBrain();
-builder.AddBehaviors();
+builder.AddDigitalBrainRuntime();
+builder.Services.AddShippedApps(typeof(Program).Assembly, "IntoChat.ShippedApps/", publisher: "intochat");
+builder.Services.Configure<BuiltInSettingsOptions>(options => options.Package = PackageId.Create("intochat", "settings"));
 builder.AddKernelCors();
-builder.Services.AddAuthentication();
-builder.Services.AddDataProtection();
-builder.Services.Configure<LocalFilesOptions>(builder.Configuration.GetSection("IntoChat:LocalFiles"));
-builder.Services.AddSingleton<LocalFileStore>();
-builder.Services.AddSingleton<AppSurfaceComposer>();
-builder.Services.AddSingleton<ImageSaveCoordinator>();
-builder.Services.AddSingleton<LiveTableWindows>();
-builder.Services.AddSingleton<IAgentToolFactory, WorkspaceTableTools>();
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.Cookie.Name = "intochat.session";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.SlidingExpiration = true;
+        options.Events.OnRedirectToLogin = context => { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; };
+        options.Events.OnRedirectToAccessDenied = context => { context.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; };
+    });
+builder.Services.AddMasterKeyWrapper();
+builder.Services.AddCookieProtection();
 
 var app = builder.Build();
 
 app.UseKernelCors();
 app.UseModuleHttpSurfaces();
 app.UseAuthentication();
-app.UseBasicAuthGate();
+app.UseAccountSession();
 app.MapDefaultEndpoints();
-app.MapOrleansDashboard("/orleans");
-app.MapBehaviors();
+app.MapGet("/session/capabilities", static (IServiceProvider services) =>
+    Results.Ok(new { developerMode = services.GetService<DigitalBrain.Apps.IScriptSandbox>()?.CanRun == true }));
 app.MapDigitalBrainModules();
-app.MapWorkspaceDataEndpoints();
-app.MapWorkspaceAgent();
-app.MapLocalApps();
+
 
 app.Run();
+

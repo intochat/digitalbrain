@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../Apps/DigitalBrain.Modules.Apps.Testing/DigitalBrain.Modules.Apps.Testing.csproj" />
+    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
+    <ProjectReference Include="../../Specs/DigitalBrain.Modules.Specs/DigitalBrain.Modules.Specs.csproj" />
+    <ProjectReference Include="../DigitalBrain.Modules.Assistant/DigitalBrain.Modules.Assistant.csproj" />
+    <ProjectReference Include="../../../Supabase/DigitalBrain.Modules.Supabase/DigitalBrain.Modules.Supabase.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="assistant.feature" LogicalName="assistant.feature" />
+  </ItemGroup>
+</Project>

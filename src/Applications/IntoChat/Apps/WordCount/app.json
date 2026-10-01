@@ -1,0 +1,10 @@
+{
+  "name": "word-count",
+  "title": "Word count",
+  "description": "Counts the words in a text. A small C# script running in the sandbox.",
+  "runtime": "csharp",
+  "operations": [
+    { "name": "ask", "description": "Count the words in a text." }
+  ],
+  "settings": []
+}

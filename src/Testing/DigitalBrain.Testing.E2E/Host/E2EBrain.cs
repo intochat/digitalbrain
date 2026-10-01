@@ -1,3 +1,4 @@
+using DigitalBrain.Client;
 using System.Diagnostics;
 using Aspire.Hosting;
 using DigitalBrain.Contracts;
@@ -23,6 +24,19 @@ public sealed class E2EBrain : IDigitalBrain, ITrackedBrain
         _options = options;
     }
 
+    private E2EBrain(AspireTestSession session, ResolvedBrowserOptions options, TestSessionLifetime leaseLifetime)
+    {
+        _session = session;
+        _lifetime = leaseLifetime;
+        _options = options;
+    }
+
+    // Fresh per brain instance, so facts sharing one host address their own workspace.
+    public string WorkspaceId { get; } = "workspace-" + Guid.NewGuid().ToString("N");
+
+    // A fact's view of a host it does not own: disposing it releases only what the fact observed.
+    internal E2EBrain Lease() => new(_session, _options, new TestSessionLifetime(_session.Options));
+
     public HttpClient HttpClient => _session.HttpClient;
     public DistributedApplication Application => _session.App;
 
@@ -41,7 +55,7 @@ public sealed class E2EBrain : IDigitalBrain, ITrackedBrain
     internal async Task StartBrowserAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (_session.BrowserEndpoint is not null)
+        if (_session.BrowserEndpoint is not null && _options.PrimarySession)
         { _primaryBrowser = await OpenBrowserAsync(cancellationToken).ConfigureAwait(false); }
         cancellationToken.ThrowIfCancellationRequested();
     }
@@ -84,6 +98,8 @@ public sealed class E2EBrain : IDigitalBrain, ITrackedBrain
             var page = await context.NewPageAsync().ConfigureAwait(false);
             session.Page = page;
             page.SetDefaultTimeout((float)_options.AssertionTimeout.TotalMilliseconds);
+            // Playwright's Expect() has its own 5s default, separate from the page timeout.
+            Assertions.SetDefaultExpectTimeout((float)_options.AssertionTimeout.TotalMilliseconds);
             stage = "browser-readiness";
             await PreparePageAsync(page, endpoint, _session.BrowserReadySelector, Remaining, deadline.Token).ConfigureAwait(false);
             deadline.Token.ThrowIfCancellationRequested();

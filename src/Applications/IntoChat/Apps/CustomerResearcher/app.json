@@ -1,0 +1,12 @@
+{
+  "name": "customer-researcher",
+  "title": "Customer Researcher",
+  "description": "Research companies live in a driven browser and save the findings to Postgres.",
+  "runtime": "csharp",
+  "operations": [
+    { "name": "open", "description": "Open the researcher window and answer its surface." },
+    { "name": "research", "description": "Start researching a company by name, location or website." },
+    { "name": "stop", "description": "Stop the running research." }
+  ],
+  "settings": []
+}
