@@ -44,7 +44,8 @@ public sealed class TraceBudgetFacts
         using var response = await brain.HttpClient.PostAsJsonAsync("/agent", input, ct);
         var stream = await response.Content.ReadAsStringAsync(ct);
         Assert.Contains("RUN_FINISHED", stream);
-        await Task.Delay(TimeSpan.FromSeconds(2), ct);
+        await WaitForAsync(() => collector.Snapshot().Skip(intentStart)
+            .Any(span => string.Equals(span.Name, "IIntentUsage/RecordBatchAsync", StringComparison.Ordinal)), ct);
         var intentSpans = collector.Snapshot().Skip(intentStart).ToArray();
         TestContext.Current.TestOutputHelper?.WriteLine($"Idle {idleSpans.Length} spans/min; J1 {intentSpans.Length} spans total.\n{DescribeTree(intentSpans)}");
         // Plan P0.4 (docs/superpowers/plans/2026-09-23-intochat-product-delivery.md:248) measured
@@ -78,7 +79,8 @@ public sealed class TraceBudgetFacts
             Assert.Equal(HttpStatusCode.OK, warm.StatusCode);
         }
 
-        await Task.Delay(TimeSpan.FromSeconds(3), ct);
+        await WaitForAsync(() => GrainCallSpans(collector, 0).Length >= 2, TimeSpan.FromSeconds(15), ct);
+        Assert.Equal(2, GrainCallSpans(collector, 0).Length);
         var before = collector.Snapshot().Count;
         using (var response = await brain.HttpClient.GetAsync(ConversationPath, ct))
         {
