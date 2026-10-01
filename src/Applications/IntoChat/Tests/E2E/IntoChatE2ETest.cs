@@ -49,7 +49,7 @@ internal static class IntoChatE2ETest
             .ConfigureModule<QdrantModule, QdrantModuleOptions>(qdrant => qdrant.Host = false)
             .ConfigureModule<PostgresModule, PostgresModuleOptions>(database => database.WithPostgres(options =>
             {
-                options.DatabaseName = "customer-research";
+                options.DatabaseName = "digitalbrain";
                 options.PersistentStorage = false;
             }))
             .ConfigureModule<ClickHouseModule, ClickHouseModuleOptions>(database => database.WithClickHouse(options =>
