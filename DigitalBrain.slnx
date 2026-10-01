@@ -1,9 +1,4 @@
 <Solution>
-  <Folder Name="/Modules/DigitalBrain/CustomerResearcher/">
-    <Project Path="src/Modules/DigitalBrain/CustomerResearcher/DigitalBrain.Modules.CustomerResearcher.Contracts/DigitalBrain.Modules.CustomerResearcher.Contracts.csproj" />
-    <Project Path="src/Modules/DigitalBrain/CustomerResearcher/DigitalBrain.Modules.CustomerResearcher/DigitalBrain.Modules.CustomerResearcher.csproj" />
-    <Project Path="src/Modules/DigitalBrain/CustomerResearcher/DigitalBrain.Modules.CustomerResearcher.Tests.Unit/DigitalBrain.Modules.CustomerResearcher.Tests.Unit.csproj" />
-  </Folder>
   <Folder Name="/Modules/Microsoft/Playwright/">
     <Project Path="src/Modules/Microsoft/Playwright/DigitalBrain.Modules.Microsoft.Playwright.Contracts/DigitalBrain.Modules.Microsoft.Playwright.Contracts.csproj" />
     <Project Path="src/Modules/Microsoft/Playwright/DigitalBrain.Modules.Microsoft.Playwright/DigitalBrain.Modules.Microsoft.Playwright.csproj" />
