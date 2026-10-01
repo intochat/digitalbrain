@@ -62,4 +62,15 @@ public sealed class MasterKeyWrapperFacts
     }
 
     private static MasterKeyWrapper Wrapper(string masterKey) => new(Options.Create(new MasterKeyOptions { MasterKey = masterKey }));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void Direct_construction_rejects_a_blank_master_key_with_the_operator_configuration_names(string? masterKey)
+    {
+        var error = Assert.Throws<InvalidOperationException>(() => Wrapper(masterKey!));
+        Assert.Contains(DigitalBrainNames.MasterKeyConfigurationKey, error.Message, StringComparison.Ordinal);
+        Assert.Contains(DigitalBrainNames.MasterKeyEnvironmentVariable, error.Message, StringComparison.Ordinal);
+    }
 }

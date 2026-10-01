@@ -1,6 +1,7 @@
 using System.Reflection;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Azure;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
@@ -10,6 +11,13 @@ namespace DigitalBrain.Aspire.Hosting;
 
 public static class DigitalBrainHostingExtensions
 {
+    public static IResourceBuilder<AzureBlobStorageContainerResource> AddBlobContainer(this DigitalBrainBuilder brain, string name)
+    {
+        ArgumentNullException.ThrowIfNull(brain);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return brain.Storage.AddBlobContainer(name);
+    }
+
     public static DigitalBrainBuilder AddModules(this DigitalBrainBuilder brain, IReadOnlyList<ModuleDefinition> modules)
     {
         var resolved = ModuleComposition.Resolve(modules);
@@ -86,7 +94,7 @@ public static class DigitalBrainHostingExtensions
             .WithGrainStorage(DigitalBrainNames.DefaultGrainStorage, grainState)
             .WithClusterId(clusterId)
             .WithServiceId(resolvedServiceId);
-        brain.AttachRuntime(orleans, grainState);
+        brain.AttachRuntime(orleans, storage, grainState);
 
         brain.RequireHealthyBeforeStart(storage.Resource);
         brain.RequireHealthyBeforeStart(clustering.Resource);

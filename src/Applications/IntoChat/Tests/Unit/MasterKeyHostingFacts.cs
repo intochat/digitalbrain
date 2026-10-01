@@ -18,21 +18,14 @@ public sealed class MasterKeyHostingFacts
         var second = builder.AddExecutable("second", "unused", ".").WithReference(brain);
         var client = builder.AddExecutable("client", "unused", ".").WithReference(brain.AsClient());
 
-        // Resolve the model's connection strings without starting storage or silo processes.
-        foreach (var endpoint in builder.Resources.SelectMany(resource => resource.Annotations.OfType<EndpointAnnotation>()))
-        {
-            var port = endpoint.Port ?? endpoint.TargetPort ?? 17000;
-            endpoint.AllocatedEndpoint = new AllocatedEndpoint(endpoint, "localhost", port,
-                port.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        }
-
         var parameter = builder.Resources.OfType<ParameterResource>().Single(resource => resource.Name == DigitalBrainHostingNames.MasterKeyParameter);
-        var expected = await parameter.GetValueAsync(TestContext.Current.CancellationToken);
-        var firstEnvironment = await EnvironmentOf(builder, first.Resource);
-        var secondEnvironment = await EnvironmentOf(builder, second.Resource);
-        Assert.Equal(expected, firstEnvironment[DigitalBrainNames.MasterKeyEnvironmentVariable]);
-        Assert.Equal(firstEnvironment[DigitalBrainNames.MasterKeyEnvironmentVariable], secondEnvironment[DigitalBrainNames.MasterKeyEnvironmentVariable]);
-        Assert.DoesNotContain(DigitalBrainNames.MasterKeyEnvironmentVariable, (await EnvironmentOf(builder, client.Resource)).Keys);
+        Assert.True(parameter.Secret);
+        Assert.NotNull(parameter.Default);
+        var firstEnvironment = await EnvironmentOf(first.Resource);
+        var secondEnvironment = await EnvironmentOf(second.Resource);
+        Assert.Same(parameter, firstEnvironment[DigitalBrainNames.MasterKeyEnvironmentVariable]);
+        Assert.Same(parameter, secondEnvironment[DigitalBrainNames.MasterKeyEnvironmentVariable]);
+        Assert.DoesNotContain(DigitalBrainNames.MasterKeyEnvironmentVariable, (await EnvironmentOf(client.Resource)).Keys);
     }
 
     [Fact]
@@ -50,11 +43,13 @@ public sealed class MasterKeyHostingFacts
         Assert.Null(parameter.Default);
     }
 
-    private static async Task<IReadOnlyDictionary<string, string>> EnvironmentOf(IDistributedApplicationBuilder builder, IResource resource)
+    private static async Task<IReadOnlyDictionary<string, object>> EnvironmentOf(IResource resource)
     {
+        // Publish expression resolution inspects the run model without waiting for endpoint allocation.
         var configuration = await ExecutionConfigurationBuilder.Create(resource)
             .WithEnvironmentVariablesConfig()
-            .BuildAsync(builder.ExecutionContext, NullLogger.Instance, TestContext.Current.CancellationToken);
-        return configuration.EnvironmentVariables.ToDictionary();
+            .BuildAsync(new DistributedApplicationExecutionContext(DistributedApplicationOperation.Publish),
+                NullLogger.Instance, TestContext.Current.CancellationToken);
+        return configuration.EnvironmentVariablesWithUnprocessed.ToDictionary(pair => pair.Key, pair => pair.Value.Unprocessed);
     }
 }
