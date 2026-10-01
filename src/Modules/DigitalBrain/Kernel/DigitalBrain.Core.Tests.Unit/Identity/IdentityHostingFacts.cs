@@ -7,12 +7,25 @@ using DigitalBrain.Identity;
 using DigitalBrain.Sdk.Identity;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Core.Tests.Unit.Identity;
 
 public sealed class IdentityHostingFacts
 {
+    [Fact]
+    public void TheHostProtectionIdentityOverridesTheWebApplicationsDefault()
+    {
+        var builder = WebApplication.CreateBuilder();
+        builder.Services.AddCookieProtection();
+        builder.Services.AddIdentity();
+        builder.Services.Configure<IdentityHostOptions>(options => options.ProtectionApplicationName = "another-host.v1");
+        using var provider = builder.Services.BuildServiceProvider();
+        Assert.Equal("another-host.v1", provider.GetRequiredService<IOptions<DataProtectionOptions>>().Value.ApplicationDiscriminator);
+    }
+
     [Fact]
     public async Task CookieChallengesAndForbidsReturnStatusesWithoutRedirects()
     {

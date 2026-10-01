@@ -16,10 +16,10 @@ internal static class CookieProtectionStorage
             .GetRequiredKeyedService<BlobServiceClient>(DigitalBrainNames.GrainState)
             .GetBlobContainerClient(provider.GetRequiredService<IOptions<IdentityHostOptions>>().Value.ProtectionContainerName));
         services.AddHostedService<ContainerStartup>();
-        services.AddOptions<DataProtectionOptions>().Configure<IOptions<IdentityHostOptions>>((protection, host) =>
-            protection.ApplicationDiscriminator = host.Value.ProtectionApplicationName);
         services.AddDataProtection()
             .PersistKeysToAzureBlobStorage(provider => provider.GetRequiredService<BlobContainerClient>().GetBlobClient("keys.xml"));
+        services.AddOptions<DataProtectionOptions>().Configure<IOptions<IdentityHostOptions>>((protection, host) =>
+            protection.ApplicationDiscriminator = host.Value.ProtectionApplicationName);
         return services;
     }
 
