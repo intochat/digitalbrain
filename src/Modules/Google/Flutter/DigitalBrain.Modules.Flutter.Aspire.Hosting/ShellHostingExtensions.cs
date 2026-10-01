@@ -118,7 +118,8 @@ public static class ShellHostingExtensions
                 {
                     var buildCheck = resourceName + "-build";
                     appHost.Services.AddHealthChecks().Add(new HealthCheckRegistration(buildCheck,
-                        services => new FlutterWebBuildHealthCheck(services.GetRequiredService<ResourceLoggerService>(), host.Resource),
+                        services => new FlutterWebBuildHealthCheck(services.GetRequiredService<ResourceLoggerService>(), host.Resource,
+                            host.GetEndpoint(ShellNames.HttpEndpointName)),
                         failureStatus: null, tags: null));
                     host.WithHealthCheck(buildCheck);
                 }

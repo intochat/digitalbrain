@@ -25,7 +25,11 @@ internal sealed class SandboxRunsApi(HttpClient http, Func<CancellationToken, Va
     public async Task<CSharpRunState> InspectAsync(Uri sandbox, string session, string runId, CancellationToken cancellationToken)
     {
         using var response = await SendAsync(HttpMethod.Get, Url(sandbox, $"runs/{runId}", session), content: null, cancellationToken).ConfigureAwait(false);
-        if (response.StatusCode == HttpStatusCode.NotFound) { return CSharpRunState.Stopped; }
+        // A gateway status is the endpoint proxy answering for a sandbox that is gone; like an
+        // unknown run id, it means this run no longer exists anywhere.
+        if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.BadGateway
+            or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout)
+        { return CSharpRunState.Stopped; }
         await EnsureSuccessAsync(response, "inspect", cancellationToken).ConfigureAwait(false);
         var run = await response.Content.ReadFromJsonAsync<SandboxRunStatus>(cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException("The sandbox returned an empty run status.");
