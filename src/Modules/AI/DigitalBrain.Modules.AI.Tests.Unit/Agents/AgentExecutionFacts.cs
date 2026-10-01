@@ -1,3 +1,5 @@
+using DigitalBrain.Contracts.Enforcement;
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Contracts;
 using DigitalBrain.AI.Metering;
 using DigitalBrain.AI;
@@ -9,6 +11,38 @@ namespace DigitalBrain.Modules.AI.Tests.Unit;
 
 public sealed class AgentExecutionFacts
 {
+    [Fact]
+    public async Task ExecutionAcceptsTheStampedBrainAndRefusesAnotherBrainBeforeCallingTheModel()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var model = StubChatClient.Replying("scoped answer");
+        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+            .ConfigureSilo(silo => silo.Services.AddSingleton<IChatClient>(model)).StartAsync(ct);
+        CallerContextStamper.Stamp(new CallerContext
+        {
+            PrincipalId = "owner",
+            AccountId = "owner",
+            BrainId = "research",
+            Kind = CallerKind.User,
+            StampedBy = TrustedEdge.AuthenticatedHttp,
+        });
+        try
+        {
+            var execution = brain.Get<IAgentExecution>("scoped-execution");
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(async () =>
+            {
+                await foreach (var _ in execution.Run(new("agent", "run", "foreign", [], "question", null), "intent", ct)) { }
+            });
+            Assert.Empty(model.Requests);
+            var events = new List<AgentTurnEvent>();
+            await foreach (var item in execution.Run(new("agent", "run", BrainScope.CurrentId(), [], "question", null), "intent", ct))
+            { events.Add(item); }
+            Assert.Single(events.OfType<AgentTurnEvent.Finished>());
+            Assert.Single(model.Requests);
+        }
+        finally { Orleans.Runtime.RequestContext.Clear(); }
+    }
+
     [Fact]
     public async Task MeteringStorageFailureDoesNotInvalidateASuccessfulExecution()
     {
