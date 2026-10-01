@@ -35,6 +35,7 @@ public static class PostgresHosting
             return NpgsqlDataSource.Create(PostgresConnectionSettings.Parse(connection).ConnectionString);
         });
         services.TryAddSingleton<IPostgresProvider, PostgresProvider>();
+        services.TryAddSingleton<IPostgresTableProvider, PostgresTableProvider>();
         services.AddLiveTables();
         services.TryAddKeyedSingleton<ILiveTableSource>("postgres", (provider, _) =>
             LiveTableHosting.CreatePostgresSource(provider.GetRequiredKeyedService<NpgsqlDataSource>(DataSourceKey)));

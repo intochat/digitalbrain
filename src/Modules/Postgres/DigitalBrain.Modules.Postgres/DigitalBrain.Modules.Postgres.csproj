@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <Description>Read-only PostgreSQL queries, schema discovery and connection status.</Description>
+    <Description>Read-only PostgreSQL queries, schema discovery, and scoped declarative table neurons.</Description>
     <RootNamespace>DigitalBrain.Postgres</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
   </PropertyGroup>
