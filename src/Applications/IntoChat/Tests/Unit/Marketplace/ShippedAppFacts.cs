@@ -4,7 +4,6 @@ using DigitalBrain.AI.Scripted;
 using DigitalBrain.Apps;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
-using IntoChat.Marketplace;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -16,14 +15,15 @@ namespace IntoChat.Tests.Unit.Marketplace;
 // makes in the production gate.
 public sealed class ShippedAppFacts
 {
+    private static readonly EmbeddedShippedAppSource Source = new(typeof(Program).Assembly, "IntoChat.ShippedApps/", "intochat");
     [Fact]
     public void EveryFirstPartyPackageShips()
-        => Assert.Equal(["assistant", "customer-researcher", "group-chat", "settings", "word-count"], ShippedApps.Load().Select(app => app.Package.Name).Order());
+        => Assert.Equal(["assistant", "customer-researcher", "group-chat", "settings", "word-count"], Source.Load().Select(app => app.Package.Name).Order());
 
     [Fact]
     public void EveryShippedProgramAndTestsFileParsesAsCSharp()
     {
-        foreach (var app in ShippedApps.Load())
+        foreach (var app in Source.Load())
         {
             var sources = new Dictionary<string, string> { [PackageContent.TestsPath] = app.Content.File(PackageContent.TestsPath)! };
             foreach (var (path, program) in app.Content.Programs()) { sources[path] = program; }
@@ -42,7 +42,7 @@ public sealed class ShippedAppFacts
 
     [Fact]
     public void EveryShippedAppCarriesSpecAndTests()
-        => Assert.All(ShippedApps.Load(), app =>
+        => Assert.All(Source.Load(), app =>
         {
             Assert.False(string.IsNullOrWhiteSpace(app.Content.File(PackageContent.SpecPath)), $"{app.Package} has no {PackageContent.SpecPath}.");
             Assert.False(string.IsNullOrWhiteSpace(app.Content.File(PackageContent.TestsPath)), $"{app.Package} has no {PackageContent.TestsPath}.");
@@ -122,7 +122,7 @@ public sealed class ShippedAppFacts
 
     private static async Task<(IApp App, string Scope)> Install(UnitBrain brain, string name)
     {
-        var shipped = ShippedApps.Load().Single(app => app.Package.Name == name);
+        var shipped = Source.Load().Single(app => app.Package.Name == name);
         StampPublisher();
         var revision = await brain.Get<IPackage>(shipped.Package.ToString()).Commit(new CommitPackage(Guid.NewGuid(), null, shipped.Content, "Ship"));
         var scope = $"scratch/{name}/{Guid.NewGuid():N}";
@@ -147,9 +147,9 @@ public sealed class ShippedAppFacts
 
     private static void StampPublisher() => CallerContextStamper.Stamp(new CallerContext
     {
-        PrincipalId = ShippedApps.Publisher,
-        AccountId = ShippedApps.Publisher,
-        BrainId = ShippedApps.Publisher,
+        PrincipalId = Source.Publisher,
+        AccountId = Source.Publisher,
+        BrainId = Source.Publisher,
         Kind = CallerKind.Platform,
         StampedBy = TrustedEdge.Platform,
     });
@@ -163,4 +163,5 @@ public sealed class ShippedAppFacts
         })
         .StartAsync(ct);
 }
+
 

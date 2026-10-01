@@ -5,7 +5,8 @@ using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
 using DigitalBrain.Sdk;
 using IntoChat;
-using IntoChat.Marketplace;
+using DigitalBrain.Apps;
+using DigitalBrain.Assistant;
 using IntoChat.ServiceDefaults;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using DigitalBrain.Identity;
@@ -16,7 +17,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddIntoChatOptions();
 builder.AddServiceDefaults();
 builder.AddDigitalBrainRuntime();
-builder.Services.AddHostedService<ShippedAppPublisher>();
+builder.Services.AddShippedApps(typeof(Program).Assembly, "IntoChat.ShippedApps/", publisher: "intochat");
+builder.Services.Configure<BuiltInSettingsOptions>(options => options.Package = PackageId.Create("intochat", "settings"));
 builder.AddKernelCors();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>

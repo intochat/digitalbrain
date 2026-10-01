@@ -1,29 +1,27 @@
 using System.Text.Json;
 using DigitalBrain.Apps;
 
-namespace IntoChat.Marketplace;
+namespace DigitalBrain.Apps;
 
 // The apps IntoChat ships live as folders under src/Applications/IntoChat/Apps and are embedded here.
 // app.json is the manifest, app.cs the script of a csharp app, every other file travels with the package.
-internal sealed record ShippedApp(PackageId Package, PackageContent Content);
 
-internal static class ShippedApps
+
+public sealed class EmbeddedShippedAppSource(System.Reflection.Assembly assembly, string resourcePrefix, string publisher) : IShippedAppSource
 {
-    public const string Publisher = DigitalBrain.Assistant.ShippedPublisher.Id;
-    private const string ResourcePrefix = "IntoChat.ShippedApps/";
+    public string Publisher => publisher;
     private const string ManifestFile = "app.json";
     private const string ScriptFile = "app.cs";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    public static IReadOnlyList<ShippedApp> Load()
+    public IReadOnlyList<ShippedApp> Load()
     {
-        var assembly = typeof(ShippedApps).Assembly;
         var folders = new SortedDictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
         foreach (var resource in assembly.GetManifestResourceNames())
         {
             var path = resource.Replace('\\', '/');
-            if (!path.StartsWith(ResourcePrefix, StringComparison.Ordinal)) { continue; }
-            var relative = path[ResourcePrefix.Length..];
+            if (!path.StartsWith(resourcePrefix, StringComparison.Ordinal)) { continue; }
+            var relative = path[resourcePrefix.Length..];
             var slash = relative.IndexOf('/', StringComparison.Ordinal);
             if (slash < 0) { continue; }
             using var stream = assembly.GetManifestResourceStream(resource)!;
@@ -35,7 +33,7 @@ internal static class ShippedApps
         return [.. folders.Select(folder => ToApp(folder.Key, folder.Value))];
     }
 
-    public static ShippedApp ToApp(string folder, IReadOnlyDictionary<string, string> files)
+    private ShippedApp ToApp(string folder, IReadOnlyDictionary<string, string> files)
     {
         var manifestText = files.GetValueOrDefault(ManifestFile) ?? throw new InvalidDataException($"Shipped app {folder} has no {ManifestFile}.");
         var manifest = JsonSerializer.Deserialize<AppJson>(manifestText, Json) ?? throw new InvalidDataException($"{folder}/{ManifestFile} is empty.");
@@ -55,3 +53,4 @@ internal static class ShippedApps
     private sealed record OperationJson(string Name, string Description);
     private sealed record SettingJson(string Name, string Description, string Default);
 }
+

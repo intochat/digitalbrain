@@ -12,6 +12,13 @@ namespace DigitalBrain.Modules.Assistant.Tests.Unit;
 public sealed class AgentRouteFacts
 {
     [Fact]
+    public async Task AHostWithoutABuiltInSettingsPackageReportsItAsUnavailable()
+    {
+        var result = await BuiltInSettingsEndpoints.OpenSettings(null!, null!, new BuiltInSettingsOptions());
+        Assert.Equal(StatusCodes.Status503ServiceUnavailable, ((IStatusCodeHttpResult)result).StatusCode);
+    }
+
+    [Fact]
     public void ProductCompositionKeepsInstalledPackagesWithoutMappingTheAuthoringRegistry()
     {
         var snapshot = RouteSnapshot.Map(services =>

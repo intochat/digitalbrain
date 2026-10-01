@@ -1,15 +1,18 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
 
-namespace IntoChat.Marketplace;
+namespace DigitalBrain.Apps;
 
 // Brings every shipped app to the marketplace at startup: commit it when its folder changed, verify
 // the revision's scenarios once, and publish it only when they pass. A red app stays unpublished and
 // its failing steps are visible on its spec page.
-internal sealed class ShippedAppPublisher(IDigitalBrain brain, MarketplaceService marketplace, IHostApplicationLifetime lifetime, IConfiguration configuration, ILogger<ShippedAppPublisher> logger) : BackgroundService
+internal sealed class ShippedAppPublisher(IDigitalBrain brain, MarketplaceService marketplace, IEnumerable<IShippedAppSource> sources, IHostApplicationLifetime lifetime, IConfiguration configuration, ILogger<ShippedAppPublisher> logger) : BackgroundService
 {
     // Verifying a shipped app runs real sandbox scripts. A test host declares what it needs:
     // "true" (default) ships everything, "false" nothing, and a comma-separated list of package
@@ -32,24 +35,27 @@ internal sealed class ShippedAppPublisher(IDigitalBrain brain, MarketplaceServic
             await using var registration = lifetime.ApplicationStarted.Register(started.SetResult);
             await started.Task.WaitAsync(stoppingToken);
         }
-        CallerContextStamper.Stamp(new CallerContext
+        foreach (var source in sources)
         {
-            PrincipalId = ShippedApps.Publisher,
-            AccountId = ShippedApps.Publisher,
-            BrainId = ShippedApps.Publisher,
-            Kind = CallerKind.Platform,
-            StampedBy = TrustedEdge.Platform,
-        });
-        foreach (var app in ShippedApps.Load())
-        {
-            if (stoppingToken.IsCancellationRequested) { return; }
-            if (selection is not null && !selection.Contains(app.Package.Name)) { continue; }
-            try { await Ship(app); }
-            catch (Exception error) when (error is not OperationCanceledException)
-            { logger.LogError(error, "Shipping {Package} failed.", app.Package); }
+            foreach (var app in source.Load())
+            {
+                stoppingToken.ThrowIfCancellationRequested();
+                if (selection is not null && !selection.Contains(app.Package.Name)) { continue; }
+                if (app.Package.Owner != source.Publisher) { throw new InvalidDataException("Shipped package owner must match its source publisher."); }
+                CallerContextStamper.Stamp(new CallerContext
+                {
+                    PrincipalId = source.Publisher,
+                    AccountId = source.Publisher,
+                    BrainId = source.Publisher,
+                    Kind = CallerKind.Platform,
+                    StampedBy = TrustedEdge.Platform,
+                });
+                try { await Ship(app).WaitAsync(stoppingToken); }
+                catch (Exception error) when (error is not OperationCanceledException)
+                { logger.LogError(error, "Shipping {Package} failed.", app.Package); }
+            }
         }
     }
-
     private async Task Ship(ShippedApp app)
     {
         var package = brain.Get<IPackage>(app.Package.ToString());
@@ -98,5 +104,6 @@ internal sealed class ShippedAppPublisher(IDigitalBrain brain, MarketplaceServic
         files = new SortedDictionary<string, string>(content.Files?.ToDictionary() ?? [], StringComparer.Ordinal),
     }, CanonicalJson);
 }
+
 
 
