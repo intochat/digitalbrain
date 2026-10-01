@@ -50,20 +50,20 @@ if (referenceComposition)
 }
 else
 {
-// Stands in for the identity edge's open single-owner posture: stamps the owner on the brain in the route.
-app.Use(async (context, next) =>
-{
-    CallerContextStamper.Stamp(new CallerContext
+    // Stands in for the identity edge's open single-owner posture: stamps the owner on the brain in the route.
+    app.Use(async (context, next) =>
     {
-        PrincipalId = "owner",
-        AccountId = "owner",
-        BrainId = context.Request.RouteValues["brainId"] as string ?? "owner",
-        Kind = CallerKind.User,
-        StampedBy = TrustedEdge.AuthenticatedHttp,
+        CallerContextStamper.Stamp(new CallerContext
+        {
+            PrincipalId = "owner",
+            AccountId = "owner",
+            BrainId = context.Request.RouteValues["brainId"] as string ?? "owner",
+            Kind = CallerKind.User,
+            StampedBy = TrustedEdge.AuthenticatedHttp,
+        });
+        await next(context);
     });
-    await next(context);
-});
-app.MapGet("/identity/session", () => Results.NoContent());
+    app.MapGet("/identity/session", () => Results.NoContent());
 }
 app.MapDigitalBrainModules();
 app.MapHealthChecks(ModuleHostEndpoints.Health);

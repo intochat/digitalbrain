@@ -1,6 +1,5 @@
 using DigitalBrain.Postgres;
 using DigitalBrain.Microsoft.Playwright;
-using Aspire.Hosting;
 using DigitalBrain.AI;
 using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.AI.Ollama;
@@ -8,7 +7,6 @@ using DigitalBrain.AI.OpenAI;
 using DigitalBrain.Apps;
 using DigitalBrain.Assistant;
 using DigitalBrain.Specs;
-using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.ClickHouse;
 using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.Core;
@@ -31,8 +29,6 @@ using DigitalBrain.Supabase;
 using DigitalBrain.Time;
 using DigitalBrain.Files;
 
-
-
 namespace DigitalBrain.Testing.E2E;
 
 public static class ReferenceBrain
@@ -41,39 +37,39 @@ public static class ReferenceBrain
 
     public static E2ETestBuilder Create(string modelApiKey = "fixture-key", Dictionary<string, string?>? privateConfiguration = null)
         => E2ETest.Create()
-    .WithModule<AIModule, AIOptions>(ai =>
-    {
-        ai.Telemetry.EnableSensitiveData = true;
+            .WithModule<AIModule, AIOptions>(ai =>
+            {
+                ai.Telemetry.EnableSensitiveData = true;
 
-        ai.WithLlm<IGpt56Luna>()
-            .WithDefaultLlm<IGemma4>()
-            .WithDefaultEmbedding<ITextEmbedding3Small>()
-            .WithVoiceToText<IWhisperLargeV3Turbo>()
-            .WithTavilySearch();
-    })
-    .WithModule<QdrantModule, QdrantModuleOptions>(qdrant => qdrant.WithHostedQdrant())
-    .WithModule<MemoryModule>()
-    .WithModule<ClickHouseModule, ClickHouseModuleOptions>(database => database.WithClickHouse(options => options.WithSeed("leads")))
-    .WithModule<SupabaseModule, SupabaseModuleOptions>(database => database.WithConnection("supabase"))
-    .WithModule<PostgresModule, PostgresModuleOptions>(database => database.WithPostgres(options => options.DatabaseName = "customer-research"))
-    .WithModule<PlaywrightModule>()
-    .WithModule<TimeModule>()
-    .WithModule<SecretsModule>()
-    .WithModule<IntegrationsModule>()
-    .WithModule<IdentityModule>()
-    .WithModule<FilesModule>()
-    .WithModule<GmailModule, GmailModuleOptions>(gmail => gmail.WithGmail())
-    .WithModule<SalesforceModule, SalesforceModuleOptions>(salesforce => salesforce.WithHostedMcp())
-    .WithModule<GitHubModule>()
-    .WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunDesktopApp())
-    .WithModule<ComputeModule>()
-    .WithModule<RegistryModule>()
-    .WithModule<SpecsModule>()
-    .WithModule<AppsModule>()
-    .WithModule<AssistantModule>()
-    .WithModule<AspireModule>()
-    .WithModule<CSharpModule>()
-    .WithModule<CSharpAuthoringModule>()
+                ai.WithLlm<IGpt56Luna>()
+                    .WithDefaultLlm<IGemma4>()
+                    .WithDefaultEmbedding<ITextEmbedding3Small>()
+                    .WithVoiceToText<IWhisperLargeV3Turbo>()
+                    .WithTavilySearch();
+            })
+            .WithModule<QdrantModule, QdrantModuleOptions>(qdrant => qdrant.WithHostedQdrant())
+            .WithModule<MemoryModule>()
+            .WithModule<ClickHouseModule, ClickHouseModuleOptions>(database => database.WithClickHouse(options => options.WithSeed("leads")))
+            .WithModule<SupabaseModule, SupabaseModuleOptions>(database => database.WithConnection("supabase"))
+            .WithModule<PostgresModule, PostgresModuleOptions>(database => database.WithPostgres(options => options.DatabaseName = "customer-research"))
+            .WithModule<PlaywrightModule>()
+            .WithModule<TimeModule>()
+            .WithModule<SecretsModule>()
+            .WithModule<IntegrationsModule>()
+            .WithModule<IdentityModule>()
+            .WithModule<FilesModule>()
+            .WithModule<GmailModule, GmailModuleOptions>(gmail => gmail.WithGmail())
+            .WithModule<SalesforceModule, SalesforceModuleOptions>(salesforce => salesforce.WithHostedMcp())
+            .WithModule<GitHubModule>()
+            .WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunDesktopApp())
+            .WithModule<ComputeModule>()
+            .WithModule<RegistryModule>()
+            .WithModule<SpecsModule>()
+            .WithModule<AppsModule>()
+            .WithModule<AssistantModule>()
+            .WithModule<AspireModule>()
+            .WithModule<CSharpModule>()
+            .WithModule<CSharpAuthoringModule>()
             .ConfigureModule<AIModule, AIOptions>(ai => ai.WithoutLocalModels().WithoutVoiceToText().WithoutWebSearch()
                 .WithDefaultLlm<IGpt56Luna>().WithModelEndpoint(AiProvider.OpenAI, new(UnconfiguredProvider, "v1/")))
             .ConfigureModule<QdrantModule, QdrantModuleOptions>(qdrant => qdrant.Host = false)

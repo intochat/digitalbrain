@@ -6,6 +6,8 @@ namespace IntoChat.Tests.E2E;
 // Product-only shipped content; all lease, model, browser and telemetry support is shared.
 public sealed class IntoChatHostFixture : ReferenceBrainFixture
 {
+    public static readonly string[] ShippedPackages = ["intochat/settings"];
+
     protected override Task<E2EBrain> StartBrainAsync(CancellationToken cancellationToken)
         => IntoChatE2ETest.Create()
             .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, Model.Endpoint))

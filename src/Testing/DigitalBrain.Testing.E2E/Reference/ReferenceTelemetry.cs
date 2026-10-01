@@ -14,6 +14,8 @@ using OpenTelemetry.Trace;
 
 namespace DigitalBrain.Testing.E2E;
 
+// Mirrors the host telemetry policy so platform trace/privacy facts exercise real exports.
+// Keep this test composition independent of Applications; production ServiceDefaults stays there.
 public static class ReferenceTelemetry
 {
     private const string AlivePath = "/alive";

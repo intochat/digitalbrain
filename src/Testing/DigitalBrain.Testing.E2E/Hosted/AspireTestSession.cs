@@ -150,6 +150,23 @@ public sealed class AspireTestSession : IAsyncDisposable
             lifetime.Own("client", new AsyncAction(session.ReleaseClientAsync));
             session.HttpClient = app.CreateHttpClient(hosts[0].Name, SiloHosts.HttpEndpointName);
             lifetime.Own("http", new AsyncAction(() => { session.HttpClient.Dispose(); return ValueTask.CompletedTask; }));
+            if (session.BrowserEndpoint is not null
+                && options.ResourceEnvironment.ContainsKey("DigitalBrain__Testing__ReferenceComposition"))
+            {
+                stage = "reference-browser-bundle";
+                // Sequential suites reuse Flutter's build directory. A cached bundle can answer
+                // health probes while still targeting the previous suite's now-stopped runtime.
+                using var probe = new HttpClient();
+                var runtimeEndpoint = session.HttpClient.BaseAddress!.GetLeftPart(UriPartial.Authority);
+                while (true)
+                {
+                    using var response = await probe.GetAsync(new Uri(session.BrowserEndpoint, "/main.dart.js"), ct).ConfigureAwait(false);
+                    if (response.IsSuccessStatusCode
+                        && (await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false)).Contains(runtimeEndpoint, StringComparison.Ordinal))
+                    { break; }
+                    await Task.Delay(TimeSpan.FromSeconds(1), ct).ConfigureAwait(false);
+                }
+            }
             return session;
         }
         catch (Exception error)

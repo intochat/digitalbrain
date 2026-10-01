@@ -7,6 +7,7 @@
   <Folder Name="/Modules/DigitalBrain/Assistant/">
     <Project Path="src/Modules/DigitalBrain/Assistant/DigitalBrain.Modules.Assistant.Contracts/DigitalBrain.Modules.Assistant.Contracts.csproj" />
     <Project Path="src/Modules/DigitalBrain/Assistant/DigitalBrain.Modules.Assistant/DigitalBrain.Modules.Assistant.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Assistant/DigitalBrain.Modules.Assistant.Tests.E2E/DigitalBrain.Modules.Assistant.Tests.E2E.csproj" />
     <Project Path="src/Modules/DigitalBrain/Assistant/DigitalBrain.Modules.Assistant.Tests.Unit/DigitalBrain.Modules.Assistant.Tests.Unit.csproj" />
   </Folder>
   <Folder Name="/IntoChat/">
@@ -104,11 +105,13 @@
     <Project Path="src/Modules/Salesforce/DigitalBrain.Modules.Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
   </Folder>
   <Folder Name="/Modules/Files/">
+    <Project Path="src/Modules/Files/DigitalBrain.Modules.Files.Tests.E2E/DigitalBrain.Modules.Files.Tests.E2E.csproj" />
     <Project Path="src/Modules/Files/DigitalBrain.Modules.Files.Tests.Unit/DigitalBrain.Modules.Files.Tests.Unit.csproj" />
     <Project Path="src/Modules/Files/DigitalBrain.Modules.Files.Contracts/DigitalBrain.Modules.Files.Contracts.csproj" />
     <Project Path="src/Modules/Files/DigitalBrain.Modules.Files/DigitalBrain.Modules.Files.csproj" />
   </Folder>
   <Folder Name="/Modules/DigitalBrain/Identity/">
+    <Project Path="src/Modules/DigitalBrain/Identity/DigitalBrain.Modules.Identity.Tests.E2E/DigitalBrain.Modules.Identity.Tests.E2E.csproj" />
     <Project Path="src/Modules/DigitalBrain/Identity/DigitalBrain.Modules.Identity.Tests.Unit/DigitalBrain.Modules.Identity.Tests.Unit.csproj" />
     <Project Path="src/Modules/DigitalBrain/Identity/DigitalBrain.Modules.Identity.Contracts/DigitalBrain.Modules.Identity.Contracts.csproj" />
     <Project Path="src/Modules/DigitalBrain/Identity/DigitalBrain.Modules.Identity/DigitalBrain.Modules.Identity.csproj" />
@@ -120,6 +123,7 @@
     <Project Path="src/Modules/Postgres/DigitalBrain.Modules.Postgres.Tests.Unit/DigitalBrain.Modules.Postgres.Tests.Unit.csproj" />
   </Folder>
   <Folder Name="/Modules/Supabase/">
+    <Project Path="src/Modules/Supabase/DigitalBrain.Modules.Supabase.Tests.E2E/DigitalBrain.Modules.Supabase.Tests.E2E.csproj" />
     <Project Path="src/Modules/Supabase/DigitalBrain.Modules.Supabase.Tests.Unit/DigitalBrain.Modules.Supabase.Tests.Unit.csproj" />
     <Project Path="src/Modules/Supabase/DigitalBrain.Modules.Supabase.Aspire.Hosting/DigitalBrain.Modules.Supabase.Aspire.Hosting.csproj" />
     <Project Path="src/Modules/Supabase/DigitalBrain.Modules.Supabase.Contracts/DigitalBrain.Modules.Supabase.Contracts.csproj" />
