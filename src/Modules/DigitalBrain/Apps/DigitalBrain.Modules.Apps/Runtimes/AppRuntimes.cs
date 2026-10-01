@@ -21,9 +21,11 @@ public sealed class GroupChatRuntime(IGrainFactory grains) : IAppRuntime
         Include every named prompt file. Declare a "{Name}Model" setting for each participant,
         default IGpt56Luna for the first and IGemma4 for others; "MaxRounds" defaults to "3".
         In each round everyone speaks once in order. From round 2, all replies starting with AGREE end discussion.
-        """ + $"\nFor discussion assertions use IGroupChat at {ChatKey("{scope}/app", Guid.Empty).Replace(Guid.Empty.ToString("N"), "{invocationId:N}", StringComparison.Ordinal)} and Read() for turns, rounds and agreement.";
+        """ + $"\nFor discussion assertions use IGroupChat at {ChatKey("{scope}/app", "{invocationId:N}")} and Read() for turns, rounds and agreement.";
 
-    public static string ChatKey(string appKey, Guid invocationId) => $"{appKey}/chat/{invocationId:N}";
+    public static string ChatKey(string appKey, Guid invocationId) => ChatKey(appKey, invocationId.ToString("N"));
+
+    private static string ChatKey(string appKey, string invocationId) => $"{appKey}/chat/{invocationId}";
 
     public async Task<string> Answer(AppRuntimeRequest request, CancellationToken cancellationToken)
     {
@@ -62,4 +64,3 @@ public sealed class PromptRuntime(IGrainFactory grains) : IAppRuntime
         return answer.Length > 0 ? answer : throw new InvalidOperationException("The model returned an empty answer.");
     }
 }
-

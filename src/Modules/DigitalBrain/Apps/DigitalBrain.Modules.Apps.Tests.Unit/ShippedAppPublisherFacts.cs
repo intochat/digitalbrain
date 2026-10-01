@@ -19,7 +19,7 @@ public sealed class ShippedAppPublisherFacts
         await using var brain = await UnitTest.Create().WithModule<AppsModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<ITestScriptRunner>(runner)).StartAsync(ct);
         var sources = new IShippedAppSource[] { new Source("first"), new Source("second"), new Source("red") };
-        var service = new MarketplaceService(brain.SiloServices.GetRequiredService<IDigitalBrain>(), new Sandbox());
+        var service = new MarketplaceService(brain.SiloServices.GetRequiredService<IDigitalBrain>(), new AppAuthoringPolicy([], new Sandbox()));
         async Task Ship(string selection)
         {
             using var publisher = new ShippedAppPublisher(brain.SiloServices.GetRequiredService<IDigitalBrain>(), service,

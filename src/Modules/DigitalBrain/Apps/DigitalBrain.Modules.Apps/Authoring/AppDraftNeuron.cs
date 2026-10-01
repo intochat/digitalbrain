@@ -17,6 +17,7 @@ internal sealed class AppDraftNeuron(
     IConfiguration configuration,
     ILogger<AppDraftNeuron> logger,
     IEnumerable<IAppRuntime> runtimes,
+    AppAuthoringPolicy policy,
     IScriptSandbox? csharp = null)
     : Neuron<AppDraftState>(store), IAppDraft
 {
@@ -28,12 +29,10 @@ internal sealed class AppDraftNeuron(
 
     private string DraftId => this.GetPrimaryKeyString();
     private string Owner => DraftId.Split('/')[0];
-    private string AuthorModel => configuration["IntoChat:Apps:AuthorModel"] ?? nameof(IGpt56Luna);
-    private string BuilderModel => configuration["IntoChat:Apps:BuilderModel"] ?? nameof(IGpt56Luna);
+    private string AuthorModel => configuration["DigitalBrain:Apps:AuthorModel"] ?? nameof(IGpt56Luna);
+    private string BuilderModel => configuration["DigitalBrain:Apps:BuilderModel"] ?? nameof(IGpt56Luna);
     // A csharp app is only offered where this host may run it.
-    private string[] Runtimes => csharp?.CanRun == true
-        ? [PackageManifest.CSharpRuntime, .. runtimes.Select(runtime => runtime.Name).Distinct(StringComparer.Ordinal)]
-        : [.. runtimes.Select(runtime => runtime.Name).Distinct(StringComparer.Ordinal)];
+    private string[] Runtimes => policy.AvailableRuntimes;
     private string RuntimeDescriptions => string.Join("\n\n", runtimes.Select(runtime => runtime.AuthoringDescription)
         .Concat(csharp?.CanRun == true ? [csharp.AuthoringDescription] : []));
 
@@ -66,7 +65,8 @@ internal sealed class AppDraftNeuron(
         RequireSpec();
         // Verification runs tests.cs as a sandbox script whatever the app's own runtime is, so a
         // sandbox-less host refuses here instead of burning build attempts that can only fail.
-        if (csharp?.CanRun != true || !Runtimes.Contains(Snapshot.Runtime)) { throw new InvalidOperationException(MarketplaceService.SandboxMissing); }
+        policy.RequireSandbox();
+        policy.RequireRuntime(Snapshot.Runtime);
         await Persist(Snapshot with { Status = AppDraftStatus.Building, Attempts = [], Error = "" });
         var package = GrainFactory.GetGrain<IPackage>(PackageId.Create(Owner, Snapshot.Name).ToString());
         var failures = "";
@@ -214,7 +214,7 @@ internal sealed class AppDraftNeuron(
         }
 
         static T Require<T>(T? service) where T : class
-            => service ?? throw new InvalidOperationException(MarketplaceService.SandboxMissing);
+            => service ?? throw new InvalidOperationException(AppAuthoringPolicy.SandboxMissing);
     }
 
     private static string Failures(AppTestRun run)
@@ -256,5 +256,3 @@ internal sealed class AppDraftNeuron(
     private sealed record BuiltApp(IReadOnlyList<BuiltSetting>? Settings, IReadOnlyDictionary<string, string>? Files, string? Source);
     private sealed record BuiltSetting(string Name, string? Description, string? Default);
 }
-
-

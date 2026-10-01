@@ -234,8 +234,8 @@ public sealed class AppDraftFacts
             if (runtime is not null) { silo.Services.AddSingleton(runtime); }
             silo.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["IntoChat:Apps:AuthorModel"] = IScriptedLLM.ModelPrefix + "author",
-                ["IntoChat:Apps:BuilderModel"] = IScriptedLLM.ModelPrefix + "builder",
+                ["DigitalBrain:Apps:AuthorModel"] = IScriptedLLM.ModelPrefix + "author",
+                ["DigitalBrain:Apps:BuilderModel"] = IScriptedLLM.ModelPrefix + "builder",
             }).Build());
             silo.Services.AddSingleton<DigitalBrain.Apps.ITestScriptRunner>(_ => runner ?? new ScriptedTestRunner());
             silo.Services.AddSingleton<IScriptSandbox>(new DraftSandbox(canRun));
@@ -249,7 +249,3 @@ public sealed class AppDraftFacts
             => Task.FromResult(new ScriptContractCatalog([], [], ""));
         public ScriptCompilationCheck Check(IReadOnlyDictionary<string, string> files) => new(true, []);
     }}
-
-
-
-

@@ -14,6 +14,7 @@ public sealed class AppsModule : IModule
         silo.Services.TryAddSingleton(TimeProvider.System);
         silo.Services.TryAddSingleton<ITestScriptRunner, CSharpFileTestRunner>();
         silo.Services.TryAddSingleton<MarketplaceService>();
+        silo.Services.TryAddSingleton<AppAuthoringPolicy>();
         silo.Services.AddAppRuntime<GroupChatRuntime>();
         silo.Services.AddAppRuntime<PromptRuntime>();
     }

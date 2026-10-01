@@ -39,8 +39,8 @@ behaviors/*.cs   the implementation: one script per concern (plus legacy single 
 ```
 
 - **Spec is the program.** The Author agent turns a request into `app.spec.md`; the Builder agent
-  compiles it into `tests.cs` and behaviors (`AppDraft` in IntoChat.Marketplace, prompts in
-  `Marketplace/AgentPrompts.cs`). The LLM is a compiler, never a runtime interpreter: no model sits in the
+  compiles it into `tests.cs` and behaviors (`AppDraft` in DigitalBrain.Apps, prompts in
+  `Apps/Authoring/AgentPrompts.cs`). The LLM is a compiler, never a runtime interpreter: no model sits in the
   publish gate or the signal path. There is no step vocabulary or sentence grammar — **the type
   system is the grammar**: a scenario is expressible exactly when its test compiles against the
   installed contracts (`ScriptContracts` exposes the composed modules' contracts assemblies).

@@ -3,7 +3,7 @@ using DigitalBrain.Apps;
 
 namespace DigitalBrain.Apps;
 
-// The apps IntoChat ships live as folders under src/Applications/IntoChat/Apps and are embedded here.
+// App folders are embedded by the host under its configured resource prefix.
 // app.json is the manifest, app.cs the script of a csharp app, every other file travels with the package.
 
 
@@ -53,4 +53,3 @@ public sealed class EmbeddedShippedAppSource(System.Reflection.Assembly assembly
     private sealed record OperationJson(string Name, string Description);
     private sealed record SettingJson(string Name, string Description, string Default);
 }
-

@@ -6,22 +6,22 @@ public sealed class CSharpScriptSandbox(CSharpToolService tools) : IScriptSandbo
 {
     public bool CanRun => tools.CanRun;
     public string AuthoringDescription => """
-- "csharp": one C# file-based app per concern under "files" as "behaviors/<name>.cs" (a single
-          behavior is fine). Each behavior answers invocations or reacts to signals through the brain
-          client. The invocation-answering shape (change only the Answer function, keep the #:project line):
-            #:project /brain/src/Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps.Contracts/DigitalBrain.Modules.Apps.Contracts.csproj
-            using DigitalBrain.Apps;
-            using DigitalBrain.Apps.Signals;
+        - "csharp": one C# file-based app per concern under "files" as "behaviors/<name>.cs" (a single
+                  behavior is fine). Each behavior answers invocations or reacts to signals through the brain
+                  client. The invocation-answering shape (change only the Answer function, keep the #:project line):
+                    #:project /brain/src/Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps.Contracts/DigitalBrain.Modules.Apps.Contracts.csproj
+                    using DigitalBrain.Apps;
+                    using DigitalBrain.Apps.Signals;
 
-            await using var brain = await DigitalBrainClient.ConnectAsync(args);
-            var app = brain.Get<IApp>(brain.Setting("App")!);
-            await using var invocations = await brain.SubscribeAsync<AppInvoked>(app, brain.Stopping);
-            foreach (var missed in await app.Pending()) { await app.Respond(Answer(missed.Id, missed.Input)); }
-            await foreach (var invoked in invocations.ReadAllAsync(brain.Stopping)) { await app.Respond(Answer(invoked.InvocationId, invoked.Input)); }
+                    await using var brain = await DigitalBrainClient.ConnectAsync(args);
+                    var app = brain.Get<IApp>(brain.Setting("App")!);
+                    await using var invocations = await brain.SubscribeAsync<AppInvoked>(app, brain.Stopping);
+                    foreach (var missed in await app.Pending()) { await app.Respond(Answer(missed.Id, missed.Input)); }
+                    await foreach (var invoked in invocations.ReadAllAsync(brain.Stopping)) { await app.Respond(Answer(invoked.InvocationId, invoked.Input)); }
 
-            static AppResponse Answer(Guid invocationId, string input) => new(invocationId, /* the answer */ input, null);
-          Settings are read with brain.Setting("Name").
-""";
+                    static AppResponse Answer(Guid invocationId, string input) => new(invocationId, /* the answer */ input, null);
+                  Settings are read with brain.Setting("Name").
+        """;
 
 
     public async Task<ScriptContractCatalog> ReadContracts(IReadOnlyList<string> modules, CancellationToken cancellationToken)
@@ -39,4 +39,3 @@ public sealed class CSharpScriptSandbox(CSharpToolService tools) : IScriptSandbo
         return new(result.Success, [.. result.Errors.Select(error => new ScriptCompilationDiagnostic(error.File, error.Id, error.Line, error.Message))]);
     }
 }
-

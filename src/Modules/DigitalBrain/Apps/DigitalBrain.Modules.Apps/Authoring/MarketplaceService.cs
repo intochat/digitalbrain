@@ -4,16 +4,15 @@ using DigitalBrain.Contracts;
 
 namespace DigitalBrain.Apps;
 
-internal sealed class MarketplaceService(IDigitalBrain brain, IScriptSandbox? csharp = null)
+internal sealed class MarketplaceService(IDigitalBrain brain, AppAuthoringPolicy policy)
 {
-    public const string SandboxMissing = "This host has no C# sandbox, and verifying an app runs its tests as one. Compose CSharpModule where the brain can run scripts.";
 
     // Verifying any revision runs its tests.cs in the sandbox, so it is allowed exactly when running scripts is.
     public async Task RequireRunnable(PackageRevisionRef revision)
     {
         var content = (await brain.Get<IPackage>(revision.Package.ToString()).ReadRevision(revision.Revision)).Content;
         var runsScripts = content.Manifest.RuntimeName == PackageManifest.CSharpRuntime || content.File(PackageContent.TestsPath) is not null;
-        if (runsScripts && csharp?.CanRun != true) { throw new InvalidOperationException(SandboxMissing); }
+        if (runsScripts) { policy.RequireSandbox(); }
     }
 
     public async Task<AppSpecView> Spec(PackageId id, string? revisionId)
@@ -43,5 +42,3 @@ internal sealed class MarketplaceService(IDigitalBrain brain, IScriptSandbox? cs
         return new(id, snapshot.Head ?? throw new KeyNotFoundException($"{id} has no revisions yet."));
     }
 }
-
-
