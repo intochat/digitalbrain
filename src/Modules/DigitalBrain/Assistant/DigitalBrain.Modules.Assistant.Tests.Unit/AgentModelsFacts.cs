@@ -2,7 +2,6 @@ using DigitalBrain.Assistant;
 using System.Text.Json;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -12,34 +11,34 @@ namespace DigitalBrain.Modules.Assistant.Tests.Unit;
 public sealed class AgentModelsFacts
 {
     [Fact]
-    public void CompletedTurnReplaysWithoutTheRemovedProviderOrProfile()
+    public async Task CompletedTurnReplaysWithoutTheRemovedProviderOrProfile()
     {
-        using var services = Services(_ => { });
+        await using var brain = await StartAsync(_ => { });
         var completed = new AgentConversationTurn("run", "hello", "persisted answer", []);
         var snapshot = new AgentConversationState(2, null, [completed]);
         var input = new AssistantRun("thread", "run", "hello", "owner", "profile:removed");
 
-        var prepared = AssistantTurnExecution.PrepareTurn(snapshot, input, Catalog(services));
+        var prepared = AssistantTurnExecution.PrepareTurn(snapshot, input, Catalog(brain.SiloServices));
 
         Assert.Equal(completed, prepared.Replay);
         Assert.Null(prepared.Model);
-        Assert.Throws<ArgumentException>(() => AssistantTurnExecution.PrepareTurn(snapshot, input with { RunId = "fresh" }, Catalog(services)));
+        Assert.Throws<ArgumentException>(() => AssistantTurnExecution.PrepareTurn(snapshot, input with { RunId = "fresh" }, Catalog(brain.SiloServices)));
         Assert.Throws<InvalidOperationException>(() => AssistantTurnExecution.PrepareTurn(snapshot,
-            input with { Message = "different message" }, Catalog(services)));
+            input with { Message = "different message" }, Catalog(brain.SiloServices)));
         Assert.Null(snapshot.ActiveRunId);
         Assert.Single(snapshot.Turns);
     }
 
     [Fact]
-    public void CatalogContainsOnlyConfiguredToolModelsAndNeverSecretsOrEndpoints()
+    public async Task CatalogContainsOnlyConfiguredToolModelsAndNeverSecretsOrEndpoints()
     {
-        using var services = Services(options =>
+        await using var brain = await StartAsync(options =>
         {
             options.ModelProfiles["work"] = new() { Provider = "OpenAI", Model = "private-chat", Capabilities = LlmCapabilities.Tools };
             options.ModelProfiles["no-tools"] = new() { Provider = "OpenAI", Model = "text-only" };
             options.ModelProfiles["unconfigured"] = new() { Provider = "Google", Model = "remote-chat", Capabilities = LlmCapabilities.Tools };
-        }, new FixedAiCredentials().Ready("openai", "secret-api-key", "https://private.example/v1"));
-        var catalog = Catalog(services);
+        }, "secret-api-key", "https://private.example/v1");
+        var catalog = Catalog(brain.SiloServices);
         var result = catalog.Read();
         Assert.True(result.Automatic.Available);
         Assert.Contains(result.Models, model => model.Id == "profile:work");
@@ -54,25 +53,23 @@ public sealed class AgentModelsFacts
     }
 
     [Fact]
-    public void UnconfiguredDeploymentHasUnavailableAutomaticAndNoChoices()
+    public async Task UnconfiguredDeploymentHasUnavailableAutomaticAndNoChoices()
     {
-        using var services = Services(_ => { });
-        var catalog = Catalog(services);
+        await using var brain = await StartAsync(_ => { });
+        var catalog = Catalog(brain.SiloServices);
         Assert.False(catalog.Read().Automatic.Available);
         Assert.Empty(catalog.Read().Models);
         Assert.Throws<ArgumentException>(() => catalog.Select(null));
     }
 
     [Fact]
-    public void SelectionUsesCatalogIdsAndPreservesAutomaticServerOverride()
+    public async Task SelectionUsesCatalogIdsAndPreservesAutomaticServerOverride()
     {
-        using var services = Services(options =>
+        await using var brain = await StartAsync(options =>
         {
             options.ModelProfiles["work"] = new() { Provider = "OpenAI", Model = "private-chat", Capabilities = LlmCapabilities.Tools };
-        }, new FixedAiCredentials().Ready("openai", "configured"));
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        { ["IntoChat:Assistant:Model"] = "IGpt56Luna" }).Build();
-        var catalog = Catalog(services, configuration);
+        }, "configured", model: "IGpt56Luna");
+        var catalog = Catalog(brain.SiloServices);
         Assert.Equal(new AgentModelSelection(Model: "IGpt56Luna"), catalog.Select(null));
         Assert.Equal(new AgentModelSelection(Profile: "work"), catalog.Select("profile:work"));
         Assert.Equal(new AgentModelSelection(Model: "IGpt56Sol"), catalog.Select("preset:IGpt56Sol"));
@@ -81,11 +78,11 @@ public sealed class AgentModelsFacts
     }
 
     [Fact]
-    public void SelectingAnUnavailableModelExplainsWhatIsMissing()
+    public async Task SelectingAnUnavailableModelExplainsWhatIsMissing()
     {
-        using var services = Services(_ => { }, new FixedAiCredentials().Ready("openai", "configured"));
+        await using var brain = await StartAsync(_ => { }, "configured");
 
-        var unavailable = Assert.Throws<ProviderUnavailableException>(() => Catalog(services).Select("preset:IGemini31Pro"));
+        var unavailable = Assert.Throws<ProviderUnavailableException>(() => Catalog(brain.SiloServices).Select("preset:IGemini31Pro"));
 
         Assert.Equal("google", unavailable.Integration);
         Assert.Equal("Unconfigured", unavailable.Status);
@@ -110,17 +107,27 @@ public sealed class AgentModelsFacts
     }
 
     [Fact]
-    public void AutomaticWithoutServerOverrideKeepsAiDefault()
+    public async Task AutomaticWithoutServerOverrideKeepsAiDefault()
     {
-        using var services = Services(_ => { }, new FixedAiCredentials().Ready("openai", "configured"));
-        Assert.Null(Catalog(services).Select(null));
+        await using var brain = await StartAsync(_ => { }, "configured");
+        Assert.Null(Catalog(brain.SiloServices).Select(null));
     }
 
-    private static ServiceProvider Services(Action<AIOptions> configure, FixedAiCredentials? credentials = null) => new ServiceCollection()
-        .Configure(configure).AddSingleton<IAiCredentials>(credentials ?? new FixedAiCredentials())
-        .AddSingleton<ModelProfiles>().BuildServiceProvider();
+    private static Task<UnitBrain> StartAsync(Action<AIOptions> configure, string? apiKey = null, string? endpoint = null, string? model = null)
+        => UnitTest.Create().WithModule<AIModule>().WithModule<AssistantModule>()
+            .WithExecution(new TestExecutionOptions
+            {
+                PrivateConfiguration = apiKey is null ? new Dictionary<string, string?>() : new Dictionary<string, string?>
+                {
+                    ["Assistant:Model"] = model,
+                    ["DigitalBrain:Integrations:openai:ApiKey"] = apiKey,
+                    ["DigitalBrain:Integrations:openai:Endpoint"] = endpoint ?? "https://api.openai.com/v1",
+                },
+            })
+            .ConfigureSilo(silo => silo.Services.Configure(configure))
+            .StartAsync(TestContext.Current.CancellationToken);
 
-    private static AgentModelCatalog Catalog(ServiceProvider services, IConfiguration? configuration = null) => new(
+    private static AgentModelCatalog Catalog(IServiceProvider services) => new(
         services.GetRequiredService<ModelProfiles>(), services.GetRequiredService<IOptionsMonitor<AIOptions>>(),
-        configuration ?? new ConfigurationBuilder().Build());
+        services.GetRequiredService<IOptions<AssistantOptions>>());
 }

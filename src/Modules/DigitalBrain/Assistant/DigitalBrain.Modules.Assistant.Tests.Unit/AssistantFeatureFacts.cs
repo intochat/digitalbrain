@@ -17,12 +17,14 @@ public sealed class AssistantFeatureFacts
     public async Task TheAssistantFeatureIsGreen()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create()
+        await using var brain = await UnitTest.Create().WithExecution(new TestExecutionOptions
+        {
+            PrivateConfiguration = new Dictionary<string, string?> { ["DigitalBrain:Integrations:openai:ApiKey"] = "test-no-network" },
+        })
             .WithModule<AssistantModule>().RequireModules([typeof(DigitalBrain.Apps.AppsModule), typeof(DigitalBrain.AI.AIModule), typeof(DigitalBrain.Compute.ComputeModule), typeof(DigitalBrain.Flutter.FlutterModule)])
             .WithModule<SpecsModule>()
             .WithModule<SupabaseModule>()
             .ConfigureSilo(silo => silo.Services
-                .AddSingleton<IAiCredentials>(new FixedAiCredentials().Ready("openai", "fixture"))
                 .AddSingleton<StepLibrary, AssistantSteps>()
                 .Configure<AIOptions>(options => { options.Default.Provider = "OpenAI"; options.Default.Model = "fixture"; options.Default.Capabilities = LlmCapabilities.Tools; })
                 .AddSingleton<InjectedModelTurnRunner>()

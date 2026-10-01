@@ -19,13 +19,15 @@ namespace DigitalBrain.Modules.Assistant.Tests.Unit;
 
 public sealed class AssistantStreamFacts
 {
-    private static async Task<UnitBrain> StartBrain(CancellationToken ct) => await UnitTest.Create().WithModule<AssistantModule>()
+    private static async Task<UnitBrain> StartBrain(CancellationToken ct) => await UnitTest.Create().WithExecution(new TestExecutionOptions
+        {
+            PrivateConfiguration = new Dictionary<string, string?> { ["DigitalBrain:Integrations:openai:ApiKey"] = "test-no-network" },
+        }).WithModule<AssistantModule>()
         .RequireModules([typeof(DigitalBrain.Apps.AppsModule), typeof(DigitalBrain.AI.AIModule), typeof(DigitalBrain.Compute.ComputeModule), typeof(DigitalBrain.Flutter.FlutterModule)])
         .ConfigureSilo(silo =>
         {
             silo.Services.AddSingleton<StreamScenarioRunner>();
             silo.Services.AddSingleton<IAgentTurnRunner>(services => services.GetRequiredService<StreamScenarioRunner>());
-            silo.Services.AddSingleton<IAiCredentials>(new FixedAiCredentials().Ready("openai", "test-no-network"));
             silo.Services.Configure<AIOptions>(options =>
             {
                 options.Default.Provider = "OpenAI";

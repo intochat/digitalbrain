@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -60,7 +61,7 @@ internal sealed partial class AssistantNeuron(
             .SelectMany(factory => factory.Create(() => throw new InvalidOperationException("No tool call is active.")))
             .Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
         var authoringTools = registered.Where(AgentToolPolicy.IsCSharpTool).ToArray();
-        var definition = Snapshot.Definition ?? AssistantDefinition.For(authoringTools, appTools, message);
+        var definition = Snapshot.Definition ?? AssistantDefinition.For(authoringTools, appTools, message, services.GetRequiredService<IOptions<AssistantOptions>>().Value);
         if (Snapshot.Definition is null)
         {
             var native = services.GetService<NativeTools>();

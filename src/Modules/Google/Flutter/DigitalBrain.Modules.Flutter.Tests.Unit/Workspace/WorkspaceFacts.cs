@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Surface;
 using DigitalBrain.Flutter.Workspace;
@@ -8,6 +9,17 @@ namespace DigitalBrain.Modules.Flutter.Tests.Unit.Workspace;
 
 public sealed class WorkspaceFacts
 {
+    [Fact]
+    public async Task TheHostCanNameTheFirstRunAssistant()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<FlutterModule>()
+            .ConfigureSilo(silo => silo.Services.Configure<FlutterModuleOptions>(options => options.AssistantTitle = "Example assistant"))
+            .StartAsync(ct);
+        var firstRun = (await brain.Get<IWorkspace>("owner/a").Read()).FirstRun;
+        Assert.Equal("Example assistant", Assert.IsType<FirstRunState>(firstRun).AssistantTitle);
+    }
+
     [Fact]
     public async Task WindowReferenceIsOneTypedNeuronReference()
     {
@@ -34,6 +46,7 @@ public sealed class WorkspaceFacts
         var fresh = await workspace.Read();
         var firstRun = Assert.IsType<FirstRunState>(fresh.FirstRun);
         Assert.Equal(WorkspaceStarterCatalog.AssistantId, firstRun.AssistantId);
+        Assert.Equal("Assistant", firstRun.AssistantTitle);
         Assert.Contains(firstRun.Prompts, prompt => prompt.Source == "assistant");
         Assert.DoesNotContain(firstRun.Prompts, prompt => prompt.Source == "salesforce");
 

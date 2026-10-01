@@ -6,7 +6,6 @@ using DigitalBrain.AI.Agents;
 using DigitalBrain.AI.Metering;
 using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
-using Microsoft.Extensions.Configuration;
 using Xunit;
 
 namespace DigitalBrain.Modules.Assistant.Tests.Unit;
@@ -18,8 +17,7 @@ public sealed class AgentTurnFacts
     {
         var runner = new RecordingRunner();
         var selected = new AgentModelSelection(Profile: "work");
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        { ["IntoChat:Assistant:Model"] = "IGpt56Luna" }).Build();
+        var configuration = new AssistantOptions { Model = "IGpt56Luna" };
 
         await AssistantTurnExecution.RunModel("scope", "run", "hello", AssistantDefinition.Product, EmptyState, "reply",
             configuration, runner, _ => Task.CompletedTask,
@@ -39,7 +37,7 @@ public sealed class AgentTurnFacts
         var results = new List<string>();
 
         await AssistantTurnExecution.RunModel("scope", "run", "hello", definition, state, "run-reply",
-            new ConfigurationBuilder().Build(), runner, _ => Task.CompletedTask, text, results, new IntentActivity(), TestContext.Current.CancellationToken);
+            new AssistantOptions(), runner, _ => Task.CompletedTask, text, results, new IntentActivity(), TestContext.Current.CancellationToken);
 
         Assert.NotNull(runner.Request);
         Assert.Equal(definition.Instructions, runner.Request!.Instructions);
@@ -56,7 +54,7 @@ public sealed class AgentTurnFacts
         var results = new List<string>();
 
         var queryError = await AssistantTurnExecution.RunModel("scope", "run", "how many?", AssistantDefinition.Product,
-            EmptyState, "run-reply", new ConfigurationBuilder().Build(), runner, _ => Task.CompletedTask, new StringBuilder(), results, new IntentActivity(), TestContext.Current.CancellationToken);
+            EmptyState, "run-reply", new AssistantOptions(), runner, _ => Task.CompletedTask, new StringBuilder(), results, new IntentActivity(), TestContext.Current.CancellationToken);
 
         Assert.Null(queryError);
         Assert.Empty(results);
@@ -70,7 +68,7 @@ public sealed class AgentTurnFacts
         var results = new List<string>();
 
         var queryError = await AssistantTurnExecution.RunModel("scope", "run", "read it", AssistantDefinition.Product,
-            EmptyState, "run-reply", new ConfigurationBuilder().Build(), runner, _ => Task.CompletedTask, new StringBuilder(), results, new IntentActivity(), TestContext.Current.CancellationToken);
+            EmptyState, "run-reply", new AssistantOptions(), runner, _ => Task.CompletedTask, new StringBuilder(), results, new IntentActivity(), TestContext.Current.CancellationToken);
 
         Assert.Equal("No readable Public columns were requested.", queryError);
     }
@@ -81,7 +79,7 @@ public sealed class AgentTurnFacts
         var results = new List<string>();
         var runner = new ToolEventRunner(new AgentTurnEvent.ToolCompleted("open", "show_postgres_query_table", """{"windowId":"pg-table","source":"postgres"}"""));
         var error = await AssistantTurnExecution.RunModel("scope", "run", "show postgres", AssistantDefinition.Product,
-            EmptyState, "reply", new ConfigurationBuilder().Build(), runner, _ => Task.CompletedTask,
+            EmptyState, "reply", new AssistantOptions(), runner, _ => Task.CompletedTask,
             new StringBuilder(), results, new IntentActivity(), TestContext.Current.CancellationToken);
         Assert.Null(error);
         Assert.Equal("pg-table", Assert.Single(results));
@@ -93,7 +91,7 @@ public sealed class AgentTurnFacts
             new AgentTurnEvent.ToolCompleted("open", "show_postgres_query_table", """{"isError":true,"message":"Query refused"}"""),
             new AgentTurnEvent.ToolCompleted("schema", "postgres_schema", """{"database":"research","tables":[]}"""));
         var error = await AssistantTurnExecution.RunModel("scope", "run", "show postgres", AssistantDefinition.Product,
-            EmptyState, "reply", new ConfigurationBuilder().Build(), runner, _ => Task.CompletedTask,
+            EmptyState, "reply", new AssistantOptions(), runner, _ => Task.CompletedTask,
             new StringBuilder(), [], new IntentActivity(), TestContext.Current.CancellationToken);
         Assert.Equal("Query refused", error);
     }

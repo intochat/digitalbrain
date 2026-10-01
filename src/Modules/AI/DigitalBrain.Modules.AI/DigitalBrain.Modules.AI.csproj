@@ -39,6 +39,5 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Modules.AI.Tests.Unit" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Assistant.Tests.Unit" />
   </ItemGroup>
 </Project>

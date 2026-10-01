@@ -21,7 +21,7 @@ public sealed record StarterPrompt(
 public static class WorkspaceStarterCatalog
 {
     public const string AssistantId = "intocaht";
-    public const string AssistantTitle = "IntoChat";
+    public const string AssistantTitle = "Assistant";
 
     private static readonly StarterPrompt Assistant = new(
         "assistant",
