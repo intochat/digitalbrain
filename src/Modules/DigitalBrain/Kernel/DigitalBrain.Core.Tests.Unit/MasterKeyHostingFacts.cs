@@ -5,7 +5,7 @@ using DigitalBrain.Contracts;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace IntoChat.Tests.Unit;
+namespace DigitalBrain.Core.Tests.Unit;
 
 public sealed class MasterKeyHostingFacts
 {

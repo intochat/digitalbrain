@@ -4,7 +4,7 @@ using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
 using Xunit;
 
-namespace IntoChat.Tests.Unit;
+namespace DigitalBrain.Modules.Assistant.Tests.Unit;
 
 public sealed class ComputeUsageFacts
 {
@@ -50,3 +50,4 @@ public sealed class ComputeUsageFacts
         Assert.NotEqual(ComputeUsageEndpoints.IntentId("scope", "thread", "run"), ComputeUsageEndpoints.IntentId("other", "thread", "run"));
     }
 }
+

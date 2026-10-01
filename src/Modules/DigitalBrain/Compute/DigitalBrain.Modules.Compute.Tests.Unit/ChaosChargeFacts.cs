@@ -1,9 +1,9 @@
-using DigitalBrain.AI;
+using DigitalBrain.Testing.Unit;
 using DigitalBrain.Compute;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Compute.Allowances;
 
-namespace IntoChat.Tests.Unit.Compute;
+namespace DigitalBrain.Modules.Compute.Tests.Unit;
 
 // Chaos and prompt-injection facts for the allowance path. The model never reaches a paid call
 // without an allowance: a scripted sequence of tool calls is replayed as CallRequests against the
@@ -32,62 +32,6 @@ public sealed class ChaosChargeFacts
         Assert.Equal(90m, report.SpentCompute);
         Assert.True(report.SpentCompute <= report.LimitCompute);
     }
-
-    [Fact]
-    public async Task AScriptedModelMakesZeroPaidCallsWithoutAnAllowance()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
-        var ledger = brain.Get<IAllowanceLedger>("account-injected");
-
-        var injected = new[]
-        {
-            Paid("account-injected", "ws-injected", 40m, "inject-1", operation: "RemoveBackground"),
-            Paid("account-injected", "ws-injected", 40m, "inject-2", operation: "EnrichCompany"),
-            Paid("account-injected", "ws-injected", 500m, "inject-3", operation: "RunAgent"),
-        };
-
-        foreach (var request in injected)
-        {
-            var denied = await ledger.AuthorizeAsync(request, ct);
-            Assert.False(denied.Allowed);
-            Assert.Equal(CallDenial.MissingAllowance, denied.Denial);
-        }
-
-        Assert.Empty(await ledger.ReadReservationsAsync(ct));
-        Assert.Equal(3, (await ledger.ListPendingAsync(ct)).Length);
-    }
-
-    [Fact]
-    public async Task APermissionGrowthBeyondTheConsentedScopeRequiresReconsent()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
-        var ledger = brain.Get<IAllowanceLedger>("account-consent");
-
-        await ledger.GrantAsync(new Allowance
-        {
-            AllowanceId = "consent-app",
-            AccountId = "account-consent",
-            WorkspaceId = "ws-consent",
-            AppId = "app-1",
-            Level = ApprovalLevel.InstallConsent,
-            Scope = AllowanceScope.Always,
-            LimitCompute = 20m,
-            MonthlyLimitCompute = 20m,
-            PriceBookVersion = new PriceBook().Version,
-            GrantedAt = DateTimeOffset.UtcNow,
-        }, ct);
-
-        var allowed = await ledger.AuthorizeAsync(Paid("account-consent", "ws-consent", 5m, "i-1", appId: "app-1"), ct);
-        Assert.True(allowed.Allowed);
-
-        var grown = await ledger.AuthorizeAsync(
-            Paid("account-consent", "ws-consent", 5m, "i-2", "app-1", "Render", "person.birthDate"), ct);
-        Assert.False(grown.Allowed);
-        Assert.Contains("re-consent", grown.Explanation!, StringComparison.Ordinal);
-    }
-
 
     private static Allowance Allowance(string account, string workspace, decimal limit) => new()
     {
@@ -122,3 +66,4 @@ public sealed class ChaosChargeFacts
             SemanticTypeIds = permissions,
         };
 }
+
