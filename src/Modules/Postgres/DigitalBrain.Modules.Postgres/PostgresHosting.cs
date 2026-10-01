@@ -40,6 +40,10 @@ public static class PostgresHosting
         services.TryAddSingleton<IPostgresSourceRegistry, PostgresSourceRegistry>();
         services.AddSingleton<ICapacityConfiguredSource>(provider =>
             new PostgresConfiguredSource(active: provider.GetRequiredService<IConfiguration>()[PostgresCapacityKind.AdminConnectionKey] is null));
+        services.AddSingleton<ICapacityProvisioner>(provider =>
+            provider.GetRequiredService<IConfiguration>()[PostgresCapacityKind.AdminConnectionKey] is { } admin
+                ? new DockerPostgresProvisioner(admin)
+                : new InactivePostgresProvisioner());
         services.TryAddSingleton<IPostgresProvider, PostgresProvider>();
         services.TryAddSingleton<IPostgresTableProvider, PostgresTableProvider>();
         services.AddLiveTables();

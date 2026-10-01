@@ -32,6 +32,33 @@ public sealed class PostgresCapacityFacts
     }
 
     [Fact]
+    public void DatabaseNamesAreStableHashedAndDistinctPerBrain()
+    {
+        var one = DockerPostgresProvisioner.DatabaseName("brain-1");
+        var two = DockerPostgresProvisioner.DatabaseName("brain-2");
+        Assert.Equal(one, DockerPostgresProvisioner.DatabaseName("brain-1"));
+        Assert.NotEqual(one, two);
+        Assert.Matches("^brain_[0-9a-f]{16}$", one);
+    }
+
+    [Fact]
+    public async Task AnAdminConnectionActivatesTheProvisionerAndDeactivatesThePlatformSource()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<PostgresModule>()
+            .ConfigureSilo(silo =>
+            {
+                silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=sample;Username=reader";
+                silo.Configuration["DigitalBrain:Capacity:Postgres:AdminConnection"] = "Host=localhost;Database=postgres;Username=admin;Password=admin";
+                silo.Services.AddSingleton<ICapacityProvisioner>(new DockerPostgresProvisioner(
+                    "Host=localhost;Database=postgres;Username=admin;Password=admin", (_, _, _) => Task.CompletedTask));
+            }).StartAsync(ct);
+        var capacity = brain.SiloServices.GetRequiredService<ICapacity>();
+        var resolved = await capacity.Resolve("postgres", new("brain-1", "app-1"), ct);
+        Assert.Equal("db:" + DockerPostgresProvisioner.DatabaseName("brain-1"), resolved.Origin);
+    }
+
+    [Fact]
     public void TheRegistryAnswersThePlatformSourceForANullOrLegacyOrigin()
     {
         Assert.Equal(PostgresCapacityKind.PlatformOrigin, PostgresCapacityKind.OriginOrPlatform(null));

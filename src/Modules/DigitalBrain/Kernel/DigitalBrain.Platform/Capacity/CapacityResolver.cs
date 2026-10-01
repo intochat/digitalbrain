@@ -11,7 +11,8 @@ internal sealed class CapacityResolver(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(kind);
         ArgumentNullException.ThrowIfNull(scope);
-        if (sources.FirstOrDefault(source => source.Kind == kind) is { } configured)
+        // Last registration wins, matching DI override convention (a test fake replaces the module's).
+        if (sources.LastOrDefault(source => source.Kind == kind) is { } configured)
         { return new(kind, configured.Origin); }
         return await Provision(kind, scope, ct);
     }
@@ -20,7 +21,7 @@ internal sealed class CapacityResolver(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(kind);
         ArgumentNullException.ThrowIfNull(scope);
-        if (provisioners.FirstOrDefault(provisioner => provisioner.Kind == kind) is { } provisioner)
+        if (provisioners.LastOrDefault(provisioner => provisioner.Kind == kind) is { } provisioner)
         { return new(kind, await provisioner.Ensure(scope, ct)); }
         throw new CapacityUnavailableException();
     }
