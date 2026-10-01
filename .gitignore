@@ -46,3 +46,6 @@ src/Applications/IntoChat/IntoChat/applications/
 .file-compiler-tests/
 .script-graph-tests/
 .graph-failure-tests/
+# Local Aspire state created by E2E hosts.
+**/Tests/E2E/.aspire/
+**/*.Tests.E2E/.aspire/

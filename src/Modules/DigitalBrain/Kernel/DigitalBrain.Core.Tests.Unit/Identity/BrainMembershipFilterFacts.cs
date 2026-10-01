@@ -8,7 +8,7 @@ namespace DigitalBrain.Core.Tests.Unit.Identity;
 
 // A caller that claims a workspace it is not a member of is denied by the single call filter.
 // This exercises the same pipeline the neurons run, with the grant stage in place.
-public sealed class CrossWorkspaceFacts
+public sealed class BrainMembershipFilterFacts
 {
     [Fact]
     public async Task ACallerCannotActInsideAWorkspaceItIsNotAMemberOf()

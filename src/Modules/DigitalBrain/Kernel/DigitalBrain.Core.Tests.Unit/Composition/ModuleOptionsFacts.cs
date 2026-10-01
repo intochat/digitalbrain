@@ -111,6 +111,26 @@ public sealed class ModuleOptionsFacts
         }
     }
 
+    private sealed class IgnoredOptions : IModuleOptions
+    {
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string Endpoint { get; set; } = "";
+        public void Validate() { }
+    }
+
+    private sealed class IgnoredModule : IModule<IgnoredOptions>
+    {
+        public void Configure(ISiloBuilder silo) { }
+    }
+
+    [Fact]
+    public void WritableOptionsCannotDisappearWhenCompositionCrossesTheHostBoundary()
+    {
+        var refusal = Assert.Throws<ArgumentException>(() =>
+            ModuleOptionsSerialization.Compile<IgnoredModule, IgnoredOptions>(new() { Endpoint = "https://example.org" }));
+        Assert.Contains("IgnoredOptions.Endpoint", refusal.Message);
+    }
+
     [Theory]
     [InlineData("DigitalBrain:Modules:0:Options")]
     [InlineData("DigitalBrain:Modules:Options")]

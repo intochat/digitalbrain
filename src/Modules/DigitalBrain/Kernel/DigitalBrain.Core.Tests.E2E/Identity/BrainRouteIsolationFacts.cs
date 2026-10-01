@@ -8,7 +8,7 @@ using DigitalBrain.Identity;
 
 namespace DigitalBrain.Core.Tests.E2E.Identity;
 
-public sealed class CrossWorkspaceFacts(ReferenceBrainFixture host)
+public sealed class BrainRouteIsolationFacts(ReferenceBrainFixture host)
 {
 
     [Fact(Timeout = 180_000)]
