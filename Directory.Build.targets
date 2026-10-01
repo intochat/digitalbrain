@@ -17,6 +17,8 @@
   <Import Project="$(MSBuildThisFileDirectory)src/Testing/DigitalBrain.Testing.E2E/Build/DigitalBrain.Testing.E2E.targets"
           Condition="$(MSBuildProjectName.EndsWith('.Tests.E2E'))" />
 
+  <!-- Pinned to CodeGraph 1.6.0 in Directory.Build.props until the Windows fix ships:
+       https://github.com/colbymchenry/codegraph/issues/2094 -->
   <Target Name="RefreshCodeGraph"
           BeforeTargets="BeforeBuild"
           Inputs="@(Compile);$(MSBuildProjectFullPath)"
