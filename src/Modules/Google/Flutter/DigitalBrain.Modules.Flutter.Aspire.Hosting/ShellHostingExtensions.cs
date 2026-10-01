@@ -61,14 +61,12 @@ public static class ShellHostingExtensions
     private sealed class ShellHostingState(DigitalBrainBuilder brain) : DigitalBrainModuleProjection
     {
         private IResourceBuilder<ExecutableResource>? _flutterHost;
-        private IResourceBuilder<ContainerResource>? _shellContainer;
-        private string? _servedConfigPath;
         private FlutterHostKind _flutterKind;
         private bool _uiBaseBound;
 
         internal void EnsureFlutterHost(FlutterHostKind kind, FlutterHostOptions options)
         {
-            if (_flutterHost is not null || _shellContainer is not null)
+            if (_flutterHost is not null)
             {
                 throw new InvalidOperationException(
                     $"Flutter host is already configured on brain '{brain.Name}'. " +
@@ -85,6 +83,7 @@ public static class ShellHostingExtensions
                     "Pass FlutterHostOptions.WorkingDirectory or place src/Modules/Google/Flutter/app/core in the repo.");
             }
 
+            var launch = FlutterHostLaunch.Resolve(kind, packageRoot, options, appHost.Configuration);
             var resourceName = string.IsNullOrWhiteSpace(options.ResourceName)
                 ? ShellNames.DefaultFlutterResourceName
                 : options.ResourceName;
@@ -94,17 +93,6 @@ public static class ShellHostingExtensions
             var chat = string.IsNullOrWhiteSpace(options.ChatName)
                 ? ShellNames.DefaultChatName
                 : options.ChatName;
-            _flutterKind = kind;
-            _pendingShell = shell;
-            _pendingChat = chat;
-
-            if (kind == FlutterHostKind.Web && options.WebContainer)
-            {
-                EnsureShellContainer(appHost, packageRoot, resourceName);
-                return;
-            }
-
-            var launch = FlutterHostLaunch.Resolve(kind, packageRoot, options, appHost.Configuration);
 
             var host = appHost
                 .AddExecutable(resourceName, launch.Command, launch.WorkingDirectory, launch.Args)
@@ -154,43 +142,9 @@ public static class ShellHostingExtensions
             }
 
             _flutterHost = host;
-        }
-
-        // Compile once per source change, serve per session: the image bakes the release
-        // bundle (docker layer cache is the staleness logic), and the kernel URL arrives at
-        // serve time through the config.json this AppHost writes before the container starts.
-        private void EnsureShellContainer(
-            IDistributedApplicationBuilder appHost,
-            string packageRoot,
-            string resourceName)
-        {
-            var shellDirectory = FlutterHostLaunch.ResolveWebPackageDirectory(packageRoot)
-                ?? throw new InvalidOperationException(
-                    $"Containerized web shell needs lib/main.dart and a 'web/' folder under " +
-                    $"'{packageRoot}' or its 'shell' sibling.");
-            var dockerfile = Path.Combine(shellDirectory, "Dockerfile");
-            if (!File.Exists(dockerfile))
-            {
-                throw new InvalidOperationException(
-                    $"Containerized web shell needs a Dockerfile at '{dockerfile}'.");
-            }
-
-            // The pub workspace root: the shell's core and ui siblings belong to the build context.
-            var workspaceRoot = Path.GetFullPath(Path.Combine(shellDirectory, ".."));
-
-            // The bind-mount source must exist when docker creates the container; the real
-            // content lands in Apply right before start, once the kernel endpoint is allocated.
-            _servedConfigPath = Path.Combine(
-                Directory.CreateTempSubdirectory("digitalbrain-shell-").FullName, "config.json");
-            File.WriteAllText(_servedConfigPath, "{}");
-
-            _shellContainer = appHost
-                .AddDockerfile(resourceName, workspaceRoot, Path.GetRelativePath(workspaceRoot, dockerfile))
-                .WithHttpEndpoint(targetPort: 80, name: ShellNames.HttpEndpointName)
-                .WithHttpHealthCheck("/")
-                .WithBindMount(_servedConfigPath, ShellServedConfig.ContainerPath, isReadOnly: true)
-                .WithParentRelationship(brain.Resource)
-                .AsBrainBrowser(path: "/?semantics=true", readySelector: "flt-semantics");
+            _flutterKind = kind;
+            _pendingShell = shell;
+            _pendingChat = chat;
         }
 
         private static void ArmHotReload(IResourceBuilder<ExecutableResource> host, string workingDirectory)
@@ -265,30 +219,7 @@ public static class ShellHostingExtensions
         {
             ArgumentNullException.ThrowIfNull(builder);
 
-            if (_uiBaseBound)
-            {
-                return;
-            }
-
-            if (_shellContainer is not null)
-            {
-                var kernelEndpoint = builder.GetEndpoint(ShellNames.HttpEndpointName);
-                var configPath = _servedConfigPath!;
-                var shellName = _pendingShell;
-                var chatName = _pendingChat;
-                _shellContainer
-                    .WithAnnotation(new WaitAnnotation(builder.Resource, WaitType.WaitUntilHealthy, exitCode: 0))
-                    // Endpoints are allocated before any resource starts, so the kernel URL is real here.
-                    .OnBeforeResourceStarted((_, _, ct) => File.WriteAllTextAsync(
-                        configPath, ShellServedConfig.Payload(kernelEndpoint.Url, shellName, chatName), ct));
-                builder.WithEnvironment(
-                    EnvironmentKeys.For("DigitalBrain:Cors", "AllowedOrigin"),
-                    _shellContainer.GetEndpoint(ShellNames.HttpEndpointName));
-                _uiBaseBound = true;
-                return;
-            }
-
-            if (_flutterHost is null)
+            if (_flutterHost is null || _uiBaseBound)
             {
                 return;
             }

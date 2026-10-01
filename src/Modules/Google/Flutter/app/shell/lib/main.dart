@@ -25,10 +25,6 @@ Future<void> main() async {
     _semantics = SemanticsBinding.instance.ensureSemantics();
   }
 
-  // A containerized bundle learns the kernel URL from same-origin config.json;
-  // bundles with baked defines skip the fetch inside loadServedConfig.
-  await DigitalBrainHostEnv.loadServedConfig();
-
   final chat = DigitalBrainHostEnv.resolveChat();
   // Capture the deep link before the authentication gate builds its Navigator.
   final initialLocation = Uri.parse(
