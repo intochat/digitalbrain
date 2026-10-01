@@ -5,9 +5,9 @@ using DigitalBrain.Supabase.Tables;
 using Microsoft.Playwright;
 using DigitalBrain.Identity;
 
-namespace IntoChat.Tests.E2E.Workspace;
+namespace DigitalBrain.Modules.Supabase.Tests.E2E;
 
-public sealed class SupabaseTableDisplayFacts(IntoChatHostFixture host) : BrainFact(host)
+public sealed class SupabaseTableDisplayFacts(ReferenceBrainFixture host) : BrainFact(host)
 {
     [Fact(Timeout = 300_000)]
     public async Task DatabaseTableAppearsAndFilterFindsRowsBeyondTheFirstPage()

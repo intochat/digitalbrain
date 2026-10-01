@@ -7,7 +7,7 @@
   <ItemGroup>
     <PackageReference Include="Azure.Storage.Blobs" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.Files.Tests.Unit" />
-    <InternalsVisibleTo Include="IntoChat.Tests.E2E" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Files.Tests.E2E" />
     <ProjectReference Include="../DigitalBrain.Modules.Files.Contracts/DigitalBrain.Modules.Files.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/Identity/DigitalBrain.Modules.Identity/DigitalBrain.Modules.Identity.csproj" />
     <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />

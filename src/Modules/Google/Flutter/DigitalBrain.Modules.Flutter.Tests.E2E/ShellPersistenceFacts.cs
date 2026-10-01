@@ -5,9 +5,9 @@ using Microsoft.Playwright;
 using Aspire.Hosting.ApplicationModel;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace IntoChat.Tests.E2E.Workspace;
+namespace DigitalBrain.Modules.Flutter.Tests.E2E;
 
-public sealed class ShellPersistenceFacts(IntoChatHostFixture host) : BrainFact(host)
+public sealed class ShellPersistenceFacts(ReferenceBrainFixture host) : BrainFact(host)
 {
     [Fact(Timeout = 300_000)]
     public async Task FreshBrowserRestoresWorkspaceWithoutDeviceStorage()

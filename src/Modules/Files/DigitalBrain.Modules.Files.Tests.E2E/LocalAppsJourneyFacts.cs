@@ -5,9 +5,9 @@ using DigitalBrain.Flutter;
 using DigitalBrain.Testing.E2E.Workspace;
 using Microsoft.Playwright;
 
-namespace IntoChat.Tests.E2E.LocalApps;
+namespace DigitalBrain.Modules.Files.Tests.E2E;
 
-public sealed class LocalAppsJourneyFacts(IntoChatHostFixture host) : BrainFact(host)
+public sealed class LocalAppsJourneyFacts(ReferenceBrainFixture host) : BrainFact(host)
 {
     [Fact(Timeout = 300_000)]
     public async Task DownloadsImageCanBeDrawnCroppedAndSavedWithoutChangingOriginal()
@@ -35,7 +35,7 @@ public sealed class LocalAppsJourneyFacts(IntoChatHostFixture host) : BrainFact(
             var brain = Brain;
             var page = await OpenPageAsync(ct);
             page.SetDefaultTimeout(15000);
-            Microsoft.Playwright.IRequest? saveRequest = null;
+            global::Microsoft.Playwright.IRequest? saveRequest = null;
             page.Request += (_, request) => { if (request.Method == "POST" && request.Url.Contains("/save/", StringComparison.Ordinal)) { saveRequest = request; } };
             await page.SetViewportSizeAsync(1600, 1000);
             var workspaceId = await WorkspaceBrowser.CreateProjectAsync(page, "Local images");
