@@ -28,6 +28,7 @@
   </Folder>
   <Folder Name="/Modules/DigitalBrain/">
     <Project Path="src/Modules/DigitalBrain/Mcp/DigitalBrain.Mcp.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Mcp.Tests.Unit/DigitalBrain.Mcp.Tests.Unit.csproj" />
   </Folder>
   <Folder Name="/Modules/DigitalBrain/Kernel/">
     <Project Path="src/Modules/DigitalBrain/Kernel/DigitalBrain.Core.Tests.Unit/DigitalBrain.Core.Tests.Unit.csproj" />
