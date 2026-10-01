@@ -10,6 +10,9 @@ using IntoChat.Marketplace;
 using IntoChat.ServiceDefaults;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using DigitalBrain.Identity;
+using Azure.Storage.Blobs;
+using DigitalBrain.Platform.Secrets;
+using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,9 +32,17 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Events.OnRedirectToLogin = context => { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; };
         options.Events.OnRedirectToAccessDenied = context => { context.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; };
     });
-builder.AddDurableProtection();
+builder.Services.AddSingleton<IKeyWrapper, MasterKeyWrapper>();
+builder.Services.AddDataProtection()
+    .SetApplicationName("IntoChat.v1")
+    .PersistKeysToAzureBlobStorage(services => services
+        .GetRequiredKeyedService<BlobServiceClient>(DigitalBrainNames.GrainState)
+        .GetBlobContainerClient("intochat-protection-v1").GetBlobClient("keys.xml"));
 
 var app = builder.Build();
+_ = app.Services.GetRequiredService<IKeyWrapper>();
+await app.Services.GetRequiredKeyedService<BlobServiceClient>(DigitalBrainNames.GrainState)
+    .GetBlobContainerClient("intochat-protection-v1").CreateIfNotExistsAsync(cancellationToken: app.Lifetime.ApplicationStopping);
 
 app.UseKernelCors();
 app.UseModuleHttpSurfaces();

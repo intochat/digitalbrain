@@ -36,6 +36,9 @@ using DigitalBrain.Time;
 using DigitalBrain.Files;
 
 var builder = DistributedApplication.CreateBuilder(args);
+var masterKey = builder.ExecutionContext.IsRunMode
+    ? builder.AddParameter("digitalbrain-master-key", new Aspire.Hosting.ApplicationModel.GenerateParameterDefault { MinLength = 32 }, secret: true, persist: true)
+    : builder.AddParameter("digitalbrain-master-key", secret: true);
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serviceId: "intochat")
     .WithModule<AIModule, AIOptions>(ai =>
     {
@@ -75,6 +78,7 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serv
     .WithModule<CSharpModule>();
 
 var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.IntoChat)
+    .WithEnvironment("DigitalBrain__MasterKey", masterKey)
     .WithReference(digitalBrain)
     .WithHttpEndpoint(
         port: ProductSurfaceResources.UiHttpPort,
