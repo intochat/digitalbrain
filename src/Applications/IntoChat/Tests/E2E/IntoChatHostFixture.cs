@@ -30,7 +30,7 @@ public sealed class IntoChatHostFixture : SharedBrainFixture, IAsyncLifetime
     {
         _collector = TestTelemetryCollector.Start();
         _model = await ScriptedModelServer.StartAsync(cancellationToken);
-        var brain = await IntoChatE2ETest.Create()
+        return await IntoChatE2ETest.Create()
             .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, _model.Endpoint))
             .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp())
             .WithBrowser(new() { PrimarySession = false })
@@ -44,23 +44,8 @@ public sealed class IntoChatHostFixture : SharedBrainFixture, IAsyncLifetime
                 ["DigitalBrain__Apps__ShipOnStartup"] = "settings",
             })
             .StartAsync(cancellationToken);
-        try
-        {
-            // Shipping is serial in the publisher; waiting here keeps the sandbox quiet while
-            // facts run and lets any fact use a shipped app without its own wait. The first
-            // package pays the sandbox's cold start and in-sandbox restore, which on a CI runner
-            // takes far longer than the per-fact default.
-            using var shipping = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            shipping.CancelAfter(TimeSpan.FromMinutes(25));
-            foreach (var package in ShippedPackages)
-            { await IntoChatE2ETest.WaitUntilShippedAsync(brain, package, shipping.Token, TimeSpan.FromMinutes(25)); }
-        }
-        catch
-        {
-            await brain.DisposeAsync();
-            throw;
-        }
-        return brain;
+        // Shipping (settings only) verifies through real sandbox scripts and continues in the
+        // background while facts run; the one fact that installs the package waits for it.
     }
 
     protected override async ValueTask OnDisposedAsync()
