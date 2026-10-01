@@ -1,6 +1,6 @@
 # IntoChat test cleanup and Marketplace extraction
 
-Status: proposed for review. The attached user request is the authoritative scope.
+Status: approved by the user on 2026-10-01. The attached user request is the authoritative scope.
 
 ## Goal and constraints
 
