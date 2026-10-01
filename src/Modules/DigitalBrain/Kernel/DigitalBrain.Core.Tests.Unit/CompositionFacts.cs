@@ -109,6 +109,14 @@ public sealed class CompositionFacts
     }
 
     [Fact]
+    public void OverridesCanOmitAnAuthoringModuleWithoutChangingExecutionModules()
+    {
+        var application = new BrainCompositionBuilder().WithModule<ExampleModule, ExampleOptions>().WithModule<OtherModule>();
+        var token = new CompositionOverrides().WithoutModule<OtherModule>().Serialize();
+        Assert.Equal(typeof(ExampleModule), Assert.Single(application.ApplyOverrides(token).Build().Modules).ModuleType);
+    }
+
+    [Fact]
     public void OverridesForUndeclaredModulesAndUnknownTokensFail()
     {
         var token = new CompositionOverrides().ConfigureModule<ExampleModule, ExampleOptions>(_ => { }).Serialize();

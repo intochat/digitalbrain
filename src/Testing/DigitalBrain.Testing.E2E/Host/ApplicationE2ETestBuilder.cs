@@ -9,6 +9,13 @@ public sealed class E2ETestBuilder<TAppHost> where TAppHost : class
     private BrowserOptions _browser = new() { Headless = true };
     private bool _started;
 
+    public E2ETestBuilder<TAppHost> WithoutModule<TModule>() where TModule : class, IModule, new()
+    {
+        EnsureMutable();
+        _overrides.WithoutModule<TModule>();
+        return this;
+    }
+
     public E2ETestBuilder<TAppHost> ConfigureModule<TModule, TOptions>(Action<TOptions> configureOptions)
         where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
     {

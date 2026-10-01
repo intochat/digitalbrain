@@ -120,7 +120,7 @@ public sealed class CanarySecretFacts(IntoChatHostFixture host)
     }
 
     [Fact(Timeout = 300_000)]
-    public async Task CSharpConsoleIsGatedByServerDeveloperMode()
+    public async Task CSharpConsoleIsAvailableOnlyWhenTheHostComposesAuthoring()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var on = await host.LeaseAsync(ct);
@@ -128,16 +128,16 @@ public sealed class CanarySecretFacts(IntoChatHostFixture host)
         var capabilities = await on.HttpClient.GetFromJsonAsync<JsonElement>("/session/capabilities", ct);
         Assert.True(capabilities.GetProperty("developerMode").GetBoolean());
 
+        using var available = await on.HttpClient.GetAsync($"/brains/{Owner}/csharp/", ct);
+        Assert.Equal(System.Net.HttpStatusCode.OK, available.StatusCode);
+
         await using var off = await IntoChatE2ETest.Create()
-            .WithResourceEnvironment(new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["DigitalBrain__DeveloperMode"] = "false",
-            })
+            .WithoutModule<DigitalBrain.Microsoft.CSharp.CSharpAuthoringModule>()
             .StartAsync(ct);
 
         var gated = await off.HttpClient.GetFromJsonAsync<JsonElement>("/session/capabilities", ct);
         Assert.False(gated.GetProperty("developerMode").GetBoolean());
-        using var files = await off.HttpClient.GetAsync($"/brains/{Owner}/csharp/", ct);
+        using var files = await off.HttpClient.GetAsync($"/brains/{Owner}/csharp/?developerMode=true", ct);
         Assert.Equal(System.Net.HttpStatusCode.NotFound, files.StatusCode);
     }
 

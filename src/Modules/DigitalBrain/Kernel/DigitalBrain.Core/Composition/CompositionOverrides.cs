@@ -4,6 +4,7 @@ public sealed class CompositionOverrides
 {
     private readonly Dictionary<Type, List<Delegate>> _optionEdits = [];
     private readonly HashSet<Type> _localServiceModules = [];
+    private readonly HashSet<Type> _omittedModules = [];
     private string? _serialized;
 
     public CompositionOverrides ConfigureModule<TModule, TOptions>(Action<TOptions> configureOptions)
@@ -27,13 +28,21 @@ public sealed class CompositionOverrides
         return this;
     }
 
+    public CompositionOverrides WithoutModule<TModule>() where TModule : class, IModule, new()
+    {
+        EnsureMutable();
+        _omittedModules.Add(typeof(TModule));
+        return this;
+    }
+
     public string Serialize()
     {
         if (_serialized is not null) { return _serialized; }
         if (_localServiceModules.Count > 0)
         { throw new NotSupportedException("Local service substitutions cannot cross process boundaries. Use a hosted provider or endpoint fixture."); }
         return _serialized = CompositionOverrideTransport.Publish(
-            [.. _optionEdits.Select(pair => new CompositionOverrideTransport.ModuleEdit(pair.Key, pair.Value))]);
+            [.. _optionEdits.Keys.Concat(_omittedModules).Distinct().Select(type =>
+                new CompositionOverrideTransport.ModuleEdit(type, _optionEdits.GetValueOrDefault(type) ?? [], _omittedModules.Contains(type)))]);
     }
 
     private void EnsureMutable()

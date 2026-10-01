@@ -75,7 +75,8 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serv
     .WithModule<RoslynModule>()
     .WithModule<DotNetModule>()
     .WithModule<CodingModule>()
-    .WithModule<CSharpModule>();
+    .WithModule<CSharpModule>()
+    .WithModule<CSharpAuthoringModule>();
 
 var storage = builder.CreateResourceBuilder(builder.Resources.OfType<AzureStorageResource>()
     .Single(resource => resource.Name == DigitalBrainNames.Storage));

@@ -67,12 +67,12 @@ internal sealed class AssistantSteps : StepLibrary
             Assistant(context).Configure(new AgentDefinition { DisplayName = "Custom assistant", Instructions = args.Text(0) }));
         Step("the assistant turn uses instructions {string}", "The application preserves its configured agent.", async (context, args) =>
         {
-            if ((await Assistant(context).DefineTurn(false, null)).Instructions != args.Text(0))
+            if ((await Assistant(context).DefineTurn(null)).Instructions != args.Text(0))
             { throw new StepFailedException("The application lost its agent configuration."); }
         });
         Step("the assistant includes the summary {string} in its turn instructions", "The neuron composes retained context.", async (context, args) =>
         {
-            var definition = await Assistant(context).DefineTurn(false, args.Text(0));
+            var definition = await Assistant(context).DefineTurn(args.Text(0));
             if (!definition.Instructions.Contains("Earlier conversation summary: " + args.Text(0), StringComparison.Ordinal))
             { throw new StepFailedException("The retained context is missing."); }
         });

@@ -23,5 +23,7 @@ public sealed class AssistantModule : IModule
         AssistantEndpoints.Map(endpoints);
         AgentEndpoints.Map(endpoints);
         PackageEndpoints.Map(endpoints);
+        if (endpoints.ServiceProvider.GetServices<IAgentToolFactory>().Any(factory => factory is DigitalBrain.Microsoft.CSharp.CSharpAgentTools))
+        { PackageEndpoints.MapAuthoring(endpoints); }
     }
 }

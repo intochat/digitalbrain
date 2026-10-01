@@ -3,7 +3,6 @@ using DigitalBrain.AI.Agents;
 using DigitalBrain.Aspire;
 using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Sdk;
 using IntoChat;
 using IntoChat.Marketplace;
@@ -40,9 +39,8 @@ app.UseModuleHttpSurfaces();
 app.UseAuthentication();
 app.UseAccountSession();
 app.MapDefaultEndpoints();
-// Developer mode is a server setting, so a client cannot grant itself the C# console.
-app.MapGet("/session/capabilities", static (IConfiguration configuration) =>
-    Results.Ok(new { developerMode = DeveloperMode.IsEnabled(configuration) }));
+app.MapGet("/session/capabilities", static (IEnumerable<IAgentToolFactory> factories) =>
+    Results.Ok(new { developerMode = factories.Any(factory => factory is DigitalBrain.Microsoft.CSharp.CSharpAgentTools) }));
 app.MapDigitalBrainModules();
 app.MapMarketplace();
 

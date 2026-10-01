@@ -1,4 +1,3 @@
-using DigitalBrain.Core.Enforcement;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using System.Text;
@@ -27,7 +26,7 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
         services.GetRequiredService<IOptionsMonitor<AIOptions>>(), Configuration);
 
     public async IAsyncEnumerable<string> Run(string workspace, AssistantRun input,
-        Func<bool, string?, Task<AgentDefinition>> define, [EnumeratorCancellation] CancellationToken ct)
+        Func<string?, Task<AgentDefinition>> define, [EnumeratorCancellation] CancellationToken ct)
     {
         if (!ValidId(input.ThreadId) || !ValidId(input.RunId) || string.IsNullOrWhiteSpace(input.Owner)
             || string.IsNullOrWhiteSpace(input.Message) || input.Message.Length > 32000)
@@ -60,7 +59,7 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
         && !value.Any(character => char.IsControl(character) || character is '/' or '\\');
 
     private async Task Execute(string workspace, AssistantRun input, IAgent agent, AgentConversationState snapshot,
-        PreparedTurn prepared, Func<bool, string?, Task<AgentDefinition>> define, Func<object, Task> Emit, CancellationToken ct)
+        PreparedTurn prepared, Func<string?, Task<AgentDefinition>> define, Func<object, Task> Emit, CancellationToken ct)
     {
         var configuration = Configuration;
         var runner = services.GetRequiredService<IAgentTurnRunner>();
@@ -103,22 +102,12 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
                 }
                 else
                 {
-                    var developerMode = DeveloperMode.IsEnabled(configuration);
-                    var fallback = AgentToolPolicy.UnsupportedCSharpAuthoring(developerMode, userText);
-                    if (fallback is not null)
-                    {
-                        await Emit(new { type = "TEXT_MESSAGE_CONTENT", messageId, delta = fallback });
-                        await agent.CompleteConversation(new(input.RunId, userText, fallback, []), ct);
-                    }
-                    else
-                    {
-                        var text = new StringBuilder();
-                        var results = new List<string>();
-                        var definition = await define(developerMode, state.Summary);
-                        var queryError = await RunModel(workspace, usageId, userText, definition, state, messageId, configuration, runner, Emit, text, results, activity, ct, prepared.Model);
-                        if (queryError is not null) { throw new AssistantQueryException(queryError); }
-                        await agent.CompleteConversation(new(input.RunId, userText, text.ToString(), results), ct);
-                    }
+                    var text = new StringBuilder();
+                    var results = new List<string>();
+                    var definition = await define(state.Summary);
+                    var queryError = await RunModel(workspace, usageId, userText, definition, state, messageId, configuration, runner, Emit, text, results, activity, ct, prepared.Model);
+                    if (queryError is not null) { throw new AssistantQueryException(queryError); }
+                    await agent.CompleteConversation(new(input.RunId, userText, text.ToString(), results), ct);
                     ownsRun = false;
                 }
                 await Emit(new { type = "TEXT_MESSAGE_END", messageId });

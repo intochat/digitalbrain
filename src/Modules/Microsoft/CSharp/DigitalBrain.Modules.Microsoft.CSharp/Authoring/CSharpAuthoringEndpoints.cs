@@ -2,8 +2,6 @@ using DigitalBrain.Core.Enforcement;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Microsoft.CSharp;
 
@@ -14,8 +12,6 @@ internal static class CSharpAuthoringEndpoints
         var files = BrainRoutes.Group(endpoints, "/csharp");
         files.AddEndpointFilter(async (context, next) =>
         {
-            var configuration = context.HttpContext.RequestServices.GetRequiredService<IConfiguration>();
-            if (!CSharpAuthoringGate.IsOpen(configuration)) { return Results.NotFound(); }
             try { return await next(context); }
             catch (ArgumentException error) { return Results.Problem(error.Message, statusCode: StatusCodes.Status400BadRequest); }
             catch (UnauthorizedAccessException error) { return Results.Problem(error.Message, statusCode: StatusCodes.Status403Forbidden); }

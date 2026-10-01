@@ -1,18 +1,14 @@
-using DigitalBrain.Core;
-using DigitalBrain.AI.Agents;
 using DigitalBrain.Apps;
 using DigitalBrain.Core.Enforcement;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Assistant;
 
 internal static class PackageEndpoints
 {
-    public static void Map(IEndpointRouteBuilder endpoints)
+    public static void MapAuthoring(IEndpointRouteBuilder endpoints)
     {
         var registry = endpoints.MapGroup("/packages").AddEndpointFilter(PackageRouteGuard.Guard);
         registry.MapGet("", (PackageService service) => service.List());
@@ -34,6 +30,10 @@ internal static class PackageEndpoints
         registry.MapPost("/{owner}/{name}/publish", (string owner, string name, PublishPackageRequest request, PackageService service)
             => service.Publish(PackageId.Create(owner, name), request));
 
+    }
+
+    public static void Map(IEndpointRouteBuilder endpoints)
+    {
         var installed = BrainRoutes.Group(endpoints, "/packages/{owner}/{name}").AddEndpointFilter(PackageRouteGuard.Guard);
         installed.MapGet("", (string owner, string name, PackageService service)
             => service.ReadApp(PackageId.Create(owner, name)));
@@ -58,11 +58,8 @@ internal static class PackageEndpoints
 
 public static class PackageRouteGuard
 {
-    // Packages run code, so they share the C# console's developer-mode gate.
     public static async ValueTask<object?> Guard(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
     {
-        var configuration = context.HttpContext.RequestServices.GetRequiredService<IConfiguration>();
-        if (!DeveloperMode.IsEnabled(configuration)) { return Results.NotFound(); }
         try { return await next(context); }
         catch (ArgumentException error) { return Results.Problem(error.Message, statusCode: StatusCodes.Status400BadRequest); }
         catch (UnauthorizedAccessException error) { return Results.Problem(error.Message, statusCode: StatusCodes.Status403Forbidden); }
