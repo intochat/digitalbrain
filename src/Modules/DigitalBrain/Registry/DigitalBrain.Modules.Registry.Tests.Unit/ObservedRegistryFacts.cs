@@ -26,7 +26,7 @@ public sealed class ObservedRegistryFacts
         Assert.Contains(timer.Signals!, signal => signal.Contains("TimerTick", StringComparison.Ordinal) && signal.Contains("TimerId", StringComparison.Ordinal));
         Assert.Contains(types, type => type.Id == "reminder");
         Assert.DoesNotContain(types, type => type.Id == "test.registry-clock");
-        await Assert.ThrowsAsync<InvalidOperationException>(() => brain.Get<IRegistry>(RegistryModule.Key).Search("schedule a timer", cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Empty(await brain.Get<IRegistry>(RegistryModule.Key).Search("schedule a timer", cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]

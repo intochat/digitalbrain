@@ -1,3 +1,4 @@
+using DigitalBrain.Sdk.Vectors;
 using DigitalBrain.Qdrant;
 using Xunit;
 
