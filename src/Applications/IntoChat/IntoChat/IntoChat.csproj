@@ -7,7 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Client" />
-    <PackageReference Include="Azure.Extensions.AspNetCore.DataProtection.Blobs" />
     <InternalsVisibleTo Include="IntoChat.Tests.E2E" />
     <InternalsVisibleTo Include="IntoChat.Tests.Unit" />
   </ItemGroup>
@@ -17,7 +16,6 @@
     <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/DigitalBrain.Kernel.Aspire/DigitalBrain.Kernel.Aspire.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
-    <ProjectReference Include="../../../Modules/DigitalBrain/Kernel/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
     <ProjectReference Include="../../../Modules/Time/DigitalBrain.Modules.Time/DigitalBrain.Modules.Time.csproj" />
     <ProjectReference Include="../../../Modules/Files/DigitalBrain.Modules.Files/DigitalBrain.Modules.Files.csproj" />
     <ProjectReference Include="../../../Modules/Microsoft/Playwright/DigitalBrain.Modules.Microsoft.Playwright/DigitalBrain.Modules.Microsoft.Playwright.csproj" />

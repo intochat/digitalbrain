@@ -1,4 +1,6 @@
 using DigitalBrain.Core;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -22,6 +24,8 @@ public sealed class AppsModule : IModule
     public void Configure(IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
+        endpoints.MapGet("/session/capabilities", static (IServiceProvider services) =>
+            Results.Ok(new { developerMode = services.GetService<IScriptSandbox>()?.CanRun == true }));
         AppsEndpoints.Map(endpoints);
         MarketplaceEndpoints.MapMarketplace(endpoints);
     }

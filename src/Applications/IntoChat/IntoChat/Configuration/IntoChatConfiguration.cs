@@ -1,18 +1,19 @@
-using DigitalBrain.Identity.Configuration;
-using DigitalBrain.Identity;
-using Microsoft.Extensions.Options;
+using DigitalBrain.Sdk.Identity;
 
 namespace IntoChat;
 
-internal static class IntoChatConfiguration
+public static class IntoChatConfiguration
 {
+    public const string ProtectionContainerName = "intochat-protection-v1";
+
     internal static IServiceCollection AddIntoChatOptions(this IServiceCollection services)
     {
-        services.AddOptions<GraphOptions>().BindConfiguration(GraphOptions.SectionName);
-        services.AddOptions<BasicAuthOptions>().BindConfiguration(BasicAuthOptions.SectionName);
-        services.AddOptions<SessionStreamOptions>().BindConfiguration(SessionStreamOptions.SectionName)
-            .Validate(options => options.PollInterval > TimeSpan.Zero, "Session stream PollInterval must be positive.")
-            .ValidateOnStart();
+        services.Configure<IdentityHostOptions>(options =>
+        {
+            options.CookieName = "intochat.session";
+            options.ProtectionApplicationName = "IntoChat.v1";
+            options.ProtectionContainerName = ProtectionContainerName;
+        });
         return services;
     }
 }

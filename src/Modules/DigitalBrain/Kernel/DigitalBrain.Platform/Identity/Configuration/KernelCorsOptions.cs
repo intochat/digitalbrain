@@ -1,4 +1,4 @@
-namespace IntoChat;
+namespace DigitalBrain.Identity;
 
 public sealed class KernelCorsOptions
 {

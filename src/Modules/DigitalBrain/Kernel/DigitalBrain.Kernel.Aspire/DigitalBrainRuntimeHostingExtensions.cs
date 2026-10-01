@@ -2,6 +2,8 @@ using Azure.Data.Tables;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using DigitalBrain.Platform;
+using DigitalBrain.Identity;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,6 +30,7 @@ public static class DigitalBrainRuntimeHostingExtensions
         builder.AddKeyedAzureTableServiceClient(DigitalBrainNames.Clustering);
         builder.AddKeyedAzureTableServiceClient(DigitalBrainNames.Reminders);
         builder.AddKeyedAzureBlobServiceClient(DigitalBrainNames.GrainState);
+        builder.Services.AddIdentityStorage();
         var modules = LoadModules(builder.Configuration);
         builder.UseOrleans(silo =>
         {
@@ -56,11 +59,12 @@ public static class DigitalBrainRuntimeHostingExtensions
         return builder;
     }
 
-    public static IEndpointRouteBuilder MapDigitalBrainModules(this IEndpointRouteBuilder endpoints)
+    public static WebApplication MapDigitalBrainModules(this WebApplication endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
+        endpoints.UsePlatformHttp();
         endpoints.MapDigitalBrainPlatform();
-        foreach (var module in endpoints.ServiceProvider.GetServices<IModule>())
+        foreach (var module in endpoints.Services.GetServices<IModule>())
         {
             module.Configure(endpoints);
         }

@@ -5,7 +5,6 @@ using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -33,7 +32,7 @@ public static class AccountSession
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        var credential = BasicCredential.FromOptions(ResolveAuthOptions(app));
+        var credential = BasicCredential.FromOptions(app.Services.GetRequiredService<IOptions<BasicAuthOptions>>().Value);
 
         app.Use(async (context, next) =>
         {
@@ -80,21 +79,7 @@ public static class AccountSession
             await next(context).ConfigureAwait(false);
         });
 
-        // Inside the gate, so reaching it at all proves the session is good.
-        app.MapGet(CheckPath, static () => Results.NoContent());
-
         return app;
-    }
-
-    // Small standalone hosts can use the middleware without registering the options; open-generic
-    // IOptions registration alone does not mean auth was configured.
-    private static BasicAuthOptions ResolveAuthOptions(WebApplication app)
-    {
-        var configured = app.Services.GetServices<IConfigureOptions<BasicAuthOptions>>().Any()
-            || app.Services.GetServices<IPostConfigureOptions<BasicAuthOptions>>().Any();
-        return configured
-            ? app.Services.GetRequiredService<IOptions<BasicAuthOptions>>().Value
-            : app.Configuration.GetSection(BasicAuthOptions.SectionName).Get<BasicAuthOptions>() ?? new();
     }
 
     // A cookie session wins; otherwise the configured single-owner Basic credential; otherwise,

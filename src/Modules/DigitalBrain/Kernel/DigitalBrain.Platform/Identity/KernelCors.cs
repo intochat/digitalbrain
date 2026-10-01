@@ -1,7 +1,9 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.Extensions.Options;
 
-namespace IntoChat;
+namespace DigitalBrain.Identity;
 
 // The shell may have a separate web origin. An explicitly configured loopback origin
 // also admits its localhost/127.0.0.1 aliases at the same port for local browser hosting.
@@ -11,13 +13,13 @@ internal static class KernelCors
 
     private const string PolicyName = "shell";
 
-    public static IHostApplicationBuilder AddKernelCors(this IHostApplicationBuilder builder)
+    public static IServiceCollection AddKernelCors(this IServiceCollection services)
     {
-        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(services);
 
-        builder.Services.AddOptions<KernelCorsOptions>().BindConfiguration(KernelCorsOptions.SectionName);
-        builder.Services.AddCors();
-        builder.Services.AddOptions<CorsOptions>().Configure<IOptions<KernelCorsOptions>>((cors, options) =>
+        services.AddOptions<KernelCorsOptions>().BindConfiguration(KernelCorsOptions.SectionName);
+        services.AddCors();
+        services.AddOptions<CorsOptions>().Configure<IOptions<KernelCorsOptions>>((cors, options) =>
         {
             if (ResolveOrigins(options.Value) is { Length: > 0 } origins)
             {
@@ -29,7 +31,7 @@ internal static class KernelCors
             }
         });
 
-        return builder;
+        return services;
     }
 
     public static WebApplication UseKernelCors(this WebApplication app)

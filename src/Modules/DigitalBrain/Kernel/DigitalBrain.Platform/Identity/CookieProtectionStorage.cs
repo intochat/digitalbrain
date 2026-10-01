@@ -1,20 +1,24 @@
 using Azure.Storage.Blobs;
 using DigitalBrain.Contracts;
+using DigitalBrain.Sdk.Identity;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
-namespace IntoChat;
+namespace DigitalBrain.Identity;
 
-public static class CookieProtectionStorage
+internal static class CookieProtectionStorage
 {
-    public const string ContainerName = "intochat-protection-v1";
-
     internal static IServiceCollection AddCookieProtection(this IServiceCollection services)
     {
         services.AddSingleton(provider => provider
             .GetRequiredKeyedService<BlobServiceClient>(DigitalBrainNames.GrainState)
-            .GetBlobContainerClient(ContainerName));
+            .GetBlobContainerClient(provider.GetRequiredService<IOptions<IdentityHostOptions>>().Value.ProtectionContainerName));
         services.AddHostedService<ContainerStartup>();
-        services.AddDataProtection().SetApplicationName("IntoChat.v1")
+        services.AddOptions<DataProtectionOptions>().Configure<IOptions<IdentityHostOptions>>((protection, host) =>
+            protection.ApplicationDiscriminator = host.Value.ProtectionApplicationName);
+        services.AddDataProtection()
             .PersistKeysToAzureBlobStorage(provider => provider.GetRequiredService<BlobContainerClient>().GetBlobClient("keys.xml"));
         return services;
     }
