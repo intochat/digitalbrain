@@ -1,5 +1,3 @@
-# Codex cannot read root `.mcp.json`. Keep this in lockstep with `.mcp.json`.
-
 [mcp_servers.aspire]
 command = "aspire"
 args = ["agent", "mcp"]
