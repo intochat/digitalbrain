@@ -1,16 +1,14 @@
 using DigitalBrain.AI;
 using DigitalBrain.AI.Scripted;
-using DigitalBrain.Microsoft.CSharp;
 using Microsoft.Extensions.Options;
 using DigitalBrain.Apps;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
-using IntoChat.Marketplace;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace IntoChat.Tests.Unit.Marketplace;
+namespace DigitalBrain.Modules.Apps.Tests.Unit;
 
 // The create loop with scripted Author and Builder models: the request becomes a plain-language
 // spec, a failing implementation is sent back with its failing scenarios, and the app is published
@@ -215,19 +213,18 @@ public sealed class AppDraftFacts
                 ["IntoChat:Apps:AuthorModel"] = IScriptedLLM.ModelPrefix + "author",
                 ["IntoChat:Apps:BuilderModel"] = IScriptedLLM.ModelPrefix + "builder",
             }).Build());
-            silo.Services.AddAppRuntime<GroupChatRuntime>();
-            silo.Services.AddAppRuntime<PromptRuntime>();
             silo.Services.AddSingleton<DigitalBrain.Apps.ITestScriptRunner>(_ => runner ?? new ScriptedTestRunner());
-            silo.Services.AddSingleton<CSharpCatalogStore>();
-            if (canRun)
-            {
-                silo.Services.AddSingleton(provider => new CSharpContractDiscovery(provider.GetRequiredService<DigitalBrain.Contracts.IDigitalBrain>(),
-                    new DigitalBrain.Core.ModuleInventory([]), new CSharpDirectives(Options.Create(new CSharpOptions()))));
-                silo.Services.AddSingleton<CSharpScriptCheck>();
-            }
-            silo.Services.AddSingleton<CSharpToolService>();
-            silo.Services.AddSingleton<IScriptSandbox, CSharpScriptSandbox>();
+            silo.Services.AddSingleton<IScriptSandbox>(new DraftSandbox(canRun));
         })
         .StartAsync(ct);
-}
+    private sealed class DraftSandbox(bool canRun) : IScriptSandbox
+    {
+        public bool CanRun => canRun;
+        public Task<ScriptContractCatalog> ReadContracts(IReadOnlyList<string> modules, CancellationToken cancellationToken)
+            => Task.FromResult(new ScriptContractCatalog([], [], ""));
+        public ScriptCompilationCheck Check(IReadOnlyDictionary<string, string> files) => new(true, []);
+    }}
+
+
+
 

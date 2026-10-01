@@ -13,11 +13,15 @@ public sealed class AppsModule : IModule
         ArgumentNullException.ThrowIfNull(silo);
         silo.Services.TryAddSingleton(TimeProvider.System);
         silo.Services.TryAddSingleton<ITestScriptRunner, CSharpFileTestRunner>();
+        silo.Services.TryAddSingleton<MarketplaceService>();
+        silo.Services.AddAppRuntime<GroupChatRuntime>();
+        silo.Services.AddAppRuntime<PromptRuntime>();
     }
 
     public void Configure(IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
         AppsEndpoints.Map(endpoints);
+        MarketplaceEndpoints.MapMarketplace(endpoints);
     }
 }

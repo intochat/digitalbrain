@@ -98,3 +98,5 @@ internal sealed class ShippedAppPublisher(IDigitalBrain brain, MarketplaceServic
         files = new SortedDictionary<string, string>(content.Files?.ToDictionary() ?? [], StringComparer.Ordinal),
     }, CanonicalJson);
 }
+
+

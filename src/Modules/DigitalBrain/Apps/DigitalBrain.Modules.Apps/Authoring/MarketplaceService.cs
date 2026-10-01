@@ -2,7 +2,7 @@ using DigitalBrain.AI.GroupChat;
 using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
 
-namespace IntoChat.Marketplace;
+namespace DigitalBrain.Apps;
 
 internal sealed class MarketplaceService(IDigitalBrain brain, IScriptSandbox? csharp = null)
 {
@@ -43,4 +43,5 @@ internal sealed class MarketplaceService(IDigitalBrain brain, IScriptSandbox? cs
         return new(id, snapshot.Head ?? throw new KeyNotFoundException($"{id} has no revisions yet."));
     }
 }
+
 

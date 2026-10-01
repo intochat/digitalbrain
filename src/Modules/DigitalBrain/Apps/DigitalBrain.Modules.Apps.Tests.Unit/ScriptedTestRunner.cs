@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using DigitalBrain.Apps;
 
-namespace IntoChat.Tests.Unit.Marketplace;
+namespace DigitalBrain.Modules.Apps.Tests.Unit;
 
 // Stands in for the sandbox in draft tests: a tests file whose source contains a scripted marker
 // "runs" instantly with that marker's verdicts.
@@ -35,4 +35,5 @@ internal sealed class ScriptedTestRunner : ITestScriptRunner
         return [.. verdicts];
     }
 }
+
 

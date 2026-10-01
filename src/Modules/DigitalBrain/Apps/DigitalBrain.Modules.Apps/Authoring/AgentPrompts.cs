@@ -1,4 +1,4 @@
-namespace IntoChat.Marketplace;
+namespace DigitalBrain.Apps;
 
 // The Author and Builder system prompts. They live in code, next to the loop that sends them:
 // the tools referenced here are defined in BuilderTools, and a prompt change ships like any
@@ -151,3 +151,4 @@ internal static class AgentPrompts
          "files": {"tests.cs": "...", "prompts/system.md": "..."}, "source": ""}
         """;
 }
+

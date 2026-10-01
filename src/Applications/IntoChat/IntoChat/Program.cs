@@ -16,7 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddIntoChatOptions();
 builder.AddServiceDefaults();
 builder.AddDigitalBrainRuntime();
-builder.AddMarketplace();
+builder.Services.AddHostedService<ShippedAppPublisher>();
 builder.AddKernelCors();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -42,6 +42,7 @@ app.MapDefaultEndpoints();
 app.MapGet("/session/capabilities", static (IServiceProvider services) =>
     Results.Ok(new { developerMode = services.GetService<DigitalBrain.Apps.IScriptSandbox>()?.CanRun == true }));
 app.MapDigitalBrainModules();
-app.MapMarketplace();
+
 
 app.Run();
+

@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.AI;
@@ -7,7 +9,7 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using Orleans.Runtime;
 
-namespace IntoChat.Marketplace;
+namespace DigitalBrain.Apps;
 
 [GrainType("intochat.app-draft")]
 internal sealed class AppDraftNeuron(
@@ -250,3 +252,5 @@ internal sealed class AppDraftNeuron(
     private sealed record BuiltApp(IReadOnlyList<BuiltSetting>? Settings, IReadOnlyDictionary<string, string>? Files, string? Source);
     private sealed record BuiltSetting(string Name, string? Description, string? Default);
 }
+
+

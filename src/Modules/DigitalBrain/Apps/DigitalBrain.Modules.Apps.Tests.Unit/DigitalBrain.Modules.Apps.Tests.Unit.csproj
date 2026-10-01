@@ -2,5 +2,8 @@
   <ItemGroup>
     <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
     <ProjectReference Include="../DigitalBrain.Modules.Apps/DigitalBrain.Modules.Apps.csproj" />
+    <ProjectReference Include="../../../AI/DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj" />
   </ItemGroup>
 </Project>
+
+

@@ -1,22 +1,16 @@
-using DigitalBrain.Assistant;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
 using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core.Enforcement;
 
-namespace IntoChat.Marketplace;
+namespace DigitalBrain.Apps;
 
 internal sealed record DraftRequest(string Text);
 
 internal static class MarketplaceEndpoints
 {
-    public static void AddMarketplace(this IHostApplicationBuilder builder)
-    {
-        builder.Services.AddSingleton<MarketplaceService>();
-        builder.Services.AddAppRuntime<GroupChatRuntime>();
-        builder.Services.AddAppRuntime<PromptRuntime>();
-        builder.Services.AddHostedService<ShippedAppPublisher>();
-    }
-
     public static void MapMarketplace(this IEndpointRouteBuilder routes)
     {
         var packages = routes.MapGroup("/packages").AddEndpointFilter(PackageRouteGuard.Guard);
@@ -47,3 +41,7 @@ internal static class MarketplaceEndpoints
         return brain.Get<IAppDraft>($"{CallerContextStamper.Require().PrincipalId}/drafts/{draftId:N}");
     }
 }
+
+
+
+

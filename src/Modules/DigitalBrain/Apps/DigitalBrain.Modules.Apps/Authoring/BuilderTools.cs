@@ -1,7 +1,7 @@
 using DigitalBrain.AI;
 using DigitalBrain.Registry;
 
-namespace IntoChat.Marketplace;
+namespace DigitalBrain.Apps;
 
 // The Builder's grounding: search the registry for neuron contracts, read a module's contracts in
 // full, and compile-check C# before answering. The registry is the catalog; nothing here reflects.
@@ -51,3 +51,4 @@ internal static class BuilderTools
 
     private static ContractHit Hit(NeuronType type) => new(type.ModuleId, type.Contract, type.Description);
 }
+

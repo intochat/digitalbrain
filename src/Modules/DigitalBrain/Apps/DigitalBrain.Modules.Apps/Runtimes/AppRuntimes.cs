@@ -4,11 +4,11 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.GroupChat;
 using DigitalBrain.Apps;
 
-namespace IntoChat.Marketplace;
+namespace DigitalBrain.Apps;
 
 // A group chat app is IGroupChat configured from groupchat.json, its prompt files and its settings:
 // each participant speaks with the model named by the "{Name}Model" setting.
-internal sealed class GroupChatRuntime(IGrainFactory grains) : IAppRuntime
+public sealed class GroupChatRuntime(IGrainFactory grains) : IAppRuntime
 {
     public const string RuntimeName = "group-chat";
     private const string ConfigFile = "groupchat.json";
@@ -41,7 +41,7 @@ internal sealed class GroupChatRuntime(IGrainFactory grains) : IAppRuntime
 }
 
 // A prompt app answers with one model, the one named by its "Model" setting, and prompts/system.md.
-internal sealed class PromptRuntime(IGrainFactory grains) : IAppRuntime
+public sealed class PromptRuntime(IGrainFactory grains) : IAppRuntime
 {
     private const string SystemPrompt = "prompts/system.md";
 
@@ -54,3 +54,4 @@ internal sealed class PromptRuntime(IGrainFactory grains) : IAppRuntime
         return answer.Length > 0 ? answer : throw new InvalidOperationException("The model returned an empty answer.");
     }
 }
+

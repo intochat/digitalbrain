@@ -160,8 +160,7 @@ public sealed class ShippedAppFacts
         .ConfigureSilo(silo =>
         {
             silo.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().Build());
-            silo.Services.AddAppRuntime<GroupChatRuntime>();
-            silo.Services.AddAppRuntime<PromptRuntime>();
         })
         .StartAsync(ct);
 }
+

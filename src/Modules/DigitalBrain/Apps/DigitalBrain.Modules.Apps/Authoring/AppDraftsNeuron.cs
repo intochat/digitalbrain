@@ -3,7 +3,7 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using Orleans.Runtime;
 
-namespace IntoChat.Marketplace;
+namespace DigitalBrain.Apps;
 
 [GrainType("intochat.app-drafts")]
 internal sealed class AppDraftsNeuron(
@@ -23,4 +23,5 @@ internal sealed class AppDraftsNeuron(
 
     public Task<IReadOnlyList<AppDraftEntry>> List() => Task.FromResult<IReadOnlyList<AppDraftEntry>>(Snapshot.Entries);
 }
+
 
