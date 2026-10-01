@@ -6,7 +6,7 @@ using DigitalBrain.AI;
 using DigitalBrain.Testing.E2E.Agent;
 using Npgsql;
 
-namespace IntoChat.Tests.E2E.Diagnostics;
+namespace DigitalBrain.Core.Tests.E2E;
 
 // Proves the trace budget from real exported spans, not from source inspection: an idle shell stays
 // quiet, the J1 intent stays within budget, a grain call is exactly two spans (one per end), and the
@@ -22,7 +22,7 @@ public sealed class TraceBudgetFacts
         var ct = TestContext.Current.CancellationToken;
         await using var collector = TestTelemetryCollector.Start();
         await using var model = await ScriptedModelServer.StartAsync(ct);
-        await using var brain = await IntoChatE2ETest.Create()
+        await using var brain = await ReferenceBrain.Create()
             .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
             .WithResourceEnvironment(OtlpEnvironment(collector))
             .StartAsync(ct);
@@ -67,7 +67,7 @@ public sealed class TraceBudgetFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var collector = TestTelemetryCollector.Start();
-        await using var brain = await IntoChatE2ETest.Create()
+        await using var brain = await ReferenceBrain.Create()
             .WithResourceEnvironment(OtlpEnvironment(collector))
             .StartAsync(ct);
 

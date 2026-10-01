@@ -6,7 +6,7 @@ using DigitalBrain.Testing.E2E.Agent;
 using DigitalBrain.Testing.E2E.Diagnostics;
 using DigitalBrain.Testing.E2E.Workspace;
 
-namespace IntoChat.Tests.E2E.Security;
+namespace DigitalBrain.Core.Tests.E2E;
 
 // The module option is the only content-capture switch. Check the exported spans/logs,
 // including a Production host to catch accidental environment/profile gates.
@@ -74,7 +74,7 @@ public sealed class ContentCaptureFacts
                 [EnableSensitiveKey] = "true",
             };
             foreach (var (key, value) in environment) { primary[key] = value; }
-            return IntoChatE2ETest.Create()
+            return ReferenceBrain.Create()
                 .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
                 .WithResourceEnvironment(primary)
                 .StartAsync(ct);

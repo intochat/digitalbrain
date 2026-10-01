@@ -6,9 +6,9 @@ using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Slider;
 using DigitalBrain.Identity;
 
-namespace IntoChat.Tests.E2E.Security;
+namespace DigitalBrain.Modules.Identity.Tests.E2E;
 
-public sealed class CrossWorkspaceFacts(IntoChatHostFixture host)
+public sealed class CrossWorkspaceFacts(ReferenceBrainFixture host)
 {
 
     [Fact(Timeout = 180_000)]

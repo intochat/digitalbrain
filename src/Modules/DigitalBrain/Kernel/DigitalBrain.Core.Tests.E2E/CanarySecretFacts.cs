@@ -4,10 +4,10 @@ using System.Text.Json;
 using DigitalBrain.Testing.E2E;
 using DigitalBrain.Testing.E2E.Diagnostics;
 
-namespace IntoChat.Tests.E2E.Security;
+namespace DigitalBrain.Core.Tests.E2E;
 
 // A secret must not appear in HTTP responses, traces, or logs. SecretsFacts inspects persisted state.
-public sealed class CanarySecretFacts(IntoChatHostFixture host)
+public sealed class CanarySecretFacts(ReferenceBrainFixture host)
 {
     private const string Owner = "owner";
     private const string Canary = "canary-secret-7f3a91";

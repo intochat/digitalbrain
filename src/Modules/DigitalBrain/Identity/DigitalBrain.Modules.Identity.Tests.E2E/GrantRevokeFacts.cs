@@ -3,11 +3,11 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using DigitalBrain.Identity;
 
-namespace IntoChat.Tests.E2E.Security;
+namespace DigitalBrain.Modules.Identity.Tests.E2E;
 
 // The grants list and revoke routes at the HTTP edge are scoped to the caller's workspace.
 // Enforcement of a grant on a call is covered by Identity's GrantFacts.
-public sealed class GrantRevokeFacts(IntoChatHostFixture host)
+public sealed class GrantRevokeFacts(ReferenceBrainFixture host)
 {
     [Fact(Timeout = 300_000)]
     public async Task GrantsAreListedAndRevokedOnlyInTheOwnersWorkspace()
