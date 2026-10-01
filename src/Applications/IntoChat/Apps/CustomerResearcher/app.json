@@ -1,12 +1,16 @@
 {
   "name": "customer-researcher",
   "title": "Customer Researcher",
-  "description": "Research companies live in a driven browser and save the findings to Postgres.",
+  "description": "Research companies live in a driven browser and save verified findings to a Postgres table.",
   "runtime": "csharp",
   "operations": [
     { "name": "open", "description": "Open the researcher window and answer its surface." },
-    { "name": "research", "description": "Start researching a company by name, location or website." },
-    { "name": "stop", "description": "Stop the running research." }
+    { "name": "research", "description": "Research a company by name, location or website and answer the outcome." },
+    { "name": "stop", "description": "Stop the running research." },
+    { "name": "result", "description": "Answer the stored research row for a company query, or null." }
   ],
-  "settings": []
+  "settings": [
+    { "name": "Model", "description": "The model that chooses links and extracts details: IGemma4 or scripted/<key>.", "default": "IGemma4" },
+    { "name": "Browser", "description": "The browser driver: empty for the window's own driven browser, or scripted/<key>.", "default": "" }
+  ]
 }

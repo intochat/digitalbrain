@@ -6,6 +6,42 @@ namespace DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit;
 public sealed class CSharpSubscriptionFacts
 {
     [Fact]
+    public async Task OppositePublicationOrdersAcrossSubscriptionsHaveIdenticalWakeReplayPayloads()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sandbox = new FakeSandbox();
+        await using var brain = await SandboxBrain.StartAsync(sandbox, ct);
+
+        async Task<string[]> Replay(bool researchFirst)
+        {
+            var scope = "workspace/stop-order/" + researchFirst;
+            var research = brain.Get<IPinger>(scope + "/research");
+            var stop = brain.Get<IPinger>(scope + "/stop");
+            var file = await Subscribed(brain, sandbox, scope, research, ct);
+            var edge = file.AsReference<ICSharpFileEdge>();
+            await edge.Subscribed(sandbox.LatestRunId, stop.GetGrainId().ToString(), nameof(Pinged));
+            sandbox.ExitLatest(0);
+
+            var first = researchFirst ? research : stop;
+            var second = researchFirst ? stop : research;
+            await first.Ping(1);
+            await Eventually(async () => (await file.Read(ct)).Subscriptions.Single(s => s.Neuron == first.GetGrainId().ToString()).Pending == 1, ct);
+            await second.Ping(1);
+            await Eventually(async () => (await file.Read(ct)).Subscriptions.All(s => s.Pending == 1), ct);
+
+            // A resumed Stop loop can drain first regardless of publication order.
+            var stopped = Assert.Single(await edge.DrainPending(sandbox.LatestRunId, stop.GetGrainId().ToString(), nameof(Pinged)));
+            var requested = Assert.Single(await edge.DrainPending(sandbox.LatestRunId, research.GetGrainId().ToString(), nameof(Pinged)));
+            return [stopped, requested];
+        }
+
+        var staleResearch = await Replay(researchFirst: true);
+        var freshResearch = await Replay(researchFirst: false);
+        Assert.Equal(new[] { "{\"number\":1}", "{\"number\":1}" }, staleResearch);
+        Assert.Equal(staleResearch, freshResearch);
+    }
+
+    [Fact]
     public async Task ASubscriptionIsRecordedOnceAndBuffersOnlyMatchingSignals()
     {
         var ct = TestContext.Current.CancellationToken;
