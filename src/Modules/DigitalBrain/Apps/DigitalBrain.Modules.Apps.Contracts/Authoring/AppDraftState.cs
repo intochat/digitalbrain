@@ -1,6 +1,5 @@
-using DigitalBrain.Apps;
 
-namespace IntoChat.Marketplace;
+namespace DigitalBrain.Apps;
 
 [GenerateSerializer, Alias("intochat.app-draft-state")]
 public sealed record AppDraftState
@@ -13,7 +12,8 @@ public sealed record AppDraftState
     [Id(5)] public string Runtime { get; init; } = "";
     [Id(6)] public string Spec { get; init; } = "";
     [Id(7)] public AppDraftStatus Status { get; init; }
-    [Id(8)] public IReadOnlyList<AppDraftAttempt> Attempts { get; init; } = [];
+    [Id(8)] public AppDraftAttempt[] Attempts { get; init; } = [];
     [Id(9)] public PackageRevisionRef? Published { get; init; }
     [Id(10)] public string Error { get; init; } = "";
 }
+

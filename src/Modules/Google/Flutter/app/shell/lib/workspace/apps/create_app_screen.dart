@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'app_spec_view.dart';
 import 'packages_screen.dart';
 
-// Numeric values of IntoChat.Marketplace.AppDraftStatus on the wire.
+// Numeric values of DigitalBrain.Apps.AppDraftStatus on the wire.
 const _drafted = 1;
 const _building = 2;
 const _published = 3;

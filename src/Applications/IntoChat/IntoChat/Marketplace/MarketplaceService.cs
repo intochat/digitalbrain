@@ -4,16 +4,6 @@ using DigitalBrain.Contracts;
 
 namespace IntoChat.Marketplace;
 
-// What the marketplace shows about an app beyond its listing: its spec and tests as the author wrote
-// them, with the verdicts of the revision's last verification.
-internal sealed record AppSpecView(
-    PackageRevisionRef Revision,
-    string Runtime,
-    IReadOnlyDictionary<string, string> Files,
-    string? Spec,
-    string? Tests,
-    AppVerification? Verification);
-
 internal sealed class MarketplaceService(IDigitalBrain brain, IScriptSandbox? csharp = null)
 {
     public const string SandboxMissing = "This host has no C# sandbox, and verifying an app runs its tests as one. Compose CSharpModule where the brain can run scripts.";
@@ -53,3 +43,4 @@ internal sealed class MarketplaceService(IDigitalBrain brain, IScriptSandbox? cs
         return new(id, snapshot.Head ?? throw new KeyNotFoundException($"{id} has no revisions yet."));
     }
 }
+

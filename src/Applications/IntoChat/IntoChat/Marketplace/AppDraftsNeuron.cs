@@ -1,3 +1,4 @@
+using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using Orleans.Runtime;
@@ -22,3 +23,4 @@ internal sealed class AppDraftsNeuron(
 
     public Task<IReadOnlyList<AppDraftEntry>> List() => Task.FromResult<IReadOnlyList<AppDraftEntry>>(Snapshot.Entries);
 }
+

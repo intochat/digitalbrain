@@ -58,6 +58,11 @@ public sealed class AppDraftFacts
         Assert.Contains("The answer was \"hello\".", builderPrompts[1], StringComparison.Ordinal);
         var listing = Assert.Single(await brain.Get<IPackageDirectory>(PackageDirectory.Key).List());
         Assert.Equal("alice/shouter", listing.Package.ToString());
+        await brain.DeactivateAsync(draft, ct);
+        var restored = await draft.Read();
+        Assert.Equal(AppDraftStatus.Published, restored.Draft.Status);
+        Assert.Equal([false, true], restored.Draft.Attempts.Select(attempt => attempt.Green));
+        Assert.Equal(built.Draft.Published, restored.Draft.Published);
     }
 
     [Fact]
