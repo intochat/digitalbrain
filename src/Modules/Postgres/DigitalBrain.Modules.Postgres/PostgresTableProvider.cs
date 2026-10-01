@@ -5,7 +5,7 @@ using NpgsqlTypes;
 
 namespace DigitalBrain.Postgres;
 
-internal sealed class PostgresTableProvider([FromKeyedServices(PostgresHosting.DataSourceKey)] NpgsqlDataSource source) : IPostgresTableProvider
+internal sealed class PostgresTableProvider(IPostgresSourceRegistry registry) : IPostgresTableProvider
 {
     private static string Q(string identifier)
     {
@@ -22,8 +22,8 @@ internal sealed class PostgresTableProvider([FromKeyedServices(PostgresHosting.D
     private static string Predicate(TableDefinition definition, TableValue[] key)
         => string.Join(" AND ", key.Select((v, i) => $"{Q(v.Column)} = {Parameter(definition, v, i + 1)}"));
 
-    public Task DefineAsync(string table, TableDefinition definition, CancellationToken ct)
-        => Execute(async (connection, transaction, token) =>
+    public Task DefineAsync(string origin, string table, TableDefinition definition, CancellationToken ct)
+        => Execute(origin, async (connection, transaction, token) =>
         {
             definition = PostgresTablePolicy.Validate(definition);
             await using (var guard = new NpgsqlCommand("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", connection, transaction))
@@ -60,34 +60,34 @@ internal sealed class PostgresTableProvider([FromKeyedServices(PostgresHosting.D
             return true;
         }, ct);
 
-    public Task<bool> UpsertAsync(string table, TableDefinition definition, TableValue[] key, TableValue[] values, CancellationToken ct)
+    public Task<bool> UpsertAsync(string origin, string table, TableDefinition definition, TableValue[] key, TableValue[] values, CancellationToken ct)
     {
         var all = key.Concat(values).ToArray();
         var conflict = values.Length == 0 ? "DO NOTHING" :
             $"DO UPDATE SET {string.Join(",", values.Select(v => $"{Q(v.Column)}=EXCLUDED.{Q(v.Column)}"))} WHERE " +
             string.Join(" OR ", values.Select(v => $"target.{Q(v.Column)} IS DISTINCT FROM EXCLUDED.{Q(v.Column)}"));
         var sql = $"INSERT INTO {Table(table)} AS target ({string.Join(",", all.Select(v => Q(v.Column)))}) VALUES ({string.Join(",", all.Select((v, i) => Parameter(definition, v, i + 1)))}) ON CONFLICT ({string.Join(",", definition.PrimaryKey.Select(Q))}) {conflict}";
-        return Change(sql, all, ct);
+        return Change(origin, sql, all, ct);
     }
 
-    public Task<bool> DeleteAsync(string table, TableDefinition definition, TableValue[] key, CancellationToken ct)
-        => Change($"DELETE FROM {Table(table)} WHERE {Predicate(definition, key)}", key, ct);
+    public Task<bool> DeleteAsync(string origin, string table, TableDefinition definition, TableValue[] key, CancellationToken ct)
+        => Change(origin, $"DELETE FROM {Table(table)} WHERE {Predicate(definition, key)}", key, ct);
 
-    public async Task<TableValue[]?> ReadAsync(string table, TableDefinition definition, TableValue[] key, CancellationToken ct)
-        => (await Rows($"SELECT to_jsonb(t)::text FROM {Table(table)} t WHERE {Predicate(definition, key)}", key.Select(v => (object)v.Json).ToArray(), ct)).SingleOrDefault();
+    public async Task<TableValue[]?> ReadAsync(string origin, string table, TableDefinition definition, TableValue[] key, CancellationToken ct)
+        => (await Rows(origin, $"SELECT to_jsonb(t)::text FROM {Table(table)} t WHERE {Predicate(definition, key)}", key.Select(v => (object)v.Json).ToArray(), ct)).SingleOrDefault();
 
-    public Task<TableValue[][]> PageAsync(string table, TableDefinition definition, int offset, int limit, CancellationToken ct)
-        => Rows($"SELECT to_jsonb(t)::text FROM {Table(table)} t ORDER BY {string.Join(",", definition.PrimaryKey.Select(Q))} OFFSET $1 LIMIT $2", [offset, limit], ct);
+    public Task<TableValue[][]> PageAsync(string origin, string table, TableDefinition definition, int offset, int limit, CancellationToken ct)
+        => Rows(origin, $"SELECT to_jsonb(t)::text FROM {Table(table)} t ORDER BY {string.Join(",", definition.PrimaryKey.Select(Q))} OFFSET $1 LIMIT $2", [offset, limit], ct);
 
-    private Task<bool> Change(string sql, TableValue[] values, CancellationToken ct)
-        => Execute(async (connection, transaction, token) =>
+    private Task<bool> Change(string origin, string sql, TableValue[] values, CancellationToken ct)
+        => Execute(origin, async (connection, transaction, token) =>
         {
             await using var command = Command(sql, values.Select(v => (object)v.Json).ToArray(), connection, transaction);
             return await command.ExecuteNonQueryAsync(token) > 0;
         }, ct);
 
-    private Task<TableValue[][]> Rows(string sql, object[] values, CancellationToken ct)
-        => Execute(async (connection, transaction, token) =>
+    private Task<TableValue[][]> Rows(string origin, string sql, object[] values, CancellationToken ct)
+        => Execute(origin, async (connection, transaction, token) =>
         {
             await using var command = Command(sql, values, connection, transaction);
             await using var reader = await command.ExecuteReaderAsync(token);
@@ -107,13 +107,13 @@ internal sealed class PostgresTableProvider([FromKeyedServices(PostgresHosting.D
         return command;
     }
 
-    private async Task<T> Execute<T>(Func<NpgsqlConnection, NpgsqlTransaction, CancellationToken, Task<T>> action, CancellationToken ct)
+    private async Task<T> Execute<T>(string origin, Func<NpgsqlConnection, NpgsqlTransaction, CancellationToken, Task<T>> action, CancellationToken ct)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(TimeSpan.FromSeconds(20));
         try
         {
-            await using var connection = await source.OpenConnectionAsync(deadline.Token);
+            await using var connection = await registry.Get(origin).OpenConnectionAsync(deadline.Token);
             await using var transaction = await connection.BeginTransactionAsync(deadline.Token);
             await using (var setup = new NpgsqlCommand("SET LOCAL statement_timeout='15s'; SET LOCAL lock_timeout='3s'; SET LOCAL timezone='UTC'", connection, transaction))
             { await setup.ExecuteNonQueryAsync(deadline.Token); }

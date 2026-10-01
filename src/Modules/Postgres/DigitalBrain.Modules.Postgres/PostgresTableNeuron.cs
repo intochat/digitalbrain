@@ -11,10 +11,11 @@ internal sealed record PostgresTableState
 {
     [Id(0)] public string? Owner { get; init; }
     [Id(1)] public PostgresTableDefinition? Accepted { get; init; }
+    [Id(2)] public string? Origin { get; init; }
 }
 
 [GrainType("postgres.table")]
-internal sealed class PostgresTableNeuron(IPostgresTableProvider provider,
+internal sealed class PostgresTableNeuron(IPostgresTableProvider provider, DigitalBrain.Sdk.Capacity.ICapacity capacity,
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<PostgresTableState> state) : Neuron, IPostgresTable
 {
     private string Scope()
@@ -45,10 +46,13 @@ internal sealed class PostgresTableNeuron(IPostgresTableProvider provider,
             return accepted;
         }
         var table = PostgresTablePolicy.PhysicalName(scope, this.GetPrimaryKeyString());
-        await provider.DefineAsync(table, normalized, CancellationToken.None);
+        // The origin is pinned at first Define; later-registered capacity never migrates a table.
+        var origin = state.State.Origin
+            ?? (await capacity.Resolve(PostgresCapacityKind.Kind, new(BrainScope.CurrentId(), CallerContextStamper.Require().AppId))).Origin;
+        await provider.DefineAsync(origin, table, normalized, CancellationToken.None);
         var previous = state.State;
         var result = new PostgresTableDefinition(table, normalized, 1);
-        state.State = new() { Owner = scope, Accepted = result };
+        state.State = new() { Owner = scope, Accepted = result, Origin = origin };
         try { await state.WriteStateAsync(); }
         catch { state.State = previous; throw; }
         await PublishAsync(new TableDefined(table, result.Revision));
@@ -60,7 +64,7 @@ internal sealed class PostgresTableNeuron(IPostgresTableProvider provider,
         var current = Current();
         key = PostgresTablePolicy.Values(current.Definition, key, true);
         values = PostgresTablePolicy.Values(current.Definition, values, false);
-        var changed = await provider.UpsertAsync(current.Table, current.Definition, key, values, CancellationToken.None);
+        var changed = await provider.UpsertAsync(PostgresCapacityKind.OriginOrPlatform(state.State.Origin), current.Table, current.Definition, key, values, CancellationToken.None);
         if (changed) { await PublishAsync(new RowUpserted(current.Table, key)); }
         return changed;
     }
@@ -69,7 +73,7 @@ internal sealed class PostgresTableNeuron(IPostgresTableProvider provider,
     {
         var current = Current();
         key = PostgresTablePolicy.Values(current.Definition, key, true);
-        var changed = await provider.DeleteAsync(current.Table, current.Definition, key, CancellationToken.None);
+        var changed = await provider.DeleteAsync(PostgresCapacityKind.OriginOrPlatform(state.State.Origin), current.Table, current.Definition, key, CancellationToken.None);
         if (changed) { await PublishAsync(new RowDeleted(current.Table, key)); }
         return changed;
     }
@@ -78,7 +82,7 @@ internal sealed class PostgresTableNeuron(IPostgresTableProvider provider,
     {
         var current = Current();
         key = PostgresTablePolicy.Values(current.Definition, key, true);
-        return provider.ReadAsync(current.Table, current.Definition, key, CancellationToken.None);
+        return provider.ReadAsync(PostgresCapacityKind.OriginOrPlatform(state.State.Origin), current.Table, current.Definition, key, CancellationToken.None);
     }
 
     public Task<TableValue[][]> Page(int offset = 0, int limit = 200)
@@ -86,6 +90,6 @@ internal sealed class PostgresTableNeuron(IPostgresTableProvider provider,
         var current = Current();
         if (offset < 0 || limit is < 1 or > PostgresQuery.MaxRowsLimit)
         { throw new PostgresQueryException($"Offset must be nonnegative and limit must be 1–{PostgresQuery.MaxRowsLimit}."); }
-        return provider.PageAsync(current.Table, current.Definition, offset, limit, CancellationToken.None);
+        return provider.PageAsync(PostgresCapacityKind.OriginOrPlatform(state.State.Origin), current.Table, current.Definition, offset, limit, CancellationToken.None);
     }
 }

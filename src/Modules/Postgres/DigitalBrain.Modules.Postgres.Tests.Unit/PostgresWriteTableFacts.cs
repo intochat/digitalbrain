@@ -148,8 +148,8 @@ public sealed class PostgresWriteTableFacts
             Assert.Equal("'; DROP TABLE --", JsonSerializer.Deserialize<string>(Assert.Single(Assert.Single(result.Rows))));
             await Assert.ThrowsAsync<PostgresQueryException>(() => brain.Get<IPostgres>("default").Query(new($"DELETE FROM public.{accepted.Table}")));
             var provider = brain.SiloServices.GetRequiredService<IPostgresTableProvider>();
-            await provider.DefineAsync(accepted.Table, Definition, ct);
-            await Assert.ThrowsAsync<PostgresQueryException>(() => provider.DefineAsync(accepted.Table,
+            await provider.DefineAsync(PostgresCapacityKind.PlatformOrigin, accepted.Table, Definition, ct);
+            await Assert.ThrowsAsync<PostgresQueryException>(() => provider.DefineAsync(PostgresCapacityKind.PlatformOrigin, accepted.Table,
                 new([new("id", "text"), new("value", "number")], ["id"]), ct));
             Stamp("other-brain");
             var other = brain.Get<IPostgresTable>("other-" + Guid.NewGuid().ToString("N"));
@@ -230,21 +230,21 @@ public sealed class PostgresWriteTableFacts
     {
         private readonly Dictionary<string, Dictionary<string, TableValue[]>> tables = [];
         public int Definitions { get; private set; }
-        public Task DefineAsync(string table, TableDefinition definition, CancellationToken ct)
+        public Task DefineAsync(string origin, string table, TableDefinition definition, CancellationToken ct)
         { Definitions++; tables.TryAdd(table, []); return Task.CompletedTask; }
         private static string RowKey(TableValue[] key) => JsonSerializer.Serialize(key);
-        public Task<bool> UpsertAsync(string table, TableDefinition definition, TableValue[] key, TableValue[] values, CancellationToken ct)
+        public Task<bool> UpsertAsync(string origin, string table, TableDefinition definition, TableValue[] key, TableValue[] values, CancellationToken ct)
         {
             var row = key.Concat(values).ToArray();
             var changed = !tables[table].TryGetValue(RowKey(key), out var previous) || !row.SequenceEqual(previous);
             tables[table][RowKey(key)] = row;
             return Task.FromResult(changed);
         }
-        public Task<bool> DeleteAsync(string table, TableDefinition definition, TableValue[] key, CancellationToken ct)
+        public Task<bool> DeleteAsync(string origin, string table, TableDefinition definition, TableValue[] key, CancellationToken ct)
             => Task.FromResult(tables[table].Remove(RowKey(key)));
-        public Task<TableValue[]?> ReadAsync(string table, TableDefinition definition, TableValue[] key, CancellationToken ct)
+        public Task<TableValue[]?> ReadAsync(string origin, string table, TableDefinition definition, TableValue[] key, CancellationToken ct)
             => Task.FromResult(tables[table].GetValueOrDefault(RowKey(key)));
-        public Task<TableValue[][]> PageAsync(string table, TableDefinition definition, int offset, int limit, CancellationToken ct)
+        public Task<TableValue[][]> PageAsync(string origin, string table, TableDefinition definition, int offset, int limit, CancellationToken ct)
             => Task.FromResult(tables[table].OrderBy(p => p.Key, StringComparer.Ordinal).Skip(offset).Take(limit).Select(p => p.Value).ToArray());
     }
 }
