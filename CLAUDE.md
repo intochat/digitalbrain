@@ -87,8 +87,8 @@ renderable palette v1 / UiPart; run-token tightening.
   `dotnet test src/<path-to-test-project>`. After changes: build, run the relevant unit suites,
   and smoke with `aspire run` from `src/Applications/IntoChat/AppHost` (all resources Healthy).
   Skip the 18-minute IntoChat E2E; unit suites + aspire run are the bar.
-- `src/Applications/IntoChat/Tests/Unit` has 3 known pre-existing failures (HostedDeployment ×2,
-  PathTruth) — not yours to fix in passing.
+- `src/Applications/IntoChat/Tests/Unit` covers host composition and wiring; module behavior
+  belongs in the module's test project. Packaging manifests are checked as one parsed module set.
 - Flutter shell: `flutter analyze` and `flutter test` from `src/Modules/Google/Flutter/app/shell`.
   Wire-shape changes in C# records must be mirrored in the Dart screens in the same change.
 - Persisted grain state: append `[Id(n)]`, never renumber; use concrete arrays, not interface
