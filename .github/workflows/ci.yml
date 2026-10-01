@@ -52,8 +52,16 @@ jobs:
       - name: Validate NuGet packages
         run: dotnet pack DigitalBrain.slnx -c Release --no-build -v quiet -o artifacts
 
+      # One deterministic image build before the parallel AppHost sessions race to
+      # request it; every E2E web host then serves this cached image in seconds.
+      - name: Build the shell web image
+        run: docker build -f src/Modules/Google/Flutter/app/shell/Dockerfile src/Modules/Google/Flutter/app
+
       - name: Test
         run: dotnet test DigitalBrain.slnx -c Release --no-build -v quiet
+        env:
+          # No Flutter SDK on this runner: E2E web hosts serve the containerized bundle.
+          DigitalBrain__Flutter__Hosting__WebContainer: 'true'
 
   flutter-web-build:
     name: Flutter analyze and web build
