@@ -21,7 +21,7 @@ jobs:
   dotnet-build-test:
     name: .NET build and test
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
 
@@ -73,8 +73,10 @@ jobs:
       - name: Prime the C# sandbox image build cache
         run: docker build src/Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Sandbox
 
+      # One module at a time: the shared E2E host compiles the web shell and the sandbox
+      # E2E builds containers; running them beside other suites starves both on a small runner.
       - name: Test
-        run: dotnet test DigitalBrain.slnx -c Release --no-build -v quiet
+        run: dotnet test DigitalBrain.slnx -c Release --no-build -v quiet --max-parallel-test-modules 1
         env:
           DIGITALBRAIN_E2E_LIVE_MODEL: '0'
           DIGITALBRAIN_E2E_HEADED: '0'

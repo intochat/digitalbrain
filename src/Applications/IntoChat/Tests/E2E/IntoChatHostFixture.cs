@@ -34,7 +34,7 @@ public sealed class IntoChatHostFixture : SharedBrainFixture, IAsyncLifetime
             .WithBrowser(new() { PrimarySession = false })
             // The one shared boot compiles the web shell; a cold CI runner needs well over the
             // default three minutes.
-            .WithStartupTimeout(TimeSpan.FromMinutes(12))
+            .WithStartupTimeout(TimeSpan.FromMinutes(20))
             .WithResourceEnvironment(new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["OTEL_EXPORTER_OTLP_ENDPOINT"] = _collector.Endpoint.AbsoluteUri,
