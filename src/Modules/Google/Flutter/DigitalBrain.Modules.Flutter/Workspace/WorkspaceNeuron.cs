@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Options;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using DigitalBrain.Flutter.Workspace.Signals;
@@ -7,7 +8,7 @@ namespace DigitalBrain.Flutter.Workspace;
 
 [GrainType("ui.workspace")]
 internal sealed class WorkspaceNeuron(
-    [PersistentState("workspace", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<WorkspaceStorage> store)
+    [PersistentState("workspace", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<WorkspaceStorage> store, IOptions<FlutterModuleOptions> options)
     : Neuron, IWorkspace
 {
     public async Task<WorkspaceOpenResult> Open(OpenWindow request)
@@ -144,7 +145,7 @@ internal sealed class WorkspaceNeuron(
 
     private FirstRunState? FirstRun() =>
         store.State.OperationLog.Count == 0 && store.State.SurfaceOperationLog.Count == 0 && store.State.Windows.Count == 0
-            ? WorkspaceStarterCatalog.Build(store.State.ConnectedSources)
+            ? WorkspaceStarterCatalog.Build(store.State.ConnectedSources) with { AssistantTitle = options.Value.AssistantTitle }
             : null;
 
     private async Task Save(WorkspaceStorage next)

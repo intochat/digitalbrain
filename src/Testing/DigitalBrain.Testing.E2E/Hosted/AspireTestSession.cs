@@ -41,8 +41,17 @@ public sealed class AspireTestSession : IAsyncDisposable
         Action<IDistributedApplicationTestingBuilder> declareTopology, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(declareTopology);
-        return StartCoreAsync(_ => Task.FromResult(DistributedApplicationTestingBuilder.Create([])),
+        return StartCoreAsync(_ => Task.FromResult(CreateModuleBuilder()),
             declareTopology, identity, options, cancellationToken);
+    }
+
+    private static IDistributedApplicationTestingBuilder CreateModuleBuilder()
+    {
+        // Aspire discovers its metadata on the caller stack. The build-transitive factory is
+        // compiled into the consuming assembly, even when an assembly fixture starts the host.
+        var factory = System.Reflection.Assembly.GetEntryAssembly()!
+            .GetType("DigitalBrain.Testing.Generated.ModuleBuilderFactory", throwOnError: true)!;
+        return (IDistributedApplicationTestingBuilder)factory.GetMethod("Create")!.Invoke(null, null)!;
     }
 
     private static async Task<AspireTestSession> StartCoreAsync(
@@ -59,8 +68,7 @@ public sealed class AspireTestSession : IAsyncDisposable
         var stage = "builder";
         try
         {
-            // Aspire's module builder discovers AppHost metadata from the caller stack.
-            // Create it before the first asynchronous file write can detach that stack.
+            // Module hosts explicitly use the consuming test assembly's Aspire metadata.
             var builder = await createBuilder(ct).ConfigureAwait(false);
             lifetime.Own("builder", builder);
             PrivateTestConfiguration? privateSettings = null;
@@ -142,6 +150,23 @@ public sealed class AspireTestSession : IAsyncDisposable
             lifetime.Own("client", new AsyncAction(session.ReleaseClientAsync));
             session.HttpClient = app.CreateHttpClient(hosts[0].Name, SiloHosts.HttpEndpointName);
             lifetime.Own("http", new AsyncAction(() => { session.HttpClient.Dispose(); return ValueTask.CompletedTask; }));
+            if (session.BrowserEndpoint is not null
+                && options.ResourceEnvironment.ContainsKey("DigitalBrain__Testing__ReferenceComposition"))
+            {
+                stage = "reference-browser-bundle";
+                // Sequential suites reuse Flutter's build directory. A cached bundle can answer
+                // health probes while still targeting the previous suite's now-stopped runtime.
+                using var probe = new HttpClient();
+                var runtimeEndpoint = session.HttpClient.BaseAddress!.GetLeftPart(UriPartial.Authority);
+                while (true)
+                {
+                    using var response = await probe.GetAsync(new Uri(session.BrowserEndpoint, "/main.dart.js"), ct).ConfigureAwait(false);
+                    if (response.IsSuccessStatusCode
+                        && (await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false)).Contains(runtimeEndpoint, StringComparison.Ordinal))
+                    { break; }
+                    await Task.Delay(TimeSpan.FromSeconds(1), ct).ConfigureAwait(false);
+                }
+            }
             return session;
         }
         catch (Exception error)

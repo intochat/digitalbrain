@@ -63,7 +63,7 @@ internal static class AppUiEndpoints
                     BrowserConnection connection;
                     try { connection = JsonSerializer.Deserialize<BrowserConnection>(input.Value ?? "", JsonSerializerOptions.Web) ?? throw new ArgumentException("Browser connection is required."); }
                     catch (JsonException) { throw new ArgumentException("Invalid browser connection."); }
-                    var browser = brain.Get<IWebBrowser>(input.Name);
+                    var browser = brain.Get<IWebBrowserConnector>(input.Name);
                     if (input.Action == "connect") { await browser.Connect(connection.Port, connection.SessionId).WaitAsync(ct); }
                     else if (input.Action == "disconnect") { await browser.Disconnect(connection.SessionId).WaitAsync(ct); }
                     else { throw new ArgumentException("Unknown browser action."); }

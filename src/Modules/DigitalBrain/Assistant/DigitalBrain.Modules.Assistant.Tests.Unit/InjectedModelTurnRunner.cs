@@ -23,8 +23,7 @@ internal sealed class InjectedModelTurnRunner(IServiceProvider services) : IAgen
     }
     private sealed class InjectedModelServices(IServiceProvider original) : IServiceProvider
     {
-        public object? GetService(Type type) => type == typeof(IOptions<AIOptions>) ? Options.Create(new AIOptions())
-            : type == typeof(IAiCredentials) ? new FixedAiCredentials()
+        public object? GetService(Type type) => type == typeof(IOptions<AIOptions>) ? null
             : original.GetService(type);
     }
 }

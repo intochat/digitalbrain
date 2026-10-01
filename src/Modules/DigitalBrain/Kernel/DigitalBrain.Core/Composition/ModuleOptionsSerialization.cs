@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Text.Json.Serialization;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 
@@ -16,6 +18,14 @@ public static class ModuleOptionsSerialization
         {
             throw new ArgumentException(
                 $"{typeof(TOptions).Name}.{credentialProperty.Name} looks like a credential; credentials belong to the integrations registration, not module options.");
+        }
+
+        var ignoredProperty = typeof(TOptions).GetProperties().FirstOrDefault(property =>
+            property.SetMethod is { IsPublic: true }
+            && property.GetCustomAttribute<JsonIgnoreAttribute>() is { Condition: not JsonIgnoreCondition.Never });
+        if (ignoredProperty is not null)
+        {
+            throw new ArgumentException($"{typeof(TOptions).Name}.{ignoredProperty.Name} is writable but excluded from module options serialization.");
         }
 
         options.Validate();

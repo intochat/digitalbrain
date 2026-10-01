@@ -16,7 +16,7 @@ internal sealed class PostgresTools(IPostgresProvider provider, LiveTableWindows
             catch (PostgresQueryException error) { return new { isError = true, source = "postgres", message = error.Message }; }
         }
         async Task<object> Open([Description("Short window title.")] string title,
-            [Description("One read-only SELECT on the Postgres database using discovered schema and 1–32 explicitly named columns. Rows are paginated automatically. For customer_research filter workspace to the current workspace id.")] string sql,
+            [Description("One read-only SELECT on the Postgres database using discovered schema and 1–32 explicitly named columns. Rows are paginated automatically.")] string sql,
             CancellationToken ct)
         {
             var trusted = context();
@@ -25,7 +25,7 @@ internal sealed class PostgresTools(IPostgresProvider provider, LiveTableWindows
             { return new { isError = true, source = "postgres", message = error.Message }; }
         }
         return [
-            AIFunctionFactory.Create(Schema, "postgres_schema", "Discover tables and columns in the Postgres module's database, including Customer Researcher results. This is a separate connection from Supabase."),
+            AIFunctionFactory.Create(Schema, "postgres_schema", "Discover tables and columns in the Postgres module's database. This is a separate connection from Supabase."),
             AIFunctionFactory.Create(Open, "show_postgres_query_table", "Open a live interactive table from Postgres in the current workspace. Never substitutes Supabase. Use table_read and table_refine on the returned windowId.")];
     }
 }

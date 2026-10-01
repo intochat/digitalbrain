@@ -1,6 +1,7 @@
 using Azure.Data.Tables;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
+using DigitalBrain.Platform;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -58,6 +59,7 @@ public static class DigitalBrainRuntimeHostingExtensions
     public static IEndpointRouteBuilder MapDigitalBrainModules(this IEndpointRouteBuilder endpoints)
     {
         ArgumentNullException.ThrowIfNull(endpoints);
+        endpoints.MapDigitalBrainPlatform();
         foreach (var module in endpoints.ServiceProvider.GetServices<IModule>())
         {
             module.Configure(endpoints);

@@ -46,7 +46,7 @@ public sealed class GmailModule : IModule<GmailModuleOptions>
             await grains.GetGrain<IGmail>(push.EmailAddress).AcceptWatchPush(push);
             return Results.Accepted();
         });
-        endpoints.MapGet("/google/gmail/oauth/callback", async (string? code, GmailRegistration registration, IGrainFactory grains) =>
+        endpoints.MapGet("/google/gmail/oauth/callback", async (string? code, GmailRegistration registration, IGrainFactory grains, DigitalBrain.Sdk.Identity.IIdentity identity) =>
         {
             if (string.IsNullOrWhiteSpace(code))
             {
@@ -58,9 +58,7 @@ public sealed class GmailModule : IModule<GmailModuleOptions>
                 return Results.Json(unavailable, statusCode: StatusCodes.Status409Conflict);
             }
 
-            var owner = DigitalBrain.Core.Enforcement.CallerContextStamper.TryGet(out var caller)
-                ? caller.PrincipalId
-                : null;
+            var owner = identity.CurrentPrincipal?.PrincipalId;
             await grains.GetGrain<IGmail>("gmail").AcceptAuthorizationCode(code, owner);
             return Results.Ok();
         });

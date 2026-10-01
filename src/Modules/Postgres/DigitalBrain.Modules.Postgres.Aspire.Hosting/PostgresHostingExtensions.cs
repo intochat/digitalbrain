@@ -39,6 +39,7 @@ internal static class PostgresHostingExtensions
         : DigitalBrainModuleProjection
     {
         private HostingConfiguration? _configuration;
+        private IResourceBuilder<PostgresServerResource>? _server;
         private IResourceBuilder<PostgresDatabaseResource>? _database;
         private IResourceBuilder<ParameterResource>? _connection;
 
@@ -50,15 +51,15 @@ internal static class PostgresHostingExtensions
                 throw new InvalidOperationException("Postgres hosting is already configured. Configure it once before referencing the brain.");
             }
 
-            if (configuration.DatabaseName is { } databaseName)
+            // Publish mode never runs the container: the external secret parameter carries the
+            // manually provisioned database, and without an admin connection no provisioner registers.
+            if (configuration.DatabaseName is { } databaseName && !brain.ApplicationBuilder.ExecutionContext.IsPublishMode)
             {
                 var server = brain.ApplicationBuilder.AddPostgres("postgres-server")
-                    .WithParentRelationship(module);
-                if (!brain.ApplicationBuilder.ExecutionContext.IsPublishMode)
-                {
-                    server = server.WithRepl();
-                }
+                    .WithParentRelationship(module)
+                    .WithRepl();
                 if (configuration.PersistentStorage) { server.WithDataVolume().WithLifetime(ContainerLifetime.Persistent); }
+                _server = server;
                 _database = server.AddDatabase("postgres-database", databaseName);
             }
             else
@@ -80,6 +81,12 @@ internal static class PostgresHostingExtensions
             {
                 builder.WithReference(_database, connectionName: _configuration.ConnectionName)
                     .WithAnnotation(new WaitAnnotation(_database.Resource, WaitType.WaitUntilHealthy, exitCode: 0));
+                if (_server is not null)
+                {
+                    var server = _server.Resource;
+                    builder.WithEnvironment(context =>
+                        context.EnvironmentVariables["DigitalBrain__Capacity__Postgres__AdminConnection"] = server.ConnectionStringExpression);
+                }
             }
             else if (_connection is not null)
             {

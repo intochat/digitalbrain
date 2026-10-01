@@ -19,7 +19,7 @@ startup_timeout_sec = 45
 
 [mcp_servers.codegraph]
 command = "cmd"
-args = ["/c", "npx", "-y", "@colbymchenry/codegraph@latest", "serve", "--mcp"]
+args = ["/c", "npx", "-y", "@colbymchenry/codegraph@1.6.0", "serve", "--mcp"]
 startup_timeout_sec = 45
 
 [mcp_servers.digitalbrain-mcp]

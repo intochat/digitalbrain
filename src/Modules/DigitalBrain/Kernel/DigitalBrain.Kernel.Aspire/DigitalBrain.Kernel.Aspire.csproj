@@ -15,6 +15,6 @@
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../DigitalBrain.Core/DigitalBrain.Core.csproj" />
+    <ProjectReference Include="../DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
   </ItemGroup>
 </Project>

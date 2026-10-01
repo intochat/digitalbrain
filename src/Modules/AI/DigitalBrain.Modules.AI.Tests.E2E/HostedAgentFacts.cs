@@ -18,7 +18,7 @@ public sealed class HostedAgentFacts
         deadline.CancelAfter(TimeSpan.FromMinutes(5));
         var ct = deadline.Token;
         using var endpoint = new LoopbackServer();
-        await using var brain = await E2ETest.Create().WithModule<DigitalBrain.Platform.Secrets.SecretsModule>().WithModule<DigitalBrain.Platform.Integrations.IntegrationsModule>().WithModule<AIModule, AIOptions>(options =>
+        await using var brain = await E2ETest.Create().WithModule<AIModule, AIOptions>(options =>
             {
                 options.Default.Profile = "fixture";
                 options.ModelProfiles.Add("fixture", new AIModelProfileOptions

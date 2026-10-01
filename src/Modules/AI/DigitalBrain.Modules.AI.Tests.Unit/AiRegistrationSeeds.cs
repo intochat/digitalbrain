@@ -22,5 +22,5 @@ internal static class AiRegistrationSeeds
         };
 
     internal static UnitTestBuilder WithRegistrations(this UnitTestBuilder builder, TestExecutionOptions? seeds = null)
-        => builder.WithExecution(seeds ?? new TestExecutionOptions()).WithModule<SecretsModule>().WithModule<IntegrationsModule>();
+        => builder.WithExecution(seeds ?? new TestExecutionOptions());
 }

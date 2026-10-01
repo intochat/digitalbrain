@@ -35,12 +35,9 @@
     <ProjectReference Include="../../DigitalBrain/Compute/DigitalBrain.Modules.Compute.Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
-    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Modules.AI.Tests.Unit" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Assistant.Tests.Unit" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.CustomerResearcher.Tests.Unit" />
   </ItemGroup>
 </Project>

@@ -2,12 +2,12 @@
   <PropertyGroup><IsPackable>true</IsPackable><Description>Connects single-file C# apps to a DigitalBrain cluster: neuron calls and live signal subscriptions.</Description></PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Core" />
+    <InternalsVisibleTo Include="DigitalBrain.Platform" />
     <InternalsVisibleTo Include="DigitalBrain.Testing" />
     <InternalsVisibleTo Include="DigitalBrain.Testing.Unit" />
     <InternalsVisibleTo Include="DigitalBrain.Testing.E2E" />
     <!-- The script edge speaks the same protocol records as the client. -->
     <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.CSharp" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit" />
   </ItemGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />

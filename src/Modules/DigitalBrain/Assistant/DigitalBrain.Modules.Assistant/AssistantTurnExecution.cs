@@ -9,7 +9,6 @@ using DigitalBrain.AI.Metering;
 using DigitalBrain.Compute;
 using DigitalBrain.Compute.Usage;
 using DigitalBrain.Contracts;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -21,9 +20,9 @@ namespace DigitalBrain.Assistant;
 // retained history, tools, metering and receipts; no HTTP or Flutter dependencies.
 public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFactory grains)
 {
-    private IConfiguration Configuration => services.GetRequiredService<IConfiguration>();
+    private AssistantOptions Options => services.GetRequiredService<IOptions<AssistantOptions>>().Value;
     public AgentModelCatalog Models => new(services.GetRequiredService<ModelProfiles>(),
-        services.GetRequiredService<IOptionsMonitor<AIOptions>>(), Configuration);
+        services.GetRequiredService<IOptionsMonitor<AIOptions>>(), services.GetRequiredService<IOptions<AssistantOptions>>());
 
     public async IAsyncEnumerable<string> Run(string workspace, AssistantRun input,
         Func<string?, Task<AgentDefinition>> define, [EnumeratorCancellation] CancellationToken ct)
@@ -61,7 +60,7 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
     private async Task Execute(string workspace, AssistantRun input, IAgent agent, AgentConversationState snapshot,
         PreparedTurn prepared, Func<string?, Task<AgentDefinition>> define, Func<object, Task> Emit, CancellationToken ct)
     {
-        var configuration = Configuration;
+        var configuration = Options;
         var runner = services.GetRequiredService<IAgentTurnRunner>();
         var priceBook = services.GetRequiredService<IPriceBook>();
         var usage = services.GetRequiredService<IIntentUsageSink>();
@@ -217,12 +216,12 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
     public sealed record PreparedTurn(AgentConversationTurn? Replay, AgentModelSelection? Model);
 
     public static async Task<string?> RunModel(string scope, string run, string message, AgentDefinition definition,
-        AgentConversationState state, string messageId, IConfiguration configuration,
+        AgentConversationState state, string messageId, AssistantOptions configuration,
         IAgentTurnRunner runner, Func<object, Task> emit, StringBuilder text, List<string> results, IntentActivity activity, CancellationToken ct, AgentModelSelection? modelSelection = null)
     {
         var finished = false;
         string? queryError = null;
-        var model = modelSelection ?? (configuration["IntoChat:Assistant:Model"] is { Length: > 0 } modelName ? new AgentModelSelection(Model: modelName) : null);
+        var model = modelSelection ?? (configuration.Model is { Length: > 0 } modelName ? new AgentModelSelection(Model: modelName) : null);
         await foreach (var item in runner.RunAsync(new("workspace-assistant", run, scope, state.Turns, message, model,
             definition.Instructions, AgentToolPolicy.ForDatabase(definition.Tools, message), ContextProviders: definition.ContextProviders), ct))
         {

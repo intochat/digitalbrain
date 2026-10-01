@@ -71,8 +71,6 @@ public sealed class AppAuthFacts
 
         return UnitTest.Create()
             .WithExecution(new TestExecutionOptions { PrivateConfiguration = seeds })
-            .WithModule<SecretsModule>()
-            .WithModule<IntegrationsModule>()
             .WithModule<GitHubModule>()
             .StartAsync(cancellationToken);
     }

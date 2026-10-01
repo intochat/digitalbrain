@@ -15,7 +15,7 @@ internal static class ScriptEdgeEndpoints
         {
             try
             {
-                return await scripts.InvokeAsync(Bearer(http), invocation, cancellationToken) is { } value ? Results.Json(value) : Results.NoContent();
+                return await scripts.InvokeAsync(Bearer(http), (invocation.Contract, invocation.Key, invocation.Method, invocation.Arguments), cancellationToken) is { } value ? Results.Json(value) : Results.NoContent();
             }
             catch (Exception error) { return Refusal(error); }
         });

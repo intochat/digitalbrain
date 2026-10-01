@@ -1,4 +1,7 @@
 <Project>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)ModuleBuilderFactory.cs" Link="Generated/ModuleBuilderFactory.cs" />
+  </ItemGroup>
   <!-- Aspire normally emits these paths from its AppHost SDK. Hosted tests build the application
        model in-process instead, so the test assembly carries the metadata and Aspire finds it by
        walking the call stack. The paths are machine-local and must never be baked into a package,

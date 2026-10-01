@@ -8,12 +8,17 @@ public sealed class BrowserSessionOwner(IBrowserSessionProvider provider) : IAsy
     private Lease? _lease;
     private bool _disposed;
 
-    public async Task Attach(BrowserAttachment attachment, CancellationToken ct = default)
+    internal static void Validate(BrowserAttachment attachment)
     {
         ArgumentNullException.ThrowIfNull(attachment);
         if (attachment.Port is < 1 or > 65535 || attachment.SessionId?.Length != 32
             || !attachment.SessionId.All(char.IsAsciiHexDigit))
         { throw new ArgumentException("A loopback port and 32 hex character session marker are required.", nameof(attachment)); }
+    }
+
+    public async Task Attach(BrowserAttachment attachment, CancellationToken ct = default)
+    {
+        Validate(attachment);
         ct.ThrowIfCancellationRequested();
         Lease next;
         Lease? previous;
@@ -67,7 +72,7 @@ public sealed class BrowserSessionOwner(IBrowserSessionProvider provider) : IAsy
         {
             var lease = _lease;
             return lease?.Page is { Connected: true } page && !lease.Lifetime.IsCancellationRequested
-                ? new(true, lease.Id, page.Url, page.Title)
+                ? new(true, lease.Id, page.Url, page.Title, true)
                 : new(false, lease?.Id, null, null);
         }
     }
@@ -84,14 +89,14 @@ public sealed class BrowserSessionOwner(IBrowserSessionProvider provider) : IAsy
     private async Task<BrowserObservation> Run(Func<IBrowserPageSession, CancellationToken, Task<BrowserObservation>> action, CancellationToken ct)
     {
         Lease lease;
-        lock (_sync) { lease = _lease ?? throw new InvalidOperationException("The visible browser is not connected."); }
+        lock (_sync) { lease = _lease is { Page.Connected: true } current ? current : throw new BrowserNotConnectedException(); }
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, lease.Lifetime.Token);
         await _gate.WaitAsync(linked.Token).ConfigureAwait(false);
         try
         {
             linked.Token.ThrowIfCancellationRequested();
             var page = lease.Page;
-            if (page is not { Connected: true }) { throw new InvalidOperationException("The visible browser is disconnected."); }
+            if (page is not { Connected: true }) { throw new BrowserNotConnectedException(); }
             var result = await action(page, linked.Token).ConfigureAwait(false);
             linked.Token.ThrowIfCancellationRequested();
             return result;

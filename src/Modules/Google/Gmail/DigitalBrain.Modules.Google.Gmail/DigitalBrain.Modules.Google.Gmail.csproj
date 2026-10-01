@@ -16,6 +16,5 @@
     <ProjectReference Include="../DigitalBrain.Modules.Google.Gmail.Contracts/DigitalBrain.Modules.Google.Gmail.Contracts.csproj" />
     <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
     <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
-    <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
   </ItemGroup>
 </Project>

@@ -14,6 +14,7 @@ public sealed class AssistantModule : IModule
         ArgumentNullException.ThrowIfNull(silo);
         silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IAgentToolFactory, WorkspaceFormTools>());
         silo.Services.TryAddSingleton<PackageService>();
+        silo.Services.AddOptions<AssistantOptions>().BindConfiguration("Assistant");
     }
 
     public void Configure(IEndpointRouteBuilder endpoints)

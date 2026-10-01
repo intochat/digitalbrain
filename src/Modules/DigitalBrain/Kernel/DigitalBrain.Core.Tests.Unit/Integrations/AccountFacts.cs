@@ -69,8 +69,6 @@ public sealed class AccountFacts : IDisposable
         var ct = TestContext.Current.CancellationToken;
         var scripted = new ScriptedProbe(AccountProbeOutcome.Expired, AccountProbeOutcome.Failing);
         await using var brain = await UnitTest.Create()
-            .WithModule<SecretsModule>()
-            .WithModule<IntegrationsModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IAccountProbe>(scripted))
             .StartAsync(ct);
         var accounts = brain.Get<IIntegrationAccounts>(Owner);
@@ -198,8 +196,9 @@ public sealed class AccountFacts : IDisposable
         var builder = WebApplication.CreateBuilder();
         DigitalBrain.Testing.TestLogging.Apply(builder.Configuration);
         builder.Services.AddSingleton(typeof(IGrainFactory), _ => null!);
+        builder.Services.AddSingleton(typeof(IDigitalBrain), _ => null!);
         IEndpointRouteBuilder app = builder.Build();
-        new IntegrationsModule().Configure(app);
+        DigitalBrain.Platform.PlatformHosting.MapDigitalBrainPlatform(app);
 
         var routes = app.DataSources.SelectMany(source => source.Endpoints)
             .OfType<RouteEndpoint>().Select(endpoint => endpoint.RoutePattern.RawText!).ToArray();
@@ -213,8 +212,9 @@ public sealed class AccountFacts : IDisposable
         var builder = WebApplication.CreateBuilder();
         DigitalBrain.Testing.TestLogging.Apply(builder.Configuration);
         builder.Services.AddSingleton(typeof(IGrainFactory), _ => null!);
+        builder.Services.AddSingleton(typeof(IDigitalBrain), _ => null!);
         IEndpointRouteBuilder app = builder.Build();
-        new IntegrationsModule().Configure(app);
+        DigitalBrain.Platform.PlatformHosting.MapDigitalBrainPlatform(app);
 
         var routes = app.DataSources.SelectMany(source => source.Endpoints)
             .OfType<RouteEndpoint>().Select(endpoint => endpoint.RoutePattern.RawText!).ToArray();
@@ -249,7 +249,7 @@ public sealed class AccountFacts : IDisposable
     }
 
     private static Task<UnitBrain> StartAsync(CancellationToken cancellationToken)
-        => UnitTest.Create().WithModule<SecretsModule>().WithModule<IntegrationsModule>().StartAsync(cancellationToken);
+        => UnitTest.Create().StartAsync(cancellationToken);
 
     private static CallerContext UserCaller() => new()
     {

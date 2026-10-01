@@ -17,6 +17,8 @@ public sealed record FlutterHostingOptions
 }
 public sealed record FlutterModuleOptions : IModuleOptions
 {
+    public string AssistantTitle { get; set; } = "Assistant";
+
     public FlutterHostingOptions Hosting { get; set; } = new();
 
     public FlutterModuleOptions RunWebApp() => WithHost(FlutterHostKind.Web);
