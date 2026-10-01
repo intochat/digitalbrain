@@ -123,7 +123,7 @@ public sealed class PostgresWriteTableFacts
     {
         await using var brain = await Start(new MemoryTables());
         Stamp();
-        await Research(brain.Get<IPostgresTable>("customer-research"));
+        await Research(brain.Get<IPostgresTable>("research-results"));
     }
 
     [Fact]

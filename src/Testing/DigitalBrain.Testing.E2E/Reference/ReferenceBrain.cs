@@ -48,7 +48,7 @@ public static class ReferenceBrain
             .WithModule<MemoryModule>()
             .WithModule<ClickHouseModule, ClickHouseModuleOptions>(database => database.WithClickHouse(options => options.WithSeed("leads")))
             .WithModule<SupabaseModule, SupabaseModuleOptions>(database => database.WithConnection("supabase"))
-            .WithModule<PostgresModule, PostgresModuleOptions>(database => database.WithPostgres(options => options.DatabaseName = "customer-research"))
+            .WithModule<PostgresModule, PostgresModuleOptions>(database => database.WithPostgres(options => options.DatabaseName = "digitalbrain"))
             .WithModule<PlaywrightModule>()
             .WithModule<TimeModule>()
             .WithModule<FilesModule>()
@@ -69,7 +69,7 @@ public static class ReferenceBrain
             .ConfigureModule<QdrantModule, QdrantModuleOptions>(qdrant => qdrant.Host = false)
             .ConfigureModule<PostgresModule, PostgresModuleOptions>(database => database.WithPostgres(options =>
             {
-                options.DatabaseName = "customer-research";
+                options.DatabaseName = "digitalbrain";
                 options.PersistentStorage = false;
             }))
             .ConfigureModule<ClickHouseModule, ClickHouseModuleOptions>(database => database.WithClickHouse(options =>

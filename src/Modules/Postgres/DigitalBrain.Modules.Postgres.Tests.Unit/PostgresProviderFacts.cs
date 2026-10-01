@@ -52,7 +52,7 @@ public sealed class PostgresProviderFacts
         finally
         {
             await using var cleanup = source.CreateCommand($"DROP SCHEMA {schema} CASCADE");
-            await cleanup.ExecuteNonQueryAsync(CancellationToken.None);
+            await cleanup.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
         }
     }
 }

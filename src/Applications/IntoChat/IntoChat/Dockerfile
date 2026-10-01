@@ -17,9 +17,6 @@
 #   ConnectionStrings__grainstate   Orleans grain state (digitalbrain-v2-state)
 #   ConnectionStrings__qdrant  Endpoint=http://qdrant:6334;Key=...
 #
-# The product profile excludes the developer executors: Coding, CSharp, Roslyn, DotNet
-# and Aspire are not in the module list below.
-#
 # Ports: 8080 silo HTTP (broker + health).
 
 FROM mcr.microsoft.com/dotnet/sdk:11.0.100-rc.1 AS build
@@ -40,7 +37,7 @@ WORKDIR /app
 
 COPY --from=build /out/silo /app/silo
 
-# Product module set matching the product AppHost profile (no developer modules).
+# Product module set checked against AppHost composition by the host unit suite.
 ENV ASPNETCORE_ENVIRONMENT=Production \
     ASPNETCORE_URLS=http://0.0.0.0:8080 \
     DOTNET_EnableDiagnostics=0 \
@@ -59,7 +56,14 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     DigitalBrain__Modules__10="DigitalBrain.Registry.RegistryModule, DigitalBrain.Modules.Registry" \
     DigitalBrain__Modules__11="DigitalBrain.Apps.AppsModule, DigitalBrain.Modules.Apps" \
     DigitalBrain__Modules__12="DigitalBrain.Qdrant.QdrantModule, DigitalBrain.Modules.Qdrant" \
-    DigitalBrain__Modules__13="DigitalBrain.Files.FilesModule, DigitalBrain.Modules.Files"
+    DigitalBrain__Modules__13="DigitalBrain.Files.FilesModule, DigitalBrain.Modules.Files" \
+    DigitalBrain__Modules__14="DigitalBrain.Postgres.PostgresModule, DigitalBrain.Modules.Postgres" \
+    DigitalBrain__Modules__15="DigitalBrain.Assistant.AssistantModule, DigitalBrain.Modules.Assistant" \
+    DigitalBrain__Modules__16="DigitalBrain.Microsoft.Playwright.PlaywrightModule, DigitalBrain.Modules.Microsoft.Playwright" \
+    DigitalBrain__Modules__17="DigitalBrain.Specs.SpecsModule, DigitalBrain.Modules.Specs" \
+    DigitalBrain__Modules__18="DigitalBrain.Microsoft.Aspire.AspireModule, DigitalBrain.Modules.Microsoft.Aspire" \
+    DigitalBrain__Modules__19="DigitalBrain.Microsoft.CSharp.CSharpModule, DigitalBrain.Modules.Microsoft.CSharp" \
+    DigitalBrain__Modules__20="DigitalBrain.Microsoft.CSharp.CSharpAuthoringModule, DigitalBrain.Modules.Microsoft.CSharp"
 
 EXPOSE 8080
 
