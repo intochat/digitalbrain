@@ -10,6 +10,22 @@ namespace DigitalBrain.Modules.Supabase.Tests.Unit.Table;
 public sealed class SupabaseTableFacts
 {
     [Fact]
+    public async Task SharedTableEngineReactivatesThePersistedViewAndCreationReceipt()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartAsync(new FakeSupabaseProvider(), ct);
+        var table = brain.Get<ISupabaseTable>("shared-engine");
+        var request = new CreateQueryTable("Saved view", "select id from people");
+        var saved = await table.CreateFromQueryOnce("create-once", request, ct);
+        await brain.DeactivateAsync(table, ct);
+        var restored = await table.ReadSummary();
+        Assert.Equal(saved.Title, restored!.Title);
+        Assert.Equal(saved.Revision, restored.Revision);
+        Assert.Equal(saved.Revision, (await table.CreateFromQueryOnce("create-once", request, ct)).Revision);
+        Assert.Single((await table.Read(new(0, 50)))!.Rows);
+    }
+
+    [Fact]
     public async Task TerminatedSelectCreatesTableAndServesLiveRows()
     {
         var ct = TestContext.Current.CancellationToken;

@@ -6,7 +6,7 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005;CA1812</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../Supabase/DigitalBrain.Modules.Supabase/DigitalBrain.Modules.Supabase.csproj" />
+    <ProjectReference Include="../../../Libraries/DigitalBrain.LiveTables/DigitalBrain.LiveTables.csproj" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Npgsql" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.Postgres.Tests.Unit" />

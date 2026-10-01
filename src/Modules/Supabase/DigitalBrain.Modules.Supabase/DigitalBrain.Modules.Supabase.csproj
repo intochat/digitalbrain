@@ -11,6 +11,7 @@
     <InternalsVisibleTo Include="DigitalBrain.Modules.Supabase.Tests.Unit" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../../../Libraries/DigitalBrain.LiveTables/DigitalBrain.LiveTables.csproj" />
     <ProjectReference Include="../DigitalBrain.Modules.Supabase.Contracts/DigitalBrain.Modules.Supabase.Contracts.csproj" />
     <ProjectReference Include="../../AI/DigitalBrain.Modules.AI.Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../../Google/Flutter/DigitalBrain.Modules.Flutter.Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />

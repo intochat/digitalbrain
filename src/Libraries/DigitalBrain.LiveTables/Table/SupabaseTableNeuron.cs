@@ -76,7 +76,7 @@ internal sealed class SupabaseTableNeuron(
 
         var view = SupabaseTablePolicy.CreateView(this.GetPrimaryKeyString(), request.Title, columns) with { Source = request.Source };
         cancellationToken.ThrowIfCancellationRequested();
-        state.State = current with { View = view, BaseSql = sql, SourceColumns = columns, CreationOperation = operationId, CreationRequest = request };
+        state.State = current with { View = view, BaseSql = sql, SourceColumns = columns.ToArray(), CreationOperation = operationId, CreationRequest = request };
         try { await state.WriteStateAsync(); }
         catch { state.State = current; throw; }
         await PublishAsync(new SupabaseTableChanged(view.Id, view.Title, view.Revision));
@@ -176,3 +176,4 @@ internal sealed class SupabaseTableNeuron(
 
     private static int Clamp(long count) => count > int.MaxValue ? int.MaxValue : (int)count;
 }
+
