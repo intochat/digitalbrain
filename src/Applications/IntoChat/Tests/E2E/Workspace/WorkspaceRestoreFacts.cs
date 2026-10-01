@@ -8,20 +8,19 @@ using DigitalBrain.Identity;
 
 namespace IntoChat.Tests.E2E.Workspace;
 
-public sealed class WorkspaceRestoreFacts
+public sealed class WorkspaceRestoreFacts(IntoChatHostFixture host) : BrainFact(host)
 {
     [Fact(Timeout = 300_000)]
     public async Task RemoteWindowStaysInItsWorkspaceAndFilteredViewSurvivesReloadAndReopen()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp()).StartAsync(ct);
+        var brain = Brain;
         const string marker = "Restored filtered row";
         await LeadData.SeedAsync(brain, marker, ct);
-        var page = brain.Page;
+        var page = await OpenPageAsync(ct);
         await page.SetViewportSizeAsync(1600, 1000);
-        var projectId = await WorkspaceBrowser.CreateProjectAsync(page, "Data workspace");
-        await WorkspaceBrowser.CreateProjectAsync(page, "Other workspace");
+        var projectId = await WorkspaceBrowser.CreateProjectAsync(page, "Restore data workspace");
+        await WorkspaceBrowser.CreateProjectAsync(page, "Restore other workspace");
 
         var table = brain.Get<ISupabaseTable>("restored-leads");
         var snapshot = await table.CreateFromQuery(new("Active leads", "select id, company, email from leads where active order by id"));
@@ -33,19 +32,29 @@ public sealed class WorkspaceRestoreFacts
         var window = page.GetByRole(AriaRole.Region, new() { Name = "Active leads", Exact = true });
         await Assertions.Expect(window).ToHaveCountAsync(0);
         await page.GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("^Workspaces") }).ClickAsync();
-        await page.GetByRole(AriaRole.Menuitemcheckbox, new() { Name = "Data workspace", Exact = true }).ClickAsync();
+        await page.GetByRole(AriaRole.Menuitemcheckbox, new() { Name = "Restore data workspace", Exact = true }).ClickAsync();
         await Assertions.Expect(window.GetByText(marker, new() { Exact = true })).ToBeVisibleAsync();
 
+        // A reload starts with a clean dock by design; the saved window is reopened explicitly
+        // and still carries its filtered view.
         await page.ReloadAsync();
-        await Assertions.Expect(window.GetByText(marker, new() { Exact = true })).ToBeVisibleAsync();
+        await Assertions.Expect(window).ToHaveCountAsync(0);
+        await OpenSavedWorkAsync(page);
         await Assertions.Expect(window).ToHaveCountAsync(1);
+        await Assertions.Expect(window.GetByText(marker, new() { Exact = true })).ToBeVisibleAsync();
+
         await page.GetByRole(AriaRole.Button, new() { Name = "Close editor", Exact = true }).ClickAsync();
         await Assertions.Expect(window).ToHaveCountAsync(0);
+        await OpenSavedWorkAsync(page);
+        await Assertions.Expect(window).ToHaveCountAsync(1);
+        await Assertions.Expect(window.GetByText(marker, new() { Exact = true })).ToBeVisibleAsync();
+    }
+
+    private static async Task OpenSavedWorkAsync(IPage page)
+    {
         await page.GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("^Workspaces") }).ClickAsync();
         await page.GetByRole(AriaRole.Menuitem, new() { Name = "Saved work", Exact = true }).ClickAsync();
         await page.GetByRole(AriaRole.Alertdialog)
             .GetByRole(AriaRole.Button, new() { Name = "Active leads" }).ClickAsync();
-        await Assertions.Expect(window).ToHaveCountAsync(1);
-        await Assertions.Expect(window.GetByText(marker, new() { Exact = true })).ToBeVisibleAsync();
     }
 }

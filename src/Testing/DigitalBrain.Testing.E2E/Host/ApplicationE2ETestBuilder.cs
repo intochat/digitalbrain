@@ -46,12 +46,15 @@ public sealed class E2ETestBuilder<TAppHost> where TAppHost : class
     }
 
     // Adds environment variables to the primary application resource, for test-only wiring such as
-    // pointing the OTLP exporter at a collector owned by the test process.
+    // pointing the OTLP exporter at a collector owned by the test process. Later calls merge over
+    // earlier ones, so a composition's defaults survive a fact adding its own variables.
     public E2ETestBuilder<TAppHost> WithResourceEnvironment(IReadOnlyDictionary<string, string> environment)
     {
         EnsureMutable();
         ArgumentNullException.ThrowIfNull(environment);
-        _execution = _execution with { ResourceEnvironment = environment };
+        var merged = new Dictionary<string, string>(_execution.ResourceEnvironment, StringComparer.Ordinal);
+        foreach (var (key, value) in environment) { merged[key] = value; }
+        _execution = _execution with { ResourceEnvironment = merged };
         return this;
     }
     public E2ETestBuilder<TAppHost> WithBrowser(BrowserOptions browser)

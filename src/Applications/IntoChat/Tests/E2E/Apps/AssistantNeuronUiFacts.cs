@@ -6,15 +6,14 @@ using IntoChat.Tests.E2E.Workspace;
 
 namespace IntoChat.Tests.E2E.Apps;
 
-public sealed class AssistantNeuronUiFacts
+public sealed class AssistantNeuronUiFacts(IntoChatHostFixture host) : BrainFact(host)
 {
     [Fact(Timeout = 180_000)]
     public async Task OpeningAssistantCreatesIndependentPrimitiveWindowsAndBoundButtonsExecuteTurns()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var model = await ScriptedModelServer.StartAsync(ct);
-        await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint)).StartAsync(ct);
+        var model = Model;
+        var brain = Brain;
         await LeadData.SeedAsync(brain, "Neuron UI", ct);
         async Task<JsonElement> Open()
         {

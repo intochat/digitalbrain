@@ -52,16 +52,27 @@ jobs:
       - name: Validate NuGet packages
         run: dotnet pack DigitalBrain.slnx -c Release --no-build -v quiet -o artifacts
 
-      # One deterministic image build before the parallel AppHost sessions race to
-      # request it; every E2E web host then serves this cached image in seconds.
-      - name: Build the shell web image
-        run: docker build -f src/Modules/Google/Flutter/app/shell/Dockerfile src/Modules/Google/Flutter/app
+      # The one shared E2E host (IntoChatHostFixture) serves the web shell, so the suite
+      # compiles Flutter once per run and drives it with Playwright.
+      - name: Install Flutter for the shared E2E web host
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.2'
+          cache: true
+
+      - name: Resolve Flutter workspace
+        working-directory: src/Modules/Google/Flutter/app
+        run: flutter pub get --enforce-lockfile
+
+      - name: Install Playwright browser and system dependencies
+        run: pwsh src/Applications/IntoChat/Tests/E2E/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
 
       - name: Test
         run: dotnet test DigitalBrain.slnx -c Release --no-build -v quiet
         env:
-          # No Flutter SDK on this runner: E2E web hosts serve the containerized bundle.
-          DigitalBrain__Flutter__Hosting__WebContainer: 'true'
+          DIGITALBRAIN_E2E_LIVE_MODEL: '0'
+          DIGITALBRAIN_E2E_HEADED: '0'
 
   flutter-web-build:
     name: Flutter analyze and web build

@@ -8,7 +8,7 @@ namespace IntoChat.Tests.E2E.Packages;
 
 // Two signed-in people share a C# app through the product routes: Alice publishes, Bob installs it
 // in one request, customizes it, forks and improves it, and Alice accepts his change back.
-public sealed class PackageSharingFacts
+public sealed class PackageSharingFacts(IntoChatHostFixture host) : BrainFact(host)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -16,8 +16,7 @@ public sealed class PackageSharingFacts
     public async Task PeopleShareInstallForkAndContributeCSharpAppsOverHttp()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.Create()
-            .StartAsync(ct);
+        var brain = Brain;
         using var alice = await People.SignedIn(brain.HttpClient, "alice", ct);
         using var bob = await People.SignedIn(brain.HttpClient, "bob", ct);
 
@@ -66,7 +65,8 @@ public sealed class PackageSharingFacts
         while (invocation.GetProperty("status").GetInt32() == (int)InvocationStatus.Pending)
         {
             var view = await People.Send(client, HttpMethod.Get, app, null, timeout.Token);
-            Assert.NotEqual((int)CSharpFileStatus.Exited, view.GetProperty("file").GetProperty("status").GetInt32());
+            foreach (var file in view.GetProperty("files").EnumerateArray())
+            { Assert.NotEqual((int)CSharpFileStatus.Exited, file.GetProperty("status").GetInt32()); }
             await Task.Delay(500, timeout.Token);
             invocation = await People.Send(client, HttpMethod.Get, $"{app}/invocations/{invocation.GetProperty("id").GetGuid()}", null, timeout.Token);
         }

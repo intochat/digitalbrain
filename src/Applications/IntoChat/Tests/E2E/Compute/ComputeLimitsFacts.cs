@@ -4,7 +4,6 @@ using IntoChat.Tests.E2E.Agent;
 
 namespace IntoChat.Tests.E2E.Compute;
 
-[Collection(IntoChatHostCollection.Name)]
 public sealed class ComputeLimitsFacts(IntoChatHostFixture host)
 {
     [Fact(Timeout = 240_000)]

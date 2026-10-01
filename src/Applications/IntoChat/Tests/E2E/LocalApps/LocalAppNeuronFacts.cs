@@ -4,7 +4,6 @@ using DigitalBrain.Files;
 using DigitalBrain.Identity;
 namespace IntoChat.Tests.E2E.LocalApps;
 
-[Collection(IntoChatHostCollection.Name)]
 public sealed class LocalAppNeuronFacts(IntoChatHostFixture host)
 {
     [Fact(Timeout = 180_000)]

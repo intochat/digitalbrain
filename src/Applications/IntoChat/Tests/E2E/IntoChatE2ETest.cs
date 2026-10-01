@@ -56,6 +56,12 @@ internal static class IntoChatE2ETest
             .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.BackendOnly())
             .WithExecution(new()
             {
+                // Shipping verifies five packages through real sandbox scripts. Only the shared
+                // host (IntoChatHostFixture) pays that once; private hosts opt out by default.
+                ResourceEnvironment = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["DigitalBrain__Apps__ShipOnStartup"] = "false",
+                },
                 PrivateConfiguration = Merge(new Dictionary<string, string?>
                 {
                     ["Parameters:openai-api-key"] = modelApiKey,

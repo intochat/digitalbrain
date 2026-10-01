@@ -28,7 +28,14 @@ internal abstract class ApiKeyProviderFactory : ILlmProviderFactory
         return credentials.ReleaseSecret(IntegrationId, AiIntegrations.ApiKeyField);
     }
 
-    protected Uri EndpointOf(IAiCredentials credentials, string? pinned)
+    // A pinned profile endpoint wins, then the registration's runtime setting, then the
+    // composition's declared endpoint (AIOptions), then the provider's hosted default.
+    protected Uri EndpointOf(AIOptions configuration, IAiCredentials credentials, string? pinned)
         => new(pinned is { Length: > 0 } ? pinned
-            : credentials.Setting(IntegrationId, AiIntegrations.EndpointField) ?? AiIntegrations.DefaultEndpointOf(Provider));
+            : credentials.Setting(IntegrationId, AiIntegrations.EndpointField)
+            ?? DeclaredEndpoint(configuration)
+            ?? AiIntegrations.DefaultEndpointOf(Provider));
+
+    protected string? DeclaredEndpoint(AIOptions configuration)
+        => configuration.Provider(Provider).Endpoint is { Length: > 0 } declared ? declared : null;
 }

@@ -10,16 +10,13 @@ using DigitalBrain.Identity;
 
 namespace IntoChat.Tests.E2E.Receipts;
 
-public sealed class ReceiptJourneyFacts
+public sealed class ReceiptJourneyFacts(IntoChatHostFixture host) : BrainFact(host)
 {
     [Fact(Timeout = 240_000)]
     public async Task EveryIntentEmitsAShadowPricedReceiptFromDurableUsage()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var model = await ScriptedModelServer.StartAsync(ct);
-        await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
-            .StartAsync(ct);
+        var brain = Brain;
         await LeadData.SeedAsync(brain, "Receipt run", ct);
 
         using var response = await brain.HttpClient.PostAsJsonAsync("/agent",

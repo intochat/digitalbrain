@@ -6,7 +6,6 @@ using IntoChat.Tests.E2E.Diagnostics;
 namespace IntoChat.Tests.E2E.Security;
 
 // A secret must not appear in HTTP responses, traces, or logs. SecretsFacts inspects persisted state.
-[Collection(IntoChatHostCollection.Name)]
 public sealed class CanarySecretFacts(IntoChatHostFixture host)
 {
     private const string Owner = "owner";
@@ -30,14 +29,8 @@ public sealed class CanarySecretFacts(IntoChatHostFixture host)
     public async Task ASeededVaultSecretNeverAppearsInPlaintext()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var collector = TestTelemetryCollector.Start();
-        await using var brain = await IntoChatE2ETest.Create()
-            .WithResourceEnvironment(new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["OTEL_EXPORTER_OTLP_ENDPOINT"] = collector.Endpoint.AbsoluteUri,
-                ["OTEL_EXPORTER_OTLP_PROTOCOL"] = "http/protobuf",
-            })
-            .StartAsync(ct);
+        await using var brain = await host.LeaseAsync(ct);
+        var collector = host.Collector;
 
         using var seeded = await brain.HttpClient.PostAsJsonAsync(
             $"/secrets/{Owner}",
@@ -63,14 +56,8 @@ public sealed class CanarySecretFacts(IntoChatHostFixture host)
     public async Task AConnectionTokenNeverAppearsInPlaintext(string source)
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var collector = TestTelemetryCollector.Start();
-        await using var brain = await IntoChatE2ETest.Create()
-            .WithResourceEnvironment(new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["OTEL_EXPORTER_OTLP_ENDPOINT"] = collector.Endpoint.AbsoluteUri,
-                ["OTEL_EXPORTER_OTLP_PROTOCOL"] = "http/protobuf",
-            })
-            .StartAsync(ct);
+        await using var brain = await host.LeaseAsync(ct);
+        var collector = host.Collector;
 
         using var seeded = await brain.HttpClient.PostAsJsonAsync(
             $"/brains/{Owner}/integrations/accounts/connect",
@@ -94,14 +81,8 @@ public sealed class CanarySecretFacts(IntoChatHostFixture host)
     public async Task AFormSecretTravelsOnlyAsAVaultReference()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var collector = TestTelemetryCollector.Start();
-        await using var brain = await IntoChatE2ETest.Create()
-            .WithResourceEnvironment(new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["OTEL_EXPORTER_OTLP_ENDPOINT"] = collector.Endpoint.AbsoluteUri,
-                ["OTEL_EXPORTER_OTLP_PROTOCOL"] = "http/protobuf",
-            })
-            .StartAsync(ct);
+        await using var brain = await host.LeaseAsync(ct);
+        var collector = host.Collector;
 
         const string workspace = "form-canary";
         var scope = Scope(Owner, workspace);

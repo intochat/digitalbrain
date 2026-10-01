@@ -7,15 +7,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace IntoChat.Tests.E2E.Workspace;
 
-public sealed class ShellPersistenceFacts
+public sealed class ShellPersistenceFacts(IntoChatHostFixture host) : BrainFact(host)
 {
     [Fact(Timeout = 300_000)]
     public async Task FreshBrowserRestoresWorkspaceWithoutDeviceStorage()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp()).StartAsync(ct);
-        var page = brain.Page;
+        var brain = Brain;
+        var page = await OpenPageAsync(ct);
         var id = await WorkspaceBrowser.CreateProjectAsync(page, "Cloud-only workspace");
         var durable = false;
         for (var attempt = 0; attempt < 100; attempt++)

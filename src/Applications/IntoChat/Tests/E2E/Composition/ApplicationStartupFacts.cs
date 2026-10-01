@@ -1,7 +1,6 @@
 using DigitalBrain.Flutter;
 namespace IntoChat.Tests.E2E.Composition;
 
-[Collection(IntoChatHostCollection.Name)]
 public sealed class ApplicationStartupFacts(IntoChatHostFixture host)
 {
     [Fact]

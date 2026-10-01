@@ -8,7 +8,6 @@ using DigitalBrain.Identity;
 
 namespace IntoChat.Tests.E2E.Security;
 
-[Collection(IntoChatHostCollection.Name)]
 public sealed class CrossWorkspaceFacts(IntoChatHostFixture host)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);

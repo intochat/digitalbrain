@@ -14,16 +14,14 @@ using DigitalBrain.Identity;
 
 namespace IntoChat.Tests.E2E.Agent;
 
-public sealed class AgentWorkflowFacts
+public sealed class AgentWorkflowFacts(IntoChatHostFixture host) : BrainFact(host)
 {
     [Fact(Timeout = 240_000)]
     public async Task EmptyQueryIsRealAndFailedToolsNeverReportSuccess()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var model = await ScriptedModelServer.StartAsync(ct);
-        await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
-            .StartAsync(ct);
+        var model = Model;
+        var brain = Brain;
         await LeadData.SeedAsync(brain, "Beyond first page", ct);
         async Task<string> Ask(string run)
         {
@@ -58,10 +56,8 @@ public sealed class AgentWorkflowFacts
     public async Task DisconnectInterruptsRunAndRejectsConcurrentSubmission()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var model = await ScriptedModelServer.StartAsync(ct);
-        await using var brain = await IntoChatE2ETest.Create()
-            .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint))
-            .StartAsync(ct);
+        var model = Model;
+        var brain = Brain;
         await LeadData.SeedAsync(brain, "Beyond first page", ct);
         model.Delay = TimeSpan.FromMinutes(1);
         var input = new { brainId = "cancel", threadId = "thread", runId = "cancel-run", messages = new[] { new { role = "user", content = "Show leads" } } };
@@ -108,11 +104,11 @@ public sealed class AgentWorkflowFacts
     public async Task RealModelProtocolOpensWindowAndReplayedRunDoesNotCallModelAgain()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var model = await ScriptedModelServer.StartAsync(ct);
-        await using var brain = await IntoChatE2ETest.Create().ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, model.Endpoint)).StartAsync(ct);
+        var model = Model;
+        var brain = Brain;
         await using var connection = new NpgsqlConnection(await brain.Application.GetConnectionStringAsync("supabase-database", ct));
         await connection.OpenAsync(ct);
-        await using var seed = new NpgsqlCommand("CREATE TABLE leads (id int, company text, email text, active boolean); INSERT INTO leads VALUES (1, 'Real company', 'real@example.test', true)", connection);
+        await using var seed = new NpgsqlCommand("DROP TABLE IF EXISTS leads CASCADE; CREATE TABLE leads (id int, company text, email text, active boolean); INSERT INTO leads VALUES (1, 'Real company', 'real@example.test', true)", connection);
         await seed.ExecuteNonQueryAsync(ct);
         var input = new { brainId = "agent", threadId = "thread", runId = "run", messages = new[] { new { role = "user", content = "Show active leads" } } };
         using var response = await brain.HttpClient.PostAsJsonAsync("/agent", input, ct);

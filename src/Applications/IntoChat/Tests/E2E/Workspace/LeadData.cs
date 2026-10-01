@@ -10,8 +10,22 @@ internal static class LeadData
         await using var connection = new NpgsqlConnection(await brain.Application.GetConnectionStringAsync("supabase-database", ct));
         await connection.OpenAsync(ct);
         var columns = string.Join(", ", Enumerable.Range(1, 58).Select(i => $"{i} AS extra_{i}"));
-        await using var command = new NpgsqlCommand($"CREATE VIEW wide_customers AS SELECT leads.*, {columns} FROM leads", connection);
+        await using var command = new NpgsqlCommand(
+            $"DROP VIEW IF EXISTS wide_customers; CREATE VIEW wide_customers AS SELECT leads.*, {columns} FROM leads", connection);
         await command.ExecuteNonQueryAsync(ct);
+    }
+
+    // Facts share one database; resetting the fixture tables keeps each fact's data its own.
+    public static async Task CreateCustomersAsync(E2EBrain brain, CancellationToken ct)
+    {
+        await using var connection = new NpgsqlConnection(await brain.Application.GetConnectionStringAsync("supabase-database", ct));
+        await connection.OpenAsync(ct);
+        await using var seed = new NpgsqlCommand(
+            "DROP TABLE IF EXISTS customers CASCADE; " +
+            "CREATE TABLE customers (id int PRIMARY KEY, company text, city text); " +
+            "INSERT INTO customers SELECT n, 'Customer ' || n, CASE WHEN n % 10 = 0 THEN 'London' ELSE 'Berlin' END FROM generate_series(1,60) n",
+            connection);
+        await seed.ExecuteNonQueryAsync(ct);
     }
 
     public static async Task SeedAsync(E2EBrain brain, string marker, CancellationToken ct)
@@ -19,6 +33,7 @@ internal static class LeadData
         await using var connection = new NpgsqlConnection(await brain.Application.GetConnectionStringAsync("supabase-database", ct));
         await connection.OpenAsync(ct);
         await using var schema = new NpgsqlCommand(
+            "DROP TABLE IF EXISTS leads CASCADE; " +
             "CREATE TABLE leads (id int PRIMARY KEY, company text, email text, active boolean)", connection);
         await schema.ExecuteNonQueryAsync(ct);
         await using var seed = new NpgsqlCommand(
@@ -31,7 +46,7 @@ internal static class LeadData
     {
         await using var connection = new NpgsqlConnection(await brain.Application.GetConnectionStringAsync("supabase-database", ct));
         await connection.OpenAsync(ct);
-        await using var command = new NpgsqlCommand("DROP TABLE leads", connection);
+        await using var command = new NpgsqlCommand("DROP TABLE leads CASCADE", connection);
         await command.ExecuteNonQueryAsync(ct);
     }
 }

@@ -36,6 +36,11 @@ public sealed class AgentModelsHttpFacts
         Assert.Contains(catalog.RootElement.GetProperty("models").EnumerateArray(),
             model => model.GetProperty("id").GetString() == "preset:IGpt56Luna");
 
+        // With authentication on, brain routes require directory membership; grant the owner
+        // this workspace so the fact measures model validation, not access control.
+        await brain.Get<DigitalBrain.Identity.IIdentityDirectory>(DigitalBrain.Identity.IdentityGrains.Directory)
+            .ShareBrainAsync("owner", "model-validation", "owner", "Owner", DigitalBrain.Identity.MemberRole.Owner, ct);
+
         using var rejected = await brain.HttpClient.PostAsJsonAsync("/agent", new
         {
             brainId = "model-validation",

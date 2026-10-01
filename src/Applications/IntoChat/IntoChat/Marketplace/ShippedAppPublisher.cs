@@ -9,12 +9,21 @@ namespace IntoChat.Marketplace;
 // Brings every shipped app to the marketplace at startup: commit it when its folder changed, verify
 // the revision's scenarios once, and publish it only when they pass. A red app stays unpublished and
 // its failing steps are visible on its spec page.
-internal sealed class ShippedAppPublisher(IDigitalBrain brain, MarketplaceService marketplace, IHostApplicationLifetime lifetime, ILogger<ShippedAppPublisher> logger) : BackgroundService
+internal sealed class ShippedAppPublisher(IDigitalBrain brain, MarketplaceService marketplace, IHostApplicationLifetime lifetime, IConfiguration configuration, ILogger<ShippedAppPublisher> logger) : BackgroundService
 {
+    // Verifying every shipped app runs real sandbox scripts; a test host that exercises none of
+    // them turns shipping off and shares one shipped host instead.
+    public const string ShipOnStartupKey = "DigitalBrain:Apps:ShipOnStartup";
+
     private static readonly JsonSerializerOptions CanonicalJson = new(JsonSerializerDefaults.Web);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (!configuration.GetValue(ShipOnStartupKey, true))
+        {
+            logger.LogInformation("Shipped apps stay unpublished: {Key} is off.", ShipOnStartupKey);
+            return;
+        }
         if (!lifetime.ApplicationStarted.IsCancellationRequested)
         {
             var started = new TaskCompletionSource();

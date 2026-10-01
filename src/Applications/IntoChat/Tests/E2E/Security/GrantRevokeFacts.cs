@@ -7,7 +7,6 @@ namespace IntoChat.Tests.E2E.Security;
 
 // The grants list and revoke routes at the HTTP edge are scoped to the caller's workspace.
 // Enforcement of a grant on a call is covered by Identity's GrantFacts.
-[Collection(IntoChatHostCollection.Name)]
 public sealed class GrantRevokeFacts(IntoChatHostFixture host)
 {
     [Fact(Timeout = 300_000)]

@@ -11,7 +11,7 @@ internal abstract class OpenAICompatibleProviderFactory : ApiKeyProviderFactory
     public override IChatClient CreateChatClient(string model, AIOptions configuration, IAiCredentials credentials, string? endpoint = null)
     {
         var builder = new ChatClientBuilder(
-            CreateClient(credentials, endpoint).GetChatClient(model).AsIChatClient());
+            CreateClient(configuration, credentials, endpoint).GetChatClient(model).AsIChatClient());
 
         if (Provider is AiProvider.OpenAI && model.StartsWith("gpt-5.6", StringComparison.OrdinalIgnoreCase))
         {
@@ -36,11 +36,11 @@ internal abstract class OpenAICompatibleProviderFactory : ApiKeyProviderFactory
         EmbeddingModel model,
         AIOptions configuration,
         IAiCredentials credentials)
-        => CreateClient(credentials, null).GetEmbeddingClient(model.Id).AsIEmbeddingGenerator();
+        => CreateClient(configuration, credentials, null).GetEmbeddingClient(model.Id).AsIEmbeddingGenerator();
 
-    private OpenAIClient CreateClient(IAiCredentials credentials, string? pinnedEndpoint)
+    private OpenAIClient CreateClient(AIOptions configuration, IAiCredentials credentials, string? pinnedEndpoint)
     {
-        var options = new OpenAIClientOptions { NetworkTimeout = RequestTimeout, Endpoint = EndpointOf(credentials, pinnedEndpoint) };
+        var options = new OpenAIClientOptions { NetworkTimeout = RequestTimeout, Endpoint = EndpointOf(configuration, credentials, pinnedEndpoint) };
         return new OpenAIClient(new ApiKeyCredential(ReleaseApiKey(credentials)), options);
     }
 }

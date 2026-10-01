@@ -306,8 +306,17 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     });
   }
 
+  String? _lastSelectedProject;
+
   void _changed() {
     _connectWorkspaces();
+    // A switch re-reads the workspace authoritatively, so a window opened remotely while this
+    // workspace was in the background appears even if its change event was missed.
+    if (store.selectedProjectId != _lastSelectedProject) {
+      _lastSelectedProject = store.selectedProjectId;
+      final controller = _remote[_lastSelectedProject];
+      if (controller != null) unawaited(controller.refresh());
+    }
     if (store.projects.isNotEmpty) _loadApps(store.currentProject.id);
     if (mounted) setState(() {});
   }
