@@ -2,5 +2,5 @@ namespace DigitalBrain;
 
 public interface INeuron
 {
-    IAsyncEnumerable<T> Watch<T>(CancellationToken cancellationToken = default) where T : Signal;
+    IAsyncEnumerable<T> Watch<T>(CancellationToken cancellationToken) where T : Signal;
 }

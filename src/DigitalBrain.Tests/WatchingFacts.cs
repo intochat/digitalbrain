@@ -43,17 +43,22 @@ public class WatchingFacts
     }
 
     [Fact]
-    public async Task A_publisher_resolves_back_through_the_brain()
+    public async Task A_resolved_neuron_streams_clicks_whose_publisher_resolves_back()
     {
-        var button = new FakeButton();
-        await using var brain = new FakeBrain(new NeuronId("button-1"), button);
-        button.Publish(new Clicked { Publisher = new("button-1") });
-        button.Complete();
+        await using IDigitalBrain brain = new FakeBrain(new NeuronId("button-1"), new FakeButton());
+        var button = brain.Get<INeuron>(new NeuronId("button-1"));
+        ((FakeButton)button).Publish(new Clicked { Publisher = new("button-1") });
+        ((FakeButton)button).Complete();
 
+        var clicks = 0;
         await foreach (var click in button.Watch<Clicked>(TestContext.Current.CancellationToken))
         {
+            clicks++;
+            Assert.Equal(new NeuronId("button-1"), click.Publisher);
             Assert.Same(button, brain.Get<INeuron>(click.Publisher));
         }
+
+        Assert.Equal(1, clicks);
     }
 
     [Fact]
@@ -86,7 +91,7 @@ public class WatchingFacts
         public void Complete() => signals.Writer.TryComplete();
 
         public async IAsyncEnumerable<T> Watch<T>(
-            [EnumeratorCancellation] CancellationToken cancellationToken = default) where T : Signal
+            [EnumeratorCancellation] CancellationToken cancellationToken) where T : Signal
         {
             await foreach (var signal in signals.Reader.ReadAllAsync(cancellationToken))
             {
