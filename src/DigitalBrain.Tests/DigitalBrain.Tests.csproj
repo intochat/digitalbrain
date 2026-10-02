@@ -1,9 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <IsPackable>false</IsPackable>
-  </PropertyGroup>
   <ItemGroup>
-    <None Include="../DigitalBrain/DigitalBrain.csproj" Link="Model.csproj" CopyToOutputDirectory="Always" />
+    <AssemblyMetadata Include="ModelProject"
+      Value="$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../DigitalBrain/DigitalBrain.csproj'))" />
     <Using Remove="DigitalBrain.Testing" />
     <PackageReference Include="TngTech.ArchUnitNET.xUnitV3" />
     <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />

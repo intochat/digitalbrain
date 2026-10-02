@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Xml.Linq;
 using ArchUnitNET.Domain;
 using ArchUnitNET.Loader;
@@ -43,7 +44,9 @@ public class ModelFacts
     public void The_model_project_declares_no_dependencies()
     {
         // Unused build references may disappear from the compiled assembly altogether.
-        var project = XDocument.Load(Path.Combine(AppContext.BaseDirectory, "Model.csproj"));
+        var project = XDocument.Load(typeof(ModelFacts).Assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .Single(attribute => attribute.Key == "ModelProject").Value!);
         Assert.DoesNotContain(project.Descendants(), element => element.Name.LocalName is
             "PackageReference" or "ProjectReference" or "FrameworkReference");
     }
