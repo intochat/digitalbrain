@@ -47,7 +47,7 @@ jobs:
         env:
           ContainerImageTags: ${{ github.event.release.tag_name }};latest
         run: |
-          dotnet publish src/Applications/IntoChat/IntoChat/IntoChat.csproj \
+          dotnet publish src/IntoChat/IntoChat/IntoChat.csproj \
             -c Release -r linux-x64 /t:PublishContainer \
             -p:PublishProfile=Container \
             -p:EnableSdkContainerSupport=true \

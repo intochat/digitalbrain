@@ -1,6 +1,7 @@
 using DigitalBrain.Client;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
+using DigitalBrain.Platform.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Orleans.Hosting;

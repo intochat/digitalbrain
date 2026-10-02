@@ -5,7 +5,7 @@
     <RootNamespace>DigitalBrain.ClickHouse</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Deployment/DigitalBrain.Deployment.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/Deployment/DigitalBrain.Deployment/DigitalBrain.Deployment.csproj" />
     <ProjectReference Include="../DigitalBrain.Modules.ClickHouse/DigitalBrain.Modules.ClickHouse.csproj" />
   </ItemGroup>
 </Project>

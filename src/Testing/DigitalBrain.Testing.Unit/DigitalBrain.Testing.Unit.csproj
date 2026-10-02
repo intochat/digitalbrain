@@ -5,7 +5,7 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
+    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/Platform/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
     <ProjectReference Include="../DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
     <PackageReference Include="Microsoft.Orleans.TestingHost" />
     <PackageReference Include="Microsoft.Orleans.Reminders" />

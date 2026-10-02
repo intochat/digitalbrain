@@ -1,4 +1,5 @@
 using DigitalBrain.Contracts;
+using DigitalBrain.Contracts.Data;
 using Orleans.Concurrency;
 
 namespace DigitalBrain.Flutter.Chart;
@@ -8,6 +9,7 @@ public interface IChart : INeuron
 {
     Task Render(string title, string kind, IReadOnlyList<ChartPoint> points);
     Task Append(ChartPoint point);
+    Task Bind(string sourceNeuronId, RowQuery query);
     [ReadOnly, Alias("read")] Task<ChartState> Read();
 }
 
@@ -25,4 +27,6 @@ public sealed class ChartState
     [Id(2)] public string Title { get; set; } = "";
     [Id(3)] public string Kind { get; set; } = "bar";
     [Id(4)] public List<ChartPoint> Points { get; set; } = [];
+    [Id(5)] public string? SourceNeuronId { get; set; }
+    [Id(6)] public RowQuery? Query { get; set; }
 }

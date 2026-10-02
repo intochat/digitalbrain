@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><RootNamespace>DigitalBrain.Microsoft.Playwright</RootNamespace><NoWarn>$(NoWarn);CS1591</NoWarn></PropertyGroup>
   <!-- Neuron interfaces and signals use the Kernel wire vocabulary. -->
-  <ItemGroup><ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Modules.Kernel.Contracts/DigitalBrain.Modules.Kernel.Contracts.csproj" /></ItemGroup>
 </Project>
