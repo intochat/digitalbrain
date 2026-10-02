@@ -85,8 +85,15 @@ internal sealed class App(
         var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], selected);
         await BackfillStorageFiles();
         var programs = Snapshot.RunsScript ? revision.Content.Programs().Keys.ToArray() : [];
-        await DeployAndPersist(Snapshot with { Settings = settings, Accounts = accounts, ProgramGeneration = Snapshot.ProgramGeneration + 1, ScriptPaths = programs, Receipts = Receipted(request.OperationId, request),
-            StorageFiles = [.. Snapshot.StorageFiles, .. programs.Select(path => FileKey(Snapshot.ProgramGeneration + 1, path))] });
+        await DeployAndPersist(Snapshot with
+        {
+            Settings = settings,
+            Accounts = accounts,
+            ProgramGeneration = Snapshot.ProgramGeneration + 1,
+            ScriptPaths = programs,
+            Receipts = Receipted(request.OperationId, request),
+            StorageFiles = [.. Snapshot.StorageFiles, .. programs.Select(path => FileKey(Snapshot.ProgramGeneration + 1, path))]
+        });
         return Describe(Snapshot);
     }
 
@@ -162,10 +169,16 @@ internal sealed class App(
             .Select(item => item.Status == InvocationStatus.Pending ? item with { Status = InvocationStatus.Failed, Error = "The app was uninstalled.", CompletedAt = now } : item)
             .ToList();
         OperationReceipt[] completed = abandon is null ? [] : [new(abandon.OperationId, CommandHash(abandon), "Storage left behind")];
-        await Persist(Snapshot with { Status = AppStatus.Uninstalled, Invocations = invocations, Receipts = Receipted(request.OperationId, request), PendingUninstall = null,
+        await Persist(Snapshot with
+        {
+            Status = AppStatus.Uninstalled,
+            Invocations = invocations,
+            Receipts = Receipted(request.OperationId, request),
+            PendingUninstall = null,
             PendingAbandonStorage = null,
             AbandonedStorage = abandon is null ? Snapshot.AbandonedStorage : [.. Snapshot.AbandonedStorage, new(abandon.OperationId, Snapshot.StorageFiles.ToArray())],
-            LifecycleReceipts = [.. Snapshot.LifecycleReceipts, new(request.OperationId, CommandHash(request), ""), .. completed] });
+            LifecycleReceipts = [.. Snapshot.LifecycleReceipts, new(request.OperationId, CommandHash(request), ""), .. completed]
+        });
     }
 
     public async Task<AppInvocation> Invoke(InvokeApp request)

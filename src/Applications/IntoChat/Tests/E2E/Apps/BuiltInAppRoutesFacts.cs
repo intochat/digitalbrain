@@ -13,7 +13,7 @@ public sealed class BuiltInAppRoutesFacts(IntoChatHostFixture host) : BrainFact(
         var ct = TestContext.Current.CancellationToken;
         await IntoChatE2ETest.WaitUntilShippedAsync(Brain, "intochat/customer-researcher", ct, TimeSpan.FromMinutes(30));
         using var person = await People.SignedIn(Brain.HttpClient, "app-open-" + Guid.NewGuid().ToString("N"), ct);
-        var scope = "/brains/" + person.BrainId;
+        var scope = "/brains/" + person.Workspace;
         await People.Send(person.Client, HttpMethod.Post, scope + "/packages/intochat/customer-researcher", new { }, ct);
         var opened = await People.Send(person.Client, HttpMethod.Post, scope + "/apps/intochat%2Fcustomer-researcher/open", new { }, ct);
         Assert.Equal("customer-researcher", opened.GetProperty("id").GetString());

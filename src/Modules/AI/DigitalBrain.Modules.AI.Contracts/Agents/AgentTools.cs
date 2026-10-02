@@ -14,6 +14,18 @@ public interface IAgentToolFactory
     IReadOnlyList<AIFunction> Create(Func<AgentToolContext> context);
 }
 
+public interface IAgentToolSource
+{
+    Task<IAgentToolSession> OpenAsync(IReadOnlyList<string> selectedToolNames,
+        Func<AgentToolContext> context, CancellationToken ct);
+}
+
+// Owns live tool connections until the execution completes.
+public interface IAgentToolSession : IAsyncDisposable
+{
+    IReadOnlyList<AIFunction> Tools { get; }
+}
+
 public sealed record AgentContextRequest(string ScopeId, string Message, string? PreviousMessage = null);
 
 // Text is what the model should know before it answers; Tools are registered tools it may need for it.

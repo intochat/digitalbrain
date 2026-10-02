@@ -7,8 +7,7 @@ void main() {
   testWidgets('a refused uninstall can explicitly leave storage behind', (
     tester,
   ) async {
-    final server = _FakeAppsServer()
-      ..installedRevision = 'published-revision';
+    final server = _FakeAppsServer()..installedRevision = 'published-revision';
     var pending = false;
     var abandoned = false;
     await tester.pumpWidget(

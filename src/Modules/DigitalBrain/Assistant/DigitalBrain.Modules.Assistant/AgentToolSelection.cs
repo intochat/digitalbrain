@@ -9,7 +9,7 @@ internal sealed class AgentToolSelection(IGrainFactory grains)
         try
         {
             var installed = await InstalledApps.List(grains, scope, ct);
-            return installed.SelectMany(app => app.App.Operations.Select(operation => operation.Name))
+            return installed.SelectMany(app => app.App.Operations.Select(operation => AppToolName.For(app.Package, operation.Name)))
                 .Distinct(StringComparer.Ordinal).ToArray();
         }
         catch (Exception) when (!ct.IsCancellationRequested)

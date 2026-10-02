@@ -44,9 +44,9 @@ internal static class ScriptEdgeEndpoints
         }
         return error switch
         {
-        UnauthorizedAccessException => Results.Text(error.Message, statusCode: StatusCodes.Status401Unauthorized),
-        ArgumentException or NotSupportedException or System.Text.Json.JsonException => Results.Text(error.Message, statusCode: StatusCodes.Status400BadRequest),
-        _ => Results.Text(error.Message, statusCode: StatusCodes.Status422UnprocessableEntity),
+            UnauthorizedAccessException => Results.Text(error.Message, statusCode: StatusCodes.Status401Unauthorized),
+            ArgumentException or NotSupportedException or System.Text.Json.JsonException => Results.Text(error.Message, statusCode: StatusCodes.Status400BadRequest),
+            _ => Results.Text(error.Message, statusCode: StatusCodes.Status422UnprocessableEntity),
         };
     }
 }

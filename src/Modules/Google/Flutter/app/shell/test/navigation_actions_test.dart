@@ -50,9 +50,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Apps'));
       await tester.pumpAndSettle();
-      final packages = tester.widget<AppsScreen>(
-        find.byType(AppsScreen),
-      );
+      final packages = tester.widget<AppsScreen>(find.byType(AppsScreen));
       expect(packages.workspaceId, store.currentProject.id);
       packages.onClose();
       await tester.pumpAndSettle();

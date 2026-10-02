@@ -79,7 +79,10 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
             {
                 foreach (var source in services.GetServices<IAgentToolSource>())
                 {
-                    var session = await source.OpenAsync(selected, Context, ct).ConfigureAwait(false);
+                    // Sources resolve scope-dependent tools before the first call; CallId is
+                    // filled in when the model invokes one of those tools.
+                    var session = await source.OpenAsync(selected, () => new(request.ScopeId, request.RunId, currentCall ?? "")
+                    { DatabaseSource = AgentToolPolicy.DatabaseSource(request.Message) }, ct).ConfigureAwait(false);
                     sessions.Add(session);
                     available.AddRange(session.Tools);
                 }

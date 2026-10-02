@@ -32,8 +32,11 @@ public sealed class AppsRouteFacts
         await using var brain = await UnitTest.Create().WithModule<AppsModule>().StartAsync(ct);
         CallerContextStamper.Stamp(new CallerContext
         {
-            PrincipalId = "alice", AccountId = "alice", BrainId = "alice",
-            Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp,
+            PrincipalId = "alice",
+            AccountId = "alice",
+            BrainId = "alice",
+            Kind = CallerKind.User,
+            StampedBy = TrustedEdge.AuthenticatedHttp,
         });
         var id = PackageId.Create("alice", "customer-researcher");
         var package = brain.Get<IPackage>(id.ToString());
