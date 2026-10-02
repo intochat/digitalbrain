@@ -15,5 +15,16 @@ public sealed record AppState
     [Id(10)] public string Runtime { get; init; } = PackageManifest.CSharpRuntime;
     // The program paths the current generation deployed, so retiring needs no second look at the revision.
     [Id(11)] public string[] ScriptPaths { get; init; } = [];
+    [Id(12)] public string[] StorageFiles { get; init; } = [];
+    [Id(13)] public AppDeployment? PendingDeployment { get; init; }
+    [Id(14)] public UninstallApp? PendingUninstall { get; init; }
+    [Id(15)] public bool StorageHistoryKnown { get; init; }
+    [Id(16)] public OperationReceipt[] LifecycleReceipts { get; init; } = [];
+    [Id(17)] public bool PostgresScopes { get; init; }
+    [Id(18)] public AbandonAppStorage? PendingAbandonStorage { get; init; }
+    [Id(19)] public AbandonedAppStorage[] AbandonedStorage { get; init; } = [];
     public bool RunsScript => Runtime == PackageManifest.CSharpRuntime;
 }
+
+[GenerateSerializer]
+public sealed record AppDeployment([property: Id(0)] AppState Target);

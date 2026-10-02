@@ -121,6 +121,9 @@ internal sealed class PackageService(
         return await View(await app.Uninstall(new(Guid.NewGuid())));
     }
 
+    public async Task<InstalledPackageView> AbandonStorage(PackageId id, AbandonAppStorage request)
+        => await View(await App(id).AbandonStorage(request));
+
     public Task<AppInvocation> Invoke(PackageId id, InvokePackageRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);

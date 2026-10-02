@@ -5,6 +5,8 @@
     <RootNamespace>DigitalBrain.Microsoft.CSharp</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../../DigitalBrain/Apps/DigitalBrain.Modules.Apps.Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit" />
     <PackageReference Include="Azure.Identity" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />

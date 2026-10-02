@@ -14,6 +14,17 @@ internal sealed class PostgresTableProvider(IPostgresSourceRegistry registry) : 
     }
 
     private static string Table(string table) => "public." + Q(table);
+
+    public Task DropAsync(string origin, string table, CancellationToken ct)
+        => Execute(origin, async (connection, transaction, token) =>
+        {
+            await using var guard = new NpgsqlCommand("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", connection, transaction);
+            guard.Parameters.AddWithValue(table);
+            await guard.ExecuteNonQueryAsync(token);
+            await using var drop = new NpgsqlCommand($"DROP TABLE IF EXISTS {Table(table)}", connection, transaction);
+            await drop.ExecuteNonQueryAsync(token);
+            return true;
+        }, ct);
     private static string Parameter(TableDefinition definition, TableValue value, int index)
     {
         var type = PostgresTablePolicy.SqlType(definition.Columns.Single(c => c.Name == value.Column).Type);

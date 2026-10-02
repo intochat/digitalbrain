@@ -11,6 +11,7 @@ public interface IPinger : INeuron
     Task<int> Double(int number, CancellationToken cancellationToken = default);
 
     Task<string> Caller();
+    Task RefuseCapacity();
 }
 
 [PlatformOnly]
@@ -29,6 +30,7 @@ public sealed record Ignored([property: Id(0)] int Number) : Signal;
 // callable contract that reports the caller context the script edge stamped.
 public sealed class Pinger : Neuron, IPinger
 {
+    public Task RefuseCapacity() => throw new DigitalBrain.Sdk.Capacity.CapacityUnavailableException();
     public async Task Ping(int number)
     {
         await PublishAsync(new Ignored(number));

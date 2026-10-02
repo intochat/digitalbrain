@@ -33,6 +33,8 @@ internal sealed class ScriptEdgeClient(HttpClient http)
     {
         if (response.IsSuccessStatusCode) { return; }
         var detail = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        if (response.Headers.TryGetValues(ScriptEdgeProtocol.RefusalHeader, out var codes))
+        { throw new ScriptRefusalException(detail, codes.Single()); }
         throw new InvalidOperationException($"The brain refused {operation} ({(int)response.StatusCode}): {detail}");
     }
 }

@@ -43,7 +43,7 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serv
     })
     .WithModule<QdrantModule, QdrantModuleOptions>(qdrant => qdrant.WithHostedQdrant())
     .WithModule<MemoryModule>()
-    .WithModule<ClickHouseModule, ClickHouseModuleOptions>(database => database.WithClickHouse(options => options.WithSeed("leads")))
+    .WithModule<ClickHouseModule, ClickHouseModuleOptions>(database => database.WithClickHouse())
     .WithModule<SupabaseModule, SupabaseModuleOptions>(database => database.WithConnection("supabase"))
     .WithModule<PostgresModule, PostgresModuleOptions>(database => database.WithPostgres(options => options.DatabaseName = "digitalbrain"))
     .WithModule<PlaywrightModule>()

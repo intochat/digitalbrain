@@ -120,6 +120,14 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
                 // The client disconnected; the run is interrupted and its turn is dropped.
                 outcome = AgentRunOutcome.Cancelled;
             }
+            catch (Exception error) when (error.Message == DigitalBrain.Sdk.Capacity.CapacityUnavailableException.RefusalMessage
+                || DigitalBrain.Apps.AppRequirementsException.IsRefusal(error.Message))
+            {
+                outcome = AgentRunOutcome.Failed;
+                if (ownsRun) { await KeepFailedTurn(error.Message); }
+                if (!ct.IsCancellationRequested)
+                { await Emit(new { type = "RUN_ERROR", message = error.Message, code = "APP_REFUSED" }); }
+            }
             catch (AssistantQueryException error)
             {
                 outcome = AgentRunOutcome.Failed;

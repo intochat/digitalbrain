@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 import '../csharp/csharp_manager.dart';
 import 'app_spec_screen.dart';
@@ -145,10 +146,48 @@ class _PackagesScreenState extends State<PackagesScreen> {
     String notice, [
     Object? body,
   ]) => _perform(() async {
-    await widget.request(method, path, body);
+    try {
+      await widget.request(method, path, body);
+    } catch (_) {
+      // A refused uninstall can still have persisted its pending state.
+      try {
+        await _load();
+      } catch (_) {}
+      rethrow;
+    }
     await _load();
     if (mounted) setState(() => _notice = notice);
   });
+
+  Future<void> _abandonStorage(String id) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Uninstall and leave storage behind?'),
+        content: const Text(
+          'Existing storage will remain and must be cleaned up separately.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const ValueKey('confirm-abandon-storage'),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Leave storage behind'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _change(
+      'POST',
+      '${_appPath(id)}/abandon-storage',
+      'Uninstalled $id. Storage was left behind.',
+      {'operationId': const Uuid().v4()},
+    );
+  }
 
   Future<void> _run(String id, String operation) => _perform(() async {
     final input = _inputs[id]?.text ?? '';
@@ -322,6 +361,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
     final id = _id(listing);
     final app = _apps[id] ?? const <String, dynamic>{};
     final installed = app['status'] == _installed;
+    final uninstallPending = app['uninstallPending'] == true;
     final running = '${_map(app['revision'])['revision'] ?? ''}';
     final published = '${listing['revision'] ?? ''}';
     final origin = _map(_map(listing['forkedFrom'])['package']);
@@ -346,6 +386,9 @@ class _PackagesScreenState extends State<PackagesScreen> {
             ),
             if (origin.isNotEmpty)
               Text('Forked from ${origin['owner']}/${origin['name']}'),
+            if (uninstallPending) const Text('Uninstall pending'),
+            if ((app['abandonedStorage'] as List? ?? const []).isNotEmpty)
+              const Text('Storage from a previous uninstall was left behind.'),
             if ('${listing['description'] ?? ''}'.isNotEmpty)
               Text('${listing['description']}'),
             if (installed && files.isNotEmpty)
@@ -370,7 +413,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
                           ),
                     child: const Text('Install'),
                   ),
-                if (installed && running != published)
+                if (installed && !uninstallPending && running != published)
                   FilledButton.tonal(
                     key: ValueKey('upgrade-$id'),
                     onPressed: _busy
@@ -395,6 +438,12 @@ class _PackagesScreenState extends State<PackagesScreen> {
                           ),
                     child: const Text('Uninstall'),
                   ),
+                if (uninstallPending)
+                  OutlinedButton(
+                    key: ValueKey('abandon-storage-$id'),
+                    onPressed: _busy ? null : () => _abandonStorage(id),
+                    child: const Text('Leave storage behind'),
+                  ),
                 OutlinedButton(
                   key: ValueKey('scenarios-$id'),
                   onPressed: () => _openSpec(id, '${listing['title'] ?? id}'),
@@ -414,7 +463,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
                 ),
               ],
             ),
-            if (installed && operations.isNotEmpty) ...[
+            if (installed && !uninstallPending && operations.isNotEmpty) ...[
               const SizedBox(height: 8),
               TextField(
                 key: ValueKey('input-$id'),

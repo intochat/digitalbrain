@@ -116,8 +116,9 @@ async Task RunAsync(string query, Guid? invocation)
     }
     catch (OperationCanceledException) when (run.IsCancellationRequested) { outcome = "Stopped."; }
     catch (OperationCanceledException) { outcome = "Research timed out. Retry to safely update the same record."; failed = true; }
+    catch (ScriptRefusalException error) { outcome = error.Message; failed = true; }
     catch (Exception) { outcome = "Research or save failed. Retry to safely update the same record."; failed = true; }
-    try { if (!run.IsCancellationRequested || outcome == "Stopped.") { await status.Set(outcome.TrimEnd('.')); } } catch (Exception) { }
+    try { if (!run.IsCancellationRequested || outcome == "Stopped.") { await status.Set(failed ? outcome : outcome.TrimEnd('.')); } } catch (Exception) { }
     if (invocation is { } id)
     { try { await app.Respond(new AppResponse(id, failed ? null : outcome, failed ? outcome : null)); } catch (Exception) { } }
     // The source is not disposed: Stop may still cancel it from another loop, and one small
@@ -334,6 +335,7 @@ async Task<AppResponse> ResultAsync(Guid id, string input)
         return new AppResponse(id, row is null ? "null"
             : "{" + string.Join(",", row.Select(value => JsonSerializer.Serialize(value.Column) + ":" + value.Json)) + "}", null);
     }
+    catch (ScriptRefusalException error) { return new AppResponse(id, null, error.Message); }
     catch (Exception) { return new AppResponse(id, "null", null); }
 }
 

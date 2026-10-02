@@ -55,7 +55,6 @@ internal static class IntoChatE2ETest
             .ConfigureModule<ClickHouseModule, ClickHouseModuleOptions>(database => database.WithClickHouse(options =>
             {
                 options.PersistentStorage = false;
-                options.WithSeed("leads");
             }))
             .ConfigureModule<SupabaseModule, SupabaseModuleOptions>(database => database.WithPostgres())
             .ConfigureModule<GmailModule, GmailModuleOptions>(gmail => gmail.WithTokenEndpoint(new(UnconfiguredProvider, "token")))

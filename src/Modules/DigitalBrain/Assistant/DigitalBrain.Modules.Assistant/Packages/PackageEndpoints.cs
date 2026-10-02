@@ -48,6 +48,8 @@ internal static class PackageEndpoints
             => service.Upgrade(PackageId.Create(owner, name), request));
         installed.MapDelete("", (string owner, string name, PackageService service)
             => service.Uninstall(PackageId.Create(owner, name)));
+        installed.MapPost("/abandon-storage", (string owner, string name, AbandonAppStorage request, PackageService service)
+            => service.AbandonStorage(PackageId.Create(owner, name), request));
         installed.MapPost("/invocations", (string owner, string name, InvokePackageRequest request, PackageService service)
             => service.Invoke(PackageId.Create(owner, name), request));
         installed.MapGet("/invocations/{invocationId:guid}", (string owner, string name, Guid invocationId, PackageService service)

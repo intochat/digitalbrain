@@ -10,4 +10,6 @@ public sealed record AppSnapshot(
     [property: Id(3)] IReadOnlyList<PackageOperation> Operations,
     // Web JSON would otherwise spell it "cSharpFiles".
     [property: Id(4), JsonPropertyName("csharpFiles")] IReadOnlyList<string> CSharpFiles,
-    [property: Id(5)] IReadOnlyDictionary<string, string>? Accounts = null);
+    [property: Id(5)] IReadOnlyDictionary<string, string>? Accounts = null,
+    [property: Id(6)] bool UninstallPending = false,
+    [property: Id(7)] AbandonedAppStorage[]? AbandonedStorage = null);

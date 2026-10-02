@@ -1,9 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using DigitalBrain.Apps.Signals;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Microsoft.CSharp;
+using DigitalBrain.Postgres;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Apps;
@@ -11,7 +14,7 @@ namespace DigitalBrain.Apps;
 [GrainType("apps.app")]
 internal sealed class App(
     [PersistentState("app", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<AppState> store,
-    TimeProvider clock)
+    TimeProvider clock, AppRequirements requirements, ModuleInventory modules)
     : Neuron<AppState>(store), IApp
 {
     private const int MaxInvocations = 256;
@@ -20,19 +23,35 @@ internal sealed class App(
 
     public Task<AppSnapshot> Read() => Task.FromResult(Describe(Snapshot));
 
+    public async Task<AppSnapshot> AbandonStorage(AbandonAppStorage request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (Replay(request.OperationId, request)) { return Describe(Snapshot); }
+        if (Snapshot.PendingUninstall is null)
+        { throw new InvalidOperationException("Storage can only be abandoned for a pending uninstall."); }
+        if (request.OperationId == Snapshot.PendingUninstall.OperationId)
+        { throw new InvalidOperationException("Abandoning storage requires its own operation ID."); }
+        if (Snapshot.PendingAbandonStorage is null)
+        { await Persist(Snapshot with { PendingAbandonStorage = request }); }
+        await CompleteUninstall();
+        return Describe(Snapshot);
+    }
+
     public async Task<AppSnapshot> Install(InstallApp request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        await Resume();
         if (Replay(request.OperationId, request)) { return Describe(Snapshot); }
         if (Snapshot.Status == AppStatus.Installed)
         { throw new InvalidOperationException($"{Snapshot.Revision!.Package} is already installed here; configure or upgrade it instead."); }
         var revision = await GrainFactory.GetGrain<IPackage>(request.Revision.Package.ToString()).ReadRevision(request.Revision.Revision);
+        requirements.Check(revision.Content);
         var settings = Resolve(revision.Content.Manifest.Settings, new Dictionary<string, string>(), request.Settings);
         var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], request.Accounts ?? new Dictionary<string, string>());
         var runtime = revision.Content.Manifest.RuntimeName;
         var generation = Snapshot.ProgramGeneration + 1;
-        var programs = await Deploy(runtime, generation, revision.Content, settings, accounts);
-        await Persist(Snapshot with
+        var programs = runtime == PackageManifest.CSharpRuntime ? revision.Content.Programs().Keys.ToArray() : [];
+        await DeployAndPersist(Snapshot with
         {
             Status = AppStatus.Installed,
             Runtime = runtime,
@@ -44,6 +63,10 @@ internal sealed class App(
             ProgramGeneration = generation,
             ScriptPaths = programs,
             Receipts = Receipted(request.OperationId, request),
+            StorageFiles = programs.Select(path => FileKey(generation, path)).ToArray(),
+            StorageHistoryKnown = true,
+            PostgresScopes = AppRequirements.ReferencesAssembly(revision.Content, typeof(IPostgresTable).Assembly.GetName().Name!),
+            LifecycleReceipts = [.. Snapshot.LifecycleReceipts, new(request.OperationId, CommandHash(request), "")],
         });
         return Describe(Snapshot);
     }
@@ -51,37 +74,42 @@ internal sealed class App(
     public async Task<AppSnapshot> Configure(ConfigureApp request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        await Resume();
         if (Replay(request.OperationId, request)) { return Describe(Snapshot); }
         RequireInstalled();
         var settings = Resolve(Snapshot.Declared, Snapshot.Settings, request.Settings);
         var revision = await GrainFactory.GetGrain<IPackage>(Snapshot.Revision!.Package.ToString()).ReadRevision(Snapshot.Revision.Revision);
+        requirements.Check(revision.Content);
         var selected = new Dictionary<string, string>(Snapshot.Accounts);
         foreach (var (slot, account) in request.Accounts ?? new Dictionary<string, string>()) { selected[slot] = account; }
         var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], selected);
-        await Retire(Snapshot.Runtime, Snapshot.ProgramGeneration);
-        var programs = await Deploy(Snapshot.Runtime, Snapshot.ProgramGeneration + 1, revision.Content, settings, accounts);
-        await Persist(Snapshot with { Settings = settings, Accounts = accounts, ProgramGeneration = Snapshot.ProgramGeneration + 1, ScriptPaths = programs, Receipts = Receipted(request.OperationId, request) });
+        await BackfillStorageFiles();
+        var programs = Snapshot.RunsScript ? revision.Content.Programs().Keys.ToArray() : [];
+        await DeployAndPersist(Snapshot with { Settings = settings, Accounts = accounts, ProgramGeneration = Snapshot.ProgramGeneration + 1, ScriptPaths = programs, Receipts = Receipted(request.OperationId, request),
+            StorageFiles = [.. Snapshot.StorageFiles, .. programs.Select(path => FileKey(Snapshot.ProgramGeneration + 1, path))] });
         return Describe(Snapshot);
     }
 
     public async Task<AppSnapshot> Upgrade(UpgradeApp request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        await Resume();
         if (Replay(request.OperationId, request)) { return Describe(Snapshot); }
         RequireInstalled();
         var installed = Snapshot.Revision!.Package;
         if (request.Revision.Package != installed)
         { throw new ArgumentException($"This app runs {installed}. Install {request.Revision.Package} as its own app to try it."); }
         var revision = await GrainFactory.GetGrain<IPackage>(installed.ToString()).ReadRevision(request.Revision.Revision);
+        requirements.Check(revision.Content);
         // Keep what the installer chose for settings the new revision still declares.
         var declared = revision.Content.Manifest.Settings;
         var kept = Snapshot.Settings.Where(pair => declared.Any(setting => setting.Name == pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value);
         var settings = Resolve(declared, kept, new Dictionary<string, string>());
         var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], request.Accounts ?? Snapshot.Accounts);
         var runtime = revision.Content.Manifest.RuntimeName;
-        await Retire(Snapshot.Runtime, Snapshot.ProgramGeneration);
-        var programs = await Deploy(runtime, Snapshot.ProgramGeneration + 1, revision.Content, settings, accounts);
-        await Persist(Snapshot with
+        await BackfillStorageFiles();
+        var programs = runtime == PackageManifest.CSharpRuntime ? revision.Content.Programs().Keys.ToArray() : [];
+        await DeployAndPersist(Snapshot with
         {
             Runtime = runtime,
             Revision = request.Revision,
@@ -92,6 +120,8 @@ internal sealed class App(
             Operations = [.. revision.Content.Manifest.Operations],
             ScriptPaths = programs,
             Receipts = Receipted(request.OperationId, request),
+            StorageFiles = [.. Snapshot.StorageFiles, .. programs.Select(path => FileKey(Snapshot.ProgramGeneration + 1, path))],
+            PostgresScopes = Snapshot.PostgresScopes || AppRequirements.ReferencesAssembly(revision.Content, typeof(IPostgresTable).Assembly.GetName().Name!),
         });
         return Describe(Snapshot);
     }
@@ -99,20 +129,49 @@ internal sealed class App(
     public async Task<AppSnapshot> Uninstall(UninstallApp request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        await Resume();
         if (Replay(request.OperationId, request)) { return Describe(Snapshot); }
-        RequireInstalled();
-        await Retire(Snapshot.Runtime, Snapshot.ProgramGeneration);
+        if (Snapshot.Status != AppStatus.Installed)
+        {
+            // Even a no-op must remain a no-op when delivery repeats after a later install.
+            await Persist(Snapshot with { LifecycleReceipts = [.. Snapshot.LifecycleReceipts, new(request.OperationId, CommandHash(request), "")] });
+            return Describe(Snapshot);
+        }
+        await BackfillStorageFiles();
+        await Persist(Snapshot with { PendingUninstall = request });
+        await CompleteUninstall();
+        return Describe(Snapshot);
+    }
+
+    private async Task CompleteUninstall()
+    {
+        var request = Snapshot.PendingUninstall!;
+        var abandon = Snapshot.PendingAbandonStorage;
+        var postgresAvailable = modules.ContractAssemblies().Contains(typeof(IPostgresTable).Assembly);
+        if (abandon is null && Snapshot.PostgresScopes && !postgresAvailable) { throw new InvalidOperationException(AppRequirementsException.RestorePostgres); }
+        foreach (var file in Snapshot.StorageFiles) { await GrainFactory.GetGrain<ICSharpFile>(file).Delete(); }
+        if (abandon is null && postgresAvailable)
+        {
+            await GrainFactory.GetGrain<IPostgresStorageMigration>("table-owners-v1").Ensure();
+            var brain = BrainScope.CurrentId();
+            foreach (var file in Snapshot.StorageFiles)
+            { await GrainFactory.GetGrain<IPostgresTables>(JsonSerializer.Serialize(new[] { brain, file })).Retire(); }
+        }
         var now = clock.GetUtcNow();
         var invocations = Snapshot.Invocations
             .Select(item => item.Status == InvocationStatus.Pending ? item with { Status = InvocationStatus.Failed, Error = "The app was uninstalled.", CompletedAt = now } : item)
             .ToList();
-        await Persist(Snapshot with { Status = AppStatus.Uninstalled, Invocations = invocations, Receipts = Receipted(request.OperationId, request) });
-        return Describe(Snapshot);
+        OperationReceipt[] completed = abandon is null ? [] : [new(abandon.OperationId, CommandHash(abandon), "Storage left behind")];
+        await Persist(Snapshot with { Status = AppStatus.Uninstalled, Invocations = invocations, Receipts = Receipted(request.OperationId, request), PendingUninstall = null,
+            PendingAbandonStorage = null,
+            AbandonedStorage = abandon is null ? Snapshot.AbandonedStorage : [.. Snapshot.AbandonedStorage, new(abandon.OperationId, Snapshot.StorageFiles.ToArray())],
+            LifecycleReceipts = [.. Snapshot.LifecycleReceipts, new(request.OperationId, CommandHash(request), ""), .. completed] });
     }
 
     public async Task<AppInvocation> Invoke(InvokeApp request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        await Resume();
         if (Snapshot.Invocations.Find(item => item.Id == request.InvocationId) is { } existing) { return existing; }
         RequireInstalled();
         if (!Snapshot.Operations.Any(operation => operation.Name == request.Operation))
@@ -191,6 +250,51 @@ internal sealed class App(
         }
     }
 
+    private async Task Resume()
+    {
+        if (Snapshot.PendingDeployment is not null) { await CompleteDeployment(); }
+        if (Snapshot.PendingUninstall is not null) { await CompleteUninstall(); }
+    }
+
+    private async Task DeployAndPersist(AppState target)
+    {
+        await Persist(Snapshot with { PendingDeployment = new(target) });
+        await CompleteDeployment();
+    }
+
+    private async Task CompleteDeployment()
+    {
+        var target = Snapshot.PendingDeployment!.Target;
+        var revision = await GrainFactory.GetGrain<IPackage>(target.Revision!.Package.ToString()).ReadRevision(target.Revision.Revision);
+        await Retire(Snapshot.Runtime, Snapshot.ProgramGeneration);
+        await Deploy(target.Runtime, target.ProgramGeneration, revision.Content, target.Settings, target.Accounts);
+        await Persist(target);
+    }
+
+    private async Task BackfillStorageFiles()
+    {
+        if (Snapshot.StorageHistoryKnown) { return; }
+        var paths = new HashSet<string>(Snapshot.ScriptPaths, StringComparer.Ordinal) { PackageContent.SourcePath };
+        var postgres = Snapshot.PostgresScopes;
+        if (Snapshot.Revision is { } installed)
+        {
+            var package = GrainFactory.GetGrain<IPackage>(installed.Package.ToString());
+            var remaining = new Stack<string>();
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            remaining.Push(installed.Revision);
+            while (remaining.TryPop(out var id))
+            {
+                if (!visited.Add(id)) { continue; }
+                var revision = await package.ReadRevision(id);
+                paths.UnionWith(revision.Content.Programs().Keys);
+                postgres |= AppRequirements.ReferencesAssembly(revision.Content, typeof(IPostgresTable).Assembly.GetName().Name!);
+                foreach (var parent in revision.Parents) { remaining.Push(parent); }
+            }
+        }
+        var files = Enumerable.Range(1, Snapshot.ProgramGeneration).SelectMany(generation => paths.Select(path => FileKey(generation, path)));
+        await Persist(Snapshot with { StorageFiles = files.Distinct(StringComparer.Ordinal).ToArray(), StorageHistoryKnown = true, PostgresScopes = postgres });
+    }
+
     // The script reads brain.Setting("App") to find this neuron, brain.Setting(name) for each setting
     // and brain.Setting("Account__" + slot) for each connected account.
     private Dictionary<string, string> Configuration(IReadOnlyDictionary<string, string> settings, IReadOnlyDictionary<string, string> accounts)
@@ -239,7 +343,8 @@ internal sealed class App(
 
     private bool Replay(Guid operationId, object request)
     {
-        var receipt = Snapshot.Receipts.Find(item => item.OperationId == operationId);
+        var receipt = Snapshot.LifecycleReceipts.FirstOrDefault(item => item.OperationId == operationId)
+            ?? Snapshot.Receipts.Find(item => item.OperationId == operationId);
         if (receipt is null) { return false; }
         return receipt.RequestHash == CommandHash(request)
             ? true
@@ -280,5 +385,5 @@ internal sealed class App(
         state.ProgramGeneration == 0 || !state.RunsScript
             ? []
             : state.ScriptPaths.Select(path => FileKey(state.ProgramGeneration, path)).ToArray(),
-        new Dictionary<string, string>(state.Accounts));
+        new Dictionary<string, string>(state.Accounts), state.PendingUninstall is not null, state.AbandonedStorage.ToArray());
 }
