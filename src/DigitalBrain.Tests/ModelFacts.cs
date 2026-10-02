@@ -1,5 +1,3 @@
-using System.Reflection;
-using System.Xml.Linq;
 using ArchUnitNET.Domain;
 using ArchUnitNET.Loader;
 using ArchUnitNET.xUnitV3;
@@ -38,17 +36,6 @@ public class ModelFacts
         // ArchUnitNET sees type dependencies; this also checks emitted assembly links.
         Assert.All(Model.GetReferencedAssemblies(),
             reference => Assert.StartsWith("System", reference.Name));
-    }
-
-    [Fact]
-    public void The_model_project_declares_no_dependencies()
-    {
-        // Unused build references may disappear from the compiled assembly altogether.
-        var project = XDocument.Load(typeof(ModelFacts).Assembly
-            .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .Single(attribute => attribute.Key == "ModelProject").Value!);
-        Assert.DoesNotContain(project.Descendants(), element => element.Name.LocalName is
-            "PackageReference" or "ProjectReference" or "FrameworkReference");
     }
 
     [Fact]

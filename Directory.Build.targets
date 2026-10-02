@@ -12,6 +12,15 @@
     <None Include="$(MSBuildThisFileDirectory)src/Assets/nuget/icon.png" Pack="true" PackagePath="/" Visible="false" Condition="Exists('$(MSBuildThisFileDirectory)src/Assets/nuget/icon.png')" />
   </ItemGroup>
 
+  <!-- Imported after the project body, where ProjectReference items exist: the global using
+       follows the reference, so a project that stays off the Testing packages - the model's
+       tests - needs no Using Remove. -->
+  <ItemGroup Condition="@(ProjectReference->AnyHaveMetadataValue('Filename', 'DigitalBrain.Testing'))
+      Or @(ProjectReference->AnyHaveMetadataValue('Filename', 'DigitalBrain.Testing.Unit'))
+      Or @(ProjectReference->AnyHaveMetadataValue('Filename', 'DigitalBrain.Testing.E2E'))">
+    <Using Include="DigitalBrain.Testing" />
+  </ItemGroup>
+
   <!-- One file, two consumers: imported here for in-repo test projects and packed into the
        DigitalBrain.Testing.E2E package's buildTransitive for everyone else. -->
   <Import Project="$(MSBuildThisFileDirectory)src/Testing/DigitalBrain.Testing.E2E/Build/DigitalBrain.Testing.E2E.targets"

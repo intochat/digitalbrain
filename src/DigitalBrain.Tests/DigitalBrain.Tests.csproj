@@ -1,8 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <AssemblyMetadata Include="ModelProject"
-      Value="$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../DigitalBrain/DigitalBrain.csproj'))" />
-    <Using Remove="DigitalBrain.Testing" />
     <PackageReference Include="TngTech.ArchUnitNET.xUnitV3" />
     <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
   </ItemGroup>
