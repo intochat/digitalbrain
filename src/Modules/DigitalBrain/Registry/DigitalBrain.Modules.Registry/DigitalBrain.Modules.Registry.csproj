@@ -7,8 +7,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Modules.Registry.Tests.Unit" />
     <ProjectReference Include="../DigitalBrain.Modules.Registry.Contracts/DigitalBrain.Modules.Registry.Contracts.csproj" />
-    <ProjectReference Include="../../Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
-    <ProjectReference Include="../../Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
+    <ProjectReference Include="../../Kernel/DigitalBrain.Modules.Kernel/DigitalBrain.Modules.Kernel.csproj" />
+    <ProjectReference Include="../../Kernel/Sdk/DigitalBrain.Modules.Kernel.Sdk/DigitalBrain.Modules.Kernel.Sdk.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.AI" />

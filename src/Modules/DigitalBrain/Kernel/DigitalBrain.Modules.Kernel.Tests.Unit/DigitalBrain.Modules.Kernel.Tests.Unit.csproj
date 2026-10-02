@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DigitalBrain.Core.Tests.Unit</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Update="Identity/LegacyState/*.orleans" CopyToOutputDirectory="PreserveNewest" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
+    <ProjectReference Include="../Sdk/DigitalBrain.Modules.Kernel.Sdk/DigitalBrain.Modules.Kernel.Sdk.csproj" />
+    <ProjectReference Include="../Platform/DigitalBrain.Modules.Kernel.Platform/DigitalBrain.Modules.Kernel.Platform.csproj" />
+    <ProjectReference Include="../Aspire/DigitalBrain.Kernel.Aspire.Hosting/DigitalBrain.Kernel.Aspire.Hosting.csproj" />
+  </ItemGroup>
+</Project>
+

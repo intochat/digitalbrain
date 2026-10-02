@@ -10,8 +10,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Modules.Memory.Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
-    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />
-    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Modules.Kernel/DigitalBrain.Modules.Kernel.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/Sdk/DigitalBrain.Modules.Kernel.Sdk/DigitalBrain.Modules.Kernel.Sdk.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.AI" />

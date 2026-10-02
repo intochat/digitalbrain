@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Kernel module runtime: neurons, signals, and composition.</Description>
+    <RootNamespace>DigitalBrain.Core</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup><PackageReference Include="Microsoft.Orleans.Server" /></ItemGroup>
+  <ItemGroup><FrameworkReference Include="Microsoft.AspNetCore.App" /></ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../DigitalBrain.Modules.Kernel.Client/DigitalBrain.Modules.Kernel.Client.csproj" />
+    <ProjectReference Include="../DigitalBrain.Modules.Kernel.Contracts/DigitalBrain.Modules.Kernel.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="DigitalBrain.Modules.Kernel.Tests.Unit" /></ItemGroup>
+</Project>

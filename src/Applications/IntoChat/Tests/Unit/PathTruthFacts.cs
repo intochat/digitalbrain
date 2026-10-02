@@ -101,7 +101,7 @@ public sealed class PathTruthFacts
             var type = Type.GetType(entry.Module, throwOnError: true)!;
             Assert.True(typeof(DigitalBrain.Core.IModule).IsAssignableFrom(type));
             Assert.False(DigitalBrain.Contracts.PlatformAssemblyAttribute.IsPlatform(type.Assembly));
-            Assert.DoesNotContain(type.Assembly.GetReferencedAssemblies(), reference => reference.Name == "DigitalBrain.Platform");
+            Assert.DoesNotContain(type.Assembly.GetReferencedAssemblies(), reference => reference.Name == "DigitalBrain.Modules.Kernel.Platform");
 
         });
     }

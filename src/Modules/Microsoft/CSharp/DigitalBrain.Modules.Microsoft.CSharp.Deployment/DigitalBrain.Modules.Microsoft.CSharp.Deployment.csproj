@@ -5,7 +5,7 @@
     <RootNamespace>DigitalBrain.Microsoft.CSharp</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Deployment/DigitalBrain.Deployment.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/Kernel/Deployment/DigitalBrain.Deployment/DigitalBrain.Deployment.csproj" />
     <ProjectReference Include="../DigitalBrain.Modules.Microsoft.CSharp/DigitalBrain.Modules.Microsoft.CSharp.csproj" />
   </ItemGroup>
 </Project>

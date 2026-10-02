@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DigitalBrain.Core.Tests.E2E</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
+  </ItemGroup>
+</Project>

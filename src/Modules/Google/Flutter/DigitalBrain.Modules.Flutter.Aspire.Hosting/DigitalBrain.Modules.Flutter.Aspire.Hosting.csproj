@@ -7,6 +7,6 @@
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Modules.Flutter.Tests.E2E" />
     <ProjectReference Include="../DigitalBrain.Modules.Flutter/DigitalBrain.Modules.Flutter.csproj" />
-    <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Kernel.Aspire.Hosting/DigitalBrain.Kernel.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/Kernel/Aspire/DigitalBrain.Kernel.Aspire.Hosting/DigitalBrain.Kernel.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>
