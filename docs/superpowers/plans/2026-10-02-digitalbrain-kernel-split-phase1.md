@@ -169,7 +169,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Consumes: nothing from Task 1.
 - Produces: no API change — comments only. Later (migration-phase) tasks rely on these notes naming the seam.
 
-- [ ] **Step 1: Annotate INeuron.cs**
+- [x] **Step 1: Annotate INeuron.cs**
 
 Add above the existing `public interface INeuron` declaration (keep every existing member and comment untouched):
 
@@ -182,7 +182,7 @@ Add above the existing `public interface INeuron` declaration (keep every existi
 // Signal/INeuron in every module type declared under a DigitalBrain.* namespace.
 ```
 
-- [ ] **Step 2: Annotate Signal.cs**
+- [x] **Step 2: Annotate Signal.cs**
 
 Add above `public record Signal`:
 
@@ -193,7 +193,7 @@ Add above `public record Signal`:
 // migration phase — thirteen call sites compare Publisher to raw strings today.
 ```
 
-- [ ] **Step 3: Annotate the csproj**
+- [x] **Step 3: Annotate the csproj**
 
 Add inside the first `<ItemGroup>` of `DigitalBrain.Contracts.csproj`:
 
@@ -202,7 +202,7 @@ Add inside the first `<ItemGroup>` of `DigitalBrain.Contracts.csproj`:
      spec): its DigitalBrain namespace shadows these contracts across module namespaces. -->
 ```
 
-- [ ] **Step 4: Build Contracts and run the kernel unit suite — comments must change nothing**
+- [x] **Step 4: Build Contracts and run the kernel unit suite — comments must change nothing**
 
 Run: `dotnet build src/Modules/DigitalBrain/Kernel/DigitalBrain.Contracts`
 Expected: Build succeeded, 0 warnings beyond baseline.
@@ -210,7 +210,7 @@ Expected: Build succeeded, 0 warnings beyond baseline.
 Run: `dotnet test src/Modules/DigitalBrain/Kernel/DigitalBrain.Core.Tests.Unit`
 Expected: all facts PASS (same count as a pre-change run; record the count before editing).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/Modules/DigitalBrain/Kernel/DigitalBrain.Contracts

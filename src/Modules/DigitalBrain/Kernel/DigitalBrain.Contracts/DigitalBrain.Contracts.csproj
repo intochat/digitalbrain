@@ -4,6 +4,8 @@
     <Description>The DigitalBrain programming model: neurons and signals.</Description>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Do not reference src/DigitalBrain here until Signal unification (see the kernel-split
+         spec): its DigitalBrain namespace shadows these contracts across module namespaces. -->
     <PackageReference Include="Microsoft.Orleans.Sdk" />
   </ItemGroup>
   <ItemGroup>
