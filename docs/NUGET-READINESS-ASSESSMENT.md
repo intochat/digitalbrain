@@ -55,7 +55,7 @@ No packable project has `PackageReadmeFile` or `GenerateDocumentationFile`.
 | C3 | Sdk | whole project | Grab-bag SDK: grains, middleware, SQL compiler, MCP client, identity, secrets APIs in one assembly. Split public module-author surface from unpublished platform contracts. | |
 | C4 | Sdk | `Secrets/ISecrets.cs:17`, `Integrations/IIntegrationRegistration.cs:33`, `Auth/TokenHandoff.cs`, `Identity/Accounts.cs:41` | Plaintext-credential-returning APIs on the public NuGet surface; only runtime `[PlatformOnly]` protects them. Move to a non-published platform-contracts assembly. | |
 | C5 | Aspire | `DigitalBrain.Aspire.csproj` | Misnamed (it's the silo runtime, not an Aspire client integration), product-coupled ("Silo host wiring for IntoChat"), and references `DigitalBrain.Platform` — publishing it publishes the credential ring. Rename (e.g. `DigitalBrain.Silo`) and cut the Platform dependency from the public graph. | |
-| C6 | repo | `Directory.Build.props` | `PackageIcon` without a packed icon file → `dotnet pack` fails/ships wrong. Add the icon + pack item or drop the property; add a pack smoke test to CI. | |
+| C6 | repo | `Directory.Build.props` | `PackageIcon` without a packed icon file → `dotnet pack` fails/ships wrong. Add the icon + pack item or drop the property; add a pack smoke test to CI. | ✅ `1b65d23c7` |
 | C7 | Kernel | `Composition/CompositionOverrideTransport.cs` | Test-only global static in the shipped runtime; `Take` doesn't remove entries (unbounded growth, token reuse). Move to DigitalBrain.Testing; fix the leak regardless. | |
 
 ## High findings
@@ -132,7 +132,7 @@ misleading.
 
 **Phase 0 — stop the bleeding (small, independent fixes)**
 1. C1: remove `FakeKeyVault` from production composition; fail fast without real crypto. — ✅ Done in `9c1f84870` (also extracted the master-key parameter into `Aspire.Hosting/Brain/MasterKey.cs`; `AddIdentityStorage` dissolved into `AddCookieProtection`; kernel suite 197/197 green, broader module suites not re-run).
-2. C6: fix `PackageIcon`/pack; add a `dotnet pack` smoke check.
+2. C6: fix `PackageIcon`/pack; add a `dotnet pack` smoke check. — ✅ Done in `1b65d23c7` (512×512 icon at `src/Assets/nuget/icon.png`, `Exists` guard removed so a missing icon fails the pack; CI's existing solution-wide pack step enforces it; verified with the icon inside the nupkg).
 3. C7 + H11: move `CompositionOverrideTransport` and the private-config hook to Testing; fix the token leak.
 4. H9: HtmlEncode `LoginPage`.
 5. H7/H8: make both open-posture defaults explicit opt-in, with pinning tests.
