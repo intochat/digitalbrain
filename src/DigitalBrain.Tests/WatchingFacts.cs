@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 
 namespace DigitalBrain.Tests;
@@ -5,134 +6,103 @@ namespace DigitalBrain.Tests;
 public class WatchingFacts
 {
     [Fact]
-    public async Task A_typed_watch_streams_only_that_signal_type()
+    public async Task The_watch_loop_streams_typed_signals_until_the_source_completes()
     {
-        var button = new FakeNeuron();
-        await using var clicks = await button.Watch<Clicked>();
-
-        var synapse = Assert.Single(button.Synapses);
-        synapse.Publish(new Hovered { Publisher = new("cursor") });
-        synapse.Publish(new Clicked { Publisher = new("button-1") });
-        synapse.Publish(new Hovered { Publisher = new("cursor") });
-        synapse.Complete();
-
+        var button = new FakeButton();
         var received = new List<Clicked>();
-        await foreach (var signal in clicks.Signals(TestContext.Current.CancellationToken))
+        var loop = Task.Run(async () =>
         {
-            received.Add(signal);
-        }
+            await foreach (var click in button.Watch<Clicked>(TestContext.Current.CancellationToken))
+            {
+                received.Add(click);
+            }
+        }, TestContext.Current.CancellationToken);
+
+        button.Publish(new Hovered { Publisher = new("cursor") });
+        button.Publish(new Clicked { Publisher = new("button-1") });
+        button.Complete();
+        await loop;
 
         var click = Assert.Single(received);
         Assert.Equal(new NeuronId("button-1"), click.Publisher);
     }
 
     [Fact]
-    public async Task A_typed_watch_pulls_without_pushing_anywhere()
+    public async Task Cancelling_the_token_severs_the_loop()
     {
-        var button = new FakeNeuron();
-        await using var clicks = await button.Watch<Clicked>();
-
-        // The observer the typed watch supplies is inert: pull is the only consumer.
-        await Assert.Single(button.Synapses).Observer
-            .OnSignalAsync(new Clicked { Publisher = new("button-1") });
-    }
-
-    [Fact]
-    public async Task Disposing_the_typed_synapse_severs_the_underlying_one()
-    {
-        var button = new FakeNeuron();
-        var clicks = await button.Watch<Clicked>();
-
-        await clicks.DisposeAsync();
-
-        Assert.True(Assert.Single(button.Synapses).Severed);
-    }
-
-    [Fact]
-    public async Task Each_typed_watch_forms_its_own_severable_synapse()
-    {
-        var button = new FakeNeuron();
-        await using var first = await button.Watch<Clicked>();
-        await using var second = await button.Watch<Clicked>();
-
-        Assert.Equal(2, button.Synapses.Count);
-        Assert.NotSame(button.Synapses[0].Observer, button.Synapses[1].Observer);
-    }
-
-    [Fact]
-    public async Task The_typed_synapse_completes_with_the_underlying_one()
-    {
-        var button = new FakeNeuron();
-        await using var clicks = await button.Watch<Clicked>();
-
-        var synapse = Assert.Single(button.Synapses);
-        Assert.False(clicks.Completion.IsCompleted);
-        synapse.CompletionSource.SetResult();
-        await clicks.Completion;
-    }
-
-    [Fact]
-    public async Task Cancelling_the_read_stops_it_without_severing_the_synapse()
-    {
-        var button = new FakeNeuron();
-        await using var clicks = await button.Watch<Clicked>();
-
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+        var button = new FakeButton();
+        using var stopping = new CancellationTokenSource();
+        var loop = Task.Run(async () =>
         {
-            await foreach (var _ in clicks.Signals(cancellation.Token)) { }
-        });
+            await foreach (var _ in button.Watch<Clicked>(stopping.Token)) { }
+        }, TestContext.Current.CancellationToken);
 
-        Assert.False(Assert.Single(button.Synapses).Severed);
+        stopping.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => loop);
+    }
+
+    [Fact]
+    public async Task A_publisher_resolves_back_through_the_brain()
+    {
+        var button = new FakeButton();
+        await using var brain = new FakeBrain(new NeuronId("button-1"), button);
+        button.Publish(new Clicked { Publisher = new("button-1") });
+        button.Complete();
+
+        await foreach (var click in button.Watch<Clicked>(TestContext.Current.CancellationToken))
+        {
+            Assert.Same(button, brain.Get<INeuron>(click.Publisher));
+        }
+    }
+
+    [Fact]
+    public async Task Watching_the_signal_base_type_streams_everything()
+    {
+        var button = new FakeButton();
+        button.Publish(new Hovered { Publisher = new("cursor") });
+        button.Publish(new Clicked { Publisher = new("button-1") });
+        button.Complete();
+
+        var received = new List<Signal>();
+        await foreach (var signal in button.Watch<Signal>(TestContext.Current.CancellationToken))
+        {
+            received.Add(signal);
+        }
+
+        Assert.Equal(2, received.Count);
     }
 
     private sealed record Clicked : Signal;
 
     private sealed record Hovered : Signal;
 
-    private sealed class FakeNeuron : INeuron
+    private sealed class FakeButton : INeuron
     {
-        public List<FakeSynapse> Synapses { get; } = [];
+        private readonly Channel<Signal> signals = Channel.CreateUnbounded<Signal>();
 
-        public Task<ISynapse> Watch(INeuronObserver observer)
-        {
-            var synapse = new FakeSynapse(observer);
-            Synapses.Add(synapse);
-            return Task.FromResult<ISynapse>(synapse);
-        }
+        public void Publish(Signal signal) => signals.Writer.TryWrite(signal);
 
-        public Task Unwatch(INeuronObserver observer)
+        public void Complete() => signals.Writer.TryComplete();
+
+        public async IAsyncEnumerable<T> Watch<T>(
+            [EnumeratorCancellation] CancellationToken cancellationToken = default) where T : Signal
         {
-            Synapses.RemoveAll(synapse => ReferenceEquals(synapse.Observer, observer));
-            return Task.CompletedTask;
+            await foreach (var signal in signals.Reader.ReadAllAsync(cancellationToken))
+            {
+                if (signal is T typed)
+                {
+                    yield return typed;
+                }
+            }
         }
     }
 
-    private sealed class FakeSynapse(INeuronObserver observer) : ISynapse
+    private sealed class FakeBrain(NeuronId id, INeuron neuron) : IDigitalBrain
     {
-        private readonly Channel<Signal> channel = Channel.CreateUnbounded<Signal>();
+        public T Get<T>(NeuronId requested) where T : class, INeuron =>
+            requested == id ? (T)neuron : throw new InvalidOperationException(requested.ToString());
 
-        public INeuronObserver Observer { get; } = observer;
-
-        public bool Severed { get; private set; }
-
-        public TaskCompletionSource CompletionSource { get; } = new();
-
-        public void Publish(Signal signal) => channel.Writer.TryWrite(signal);
-
-        public void Complete() => channel.Writer.TryComplete();
-
-        public IAsyncEnumerable<Signal> Signals(CancellationToken cancellationToken = default) =>
-            channel.Reader.ReadAllAsync(cancellationToken);
-
-        public Task Completion => CompletionSource.Task;
-
-        public ValueTask DisposeAsync()
-        {
-            Severed = true;
-            channel.Writer.TryComplete();
-            return ValueTask.CompletedTask;
-        }
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }
