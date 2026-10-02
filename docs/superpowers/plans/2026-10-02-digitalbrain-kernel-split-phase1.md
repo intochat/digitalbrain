@@ -40,7 +40,7 @@
 - Consumes: the pure package `src/DigitalBrain` (types `Signal`, `NeuronId`).
 - Produces: nothing later tasks call; this task's deliverable is the enforced invariant.
 
-- [ ] **Step 1: Create the test project**
+- [x] **Step 1: Create the test project**
 
 `src/DigitalBrain.Tests/DigitalBrain.Tests.csproj` — mirror the xunit package set from `src/Modules/DigitalBrain/Kernel/DigitalBrain.Core.Tests.Unit/DigitalBrain.Core.Tests.Unit.csproj` (open it and copy the exact xunit/test-sdk `PackageReference` lines and any shared test props import), plus ArchUnitNET, with exactly one ProjectReference:
 
@@ -61,7 +61,7 @@ Pick the xUnit-integration package matching the repo's xunit major: `TngTech.Arc
 
 The root namespace defaults to `DigitalBrain.Tests` — that is fine: its enclosing namespace chain reaches `DigitalBrain`, which is exactly the pure package, and it references nothing else, so no shadowing is possible.
 
-- [ ] **Step 2: Write the facts, run red first**
+- [x] **Step 2: Write the facts, run red first**
 
 `src/DigitalBrain.Tests/ModelFacts.cs`:
 
@@ -132,7 +132,7 @@ which every type uses).
 Run: `dotnet test src/DigitalBrain.Tests`
 Expected: `The_model_depends_on_nothing_but_the_runtime` FAILS listing the model's types; other facts PASS.
 
-- [ ] **Step 3: Restore the pattern, run green**
+- [x] **Step 3: Restore the pattern, run green**
 
 Revert to `"^(System|DigitalBrain)($|\\.)"`.
 
@@ -141,15 +141,15 @@ Expected: all 5 facts PASS. If `The_model_assembly_references_only_the_runtime` 
 non-System name the SDK injects (e.g. `netstandard` or `mscorlib` facades), widen the assertion
 to the exact observed set — list the names explicitly rather than loosening to a prefix soup.
 
-- [ ] **Step 4: Confirm note on default NeuronId behavior**
+- [x] **Step 4: Confirm note on default NeuronId behavior**
 
 `default(NeuronId).ToString()` returning null is pinned deliberately: the model treats an unstamped publisher as "born outside a neuron" (see `Signal.cs` comment). If Step 3 instead shows it throwing or returning "", stop — that is a model decision, not a test fix; surface it to your human partner.
 
-- [ ] **Step 5: Assert the test project itself cannot shadow**
+- [x] **Step 5: Assert the test project itself cannot shadow**
 
 Open `src/DigitalBrain.Tests/DigitalBrain.Tests.csproj` and confirm the only `ProjectReference` is `../DigitalBrain/DigitalBrain.csproj` and there is no reference to `DigitalBrain.Contracts` or any module (xunit/test-sdk/ArchUnitNET packages are fine). This is a review step, not a code change; the Review Focus explains why it matters.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/DigitalBrain.Tests
