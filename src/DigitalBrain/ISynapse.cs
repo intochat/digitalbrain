@@ -1,15 +1,24 @@
 namespace DigitalBrain;
 
-// The formed connection, returned by Watch: holding it is being connected, disposing it severs
-// it, and the signals that cross it flow through it. Delivery is at-least-once; neuron-held
-// synapses resume from their watermark, and observers dedup through neuron state.
+/// <summary>
+/// The formed connection between a neuron and an observer, returned by
+/// <see cref="INeuron.Watch"/>. Holding it is being connected; disposing it severs the
+/// connection; the signals that cross it flow through it. Push (the observer's callbacks) and
+/// pull (<see cref="Signals"/>) are the same synapse, not two mechanisms.
+/// </summary>
 public interface ISynapse : IAsyncDisposable
 {
-    // The signals crossing this synapse, in publish order, as they arrive — the same facts the
-    // observer receives, readable as a stream by whoever holds the connection.
+    /// <summary>
+    /// The signals crossing this synapse, in publish order, as they arrive — the same facts the
+    /// observer receives, readable as a stream by whoever holds the connection.
+    /// </summary>
+    /// <param name="cancellationToken">Stops reading without severing the synapse.</param>
     IAsyncEnumerable<Signal> Signals(CancellationToken cancellationToken = default);
 
-    // Completes when the kernel can no longer honor the connection (severed, holder gone,
-    // brain disposing); reading past that point is over, not an error.
+    /// <summary>
+    /// Completes when the kernel can no longer honor the connection — it was severed, its
+    /// holder went away, or the brain is disposing. Reading past that point is over, not an
+    /// error.
+    /// </summary>
     Task Completion { get; }
 }

@@ -2,38 +2,58 @@
 
 Neurons, connected by synapses, exchanging signals, within a brain.
 
-This package defines what DigitalBrain *means*, on any runtime. It has no dependencies, and a
-test enforces that. A kernel (today: Orleans, under `Kernel/`) is a licensed implementation of
-this meaning; changing how a kernel hosts or delivers never changes this package — observers'
-object references, channels, watermark tables and leases are kernel vocabulary and must not
-appear here.
+This package is the DigitalBrain model: the handful of types that define what those four words
+mean, on any runtime. It depends on nothing — no actor framework, no serializer, no host — and
+a test keeps it that way. Kernels implement the model; this package is what everything else
+writes against.
 
-The model, one role per type:
+## The model
 
-| Role                | Type               | Job                                          |
-| ------------------- | ------------------ | -------------------------------------------- |
-| Publishing endpoint | `INeuron`          | holds state; publishes in its own name; where synapses form (`Watch`/`Unwatch`) |
-| Receiving endpoint  | `INeuronObserver`  | the dendrite: what a signal arrives at       |
-| Connection          | `ISynapse`         | the formed link; carries the signals; dispose to sever |
-| Fact                | `Signal`           | what crosses; `Publisher` stamped by the kernel |
-| Identity            | `NeuronId`         | a value, never a capability                  |
-| Space               | `IDigitalBrain`    | resolves neurons; the brain resolves, it does not switch |
+A **neuron** is a stateful, addressable capability — a chart, a timer, a button, an inbox, a
+brain. All state lives in neurons, never in a process; processes are caches.
 
-The laws every kernel must honor:
+A **signal** is a typed fact a neuron publishes. Its `Publisher` is stamped by the kernel at
+publish, so provenance cannot be forged: there is no publish-as-someone-else anywhere.
+
+A **synapse** is the connection a signal travels across. Watching a neuron forms one; disposing
+it severs it; the signals that cross it flow through it. The receiving endpoint is an
+**observer** — push (the observer's callback) and pull (the synapse's stream) are the same
+synapse, not two mechanisms. When the observer is itself a neuron, the synapse lives in that
+neuron's state and survives every process: that, and nothing more, is a durable subscription.
+
+A **brain** is the space neurons live in. It resolves, it does not switch — synapses form at
+neurons, the brain only finds them by identity.
+
+```csharp
+var button  = brain.Get<INeuron>(new NeuronId("button-1"));
+var synapse = await button.Watch(observer);
+
+await foreach (var signal in synapse.Signals())
+{
+    // signal.Publisher is a NeuronId: a value, never a capability.
+    // Turning it back into the neuron goes through the brain.
+}
+```
+
+## The laws
+
+Every kernel implementing this model must honor four laws:
 
 1. **Provenance is inviolable.** `Signal.Publisher` is stamped at publish by the kernel;
    nothing publishes in another neuron's name.
-2. **State lives in neurons, never in processes.** Processes are caches; a neuron-held synapse
-   is neuron state like any other, which is the whole of what "durable subscription" means.
+2. **State lives in neurons, never in processes.** Anything a process holds must be
+   re-creatable from neuron state.
 3. **Delivery is at-least-once.** Neuron-held synapses resume from their watermark; observers
-   dedup through neuron state.
-4. **Derived state is re-derived wholesale**, never incrementally patched.
+   deduplicate through neuron state.
+4. **Derived state is re-derived wholesale,** never incrementally patched.
 
-Observer and synapse are endpoint and connection, not two mechanisms: push (an observer you
-bring) and pull (a synapse's `Signals()` stream) are the same synapse with different holders.
-Typed subscription (`brain.On<T>(source)`) is ergonomics the script SDK supplies over `Watch`,
-not a concept of the model.
+## What is deliberately absent
 
-Admission rule: a member enters this package only if changing it changes what DigitalBrain
-means on any runtime. If a change only alters how a kernel hosts or delivers, it belongs in
-that kernel's ring.
+Hosting, delivery, serialization, persistence, scheduling — observers' object references,
+channels, watermark tables, leases. That is kernel vocabulary. The reference kernel runs on
+Microsoft Orleans and lives in `DigitalBrain.Kernel`; a different kernel could honor the same
+laws on a different substrate without this package changing.
+
+The admission rule that keeps it so: a member enters this package only if changing it would
+change what DigitalBrain *means* on any runtime. A change that only alters how a kernel hosts
+or delivers belongs to that kernel.

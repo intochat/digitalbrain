@@ -2,5 +2,10 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>The DigitalBrain model: neurons, connected by synapses, exchanging signals, within a brain.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
 </Project>
