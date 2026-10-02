@@ -67,7 +67,15 @@ class _BehaviorAuthoringViewState extends State<BehaviorAuthoringView> {
           doc.withBehaviors(
             exists
                 ? doc.behaviors
-                      .map((b) => b.id == value.id ? value : b)
+                      .map(
+                        (b) => b.id == value.id
+                            ? b.edit(
+                                value.title,
+                                value.description,
+                                value.scenarioIds,
+                              )
+                            : b,
+                      )
                       .toList()
                 : [...doc.behaviors, value],
           ),

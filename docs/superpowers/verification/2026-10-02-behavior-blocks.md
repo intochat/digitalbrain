@@ -45,3 +45,9 @@ The standard `aspire run` could not bind the occupied resource-service port 2214
 10. Used a fixture harness for repeatable responsive visual checks and a separate actual AppHost smoke. Cost: visual evidence does not validate live-model generation or the full authenticated production journey.
 
 No deferred review minors. The branch and worktree remain available for integration.
+
+## PR 128 review follow-up
+
+An independent review of pushed commit `5fddf6234` found two further issues: conflict recovery restored obsolete source bindings, and embedded tabs in scenario names conflicted with the existing failure-result protocol. Both were reproduced by failing regressions and repaired. Behavior saves now apply editable fields onto the latest behavior record; scenario validation rejects tabs. GitHub CI also identified seven whitespace violations in the codec; the formatter repaired them.
+
+After these corrections: Flutter 113 tests passed, Apps unit 89 passed, Flutter analyzer clean, targeted C# whitespace verification passed, and the entire PR diff passes `git diff --check`. Earlier CSharp and integration results remain the evidence for unchanged paths. GitHub CI reruns against the correction commit. The review and fix summary are posted on PR 128.

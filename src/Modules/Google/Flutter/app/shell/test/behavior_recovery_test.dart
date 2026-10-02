@@ -32,6 +32,82 @@ Map<String, dynamic> fixture() => {
   },
 };
 void main() {
+  testWidgets('behavior conflict recovery retains rebuilt source bindings', (
+    tester,
+  ) async {
+    var view = fixture();
+    final behavior = {
+      'id': 'b',
+      'title': 'Research',
+      'description': 'Original prose',
+      'sourcePaths': ['behaviors/old.cs'],
+      'scenarioIds': ['s'],
+    };
+    view['draft']['document']['behaviors'] = [behavior];
+    var saves = 0;
+    Map<String, dynamic>? saved;
+    Future<dynamic> request(String method, String path, [Object? body]) async {
+      if (method == 'GET') {
+        return {
+          'draft': {
+            ...view['draft'],
+            'revision': 5,
+            'document': {
+              ...view['draft']['document'],
+              'behaviors': [
+                {
+                  ...behavior,
+                  'sourcePaths': ['behaviors/new.cs'],
+                },
+              ],
+            },
+          },
+        };
+      }
+      if (++saves == 1) {
+        throw StateError(
+          'This draft changed. Reload it before saving your edits.',
+        );
+      }
+      saved = body as Map<String, dynamic>;
+      view = {
+        'draft': {
+          ...view['draft'],
+          'revision': 6,
+          'document': saved!['document'],
+        },
+      };
+      return view;
+    }
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BehaviorAuthoringView(
+          draftId: 'd',
+          initial: view,
+          request: request,
+        ),
+      ),
+    );
+    await tester.tap(find.byTooltip('Options for Research'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit description'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('behavior-description')),
+      'Keep my edited prose',
+    );
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Reload latest draft; keep my text'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(saved!['expectedRevision'], 5);
+    final updated = saved!['document']['behaviors'][0];
+    expect(updated['description'], 'Keep my edited prose');
+    expect(updated['sourcePaths'], ['behaviors/new.cs']);
+  });
   testWidgets(
     'published actions leave room for the app title on narrow screens',
     (tester) async {

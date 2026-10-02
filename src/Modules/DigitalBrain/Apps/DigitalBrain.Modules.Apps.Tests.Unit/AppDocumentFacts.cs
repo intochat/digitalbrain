@@ -31,6 +31,14 @@ public sealed class AppDocumentFacts
     }
 
     [Fact]
+    public void ScenarioNamesCannotContainTheFailureProtocolSeparator()
+    {
+        var document = Document();
+        var invalid = document with { Scenarios = [document.Scenarios[0] with { Name = "Save\tresult" }] };
+        Assert.Throws<ArgumentException>(() => AppDocumentCodec.Validate(invalid));
+    }
+
+    [Fact]
     public void SourceReferencesArePackageKeysAndMustResolveWhenBuilt()
     {
         var d = Document();
