@@ -3,8 +3,8 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using Orleans.Concurrency;
 
-// SDK contracts retain their original namespace and wire identities for compatibility.
-namespace DigitalBrain.Platform.Integrations;
+// Orleans aliases retain the original wire identities across the SDK namespace rename.
+namespace DigitalBrain.Sdk.Integrations;
 
 public enum RegistrationStatus
 {

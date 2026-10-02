@@ -19,7 +19,11 @@ internal static class PostgresTablePolicy
 
     public static string SqlType(string type) => type switch
     {
-        "text" => "text", "number" => "numeric", "boolean" => "boolean", "timestamptz" => "timestamptz", "jsonb" => "jsonb",
+        "text" => "text",
+        "number" => "numeric",
+        "boolean" => "boolean",
+        "timestamptz" => "timestamptz",
+        "jsonb" => "jsonb",
         _ => throw new PostgresQueryException("Column type must be text, number, boolean, timestamptz or jsonb.")
     };
 

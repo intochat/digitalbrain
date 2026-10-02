@@ -5,7 +5,7 @@ using Npgsql;
 
 namespace DigitalBrain.Supabase;
 
-internal sealed class SupabaseProvider(NpgsqlDataSource source) : ISupabaseProvider
+public sealed class SupabaseProvider(NpgsqlDataSource source) : ISupabaseProvider
 {
     public async Task<SupabaseQueryResult> QueryAsync(string sql, int maxRows, CancellationToken cancellationToken)
     {
@@ -85,12 +85,12 @@ internal sealed class SupabaseProvider(NpgsqlDataSource source) : ISupabaseProvi
         try
         {
             var (_, rows) = await ReadAsync("SELECT version()", [], 1, deadline.Token).ConfigureAwait(false);
-            return new(true, Database, rows[0][0], SupabaseModule.ProviderName);
+            return new(true, Database, rows[0][0], "Npgsql");
         }
         catch (Exception error) when (error is SupabaseUnavailableException or SupabaseQueryException ||
             (error is OperationCanceledException && !cancellationToken.IsCancellationRequested))
         {
-            return new(false, Database, null, SupabaseModule.ProviderName);
+            return new(false, Database, null, "Npgsql");
         }
     }
 

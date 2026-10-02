@@ -11,6 +11,8 @@ namespace DigitalBrain.AI.Agents;
 // Providers propose calls; this is the single, bounded tool invocation loop.
 public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunner
 {
+    private static readonly ConditionalWeakTable<AgentTurnEvent, TaskCompletionSource> Observations = new();
+
     public async IAsyncEnumerable<AgentTurnEvent> RunAsync(AgentTurnRequest request, [EnumeratorCancellation] CancellationToken ct)
     {
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -22,7 +24,7 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
             await foreach (var item in events.Reader.ReadAllAsync(ct).ConfigureAwait(false))
             {
                 yield return item;
-                item.Observed?.TrySetResult();
+                if (Observations.TryGetValue(item, out var observed)) { observed.TrySetResult(); }
             }
         }
         finally { await lifetime.CancelAsync().ConfigureAwait(false); await execution.ConfigureAwait(false); }
@@ -236,8 +238,9 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
     {
         // The agent persists the selected model/tool-start before requesting the next event.
         // Do not begin external work before that write has succeeded.
-        item.Observed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        var observed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Observations.Add(item, observed);
         await events.WriteAsync(item, ct).ConfigureAwait(false);
-        await item.Observed.Task.WaitAsync(ct).ConfigureAwait(false);
+        await observed.Task.WaitAsync(ct).ConfigureAwait(false);
     }
 }

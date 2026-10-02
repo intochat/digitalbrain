@@ -1,6 +1,6 @@
+using DigitalBrain.Sdk.Integrations;
 using DigitalBrain.Contracts;
 using DigitalBrain.Mcp;
-using DigitalBrain.Platform.Integrations;
 
 namespace DigitalBrain.Mcp.Tests.Unit;
 

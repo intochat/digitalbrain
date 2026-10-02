@@ -1,9 +1,10 @@
+using DigitalBrain.Sdk.Vectors;
 using System.Collections.Concurrent;
 
 namespace DigitalBrain.Qdrant;
 
 // The same contract without a server: hosts that compose no Qdrant connection, and tests.
-public sealed class InMemoryQdrant : IQdrant
+public sealed class InMemoryQdrant : IVectorStore
 {
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<Guid, VectorPoint>> _collections = new(StringComparer.Ordinal);
 

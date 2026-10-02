@@ -1,9 +1,10 @@
+using DigitalBrain.AI.Media;
 using DigitalBrain.AI;
 
 namespace DigitalBrain.Assistant;
 
 
-public sealed class AssistantTranscription(IAudioTranscriptionService? transcription)
+public sealed class AssistantTranscription(ISpeechRecognizer? transcription)
 {
     public const int MaxAudioBytes = 4 * 1024 * 1024;
 
@@ -17,12 +18,12 @@ public sealed class AssistantTranscription(IAudioTranscriptionService? transcrip
         if (bytes.Length < 44 || bytes.Length > MaxAudioBytes ||
             !bytes.AsSpan(0, 4).SequenceEqual("RIFF"u8) || !bytes.AsSpan(8, 4).SequenceEqual("WAVE"u8))
         { return new(400, Error: "A WAV recording is required."); }
-        if (transcription?.IsReady != true)
+        if (transcription is null || !(await transcription.Describe()).Available)
         { return new(503, Error: "Voice transcription is unavailable. Please try again later."); }
         try
         {
-            using var audio = new MemoryStream(bytes, writable: false);
-            var text = await transcription.TranscribeAsync(audio, "voice.wav", ct);
+            var result = await transcription.Recognize(new(new(bytes, "audio/wav"), "voice.wav"), ct);
+            var text = result.Text;
             return new(200, Text: text);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }

@@ -1,3 +1,4 @@
+using DigitalBrain.Sdk.Vectors;
 using System.Collections.Concurrent;
 using Google.Protobuf.Collections;
 using Qdrant.Client;
@@ -5,7 +6,7 @@ using Qdrant.Client.Grpc;
 
 namespace DigitalBrain.Qdrant;
 
-internal sealed class QdrantStore(QdrantClient client) : IQdrant
+internal sealed class QdrantStore(QdrantClient client) : IVectorStore
 {
     private readonly ConcurrentDictionary<string, ulong> _dimensions = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _collectionGate = new(1, 1);

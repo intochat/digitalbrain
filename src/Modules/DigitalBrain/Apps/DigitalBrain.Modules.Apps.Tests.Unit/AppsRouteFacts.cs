@@ -29,8 +29,14 @@ public sealed class AppsRouteFacts
         var endpoints = ((IEndpointRouteBuilder)app).DataSources.SelectMany(source => source.Endpoints).OfType<RouteEndpoint>().ToArray();
         foreach (var principal in new[] { "alice", "bob" })
         {
-            CallerContextStamper.Stamp(new CallerContext { PrincipalId = principal, AccountId = principal,
-                BrainId = principal, Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp });
+            CallerContextStamper.Stamp(new CallerContext
+            {
+                PrincipalId = principal,
+                AccountId = principal,
+                BrainId = principal,
+                Kind = CallerKind.User,
+                StampedBy = TrustedEdge.AuthenticatedHttp
+            });
             var list = await Invoke("/packages/drafts");
             Assert.Equal(200, list.Response.StatusCode);
             list.Response.Body.Position = 0;

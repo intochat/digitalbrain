@@ -1,3 +1,4 @@
+using DigitalBrain.Sdk.Integrations;
 using DigitalBrain.Contracts.Signals;
 using System.ComponentModel;
 using DigitalBrain.Contracts;
@@ -25,7 +26,7 @@ public sealed class ObservedRegistryFacts
         Assert.Contains(timer.Signals!, signal => signal.Contains("TimerTick", StringComparison.Ordinal) && signal.Contains("TimerId", StringComparison.Ordinal));
         Assert.Contains(types, type => type.Id == "reminder");
         Assert.DoesNotContain(types, type => type.Id == "test.registry-clock");
-        await Assert.ThrowsAsync<InvalidOperationException>(() => brain.Get<IRegistry>(RegistryModule.Key).Search("schedule a timer", cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Empty(await brain.Get<IRegistry>(RegistryModule.Key).Search("schedule a timer", cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -35,7 +36,7 @@ public sealed class ObservedRegistryFacts
             .StartAsync(TestContext.Current.CancellationToken);
         var types = await brain.Get<IRegistry>(RegistryModule.Key).Types();
 
-        Assert.DoesNotContain(types, type => type.Id == "integration.registration" || type.Contract == typeof(DigitalBrain.Platform.Integrations.IIntegrationRegistration).FullName);
+        Assert.DoesNotContain(types, type => type.Id == "integration.registration" || type.Contract == typeof(DigitalBrain.Sdk.Integrations.IIntegrationRegistration).FullName);
     }
 
     [Fact]

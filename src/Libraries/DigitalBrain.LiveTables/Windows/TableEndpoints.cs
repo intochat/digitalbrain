@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Routing;
 
 namespace DigitalBrain.Supabase.Windows;
 
-internal static class TableEndpoints
+public static class TableEndpoints
 {
     public static void Map(IEndpointRouteBuilder endpoints)
     {

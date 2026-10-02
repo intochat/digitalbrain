@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Http;
 
-namespace DigitalBrain.Apps;
+namespace DigitalBrain.Sdk.Http;
 
-public static class AppHttp
+public static class ModuleHttp
 {
     public static async Task<IResult> Respond(Func<Task<IResult>> action)
     {

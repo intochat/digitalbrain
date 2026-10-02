@@ -12,6 +12,25 @@ namespace DigitalBrain.Modules.Compute.Tests.Unit;
 public sealed class NeuronStoreFacts
 {
     [Fact]
+    public async Task UsageContractPreservesRowsAcrossReactivationAndRejectsForeignCursors()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        var usage = brain.Get<IComputeUsage>("account");
+        await usage.Append("workspace", "one", "first", DateTimeOffset.UnixEpoch, ct);
+        await usage.Append("workspace", "two", "second", DateTimeOffset.UnixEpoch, ct);
+        await brain.DeactivateAsync(usage, ct);
+        var page = await usage.Read("workspace", 1, null, ct);
+        Assert.Single(page.Items);
+        Assert.NotNull(page.NextCursor);
+        var next = await usage.Read("workspace", 1, page.NextCursor, ct);
+        Assert.Single(next.Items);
+        Assert.NotEqual(page.Items[0].Id, next.Items[0].Id);
+        Assert.Empty((await usage.Read("other", 20, null, ct)).Items);
+        await Assert.ThrowsAsync<ArgumentException>(() => usage.Read("other", 1, page.NextCursor, ct));
+    }
+
+    [Fact]
     public async Task ANewAccountReadsAndWrites()
     {
         var ct = TestContext.Current.CancellationToken;

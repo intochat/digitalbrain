@@ -1,4 +1,4 @@
-namespace DigitalBrain.Qdrant;
+namespace DigitalBrain.Sdk.Vectors;
 
 // Callers write points under their own keys; the store hashes each key to a stable point id,
 // which is what Scroll hands back. Keep anything a reader needs in the payload.
@@ -9,7 +9,7 @@ public sealed record VectorHit(double Score, IReadOnlyDictionary<string, string>
 public sealed record VectorPage(IReadOnlyList<VectorPoint> Points, string? NextCursor);
 
 // Reads from a collection that does not exist yet return nothing instead of failing.
-public interface IQdrant
+public interface IVectorStore
 {
     Task Upsert(string collection, IReadOnlyList<VectorPoint> points, CancellationToken cancellationToken);
 

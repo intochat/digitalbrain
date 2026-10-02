@@ -1,3 +1,5 @@
+using DigitalBrain.Qdrant;
+using DigitalBrain.Sdk.Vectors;
 using DigitalBrain.Memory;
 using DigitalBrain.Memory.Signals;
 using Microsoft.Extensions.AI;
@@ -8,6 +10,27 @@ namespace DigitalBrain.Modules.Memory.Tests.Unit;
 
 public sealed class MemoryFacts
 {
+    [Fact]
+    public async Task ComposedQdrantProjectsCanonicalMemoryIntoTheRealVectorStore()
+    {
+        var connection = Environment.GetEnvironmentVariable("DIGITALBRAIN_QDRANT_TEST_CONNECTION");
+        Assert.SkipWhen(string.IsNullOrWhiteSpace(connection), "Set DIGITALBRAIN_QDRANT_TEST_CONNECTION for the real vector-store contract.");
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<MemoryModule>().WithModule<QdrantModule>()
+            .ConfigureSilo(silo => { silo.Configuration["ConnectionStrings:qdrant"] = connection; silo.Services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new FakeEmbeddings()); })
+            .StartAsync(ct);
+        var owner = "real-store-" + Guid.NewGuid().ToString("N");
+        var memory = brain.Get<IMemory>(owner);
+        await memory.Remember(new("notes", "saved", "durable note", [], null));
+        var rebuilt = await memory.RebuildIndex("notes");
+        Assert.True(rebuilt.Available);
+        Assert.Equal(1, rebuilt.Indexed);
+        Assert.Equal(0, rebuilt.Pending);
+        Assert.Equal("durable note", Assert.Single((await memory.Recall(new("notes", "durable", 1, []))).Matches).Text);
+        Assert.Equal(1, await memory.PurgeNamespace(new("notes")));
+        Assert.Empty((await memory.Recall(new("notes", "durable", 1, []))).Matches);
+    }
+
     [Fact]
     public async Task HashCollisionsUseOverflowPagesAndPurgeRetriesIndexFailure()
     {
