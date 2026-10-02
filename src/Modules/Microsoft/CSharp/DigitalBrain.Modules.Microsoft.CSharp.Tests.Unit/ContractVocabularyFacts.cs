@@ -9,7 +9,7 @@ public sealed class ContractVocabularyFacts
     public interface IPublicNeuron : INeuron;
     [PlatformOnly] public interface IHiddenNeuron : INeuron;
     public sealed record PublicSignal : Signal;
-    [PlatformOnly] public sealed record HiddenSignal : Signal;
+    private sealed record HiddenSignal : Signal;
     public static class A { public interface ISame : INeuron; }
     public static class B { public interface ISame : INeuron; }
 

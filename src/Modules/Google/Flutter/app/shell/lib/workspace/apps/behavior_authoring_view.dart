@@ -143,7 +143,29 @@ class _BehaviorAuthoringViewState extends State<BehaviorAuthoringView> {
                     title: const Text('Live documentation (not gated)'),
                     onChanged: saving ? null : (v) => update(() => live = v!),
                   ),
-                  if (error != null) SelectableText(error!),
+                  if (error != null) ...[
+                    SelectableText(error!),
+                    TextButton(
+                      onPressed: saving
+                          ? null
+                          : () async {
+                              update(() => saving = true);
+                              try {
+                                await controller.load();
+                                if (context.mounted) update(() => error = null);
+                              } catch (e) {
+                                if (context.mounted) {
+                                  update(() => error = e.toString());
+                                }
+                              } finally {
+                                if (context.mounted) {
+                                  update(() => saving = false);
+                                }
+                              }
+                            },
+                      child: const Text('Reload latest draft'),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -172,7 +194,11 @@ class _BehaviorAuthoringViewState extends State<BehaviorAuthoringView> {
                           AppDocument(
                             preamble: doc.preamble,
                             behaviors: doc.behaviors,
-                            scenarios: original == null
+                            scenarios:
+                                original == null ||
+                                    !doc.scenarios.any(
+                                      (s) => s.id == original.id,
+                                    )
                                 ? [...doc.scenarios, value]
                                 : doc.scenarios
                                       .map(
@@ -244,6 +270,33 @@ class _BehaviorAuthoringViewState extends State<BehaviorAuthoringView> {
                 ),
               if (draft['status'] == 4)
                 SelectableText('${draft['error'] ?? 'Build failed.'}'),
+              if ((draft['attempts'] as List? ?? []).isNotEmpty)
+                ExpansionTile(
+                  title: const Text('Build diagnostics'),
+                  subtitle: const Text(
+                    'Previous attempts; results apply to their listed revisions.',
+                  ),
+                  children: [
+                    for (final (index, value)
+                        in (draft['attempts'] as List).indexed)
+                      ListTile(
+                        title: Text(
+                          'Attempt ${index + 1} · ${appMap(value)['green'] == true ? 'Passed' : 'Failed'}',
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if ('${appMap(value)['revision'] ?? ''}'.isNotEmpty)
+                              SelectableText(
+                                'Revision ${appMap(value)['revision']}',
+                              ),
+                            if ('${appMap(value)['failures'] ?? ''}'.isNotEmpty)
+                              SelectableText('${appMap(value)['failures']}'),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
               ...AppSpecView(
                 spec: '${draft['spec'] ?? ''}',
                 document: doc,

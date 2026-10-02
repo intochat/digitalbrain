@@ -115,7 +115,11 @@ internal sealed partial class AppDraftNeuron(
         var verification = last is null
             ? null
             : await GrainFactory.GetGrain<IAppVerification>(IAppVerification.Key(new(PackageId.Create(Owner, Snapshot.Name), last.Revision))).Read();
-        var source = verification?.Revision ?? Snapshot.SourceRevision;
+        // Failed attempts may change bindings; the editable document still has the last
+        // published/imported associations, so keep their files from that same revision.
+        var source = Snapshot.Document is null
+            ? verification?.Revision ?? Snapshot.SourceRevision
+            : Snapshot.Published ?? Snapshot.SourceRevision;
         var content = source is null ? null : (await GrainFactory.GetGrain<IPackage>(source.Package.ToString()).ReadRevision(source.Revision)).Content;
         var files = new Dictionary<string, string>(content?.Files ?? new Dictionary<string, string>());
         if (!string.IsNullOrEmpty(content?.Source)) { files[PackageContent.SourcePath] = content.Source; }

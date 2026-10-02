@@ -98,79 +98,90 @@ class _AppSpecScreenState extends State<AppSpecScreen> {
         .length;
     final live = scenarios.where((s) => s.isLive).length;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-        actions: [
-          if (widget.onOpen != null)
-            TextButton(onPressed: widget.onOpen, child: const Text('Open app')),
-          if (spec?['canEdit'] == true && documentError == null)
-            TextButton(
-              onPressed: _busy
-                  ? null
-                  : () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => CreateAppScreen(
-                          request: widget.request,
-                          initialRevision: _map(spec?['revision']),
-                        ),
-                      ),
+      appBar: AppBar(title: Text(widget.title)),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  if (widget.onOpen != null)
+                    TextButton(
+                      onPressed: widget.onOpen,
+                      child: const Text('Open app'),
                     ),
-              child: const Text('Edit app'),
-            ),
-          TextButton.icon(
-            key: const ValueKey('verify-app'),
-            onPressed: _busy || revision.isEmpty
-                ? null
-                : () => _perform(
-                    () => widget.request(
-                      'POST',
-                      '$_path/verify?revision=${Uri.encodeQueryComponent(revision)}',
+                  if (spec?['canEdit'] == true && documentError == null)
+                    TextButton(
+                      onPressed: _busy
+                          ? null
+                          : () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => CreateAppScreen(
+                                  request: widget.request,
+                                  initialRevision: _map(spec?['revision']),
+                                ),
+                              ),
+                            ),
+                      child: const Text('Edit app'),
                     ),
+                  TextButton.icon(
+                    key: const ValueKey('verify-app'),
+                    onPressed: _busy || revision.isEmpty
+                        ? null
+                        : () => _perform(
+                            () => widget.request(
+                              'POST',
+                              '$_path/verify?revision=${Uri.encodeQueryComponent(revision)}',
+                            ),
+                          ),
+                    icon: const Icon(Icons.play_arrow),
+                    label: const Text('Run checks'),
                   ),
-            icon: const Icon(Icons.play_arrow),
-            label: const Text('Run checks'),
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (_busy) const LinearProgressIndicator(),
-          if (_error != null)
-            Text(
-              _error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          if (spec != null) ...[
-            Text(
-              verification.isEmpty
-                  ? 'Not verified yet.'
-                  : '$passed passed · $failed failed · $live live · ${scenarios.length - passed - failed - live} not run',
-              key: const ValueKey('verification-summary'),
-            ),
-            Text(
-              'Revision $revision${verification['verifiedAt'] == null ? '' : ' · Checked ${verification['verifiedAt']}'}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const Divider(),
-            if (documentError != null) SelectableText(documentError),
-            if (document == null && specText.isNotEmpty)
-              const Text(
-                'Document view · behavior links have not been authored.',
+                ],
               ),
-            if (specText.isEmpty && document == null)
-              const Text('This app has no spec.')
-            else
-              ...AppSpecView(
-                spec: specText,
-                run: run,
-                document: document,
-                vocabulary: SpecToken.read(spec['vocabulary']),
-                files: _map(spec['files']).map((k, v) => MapEntry(k, '$v')),
-                sourceRevision: revision,
-              ).childrenFor(context),
-          ],
-        ],
+              const SizedBox(height: 12),
+              if (_busy) const LinearProgressIndicator(),
+              if (_error != null)
+                Text(
+                  _error!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              if (spec != null) ...[
+                Text(
+                  verification.isEmpty
+                      ? 'Not verified yet.'
+                      : '$passed passed · $failed failed · $live live · ${scenarios.length - passed - failed - live} not run',
+                  key: const ValueKey('verification-summary'),
+                ),
+                Text(
+                  'Revision $revision${verification['verifiedAt'] == null ? '' : ' · Checked ${verification['verifiedAt']}'}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const Divider(),
+                if (documentError != null) SelectableText(documentError),
+                if (document == null && specText.isNotEmpty)
+                  const Text(
+                    'Document view · behavior links have not been authored.',
+                  ),
+                if (specText.isEmpty && document == null)
+                  const Text('This app has no spec.')
+                else
+                  ...AppSpecView(
+                    spec: specText,
+                    run: run,
+                    document: document,
+                    vocabulary: SpecToken.read(spec['vocabulary']),
+                    files: _map(spec['files']).map((k, v) => MapEntry(k, '$v')),
+                    sourceRevision: revision,
+                  ).childrenFor(context),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

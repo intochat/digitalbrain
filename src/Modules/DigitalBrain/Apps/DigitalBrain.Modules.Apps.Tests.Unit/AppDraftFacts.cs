@@ -16,6 +16,43 @@ namespace DigitalBrain.Modules.Apps.Tests.Unit;
 public sealed class AppDraftFacts
 {
     [Fact]
+    public async Task FailedRebuildsKeepSourceFilesPairedWithTheLastPublishedBindings()
+    {
+        var runner = new ScriptedTestRunner();
+        await using var brain = await StartAsync(TestContext.Current.CancellationToken, runner);
+        var document = AppDocumentFacts.Document();
+        var authored = System.Text.Json.Nodes.JsonNode.Parse(Authored(Spec))!;
+        authored["document"] = System.Text.Json.Nodes.JsonNode.Parse(AppDocumentCodec.Encode(document));
+        string Implementation(string marker, string path) => System.Text.Json.JsonSerializer.Serialize(new
+        {
+            settings = Array.Empty<object>(),
+            files = new Dictionary<string, string> { ["tests.cs"] = marker, ["prompts/system.md"] = "Reply.", [path] = marker },
+            behaviorSources = new[] { new { behaviorId = document.Behaviors[0].Id, sourcePaths = new[] { path } } },
+        });
+        await brain.Get<IScriptedLLM>("author").Script([authored.ToJsonString()]);
+        await brain.Get<IScriptedLLM>("builder").Script([
+            Implementation("// good", "behaviors/old.cs"),
+            Implementation("// bad", "behaviors/new.cs"),
+            Implementation("// bad", "behaviors/new.cs"),
+            Implementation("// bad", "behaviors/new.cs"),
+        ]);
+        runner.BySourceMarker["// good"] = (0, "dbtest:pass Research saves");
+        runner.BySourceMarker["// bad"] = (1, "dbtest:fail Research saves\tThe report was empty.");
+        StampAlice();
+        var draft = brain.Get<IAppDraft>("alice/drafts/" + Guid.NewGuid().ToString("N"));
+        await draft.Draft("Research.");
+        var published = await draft.Build();
+        Assert.Equal(AppDraftStatus.Published, published.Draft.Status);
+        await draft.SaveDocument(new(published.Draft.Revision, published.Draft.Document! with { Preamble = "Changed" }));
+        var failed = await draft.Build();
+        Assert.Equal(AppDraftStatus.Failed, failed.Draft.Status);
+        Assert.Equal(published.Draft.Published, failed.FilesRevision);
+        Assert.Equal("// good", failed.Files![failed.Draft.Document!.Behaviors[0].SourcePaths[0]]);
+        Assert.NotEqual(failed.FilesRevision, failed.Verification!.Revision);
+        Assert.False(failed.VerificationCurrent);
+    }
+
+    [Fact]
     public async Task StructuredBuildsPreserveTheDocumentAndEditsMakeResultsHistorical()
     {
         var ct = TestContext.Current.CancellationToken;
