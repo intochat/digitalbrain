@@ -48,6 +48,7 @@ public sealed class IdentityHostingFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var builder = WebApplication.CreateBuilder();
+        builder.Configuration[AuthOptions.PostureKey] = "Open";
         builder.Services.AddIdentity();
         await using var app = builder.Build();
         app.Urls.Add("http://127.0.0.1:0");
@@ -71,6 +72,7 @@ public sealed class IdentityHostingFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().StartAsync(ct);
         var builder = WebApplication.CreateBuilder();
+        builder.Configuration[AuthOptions.PostureKey] = "Secured";
         builder.Configuration["DigitalBrain:Auth:Username"] = "bootstrap";
         builder.Configuration["DigitalBrain:Auth:Password"] = "bootstrap-password";
         builder.Configuration["DigitalBrain:Cors:AllowedOrigin"] = "http://localhost:27880";

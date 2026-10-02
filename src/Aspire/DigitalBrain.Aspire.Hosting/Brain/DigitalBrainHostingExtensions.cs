@@ -90,6 +90,7 @@ public static class DigitalBrainHostingExtensions
             });
         var brain = new DigitalBrainBuilder(builder, name, resource);
         brain.AddProjection(MasterKey.Provision(builder));
+        if (AuthPosture.Provision(builder) is { } posture) { brain.AddProjection(posture); }
         var kernel = brain.GetOrAddModuleNode(DigitalBrainHostingNames.Kernel);
         var storage = builder
             .AddAzureStorage(DigitalBrainNames.Storage)

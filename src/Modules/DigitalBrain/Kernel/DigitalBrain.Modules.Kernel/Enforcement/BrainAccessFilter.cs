@@ -6,8 +6,8 @@ namespace DigitalBrain.Core.Enforcement;
 
 // The HTTP edge of the brain membership rule. Routes that address a brain by path apply
 // this filter so a principal cannot reach a brain it does not belong to, even though the route
-// carries the brain id. The open, single-owner development posture is not authenticated and
-// keeps working; a cookie session or Basic credential is enforced.
+// carries the brain id. Every request answers it: the composed IBrainAccess carries the host's
+// posture, so openness is a composition decision, never inferred from the request's shape.
 public static class BrainAccessFilter
 {
     public static async ValueTask<object?> EnforceAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
@@ -24,7 +24,6 @@ public static class BrainAccessFilter
     public static async ValueTask<IResult?> Decide(HttpContext http, string brainId)
     {
         ArgumentNullException.ThrowIfNull(http);
-        if (!RequiresMembership(http)) { return null; }
         if (!CallerContextStamper.TryGet(out var caller)) { return Results.Unauthorized(); }
 
         var access = http.RequestServices.GetRequiredService<IBrainAccess>();
@@ -32,8 +31,4 @@ public static class BrainAccessFilter
             ? null
             : Results.StatusCode(StatusCodes.Status403Forbidden);
     }
-
-    private static bool RequiresMembership(HttpContext http)
-        => http.User.Identity?.IsAuthenticated == true
-            || http.Request.Headers.ContainsKey("Authorization");
 }

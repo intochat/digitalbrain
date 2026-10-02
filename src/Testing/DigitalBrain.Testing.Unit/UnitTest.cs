@@ -26,11 +26,14 @@ public static class UnitTest
         builder.ConfigureHost(host =>
         {
             host.Configuration.AddInMemoryCollection(TestLogging.QuietDefaults);
-            // The platform refuses to start without a master key; each cluster gets a throwaway one.
+            // The platform refuses to start without a master key or a declared auth posture;
+            // each cluster gets a throwaway key and the Open test posture. A fact that needs
+            // Secured overrides the posture through its PrivateConfiguration.
             host.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 [DigitalBrainNames.MasterKeyConfigurationKey] =
                     Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
+                ["DigitalBrain:Auth:Posture"] = "Open",
             });
             foreach (var definition in modules)
             {

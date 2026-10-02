@@ -10,11 +10,10 @@ using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Platform.Identity;
 
-// The authenticated edge. A cookie session (issued by the identity endpoints) or, for the
-// single-owner bootstrap, the configured Basic credential decides the principal; when neither is
-// configured the kernel stays open, which is the local and test posture. Resolving a principal
-// stamps a CallerContext on the Orleans RequestContext so it travels with grain calls. Replaces
-// the former Basic-only gate.
+// The authenticated edge. A cookie session (issued by the identity endpoints) or the configured
+// Basic bootstrap credential decides the principal; only the declared Open posture lets an
+// anonymous request act as the synthetic owner. Resolving a principal stamps a CallerContext on
+// the Orleans RequestContext so it travels with grain calls.
 public static class AccountSession
 {
     public const string DefaultLogin = "owner";
@@ -32,41 +31,18 @@ public static class AccountSession
     {
         ArgumentNullException.ThrowIfNull(app);
 
-        var credential = BasicCredential.FromOptions(app.Services.GetRequiredService<IOptions<BasicAuthOptions>>().Value);
+        var options = app.Services.GetRequiredService<IOptions<AuthOptions>>().Value;
+        var credential = BasicCredential.FromOptions(options);
 
         app.Use(async (context, next) =>
         {
-            if (credential is not null && context.Request.Path == "/identity/register")
-            {
-                context.Request.EnableBuffering();
-                try
-                {
-                    using var body = await System.Text.Json.JsonDocument.ParseAsync(context.Request.Body);
-                    if (body.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object &&
-                        body.RootElement.EnumerateObject().Any(property =>
-                            string.Equals(property.Name, "principalId", StringComparison.OrdinalIgnoreCase) &&
-                            property.Value.ValueKind == System.Text.Json.JsonValueKind.String &&
-                            property.Value.GetString() == credential.Username))
-                    {
-                        context.Response.StatusCode = StatusCodes.Status409Conflict;
-                        return;
-                    }
-                }
-                catch (System.Text.Json.JsonException)
-                {
-                    context.Response.StatusCode = StatusCodes.Status400BadRequest;
-                    return;
-                }
-                finally { context.Request.Body.Position = 0; }
-            }
-
             if (IsAnonymous(context.Request))
             {
                 await next(context).ConfigureAwait(false);
                 return;
             }
 
-            var principal = ResolvePrincipal(context, credential);
+            var principal = ResolvePrincipal(context, options.Posture, credential);
             if (principal is null)
             {
                 // No WWW-Authenticate: the browser's native Basic prompt would race the Flutter
@@ -82,9 +58,9 @@ public static class AccountSession
         return app;
     }
 
-    // A cookie session wins; otherwise the configured single-owner Basic credential; otherwise,
-    // with no credential configured, the open kernel behaves as the auto-provisioned owner.
-    private static CallerContext? ResolvePrincipal(HttpContext context, BasicCredential? credential)
+    // A cookie session wins; otherwise the configured Basic bootstrap credential; otherwise only
+    // the declared Open posture lets the request act as the synthetic owner — Secured answers 401.
+    private static CallerContext? ResolvePrincipal(HttpContext context, IdentityPosture? posture, BasicCredential? credential)
     {
         if (context.User.Identity?.IsAuthenticated == true)
         {
@@ -97,18 +73,13 @@ public static class AccountSession
             }
         }
 
-        if (credential is null)
+        if (credential is not null && credential.Matches(context.Request.Headers.Authorization))
         {
-            return Build(DefaultLogin, DefaultLogin, context);
+            var owner = string.Equals(credential.Username, DefaultLogin, StringComparison.Ordinal);
+            return Build(owner ? DefaultLogin : credential.Username, owner ? DefaultLogin : credential.Username, context);
         }
 
-        if (!credential.Matches(context.Request.Headers.Authorization))
-        {
-            return null;
-        }
-
-        var owner = string.Equals(credential.Username, DefaultLogin, StringComparison.Ordinal);
-        return Build(owner ? DefaultLogin : credential.Username, owner ? DefaultLogin : credential.Username, context);
+        return posture == IdentityPosture.Open ? Build(DefaultLogin, DefaultLogin, context) : null;
     }
 
     private static CallerContext Build(string principalId, string accountId, HttpContext context, string? claimBrain = null)
@@ -161,7 +132,7 @@ public static class AccountSession
 
         public string Username { get; private init; } = "";
 
-        public static BasicCredential? FromOptions(BasicAuthOptions options)
+        public static BasicCredential? FromOptions(AuthOptions options)
         {
             ArgumentNullException.ThrowIfNull(options);
             var username = options.Username;

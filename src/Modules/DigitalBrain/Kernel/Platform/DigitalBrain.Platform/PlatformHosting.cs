@@ -33,7 +33,14 @@ public static class PlatformHosting
         silo.AddStartupTask<RegistrationSeeder>();
         services.AddCapacity();
         services.TryAddSingleton<IGrantPolicySource, GrainGrantPolicySource>();
-        services.TryAddSingleton<IBrainAccess, DirectoryBrainAccess>();
+        services.TryAddSingleton<IBrainAccess>(provider =>
+        {
+            var directory = new DirectoryBrainAccess(provider.GetRequiredService<Orleans.IGrainFactory>());
+            return provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Identity.Configuration.AuthOptions>>()
+                .Value.Posture == Identity.Configuration.IdentityPosture.Open
+                    ? new OpenOwnerBrainAccess(directory)
+                    : directory;
+        });
         services.TryAddSingleton<IIdentity, PlatformIdentity>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ICallFilterStage, GrantCallFilterStage>());
     }

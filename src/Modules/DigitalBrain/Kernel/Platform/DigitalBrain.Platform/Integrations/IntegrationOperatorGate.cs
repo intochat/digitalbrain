@@ -1,24 +1,28 @@
 using DigitalBrain.Contracts.Enforcement;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
+using DigitalBrain.Platform.Identity;
+using DigitalBrain.Platform.Identity.Configuration;
 
 namespace DigitalBrain.Platform.Integrations;
 
 internal static class IntegrationOperatorGate
 {
-    // Mirrors Identity's single-operator login; the Sdk cannot reference Identity.
-    private const string OpenPostureLogin = "owner";
-
     // Deployment registrations belong to the operator; a per-account Owner role is not that.
-    public static bool Allows(CallerContext? caller, IConfiguration configuration)
+    // The operator is the Basic bootstrap credential when one is configured, the synthetic owner
+    // in the Open posture, and nobody in a Secured deployment without a bootstrap credential.
+    public static bool Allows(CallerContext? caller, AuthOptions auth)
     {
+        ArgumentNullException.ThrowIfNull(auth);
         if (caller is null || caller.Kind != CallerKind.User || caller.StampedBy != TrustedEdge.AuthenticatedHttp)
         {
             return false;
         }
 
-        var username = configuration["DigitalBrain:Auth:Username"];
-        var hasCredential = !string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(configuration["DigitalBrain:Auth:Password"]);
-        return string.Equals(caller.PrincipalId, hasCredential ? username : OpenPostureLogin, StringComparison.Ordinal);
+        if (!string.IsNullOrEmpty(auth.Username) && !string.IsNullOrEmpty(auth.Password))
+        {
+            return string.Equals(caller.PrincipalId, auth.Username, StringComparison.Ordinal);
+        }
+
+        return auth.Posture == IdentityPosture.Open
+            && string.Equals(caller.PrincipalId, AccountSession.DefaultLogin, StringComparison.Ordinal);
     }
 }

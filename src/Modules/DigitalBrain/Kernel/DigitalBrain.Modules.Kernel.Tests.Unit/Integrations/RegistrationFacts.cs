@@ -301,8 +301,10 @@ public sealed class RegistrationFacts
     [Fact]
     public void OnlyTheDeploymentOperatorMayWriteARegistration()
     {
-        var basic = Config(("DigitalBrain:Auth:Username", "ops"), ("DigitalBrain:Auth:Password", "a-long-operator-password"));
-        var open = Config();
+        var basic = new DigitalBrain.Platform.Identity.Configuration.AuthOptions
+        { Posture = DigitalBrain.Platform.Identity.Configuration.IdentityPosture.Secured, Username = "ops", Password = "a-long-operator-password" };
+        var open = new DigitalBrain.Platform.Identity.Configuration.AuthOptions
+        { Posture = DigitalBrain.Platform.Identity.Configuration.IdentityPosture.Open };
 
         Assert.True(IntegrationOperatorGate.Allows(Http("ops"), basic));
         Assert.False(IntegrationOperatorGate.Allows(Http("someone-else"), basic));

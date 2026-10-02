@@ -20,10 +20,10 @@ internal static class IntegrationCatalogEndpoints
         group.MapGet("", async ([FromServices] IReadOnlyList<IntegrationDefinition> definitions, [FromServices] IGrainFactory grains, CancellationToken cancellationToken) =>
             Results.Ok(await IntegrationCatalog.ListAsync(definitions, grains, cancellationToken)));
 
-        group.MapPost("/{id}/registration", async (string id, ConfigureRegistrationInput body, [FromServices] IConfiguration configuration,
+        group.MapPost("/{id}/registration", async (string id, ConfigureRegistrationInput body, [FromServices] Microsoft.Extensions.Options.IOptions<Identity.Configuration.AuthOptions> auth,
             [FromServices] IReadOnlyList<IntegrationDefinition> definitions, [FromServices] IGrainFactory grains) =>
         {
-            if (!IntegrationOperatorGate.Allows(CallerContextStamper.TryGet(out var caller) ? caller : null, configuration)) { return Results.StatusCode(StatusCodes.Status403Forbidden); }
+            if (!IntegrationOperatorGate.Allows(CallerContextStamper.TryGet(out var caller) ? caller : null, auth.Value)) { return Results.StatusCode(StatusCodes.Status403Forbidden); }
             if (!definitions.Any(definition => definition.Id == id)) { return Results.NotFound(); }
             try
             {
@@ -36,10 +36,10 @@ internal static class IntegrationCatalogEndpoints
             }
         });
 
-        group.MapDelete("/{id}/registration/{field}", async (string id, string field, [FromServices] IConfiguration configuration,
+        group.MapDelete("/{id}/registration/{field}", async (string id, string field, [FromServices] Microsoft.Extensions.Options.IOptions<Identity.Configuration.AuthOptions> auth,
             [FromServices] IReadOnlyList<IntegrationDefinition> definitions, [FromServices] IGrainFactory grains) =>
         {
-            if (!IntegrationOperatorGate.Allows(CallerContextStamper.TryGet(out var caller) ? caller : null, configuration)) { return Results.StatusCode(StatusCodes.Status403Forbidden); }
+            if (!IntegrationOperatorGate.Allows(CallerContextStamper.TryGet(out var caller) ? caller : null, auth.Value)) { return Results.StatusCode(StatusCodes.Status403Forbidden); }
             if (!definitions.Any(definition => definition.Id == id)) { return Results.NotFound(); }
             try
             {

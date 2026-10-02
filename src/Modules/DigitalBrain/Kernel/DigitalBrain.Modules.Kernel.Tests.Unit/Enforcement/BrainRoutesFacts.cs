@@ -21,19 +21,23 @@ public sealed class BrainRoutesFacts
         Assert.Equal(StatusCodes.Status400BadRequest, ((IStatusCodeHttpResult)result!).StatusCode);
     }
 
-    [Fact]
-    public async Task AGroupedEndpointDeniesAStampedCallerWhoIsNotAMember()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AGroupedEndpointDeniesAStampedCallerWhoIsNotAMember(bool authorized)
     {
-        var (status, handlerRan) = await Invoke("personal", authorized: true, stamped: true);
+        var (status, handlerRan) = await Invoke("personal", authorized: authorized, stamped: true);
 
         Assert.Equal(StatusCodes.Status403Forbidden, status);
         Assert.False(handlerRan);
     }
 
-    [Fact]
-    public async Task AGroupedEndpointRejectsAnAuthenticatedRequestWithoutAStamp()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AGroupedEndpointRejectsARequestWithoutAStamp(bool authorized)
     {
-        var (status, handlerRan) = await Invoke("personal", authorized: true, stamped: false);
+        var (status, handlerRan) = await Invoke("personal", authorized: authorized, stamped: false);
 
         Assert.Equal(StatusCodes.Status401Unauthorized, status);
         Assert.False(handlerRan);

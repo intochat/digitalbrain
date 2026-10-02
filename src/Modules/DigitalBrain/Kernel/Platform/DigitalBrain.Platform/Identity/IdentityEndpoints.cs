@@ -67,8 +67,11 @@ internal static class IdentityEndpoints
         return member is null ? Results.Unauthorized() : await SignInAsync(member, http);
     }
 
-    private static async Task<IResult> RegisterAsync(RegisterRequest input, HttpContext http, IDigitalBrain brain, CancellationToken ct)
+    private static async Task<IResult> RegisterAsync(RegisterRequest input, HttpContext http, IDigitalBrain brain,
+        Microsoft.Extensions.Options.IOptions<Configuration.AuthOptions> auth, CancellationToken ct)
     {
+        if (!string.IsNullOrEmpty(auth.Value.Username) && string.Equals(input.PrincipalId, auth.Value.Username, StringComparison.OrdinalIgnoreCase))
+        { return Results.Conflict(new { error = "This username is reserved." }); }
         try
         {
             var member = await Directory(brain).RegisterAsync(input.PrincipalId, input.Password ?? "", input.DisplayName ?? input.PrincipalId, ct);
