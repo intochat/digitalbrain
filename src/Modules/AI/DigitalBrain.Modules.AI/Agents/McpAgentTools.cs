@@ -6,18 +6,6 @@ using System.Text.Json;
 
 namespace DigitalBrain.AI.Agents;
 
-public interface IAgentToolSource
-{
-    Task<IAgentToolSession> OpenAsync(IReadOnlyList<string> selectedToolNames,
-        Func<AgentToolContext> context, CancellationToken ct);
-}
-
-// Owns live tool connections until the execution completes.
-public interface IAgentToolSession : IAsyncDisposable
-{
-    IReadOnlyList<AIFunction> Tools { get; }
-}
-
 public static class McpAgentTools
 {
     // Registers a server. Agents must select exact names of the form mcp_{serverId}_{toolName}.

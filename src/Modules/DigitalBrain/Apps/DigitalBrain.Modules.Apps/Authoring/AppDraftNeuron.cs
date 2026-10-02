@@ -18,6 +18,7 @@ internal sealed class AppDraftNeuron(
     ILogger<AppDraftNeuron> logger,
     IEnumerable<IAppRuntime> runtimes,
     AppAuthoringPolicy policy,
+    AppPublishing publishing,
     IScriptSandbox? csharp = null)
     : Neuron<AppDraftState>(store), IAppDraft
 {
@@ -68,22 +69,18 @@ internal sealed class AppDraftNeuron(
         policy.RequireSandbox();
         policy.RequireRuntime(Snapshot.Runtime);
         await Persist(Snapshot with { Status = AppDraftStatus.Building, Attempts = [], Error = "" });
-        var package = GrainFactory.GetGrain<IPackage>(PackageId.Create(Owner, Snapshot.Name).ToString());
         var failures = "";
         for (var attempt = 1; attempt <= MaxBuildAttempts; attempt++)
         {
             try
             {
                 var content = await Implement(failures);
-                var head = (await package.Read()).Head;
-                var revision = await package.Commit(new CommitPackage(Guid.NewGuid(), head, content, $"Build attempt {attempt}: {Snapshot.Title}"));
-                var reference = new PackageRevisionRef(PackageId.Create(Owner, Snapshot.Name), revision.Id);
-                var verification = await GrainFactory.GetGrain<IAppVerification>(IAppVerification.Key(reference)).Verify();
+                var verification = await publishing.Publish(PackageId.Create(Owner, Snapshot.Name), content, $"Build attempt {attempt}: {Snapshot.Title}");
+                var reference = verification.Revision;
                 failures = Failures(verification.Run);
-                await Persist(Snapshot with { Attempts = [.. Snapshot.Attempts, new(revision.Id, verification.Green, failures)] });
+                await Persist(Snapshot with { Attempts = [.. Snapshot.Attempts, new(reference.Revision, verification.Green, failures)] });
                 if (verification.Green)
                 {
-                    await package.Publish(new PublishPackage(Guid.NewGuid(), revision.Id));
                     await Persist(Snapshot with { Status = AppDraftStatus.Published, Published = reference });
                     return await Read();
                 }

@@ -2,6 +2,7 @@ using DigitalBrain.Sdk.Http;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core.Enforcement;
@@ -15,6 +16,8 @@ internal static class MarketplaceEndpoints
     public static void MapMarketplace(this IEndpointRouteBuilder routes)
     {
         var packages = routes.MapGroup("/packages").AddEndpointFilter(ModuleRouteGuard.Guard);
+        if (routes.ServiceProvider.GetService<IScriptSandbox>()?.CanRun == true)
+        { PackageEndpoints.MapAuthoring(packages); }
         packages.MapGet("/drafts", (IDigitalBrain brain)
             => brain.Get<IAppDrafts>(CallerContextStamper.Require().PrincipalId).List());
         packages.MapPost("/drafts/{id}", (string id, DraftRequest request, IDigitalBrain brain)

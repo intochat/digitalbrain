@@ -29,7 +29,7 @@ async Task<AppResponse> Answer(Guid id, string operation)
         displayName = name.Length > 120 ? name[..120] : name,
         theme = chosen is "dark" or "light" ? chosen : "system",
     };
-    return new(id, JsonSerializer.Serialize(new { surface = appKey + "/surface", preferences }), null);
+    return new(id, JsonSerializer.Serialize(new { id = appKey + "/window", title = "Settings", surface = appKey + "/surface", preferences }), null);
 }
 
 // The fields are the preferences: durable neurons the person edits in place.

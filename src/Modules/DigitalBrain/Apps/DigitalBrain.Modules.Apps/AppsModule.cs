@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using DigitalBrain.AI.Agents;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -17,6 +18,9 @@ public sealed class AppsModule : IModule
         silo.Services.TryAddSingleton<AppRequirements>();
         silo.Services.TryAddSingleton<ITestScriptRunner, CSharpFileTestRunner>();
         silo.Services.TryAddSingleton<MarketplaceService>();
+        silo.Services.TryAddSingleton<AppService>();
+        silo.Services.TryAddSingleton<AppPublishing>();
+        silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IAgentToolSource, AppAgentTools>());
         silo.Services.TryAddSingleton<AppAuthoringPolicy>();
         silo.Services.AddAppRuntime<GroupChatRuntime>();
         silo.Services.AddAppRuntime<PromptRuntime>();
@@ -28,6 +32,7 @@ public sealed class AppsModule : IModule
         endpoints.MapGet("/session/capabilities", static (IServiceProvider services) =>
             Results.Ok(new { developerMode = services.GetService<IScriptSandbox>()?.CanRun == true }));
         AppsEndpoints.Map(endpoints);
+        PackageEndpoints.Map(endpoints);
         MarketplaceEndpoints.MapMarketplace(endpoints);
     }
 }

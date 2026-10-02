@@ -12,9 +12,8 @@ import 'session_http_client_io.dart'
     if (dart.library.html) 'session_http_client_web.dart'
     as transport;
 import 'host_environment.dart';
-import 'models/app_manifest.dart';
+import 'models/installed_app.dart';
 import 'models/brain_models.dart';
-import 'models/consent_sheet.dart';
 import 'models/compute_usage.dart';
 import 'models/model_catalog.dart';
 import 'models/grant_summary.dart';
@@ -164,20 +163,29 @@ final class DigitalBrainUiClient {
         .toList();
   }
 
-  /// The launcher reads installed manifests; the shell never hard-codes apps.
-  Future<List<AppManifestSummary>> listApps(String workspace) async {
+  /// Installed app operations come from the revision running in this brain.
+  Future<List<InstalledAppSummary>> listInstalledApps(String workspace) async {
     final body = await _tableRequest(
       'GET',
       '/brains/${Uri.encodeComponent(workspace)}/apps',
     );
     return (body as List)
         .map(
-          (item) => AppManifestSummary.fromJson(
+          (item) => InstalledAppSummary.fromJson(
             Map<String, dynamic>.from(item as Map),
           ),
         )
         .toList();
   }
+
+  static String appOpenPath(String brainId, String appId) =>
+      '/brains/${Uri.encodeComponent(brainId)}/apps/${Uri.encodeComponent(appId)}/open';
+
+  Future<dynamic> openApp(
+    String brainId,
+    String appId, [
+    Map<String, dynamic> arguments = const {},
+  ]) => jsonRequest('POST', appOpenPath(brainId, appId), arguments);
 
   Future<TableSnapshot> readTable(
     String workspace,
@@ -777,33 +785,6 @@ final class DigitalBrainUiClient {
     body == null ? 'GET' : 'POST',
     '/brains/${Uri.encodeComponent(workspaceId)}/integrations/accounts${path.isEmpty ? '' : '/$path'}',
     body,
-  );
-
-  /// The consent sheet for an app before it is installed.
-  Future<ConsentSheet> consentSheet(
-    String workspace,
-    String appId,
-  ) async => ConsentSheet.fromJson(
-    Map<String, dynamic>.from(
-      await _tableRequest(
-        'GET',
-        '/brains/${Uri.encodeComponent(workspace)}/apps/${Uri.encodeComponent(appId)}/consent',
-      ) as Map,
-    ),
-  );
-
-  /// Records approval of an app's consent sheet; the manifest installs in the same step.
-  Future<ConsentSheet> approveConsent(
-    String workspace,
-    String appId,
-  ) async => ConsentSheet.fromJson(
-    Map<String, dynamic>.from(
-      await _tableRequest(
-        'POST',
-        '/brains/${Uri.encodeComponent(workspace)}/apps/${Uri.encodeComponent(appId)}/consent/approve',
-        body: const <String, Object?>{},
-      ) as Map,
-    ),
   );
 
   /// The live grants an owner has given to apps in this workspace.

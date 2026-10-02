@@ -4,16 +4,11 @@ using DigitalBrain.Contracts;
 
 namespace DigitalBrain.Apps;
 
-internal sealed class MarketplaceService(IDigitalBrain brain, AppAuthoringPolicy policy)
+internal sealed class MarketplaceService(IDigitalBrain brain, AppPublishing publishing)
 {
 
     // Verifying any revision runs its tests.cs in the sandbox, so it is allowed exactly when running scripts is.
-    public async Task RequireRunnable(PackageRevisionRef revision)
-    {
-        var content = (await brain.Get<IPackage>(revision.Package.ToString()).ReadRevision(revision.Revision)).Content;
-        var runsScripts = content.Manifest.RuntimeName == PackageManifest.CSharpRuntime || content.File(PackageContent.TestsPath) is not null;
-        if (runsScripts) { policy.RequireSandbox(); }
-    }
+    public Task RequireRunnable(PackageRevisionRef revision) => publishing.RequireRunnable(revision);
 
     public async Task<AppSpecView> Spec(PackageId id, string? revisionId)
     {
@@ -27,8 +22,7 @@ internal sealed class MarketplaceService(IDigitalBrain brain, AppAuthoringPolicy
     public async Task<AppSpecView> Verify(PackageId id, string? revisionId)
     {
         var revision = await Revision(id, revisionId);
-        await RequireRunnable(revision);
-        await brain.Get<IAppVerification>(IAppVerification.Key(revision)).Verify();
+        await publishing.Verify(revision, force: true);
         return await Spec(id, revision.Revision);
     }
 

@@ -4,7 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import 'app_spec_view.dart';
-import 'packages_screen.dart';
+import 'apps_screen.dart';
 
 // Numeric values of DigitalBrain.Apps.AppDraftStatus on the wire.
 const _drafted = 1;
@@ -17,7 +17,7 @@ const _failed = 4;
 class CreateAppScreen extends StatefulWidget {
   const CreateAppScreen({super.key, required this.request, this.draftId});
 
-  final PackagesRequest request;
+  final AppsRequest request;
   final String? draftId;
 
   @override

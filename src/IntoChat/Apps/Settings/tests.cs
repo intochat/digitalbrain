@@ -13,6 +13,8 @@ var failures = 0;
 await Scenario("Opening settings composes the surface and answers the defaults", async (app, scope) =>
 {
     var payload = JsonDocument.Parse(await Ask(app, "open", "")).RootElement;
+    if (payload.GetProperty("id").GetString() != scope + "/app/window" || payload.GetProperty("title").GetString() != "Settings")
+    { throw new InvalidOperationException("Settings did not answer the generic window contract."); }
     var surfaceName = payload.GetProperty("surface").GetString()!;
     var surface = await brain.Get<ISurface>(surfaceName).Read();
     if (surface.Definition.Title != "Settings") { throw new InvalidOperationException($"The surface title was \"{surface.Definition.Title}\"."); }

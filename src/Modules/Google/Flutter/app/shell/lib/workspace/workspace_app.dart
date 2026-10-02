@@ -19,8 +19,7 @@ import 'compute_usage_panel.dart';
 import 'compute_usage_history.dart';
 import 'workspace_islands.dart';
 import 'csharp/csharp_manager.dart';
-import 'apps/consent_sheet_view.dart';
-import 'apps/packages_screen.dart';
+import 'apps/apps_screen.dart';
 
 class WorkspaceApp extends StatefulWidget {
   const WorkspaceApp({
@@ -69,7 +68,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
   final _remote = <String, WorkspaceRemoteController>{};
   final _remoteCancelled = Completer<void>();
   final _tableCancelled = <String, Completer<void>>{};
-  final _apps = <String, List<AppManifestSummary>>{};
+  final _apps = <String, List<InstalledAppSummary>>{};
   final _appsLoading = <String>{};
   final _sourcesSynced = <String>{};
   final _computeRefresh = ValueNotifier<int>(0);
@@ -330,7 +329,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     }
     unawaited(
       client
-          .listApps(workspaceId)
+          .listInstalledApps(workspaceId)
           .then((apps) {
             if (!mounted) return;
             _apps[workspaceId] = apps;
@@ -1008,7 +1007,7 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
       }
     },
     onSwitchAccount: widget.onSwitchAccount,
-    onPackages: widget.programmingClient == null ? null : _openPackages,
+    onApps: widget.programmingClient == null ? null : _openApps,
     onSavedWork: () => _projectFiles(context),
     onSearch: () => _search(context),
     onCompute: widget.programmingClient == null
@@ -1022,20 +1021,31 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     ),
   );
 
-  void _openPackages() {
+  void _openApps() {
     final client = widget.programmingClient;
     if (client == null) return;
     final workspaceId = store.currentProject.id;
-    _navigator.currentState?.push(
-      MaterialPageRoute<void>(
-        builder: (_) => PackagesScreen(
-          key: ValueKey('${client.workspaceIdentity}/$workspaceId'),
-          workspaceId: workspaceId,
-          request: client.jsonRequest,
-          onClose: () => _navigator.currentState?.pop(),
-        ),
-      ),
-    );
+    _navigator.currentState
+        ?.push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => AppsScreen(
+              key: ValueKey('${client.workspaceIdentity}/$workspaceId'),
+              workspaceId: workspaceId,
+              request: client.jsonRequest,
+              onOpen: (id) async {
+                _navigator.currentState?.pop();
+                await _openApplication(id);
+              },
+              onClose: () => _navigator.currentState?.pop(),
+            ),
+          ),
+        )
+        .whenComplete(() {
+          if (!mounted) return;
+          _apps.remove(workspaceId);
+          _appsLoading.remove(workspaceId);
+          _loadApps(workspaceId);
+        });
   }
 
   void _openCompute(BuildContext context) {
@@ -1122,13 +1132,20 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     if (client == null) return;
     final project = store.currentProject;
     try {
-      final result = await client.jsonRequest(
-        'POST',
-        '/brains/${Uri.encodeComponent(project.id)}/applications/${Uri.encodeComponent(application)}/open',
-        arguments,
-      );
+      final result = application == 'assistant'
+          ? await client.jsonRequest(
+              'POST',
+              '/brains/${Uri.encodeComponent(project.id)}/applications/assistant/open',
+              arguments,
+            )
+          : await client.openApp(project.id, application, arguments);
       if (!mounted) return;
-      _accept(Map<String, dynamic>.from(result as Map), project: project);
+      final opened = Map<String, dynamic>.from(result as Map);
+      if (opened['surface'] is String) {
+        opened['surface'] = {'kind': 'surface', 'name': opened['surface']};
+      }
+      if (opened['surface'] is Map) opened['kind'] = 'surface';
+      _accept(opened, project: project);
       if (store.currentProject.id == project.id) {
         store.openArtifact(result['id'] as String, placement: 'floating');
       }
@@ -1141,57 +1158,15 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     }
   }
 
-  Future<void> _launchApp(String launchKey) async {
-    if (launchKey == 'csharp' && !store.developerMode) return;
-    if (const {
-      'files',
-      'images',
-      'csharp',
-      'assistant',
-      'customer-researcher',
-    }.contains(launchKey)) {
-      if (launchKey == 'assistant' || launchKey == 'customer-researcher') {
-        await _openApplication(launchKey);
-        return;
-      }
-      store.launchLocalApp(launchKey);
-      return;
-    }
-    final client = widget.programmingClient;
-    if (client == null) {
-      _messenger.currentState?.showSnackBar(
-        const SnackBar(content: Text('Connect to IntoChat to open this app.')),
-      );
-      return;
-    }
-    try {
-      final consent = await client.consentSheet(
-        store.currentProject.id,
-        launchKey,
-      );
-      if (consent.approved) {
-        _messenger.currentState?.showSnackBar(
-          const SnackBar(
-            content: Text('Already installed. Ask the assistant to use it.'),
-          ),
-        );
-        return;
-      }
-      if (!mounted) return;
-      final approved = await showConsentSheet(context, sheet: consent);
-      if (!approved) return;
-      await client.approveConsent(store.currentProject.id, launchKey);
-      _messenger.currentState?.showSnackBar(
-        const SnackBar(
-          content: Text('Installed. Ask the assistant to use it.'),
-        ),
-      );
-    } catch (error) {
-      if (mounted) {
-        _messenger.currentState?.showSnackBar(
-          SnackBar(content: Text('Could not install the app. $error')),
-        );
-      }
+  Future<void> _launchApp(String appId) async {
+    switch (appId) {
+      case 'files':
+      case 'images':
+        store.launchLocalApp(appId);
+      case 'csharp':
+        if (store.developerMode) store.launchLocalApp(appId);
+      default:
+        await _openApplication(appId);
     }
   }
 

@@ -14,7 +14,6 @@ public sealed class AssistantRouteFacts
         {
             services.AddSingleton(typeof(IDigitalBrain), _ => null!);
             services.AddSingleton(typeof(IUsageStore), _ => null!);
-            services.AddSingleton(typeof(PackageService), _ => null!);
         }, app => new AssistantModule().Configure(app));
 
         snapshot.AssertEveryMethodAndRouteIsDistinct();

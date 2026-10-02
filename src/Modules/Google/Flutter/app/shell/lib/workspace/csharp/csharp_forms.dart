@@ -117,7 +117,7 @@ class _CSharpShareDialogState extends State<CSharpShareDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Publishes the saved source and its settings. Anyone can install it from Packages.',
+          'Publishes the saved source and its settings. Anyone can install it from Apps.',
         ),
         TextField(
           key: const ValueKey('share-package-name'),

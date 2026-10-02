@@ -13,7 +13,6 @@ public sealed class AssistantModule : IModule
     {
         ArgumentNullException.ThrowIfNull(silo);
         silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IAgentToolFactory, WorkspaceFormTools>());
-        silo.Services.TryAddSingleton<PackageService>();
         silo.Services.AddOptions<AssistantOptions>().BindConfiguration("Assistant");
     }
 
@@ -23,8 +22,5 @@ public sealed class AssistantModule : IModule
         ComputeUsageEndpoints.Map(endpoints);
         AssistantEndpoints.Map(endpoints);
         AgentEndpoints.Map(endpoints);
-        PackageEndpoints.Map(endpoints);
-        if (endpoints.ServiceProvider.GetService<DigitalBrain.Apps.IScriptSandbox>()?.CanRun == true)
-        { PackageEndpoints.MapAuthoring(endpoints); }
     }
 }

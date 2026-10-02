@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'app_spec_view.dart';
-import 'packages_screen.dart';
+import 'apps_screen.dart';
 
 // One app's page: what it does, as scenarios the brain verified against a scratch installation.
 class AppSpecScreen extends StatefulWidget {
@@ -16,7 +16,7 @@ class AppSpecScreen extends StatefulWidget {
 
   final String packageId;
   final String title;
-  final PackagesRequest request;
+  final AppsRequest request;
 
   @override
   State<AppSpecScreen> createState() => _AppSpecScreenState();
