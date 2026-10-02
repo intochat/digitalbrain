@@ -27,6 +27,8 @@ public sealed class LocalAppNeuronFacts
         var opened = await files.OpenImage(entry);
         Assert.Equal(opened.Id, (await files.OpenImage(entry)).Id);
         var document = brain.Get<IImageDocument>(scope + "/images/" + opened.Id);
+        await brain.DeactivateAsync(document, ct);
+        Assert.Equal(opened.Versions, (await document.Read()).Versions);
         var operation = Guid.NewGuid().ToString();
         var command = new ImageEditCommand("crop", Crop: new(0, 0, 1, 1));
         var edited = await document.Apply(command, 0, operation);
@@ -42,6 +44,12 @@ public sealed class LocalAppNeuronFacts
         Assert.Equal(2, saved.Revision);
         Assert.Equal(1, saved.LastSavedRevision);
         Assert.NotNull(save.Recipe.Crop);
+        var stroke = new DigitalBrain.Flutter.ImageCanvas.PenStroke(0xffff0000, 3, [new(0, 0), new(1, 1)]);
+        await document.Apply(new("stroke", Stroke: stroke), 2, Guid.NewGuid().ToString());
+        await brain.DeactivateAsync(document, ct);
+        var restoredStroke = Assert.Single((await document.Read()).Recipe.Strokes);
+        Assert.Equal(stroke.Points, restoredStroke.Points);
+        Assert.Equal(stroke.ColorArgb, restoredStroke.ColorArgb);
         Assert.Null((await brain.Get<IImageDocument>("files-other" + "/images/" + opened.Id).Read()).Asset);
 
     }

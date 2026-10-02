@@ -40,7 +40,7 @@ public sealed record NeuronTypeHit([property: Id(0)] NeuronType Type, [property:
 public sealed record NeuronInstance(
     [property: Id(0)] string Id,
     [property: Id(1)] string Key,
-    [property: Id(2)] IReadOnlyList<string> TypeIds,
+    [property: Id(2)] string[] TypeIds,
     [property: Id(3)] Guid ActivationId,
     [property: Id(4)] DateTimeOffset FirstSeenAt,
     [property: Id(5)] DateTimeOffset LastSeenAt,

@@ -33,7 +33,7 @@ public sealed record Allowance
     [Id(6)] public required AllowanceScope Scope { get; init; }
     [Id(7)] public required decimal LimitCompute { get; init; }
     [Id(8)] public decimal MonthlyLimitCompute { get; init; }
-    [Id(9)] public IReadOnlyList<string> Permissions { get; init; } = [];
+    [Id(9)] public string[] Permissions { get; init; } = [];
     [Id(10)] public required string PriceBookVersion { get; init; }
     [Id(11)] public DateTimeOffset GrantedAt { get; init; }
     [Id(12)] public string? ConversationId { get; init; }
@@ -70,7 +70,7 @@ public sealed record PendingApproval
     [Id(5)] public required string Reason { get; init; }
     [Id(6)] public required DateTimeOffset RequestedAt { get; init; }
     [Id(7)] public string? IntentId { get; init; }
-    [Id(8)] public IReadOnlyList<string> Permissions { get; init; } = [];
+    [Id(8)] public string[] Permissions { get; init; } = [];
 }
 
 public enum LimitAlert

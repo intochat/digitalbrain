@@ -12,7 +12,7 @@ internal sealed class CollectionNeuron(
     public async Task Set(CollectionDefinition definition, long expectedRevision)
     {
         ArgumentNullException.ThrowIfNull(definition);
-        if (definition.Items.Count > 500 || definition.Items.Select(x => x.Id).Distinct().Count() != definition.Items.Count) { throw new ArgumentException("Collection items must have unique IDs and contain at most 500 items."); }
+        if (definition.Items.Length > 500 || definition.Items.Select(x => x.Id).Distinct().Count() != definition.Items.Length) { throw new ArgumentException("Collection items must have unique IDs and contain at most 500 items."); }
         if (store.State.Revision != expectedRevision) { throw new InvalidOperationException("The UI changed. Read its latest revision before retrying."); }
         var previous = store.State;
         store.State = new() { Name = this.GetPrimaryKeyString(), Revision = checked(previous.Revision + 1), Definition = definition };

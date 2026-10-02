@@ -67,8 +67,8 @@ internal sealed class MemoryPageNeuron([PersistentState("entries", DigitalBrainN
     {
         if (entry.Text.Length is 0 or > 16384 || entry.Key.Length is 0 or > 512 || entry.Namespace.Length is 0 or > 512
             || entry.Embedding.Length is 0 or > 8192 || entry.Embedding.Any(value => !float.IsFinite(value))
-            || entry.Tags.Count > 64 || entry.Tags.Any(tag => tag.Name.Length > 256 || tag.Value.Length > 1024)
-            || entry.Tags.Select(tag => tag.Name).Distinct(StringComparer.Ordinal).Count() != entry.Tags.Count)
+            || entry.Tags.Length > 64 || entry.Tags.Any(tag => tag.Name.Length > 256 || tag.Value.Length > 1024)
+            || entry.Tags.Select(tag => tag.Name).Distinct(StringComparer.Ordinal).Count() != entry.Tags.Length)
         { throw new ArgumentException("Memory exceeds the bounded entry limits or contains invalid vectors/tags."); }
     }
     private static double Cosine(float[] a, float[] b)

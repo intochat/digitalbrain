@@ -67,8 +67,8 @@ internal sealed class AgentNeuron(
         if (_state.Revision != expectedRevision) { throw new InvalidOperationException("Agent revision conflict."); }
         if (definition.MaxModelCalls is < 1 or > 128 || definition.Timeout <= TimeSpan.Zero || definition.Timeout > TimeSpan.FromMinutes(10)
             || definition.MaxHistoryMessages is < 2 or > 4096) { throw new ArgumentException("Invalid agent execution limits.", nameof(definition)); }
-        if (definition.Instructions.Length > 32000 || definition.Tools.Count > 128
-            || definition.Tools.Any(string.IsNullOrWhiteSpace) || definition.Tools.Distinct(StringComparer.Ordinal).Count() != definition.Tools.Count)
+        if (definition.Instructions.Length > 32000 || definition.Tools.Length > 128
+            || definition.Tools.Any(string.IsNullOrWhiteSpace) || definition.Tools.Distinct(StringComparer.Ordinal).Count() != definition.Tools.Length)
         { throw new ArgumentException("Instructions or tool selection are invalid.", nameof(definition)); }
         _mutating = true;
         try

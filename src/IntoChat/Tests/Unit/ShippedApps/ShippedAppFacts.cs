@@ -11,22 +11,14 @@ public sealed class ShippedAppFacts
         => Assert.Equal(["assistant", "customer-researcher", "group-chat", "settings", "word-count"], Source.Load().Select(app => app.Package.Name).Order());
 
     [Fact]
-    public void EveryShippedProgramAndTestsFileParsesAsCSharp()
+    public void EveryShippedProgramAndTestsFileCompilesAgainstCurrentContracts()
     {
         foreach (var app in Source.Load())
         {
             var sources = new Dictionary<string, string> { [PackageContent.TestsPath] = app.Content.File(PackageContent.TestsPath)! };
             foreach (var (path, program) in app.Content.Programs()) { sources[path] = program; }
-            foreach (var (path, source) in sources)
-            {
-                // dotnet run strips the #: file-based-app directives before compiling.
-                var stripped = string.Join("\n", source.Split('\n').Where(line => !line.TrimStart().StartsWith("#:", StringComparison.Ordinal)));
-                var errors = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree
-                    .ParseText(stripped, cancellationToken: TestContext.Current.CancellationToken)
-                    .GetDiagnostics(TestContext.Current.CancellationToken)
-                    .Where(diagnostic => diagnostic.Severity == Microsoft.CodeAnalysis.DiagnosticSeverity.Error).ToArray();
-                Assert.True(errors.Length == 0, $"{app.Package}/{path}: {string.Join("; ", errors.Take(3).Select(error => error.ToString()))}");
-            }
+            var result = new DigitalBrain.Microsoft.CSharp.CSharpScriptCheck().Check(sources);
+            Assert.True(result.Success, $"{app.Package}: {string.Join("; ", result.Errors.Select(error => $"{error.File}:{error.Line} {error.Message}"))}");
         }
     }
 

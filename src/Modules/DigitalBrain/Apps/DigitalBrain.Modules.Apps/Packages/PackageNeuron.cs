@@ -48,7 +48,7 @@ internal sealed class PackageNeuron(
             { throw new InvalidOperationException($"{id} already contains {merge.Package}@{merge.Revision}; commit without merging."); }
             parents.Add(merge.Revision);
         }
-        var revision = new PackageRevision(PackageHash.Revision(parents, request.Content), parents, request.Content, author, message, clock.GetUtcNow());
+        var revision = new PackageRevision(PackageHash.Revision(parents, request.Content), parents.ToArray(), request.Content, author, message, clock.GetUtcNow());
         arrived[revision.Id] = revision;
         await Persist(id, Advance(revision.Id, arrived, request.OperationId, request, revision.Id));
         return revision;

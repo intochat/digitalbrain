@@ -18,7 +18,7 @@ await Scenario("Opening settings composes the surface and answers the defaults",
     var surfaceName = payload.GetProperty("surface").GetString()!;
     var surface = await brain.Get<ISurface>(surfaceName).Read();
     if (surface.Definition.Title != "Settings") { throw new InvalidOperationException($"The surface title was \"{surface.Definition.Title}\"."); }
-    if (surface.Definition.Children.Count == 0) { throw new InvalidOperationException("The surface has no content."); }
+    if (surface.Definition.Children.Length == 0) { throw new InvalidOperationException("The surface has no content."); }
     var preferences = payload.GetProperty("preferences");
     if (preferences.GetProperty("displayName").GetString() != "") { throw new InvalidOperationException("A fresh install has no display name."); }
     if (preferences.GetProperty("theme").GetString() != "system") { throw new InvalidOperationException("A fresh install answers the system theme."); }

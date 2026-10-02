@@ -36,7 +36,7 @@ await Scenario("The models take turns and stop once they agree", async (app, sco
     var told = await brain.Get<IScriptedLLM>(scope + "/gemma").Prompts();
     if (!told.Any(prompt => prompt.Contains("Luna: A smart dog bowl.", StringComparison.Ordinal)))
     { throw new InvalidOperationException("Gemma was never told what Luna said."); }
-    var rounds = discussion.Turns.Count == 0 ? 0 : discussion.Turns.Max(turn => turn.Round);
+    var rounds = discussion.Turns.Length == 0 ? 0 : discussion.Turns.Max(turn => turn.Round);
     if (rounds != 2) { throw new InvalidOperationException($"The discussion took {rounds} rounds."); }
     if (!discussion.Agreed) { throw new InvalidOperationException("The participants did not agree."); }
 });
@@ -56,7 +56,7 @@ await Scenario("Without agreement the discussion stops at the round limit", asyn
 
     if (answer != "A leash with a collar.") { throw new InvalidOperationException($"The answer was \"{answer}\"."); }
     var discussion = await brain.Get<IGroupChat>($"{scope}/app/chat/{invocationId:N}").Read();
-    var rounds = discussion.Turns.Count == 0 ? 0 : discussion.Turns.Max(turn => turn.Round);
+    var rounds = discussion.Turns.Length == 0 ? 0 : discussion.Turns.Max(turn => turn.Round);
     if (rounds != 2) { throw new InvalidOperationException($"The discussion took {rounds} rounds."); }
     if (discussion.Agreed) { throw new InvalidOperationException("The participants agreed."); }
 });

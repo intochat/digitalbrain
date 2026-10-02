@@ -7,8 +7,4 @@ namespace DigitalBrain.Supabase.Tables;
 public sealed record SupabaseTableFilter(
     [property: Id(0)] string ColumnId,
     [property: Id(1)] string Operator,
-    [property: Id(2)] string Value)
-{
-    public SupabaseTableFilter(string columnId, string @operator)
-        : this(columnId, @operator, "null") { }
-}
+    [property: Id(2)] string Value = "null");

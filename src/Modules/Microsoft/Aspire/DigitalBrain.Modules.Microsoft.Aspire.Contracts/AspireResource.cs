@@ -6,4 +6,4 @@ public sealed record AspireResource(
     [property: Id(1)] string Type,
     [property: Id(2)] string State,
     [property: Id(3)] string? Health,
-    [property: Id(4)] IReadOnlyList<string> Urls);
+    [property: Id(4)] string[] Urls);

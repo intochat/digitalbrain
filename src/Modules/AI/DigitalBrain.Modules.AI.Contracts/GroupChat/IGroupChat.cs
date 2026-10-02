@@ -22,7 +22,7 @@ public sealed record GroupChatParticipant(
 // The first participant also moderates: it writes the final answer.
 [GenerateSerializer, Alias("ai.group-chat-setup")]
 public sealed record GroupChatSetup(
-    [property: Id(0)] IReadOnlyList<GroupChatParticipant> Participants,
+    [property: Id(0)] GroupChatParticipant[] Participants,
     [property: Id(1)] string Brief = "",
     [property: Id(2)] int MaxRounds = 3);
 
@@ -40,7 +40,7 @@ public sealed record GroupChatState
     [Id(0)] public long Revision { get; init; }
     [Id(1)] public GroupChatSetup? Setup { get; init; }
     [Id(2)] public string Question { get; init; } = "";
-    [Id(3)] public IReadOnlyList<GroupChatTurn> Turns { get; init; } = [];
+    [Id(3)] public GroupChatTurn[] Turns { get; init; } = [];
     [Id(4)] public string Answer { get; init; } = "";
     [Id(5)] public GroupChatStatus Status { get; init; }
     [Id(6)] public bool Agreed { get; init; }

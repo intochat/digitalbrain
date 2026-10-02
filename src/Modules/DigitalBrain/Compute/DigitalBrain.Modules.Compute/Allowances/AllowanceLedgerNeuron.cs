@@ -228,7 +228,7 @@ internal sealed class AllowanceLedgerNeuron : Neuron<AllowanceLedgerState>, IAll
             Reason = "Awaiting an allowance decision.",
             RequestedAt = now,
             IntentId = request.Caller.IntentId,
-            Permissions = request.SemanticTypeIds,
+            Permissions = request.SemanticTypeIds.ToArray(),
         });
     }
 

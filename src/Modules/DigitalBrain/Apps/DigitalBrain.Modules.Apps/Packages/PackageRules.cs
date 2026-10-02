@@ -18,10 +18,10 @@ internal static partial class PackageRules
         var manifest = content.Manifest;
         Require(!string.IsNullOrWhiteSpace(manifest.Title) && manifest.Title.Length <= 100, "A package title is 1-100 characters.");
         Require(manifest.Description is { Length: <= 2000 }, "A package description is at most 2000 characters.");
-        Require(manifest.Operations is { Count: <= 32 } && manifest.Settings is { Count: <= 32 } && manifest.Accounts is null or { Count: <= 32 }, "A package declares at most 32 operations, settings and accounts.");
+        Require(manifest.Operations is { Length: <= 32 } && manifest.Settings is { Length: <= 32 } && manifest.Accounts is null or { Length: <= 32 }, "A package declares at most 32 operations, settings and accounts.");
         Require(manifest.Operations.All(operation => operation is { Name: not null } && OperationName().IsMatch(operation.Name) && operation.Description is { Length: <= 500 }),
             "Operation names are lowercase words joined by hyphens, with descriptions of at most 500 characters.");
-        Require(manifest.Operations.Select(operation => operation.Name).Distinct(StringComparer.Ordinal).Count() == manifest.Operations.Count, "Operation names must be unique.");
+        Require(manifest.Operations.Select(operation => operation.Name).Distinct(StringComparer.Ordinal).Count() == manifest.Operations.Length, "Operation names must be unique.");
         foreach (var setting in manifest.Settings)
         {
             Require(setting is { Name: not null } && SettingName().IsMatch(setting.Name) && setting.Description is { Length: <= 500 } && setting.DefaultValue is { Length: <= 4096 },
@@ -30,12 +30,12 @@ internal static partial class PackageRules
             Require(!ReservedSettings.Contains(setting.Name), "App and Account are reserved: App is the installed app's address and Account prefixes the connected accounts.");
         }
         // Settings become configuration keys, which are case-insensitive.
-        Require(manifest.Settings.Select(setting => setting.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() == manifest.Settings.Count, "Setting names must be unique.");
+        Require(manifest.Settings.Select(setting => setting.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() == manifest.Settings.Length, "Setting names must be unique.");
         var accounts = manifest.Accounts ?? [];
         Require(accounts.All(account => account is { Name: not null, Source: not null, Description: not null }
             && SettingName().IsMatch(account.Name) && ModuleId().IsMatch(account.Source) && account.Description.Length <= 500),
             "Account slots need a name, source and description.");
-        Require(accounts.Select(account => account.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() == accounts.Count,
+        Require(accounts.Select(account => account.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() == accounts.Length,
             "Account slot names must be unique.");
         Require(!accounts.Any(account => manifest.Settings.Any(setting => string.Equals(setting.Name, account.Name, StringComparison.OrdinalIgnoreCase))),
             "Account slots and settings cannot share a name.");

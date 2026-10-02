@@ -6,4 +6,4 @@ namespace DigitalBrain.Supabase.Tables;
 [Alias("supabase.table-row")]
 public sealed record SupabaseTableRow(
     [property: Id(0)] string Id,
-    [property: Id(1)] IReadOnlyList<string> Cells);
+    [property: Id(1)] string[] Cells);

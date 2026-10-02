@@ -14,7 +14,7 @@ internal sealed class FileSurfaces(IGrainFactory grains)
     public async Task<UiChildRef> Files(string name, DirectoryPage page, int offset = 0, string sort = "name", string filter = "")
     {
         var collection = grains.GetGrain<ICollectionView>(name + "/items");
-        await collection.Set(new(page.Items, Cursor: page.NextOffset?.ToString(System.Globalization.CultureInfo.InvariantCulture)), (await collection.Read()).Revision);
+        await collection.Set(new(page.Items.ToArray(), Cursor: page.NextOffset?.ToString(System.Globalization.CultureInfo.InvariantCulture)), (await collection.Read()).Revision);
         var toolbar = new List<UiChildRef>();
         async Task AddButton(string id, string label, string action, bool enabled = true)
         {
@@ -31,7 +31,7 @@ internal sealed class FileSurfaces(IGrainFactory grains)
         await AddButton("sort", "Sort: " + sort, "sort");
         await AddButton("refresh", "Refresh files", "refresh");
         var bar = grains.GetGrain<ILayout>(name + "/toolbar");
-        await bar.Set(new("row", toolbar, 4), (await bar.Read()).Revision);
+        await bar.Set(new("row", toolbar.ToArray(), 4), (await bar.Read()).Revision);
         var status = grains.GetGrain<IText>(name + "/status");
         await status.Set("Workspace files · " + page.Items.Count + " items");
         var previous = grains.GetGrain<IButton>(name + "/previous"); await previous.Set("Previous", "previous", offset > 0);
@@ -56,7 +56,7 @@ internal sealed class FileSurfaces(IGrainFactory grains)
         await canvas.Set(new(asset.Id, asset.Width, asset.Height, recipe, revision), (await canvas.Read()).Revision);
         return await Compose(name, "Image Editor", [new("imagecanvas", name + "/canvas")]);
     }
-    private async Task<UiChildRef> Compose(string name, string title, UiChildRef[] children, IReadOnlyList<double>? extents = null)
+    private async Task<UiChildRef> Compose(string name, string title, UiChildRef[] children, double[]? extents = null)
     {
         var layout = grains.GetGrain<ILayout>(name + "/layout");
         await layout.Set(new("column", children, 4, extents), (await layout.Read()).Revision);

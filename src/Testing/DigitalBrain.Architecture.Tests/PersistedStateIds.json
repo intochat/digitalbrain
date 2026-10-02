@@ -1,0 +1,2670 @@
+{
+  "DigitalBrain.AI.AgentModelSelection": {
+    "Profile": 0,
+    "Provider": 1,
+    "Model": 2,
+    "Reasoning": 3,
+    "MaxOutputTokens": 4,
+    "Capabilities": 5
+  },
+  "DigitalBrain.AI.Agents.AgentConversationRequest": {
+    "RunId": 0,
+    "Message": 1
+  },
+  "DigitalBrain.AI.Agents.AgentConversationState": {
+    "Revision": 0,
+    "ActiveRunId": 1,
+    "Turns": 2,
+    "Summary": 3
+  },
+  "DigitalBrain.AI.Agents.AgentConversationTurn": {
+    "RunId": 0,
+    "UserText": 1,
+    "AssistantText": 2,
+    "ResultIds": 3
+  },
+  "DigitalBrain.AI.Agents.AgentDefinition": {
+    "DisplayName": 0,
+    "Description": 1,
+    "Instructions": 2,
+    "Model": 3,
+    "Tools": 4,
+    "Capabilities": 5,
+    "RoutingExamples": 6,
+    "MaxModelCalls": 7,
+    "Timeout": 8,
+    "MaxHistoryMessages": 9,
+    "Options": 10,
+    "ContextProviders": 11
+  },
+  "DigitalBrain.AI.Agents.AgentEvent": {
+    "Sequence": 0,
+    "RunId": 1,
+    "Kind": 2,
+    "At": 3,
+    "CallId": 4,
+    "Tool": 5
+  },
+  "DigitalBrain.AI.Agents.AgentMetadata": {
+    "Id": 0,
+    "DisplayName": 1,
+    "Description": 2,
+    "Capabilities": 3,
+    "RoutingExamples": 4
+  },
+  "DigitalBrain.AI.Agents.AgentReply": {
+    "Text": 0
+  },
+  "DigitalBrain.AI.Agents.AgentRequest": {
+    "Message": 0,
+    "Model": 1,
+    "System": 2
+  },
+  "DigitalBrain.AI.Agents.AgentResponse": {
+    "RunId": 0,
+    "Text": 1,
+    "Messages": 2,
+    "Usage": 3
+  },
+  "DigitalBrain.AI.Agents.AgentRunState": {
+    "RunId": 0,
+    "Status": 1,
+    "DefinitionRevision": 2,
+    "StartedAt": 3,
+    "EndedAt": 4,
+    "Response": 5,
+    "Error": 6,
+    "Model": 7,
+    "Capabilities": 8,
+    "Definition": 9
+  },
+  "DigitalBrain.AI.Agents.AgentState": {
+    "Revision": 0,
+    "Definition": 1,
+    "LastRun": 2,
+    "HistoryMessageCount": 3
+  },
+  "DigitalBrain.AI.Agents.AgentStorage": {
+    "Revision": 0,
+    "Definition": 1,
+    "History": 2,
+    "LastRun": 3,
+    "Events": 4,
+    "EventSequence": 5,
+    "Turns": 6,
+    "ActiveRun": 7,
+    "HistorySummary": 8,
+    "RunInputs": 9,
+    "ConversationSummary": 10
+  },
+  "DigitalBrain.AI.Agents.AgentStorageEnvelope": {
+    "Json": 0
+  },
+  "DigitalBrain.AI.Agents.AgentTurnEvent": {},
+  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BCompleted": {
+    "Messages": 0,
+    "Usage": 1
+  },
+  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BFailed": {
+    "Message": 0,
+    "Cancelled": 1
+  },
+  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BFinished": {},
+  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BModelSelected": {
+    "Model": 0,
+    "Descriptor": 1
+  },
+  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BStarted": {
+    "RunId": 0
+  },
+  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BText": {
+    "Content": 0
+  },
+  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BToolCompleted": {
+    "CallId": 0,
+    "Name": 1,
+    "Result": 2
+  },
+  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BToolFailed": {
+    "CallId": 0,
+    "Name": 1
+  },
+  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BToolStarted": {
+    "CallId": 0,
+    "Name": 1,
+    "Arguments": 2
+  },
+  "DigitalBrain.AI.Agents.AgentTurnRequest": {
+    "AgentId": 0,
+    "RunId": 1,
+    "ScopeId": 2,
+    "History": 3,
+    "Message": 4,
+    "Model": 5,
+    "Instructions": 6,
+    "ToolNames": 7,
+    "Messages": 8,
+    "Input": 9,
+    "Streaming": 10,
+    "MaxModelCalls": 11,
+    "Timeout": 12,
+    "Options": 13,
+    "ContextProviders": 14
+  },
+  "DigitalBrain.AI.Agents.AgentUsage": {
+    "InputTokens": 0,
+    "OutputTokens": 1,
+    "TotalTokens": 2
+  },
+  "DigitalBrain.AI.Agents.Signals.AgentConfigured": {
+    "AgentId": 0,
+    "Revision": 1
+  },
+  "DigitalBrain.AI.Agents.Signals.AgentHistoryCleared": {
+    "AgentId": 0,
+    "Revision": 1
+  },
+  "DigitalBrain.AI.Agents.Signals.AgentOutputDelta": {
+    "AgentId": 0,
+    "RunId": 1,
+    "Sequence": 2,
+    "Text": 3
+  },
+  "DigitalBrain.AI.Agents.Signals.AgentReplied": {
+    "AgentId": 0,
+    "Text": 1,
+    "RepliedAt": 2
+  },
+  "DigitalBrain.AI.Agents.Signals.AgentRunChanged": {
+    "AgentId": 0,
+    "Run": 1
+  },
+  "DigitalBrain.AI.Agents.Signals.AgentToolCallChanged": {
+    "AgentId": 0,
+    "Event": 1
+  },
+  "DigitalBrain.AI.AiAudio": {
+    "Uri": 0,
+    "MediaType": 1
+  },
+  "DigitalBrain.AI.AiContent": {},
+  "DigitalBrain.AI.AiImage": {
+    "Uri": 0,
+    "MediaType": 1
+  },
+  "DigitalBrain.AI.AiMessage": {
+    "Role": 0,
+    "Content": 1
+  },
+  "DigitalBrain.AI.AiReasoning": {
+    "Text": 0
+  },
+  "DigitalBrain.AI.AiText": {
+    "Text": 0
+  },
+  "DigitalBrain.AI.AiToolCall": {
+    "CallId": 0,
+    "Name": 1,
+    "ArgumentsJson": 2
+  },
+  "DigitalBrain.AI.AiToolResult": {
+    "CallId": 0,
+    "ResultJson": 1
+  },
+  "DigitalBrain.AI.GroupChat.GroupChatParticipant": {
+    "Name": 0,
+    "Model": 1,
+    "Instructions": 2
+  },
+  "DigitalBrain.AI.GroupChat.GroupChatSetup": {
+    "Participants": 0,
+    "Brief": 1,
+    "MaxRounds": 2
+  },
+  "DigitalBrain.AI.GroupChat.GroupChatState": {
+    "Revision": 0,
+    "Setup": 1,
+    "Question": 2,
+    "Turns": 3,
+    "Answer": 4,
+    "Status": 5,
+    "Agreed": 6,
+    "Failure": 7
+  },
+  "DigitalBrain.AI.GroupChat.GroupChatTurn": {
+    "Round": 0,
+    "Speaker": 1,
+    "Text": 2
+  },
+  "DigitalBrain.AI.GroupChat.Signals.GroupChatChanged": {
+    "ChatId": 0,
+    "Revision": 1,
+    "Status": 2
+  },
+  "DigitalBrain.AI.GroupChat.Signals.GroupChatConcluded": {
+    "ChatId": 0,
+    "Answer": 1,
+    "Rounds": 2,
+    "Agreed": 3
+  },
+  "DigitalBrain.AI.GroupChat.Signals.GroupChatSpoke": {
+    "ChatId": 0,
+    "Turn": 1
+  },
+  "DigitalBrain.AI.InferenceCompleted": {
+    "NeuronId": 0,
+    "OperationId": 1
+  },
+  "DigitalBrain.AI.InferenceFailed": {
+    "NeuronId": 0,
+    "OperationId": 1,
+    "Reason": 2
+  },
+  "DigitalBrain.AI.InferenceOptions": {
+    "Temperature": 0,
+    "TopP": 1,
+    "MaxOutputTokens": 2,
+    "Reasoning": 3,
+    "ProviderOptions": 4,
+    "ResponseSchemaJson": 5,
+    "Provider": 6
+  },
+  "DigitalBrain.AI.InferenceRequest": {
+    "Messages": 0,
+    "Model": 1,
+    "Options": 2,
+    "Tools": 3
+  },
+  "DigitalBrain.AI.InferenceResult": {
+    "Messages": 0,
+    "FinishReason": 1,
+    "Usage": 2,
+    "ResponseId": 3,
+    "Model": 4
+  },
+  "DigitalBrain.AI.InferenceStarted": {
+    "NeuronId": 0,
+    "OperationId": 1
+  },
+  "DigitalBrain.AI.InferenceTool": {
+    "Name": 0,
+    "Description": 1,
+    "ParametersJson": 2
+  },
+  "DigitalBrain.AI.InferenceUpdate": {
+    "Role": 0,
+    "Content": 1,
+    "FinishReason": 2,
+    "Usage": 3,
+    "ResponseId": 4,
+    "MessageId": 5,
+    "Model": 6
+  },
+  "DigitalBrain.AI.InferenceUsage": {
+    "InputTokens": 0,
+    "OutputTokens": 1,
+    "TotalTokens": 2
+  },
+  "DigitalBrain.AI.Media.EmbeddingRequest": {
+    "Inputs": 0
+  },
+  "DigitalBrain.AI.Media.EmbeddingResult": {
+    "OperationId": 0,
+    "Vectors": 1
+  },
+  "DigitalBrain.AI.Media.EmbeddingsGenerated": {
+    "OperationId": 0,
+    "Count": 1
+  },
+  "DigitalBrain.AI.Media.ImageGenerated": {
+    "OperationId": 0,
+    "Model": 1
+  },
+  "DigitalBrain.AI.Media.ImageGenerationRequest": {
+    "Prompt": 0
+  },
+  "DigitalBrain.AI.Media.ImageGenerationResult": {
+    "OperationId": 0,
+    "Image": 1,
+    "Model": 2
+  },
+  "DigitalBrain.AI.Media.MediaCapabilities": {
+    "Operation": 0,
+    "Available": 1,
+    "MaxPayloadBytes": 2,
+    "UnavailableReason": 3,
+    "MaxTextCharacters": 4,
+    "MaxBatchItems": 5
+  },
+  "DigitalBrain.AI.Media.MediaOperationFailed": {
+    "OperationId": 0,
+    "Operation": 1,
+    "Code": 2
+  },
+  "DigitalBrain.AI.Media.MediaPayload": {
+    "Content": 0,
+    "MediaType": 1
+  },
+  "DigitalBrain.AI.Media.SpeechRecognitionRequest": {
+    "Audio": 0,
+    "FileName": 1
+  },
+  "DigitalBrain.AI.Media.SpeechRecognitionResult": {
+    "OperationId": 0,
+    "Text": 1,
+    "Model": 2
+  },
+  "DigitalBrain.AI.Media.SpeechRecognized": {
+    "OperationId": 0,
+    "Model": 1
+  },
+  "DigitalBrain.AI.Media.SpeechSynthesisRequest": {
+    "Text": 0,
+    "Voice": 1
+  },
+  "DigitalBrain.AI.Media.SpeechSynthesisResult": {
+    "OperationId": 0,
+    "Audio": 1,
+    "Model": 2
+  },
+  "DigitalBrain.AI.Media.SpeechSynthesized": {
+    "OperationId": 0,
+    "Model": 1
+  },
+  "DigitalBrain.AI.Metering.IntentTokenUsage": {
+    "IntentId": 0,
+    "Entries": 1
+  },
+  "DigitalBrain.AI.Metering.IntentUsageStorage": {
+    "Entries": 0
+  },
+  "DigitalBrain.AI.Metering.TokenUsageEntry": {
+    "Meter": 0,
+    "Provider": 1,
+    "Model": 2,
+    "InputTokens": 3,
+    "CachedInputTokens": 4,
+    "ReasoningTokens": 5,
+    "OutputTokens": 6,
+    "TotalTokens": 7,
+    "UsageReported": 8,
+    "At": 9
+  },
+  "DigitalBrain.AI.ModelCatalog": {
+    "Automatic": 0,
+    "Models": 1
+  },
+  "DigitalBrain.AI.ModelChoice": {
+    "Id": 0,
+    "Label": 1,
+    "Provider": 2,
+    "Model": 3,
+    "Available": 4,
+    "Capabilities": 5
+  },
+  "DigitalBrain.AI.ModelDescriptor": {
+    "Provider": 0,
+    "Model": 1,
+    "Profile": 2,
+    "Revision": 3,
+    "Tools": 4,
+    "Vision": 5,
+    "StructuredOutput": 6,
+    "ContextWindowTokens": 7,
+    "MaximumOutputTokens": 8,
+    "Temperature": 9,
+    "TopP": 10,
+    "AllowedReasoning": 11
+  },
+  "DigitalBrain.AI.Ollama.OllamaInferenceOptions": {
+    "ContextWindowTokens": 0,
+    "Think": 1
+  },
+  "DigitalBrain.AI.OpenAI.OpenAIInferenceOptions": {
+    "ParallelToolCalls": 0
+  },
+  "DigitalBrain.AI.ProviderInferenceOptions": {},
+  "DigitalBrain.AI.ProviderUnavailableException": {
+    "Integration": 0,
+    "Status": 1,
+    "Missing": 2
+  },
+  "DigitalBrain.AI.ResolvedAgentModel": {
+    "Provider": 0,
+    "Model": 1,
+    "Endpoint": 2,
+    "Profile": 3,
+    "Revision": 4,
+    "Capabilities": 5,
+    "Reasoning": 6,
+    "MaxOutputTokens": 7
+  },
+  "DigitalBrain.AI.ScriptedLlmState": {
+    "Replies": 0,
+    "Answered": 1,
+    "Prompts": 2
+  },
+  "DigitalBrain.Apps.AbandonAppStorage": {
+    "OperationId": 0
+  },
+  "DigitalBrain.Apps.AbandonedAppStorage": {
+    "OperationId": 0,
+    "Files": 1
+  },
+  "DigitalBrain.Apps.AcceptProposal": {
+    "OperationId": 0,
+    "Number": 1
+  },
+  "DigitalBrain.Apps.AppDeployment": {
+    "Target": 0
+  },
+  "DigitalBrain.Apps.AppDraftAttempt": {
+    "Revision": 0,
+    "Green": 1,
+    "Failures": 2
+  },
+  "DigitalBrain.Apps.AppDraftChanged": {
+    "DraftId": 0,
+    "Revision": 1,
+    "Status": 2
+  },
+  "DigitalBrain.Apps.AppDraftEntry": {
+    "Id": 0,
+    "Title": 1,
+    "Status": 2,
+    "UpdatedAt": 3
+  },
+  "DigitalBrain.Apps.AppDraftState": {
+    "Revision": 0,
+    "Request": 1,
+    "Name": 2,
+    "Title": 3,
+    "Description": 4,
+    "Runtime": 5,
+    "Spec": 6,
+    "Status": 7,
+    "Attempts": 8,
+    "Published": 9,
+    "Error": 10
+  },
+  "DigitalBrain.Apps.AppDraftView": {
+    "Draft": 0,
+    "Verification": 1
+  },
+  "DigitalBrain.Apps.AppDraftsChanged": {
+    "Owner": 0
+  },
+  "DigitalBrain.Apps.AppDraftsState": {
+    "Entries": 0
+  },
+  "DigitalBrain.Apps.AppInvocation": {
+    "Id": 0,
+    "Operation": 1,
+    "Input": 2,
+    "Status": 3,
+    "Output": 4,
+    "Error": 5,
+    "RequestedAt": 6,
+    "CompletedAt": 7
+  },
+  "DigitalBrain.Apps.AppRequirementsException": {},
+  "DigitalBrain.Apps.AppResponse": {
+    "InvocationId": 0,
+    "Output": 1,
+    "Error": 2
+  },
+  "DigitalBrain.Apps.AppScenarioVerdict": {
+    "Name": 0,
+    "Passed": 1,
+    "Message": 2
+  },
+  "DigitalBrain.Apps.AppSnapshot": {
+    "Status": 0,
+    "Revision": 1,
+    "Settings": 2,
+    "Operations": 3,
+    "CSharpFiles": 4,
+    "Accounts": 5,
+    "UninstallPending": 6,
+    "AbandonedStorage": 7
+  },
+  "DigitalBrain.Apps.AppState": {
+    "Status": 0,
+    "Revision": 1,
+    "\u003Cretired:2\u003E": 2,
+    "Declared": 3,
+    "Settings": 4,
+    "Operations": 5,
+    "ProgramGeneration": 6,
+    "Invocations": 7,
+    "Receipts": 8,
+    "Accounts": 9,
+    "Runtime": 10,
+    "ScriptPaths": 11,
+    "StorageFiles": 12,
+    "PendingDeployment": 13,
+    "PendingUninstall": 14,
+    "StorageHistoryKnown": 15,
+    "LifecycleReceipts": 16,
+    "PostgresScopes": 17,
+    "PendingAbandonStorage": 18,
+    "AbandonedStorage": 19
+  },
+  "DigitalBrain.Apps.AppTestRun": {
+    "Scenarios": 0,
+    "ExitCode": 1
+  },
+  "DigitalBrain.Apps.AppVerification": {
+    "Revision": 0,
+    "Run": 1,
+    "VerifiedAt": 2
+  },
+  "DigitalBrain.Apps.AppVerificationState": {
+    "Last": 0
+  },
+  "DigitalBrain.Apps.CloseProposal": {
+    "OperationId": 0,
+    "Number": 1
+  },
+  "DigitalBrain.Apps.CommitPackage": {
+    "OperationId": 0,
+    "ExpectedHead": 1,
+    "Content": 2,
+    "\u003Cretired:3\u003E": 3,
+    "Message": 4,
+    "MergeFrom": 5
+  },
+  "DigitalBrain.Apps.ConfigureApp": {
+    "OperationId": 0,
+    "Settings": 1,
+    "Accounts": 2
+  },
+  "DigitalBrain.Apps.ForkPackage": {
+    "OperationId": 0,
+    "Source": 1
+  },
+  "DigitalBrain.Apps.InstallApp": {
+    "OperationId": 0,
+    "Revision": 1,
+    "Settings": 2,
+    "Accounts": 3
+  },
+  "DigitalBrain.Apps.InstalledAppsState": {
+    "Packages": 0,
+    "Discovered": 1
+  },
+  "DigitalBrain.Apps.InvokeApp": {
+    "InvocationId": 0,
+    "Operation": 1,
+    "Input": 2
+  },
+  "DigitalBrain.Apps.OperationReceipt": {
+    "OperationId": 0,
+    "RequestHash": 1,
+    "Result": 2
+  },
+  "DigitalBrain.Apps.PackageAccount": {
+    "Name": 0,
+    "Source": 1,
+    "Description": 2
+  },
+  "DigitalBrain.Apps.PackageContent": {
+    "Manifest": 0,
+    "Source": 1,
+    "Files": 2
+  },
+  "DigitalBrain.Apps.PackageDirectoryState": {
+    "Listings": 0
+  },
+  "DigitalBrain.Apps.PackageId": {
+    "Owner": 0,
+    "Name": 1
+  },
+  "DigitalBrain.Apps.PackageListing": {
+    "Package": 0,
+    "Title": 1,
+    "Description": 2,
+    "Revision": 3,
+    "ForkedFrom": 4,
+    "PublishedAt": 5
+  },
+  "DigitalBrain.Apps.PackageManifest": {
+    "Title": 0,
+    "Description": 1,
+    "Operations": 2,
+    "Settings": 3,
+    "Accounts": 4,
+    "Runtime": 5
+  },
+  "DigitalBrain.Apps.PackageOperation": {
+    "Name": 0,
+    "Description": 1
+  },
+  "DigitalBrain.Apps.PackageProposal": {
+    "Number": 0,
+    "Source": 1,
+    "Title": 2,
+    "Author": 3,
+    "Status": 4,
+    "OpenedAt": 5
+  },
+  "DigitalBrain.Apps.PackageRevision": {
+    "Id": 0,
+    "Parents": 1,
+    "Content": 2,
+    "\u003Cretired:3\u003E": 3,
+    "Author": 4,
+    "Message": 5,
+    "CommittedAt": 6
+  },
+  "DigitalBrain.Apps.PackageRevisionRef": {
+    "Package": 0,
+    "Revision": 1
+  },
+  "DigitalBrain.Apps.PackageRevisionSummary": {
+    "Id": 0,
+    "Parents": 1,
+    "Author": 2,
+    "Message": 3,
+    "CommittedAt": 4
+  },
+  "DigitalBrain.Apps.PackageSetting": {
+    "Name": 0,
+    "Description": 1,
+    "DefaultValue": 2
+  },
+  "DigitalBrain.Apps.PackageSnapshot": {
+    "Id": 0,
+    "ForkedFrom": 1,
+    "Head": 2,
+    "Published": 3,
+    "History": 4,
+    "Proposals": 5
+  },
+  "DigitalBrain.Apps.PackageState": {
+    "ForkedFrom": 0,
+    "Head": 1,
+    "Published": 2,
+    "Revisions": 3,
+    "History": 4,
+    "Proposals": 5,
+    "Receipts": 6
+  },
+  "DigitalBrain.Apps.ProposeChange": {
+    "OperationId": 0,
+    "Source": 1,
+    "Title": 2
+  },
+  "DigitalBrain.Apps.PublishPackage": {
+    "OperationId": 0,
+    "Revision": 1
+  },
+  "DigitalBrain.Apps.PullPackage": {
+    "OperationId": 0,
+    "Source": 1
+  },
+  "DigitalBrain.Apps.Signals.AppChanged": {
+    "App": 0
+  },
+  "DigitalBrain.Apps.Signals.AppInvocationCompleted": {
+    "Invocation": 0
+  },
+  "DigitalBrain.Apps.Signals.AppInvoked": {
+    "InvocationId": 0,
+    "Operation": 1,
+    "Input": 2
+  },
+  "DigitalBrain.Apps.Signals.AppVerified": {
+    "Revision": 0,
+    "Green": 1
+  },
+  "DigitalBrain.Apps.Signals.AppsChanged": {
+    "Packages": 0
+  },
+  "DigitalBrain.Apps.Signals.PackageChanged": {
+    "Package": 0,
+    "Head": 1,
+    "Published": 2
+  },
+  "DigitalBrain.Apps.Signals.PackageListed": {
+    "Listing": 0
+  },
+  "DigitalBrain.Apps.UninstallApp": {
+    "OperationId": 0
+  },
+  "DigitalBrain.Apps.UpgradeApp": {
+    "OperationId": 0,
+    "Revision": 1,
+    "Accounts": 2
+  },
+  "DigitalBrain.Assistant.AssistantConfigured": {
+    "Key": 0
+  },
+  "DigitalBrain.Assistant.AssistantRun": {
+    "ThreadId": 0,
+    "RunId": 1,
+    "Message": 2,
+    "Owner": 3,
+    "ModelProfile": 4
+  },
+  "DigitalBrain.Assistant.AssistantState": {
+    "Active": 0,
+    "Definition": 1,
+    "SelectedThread": 2,
+    "Threads": 3,
+    "Owner": 4,
+    "\u003Cretired:5\u003E": 5
+  },
+  "DigitalBrain.Assistant.AssistantThread": {
+    "Id": 0,
+    "Title": 1,
+    "Draft": 2,
+    "ModelProfile": 3,
+    "Messages": 4,
+    "Receipts": 5,
+    "Results": 6,
+    "Error": 7,
+    "Status": 8,
+    "TurnId": 9
+  },
+  "DigitalBrain.Assistant.AssistantTranscriptionResult": {
+    "Status": 0,
+    "Text": 1,
+    "Error": 2
+  },
+  "DigitalBrain.Assistant.AssistantWindow": {
+    "Id": 0,
+    "Title": 1,
+    "Surface": 2
+  },
+  "DigitalBrain.ClickHouse.Query.ClickHouseColumn": {
+    "Name": 0,
+    "ClickHouseType": 1,
+    "TableType": 2,
+    "SampleValues": 3
+  },
+  "DigitalBrain.ClickHouse.Query.ClickHouseConnection": {
+    "Connected": 0,
+    "Database": 1,
+    "ServerVersion": 2,
+    "Provider": 3
+  },
+  "DigitalBrain.ClickHouse.Query.ClickHouseQuery": {
+    "Sql": 0,
+    "MaxRows": 1
+  },
+  "DigitalBrain.ClickHouse.Query.ClickHouseQueryException": {},
+  "DigitalBrain.ClickHouse.Query.ClickHouseQueryResult": {
+    "Columns": 0,
+    "Rows": 1,
+    "RowCount": 2,
+    "Truncated": 3,
+    "ElapsedMs": 4
+  },
+  "DigitalBrain.ClickHouse.Query.ClickHouseSchema": {
+    "Database": 0,
+    "Tables": 1
+  },
+  "DigitalBrain.ClickHouse.Query.ClickHouseTableInfo": {
+    "Name": 0,
+    "Engine": 1,
+    "TotalRows": 2,
+    "Columns": 3
+  },
+  "DigitalBrain.ClickHouse.Query.ClickHouseUnavailableException": {},
+  "DigitalBrain.ClickHouse.Query.ReadClickHouseSchema": {
+    "Table": 0
+  },
+  "DigitalBrain.Compute.Allowance": {
+    "AllowanceId": 0,
+    "AccountId": 1,
+    "WorkspaceId": 2,
+    "AppId": 3,
+    "Operation": 4,
+    "Level": 5,
+    "Scope": 6,
+    "LimitCompute": 7,
+    "MonthlyLimitCompute": 8,
+    "Permissions": 9,
+    "PriceBookVersion": 10,
+    "GrantedAt": 11,
+    "ConversationId": 12,
+    "Revoked": 13
+  },
+  "DigitalBrain.Compute.AllowanceDecision": {
+    "Allowed": 0,
+    "Denial": 1,
+    "Explanation": 2,
+    "ReservationId": 3,
+    "ApprovalId": 4,
+    "RemainingCompute": 5,
+    "AllowanceId": 6
+  },
+  "DigitalBrain.Compute.AllowanceReservation": {
+    "ReservationId": 0,
+    "AllowanceId": 1,
+    "ReservedCompute": 2,
+    "SettledCompute": 3,
+    "OccurredAt": 4,
+    "IntentId": 5,
+    "WorkspaceId": 6,
+    "AppId": 7,
+    "Operation": 8,
+    "Failure": 9,
+    "Settled": 10
+  },
+  "DigitalBrain.Compute.Allowances.AllowanceLedgerState": {
+    "Allowances": 0,
+    "Reservations": 1,
+    "Pending": 2,
+    "Limits": 3,
+    "HighestAlert": 4,
+    "HardStoppedAt": 5
+  },
+  "DigitalBrain.Compute.Invoice": {
+    "InvoiceId": 0,
+    "AccountId": 1,
+    "Period": 2,
+    "AmountUsd": 3,
+    "Currency": 4,
+    "Lines": 5
+  },
+  "DigitalBrain.Compute.InvoiceResult": {
+    "InvoiceId": 0,
+    "Status": 1,
+    "ProviderReference": 2,
+    "CheckoutUrl": 3
+  },
+  "DigitalBrain.Compute.LedgerEntry": {
+    "AccountId": 0,
+    "IdempotencyKey": 1,
+    "Kind": 2,
+    "Amount": 3,
+    "IntentId": 4,
+    "AppId": 5,
+    "Description": 6,
+    "OccurredAt": 7
+  },
+  "DigitalBrain.Compute.LimitPolicy": {
+    "AccountLimitCompute": 0,
+    "WorkspaceLimitCompute": 1,
+    "AppLimitCompute": 2,
+    "RunLimitCompute": 3
+  },
+  "DigitalBrain.Compute.LimitReport": {
+    "AccountId": 0,
+    "SpentCompute": 1,
+    "LimitCompute": 2,
+    "HighestAlert": 3,
+    "HardStoppedAt": 4,
+    "ReadExportGraceUntil": 5
+  },
+  "DigitalBrain.Compute.MeterEvent": {
+    "IntentId": 0,
+    "MeterId": 1,
+    "Step": 2,
+    "WorkspaceId": 3,
+    "Quantity": 4,
+    "Unit": 5,
+    "Source": 6,
+    "AppId": 7,
+    "CostBasis": 8,
+    "OccurredAt": 9
+  },
+  "DigitalBrain.Compute.MonthlyStatement": {
+    "AccountId": 0,
+    "Period": 1,
+    "Lines": 2,
+    "TotalCompute": 3,
+    "TotalUsd": 4,
+    "GeneratedAt": 5
+  },
+  "DigitalBrain.Compute.PendingApproval": {
+    "ApprovalId": 0,
+    "WorkspaceId": 1,
+    "AppId": 2,
+    "Operation": 3,
+    "EstimatedCompute": 4,
+    "Reason": 5,
+    "RequestedAt": 6,
+    "IntentId": 7,
+    "Permissions": 8
+  },
+  "DigitalBrain.Compute.StatementLine": {
+    "AppId": 0,
+    "Operation": 1,
+    "Compute": 2,
+    "Count": 3,
+    "Recurring": 4,
+    "MeterId": 5
+  },
+  "DigitalBrain.Compute.Storage.ComputePartState": {
+    "Json": 0
+  },
+  "DigitalBrain.Compute.Storage.ComputeRecordPage": {
+    "Items": 0,
+    "NextKey": 1
+  },
+  "DigitalBrain.Compute.Storage.ComputeRecordsState": {
+    "Root": 0,
+    "\u003Cretired:1\u003E": 1
+  },
+  "DigitalBrain.Compute.Storage.ComputeStoredRecord": {
+    "Id": 0,
+    "Payload": 1,
+    "SortKey": 2,
+    "Revision": 3
+  },
+  "DigitalBrain.Compute.Usage.UsagePage": {
+    "Items": 0,
+    "NextCursor": 1
+  },
+  "DigitalBrain.Compute.Usage.UsageRow": {
+    "Id": 0,
+    "Payload": 1,
+    "OccurredAt": 2,
+    "Revision": 3
+  },
+  "DigitalBrain.Compute.WalletBalance": {
+    "AccountId": 0,
+    "ChargedCompute": 1,
+    "CostCompute": 2,
+    "EntryCount": 3
+  },
+  "DigitalBrain.Contracts.BrainSnapshot": {
+    "BrainId": 0,
+    "Name": 1,
+    "OwnerAccountId": 2,
+    "EstablishedAt": 3
+  },
+  "DigitalBrain.Contracts.Data.Row": {
+    "Values": 0
+  },
+  "DigitalBrain.Contracts.Data.RowAggregate": {
+    "Function": 0,
+    "Column": 1,
+    "Alias": 2
+  },
+  "DigitalBrain.Contracts.Data.RowColumn": {
+    "Name": 0,
+    "Type": 1
+  },
+  "DigitalBrain.Contracts.Data.RowFilter": {
+    "Column": 0,
+    "Operator": 1,
+    "Value": 2
+  },
+  "DigitalBrain.Contracts.Data.RowPage": {
+    "Columns": 0,
+    "Rows": 1,
+    "Truncated": 2
+  },
+  "DigitalBrain.Contracts.Data.RowQuery": {
+    "Filters": 0,
+    "Sort": 1,
+    "Offset": 2,
+    "Limit": 3,
+    "GroupBy": 4,
+    "Aggregates": 5,
+    "Columns": 6
+  },
+  "DigitalBrain.Contracts.Data.RowSchema": {
+    "Columns": 0
+  },
+  "DigitalBrain.Contracts.Data.RowSort": {
+    "Column": 0,
+    "Descending": 1
+  },
+  "DigitalBrain.Contracts.Data.RowsReplaced": {
+    "Name": 0,
+    "Count": 1
+  },
+  "DigitalBrain.Contracts.Data.SourceCapabilities": {
+    "Filter": 0,
+    "Sort": 1,
+    "GroupBy": 2,
+    "Aggregate": 3,
+    "MaxPageSize": 4
+  },
+  "DigitalBrain.Contracts.Enforcement.CallDecision": {
+    "Allowed": 0,
+    "Denial": 1,
+    "Explanation": 2
+  },
+  "DigitalBrain.Contracts.Enforcement.CallRequest": {
+    "Caller": 0,
+    "TargetNeuron": 1,
+    "Operation": 2,
+    "SemanticTypeIds": 3,
+    "EstimatedCompute": 4,
+    "HasSideEffects": 5
+  },
+  "DigitalBrain.Contracts.Enforcement.CallerContext": {
+    "PrincipalId": 0,
+    "AccountId": 1,
+    "BrainId": 2,
+    "Kind": 3,
+    "StampedBy": 4,
+    "AppId": 5,
+    "IntentId": 6,
+    "ConversationId": 7
+  },
+  "DigitalBrain.Contracts.EstablishBrain": {
+    "Name": 0,
+    "OwnerAccountId": 1
+  },
+  "DigitalBrain.Contracts.Integrations.AccountRef": {
+    "Kind": 0,
+    "Id": 1
+  },
+  "DigitalBrain.Contracts.Integrations.AccountRequested": {
+    "Kind": 0,
+    "Id": 1
+  },
+  "DigitalBrain.Contracts.Integrations.IntegrationKind": {
+    "Id": 0,
+    "DisplayName": 1
+  },
+  "DigitalBrain.Contracts.Signal": {
+    "Publisher": 0
+  },
+  "DigitalBrain.Contracts.Signals.ModuleLoaded": {
+    "ModuleType": 0
+  },
+  "DigitalBrain.Contracts.Signals.NeuronActivated": {},
+  "DigitalBrain.Contracts.Signals.NeuronActivity": {
+    "NeuronId": 0,
+    "Key": 1,
+    "TypeIds": 2,
+    "ActivationId": 3,
+    "ObservedAt": 4
+  },
+  "DigitalBrain.Contracts.Signals.NeuronDeactivated": {},
+  "DigitalBrain.Contracts.Types.SecretRef": {
+    "Reference": 0,
+    "Label": 1,
+    "Status": 2
+  },
+  "DigitalBrain.Contracts.Types.SemanticType": {
+    "Kind": 0,
+    "Id": 1,
+    "Primitive": 2,
+    "Sensitivity": 3,
+    "LlmExposure": 4,
+    "InputWidget": 5,
+    "DisplayWidget": 6,
+    "Redactor": 7,
+    "Indexable": 8
+  },
+  "DigitalBrain.Contracts.Types.TypeValidationException": {
+    "Kind": 0,
+    "AllowedValues": 1,
+    "RejectedValue": 2
+  },
+  "DigitalBrain.Core.BrainState": {
+    "Name": 0,
+    "OwnerAccountId": 1,
+    "EstablishedAt": 2
+  },
+  "DigitalBrain.Core.DocumentIndexState": {
+    "Ids": 0
+  },
+  "DigitalBrain.Core.DocumentState": {
+    "Written": 0,
+    "Version": 1,
+    "Payload": 2
+  },
+  "DigitalBrain.Core.Enforcement.UntrustedCallerException": {},
+  "DigitalBrain.Files.FileExplorerState": {
+    "FolderId": 0,
+    "Revision": 1,
+    "Surface": 2
+  },
+  "DigitalBrain.Files.ImageAsset": {
+    "Id": 0,
+    "Name": 1,
+    "Width": 2,
+    "Height": 3,
+    "Fingerprint": 4,
+    "SourceEntryId": 5,
+    "DocumentId": 6
+  },
+  "DigitalBrain.Files.ImageDocumentState": {
+    "Id": 0,
+    "Asset": 1,
+    "Recipe": 2,
+    "Revision": 3,
+    "LastSavedRevision": 4,
+    "Surface": 5,
+    "Receipts": 6,
+    "Saves": 7,
+    "Versions": 8
+  },
+  "DigitalBrain.Files.ImageEditCommand": {
+    "Kind": 0,
+    "Stroke": 1,
+    "Crop": 2,
+    "Recipe": 3
+  },
+  "DigitalBrain.Files.ImageSaveOperationState": {
+    "Result": 0,
+    "Stage": 1
+  },
+  "DigitalBrain.Files.ImageVersion": {
+    "VersionId": 0,
+    "AssetId": 1,
+    "Revision": 2,
+    "Kind": 3
+  },
+  "DigitalBrain.Files.SaveTicket": {
+    "OperationId": 0,
+    "Revision": 1,
+    "Recipe": 2,
+    "Asset": 3,
+    "Result": 4
+  },
+  "DigitalBrain.Files.SavedFile": {
+    "EntryId": 0,
+    "Name": 1,
+    "Checksum": 2,
+    "Bytes": 3
+  },
+  "DigitalBrain.Files.WorkspaceAsset": {
+    "Image": 0,
+    "Bytes": 1,
+    "CreatedAt": 2
+  },
+  "DigitalBrain.Files.WorkspaceAssetsState": {
+    "Assets": 0,
+    "Pages": 1
+  },
+  "DigitalBrain.Flutter.Button.ButtonState": {
+    "Name": 0,
+    "Version": 1,
+    "Label": 2,
+    "Action": 3,
+    "Enabled": 4,
+    "ClickCount": 5,
+    "Activation": 6
+  },
+  "DigitalBrain.Flutter.Button.Signals.ButtonChanged": {
+    "Name": 0,
+    "Version": 1
+  },
+  "DigitalBrain.Flutter.Button.Signals.ButtonClicked": {
+    "Name": 0,
+    "Action": 1
+  },
+  "DigitalBrain.Flutter.Calendar.CalendarState": {
+    "Name": 0,
+    "Version": 1,
+    "Mode": 2,
+    "Selected": 3
+  },
+  "DigitalBrain.Flutter.Calendar.Signals.CalendarChanged": {
+    "Name": 0,
+    "Version": 1
+  },
+  "DigitalBrain.Flutter.Card.CardState": {
+    "Name": 0,
+    "Version": 1,
+    "Title": 2,
+    "Body": 3,
+    "Children": 4
+  },
+  "DigitalBrain.Flutter.Card.Signals.CardChanged": {
+    "Name": 0,
+    "Version": 1
+  },
+  "DigitalBrain.Flutter.Chart.ChartPoint": {
+    "EventId": 0,
+    "Label": 1,
+    "Value": 2
+  },
+  "DigitalBrain.Flutter.Chart.ChartState": {
+    "Name": 0,
+    "Version": 1,
+    "Title": 2,
+    "Kind": 3,
+    "Points": 4,
+    "SourceNeuronId": 5,
+    "Query": 6
+  },
+  "DigitalBrain.Flutter.Chart.Signals.ChartChanged": {
+    "Name": 0,
+    "Version": 1,
+    "Title": 2
+  },
+  "DigitalBrain.Flutter.Chat.ChatEntry": {
+    "Id": 0,
+    "Role": 1,
+    "Text": 2
+  },
+  "DigitalBrain.Flutter.Clock.ClockState": {
+    "Name": 0,
+    "Version": 1,
+    "Label": 2,
+    "DueAt": 3
+  },
+  "DigitalBrain.Flutter.Clock.Signals.ClockChanged": {
+    "Name": 0,
+    "Version": 1
+  },
+  "DigitalBrain.Flutter.Collection.CollectionActivated": {
+    "Name": 0,
+    "ItemId": 1,
+    "Revision": 2
+  },
+  "DigitalBrain.Flutter.Collection.CollectionChanged": {
+    "Name": 0,
+    "Revision": 1
+  },
+  "DigitalBrain.Flutter.Collection.CollectionDefinition": {
+    "Items": 0,
+    "Selection": 1,
+    "Cursor": 2,
+    "Error": 3,
+    "FileMode": 4,
+    "SelectionEnabled": 5,
+    "EmptyLabel": 6
+  },
+  "DigitalBrain.Flutter.Collection.CollectionItem": {
+    "Id": 0,
+    "Label": 1,
+    "Kind": 2,
+    "SecondaryText": 3,
+    "SizeBytes": 4,
+    "ModifiedAt": 5,
+    "CanActivate": 6,
+    "TrailingText": 7
+  },
+  "DigitalBrain.Flutter.Collection.CollectionState": {
+    "Name": 0,
+    "Revision": 1,
+    "Definition": 2
+  },
+  "DigitalBrain.Flutter.Color.ColorState": {
+    "Name": 0,
+    "Version": 1,
+    "Hex": 2
+  },
+  "DigitalBrain.Flutter.Color.Signals.ColorChanged": {
+    "Name": 0,
+    "Hex": 1
+  },
+  "DigitalBrain.Flutter.Expander.ExpanderState": {
+    "Name": 0,
+    "Version": 1,
+    "Header": 2,
+    "Expanded": 3,
+    "Children": 4
+  },
+  "DigitalBrain.Flutter.Expander.Signals.ExpanderChanged": {
+    "Name": 0,
+    "Expanded": 1
+  },
+  "DigitalBrain.Flutter.FileInput.FileCaptured": {
+    "Name": 0,
+    "FileName": 1,
+    "Content": 2
+  },
+  "DigitalBrain.Flutter.FileInput.FileInputChanged": {
+    "Name": 0,
+    "Revision": 1
+  },
+  "DigitalBrain.Flutter.FileInput.FileInputState": {
+    "Name": 0,
+    "Revision": 1,
+    "Label": 2
+  },
+  "DigitalBrain.Flutter.Form.FormDefinition": {
+    "Title": 0,
+    "Fields": 1
+  },
+  "DigitalBrain.Flutter.Form.FormField": {
+    "Name": 0,
+    "Label": 1,
+    "Kind": 2,
+    "Required": 3,
+    "Choices": 4
+  },
+  "DigitalBrain.Flutter.Form.FormFieldState": {
+    "Name": 0,
+    "Label": 1,
+    "Kind": 2,
+    "Required": 3,
+    "Choices": 4,
+    "Value": 5,
+    "SecretSet": 6,
+    "Supported": 7,
+    "Secret": 8
+  },
+  "DigitalBrain.Flutter.Form.FormFieldValue": {
+    "Name": 0,
+    "Value": 1,
+    "Secret": 2
+  },
+  "DigitalBrain.Flutter.Form.FormState": {
+    "FormId": 0,
+    "Title": 1,
+    "Revision": 2,
+    "Fields": 3,
+    "Submitted": 4
+  },
+  "DigitalBrain.Flutter.Form.FormSubmission": {
+    "Values": 0,
+    "ExpectedRevision": 1
+  },
+  "DigitalBrain.Flutter.Form.Signals.FormChanged": {
+    "FormId": 0,
+    "Revision": 1
+  },
+  "DigitalBrain.Flutter.Graph.GraphEdge": {
+    "From": 0,
+    "To": 1
+  },
+  "DigitalBrain.Flutter.Graph.GraphNode": {
+    "Id": 0,
+    "Label": 1
+  },
+  "DigitalBrain.Flutter.Graph.GraphState": {
+    "Name": 0,
+    "Version": 1,
+    "Title": 2,
+    "Nodes": 3,
+    "Edges": 4
+  },
+  "DigitalBrain.Flutter.Graph.Signals.GraphChanged": {
+    "Name": 0,
+    "Version": 1
+  },
+  "DigitalBrain.Flutter.Image.ImageState": {
+    "Name": 0,
+    "Version": 1,
+    "Prompt": 2,
+    "MediaType": 3,
+    "Url": 4
+  },
+  "DigitalBrain.Flutter.Image.Signals.ImageChanged": {
+    "Name": 0,
+    "Version": 1
+  },
+  "DigitalBrain.Flutter.ImageCanvas.CropRect": {
+    "X": 0,
+    "Y": 1,
+    "Width": 2,
+    "Height": 3
+  },
+  "DigitalBrain.Flutter.ImageCanvas.ImageCanvasChanged": {
+    "Name": 0,
+    "Revision": 1
+  },
+  "DigitalBrain.Flutter.ImageCanvas.ImageCanvasDefinition": {
+    "AssetId": 0,
+    "Width": 1,
+    "Height": 2,
+    "Recipe": 3,
+    "DocumentRevision": 4
+  },
+  "DigitalBrain.Flutter.ImageCanvas.ImageCanvasEditRequested": {
+    "Name": 0,
+    "Recipe": 1,
+    "DocumentRevision": 2,
+    "OperationId": 3
+  },
+  "DigitalBrain.Flutter.ImageCanvas.ImageCanvasState": {
+    "Name": 0,
+    "Revision": 1,
+    "Definition": 2
+  },
+  "DigitalBrain.Flutter.ImageCanvas.ImagePoint": {
+    "X": 0,
+    "Y": 1
+  },
+  "DigitalBrain.Flutter.ImageCanvas.ImageRecipe": {
+    "Crop": 0,
+    "Strokes": 1
+  },
+  "DigitalBrain.Flutter.ImageCanvas.PenStroke": {
+    "ColorArgb": 0,
+    "Width": 1,
+    "Points": 2
+  },
+  "DigitalBrain.Flutter.InfoBar.InfoBarState": {
+    "Name": 0,
+    "Version": 1,
+    "Severity": 2,
+    "Title": 3,
+    "Body": 4,
+    "Visible": 5
+  },
+  "DigitalBrain.Flutter.InfoBar.Signals.InfoBarChanged": {
+    "Name": 0,
+    "Visible": 1
+  },
+  "DigitalBrain.Flutter.InfoBar.Signals.InfoBarDismissed": {
+    "Name": 0
+  },
+  "DigitalBrain.Flutter.Layout.LayoutChanged": {
+    "Name": 0,
+    "Revision": 1
+  },
+  "DigitalBrain.Flutter.Layout.LayoutDefinition": {
+    "Mode": 0,
+    "Children": 1,
+    "Gap": 2,
+    "Extents": 3,
+    "FollowEnd": 4
+  },
+  "DigitalBrain.Flutter.Layout.LayoutState": {
+    "Name": 0,
+    "Revision": 1,
+    "Definition": 2
+  },
+  "DigitalBrain.Flutter.Map.MapMarker": {
+    "Id": 0,
+    "Lat": 1,
+    "Lng": 2,
+    "Label": 3
+  },
+  "DigitalBrain.Flutter.Map.MapState": {
+    "Name": 0,
+    "Version": 1,
+    "Lat": 2,
+    "Lng": 3,
+    "Zoom": 4,
+    "Markers": 5
+  },
+  "DigitalBrain.Flutter.Map.Signals.MapChanged": {
+    "Name": 0,
+    "Version": 1
+  },
+  "DigitalBrain.Flutter.Person.PersonState": {
+    "Name": 0,
+    "Version": 1,
+    "DisplayName": 2,
+    "AvatarUrl": 3
+  },
+  "DigitalBrain.Flutter.Person.Signals.PersonChanged": {
+    "Name": 0,
+    "Version": 1
+  },
+  "DigitalBrain.Flutter.Progress.ProgressState": {
+    "Name": 0,
+    "Version": 1,
+    "Determinate": 2,
+    "Value": 3,
+    "Label": 4
+  },
+  "DigitalBrain.Flutter.Progress.Signals.ProgressChanged": {
+    "Name": 0,
+    "Value": 1
+  },
+  "DigitalBrain.Flutter.Rating.RatingState": {
+    "Name": 0,
+    "Version": 1,
+    "Max": 2,
+    "Value": 3
+  },
+  "DigitalBrain.Flutter.Rating.Signals.RatingChanged": {
+    "Name": 0,
+    "Value": 1
+  },
+  "DigitalBrain.Flutter.Select.SelectChanged": {
+    "Name": 0,
+    "Value": 1
+  },
+  "DigitalBrain.Flutter.Select.SelectOption": {
+    "Id": 0,
+    "Label": 1,
+    "Enabled": 2
+  },
+  "DigitalBrain.Flutter.Select.SelectState": {
+    "Name": 0,
+    "Revision": 1,
+    "Label": 2,
+    "Options": 3,
+    "Selected": 4
+  },
+  "DigitalBrain.Flutter.Sheet.SheetCell": {
+    "Row": 0,
+    "Column": 1,
+    "Value": 2
+  },
+  "DigitalBrain.Flutter.Sheet.SheetState": {
+    "Name": 0,
+    "Version": 1,
+    "Title": 2,
+    "Cells": 3
+  },
+  "DigitalBrain.Flutter.Sheet.Signals.SheetChanged": {
+    "Name": 0,
+    "Version": 1
+  },
+  "DigitalBrain.Flutter.Slider.Signals.SliderChanged": {
+    "Name": 0,
+    "Value": 1
+  },
+  "DigitalBrain.Flutter.Slider.SliderState": {
+    "Name": 0,
+    "Version": 1,
+    "Min": 2,
+    "Max": 3,
+    "Step": 4,
+    "Value": 5
+  },
+  "DigitalBrain.Flutter.Surface.SurfaceChanged": {
+    "Name": 0,
+    "Revision": 1
+  },
+  "DigitalBrain.Flutter.Surface.SurfaceDefinition": {
+    "Title": 0,
+    "Children": 1
+  },
+  "DigitalBrain.Flutter.Surface.SurfaceState": {
+    "Name": 0,
+    "Revision": 1,
+    "Definition": 2
+  },
+  "DigitalBrain.Flutter.Table.Signals.TableChanged": {
+    "Name": 0,
+    "Version": 1
+  },
+  "DigitalBrain.Flutter.Table.TableColumn": {
+    "Id": 0,
+    "Title": 1
+  },
+  "DigitalBrain.Flutter.Table.TableState": {
+    "Name": 0,
+    "Version": 1,
+    "Title": 2,
+    "Columns": 3,
+    "Rows": 4,
+    "Sort": 5,
+    "Filter": 6,
+    "SourceNeuronId": 7,
+    "Query": 8
+  },
+  "DigitalBrain.Flutter.Tabs.Signals.TabsChanged": {
+    "Name": 0,
+    "SelectedId": 1
+  },
+  "DigitalBrain.Flutter.Tabs.TabItem": {
+    "Id": 0,
+    "Title": 1,
+    "Child": 2
+  },
+  "DigitalBrain.Flutter.Tabs.TabsState": {
+    "Name": 0,
+    "Version": 1,
+    "Tabs": 2,
+    "SelectedId": 3
+  },
+  "DigitalBrain.Flutter.Text.Signals.TextChanged": {
+    "Name": 0
+  },
+  "DigitalBrain.Flutter.Text.TextState": {
+    "Name": 0,
+    "Version": 1,
+    "Markdown": 2
+  },
+  "DigitalBrain.Flutter.TextField.Signals.TextFieldChanged": {
+    "Name": 0,
+    "Value": 1
+  },
+  "DigitalBrain.Flutter.TextField.TextFieldState": {
+    "Name": 0,
+    "Version": 1,
+    "Label": 2,
+    "Kind": 3,
+    "Value": 4,
+    "SubmitButton": 5
+  },
+  "DigitalBrain.Flutter.Toggle.Signals.ToggleChanged": {
+    "Name": 0,
+    "On": 1
+  },
+  "DigitalBrain.Flutter.Toggle.ToggleState": {
+    "Name": 0,
+    "Version": 1,
+    "Label": 2,
+    "On": 3
+  },
+  "DigitalBrain.Flutter.Tree.Signals.TreeChanged": {
+    "Name": 0,
+    "Version": 1
+  },
+  "DigitalBrain.Flutter.Tree.Signals.TreeSelected": {
+    "Name": 0,
+    "SelectedId": 1
+  },
+  "DigitalBrain.Flutter.Tree.TreeNode": {
+    "Id": 0,
+    "ParentId": 1,
+    "Label": 2
+  },
+  "DigitalBrain.Flutter.Tree.TreeState": {
+    "Name": 0,
+    "Version": 1,
+    "Nodes": 2,
+    "SelectedId": 3
+  },
+  "DigitalBrain.Flutter.UiBindingChanged": {
+    "Name": 0
+  },
+  "DigitalBrain.Flutter.UiBindingState": {
+    "Handler": 0
+  },
+  "DigitalBrain.Flutter.UiChildRef": {
+    "Kind": 0,
+    "Name": 1
+  },
+  "DigitalBrain.Flutter.Video.Signals.VideoChanged": {
+    "Name": 0,
+    "Playing": 1
+  },
+  "DigitalBrain.Flutter.Video.Signals.VideoEnded": {
+    "Name": 0
+  },
+  "DigitalBrain.Flutter.Video.VideoState": {
+    "Name": 0,
+    "Version": 1,
+    "Url": 2,
+    "Playing": 3,
+    "Position": 4,
+    "Duration": 5
+  },
+  "DigitalBrain.Flutter.VoiceInput.Signals.VoiceCaptured": {
+    "Name": 0,
+    "Audio": 1,
+    "MimeType": 2
+  },
+  "DigitalBrain.Flutter.VoiceInput.Signals.VoiceInputChanged": {
+    "Name": 0,
+    "Revision": 1
+  },
+  "DigitalBrain.Flutter.VoiceInput.VoiceInputState": {
+    "Name": 0,
+    "Revision": 1,
+    "Label": 2,
+    "Captures": 3
+  },
+  "DigitalBrain.Flutter.WebBrowser.BrowserBindingState": {
+    "PlaywrightKey": 0,
+    "StatusTextName": 1
+  },
+  "DigitalBrain.Flutter.WebBrowser.Signals.BrowserConnected": {
+    "Name": 0,
+    "\u003Cretired:1\u003E": 1,
+    "SessionId": 2
+  },
+  "DigitalBrain.Flutter.WebBrowser.Signals.BrowserDisconnected": {
+    "Name": 0,
+    "SessionId": 1
+  },
+  "DigitalBrain.Flutter.WebBrowser.Signals.BrowserNavigated": {
+    "Name": 0,
+    "Uri": 1
+  },
+  "DigitalBrain.Flutter.WebBrowser.WebBrowserState": {
+    "Name": 0,
+    "Version": 1,
+    "Uri": 2,
+    "Title": 3
+  },
+  "DigitalBrain.Flutter.Workspace.FirstRunState": {
+    "AssistantId": 0,
+    "AssistantTitle": 1,
+    "Prompts": 2
+  },
+  "DigitalBrain.Flutter.Workspace.OpenSurfaceWindow": {
+    "OperationId": 0,
+    "WindowId": 1,
+    "Title": 2,
+    "Reference": 3,
+    "ExpectedRevision": 4
+  },
+  "DigitalBrain.Flutter.Workspace.OpenWindow": {
+    "OperationId": 0,
+    "WindowId": 1,
+    "Title": 2,
+    "Reference": 3,
+    "ExpectedRevision": 4
+  },
+  "DigitalBrain.Flutter.Workspace.ProblemReport": {
+    "IntentId": 0,
+    "WorkspaceId": 1,
+    "Message": 2,
+    "ReportedAt": 3
+  },
+  "DigitalBrain.Flutter.Workspace.ProblemReportsState": {
+    "Reports": 0
+  },
+  "DigitalBrain.Flutter.Workspace.ShellHeadState": {
+    "Revision": 0,
+    "Root": 1,
+    "\u003Cretired:2\u003E": 2,
+    "LastOperation": 3,
+    "LastDigest": 4
+  },
+  "DigitalBrain.Flutter.Workspace.ShellPartState": {
+    "Json": 0
+  },
+  "DigitalBrain.Flutter.Workspace.ShellRead": {
+    "Revision": 0,
+    "Json": 1
+  },
+  "DigitalBrain.Flutter.Workspace.Signals.WorkspaceChanged": {
+    "WorkspaceId": 0,
+    "Revision": 1
+  },
+  "DigitalBrain.Flutter.Workspace.StarterPrompt": {
+    "Id": 0,
+    "Label": 1,
+    "Prompt": 2,
+    "Source": 3
+  },
+  "DigitalBrain.Flutter.Workspace.WindowReference": {
+    "Kind": 0,
+    "NeuronId": 1
+  },
+  "DigitalBrain.Flutter.Workspace.WorkspaceOpenResult": {
+    "State": 0,
+    "AppliedRevision": 1
+  },
+  "DigitalBrain.Flutter.Workspace.WorkspaceRevisionConflictException": {
+    "CurrentRevision": 0
+  },
+  "DigitalBrain.Flutter.Workspace.WorkspaceState": {
+    "Revision": 0,
+    "Windows": 1,
+    "FirstRun": 2
+  },
+  "DigitalBrain.Flutter.Workspace.WorkspaceStorage": {
+    "Revision": 0,
+    "Windows": 1,
+    "OperationLog": 2,
+    "SurfaceOperationLog": 3,
+    "OperationRevisionLog": 4,
+    "ConnectedSources": 5
+  },
+  "DigitalBrain.Flutter.Workspace.WorkspaceWindow": {
+    "Id": 0,
+    "Title": 1,
+    "Reference": 2,
+    "IsOpen": 3
+  },
+  "DigitalBrain.Google.Gmail.GmailConnected": {
+    "EmailAddress": 0
+  },
+  "DigitalBrain.Google.Gmail.GmailConnection": {
+    "Connected": 0,
+    "Email": 1,
+    "CanCompose": 2,
+    "ExpiresAt": 3
+  },
+  "DigitalBrain.Google.Gmail.GmailDraftPreview": {
+    "PreviewId": 0,
+    "ToolSchemaHash": 1,
+    "To": 2,
+    "Cc": 3,
+    "Bcc": 4,
+    "Subject": 5,
+    "Body": 6,
+    "ExpiresAt": 7,
+    "DraftId": 8
+  },
+  "DigitalBrain.Google.Gmail.GmailNotConnectedException": {},
+  "DigitalBrain.Google.Gmail.GmailState": {
+    "Subject": 0,
+    "Email": 1,
+    "\u003Cretired:2\u003E": 2,
+    "\u003Cretired:3\u003E": 3,
+    "GrantedScopes": 4,
+    "ExpiresAt": 5,
+    "CanCompose": 6,
+    "PendingDraft": 7,
+    "SubmittingDraft": 8,
+    "Credential": 9,
+    "RefreshCredential": 10
+  },
+  "DigitalBrain.Google.Gmail.GmailUnavailableException": {},
+  "DigitalBrain.Google.Gmail.GmailUnreachableException": {},
+  "DigitalBrain.Google.Gmail.GmailWatchPush": {
+    "HistoryId": 0,
+    "EmailAddress": 1
+  },
+  "DigitalBrain.Google.Gmail.MailReceived": {
+    "EmailAddress": 0,
+    "HistoryId": 1
+  },
+  "DigitalBrain.Identity.Account": {
+    "AccountId": 0,
+    "Name": 1,
+    "OwnerPrincipalId": 2,
+    "CreatedAt": 3
+  },
+  "DigitalBrain.Identity.Grant": {
+    "AppId": 0,
+    "SemanticTypeId": 1,
+    "Mode": 2,
+    "WorkspaceId": 3,
+    "ConversationId": 4,
+    "GrantedAt": 5,
+    "Revoked": 6
+  },
+  "DigitalBrain.Identity.Invitation": {
+    "Code": 0,
+    "AccountId": 1,
+    "WorkspaceId": 2,
+    "Role": 3,
+    "Email": 4,
+    "CreatedAt": 5,
+    "Accepted": 6
+  },
+  "DigitalBrain.Identity.Member": {
+    "PrincipalId": 0,
+    "AccountId": 1,
+    "BrainId": 2,
+    "Role": 3,
+    "DisplayName": 4,
+    "JoinedAt": 5
+  },
+  "DigitalBrain.Memory.Forget": {
+    "Namespace": 0,
+    "Key": 1
+  },
+  "DigitalBrain.Memory.MemoryDeletion": {
+    "Name": 0,
+    "Namespace": 1
+  },
+  "DigitalBrain.Memory.MemoryIndexResult": {
+    "Available": 0,
+    "Indexed": 1,
+    "Pending": 2
+  },
+  "DigitalBrain.Memory.MemoryKey": {
+    "Namespace": 0,
+    "Key": 1
+  },
+  "DigitalBrain.Memory.MemoryMatch": {
+    "Note": 0,
+    "Score": 1
+  },
+  "DigitalBrain.Memory.MemoryNamespace": {
+    "Generation": 0,
+    "Pages": 1,
+    "\u003Cretired:2\u003E": 2,
+    "IndexPurgePending": 3,
+    "RetiredPages": 4
+  },
+  "DigitalBrain.Memory.MemoryPageState": {
+    "Entries": 0,
+    "Deleted": 1,
+    "Pending": 2
+  },
+  "DigitalBrain.Memory.MemoryState": {
+    "RememberedCount": 0,
+    "ForgottenCount": 1,
+    "LastChangedAt": 2,
+    "Namespaces": 3
+  },
+  "DigitalBrain.Memory.MemoryTag": {
+    "Name": 0,
+    "Value": 1
+  },
+  "DigitalBrain.Memory.ProtectedPayloadReference": {
+    "Id": 0,
+    "ExpiresAt": 1
+  },
+  "DigitalBrain.Memory.PurgeNamespace": {
+    "Namespace": 0
+  },
+  "DigitalBrain.Memory.Recall": {
+    "Namespace": 0,
+    "Query": 1,
+    "Limit": 2,
+    "Tags": 3
+  },
+  "DigitalBrain.Memory.RecallResult": {
+    "Matches": 0
+  },
+  "DigitalBrain.Memory.RecalledMemory": {
+    "Key": 0,
+    "Text": 1,
+    "Tags": 2,
+    "Payload": 3
+  },
+  "DigitalBrain.Memory.Remember": {
+    "Namespace": 0,
+    "Key": 1,
+    "Text": 2,
+    "Tags": 3,
+    "Payload": 4
+  },
+  "DigitalBrain.Memory.Signals.Forgotten": {
+    "Key": 0
+  },
+  "DigitalBrain.Memory.Signals.NamespacePurged": {
+    "Namespace": 0,
+    "RemovedCount": 1
+  },
+  "DigitalBrain.Memory.Signals.Remembered": {
+    "Key": 0
+  },
+  "DigitalBrain.Memory.VectorMemoryEntry": {
+    "Name": 0,
+    "Namespace": 1,
+    "Key": 2,
+    "Text": 3,
+    "Tags": 4,
+    "Payload": 5,
+    "Embedding": 6
+  },
+  "DigitalBrain.Microsoft.Aspire.AspireResource": {
+    "Name": 0,
+    "Type": 1,
+    "State": 2,
+    "Health": 3,
+    "Urls": 4
+  },
+  "DigitalBrain.Microsoft.Aspire.AspireState": {
+    "Resources": 0
+  },
+  "DigitalBrain.Microsoft.Aspire.ResourceStateChanged": {
+    "Resource": 0,
+    "State": 1,
+    "Health": 2,
+    "PreviousState": 3
+  },
+  "DigitalBrain.Microsoft.CSharp.CSharpFileChanged": {
+    "FileId": 0
+  },
+  "DigitalBrain.Microsoft.CSharp.CSharpFileSnapshot": {
+    "Id": 0,
+    "Source": 1,
+    "Settings": 2,
+    "Status": 3,
+    "ExitCode": 4,
+    "StartedAt": 5,
+    "ShouldRun": 6,
+    "Failures": 7,
+    "Trigger": 8,
+    "Subscriptions": 9
+  },
+  "DigitalBrain.Microsoft.CSharp.CSharpFileState": {
+    "Source": 0,
+    "Settings": 1,
+    "RunId": 2,
+    "ShouldRun": 3,
+    "Failures": 4,
+    "Owner": 5,
+    "Trigger": 6,
+    "OwnerContext": 7,
+    "Subscriptions": 8
+  },
+  "DigitalBrain.Microsoft.CSharp.CSharpPendingArrived": {
+    "FileId": 0
+  },
+  "DigitalBrain.Microsoft.CSharp.CSharpSubscriptionView": {
+    "Neuron": 0,
+    "Signal": 1,
+    "Pending": 2
+  },
+  "DigitalBrain.Microsoft.CSharp.CSharpTrigger": {
+    "Neuron": 0,
+    "Signal": 1
+  },
+  "DigitalBrain.Microsoft.CSharp.RunAuthorization": {
+    "Active": 0,
+    "Owner": 1
+  },
+  "DigitalBrain.Microsoft.CSharp.ScriptSubscription": {
+    "Neuron": 0,
+    "Signal": 1,
+    "Pending": 2
+  },
+  "DigitalBrain.Microsoft.GitHub.ConnectRepository": {
+    "AppId": 0,
+    "InstallationId": 1,
+    "RepositoryId": 2,
+    "RepositoryOwner": 3,
+    "RepositoryName": 4
+  },
+  "DigitalBrain.Microsoft.GitHub.GitHubCheck": {
+    "Name": 0,
+    "AppId": 1,
+    "Kind": 2,
+    "State": 3,
+    "Conclusion": 4,
+    "Sha": 5,
+    "AttemptId": 6,
+    "UpdatedAt": 7
+  },
+  "DigitalBrain.Microsoft.GitHub.GitHubCheckRequirement": {
+    "Name": 0,
+    "AppId": 1,
+    "Kind": 2
+  },
+  "DigitalBrain.Microsoft.GitHub.GitHubConnectionList": {
+    "Connections": 0
+  },
+  "DigitalBrain.Microsoft.GitHub.GitHubConnectionRecord": {
+    "Id": 0,
+    "AppId": 1,
+    "InstallationId": 2,
+    "RepositoryId": 3,
+    "RepositoryOwner": 4,
+    "RepositoryName": 5,
+    "Epoch": 6
+  },
+  "DigitalBrain.Microsoft.GitHub.GitHubConnectionsState": {
+    "Connections": 0
+  },
+  "DigitalBrain.Microsoft.GitHub.GitHubReviewEvidence": {
+    "HeadSha": 0,
+    "BaseSha": 1,
+    "Text": 2,
+    "Hash": 3,
+    "Complete": 4
+  },
+  "DigitalBrain.Microsoft.GitHub.GitHubSetupResult": {
+    "RepositoryUrl": 0,
+    "State": 1,
+    "BindingId": 2,
+    "RequiredChecks": 3,
+    "Detail": 4,
+    "WebhookUrl": 5
+  },
+  "DigitalBrain.Microsoft.GitHub.PullRequestRead": {
+    "Snapshot": 0
+  },
+  "DigitalBrain.Microsoft.GitHub.PullRequestSnapshot": {
+    "Number": 0,
+    "Title": 1,
+    "Url": 2,
+    "IsOpen": 3,
+    "IsDraft": 4,
+    "HeadSha": 5,
+    "BaseSha": 6,
+    "MergeSha": 7,
+    "CiSha": 8,
+    "Checks": 9,
+    "ChecksComplete": 10,
+    "ObservedAt": 11,
+    "CreatedAt": 12,
+    "Revision": 13,
+    "CiRevision": 14,
+    "RepositoryId": 15,
+    "BaseBranch": 16
+  },
+  "DigitalBrain.Microsoft.GitHub.PullRequestsRead": {
+    "Snapshots": 0,
+    "Available": 1
+  },
+  "DigitalBrain.Microsoft.GitHub.ReadPullRequest": {
+    "Number": 0
+  },
+  "DigitalBrain.Microsoft.GitHub.ReadReviewEvidence": {
+    "Expected": 0
+  },
+  "DigitalBrain.Microsoft.GitHub.RefreshRepository": {
+    "Number": 0
+  },
+  "DigitalBrain.Microsoft.GitHub.RegisterGitHubConnection": {
+    "ConnectionId": 0,
+    "AppId": 1,
+    "InstallationId": 2,
+    "RepositoryId": 3,
+    "RepositoryOwner": 4,
+    "RepositoryName": 5,
+    "Epoch": 6
+  },
+  "DigitalBrain.Microsoft.GitHub.RepositoryEvent": {
+    "DeliveryId": 0,
+    "Event": 1,
+    "Action": 2,
+    "Number": 3,
+    "BodyHash": 4
+  },
+  "DigitalBrain.Microsoft.GitHub.RepositoryState": {
+    "PullRequests": 0,
+    "BindingRevision": 1,
+    "Revoked": 2,
+    "LastWebhookAt": 3,
+    "ProcessedDeliveries": 4
+  },
+  "DigitalBrain.Microsoft.GitHub.RepositoryView": {
+    "BindingId": 0,
+    "Connected": 1,
+    "Revoked": 2,
+    "PullRequests": 3,
+    "LastWebhookAt": 4
+  },
+  "DigitalBrain.Microsoft.GitHub.RequiredChecksRead": {
+    "Checks": 0,
+    "Complete": 1,
+    "Detail": 2
+  },
+  "DigitalBrain.Microsoft.GitHub.ResolveRepository": {
+    "RepositoryUrl": 0
+  },
+  "DigitalBrain.Microsoft.GitHub.ReviewEvidenceRead": {
+    "Current": 0,
+    "Evidence": 1,
+    "Detail": 2
+  },
+  "DigitalBrain.Microsoft.GitHub.Signals.GitHubConnectionRegistered": {
+    "Record": 0
+  },
+  "DigitalBrain.Microsoft.GitHub.Signals.PullRequestChanged": {
+    "Number": 0,
+    "Version": 1,
+    "SubjectKey": 2
+  },
+  "DigitalBrain.Microsoft.GitHub.Signals.RepositoryAccessRevoked": {
+    "BindingId": 0
+  },
+  "DigitalBrain.Microsoft.GitHub.Signals.RepositoryConnected": {
+    "BindingId": 0,
+    "RepositoryId": 1,
+    "InstallationId": 2
+  },
+  "DigitalBrain.Microsoft.GitHub.Signals.RepositoryRefused": {
+    "Reason": 0
+  },
+  "DigitalBrain.Microsoft.Playwright.BrowserAttachment": {
+    "Port": 0,
+    "SessionId": 1
+  },
+  "DigitalBrain.Microsoft.Playwright.BrowserLink": {
+    "Text": 0,
+    "Url": 1
+  },
+  "DigitalBrain.Microsoft.Playwright.BrowserNotConnectedException": {},
+  "DigitalBrain.Microsoft.Playwright.BrowserObservation": {
+    "Url": 0,
+    "Title": 1,
+    "Text": 2,
+    "Links": 3
+  },
+  "DigitalBrain.Microsoft.Playwright.BrowserReady": {
+    "SessionId": 0
+  },
+  "DigitalBrain.Microsoft.Playwright.BrowserSession": {
+    "Connected": 0,
+    "SessionId": 1,
+    "Url": 2,
+    "Title": 3,
+    "Ready": 4
+  },
+  "DigitalBrain.Microsoft.Playwright.BrowserUnavailable": {
+    "SessionId": 0
+  },
+  "DigitalBrain.Microsoft.Playwright.ScriptedBrowserState": {
+    "Observations": 0,
+    "Consumed": 1,
+    "RequestedUrls": 2,
+    "SessionId": 3
+  },
+  "DigitalBrain.Platform.Identity.Directory.IdentityDirectoryState": {
+    "Accounts": 0,
+    "Members": 1,
+    "Invitations": 2,
+    "PasswordHashes": 3
+  },
+  "DigitalBrain.Platform.Identity.Grants.GrantStoreState": {
+    "Grants": 0
+  },
+  "DigitalBrain.Platform.Integrations.Accounts.IntegrationAccountsState": {
+    "Connections": 0
+  },
+  "DigitalBrain.Platform.Integrations.Accounts.ScriptAccountsState": {
+    "Pending": 0
+  },
+  "DigitalBrain.Platform.Integrations.RegistrationState": {
+    "References": 0,
+    "Settings": 1,
+    "Revision": 2
+  },
+  "DigitalBrain.Platform.Secrets.SecretRecord": {
+    "FieldPath": 0,
+    "Kind": 1,
+    "IsSecret": 2,
+    "Label": 3,
+    "IsSet": 4,
+    "SealedValue": 5,
+    "\u003Cretired:6\u003E": 6,
+    "SealedSecret": 7
+  },
+  "DigitalBrain.Platform.Secrets.SecretsState": {
+    "Owner": 0,
+    "WrappedOwnerKey": 1,
+    "Fields": 2,
+    "\u003Cretired:3\u003E": 3
+  },
+  "DigitalBrain.Postgres.PostgresColumn": {
+    "Name": 0,
+    "PostgreSqlType": 1,
+    "TableType": 2
+  },
+  "DigitalBrain.Postgres.PostgresConnection": {
+    "Connected": 0,
+    "Database": 1,
+    "ServerVersion": 2,
+    "Provider": 3
+  },
+  "DigitalBrain.Postgres.PostgresMigrationState": {
+    "Complete": 0,
+    "SkippedBlobs": 1
+  },
+  "DigitalBrain.Postgres.PostgresQuery": {
+    "Sql": 0,
+    "MaxRows": 1
+  },
+  "DigitalBrain.Postgres.PostgresQueryException": {},
+  "DigitalBrain.Postgres.PostgresQueryResult": {
+    "Columns": 0,
+    "Rows": 1,
+    "RowCount": 2,
+    "Truncated": 3,
+    "ElapsedMs": 4
+  },
+  "DigitalBrain.Postgres.PostgresSchema": {
+    "Database": 0,
+    "Tables": 1
+  },
+  "DigitalBrain.Postgres.PostgresTableDefinition": {
+    "Table": 0,
+    "Definition": 1,
+    "Revision": 2
+  },
+  "DigitalBrain.Postgres.PostgresTableInfo": {
+    "Name": 0,
+    "Kind": 1,
+    "TotalRows": 2,
+    "Columns": 3
+  },
+  "DigitalBrain.Postgres.PostgresTableState": {
+    "Owner": 0,
+    "Accepted": 1,
+    "Origin": 2,
+    "Pending": 3
+  },
+  "DigitalBrain.Postgres.PostgresTablesState": {
+    "Tables": 0,
+    "Retired": 1
+  },
+  "DigitalBrain.Postgres.PostgresUnavailableException": {},
+  "DigitalBrain.Postgres.ReadPostgresSchema": {
+    "Table": 0
+  },
+  "DigitalBrain.Postgres.RowDeleted": {
+    "Table": 0,
+    "Key": 1
+  },
+  "DigitalBrain.Postgres.RowUpserted": {
+    "Table": 0,
+    "Key": 1
+  },
+  "DigitalBrain.Postgres.TableColumn": {
+    "Name": 0,
+    "Type": 1
+  },
+  "DigitalBrain.Postgres.TableDefined": {
+    "Table": 0,
+    "Revision": 1
+  },
+  "DigitalBrain.Postgres.TableDefinition": {
+    "Columns": 0,
+    "PrimaryKey": 1
+  },
+  "DigitalBrain.Postgres.TableValue": {
+    "Column": 0,
+    "Json": 1
+  },
+  "DigitalBrain.Registry.NeuronInstance": {
+    "Id": 0,
+    "Key": 1,
+    "TypeIds": 2,
+    "ActivationId": 3,
+    "FirstSeenAt": 4,
+    "LastSeenAt": 5,
+    "LastKnownActive": 6
+  },
+  "DigitalBrain.Registry.NeuronType": {
+    "Id": 0,
+    "ModuleId": 1,
+    "Name": 2,
+    "Description": 3,
+    "Methods": 4,
+    "Contract": 5,
+    "Signals": 6
+  },
+  "DigitalBrain.Registry.NeuronTypeHit": {
+    "Type": 0,
+    "Score": 1
+  },
+  "DigitalBrain.Registry.RegistryState": {
+    "Instances": 0
+  },
+  "DigitalBrain.Salesforce.ConfirmSalesforceWrite": {
+    "PreviewId": 0,
+    "ToolSchemaHash": 1
+  },
+  "DigitalBrain.Salesforce.ConnectSalesforceAccount": {
+    "InstanceUrl": 0,
+    "ExpiresInSeconds": 1,
+    "Nonce": 2,
+    "SecretOwner": 3
+  },
+  "DigitalBrain.Salesforce.DisconnectSalesforce": {},
+  "DigitalBrain.Salesforce.PrepareSalesforceWrite": {
+    "Tool": 0,
+    "Arguments": 1
+  },
+  "DigitalBrain.Salesforce.ReadSalesforceSchema": {
+    "ObjectName": 0
+  },
+  "DigitalBrain.Salesforce.RefreshSalesforceConnection": {},
+  "DigitalBrain.Salesforce.SalesforceConnection": {
+    "Connected": 0,
+    "InstanceUrl": 1,
+    "ExpiresAt": 2
+  },
+  "DigitalBrain.Salesforce.SalesforceNotConnectedException": {},
+  "DigitalBrain.Salesforce.SalesforceQueryResult": {
+    "Content": 0,
+    "TotalSize": 1
+  },
+  "DigitalBrain.Salesforce.SalesforceSchema": {
+    "Content": 0
+  },
+  "DigitalBrain.Salesforce.SalesforceState": {
+    "AccessToken": 0,
+    "RefreshToken": 1,
+    "ExpiresAt": 2,
+    "InstanceUrl": 3,
+    "PendingWrite": 4,
+    "SubmittingWrite": 5
+  },
+  "DigitalBrain.Salesforce.SalesforceUnavailableException": {},
+  "DigitalBrain.Salesforce.SalesforceUnreachableException": {},
+  "DigitalBrain.Salesforce.SalesforceUserInfo": {
+    "Content": 0
+  },
+  "DigitalBrain.Salesforce.SalesforceWritePreview": {
+    "PreviewId": 0,
+    "Tool": 1,
+    "ToolSchemaHash": 2,
+    "Arguments": 3,
+    "ExpiresAt": 4,
+    "RecordId": 5
+  },
+  "DigitalBrain.Salesforce.Signals.RecordWritten": {
+    "Preview": 0
+  },
+  "DigitalBrain.Salesforce.Signals.SalesforceConnected": {
+    "Connection": 0
+  },
+  "DigitalBrain.Salesforce.Signals.SalesforceConnectionRejected": {
+    "Reason": 0
+  },
+  "DigitalBrain.Salesforce.Signals.SalesforceDisconnected": {},
+  "DigitalBrain.Salesforce.Signals.SalesforceRefreshed": {
+    "Connection": 0
+  },
+  "DigitalBrain.Salesforce.Signals.SalesforceWriteFailed": {
+    "PreviewId": 0
+  },
+  "DigitalBrain.Salesforce.Signals.SalesforceWritePrepared": {
+    "Preview": 0
+  },
+  "DigitalBrain.Salesforce.Signals.SalesforceWriteUncertain": {
+    "PreviewId": 0
+  },
+  "DigitalBrain.Salesforce.SoqlQuery": {
+    "Query": 0
+  },
+  "DigitalBrain.Sdk.Capacity.CapacityUnavailableException": {},
+  "DigitalBrain.Sdk.Data.StoredRowsState": {
+    "Columns": 0,
+    "Rows": 1
+  },
+  "DigitalBrain.Sdk.Integrations.Accounts.AccountDisconnected": {},
+  "DigitalBrain.Sdk.Integrations.Accounts.AccountNotConfiguredException": {},
+  "DigitalBrain.Sdk.Integrations.Accounts.AccountProbeResult": {},
+  "DigitalBrain.Sdk.Integrations.Accounts.AccountStatusChanged": {},
+  "DigitalBrain.Sdk.Integrations.Accounts.ConnectAccount": {
+    "IntegrationId": 0,
+    "ConnectionId": 1,
+    "Label": 2,
+    "Value": 3,
+    "SecretReference": 4
+  },
+  "DigitalBrain.Sdk.Integrations.Accounts.IntegrationAccount": {
+    "Id": 0,
+    "IntegrationId": 1,
+    "WorkspaceId": 2,
+    "Credential": 3,
+    "Status": 4,
+    "LastProbedAt": 5
+  },
+  "DigitalBrain.Sdk.Integrations.ConfigureRegistration": {
+    "Values": 0
+  },
+  "DigitalBrain.Sdk.Integrations.RegistrationChanged": {},
+  "DigitalBrain.Sdk.Integrations.RegistrationSnapshot": {
+    "IntegrationId": 0,
+    "Status": 1,
+    "MissingFields": 2,
+    "Settings": 3,
+    "Revision": 4
+  },
+  "DigitalBrain.Sdk.Integrations.ReleasedRegistration": {
+    "Values": 0
+  },
+  "DigitalBrain.Specs.BoundStep": {
+    "Line": 0,
+    "Keyword": 1,
+    "Text": 2,
+    "Pattern": 3,
+    "Parameters": 4,
+    "DocString": 5
+  },
+  "DigitalBrain.Specs.FeatureRun": {
+    "FeatureRevision": 0,
+    "Subject": 1,
+    "Scenarios": 2,
+    "StartedAt": 3,
+    "CompletedAt": 4
+  },
+  "DigitalBrain.Specs.FeatureSnapshot": {
+    "Revision": 0,
+    "Text": 1,
+    "Name": 2,
+    "Scenarios": 3,
+    "Background": 4,
+    "Problem": 5,
+    "LastRun": 6
+  },
+  "DigitalBrain.Specs.ScenarioOutline": {
+    "Name": 0,
+    "Line": 1,
+    "Steps": 2,
+    "Tags": 3
+  },
+  "DigitalBrain.Specs.ScenarioResult": {
+    "Name": 0,
+    "Line": 1,
+    "Verdict": 2,
+    "Steps": 3
+  },
+  "DigitalBrain.Specs.Signals.FeatureChanged": {
+    "FeatureId": 0,
+    "Revision": 1,
+    "FullyBound": 2
+  },
+  "DigitalBrain.Specs.Signals.FeatureVerified": {
+    "FeatureId": 0,
+    "Revision": 1,
+    "Green": 2
+  },
+  "DigitalBrain.Specs.Signals.ScenarioFinished": {
+    "FeatureId": 0,
+    "Result": 1
+  },
+  "DigitalBrain.Specs.SpecProblem": {
+    "Line": 0,
+    "Message": 1
+  },
+  "DigitalBrain.Specs.StepParameter": {
+    "Start": 0,
+    "Length": 1,
+    "Kind": 2
+  },
+  "DigitalBrain.Specs.StepPattern": {
+    "Pattern": 0,
+    "Library": 1,
+    "Description": 2
+  },
+  "DigitalBrain.Specs.StepResult": {
+    "Line": 0,
+    "Verdict": 1,
+    "Message": 2,
+    "Elapsed": 3
+  },
+  "DigitalBrain.Supabase.ReadSupabaseSchema": {
+    "Table": 0
+  },
+  "DigitalBrain.Supabase.SupabaseColumn": {
+    "Name": 0,
+    "PostgreSqlType": 1,
+    "TableType": 2
+  },
+  "DigitalBrain.Supabase.SupabaseConnection": {
+    "Connected": 0,
+    "Database": 1,
+    "ServerVersion": 2,
+    "Provider": 3
+  },
+  "DigitalBrain.Supabase.SupabaseQuery": {
+    "Sql": 0,
+    "MaxRows": 1
+  },
+  "DigitalBrain.Supabase.SupabaseQueryException": {},
+  "DigitalBrain.Supabase.SupabaseQueryResult": {
+    "Columns": 0,
+    "Rows": 1,
+    "RowCount": 2,
+    "Truncated": 3,
+    "ElapsedMs": 4
+  },
+  "DigitalBrain.Supabase.SupabaseSchema": {
+    "Database": 0,
+    "Tables": 1
+  },
+  "DigitalBrain.Supabase.SupabaseTableInfo": {
+    "Name": 0,
+    "Kind": 1,
+    "TotalRows": 2,
+    "Columns": 3
+  },
+  "DigitalBrain.Supabase.SupabaseTableState": {
+    "View": 0,
+    "BaseSql": 1,
+    "SourceColumns": 2,
+    "CreationOperation": 3,
+    "CreationRequest": 4
+  },
+  "DigitalBrain.Supabase.SupabaseUnavailableException": {},
+  "DigitalBrain.Supabase.Tables.CreateQueryTable": {
+    "Title": 0,
+    "Sql": 1,
+    "Source": 2
+  },
+  "DigitalBrain.Supabase.Tables.ReadSupabaseTable": {
+    "Offset": 0,
+    "Limit": 1
+  },
+  "DigitalBrain.Supabase.Tables.ReadSupabaseTableAggregate": {
+    "ColumnId": 0,
+    "Function": 1
+  },
+  "DigitalBrain.Supabase.Tables.Signals.SupabaseTableChanged": {
+    "Name": 0,
+    "Title": 1,
+    "Revision": 2
+  },
+  "DigitalBrain.Supabase.Tables.SupabaseTableAggregate": {
+    "ColumnId": 0,
+    "Function": 1,
+    "Value": 2
+  },
+  "DigitalBrain.Supabase.Tables.SupabaseTableColumn": {
+    "Id": 0,
+    "Label": 1,
+    "Type": 2
+  },
+  "DigitalBrain.Supabase.Tables.SupabaseTableFilter": {
+    "ColumnId": 0,
+    "Operator": 1,
+    "Value": 2
+  },
+  "DigitalBrain.Supabase.Tables.SupabaseTableNotFoundException": {},
+  "DigitalBrain.Supabase.Tables.SupabaseTableRevisionConflictException": {
+    "CurrentRevision": 0
+  },
+  "DigitalBrain.Supabase.Tables.SupabaseTableRow": {
+    "Id": 0,
+    "Cells": 1
+  },
+  "DigitalBrain.Supabase.Tables.SupabaseTableSnapshot": {
+    "Id": 0,
+    "Title": 1,
+    "Revision": 2,
+    "Columns": 3,
+    "Rows": 4,
+    "Filters": 5,
+    "Sort": 6,
+    "VisibleColumns": 7,
+    "TotalRows": 8,
+    "FilteredRows": 9,
+    "Offset": 10,
+    "Limit": 11,
+    "Source": 12
+  },
+  "DigitalBrain.Supabase.Tables.SupabaseTableSort": {
+    "ColumnId": 0,
+    "Descending": 1
+  },
+  "DigitalBrain.Supabase.Tables.SupabaseTableSourceException": {},
+  "DigitalBrain.Supabase.Tables.SupabaseTableSummary": {
+    "Id": 0,
+    "Title": 1,
+    "Revision": 2,
+    "Source": 3
+  },
+  "DigitalBrain.Supabase.Tables.SupabaseTableValidationException": {},
+  "DigitalBrain.Supabase.Tables.UpdateSupabaseTableView": {
+    "ExpectedRevision": 0,
+    "Filters": 1,
+    "Sort": 2,
+    "VisibleColumns": 3
+  },
+  "DigitalBrain.Supabase.Windows.QueryWindowResult": {
+    "WindowId": 0,
+    "TableId": 1,
+    "Title": 2,
+    "WorkspaceRevision": 3,
+    "Source": 4
+  },
+  "DigitalBrain.Time.Reminders.Signals.ReminderTick": {
+    "ReminderId": 0,
+    "ObservedAt": 1
+  },
+  "DigitalBrain.Time.Timers.Signals.TimerTick": {
+    "TimerId": 0,
+    "ObservedAt": 1
+  }
+}

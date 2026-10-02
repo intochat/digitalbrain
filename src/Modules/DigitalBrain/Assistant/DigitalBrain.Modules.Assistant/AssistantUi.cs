@@ -48,7 +48,7 @@ internal sealed partial class AssistantNeuron
             await List(AssistantSurface.MessagesPart, messages);
 
             var results = new List<UiChildRef>();
-            for (var index = 0; index < thread.Results.Count; index++)
+            for (var index = 0; index < thread.Results.Length; index++)
             {
                 using var document = JsonDocument.Parse(thread.Results[index]);
                 var result = document.RootElement;
@@ -92,7 +92,7 @@ internal sealed partial class AssistantNeuron
             await List(AssistantSurface.ResultsPart, results);
 
             var receipts = new List<UiChildRef>();
-            for (var index = 0; index < thread.Receipts.Count; index++)
+            for (var index = 0; index < thread.Receipts.Length; index++)
             {
                 var part = $"receipt/{thread.Id}/{index}";
                 await Card(part, "Receipt", ReceiptBody(thread.Receipts[index]));

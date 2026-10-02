@@ -34,7 +34,7 @@ internal sealed class GitHubConnectionsNeuron(
         }
 
         connections.Add(record);
-        state.State = new GitHubConnectionsState(connections);
+        state.State = new GitHubConnectionsState(connections.ToArray());
         await state.WriteStateAsync();
         await PublishAsync(new GitHubConnectionRegistered(record));
         return record;

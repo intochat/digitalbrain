@@ -9,9 +9,9 @@ namespace DigitalBrain.AI;
 [GenerateSerializer, Alias("ai.llm.scripted-state")]
 public sealed record ScriptedLlmState
 {
-    [Id(0)] public IReadOnlyList<string> Replies { get; init; } = [];
+    [Id(0)] public string[] Replies { get; init; } = [];
     [Id(1)] public int Answered { get; init; }
-    [Id(2)] public IReadOnlyList<string> Prompts { get; init; } = [];
+    [Id(2)] public string[] Prompts { get; init; } = [];
 }
 
 [GrainType("ai.llm.scripted")]
@@ -24,11 +24,11 @@ internal sealed class ScriptedLlmNeuron(
     public async Task Script(IReadOnlyList<string> replies)
     {
         ArgumentNullException.ThrowIfNull(replies);
-        store.State = new ScriptedLlmState { Replies = replies };
+        store.State = new ScriptedLlmState { Replies = replies.ToArray() };
         await store.WriteStateAsync();
     }
 
-    public Task<IReadOnlyList<string>> Prompts() => Task.FromResult(store.State.Prompts);
+    public Task<IReadOnlyList<string>> Prompts() => Task.FromResult<IReadOnlyList<string>>(store.State.Prompts);
 
     public Task<ModelDescriptor> Describe(AgentModelSelection? selection = null) => Task.FromResult(new ModelDescriptor(
         ModelName, ModelName, null, "1", CapabilitySupport.Unsupported, CapabilitySupport.Unsupported, CapabilitySupport.Unsupported));
@@ -37,7 +37,7 @@ internal sealed class ScriptedLlmNeuron(
     {
         ArgumentNullException.ThrowIfNull(request);
         var script = store.State;
-        if (script.Answered >= script.Replies.Count)
+        if (script.Answered >= script.Replies.Length)
         { throw new InvalidOperationException($"Scripted model '{this.GetPrimaryKeyString()}' ran out of replies after {script.Answered}."); }
         var prompt = string.Join("\n", request.Messages.SelectMany(message => message.Content).Select(content => content switch
         {

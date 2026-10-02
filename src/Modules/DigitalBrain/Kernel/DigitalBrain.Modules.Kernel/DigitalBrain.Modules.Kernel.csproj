@@ -11,4 +11,5 @@
     <ProjectReference Include="../DigitalBrain.Modules.Kernel.Contracts/DigitalBrain.Modules.Kernel.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup><InternalsVisibleTo Include="DigitalBrain.Modules.Kernel.Tests.Unit" /></ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="DigitalBrain.Architecture.Tests" /></ItemGroup>
 </Project>

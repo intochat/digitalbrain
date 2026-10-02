@@ -11,7 +11,7 @@ public interface ISurface : INeuron
 }
 
 [GenerateSerializer, Alias("ui.surface-definition")]
-public sealed record SurfaceDefinition([property: Id(0)] string Title, [property: Id(1)] IReadOnlyList<UiChildRef> Children);
+public sealed record SurfaceDefinition([property: Id(0)] string Title, [property: Id(1)] UiChildRef[] Children);
 
 [GenerateSerializer, Alias("ui.surface-state")]
 public sealed class SurfaceState
