@@ -11,7 +11,7 @@ namespace DigitalBrain.Apps;
 [GrainType("apps.app")]
 internal sealed class App(
     [PersistentState("app", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<AppState> store,
-    TimeProvider clock)
+    TimeProvider clock, AppRequirements requirements)
     : Neuron<AppState>(store), IApp
 {
     private const int MaxInvocations = 256;
@@ -27,6 +27,7 @@ internal sealed class App(
         if (Snapshot.Status == AppStatus.Installed)
         { throw new InvalidOperationException($"{Snapshot.Revision!.Package} is already installed here; configure or upgrade it instead."); }
         var revision = await GrainFactory.GetGrain<IPackage>(request.Revision.Package.ToString()).ReadRevision(request.Revision.Revision);
+        requirements.Check(revision.Content);
         var settings = Resolve(revision.Content.Manifest.Settings, new Dictionary<string, string>(), request.Settings);
         var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], request.Accounts ?? new Dictionary<string, string>());
         var runtime = revision.Content.Manifest.RuntimeName;
@@ -55,6 +56,7 @@ internal sealed class App(
         RequireInstalled();
         var settings = Resolve(Snapshot.Declared, Snapshot.Settings, request.Settings);
         var revision = await GrainFactory.GetGrain<IPackage>(Snapshot.Revision!.Package.ToString()).ReadRevision(Snapshot.Revision.Revision);
+        requirements.Check(revision.Content);
         var selected = new Dictionary<string, string>(Snapshot.Accounts);
         foreach (var (slot, account) in request.Accounts ?? new Dictionary<string, string>()) { selected[slot] = account; }
         var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], selected);
@@ -73,6 +75,7 @@ internal sealed class App(
         if (request.Revision.Package != installed)
         { throw new ArgumentException($"This app runs {installed}. Install {request.Revision.Package} as its own app to try it."); }
         var revision = await GrainFactory.GetGrain<IPackage>(installed.ToString()).ReadRevision(request.Revision.Revision);
+        requirements.Check(revision.Content);
         // Keep what the installer chose for settings the new revision still declares.
         var declared = revision.Content.Manifest.Settings;
         var kept = Snapshot.Settings.Where(pair => declared.Any(setting => setting.Name == pair.Key)).ToDictionary(pair => pair.Key, pair => pair.Value);

@@ -14,6 +14,7 @@ public sealed class AppsModule : IModule
     {
         ArgumentNullException.ThrowIfNull(silo);
         silo.Services.TryAddSingleton(TimeProvider.System);
+        silo.Services.TryAddSingleton<AppRequirements>();
         silo.Services.TryAddSingleton<ITestScriptRunner, CSharpFileTestRunner>();
         silo.Services.TryAddSingleton<MarketplaceService>();
         silo.Services.TryAddSingleton<AppAuthoringPolicy>();

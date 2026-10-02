@@ -16,13 +16,14 @@ internal sealed class AppVerificationNeuron(
     // A fresh storage name: the pre-tests state carried a FeatureRun and would not deserialize.
     [PersistentState("apps.test-verification", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<AppVerificationState> store,
     ITestScriptRunner runner,
-    TimeProvider clock)
+    TimeProvider clock, AppRequirements requirements)
     : Neuron<AppVerificationState>(store), IAppVerification
 {
     public async Task<AppVerification> Verify()
     {
         var revisionRef = Parse(this.GetPrimaryKeyString());
         var revision = await GrainFactory.GetGrain<IPackage>(revisionRef.Package.ToString()).ReadRevision(revisionRef.Revision);
+        requirements.Check(revision.Content);
         var tests = revision.Content.File(PackageContent.TestsPath)
             ?? throw new InvalidOperationException($"{revisionRef.Package}@{revisionRef.Revision} has no {PackageContent.TestsPath}, so there is nothing to verify.");
         var run = await runner.RunAsync(revisionRef, tests, CancellationToken.None);
