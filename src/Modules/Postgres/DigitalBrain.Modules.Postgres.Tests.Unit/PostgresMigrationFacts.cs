@@ -24,15 +24,16 @@ public sealed class PostgresMigrationFacts
         await brain.DeactivateAsync(migration, ct);
         await migration.Ensure();
         Assert.Equal(1, legacy.Reads);
+        Assert.Equal(["state-postgres.table/unreadable.json"], await migration.ReadSkippedBlobs());
     }
 
     private sealed class LegacyTables : IPostgresLegacyTables
     {
         public int Reads { get; private set; }
-        public Task<LegacyPostgresTable[]> Read(CancellationToken ct)
+        public Task<LegacyPostgresScan> Read(CancellationToken ct)
         {
             Reads++;
-            return Task.FromResult<LegacyPostgresTable[]>([new("legacy", JsonSerializer.Serialize(new[] { BrainScope.Create("alice", "brain").Id, "app" }))]);
+            return Task.FromResult(new LegacyPostgresScan([new("legacy", JsonSerializer.Serialize(new[] { BrainScope.Create("alice", "brain").Id, "app" }))], ["state-postgres.table/unreadable.json"]));
         }
     }
 }

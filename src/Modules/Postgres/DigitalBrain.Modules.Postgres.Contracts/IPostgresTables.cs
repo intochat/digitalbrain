@@ -22,4 +22,5 @@ public interface IPostgresTableLifetime : INeuron
 public interface IPostgresStorageMigration : INeuron
 {
     Task Ensure();
+    [Orleans.Concurrency.ReadOnly] Task<string[]> ReadSkippedBlobs();
 }

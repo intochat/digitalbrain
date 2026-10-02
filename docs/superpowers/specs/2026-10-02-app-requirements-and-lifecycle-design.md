@@ -91,6 +91,7 @@ the next free IDs starting after 11; never reuse the missing historical Id(2). T
 StorageFiles (12), PendingDeployment (13), PendingUninstall (14), StorageHistoryKnown (15),
 LifecycleReceipts (16) and PostgresScopes (17). The last flag remembers whether any behavior
 generation required Postgres, so removing that module cannot falsely complete teardown.
+Review adds PendingAbandonStorage (18) and AbandonedStorage (19); neither changes older IDs.
 
 Postgres.Contracts adds `IPostgresTables`, a neuron keyed by the encoded brain/file owner scope,
 with module-authorized registration and retirement calls. Postgres implements it with a durable
@@ -129,6 +130,16 @@ Postgres to retire every recorded owner scope, settles pending invocations, then
 Uninstalled and the operation receipt. Failure leaves durable pending work, never a successful
 uninstall. A retry or reactivation resumes the same operation before accepting a new install.
 
+Reads remain available during pending work and expose `UninstallPending` in AppSnapshot (Id 6).
+If restoring storage is impossible, the person can separately request `IApp.AbandonStorage`
+with its own operation ID. This is allowed only during a pending uninstall. Persist that choice
+before effects, stop every script, and complete uninstall without calling Postgres. Append a
+durable receipt and an AbandonedAppStorage entry containing the request ID and recorded file
+scopes; expose that history as AppSnapshot Id 7. It survives later installs. Retrying after a
+lost save resumes the same choice; replay after reinstall cannot remove the new installation.
+The package screen displays pending uninstall and offers an explicit "Leave storage behind"
+confirmation. Its separate POST abandon-storage route never runs implicitly on a refusal.
+
 For each table, Postgres drops the pinned physical table using `DROP TABLE IF EXISTS` under
 the same advisory lock used for definition. The provider alone holds SQL, quoting, connections
 and source selection. Use `Accepted.Table` when available and `OriginOrPlatform(Origin)`;
@@ -160,12 +171,17 @@ to a newly registered source. New state collections are concrete arrays.
 Lazy registration alone is insufficient: an untouched old table must also be reclaimed.
 Ship a Postgres-owned, resumable maintenance connector to backfill collection neurons from
 existing `postgres.table` state before enabling lifecycle completion for legacy installs.
-For the deployed Azure Blob store it enumerates table-state blobs in `digitalbrain-v2-state`,
+For the deployed Azure Blob store it enumerates table-state blobs in the container configured
+by the named `AzureBlobStorageOptions` for Default grain storage,
 decodes them with the existing Orleans serializer, and registers each grain ID under its stored
 Owner. It does not infer ownership from SQL names or load other modules' implementation types.
 Run the scan as a silo startup task before serving app execution; Apps also awaits Ensure before
-retirement. Persist its completion in a Postgres neuron and
-fail closed on unreadable records. Restarting an incomplete scan repeats registration safely.
+retirement. Log and collect individual unknown or unreadable blob names while importing readable
+records; persist skipped names at migration-state Id 1 with completion and expose them through
+the platform-only ReadSkippedBlobs call. A nonempty scan with zero readable records refuses
+completion; authentication/network failures also remain errors. An empty store completes normally.
+This connector deliberately depends on Orleans' Azure blob naming convention, documented at
+the scan. Restarting an incomplete scan repeats registration safely.
 For the first upgrade, stop old-version silos before starting the new version: legacy writers
 must be quiesced while their ownership is backfilled.
 Fresh stores record an empty completed scan. Test storage supplies equivalent legacy records.
@@ -276,7 +292,8 @@ with implementation; material design departures return for approval.
 - User and sandbox scratch installs enforce the same derived requirements, and every shipped
   package still passes its deterministic publish gate.
 - Uninstall reclaims all pinned tables and table definitions, including historical generations
-  and legacy state. Double-uninstall is a no-op; restart/replay cannot duplicate effects or
+  and readable legacy state. Unreadable legacy blobs are reported durably; explicitly abandoning
+  storage records the scopes left behind. Double-uninstall is a no-op; restart/replay cannot duplicate effects or
   delete a new installation's data; reinstall is empty and redefinable.
 - Apps asks through contracts; Postgres enumerates and drops. SQL and connection knowledge
   stay in Postgres. No new module-to-module implementation reference or fifth concept exists.

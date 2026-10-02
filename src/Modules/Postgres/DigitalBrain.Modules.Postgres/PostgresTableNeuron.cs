@@ -32,6 +32,8 @@ internal sealed class PostgresTableNeuron(IPostgresTableProvider provider, Digit
 
     private async Task<PostgresTableDefinition> Current()
     {
+        // Check each operation: caching would allow writes after the owner closes but before
+        // its queued Retire reaches this table. Table serialization then orders accepted work before DROP.
         await Tables(Scope()).RequireOpen();
         return state.State.Accepted ?? throw new PostgresQueryException("Define the table first.");
     }
