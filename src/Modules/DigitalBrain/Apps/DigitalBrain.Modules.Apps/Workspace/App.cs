@@ -23,6 +23,20 @@ internal sealed class App(
 
     public Task<AppSnapshot> Read() => Task.FromResult(Describe(Snapshot));
 
+    public async Task<AppSnapshot> AbandonStorage(AbandonAppStorage request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (Replay(request.OperationId, request)) { return Describe(Snapshot); }
+        if (Snapshot.PendingUninstall is null)
+        { throw new InvalidOperationException("Storage can only be abandoned for a pending uninstall."); }
+        if (request.OperationId == Snapshot.PendingUninstall.OperationId)
+        { throw new InvalidOperationException("Abandoning storage requires its own operation ID."); }
+        if (Snapshot.PendingAbandonStorage is null)
+        { await Persist(Snapshot with { PendingAbandonStorage = request }); }
+        await CompleteUninstall();
+        return Describe(Snapshot);
+    }
+
     public async Task<AppSnapshot> Install(InstallApp request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -132,10 +146,11 @@ internal sealed class App(
     private async Task CompleteUninstall()
     {
         var request = Snapshot.PendingUninstall!;
+        var abandon = Snapshot.PendingAbandonStorage;
         var postgresAvailable = modules.ContractAssemblies().Contains(typeof(IPostgresTable).Assembly);
-        if (Snapshot.PostgresScopes && !postgresAvailable) { throw new InvalidOperationException(AppRequirementsException.RestorePostgres); }
+        if (abandon is null && Snapshot.PostgresScopes && !postgresAvailable) { throw new InvalidOperationException(AppRequirementsException.RestorePostgres); }
         foreach (var file in Snapshot.StorageFiles) { await GrainFactory.GetGrain<ICSharpFile>(file).Delete(); }
-        if (postgresAvailable)
+        if (abandon is null && postgresAvailable)
         {
             await GrainFactory.GetGrain<IPostgresStorageMigration>("table-owners-v1").Ensure();
             var brain = BrainScope.CurrentId();
@@ -146,8 +161,11 @@ internal sealed class App(
         var invocations = Snapshot.Invocations
             .Select(item => item.Status == InvocationStatus.Pending ? item with { Status = InvocationStatus.Failed, Error = "The app was uninstalled.", CompletedAt = now } : item)
             .ToList();
+        OperationReceipt[] completed = abandon is null ? [] : [new(abandon.OperationId, CommandHash(abandon), "Storage left behind")];
         await Persist(Snapshot with { Status = AppStatus.Uninstalled, Invocations = invocations, Receipts = Receipted(request.OperationId, request), PendingUninstall = null,
-            LifecycleReceipts = [.. Snapshot.LifecycleReceipts, new(request.OperationId, CommandHash(request), "")] });
+            PendingAbandonStorage = null,
+            AbandonedStorage = abandon is null ? Snapshot.AbandonedStorage : [.. Snapshot.AbandonedStorage, new(abandon.OperationId, Snapshot.StorageFiles.ToArray())],
+            LifecycleReceipts = [.. Snapshot.LifecycleReceipts, new(request.OperationId, CommandHash(request), ""), .. completed] });
     }
 
     public async Task<AppInvocation> Invoke(InvokeApp request)
@@ -367,5 +385,5 @@ internal sealed class App(
         state.ProgramGeneration == 0 || !state.RunsScript
             ? []
             : state.ScriptPaths.Select(path => FileKey(state.ProgramGeneration, path)).ToArray(),
-        new Dictionary<string, string>(state.Accounts));
+        new Dictionary<string, string>(state.Accounts), state.PendingUninstall is not null, state.AbandonedStorage.ToArray());
 }

@@ -4,6 +4,76 @@ import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_flutter_shell/workspace/apps/packages_screen.dart';
 
 void main() {
+  testWidgets('a refused uninstall can explicitly leave storage behind', (
+    tester,
+  ) async {
+    final server = _FakePackagesServer()
+      ..installedRevision = 'published-revision';
+    var pending = false;
+    var abandoned = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PackagesScreen(
+          workspaceId: 'workspace-bob',
+          onClose: () {},
+          request: (method, path, [body]) async {
+            if (method == 'DELETE') {
+              pending = true;
+              throw UiRequestException(
+                method,
+                path,
+                409,
+                '{"detail":"Restore Postgres to remove storage."}',
+              );
+            }
+            if (path.endsWith('/abandon-storage')) {
+              expect(method, 'POST');
+              expect((body as Map)['operationId'], isNotEmpty);
+              abandoned = true;
+              pending = false;
+              server.installedRevision = null;
+              return <String, dynamic>{};
+            }
+            final result = await server.request(method, path, body);
+            if (result is Map && result['app'] is Map) {
+              (result['app'] as Map)['uninstallPending'] = pending;
+            }
+            return result;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('uninstall-alice/researcher')));
+    await tester.pumpAndSettle();
+    expect(find.text('Restore Postgres to remove storage.'), findsOneWidget);
+    expect(find.text('Uninstall pending'), findsOneWidget);
+    await tester.tap(
+      find.byKey(const ValueKey('abandon-storage-alice/researcher')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Existing storage will remain and must be cleaned up separately.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(abandoned, isFalse);
+    await tester.tap(
+      find.byKey(const ValueKey('abandon-storage-alice/researcher')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('confirm-abandon-storage')));
+    await tester.pumpAndSettle();
+    expect(abandoned, isTrue);
+    expect(
+      find.byKey(const ValueKey('install-alice/researcher')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('install refusals are displayed verbatim', (tester) async {
     final server = _FakePackagesServer();
     const refusal = 'Cannot install this app. Missing modules: Postgres.';

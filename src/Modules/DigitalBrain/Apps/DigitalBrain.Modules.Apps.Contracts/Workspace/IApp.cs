@@ -8,12 +8,13 @@ namespace DigitalBrain.Apps;
 [Alias("apps.app"), DefaultGrainType("apps.app")]
 public interface IApp : INeuron
 {
-    Task<AppSnapshot> Read();
+    [Orleans.Concurrency.ReadOnly, Orleans.Concurrency.AlwaysInterleave] Task<AppSnapshot> Read();
     // Each lifecycle change stops one C# file and starts another, which can outlast the default call timeout.
     [ResponseTimeout("00:10:00")] Task<AppSnapshot> Install(InstallApp request);
     [ResponseTimeout("00:10:00")] Task<AppSnapshot> Configure(ConfigureApp request);
     [ResponseTimeout("00:10:00")] Task<AppSnapshot> Upgrade(UpgradeApp request);
     [ResponseTimeout("00:10:00")] Task<AppSnapshot> Uninstall(UninstallApp request);
+    [ResponseTimeout("00:10:00")] Task<AppSnapshot> AbandonStorage(AbandonAppStorage request);
     Task<AppInvocation> Invoke(InvokeApp request);
     Task<AppInvocation> Respond(AppResponse response);
     Task<AppInvocation> ReadInvocation(Guid invocationId);
