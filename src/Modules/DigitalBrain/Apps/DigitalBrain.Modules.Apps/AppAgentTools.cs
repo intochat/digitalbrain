@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using DigitalBrain.AI.Agents;
@@ -31,8 +32,11 @@ internal sealed class AppAgentTools(IDigitalBrain brain) : IAgentToolSource
                     var invocationId = new Guid(hash.AsSpan(0, 16));
                     var neuron = brain.Get<IApp>(scope + "/packages/" + app.Package);
                     var invocation = await neuron.Invoke(new(invocationId, operation.Name, input)).WaitAsync(cancellationToken);
+                    var started = Stopwatch.GetTimestamp();
                     while (invocation.Status == InvocationStatus.Pending)
                     {
+                        if (Stopwatch.GetElapsedTime(started) >= TimeSpan.FromSeconds(30))
+                        { return invocation with { Status = InvocationStatus.Failed, Error = "App invocation timed out.", CompletedAt = DateTimeOffset.UtcNow }; }
                         await Task.Delay(100, cancellationToken);
                         invocation = await neuron.ReadInvocation(invocation.Id).WaitAsync(cancellationToken);
                     }

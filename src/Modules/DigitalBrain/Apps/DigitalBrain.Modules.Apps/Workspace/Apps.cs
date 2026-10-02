@@ -47,11 +47,8 @@ internal sealed class Apps(
             }
         }
         var tracked = Snapshot.Packages.ToHashSet();
-        foreach (var id in candidates.Except(tracked))
-        {
-            if ((await GrainFactory.GetGrain<IApp>(prefix + id).Read()).Status == AppStatus.Installed)
-            { tracked.Add(id); }
-        }
+        // Candidates are filtered by InstalledApps outside this grain, avoiding an Install/Track call cycle.
+        tracked.UnionWith(candidates);
         var next = Snapshot with { Packages = tracked.OrderBy(id => id.ToString(), StringComparer.Ordinal).ToArray(), Discovered = true };
         await Save(next, new AppsChanged(next.Packages));
     }

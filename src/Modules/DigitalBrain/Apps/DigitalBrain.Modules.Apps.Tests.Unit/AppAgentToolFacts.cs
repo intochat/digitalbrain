@@ -10,6 +10,29 @@ namespace DigitalBrain.Modules.Apps.Tests.Unit;
 public sealed class AppAgentToolFacts
 {
     [Fact]
+    public async Task PendingAppToolReturnsAnErrorWithoutExternalCancellation()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<AppsModule>().StartAsync(ct);
+        Caller.As("alice");
+        var scope = BrainScope.CurrentId();
+        var id = PackageId.Create("alice", "pending");
+        var package = brain.Get<IPackage>(id.ToString());
+        var revision = await package.Commit(new(Guid.NewGuid(), null,
+            new(new("Pending", "No responder", [new("ask", "Ask")], []), "// behavior"), "Initial"));
+        await package.Publish(new(Guid.NewGuid(), revision.Id));
+        var app = brain.Get<IApp>(scope + "/packages/" + id);
+        await Task.WhenAll(app.Install(new(Guid.NewGuid(), new(id, revision.Id), new Dictionary<string, string>())),
+            brain.Get<IApps>(scope).List()).WaitAsync(TimeSpan.FromSeconds(10), ct);
+        var source = Assert.Single(brain.SiloServices.GetServices<IAgentToolSource>());
+        await using var session = await source.OpenAsync([AppToolName.For(id, "ask")], () => new(scope, "run", "call"), ct);
+        var result = Assert.IsType<JsonElement>(await Assert.Single(session.Tools)
+            .InvokeAsync(new AIFunctionArguments { ["input"] = "hello" }, ct).AsTask().WaitAsync(TimeSpan.FromSeconds(35), ct));
+        Assert.Equal("App invocation timed out.", result.GetProperty("error").GetString());
+        Assert.Single(await app.Pending());
+    }
+
+    [Fact]
     public async Task AppToolsInvokeTheirOwnAppAndReplayTheSameCallWithoutInvokingAgain()
     {
         var ct = TestContext.Current.CancellationToken;

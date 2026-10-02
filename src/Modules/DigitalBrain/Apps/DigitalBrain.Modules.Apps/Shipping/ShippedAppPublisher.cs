@@ -11,7 +11,7 @@ namespace DigitalBrain.Apps;
 // Brings every shipped app to the marketplace at startup: commit it when its folder changed, verify
 // the revision's scenarios once, and publish it only when they pass. A red app stays unpublished and
 // its failing steps are visible on its spec page.
-internal sealed class ShippedAppPublisher(IDigitalBrain brain, MarketplaceService marketplace, IEnumerable<IShippedAppSource> sources, IHostApplicationLifetime lifetime, IConfiguration configuration, ILogger<ShippedAppPublisher> logger) : BackgroundService
+internal sealed class ShippedAppPublisher(AppPublishing publishing, IEnumerable<IShippedAppSource> sources, IHostApplicationLifetime lifetime, IConfiguration configuration, ILogger<ShippedAppPublisher> logger) : BackgroundService
 {
     // Verifying a shipped app runs real sandbox scripts. A test host declares what it needs:
     // "true" (default) ships everything, "false" nothing, and a comma-separated list of package
@@ -56,7 +56,7 @@ internal sealed class ShippedAppPublisher(IDigitalBrain brain, MarketplaceServic
     }
     private async Task Ship(ShippedApp app)
     {
-        var verification = await new AppPublishing(brain, marketplace).Publish(app.Package, app.Content, $"Ship {app.Content.Manifest.Title}");
+        var verification = await publishing.Publish(app.Package, app.Content, $"Ship {app.Content.Manifest.Title}");
         if (!verification.Green)
         { logger.LogWarning("{Package} stays unpublished: verification failed.", app.Package); }
     }
