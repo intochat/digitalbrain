@@ -56,7 +56,7 @@ No packable project has `PackageReadmeFile` or `GenerateDocumentationFile`.
 | C4 | Sdk | `Secrets/ISecrets.cs:17`, `Integrations/IIntegrationRegistration.cs:33`, `Auth/TokenHandoff.cs`, `Identity/Accounts.cs:41` | Plaintext-credential-returning APIs on the public NuGet surface; only runtime `[PlatformOnly]` protects them. Move to a non-published platform-contracts assembly. | |
 | C5 | Aspire | `DigitalBrain.Aspire.csproj` | Misnamed (it's the silo runtime, not an Aspire client integration), product-coupled ("Silo host wiring for IntoChat"), and references `DigitalBrain.Platform` — publishing it publishes the credential ring. Rename (e.g. `DigitalBrain.Silo`) and cut the Platform dependency from the public graph. | |
 | C6 | repo | `Directory.Build.props` | `PackageIcon` without a packed icon file → `dotnet pack` fails/ships wrong. Add the icon + pack item or drop the property; add a pack smoke test to CI. | ✅ `1b65d23c7` |
-| C7 | Kernel | `Composition/CompositionOverrideTransport.cs` | Test-only global static in the shipped runtime; `Take` doesn't remove entries (unbounded growth, token reuse). Move to DigitalBrain.Testing; fix the leak regardless. | |
+| C7 | Kernel | `Composition/CompositionOverrideTransport.cs` | Test-only global static in the shipped runtime; `Take` doesn't remove entries (unbounded growth, token reuse). Move to DigitalBrain.Testing; fix the leak regardless. | ✅ `3a724f8a4` (deleted, not moved — see note) |
 
 ## High findings
 
@@ -73,7 +73,7 @@ No packable project has `PackageReadmeFile` or `GenerateDocumentationFile`.
 - **H8** Platform `Identity/AccountSession.cs:100-103`: no credential ⇒ everyone is `owner`. Same opt-in treatment.
 - **H9** Sdk `Auth/LoginPage.cs:14-16`: unencoded string interpolation into HTML — XSS the moment any consumer passes tainted strings. HtmlEncode.
 - **H10** Platform `Identity/Directory/IdentityDirectoryNeuron.cs`: god grain — every account, member, invitation and password hash in one list-shaped global grain state; full scan per auth.
-- **H11** Aspire `DigitalBrainRuntimeHostingExtensions.cs:24-29`: `DigitalBrain:Testing:PrivateConfiguration` reads an arbitrary JSON file into config in the production path; move behind a Testing seam (same family as C7).
+- **H11** Aspire `DigitalBrainRuntimeHostingExtensions.cs:24-29`: `DigitalBrain:Testing:PrivateConfiguration` reads an arbitrary JSON file into config in the production path; move behind a Testing seam (same family as C7). — ✅ `3a724f8a4`: became the neutral `DigitalBrain:ConfigurationFile` setting loaded via standard `AddJsonFile` (secrets-file pattern, legitimate in production).
 - **H12** Aspire: Azure welded in with no seam (`:31-33,100-126`) — no provider choice, Orleans Dashboard unconditional (`:54`). Accept options; make Azure/Dashboard opt-in.
 - **H13** Aspire.Hosting `Brain/DigitalBrainBuilder.cs`: two classes in one; `Orleans`/`GrainState` are `null!` until `AttachRuntime`; `Materialize()` only runs from `WithReference`, so an unreferenced brain never validates. Split and construct fully.
 - **H14** Aspire reflection contracts: `"FullName, Assembly"` env strings + `Activator.CreateInstance` (`DigitalBrainRuntimeHostingExtensions.cs:77-98`) and `Assembly.Load(name + ".Aspire.Hosting")` + `<Type>Hosting` name convention (`DigitalBrainHostingExtensions.cs:124-142`). Replace with an assembly-level attribute or explicit registration; make `FindModuleHosting` internal.
@@ -133,7 +133,7 @@ misleading.
 **Phase 0 — stop the bleeding (small, independent fixes)**
 1. C1: remove `FakeKeyVault` from production composition; fail fast without real crypto. — ✅ Done in `9c1f84870` (also extracted the master-key parameter into `Aspire.Hosting/Brain/MasterKey.cs`; `AddIdentityStorage` dissolved into `AddCookieProtection`; kernel suite 197/197 green, broader module suites not re-run).
 2. C6: fix `PackageIcon`/pack; add a `dotnet pack` smoke check. — ✅ Done in `1b65d23c7` (512×512 icon at `src/Assets/nuget/icon.png`, `Exists` guard removed so a missing icon fails the pack; CI's existing solution-wide pack step enforces it; verified with the icon inside the nupkg).
-3. C7 + H11: move `CompositionOverrideTransport` and the private-config hook to Testing; fix the token leak.
+3. C7 + H11: move `CompositionOverrideTransport` and the private-config hook to Testing; fix the token leak. — ✅ Done in `3a724f8a4`, by removing the root cause instead of relocating it: module options now compile to flat configuration keys (`DigitalBrain:Modules:{Name}:Options:{Property}`) bound with the standard binder, and `AddModules` overlays the AppHost's own configuration over code defaults, so tests override options with plain host arguments. The transport, `CompositionOverrides`, `ApplyOverrides`, the `Testing:Enabled` gate, and the frozen-builder `EnsureMutable` ceremony are deleted; the private-config hook became the neutral `DigitalBrain:ConfigurationFile` (`AddJsonFile`). Verified: kernel 197/197 plus CSharp, AI, Assistant, Gmail, Postgres, Supabase, ClickHouse, Flutter, Salesforce, GitHub, Time, Qdrant, Memory unit suites green (remaining small suites were finishing green at commit time); live-gated E2E not run.
 4. H9: HtmlEncode `LoginPage`.
 5. H7/H8: make both open-posture defaults explicit opt-in, with pinning tests.
 

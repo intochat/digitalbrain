@@ -326,14 +326,19 @@ public sealed class AppDraftFacts
     private static Task<UnitBrain> StartAsync(CancellationToken ct, DigitalBrain.Apps.ITestScriptRunner? runner = null, bool canRun = true, IAppRuntime? runtime = null) => UnitTest.Create()
         .WithModule<AIModule>()
         .WithModule<AppsModule>()
-        .ConfigureSilo(silo =>
+        // Extra keys join the host configuration; replacing the IConfiguration singleton would
+        // erase the rest of the host's configuration (the master key included).
+        .WithExecution(new TestExecutionOptions
         {
-            if (runtime is not null) { silo.Services.AddSingleton(runtime); }
-            silo.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            PrivateConfiguration = new Dictionary<string, string?>
             {
                 ["DigitalBrain:Apps:AuthorModel"] = IScriptedLLM.ModelPrefix + "author",
                 ["DigitalBrain:Apps:BuilderModel"] = IScriptedLLM.ModelPrefix + "builder",
-            }).Build());
+            },
+        })
+        .ConfigureSilo(silo =>
+        {
+            if (runtime is not null) { silo.Services.AddSingleton(runtime); }
             silo.Services.AddSingleton<DigitalBrain.Apps.ITestScriptRunner>(_ => runner ?? new ScriptedTestRunner());
             silo.Services.AddSingleton<IScriptSandbox>(new DraftSandbox(canRun));
         })
