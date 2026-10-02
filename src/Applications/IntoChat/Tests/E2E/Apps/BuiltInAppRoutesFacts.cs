@@ -46,5 +46,9 @@ public sealed class BuiltInAppRoutesFacts(IntoChatHostFixture host) : BrainFact(
         Assert.Equal(HttpStatusCode.OK, settings.StatusCode);
         Assert.Equal(HttpStatusCode.OK, assistant.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        var genericSettings = await People.Send(brain.HttpClient, HttpMethod.Post, "/brains/personal/apps/intochat%2Fsettings/open", new { }, ct);
+        Assert.EndsWith("/window", genericSettings.GetProperty("id").GetString());
+        Assert.Equal("Settings", genericSettings.GetProperty("title").GetString());
+        Assert.False(string.IsNullOrEmpty(genericSettings.GetProperty("surface").GetString()));
     }
 }
