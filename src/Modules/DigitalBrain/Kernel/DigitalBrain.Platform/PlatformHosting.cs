@@ -24,6 +24,7 @@ public static class PlatformHosting
         var services = silo.Services;
         if (services.Any(service => service.ServiceType == typeof(PlatformRegistration))) { return; }
         services.AddSingleton<PlatformRegistration>();
+        services.AddIdentity();
         services.TryAddSingleton<IKeyVault, FakeKeyVault>();
         if (OperatingSystem.IsWindows()) { services.TryAddSingleton<IKeyWrapper, DpapiKeyWrapper>(); }
         else { services.TryAddSingleton<IKeyWrapper, KeyVaultKeyWrapper>(); }

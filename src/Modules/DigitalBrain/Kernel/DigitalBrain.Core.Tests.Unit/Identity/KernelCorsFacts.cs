@@ -1,9 +1,10 @@
+using DigitalBrain.Identity;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace IntoChat.Tests.Unit;
+namespace DigitalBrain.Core.Tests.Unit.Identity;
 
 public sealed class KernelCorsFacts
 {
@@ -15,7 +16,7 @@ public sealed class KernelCorsFacts
     {
         var builder = WebApplication.CreateBuilder();
         builder.Configuration[KernelCors.AllowedOriginConfigurationKey] = origin;
-        builder.AddKernelCors();
+        builder.Services.AddKernelCors();
         using var services = builder.Services.BuildServiceProvider();
         Assert.Null(services.GetRequiredService<IOptions<CorsOptions>>().Value.GetPolicy("shell"));
     }
@@ -25,7 +26,7 @@ public sealed class KernelCorsFacts
     {
         var builder = WebApplication.CreateBuilder();
         builder.Configuration[KernelCors.AllowedOriginConfigurationKey] = "http://localhost:27880";
-        builder.AddKernelCors();
+        builder.Services.AddKernelCors();
         using var services = builder.Services.BuildServiceProvider();
         var policy = services.GetRequiredService<IOptions<CorsOptions>>().Value.GetPolicy("shell");
         Assert.NotNull(policy);

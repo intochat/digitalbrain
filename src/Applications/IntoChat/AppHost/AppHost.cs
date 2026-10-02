@@ -62,7 +62,7 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serv
     .WithModule<CSharpModule>()
     .WithModule<CSharpAuthoringModule>();
 
-var cookieProtection = digitalBrain.AddBlobContainer(CookieProtectionStorage.ContainerName);
+var cookieProtection = digitalBrain.AddBlobContainer(IntoChatConfiguration.ProtectionContainerName);
 
 var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.IntoChat)
     .WithReference(digitalBrain)

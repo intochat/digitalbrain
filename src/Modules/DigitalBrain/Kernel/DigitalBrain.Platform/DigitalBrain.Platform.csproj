@@ -8,6 +8,7 @@
     <InternalsVisibleTo Include="DigitalBrain.Core.Tests.Unit" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <PackageReference Include="Azure.Extensions.AspNetCore.DataProtection.Blobs" />
     <ProjectReference Include="../DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
   </ItemGroup>
 </Project>
