@@ -1025,25 +1025,27 @@ class _WorkspaceAppState extends State<WorkspaceApp> {
     final client = widget.programmingClient;
     if (client == null) return;
     final workspaceId = store.currentProject.id;
-    _navigator.currentState?.push(
-      MaterialPageRoute<void>(
-        builder: (_) => AppsScreen(
-          key: ValueKey('${client.workspaceIdentity}/$workspaceId'),
-          workspaceId: workspaceId,
-          request: client.jsonRequest,
-          onOpen: (id) async {
-            _navigator.currentState?.pop();
-            await _openApplication(id);
-          },
-          onClose: () {
-            _apps.remove(workspaceId);
-            _appsLoading.remove(workspaceId);
-            _loadApps(workspaceId);
-            _navigator.currentState?.pop();
-          },
-        ),
-      ),
-    );
+    _navigator.currentState
+        ?.push<void>(
+          MaterialPageRoute<void>(
+            builder: (_) => AppsScreen(
+              key: ValueKey('${client.workspaceIdentity}/$workspaceId'),
+              workspaceId: workspaceId,
+              request: client.jsonRequest,
+              onOpen: (id) async {
+                _navigator.currentState?.pop();
+                await _openApplication(id);
+              },
+              onClose: () => _navigator.currentState?.pop(),
+            ),
+          ),
+        )
+        .whenComplete(() {
+          if (!mounted) return;
+          _apps.remove(workspaceId);
+          _appsLoading.remove(workspaceId);
+          _loadApps(workspaceId);
+        });
   }
 
   void _openCompute(BuildContext context) {

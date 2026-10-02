@@ -54,4 +54,31 @@ public sealed class AgentToolSelectionFacts
         await installed.Uninstall(new(Guid.NewGuid()));
         Assert.Empty(await selection.ResolveAsync(scope, ct));
     }
+
+    [Fact]
+    public async Task PrivateInstallsAreImmediatelyDiscoverableWithoutTheOptionalRegistry()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<AppsModule>().StartAsync(ct);
+        CallerContextStamper.Stamp(new CallerContext
+        {
+            PrincipalId = "alice",
+            AccountId = "alice",
+            BrainId = "personal",
+            Kind = CallerKind.User,
+            StampedBy = TrustedEdge.AuthenticatedHttp,
+        });
+        var scope = BrainScope.CurrentId();
+        var id = PackageId.Create("alice", "private");
+        var content = new PackageContent(new("Private", "A private app", [new("ask", "Answer")], [], Runtime: "prompt"), "");
+        var revision = await brain.Get<IPackage>(id.ToString()).Commit(new(Guid.NewGuid(), null, content, "Private"));
+        var app = brain.Get<IApp>(scope + "/packages/" + id);
+        await app.Install(new(Guid.NewGuid(), new(id, revision.Id), new Dictionary<string, string>()));
+        Assert.Empty(await brain.Get<IPackageDirectory>(PackageDirectory.Key).List());
+        Assert.Equal([AppToolName.For(id, "ask")], await new AgentToolSelection(brain.Grains).ResolveAsync(scope, ct));
+        await brain.DeactivateAsync(app, ct);
+        await brain.DeactivateAsync(brain.Get<IApps>(scope), ct);
+        Assert.Equal(id, Assert.Single(await brain.Get<IApps>(scope).List()));
+        Assert.Equal(id.ToString(), Assert.Single(await InstalledApps.List(brain, scope, ct)).Id);
+    }
 }

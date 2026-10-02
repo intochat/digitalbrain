@@ -51,6 +51,12 @@ internal sealed class App(
         var runtime = revision.Content.Manifest.RuntimeName;
         var generation = Snapshot.ProgramGeneration + 1;
         var programs = runtime == PackageManifest.CSharpRuntime ? revision.Content.Programs().Keys.ToArray() : [];
+        // Track before persisting the install: a failed deployment leaves a harmless candidate,
+        // while a completed install can never be hidden by a missed index write.
+        var key = this.GetPrimaryKeyString();
+        var marker = key.IndexOf("/packages/", StringComparison.Ordinal);
+        if (marker > 0 && key[(marker + "/packages/".Length)..] == request.Revision.Package.ToString())
+        { await GrainFactory.GetGrain<IApps>(key[..marker]).Track(request.Revision.Package); }
         await DeployAndPersist(Snapshot with
         {
             Status = AppStatus.Installed,

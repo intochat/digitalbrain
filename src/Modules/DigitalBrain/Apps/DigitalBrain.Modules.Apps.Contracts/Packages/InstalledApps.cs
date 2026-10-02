@@ -8,19 +8,20 @@ public sealed record InstalledAppSummary(string Id, PackageId Package, string Ti
 public static class InstalledApps
 {
     public static Task<IReadOnlyList<InstalledAppSummary>> List(IDigitalBrain brain, string scope, CancellationToken ct)
-        => List(brain.Get<IPackageDirectory>(PackageDirectory.Key), () => brain.Get<IRegistry>(IRegistry.Key), scope, id => brain.Get<IApp>(scope + "/packages/" + id),
+        => List(brain.Get<IApps>(scope), brain.Get<IPackageDirectory>(PackageDirectory.Key), () => brain.Get<IRegistry>(IRegistry.Key), scope, id => brain.Get<IApp>(scope + "/packages/" + id),
             id => brain.Get<IPackage>(id.ToString()), ct);
 
     public static Task<IReadOnlyList<InstalledAppSummary>> List(IGrainFactory grains, string scope, CancellationToken ct)
-        => List(grains.GetGrain<IPackageDirectory>(PackageDirectory.Key), () => grains.GetGrain<IRegistry>(IRegistry.Key), scope, id => grains.GetGrain<IApp>(scope + "/packages/" + id),
+        => List(grains.GetGrain<IApps>(scope), grains.GetGrain<IPackageDirectory>(PackageDirectory.Key), () => grains.GetGrain<IRegistry>(IRegistry.Key), scope, id => grains.GetGrain<IApp>(scope + "/packages/" + id),
             id => grains.GetGrain<IPackage>(id.ToString()), ct);
 
-    private static async Task<IReadOnlyList<InstalledAppSummary>> List(IPackageDirectory directory, Func<IRegistry> registry, string scope,
+    private static async Task<IReadOnlyList<InstalledAppSummary>> List(IApps apps, IPackageDirectory directory, Func<IRegistry> registry, string scope,
         Func<PackageId, IApp> app, Func<PackageId, IPackage> package, CancellationToken ct)
     {
-        var candidates = (await directory.List().WaitAsync(ct)).Select(listing => listing.Package).ToHashSet();
-        // Private revisions are absent from the marketplace. The optional registry remembers
-        // their installations across deactivation; every candidate is checked against IApp.
+        var candidates = (await apps.List().WaitAsync(ct)).ToHashSet();
+        candidates.UnionWith((await directory.List().WaitAsync(ct)).Select(listing => listing.Package));
+        // Discover installations created before the per-brain index existed. New installations
+        // are tracked synchronously by IApp; every historical candidate is checked against it.
         try
         {
             var prefix = scope + "/packages/";
