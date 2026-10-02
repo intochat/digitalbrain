@@ -9,6 +9,7 @@
     <ProjectReference Include="../../../Libraries/DigitalBrain.LiveTables/DigitalBrain.LiveTables.csproj" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Npgsql" />
+    <PackageReference Include="Azure.Storage.Blobs" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.Postgres.Tests.Unit" />
     <ProjectReference Include="../DigitalBrain.Modules.Postgres.Contracts/DigitalBrain.Modules.Postgres.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Core/DigitalBrain.Core.csproj" />

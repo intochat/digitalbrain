@@ -11,6 +11,38 @@ namespace DigitalBrain.Modules.Postgres.Tests.Unit;
 
 public sealed class PostgresWriteTableFacts
 {
+    [Fact]
+    public async Task TeardownTwiceAndReplayAfterRestartLeaveReinstallationEmptyAndRedefinable()
+    {
+        var provider = new MemoryTables();
+        await using var brain = await Start(provider);
+        Stamp();
+        var table = brain.Get<IPostgresTable>("lifecycle");
+        await table.Define(Definition);
+        await table.Upsert(Key(), Values("old"));
+        var owner = brain.Get<IPostgresLifecycleTestApp>("install");
+        await owner.Uninstall("brain", "app");
+        await owner.Uninstall("brain", "app");
+        await brain.DeactivateAsync(table, TestContext.Current.CancellationToken);
+        await brain.DeactivateAsync(brain.Get<IPostgresTables>(JsonSerializer.Serialize(new[] { BrainScope.CurrentId(), "app" })), TestContext.Current.CancellationToken);
+        await owner.Uninstall("brain", "app");
+        Stamp("brain", "new-file");
+        await table.Define(new([new("id", "text"), new("fresh", "boolean")], ["id"]));
+        Assert.Empty(await table.Page());
+        await table.Upsert(Key(), [new("fresh", "true")]);
+        await owner.Uninstall("brain", "app");
+        Assert.Single(await table.Page());
+    }
+
+    [Fact]
+    public async Task ScriptsCannotRequestStorageTeardown()
+    {
+        await using var brain = await Start(new MemoryTables());
+        Stamp();
+        var tables = brain.Get<IPostgresTables>(JsonSerializer.Serialize(new[] { BrainScope.CurrentId(), "app" }));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(tables.Retire);
+    }
+
     private static readonly TableDefinition Definition = new([new("id", "text"), new("value", "text")], ["id"]);
     private static TableValue[] Key(string id = "one") => [new("id", JsonSerializer.Serialize(id))];
     private static TableValue[] Values(string value) => [new("value", JsonSerializer.Serialize(value))];
@@ -233,10 +265,13 @@ public sealed class PostgresWriteTableFacts
             if (provider is not null) { silo.Services.AddSingleton(provider); }
         }).StartAsync(TestContext.Current.CancellationToken);
 
-    private sealed class MemoryTables : IPostgresTableProvider
+    internal sealed class MemoryTables : IPostgresTableProvider
     {
         private readonly Dictionary<string, Dictionary<string, TableValue[]>> tables = [];
         public int Definitions { get; private set; }
+        public List<(string Origin, string Table)> Drops { get; } = [];
+        public Task DropAsync(string origin, string table, CancellationToken ct)
+        { Drops.Add((origin, table)); tables.Remove(table); return Task.CompletedTask; }
         public Task DefineAsync(string origin, string table, TableDefinition definition, CancellationToken ct)
         { Definitions++; tables.TryAdd(table, []); return Task.CompletedTask; }
         private static string RowKey(TableValue[] key) => JsonSerializer.Serialize(key);
@@ -254,4 +289,16 @@ public sealed class PostgresWriteTableFacts
         public Task<TableValue[][]> PageAsync(string origin, string table, TableDefinition definition, int offset, int limit, CancellationToken ct)
             => Task.FromResult(tables[table].OrderBy(p => p.Key, StringComparer.Ordinal).Skip(offset).Take(limit).Select(p => p.Value).ToArray());
     }
+}
+
+public interface IPostgresLifecycleTestApp : DigitalBrain.Contracts.INeuron
+{
+    Task Uninstall(string brain, string file);
+}
+
+[GrainType("apps.app")]
+public sealed class PostgresLifecycleTestApp : DigitalBrain.Core.Neuron, IPostgresLifecycleTestApp
+{
+    public Task Uninstall(string brain, string file)
+        => GrainFactory.GetGrain<IPostgresTables>(JsonSerializer.Serialize(new[] { BrainScope.Create("alice", brain).Id, file })).Retire();
 }

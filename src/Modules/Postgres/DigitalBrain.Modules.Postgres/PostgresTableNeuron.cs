@@ -12,11 +12,12 @@ internal sealed record PostgresTableState
     [Id(0)] public string? Owner { get; init; }
     [Id(1)] public PostgresTableDefinition? Accepted { get; init; }
     [Id(2)] public string? Origin { get; init; }
+    [Id(3)] public TableDefinition? Pending { get; init; }
 }
 
 [GrainType("postgres.table")]
 internal sealed class PostgresTableNeuron(IPostgresTableProvider provider, DigitalBrain.Sdk.Capacity.ICapacity capacity,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<PostgresTableState> state) : Neuron, IPostgresTable
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<PostgresTableState> state) : Neuron, IPostgresTable, IPostgresTableLifetime
 {
     private string Scope()
     {
@@ -29,39 +30,60 @@ internal sealed class PostgresTableNeuron(IPostgresTableProvider provider, Digit
         return scope;
     }
 
-    private PostgresTableDefinition Current()
+    private async Task<PostgresTableDefinition> Current()
     {
-        _ = Scope();
+        await Tables(Scope()).RequireOpen();
         return state.State.Accepted ?? throw new PostgresQueryException("Define the table first.");
+    }
+
+    private IPostgresTables Tables(string owner) => GrainFactory.GetGrain<IPostgresTables>(owner);
+
+    public async Task Retire(string owner)
+    {
+        if (state.State.Owner != owner) { return; }
+        var table = state.State.Accepted?.Table ?? PostgresTablePolicy.PhysicalName(owner, this.GetPrimaryKeyString());
+        await provider.DropAsync(PostgresCapacityKind.OriginOrPlatform(state.State.Origin), table, CancellationToken.None);
+        await Persist(new());
+    }
+
+    private async Task Persist(PostgresTableState next)
+    {
+        var previous = state.State;
+        state.State = next;
+        try { await state.WriteStateAsync(); }
+        catch { state.State = previous; throw; }
     }
 
     public async Task<PostgresTableDefinition> Define(TableDefinition definition)
     {
         var scope = Scope();
         var normalized = PostgresTablePolicy.Validate(definition);
+        await Tables(scope).RequireOpen();
         if (state.State.Accepted is { } accepted)
         {
             if (!PostgresTablePolicy.Compatible(accepted.Definition, normalized))
             { throw new PostgresQueryException("Incompatible table redefinition; migrations are not supported."); }
+            await Tables(scope).Register(this.GetPrimaryKeyString());
             return accepted;
         }
         var table = PostgresTablePolicy.PhysicalName(scope, this.GetPrimaryKeyString());
         // The origin is pinned at first Define; later-registered capacity never migrates a table.
+        if (state.State.Pending is { } pending && !PostgresTablePolicy.Compatible(pending, normalized))
+        { throw new PostgresQueryException("Incompatible table redefinition; migrations are not supported."); }
         var origin = state.State.Origin
             ?? (await capacity.Resolve(PostgresCapacityKind.Kind, new(BrainScope.CurrentId(), CallerContextStamper.Require().AppId))).Origin;
+        await Tables(scope).Register(this.GetPrimaryKeyString());
+        await Persist(state.State with { Owner = scope, Origin = origin, Pending = normalized });
         await provider.DefineAsync(origin, table, normalized, CancellationToken.None);
-        var previous = state.State;
         var result = new PostgresTableDefinition(table, normalized, 1);
-        state.State = new() { Owner = scope, Accepted = result, Origin = origin };
-        try { await state.WriteStateAsync(); }
-        catch { state.State = previous; throw; }
+        await Persist(new() { Owner = scope, Accepted = result, Origin = origin });
         await PublishAsync(new TableDefined(table, result.Revision));
         return result;
     }
 
     public async Task<bool> Upsert(TableValue[] key, TableValue[] values)
     {
-        var current = Current();
+        var current = await Current();
         key = PostgresTablePolicy.Values(current.Definition, key, true);
         values = PostgresTablePolicy.Values(current.Definition, values, false);
         var changed = await provider.UpsertAsync(PostgresCapacityKind.OriginOrPlatform(state.State.Origin), current.Table, current.Definition, key, values, CancellationToken.None);
@@ -71,25 +93,25 @@ internal sealed class PostgresTableNeuron(IPostgresTableProvider provider, Digit
 
     public async Task<bool> Delete(TableValue[] key)
     {
-        var current = Current();
+        var current = await Current();
         key = PostgresTablePolicy.Values(current.Definition, key, true);
         var changed = await provider.DeleteAsync(PostgresCapacityKind.OriginOrPlatform(state.State.Origin), current.Table, current.Definition, key, CancellationToken.None);
         if (changed) { await PublishAsync(new RowDeleted(current.Table, key)); }
         return changed;
     }
 
-    public Task<TableValue[]?> Read(TableValue[] key)
+    public async Task<TableValue[]?> Read(TableValue[] key)
     {
-        var current = Current();
+        var current = await Current();
         key = PostgresTablePolicy.Values(current.Definition, key, true);
-        return provider.ReadAsync(PostgresCapacityKind.OriginOrPlatform(state.State.Origin), current.Table, current.Definition, key, CancellationToken.None);
+        return await provider.ReadAsync(PostgresCapacityKind.OriginOrPlatform(state.State.Origin), current.Table, current.Definition, key, CancellationToken.None);
     }
 
-    public Task<TableValue[][]> Page(int offset = 0, int limit = 200)
+    public async Task<TableValue[][]> Page(int offset = 0, int limit = 200)
     {
-        var current = Current();
+        var current = await Current();
         if (offset < 0 || limit is < 1 or > PostgresQuery.MaxRowsLimit)
         { throw new PostgresQueryException($"Offset must be nonnegative and limit must be 1–{PostgresQuery.MaxRowsLimit}."); }
-        return provider.PageAsync(PostgresCapacityKind.OriginOrPlatform(state.State.Origin), current.Table, current.Definition, offset, limit, CancellationToken.None);
+        return await provider.PageAsync(PostgresCapacityKind.OriginOrPlatform(state.State.Origin), current.Table, current.Definition, offset, limit, CancellationToken.None);
     }
 }
