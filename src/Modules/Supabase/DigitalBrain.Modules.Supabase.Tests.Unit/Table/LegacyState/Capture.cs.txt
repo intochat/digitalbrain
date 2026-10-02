@@ -1,0 +1,41 @@
+using DigitalBrain.Contracts;
+using DigitalBrain.Supabase;
+using DigitalBrain.Supabase.Tables;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime;
+using Orleans.Serialization;
+using Orleans.Storage;
+using Xunit;
+
+namespace DigitalBrain.Modules.Supabase.Tests.Unit;
+
+public sealed class LegacyCaptureFacts
+{
+    [Fact]
+    public async Task Capture()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().WithModule<SupabaseModule>().ConfigureSilo(silo =>
+        {
+            silo.Services.AddSingleton<ISupabaseProvider>(new FakeSupabaseProvider { Described = new SupabaseColumn[] { new("id", "int4", SupabaseTypeMap.Number) } });
+            silo.Services.AddKeyedSingleton<IGrainStorage>(DigitalBrainNames.DefaultGrainStorage, (services, _) =>
+                new CaptureStorage(new OrleansGrainStorageSerializer(services.GetRequiredService<Serializer>())));
+        }).StartAsync(ct);
+        var table = brain.Get<ISupabaseTable>("legacy-table");
+        await table.CreateFromQueryOnce("legacy-operation", new("Legacy people", "select id from people"), ct);
+    }
+
+    private sealed class CaptureStorage(IGrainStorageSerializer serializer) : IGrainStorage
+    {
+        public Task ReadStateAsync<T>(string name, GrainId id, IGrainState<T> state) => Task.CompletedTask;
+        public Task WriteStateAsync<T>(string name, GrainId id, IGrainState<T> state)
+        {
+            if (typeof(T) == typeof(SupabaseTableState))
+                File.WriteAllBytes(Path.Combine(AppContext.BaseDirectory, "table.orleans"), serializer.Serialize(state.State).ToArray());
+            state.RecordExists = true;
+            state.ETag = "captured";
+            return Task.CompletedTask;
+        }
+        public Task ClearStateAsync<T>(string name, GrainId id, IGrainState<T> state) => throw new NotSupportedException();
+    }
+}

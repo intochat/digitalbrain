@@ -48,8 +48,13 @@ public sealed class PlatformHostingFacts
         Assert.False(await identity.CanAccessAsync(member.PrincipalId, "another-brain", ct));
         var caller = new CallerContext
         {
-            PrincipalId = member.PrincipalId, AccountId = member.AccountId, BrainId = member.BrainId,
-            AppId = "reader-app", ConversationId = "chat", Kind = CallerKind.App, StampedBy = TrustedEdge.AppProxy,
+            PrincipalId = member.PrincipalId,
+            AccountId = member.AccountId,
+            BrainId = member.BrainId,
+            AppId = "reader-app",
+            ConversationId = "chat",
+            Kind = CallerKind.App,
+            StampedBy = TrustedEdge.AppProxy,
         };
         CallerContextStamper.Stamp(caller);
         try
@@ -60,8 +65,11 @@ public sealed class PlatformHostingFacts
             var store = brain.Get<IGrantStore>(IdentityGrains.Grants(member.BrainId));
             await store.GrantAsync(new Grant
             {
-                AppId = caller.AppId, WorkspaceId = caller.BrainId, SemanticTypeId = "person.email",
-                Mode = GrantMode.ThisChat, ConversationId = "chat",
+                AppId = caller.AppId,
+                WorkspaceId = caller.BrainId,
+                SemanticTypeId = "person.email",
+                Mode = GrantMode.ThisChat,
+                ConversationId = "chat",
             }, ct);
             Assert.True(await identity.HasGrantAsync(caller, "person.email", ct));
             Assert.False(await identity.HasGrantAsync(caller with { ConversationId = "other" }, "person.email", ct));
@@ -77,15 +85,22 @@ public sealed class PlatformHostingFacts
         await using var brain = await UnitTest.Create().StartAsync(ct);
         var caller = new CallerContext
         {
-            PrincipalId = "owner", AccountId = "owner", BrainId = "owner",
-            AppId = "reader", Kind = CallerKind.App, StampedBy = TrustedEdge.AppProxy,
+            PrincipalId = "owner",
+            AccountId = "owner",
+            BrainId = "owner",
+            AppId = "reader",
+            Kind = CallerKind.App,
+            StampedBy = TrustedEdge.AppProxy,
         };
         var request = new CallRequest { Caller = caller, TargetNeuron = "person", Operation = "Read", SemanticTypeIds = ["person.email"] };
         var filter = brain.SiloServices.GetRequiredService<ICallFilter>();
         Assert.Equal(CallDenial.MissingGrant, (await filter.AuthorizeAsync(request, ct)).Denial);
         await brain.Get<IGrantStore>(IdentityGrains.Grants("owner")).GrantAsync(new Grant
         {
-            AppId = "reader", WorkspaceId = "owner", SemanticTypeId = "person.email", Mode = GrantMode.Once,
+            AppId = "reader",
+            WorkspaceId = "owner",
+            SemanticTypeId = "person.email",
+            Mode = GrantMode.Once,
         }, ct);
         Assert.True((await filter.AuthorizeAsync(request, ct)).Allowed);
         Assert.Equal(CallDenial.MissingGrant, (await filter.AuthorizeAsync(request, ct)).Denial);

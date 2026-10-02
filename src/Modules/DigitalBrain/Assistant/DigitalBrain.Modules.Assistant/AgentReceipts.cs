@@ -22,14 +22,14 @@ public static class AgentReceipts
             modelCalls++;
             if (entry.Meter == MeterKind.Chat)
             {
-                compute += Price(priceBook, PriceBook.ChatMeterId(entry.Model, "input"), entry.InputTokens);
-                compute += Price(priceBook, PriceBook.ChatMeterId(entry.Model, "cached"), entry.CachedInputTokens);
-                compute += Price(priceBook, PriceBook.ChatMeterId(entry.Model, "reasoning"), entry.ReasoningTokens);
-                compute += Price(priceBook, PriceBook.ChatMeterId(entry.Model, "output"), entry.OutputTokens);
+                compute += Price(priceBook, $"chat:{entry.Model}:input", entry.InputTokens);
+                compute += Price(priceBook, $"chat:{entry.Model}:cached", entry.CachedInputTokens);
+                compute += Price(priceBook, $"chat:{entry.Model}:reasoning", entry.ReasoningTokens);
+                compute += Price(priceBook, $"chat:{entry.Model}:output", entry.OutputTokens);
             }
             else
             {
-                compute += Price(priceBook, PriceBook.EmbeddingMeterId(entry.Model), entry.InputTokens);
+                compute += Price(priceBook, $"embedding:{entry.Model}:input", entry.InputTokens);
             }
         }
         return (modelCalls, compute);

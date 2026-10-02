@@ -1,11 +1,11 @@
 using DigitalBrain.AI;
 using Microsoft.Extensions.Options;
 
-namespace DigitalBrain.Assistant;
+namespace DigitalBrain.AI;
 
 // This is the browser's allowlist. Never serialize a resolved model: it contains
 // operator-owned endpoints. Provider credentials remain entirely server-owned.
-public sealed class AgentModelCatalog(ModelProfiles profiles, IOptionsMonitor<AIOptions> options, IOptions<AssistantOptions> assistant)
+public sealed class AgentModelCatalog(ModelProfiles profiles, IOptionsMonitor<AIOptions> options, string? defaultModel)
 {
     public ModelCatalog Read()
     {
@@ -28,7 +28,7 @@ public sealed class AgentModelCatalog(ModelProfiles profiles, IOptionsMonitor<AI
         return selection;
     }
 
-    private AgentModelSelection? Default() => assistant.Value.Model is { Length: > 0 } model
+    private AgentModelSelection? Default() => defaultModel is { Length: > 0 } model
         ? new(Model: model) : null;
 
     private IEnumerable<Choice> Choices()

@@ -5,6 +5,7 @@
     <RootNamespace>DigitalBrain.Microsoft.CSharp</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Neuron interfaces and signals use the Kernel wire vocabulary. -->
     <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
 </Project>

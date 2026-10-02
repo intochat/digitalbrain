@@ -5,7 +5,9 @@
     <RootNamespace>DigitalBrain.Assistant</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Assistant conversations expose AI agent definitions, history, and model choices. -->
     <ProjectReference Include="../../../AI/DigitalBrain.Modules.AI.Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
+    <!-- Assistant surfaces expose Flutter UI child references and bindings. -->
     <ProjectReference Include="../../../Google/Flutter/DigitalBrain.Modules.Flutter.Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
   </ItemGroup>
 </Project>

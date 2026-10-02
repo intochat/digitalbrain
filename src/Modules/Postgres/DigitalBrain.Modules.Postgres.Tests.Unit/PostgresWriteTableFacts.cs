@@ -46,7 +46,7 @@ public sealed class PostgresWriteTableFacts
         await Assert.ThrowsAsync<PostgresQueryException>(() => table.Define(new([new("id", "text")], ["missing"])));
         Assert.Equal(0, provider.Definitions);
         await table.Define(Definition);
-        await Assert.ThrowsAsync<PostgresQueryException>(() => table.Upsert(Key(), [new("value", "42") ]));
+        await Assert.ThrowsAsync<PostgresQueryException>(() => table.Upsert(Key(), [new("value", "42")]));
         await Assert.ThrowsAsync<PostgresQueryException>(() => table.Upsert([new("id", "null")], Values("test")));
         await Assert.ThrowsAsync<PostgresQueryException>(() => table.Upsert(Key(), [new("value", "not json")]));
         await Assert.ThrowsAsync<PostgresQueryException>(() => table.Upsert(Key(), []));
@@ -216,8 +216,15 @@ public sealed class PostgresWriteTableFacts
     }
 
     private static void Stamp(string brain = "brain", string app = "app")
-        => CallerContextStamper.Stamp(new() { PrincipalId = "alice", AccountId = "alice", BrainId = brain,
-            Kind = CallerKind.App, StampedBy = TrustedEdge.AppProxy, AppId = app });
+        => CallerContextStamper.Stamp(new()
+        {
+            PrincipalId = "alice",
+            AccountId = "alice",
+            BrainId = brain,
+            Kind = CallerKind.App,
+            StampedBy = TrustedEdge.AppProxy,
+            AppId = app
+        });
 
     private static Task<UnitBrain> Start(IPostgresTableProvider? provider, string connection = "Host=localhost;Database=sample;Username=reader")
         => UnitTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>

@@ -35,6 +35,8 @@ internal static class AgentEndpoints
             { http.Response.StatusCode = 400; return; }
             var (scope, denied) = await ResolveBodyBrain(http, input.BrainId);
             if (denied is not null) { await denied.ExecuteAsync(http); return; }
+            // Membership was checked against the body brain; carry that same identity to downstream neurons.
+            CallerContextStamper.Stamp(CallerContextStamper.Require() with { BrainId = input.BrainId });
             var request = new AssistantRun(input.ThreadId, input.RunId, input.Messages[0].Content, scope!.Owner, input.ModelProfile);
             try
             {

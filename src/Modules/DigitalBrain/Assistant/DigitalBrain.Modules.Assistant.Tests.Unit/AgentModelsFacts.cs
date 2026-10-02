@@ -18,13 +18,13 @@ public sealed class AgentModelsFacts
         var snapshot = new AgentConversationState(2, null, [completed]);
         var input = new AssistantRun("thread", "run", "hello", "owner", "profile:removed");
 
-        var prepared = AssistantTurnExecution.PrepareTurn(snapshot, input, Catalog(brain.SiloServices));
+        var prepared = await AssistantTurnExecution.PrepareTurn(snapshot, input, id => Task.FromResult(Catalog(brain.SiloServices).Select(id)));
 
         Assert.Equal(completed, prepared.Replay);
         Assert.Null(prepared.Model);
-        Assert.Throws<ArgumentException>(() => AssistantTurnExecution.PrepareTurn(snapshot, input with { RunId = "fresh" }, Catalog(brain.SiloServices)));
-        Assert.Throws<InvalidOperationException>(() => AssistantTurnExecution.PrepareTurn(snapshot,
-            input with { Message = "different message" }, Catalog(brain.SiloServices)));
+        await Assert.ThrowsAsync<ArgumentException>(() => AssistantTurnExecution.PrepareTurn(snapshot, input with { RunId = "fresh" }, id => Task.FromResult(Catalog(brain.SiloServices).Select(id))));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => AssistantTurnExecution.PrepareTurn(snapshot,
+            input with { Message = "different message" }, id => Task.FromResult(Catalog(brain.SiloServices).Select(id))));
         Assert.Null(snapshot.ActiveRunId);
         Assert.Single(snapshot.Turns);
     }
@@ -129,5 +129,5 @@ public sealed class AgentModelsFacts
 
     private static AgentModelCatalog Catalog(IServiceProvider services) => new(
         services.GetRequiredService<ModelProfiles>(), services.GetRequiredService<IOptionsMonitor<AIOptions>>(),
-        services.GetRequiredService<IOptions<AssistantOptions>>());
+        services.GetRequiredService<IOptions<AssistantOptions>>().Value.Model);
 }

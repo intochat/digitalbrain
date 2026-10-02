@@ -1,11 +1,11 @@
+using DigitalBrain.Sdk.Vectors;
 using System.Globalization;
-using DigitalBrain.Qdrant;
 
 namespace DigitalBrain.Memory;
 
 // The optional Qdrant projection of canonical memory. The payload schema is unchanged from the
 // direct-client store, so existing collections keep working.
-internal sealed class VectorMemoryStore(IQdrant qdrant, string? collectionName) : IVectorMemoryStore
+internal sealed class VectorMemoryStore(IVectorStore qdrant, string? collectionName) : IVectorMemoryStore
 {
     internal const string DefaultCollectionName = "digitalbrain_vector_memory";
 

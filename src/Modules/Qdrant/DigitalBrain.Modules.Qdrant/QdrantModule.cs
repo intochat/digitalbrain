@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+using DigitalBrain.Sdk.Vectors;
 using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -13,19 +15,14 @@ public sealed class QdrantModule : IModule<QdrantModuleOptions>
     public static bool IsConnected(IConfiguration configuration)
         => !string.IsNullOrWhiteSpace(configuration.GetConnectionString(ConnectionName));
 
-    // Without a connection IQdrant is served from memory, so search still works; nothing survives a restart.
+    // Without a connection IVectorStore is served from memory, so search still works; nothing survives a restart.
     public void Configure(ISiloBuilder silo)
     {
         ArgumentNullException.ThrowIfNull(silo);
-        if (silo.Configuration.GetConnectionString(ConnectionName) is { Length: > 0 } connectionString)
-        {
-            silo.Services.TryAddSingleton(_ => QdrantConnection.CreateClient(connectionString));
-            silo.Services.TryAddSingleton<IQdrant, QdrantStore>();
-        }
-        else
-        {
-            silo.Services.TryAddSingleton<IQdrant, InMemoryQdrant>();
-        }
+        silo.Services.TryAddSingleton(_ => QdrantConnection.CreateClient(
+            silo.Configuration.GetConnectionString(ConnectionName)!));
+        silo.Services.TryAddSingleton<IVectorStore>(provider => IsConnected(silo.Configuration)
+            ? new QdrantStore(provider.GetRequiredService<global::Qdrant.Client.QdrantClient>()) : new InMemoryQdrant());
     }
 }
 

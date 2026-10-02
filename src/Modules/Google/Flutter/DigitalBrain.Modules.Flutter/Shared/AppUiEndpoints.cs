@@ -1,3 +1,4 @@
+using DigitalBrain.Sdk.Http;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Types;
 using DigitalBrain.Flutter;
@@ -30,7 +31,7 @@ internal static class AppUiEndpoints
     public static void Map(IEndpointRouteBuilder endpoints)
     {
         var apps = BrainRoutes.Group(endpoints, "/apps");
-        apps.MapGet("/node", (string kind, string name, IDigitalBrain brain, CancellationToken ct) => AppHttp.Respond(async () =>
+        apps.MapGet("/node", (string kind, string name, IDigitalBrain brain, CancellationToken ct) => ModuleHttp.Respond(async () =>
         {
             var scope = BrainScope.CurrentId();
             if (!OwnsUi(scope, name)) { throw new UnauthorizedAccessException("The UI belongs to another brain."); }
@@ -53,7 +54,7 @@ internal static class AppUiEndpoints
                 _ => throw new ArgumentException("Unknown app UI kind.")
             };
         }));
-        apps.MapPost("/event", (UiEvent input, IDigitalBrain brain, CancellationToken ct) => AppHttp.Respond(async () =>
+        apps.MapPost("/event", (UiEvent input, IDigitalBrain brain, CancellationToken ct) => ModuleHttp.Respond(async () =>
         {
             var scope = BrainScope.CurrentId();
             if (!OwnsUi(scope, input.Name)) { throw new UnauthorizedAccessException(); }

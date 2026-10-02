@@ -1,11 +1,11 @@
+using DigitalBrain.Sdk.Vectors;
 using System.Security.Cryptography;
 using System.Text.Json;
-using DigitalBrain.Qdrant;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Registry;
 
-internal sealed class NeuronTypeSearch(NeuronTypes types, IQdrant? vectors, IEmbeddingGenerator<string, Embedding<float>>? embeddings) : IDisposable
+internal sealed class NeuronTypeSearch(NeuronTypes types, IVectorStore? vectors, IEmbeddingGenerator<string, Embedding<float>>? embeddings) : IDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private IReadOnlyList<NeuronType>? _indexed;
@@ -16,7 +16,7 @@ internal sealed class NeuronTypeSearch(NeuronTypes types, IQdrant? vectors, IEmb
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
         ArgumentOutOfRangeException.ThrowIfLessThan(take, 1);
-        if (embeddings is null || vectors is null) { throw new InvalidOperationException("Neuron vector search requires an embedding model and QdrantModule."); }
+        if (embeddings is null || vectors is null) { return []; }
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {

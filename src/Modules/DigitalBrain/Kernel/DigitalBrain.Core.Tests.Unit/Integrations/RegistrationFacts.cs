@@ -54,6 +54,23 @@ public sealed class RegistrationFacts
     private const string OtherCanary = "canary-operator-55be02";
 
     [Fact]
+    public async Task RegistrationReactivationRetainsSecretsSettingsRevisionAndSdkWireIdentity()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartAsync(ct);
+        var registration = Registration(brain, "google");
+        var saved = await registration.Configure(Values(("ClientId", Canary + "-id"), ("ClientSecret", Canary), ("RedirectPath", "/callback")));
+        await brain.DeactivateAsync(registration, ct);
+        var restored = await registration.Read();
+        Assert.Equal(saved.Revision, restored.Revision);
+        Assert.Equal(RegistrationStatus.Ready, restored.Status);
+        Assert.Equal(saved.Settings, restored.Settings);
+        Assert.Empty(restored.MissingFields);
+        var released = await registration.Release(Caller(CallerKind.Platform, TrustedEdge.Platform));
+        Assert.Equal(Canary, released.Values["ClientSecret"]);
+    }
+
+    [Fact]
     public async Task ConfiguringAllFieldsMakesTheRegistrationReadyAndSignals()
     {
         var ct = TestContext.Current.CancellationToken;

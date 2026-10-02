@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 namespace DigitalBrain.Supabase;
 
 // Syntax restrictions improve errors; PostgreSQL READ ONLY and database role permissions enforce access.
-internal static partial class SupabaseQueryGuard
+public static partial class SupabaseQueryGuard
 {
     public const string Reason = "Use one read-only PostgreSQL SELECT (or WITH … SELECT). Writes, session control, comments and statement separators are not allowed.";
 
@@ -69,3 +69,4 @@ internal static partial class SupabaseQueryGuard
     [GeneratedRegex(@"\b(?:INSERT|UPDATE|DELETE|MERGE|ALTER|DROP|CREATE|TRUNCATE|GRANT|REVOKE|COPY|CALL|DO|EXECUTE|PREPARE|SET|RESET|INTO|LOCK|COMMIT|ROLLBACK|VACUUM|ANALYZE|LISTEN|NOTIFY)\b|\b(?:set_config|nextval|setval|pg_[a-z_]+|dblink[a-z_]*|lo_[a-z_]+)\s*\(", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex Forbidden();
 }
+

@@ -1,5 +1,5 @@
+using DigitalBrain.Sdk.Vectors;
 using DigitalBrain.Core;
-using DigitalBrain.Qdrant;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -15,7 +15,7 @@ public sealed class RegistryModule : IModule
         ArgumentNullException.ThrowIfNull(silo);
         silo.Services.TryAddSingleton<NeuronTypes>();
         silo.Services.TryAddSingleton(provider => new NeuronTypeSearch(provider.GetRequiredService<NeuronTypes>(),
-            provider.GetService<IQdrant>(), Embeddings(provider)));
+            provider.GetService<IVectorStore>(), Embeddings(provider)));
         silo.Services.AddHostedService<RegistryObserver>();
     }
 

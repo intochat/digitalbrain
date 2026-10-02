@@ -1,3 +1,4 @@
+using DigitalBrain.Sdk.Http;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core.Enforcement;
 using Microsoft.AspNetCore.Builder;
@@ -11,7 +12,7 @@ internal static class AppsEndpoints
     public static void Map(IEndpointRouteBuilder endpoints)
     {
         var apps = BrainRoutes.Group(endpoints, "/apps");
-        apps.MapGet("", (IDigitalBrain brain, CancellationToken ct) => AppHttp.Respond(async () =>
+        apps.MapGet("", (IDigitalBrain brain, CancellationToken ct) => ModuleHttp.Respond(async () =>
         {
             var scope = BrainScope.CurrentId();
             var installed = await brain.Get<IAppCatalog>(scope).List().WaitAsync(ct);
@@ -42,13 +43,13 @@ internal static class AppsEndpoints
                 .ToArray();
             return Results.Ok(manifests);
         }));
-        apps.MapGet("/{appId}/consent", (string appId, IDigitalBrain brain, CancellationToken ct) => AppHttp.Respond(async () =>
+        apps.MapGet("/{appId}/consent", (string appId, IDigitalBrain brain, CancellationToken ct) => ModuleHttp.Respond(async () =>
         {
             var scope = BrainScope.CurrentId();
             var sheet = await brain.Get<IAppConsent>(scope).Review(appId).WaitAsync(ct);
             return Results.Ok(sheet);
         }));
-        apps.MapPost("/{appId}/consent/approve", (string appId, IDigitalBrain brain, CancellationToken ct) => AppHttp.Respond(async () =>
+        apps.MapPost("/{appId}/consent/approve", (string appId, IDigitalBrain brain, CancellationToken ct) => ModuleHttp.Respond(async () =>
         {
             var scope = BrainScope.CurrentId();
             var sheet = await brain.Get<IAppConsent>(scope).Approve(appId).WaitAsync(ct);

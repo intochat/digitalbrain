@@ -60,8 +60,11 @@ internal sealed class ScriptedBrowserNeuron(
         if (state.Consumed >= state.Observations.Length)
         { throw new InvalidOperationException($"Scripted browser '{this.GetPrimaryKeyString()}' ran out of observations after {state.Consumed}."); }
         var observation = state.Observations[state.Consumed];
-        store.State = state with { Consumed = state.Consumed + 1,
-            RequestedUrls = url is null ? state.RequestedUrls : [.. state.RequestedUrls, url] };
+        store.State = state with
+        {
+            Consumed = state.Consumed + 1,
+            RequestedUrls = url is null ? state.RequestedUrls : [.. state.RequestedUrls, url]
+        };
         await store.WriteStateAsync(ct);
         return observation;
     }

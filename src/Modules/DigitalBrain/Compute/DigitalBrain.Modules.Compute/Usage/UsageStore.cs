@@ -4,9 +4,6 @@ using System.Text.Json;
 
 namespace DigitalBrain.Compute.Usage;
 
-public sealed record UsageRow(string Id, string Payload, DateTimeOffset OccurredAt, long? Revision = null);
-public sealed record UsagePage(IReadOnlyList<UsageRow> Items, string? NextCursor);
-
 public interface IUsageStore
 {
     ValueTask EnsureCreatedAsync(CancellationToken ct = default) => ValueTask.CompletedTask;

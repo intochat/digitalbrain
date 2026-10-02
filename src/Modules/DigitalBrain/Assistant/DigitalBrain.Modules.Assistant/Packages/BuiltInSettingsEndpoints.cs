@@ -27,7 +27,7 @@ internal static class BuiltInSettingsEndpoints
         {
             return Results.Json(new { error = "This host has no built-in settings package configured." }, statusCode: 503);
         }
-        var app = brain.Get<IApp>(InstalledPackages.AppKey(package));
+        var app = brain.Get<IApp>(BrainScope.CurrentId() + "/packages/" + package);
         var snapshot = await app.Read();
         if (snapshot.Status != AppStatus.Installed)
         {

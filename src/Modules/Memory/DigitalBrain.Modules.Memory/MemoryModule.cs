@@ -1,5 +1,5 @@
+using DigitalBrain.Sdk.Vectors;
 using DigitalBrain.Core;
-using DigitalBrain.Qdrant;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -9,15 +9,14 @@ namespace DigitalBrain.Memory;
 
 public sealed class MemoryModule : IModule<MemoryModuleOptions>
 {
-    // Canonical memory lives in neurons; the vector projection exists only over a real Qdrant connection.
+    // Canonical memory lives in neurons; a composed vector store supplies the optional projection.
     public void Configure(ISiloBuilder silo)
     {
         ArgumentNullException.ThrowIfNull(silo);
         var services = silo.Services;
         services.TryAddSingleton(TimeProvider.System);
-        if (!QdrantModule.IsConnected(silo.Configuration)) { return; }
         var collectionName = silo.Configuration.GetModuleOptions<MemoryModuleOptions>(nameof(MemoryModule)).CollectionName;
-        services.TryAddSingleton(provider => new VectorMemoryStore(provider.GetRequiredService<IQdrant>(), collectionName));
-        services.TryAddSingleton<IVectorMemoryStore>(provider => provider.GetRequiredService<VectorMemoryStore>());
+        services.TryAddSingleton<IVectorMemoryStore>(provider => provider.GetService<IVectorStore>() is { } vectors
+            ? new VectorMemoryStore(vectors, collectionName) : null!);
     }
 }

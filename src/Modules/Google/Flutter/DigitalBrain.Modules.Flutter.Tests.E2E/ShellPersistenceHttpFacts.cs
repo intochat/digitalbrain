@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using Xunit;
 namespace DigitalBrain.Modules.Flutter.Tests.E2E;
+
 [Collection(FlutterBackendCollection.Name)]
 public sealed class ShellPersistenceHttpFacts(FlutterBackendFixture host)
 {

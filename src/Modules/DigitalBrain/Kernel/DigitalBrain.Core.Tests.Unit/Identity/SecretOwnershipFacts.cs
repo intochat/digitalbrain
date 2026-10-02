@@ -27,8 +27,11 @@ public sealed class SecretOwnershipFacts
             .OfType<RouteEndpoint>().Single(route => route.RoutePattern.RawText == "/secrets/{owner}");
         CallerContextStamper.Stamp(new CallerContext
         {
-            PrincipalId = "owner", AccountId = "account", BrainId = "brain",
-            Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp,
+            PrincipalId = "owner",
+            AccountId = "account",
+            BrainId = "brain",
+            Kind = CallerKind.User,
+            StampedBy = TrustedEdge.AuthenticatedHttp,
         });
         var context = new DefaultHttpContext { RequestServices = app.Services, RequestAborted = ct };
         context.Request.Method = "POST";

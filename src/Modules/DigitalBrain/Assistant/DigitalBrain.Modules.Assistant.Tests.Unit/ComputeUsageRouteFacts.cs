@@ -34,8 +34,11 @@ public sealed class ComputeUsageRouteFacts
             .OfType<RouteEndpoint>().Single(route => route.RoutePattern.RawText == "/brains/{brainId}/compute/usage");
         CallerContextStamper.Stamp(new CallerContext
         {
-            PrincipalId = "owner", AccountId = "account", BrainId = "own",
-            Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp,
+            PrincipalId = "owner",
+            AccountId = "account",
+            BrainId = "own",
+            Kind = CallerKind.User,
+            StampedBy = TrustedEdge.AuthenticatedHttp,
         });
         foreach (var query in new[] { "?limit=0", "?cursor=" + Uri.EscapeDataString(cursor) })
         {

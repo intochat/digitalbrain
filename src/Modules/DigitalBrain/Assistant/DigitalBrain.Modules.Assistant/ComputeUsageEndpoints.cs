@@ -17,12 +17,12 @@ public static class ComputeUsageEndpoints
     internal static void Map(IEndpointRouteBuilder endpoints)
     {
         var compute = BrainRoutes.Group(endpoints, "/compute");
-        compute.MapGet("/usage", async (int? limit, string? cursor, IDigitalBrain brain, IUsageStore store, CancellationToken ct) =>
+        compute.MapGet("/usage", async (int? limit, string? cursor, IDigitalBrain brain, CancellationToken ct) =>
         {
             var accountId = CallerContextStamper.Require().AccountId;
             var scope = BrainScope.CurrentId();
             UsagePage page;
-            try { page = await store.ReadAsync(accountId, scope, limit ?? 20, cursor, ct); }
+            try { page = await brain.Get<IComputeUsage>(accountId).Read(scope, limit ?? 20, cursor, ct); }
             catch (ArgumentException) { return Results.BadRequest(new { error = "Invalid usage limit or cursor." }); }
             var ledger = brain.Get<IAllowanceLedger>(accountId);
             var items = new List<ComputeUsageItem>();

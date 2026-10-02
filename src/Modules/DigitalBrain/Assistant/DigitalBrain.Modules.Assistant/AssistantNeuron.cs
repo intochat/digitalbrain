@@ -1,3 +1,4 @@
+using DigitalBrain.AI.Media;
 using Microsoft.Extensions.Options;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.AI;
@@ -37,12 +38,12 @@ internal sealed partial class AssistantNeuron(
     }
 
     public Task<AssistantTranscriptionResult> Transcribe(string? base64, CancellationToken ct = default)
-        => new AssistantTranscription(services.GetService(typeof(DigitalBrain.AI.IAudioTranscriptionService)) as DigitalBrain.AI.IAudioTranscriptionService).Transcribe(base64, ct);
+        => new AssistantTranscription(GrainFactory.GetGrain<ISpeechRecognizer>(Key + "/voice")).Transcribe(base64, ct);
 
     public async Task<AgentConversationState> ReadConversation(string threadId, CancellationToken ct = default)
         => await (await Conversation(threadId)).ReadConversation(ct);
 
-    public Task<ModelCatalog> Models() => Task.FromResult(new AssistantTurnExecution(services, GrainFactory).Models.Read());
+    public Task<ModelCatalog> Models() => new AssistantTurnExecution(services, GrainFactory).Models();
 
     public Task<IAgent> Conversation(string threadId)
     {
@@ -60,7 +61,7 @@ internal sealed partial class AssistantNeuron(
         var registered = services.GetServices<IAgentToolFactory>()
             .SelectMany(factory => factory.Create(() => throw new InvalidOperationException("No tool call is active.")))
             .Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
-        var authoringTools = registered.Where(AgentToolPolicy.IsCSharpTool).ToArray();
+        var authoringTools = registered.Where(AssistantToolPolicy.IsCSharpTool).ToArray();
         var definition = Snapshot.Definition ?? AssistantDefinition.For(authoringTools, appTools, message, services.GetRequiredService<IOptions<AssistantOptions>>().Value);
         if (Snapshot.Definition is null)
         {

@@ -1,5 +1,6 @@
 using DigitalBrain.Assistant;
 using DigitalBrain.AI;
+using DigitalBrain.AI.Media;
 using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -13,7 +14,8 @@ public sealed class VoiceFacts
     public async Task AudioIsTranscribedAndReturnedAsDraftText()
     {
         var service = new Transcription();
-        var result = await new AssistantTranscription(service).Transcribe(Wav(), TestContext.Current.CancellationToken);
+        await using var brain = await Start(service);
+        var result = await new AssistantTranscription(brain.Get<ISpeechRecognizer>("voice")).Transcribe(Wav(), TestContext.Current.CancellationToken);
         Assert.Equal(200, result.Status);
         Assert.True(service.Called);
         Assert.Equal("hello", result.Text);
@@ -27,7 +29,8 @@ public sealed class VoiceFacts
     public async Task InvalidAudioIsRejectedBeforeCallingProvider(string? audio)
     {
         var service = new Transcription();
-        var result = await new AssistantTranscription(service).Transcribe(audio, TestContext.Current.CancellationToken);
+        await using var brain = await Start(service);
+        var result = await new AssistantTranscription(brain.Get<ISpeechRecognizer>("voice")).Transcribe(audio, TestContext.Current.CancellationToken);
         Assert.Equal(400, result.Status);
         Assert.False(service.Called);
     }
@@ -42,14 +45,21 @@ public sealed class VoiceFacts
     [Fact]
     public async Task ProviderFailurePreservesPublicErrorAndCancellationPropagates()
     {
-        var failed = await new AssistantTranscription(new BrokenTranscription()).Transcribe(Wav(), TestContext.Current.CancellationToken);
+        await using var brain = await Start(new BrokenTranscription());
+        var transcription = new AssistantTranscription(brain.Get<ISpeechRecognizer>("voice"));
+        var failed = await transcription.Transcribe(Wav(), TestContext.Current.CancellationToken);
         Assert.Equal(502, failed.Status);
         Assert.Equal("Voice transcription failed. Please try again.", failed.Error);
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsync();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            new AssistantTranscription(new BrokenTranscription()).Transcribe(Wav(), cancellation.Token));
+            transcription.Transcribe(Wav(), cancellation.Token));
     }
+
+    private static Task<UnitBrain> Start(IAudioTranscriptionService service)
+        => UnitTest.Create().WithModule<AIModule>()
+            .ConfigureSilo(silo => silo.Services.AddSingleton(service))
+            .StartAsync(TestContext.Current.CancellationToken);
 
     private sealed class BrokenTranscription : IAudioTranscriptionService
     {
