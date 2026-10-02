@@ -26,6 +26,7 @@ public sealed class AppsRouteFacts
     [InlineData("happy", 200)]
     [InlineData("failed", 422)]
     [InlineData("invalid-json", 422)]
+    [InlineData("invoke-text", 200)]
     public async Task OpenUsesTheInstalledRevisionAndReturnsItsInvocationResult(string scenario, int expected)
     {
         var ct = TestContext.Current.CancellationToken;
@@ -39,13 +40,14 @@ public sealed class AppsRouteFacts
             StampedBy = TrustedEdge.AuthenticatedHttp,
         });
         var id = PackageId.Create("alice", "customer-researcher");
+        var operation = scenario == "invoke-text" ? "research" : "open";
         var package = brain.Get<IPackage>(id.ToString());
         var content = new PackageContent(new("Customer Researcher", "Research companies", [new("ask", "Ask")], []), "// installed behavior");
         var published = await package.Commit(new(Guid.NewGuid(), null, content, "Initial"));
         await package.Publish(new(Guid.NewGuid(), published.Id));
         // The installed revision, rather than the marketplace's version, declares open.
         var revision = scenario == "no-open" ? published : await package.Commit(new(Guid.NewGuid(), published.Id,
-            content with { Manifest = content.Manifest with { Operations = [new("open", "Open")] } }, "Add open"));
+            content with { Manifest = content.Manifest with { Operations = [new(operation, "Run")] } }, "Add operation"));
         var installed = brain.Get<IApp>(BrainScope.Create("alice", "alice").Id + "/packages/" + id);
         if (scenario != "missing") { await installed.Install(new(Guid.NewGuid(), new(id, revision.Id), new Dictionary<string, string>())); }
 
@@ -56,22 +58,30 @@ public sealed class AppsRouteFacts
         await using var app = builder.Build();
         new AppsModule().Configure(app);
         var endpoint = ((IEndpointRouteBuilder)app).DataSources.SelectMany(source => source.Endpoints).OfType<RouteEndpoint>()
-            .Single(endpoint => endpoint.RoutePattern.RawText == "/brains/{brainId}/apps/{appId}/open");
+            .Single(endpoint => endpoint.RoutePattern.RawText == (scenario == "invoke-text"
+                ? "/brains/{brainId}/apps/{appId}/invoke/{operation}" : "/brains/{brainId}/apps/{appId}/open"));
         var http = new DefaultHttpContext { RequestServices = app.Services, RequestAborted = ct };
         http.Request.Method = "POST";
         http.Request.Headers.Authorization = "Basic test";
         http.Request.RouteValues["brainId"] = scenario == "foreign" ? "bob" : "alice";
         http.Request.RouteValues["appId"] = "customer-researcher";
+        http.Request.RouteValues["operation"] = operation;
         http.Request.Body = new MemoryStream(System.Text.Encoding.UTF8.GetBytes("{\"query\":\"test\"}"));
         http.Response.Body = new MemoryStream();
         http.SetEndpoint(endpoint);
 
-        var answer = scenario is "happy" or "failed" or "invalid-json" ? Answer() : Task.CompletedTask;
+        var answer = scenario is "happy" or "failed" or "invalid-json" or "invoke-text" ? Answer() : Task.CompletedTask;
         await endpoint.RequestDelegate!(http);
         await answer;
         Assert.Equal(expected, http.Response.StatusCode);
         if (scenario == "foreign") { return; }
         http.Response.Body.Position = 0;
+        if (scenario == "invoke-text")
+        {
+            Assert.StartsWith("text/plain", http.Response.ContentType);
+            Assert.Equal("Research result", await new StreamReader(http.Response.Body).ReadToEndAsync(ct));
+            return;
+        }
         using var response = await JsonDocument.ParseAsync(http.Response.Body, cancellationToken: ct);
         if (scenario == "happy")
         {
@@ -93,10 +103,10 @@ public sealed class AppsRouteFacts
                 invocation = (await installed.Pending().WaitAsync(deadline.Token)).SingleOrDefault();
                 if (invocation is null) { await Task.Delay(10, deadline.Token); }
             }
-            Assert.Equal("open", invocation.Operation);
+            Assert.Equal(operation, invocation.Operation);
             Assert.Equal("{\"query\":\"test\"}", invocation.Input);
             await installed.Respond(new(invocation.Id,
-                scenario == "invalid-json" ? "invalid" : "{\"id\":\"research-window\",\"title\":\"Customer Researcher\",\"surface\":{\"kind\":\"surface\",\"name\":\"research/surface\"}}",
+                scenario == "invoke-text" ? "Research result" : scenario == "invalid-json" ? "invalid" : "{\"id\":\"research-window\",\"title\":\"Customer Researcher\",\"surface\":{\"kind\":\"surface\",\"name\":\"research/surface\"}}",
                 scenario == "failed" ? "Cannot open" : null));
         }
     }

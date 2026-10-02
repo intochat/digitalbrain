@@ -15,12 +15,12 @@ internal static class AppsEndpoints
         var apps = BrainRoutes.Group(endpoints, "/apps").AddEndpointFilter(ModuleRouteGuard.Guard);
         apps.MapGet("", (IDigitalBrain brain, CancellationToken ct) => InstalledApps.List(brain, BrainScope.CurrentId(), ct));
         apps.MapPost("/{appId}/open", (string appId, HttpRequest request, IDigitalBrain brain, CancellationToken ct)
-            => ModuleHttp.Respond(() => Invoke(appId, "open", request, brain, ct)));
+            => ModuleHttp.Respond(() => Invoke(appId, "open", request, brain, ct, requireJson: true)));
         apps.MapPost("/{appId}/invoke/{operation}", (string appId, string operation, HttpRequest request, IDigitalBrain brain, CancellationToken ct)
-            => ModuleHttp.Respond(() => Invoke(appId, operation, request, brain, ct)));
+            => ModuleHttp.Respond(() => Invoke(appId, operation, request, brain, ct, requireJson: false)));
     }
 
-    private static async Task<IResult> Invoke(string appId, string operation, HttpRequest request, IDigitalBrain brain, CancellationToken ct)
+    private static async Task<IResult> Invoke(string appId, string operation, HttpRequest request, IDigitalBrain brain, CancellationToken ct, bool requireJson)
     {
         // ASP.NET keeps an encoded slash inside a single route segment.
         appId = Uri.UnescapeDataString(appId);
@@ -59,6 +59,10 @@ internal static class AppsEndpoints
             return Results.Ok(output.RootElement.Clone());
         }
         catch (JsonException)
-        { return Results.UnprocessableEntity(new { error = "The app returned invalid JSON.", invocationId = invocation.Id }); }
+        {
+            return requireJson
+                ? Results.UnprocessableEntity(new { error = "The app returned invalid JSON.", invocationId = invocation.Id })
+                : Results.Text(invocation.Output);
+        }
     }
 }
