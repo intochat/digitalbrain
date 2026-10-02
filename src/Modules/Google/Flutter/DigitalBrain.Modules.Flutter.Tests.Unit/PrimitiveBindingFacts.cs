@@ -72,7 +72,7 @@ public sealed class PrimitiveBindingFacts
         Assert.Contains(events, signal => signal is VoiceCaptured { Name: "voice", MimeType: "audio/wav" });
         await brain.DeactivateAsync(select, ct);
         Assert.Equal("yes", (await select.Read()).Selected);
-        Assert.Equal(3, (await select.Read()).Options.Count);
+        Assert.Equal(3, (await select.Read()).Options.Length);
     }
 
     [Fact]

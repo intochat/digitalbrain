@@ -101,9 +101,9 @@ internal sealed class SupabaseTableNeuron(
         var changed = saved with
         {
             Revision = saved.Revision + 1,
-            Filters = normalized.Filters,
+            Filters = normalized.Filters.ToArray(),
             Sort = normalized.Sort,
-            VisibleColumns = normalized.VisibleColumns,
+            VisibleColumns = normalized.VisibleColumns.ToArray(),
         };
         state.State = current with { View = changed };
         await state.WriteStateAsync();
@@ -138,7 +138,7 @@ internal sealed class SupabaseTableNeuron(
 
         return view with
         {
-            Rows = page.Rows,
+            Rows = page.Rows.ToArray(),
             TotalRows = Clamp(page.Total),
             FilteredRows = Clamp(page.Filtered),
             Offset = query.Offset,

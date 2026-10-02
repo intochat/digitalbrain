@@ -20,7 +20,7 @@ public sealed class SelectState
     [Id(0)] public string Name { get; set; } = "";
     [Id(1)] public long Revision { get; set; }
     [Id(2)] public string Label { get; set; } = "";
-    [Id(3)] public IReadOnlyList<SelectOption> Options { get; set; } = [];
+    [Id(3)] public SelectOption[] Options { get; set; } = [];
     [Id(4)] public string? Selected { get; set; }
 }
 

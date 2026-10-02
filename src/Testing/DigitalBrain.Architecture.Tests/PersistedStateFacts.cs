@@ -42,13 +42,7 @@ public sealed class PersistedStateFacts
         Assert.Contains(States, type => type.FullName == "DigitalBrain.Core.BrainState");
         Assert.Contains(States, type => type.FullName == "DigitalBrain.Platform.Secrets.SecretsState");
         var violations = States.SelectMany(type => PersistedStateRules.ShapeViolations(type, RetiredIds.GetValueOrDefault(type.FullName!, []))).ToArray();
-        var legacy = File.ReadAllLines(Path.Combine(AppContext.BaseDirectory, "LegacyCollectionMembers.txt"))
-            .Where(line => line.Length > 0 && !line.StartsWith('#')).ToArray();
-        var collectionViolations = violations.Where(message => message.Contains(": persisted collections", StringComparison.Ordinal)).ToArray();
-        var unexpected = violations.Except(legacy.Select(member => member + ": persisted collections must use concrete arrays, not collection interfaces")).ToArray();
-        Assert.True(unexpected.Length == 0, string.Join(Environment.NewLine, unexpected));
-        var stale = legacy.Where(member => !collectionViolations.Contains(member + ": persisted collections must use concrete arrays, not collection interfaces")).ToArray();
-        Assert.True(stale.Length == 0, "Remove resolved collection exceptions: " + string.Join(", ", stale));
+        Assert.True(violations.Length == 0, string.Join(Environment.NewLine, violations));
     }
 
     [Fact]

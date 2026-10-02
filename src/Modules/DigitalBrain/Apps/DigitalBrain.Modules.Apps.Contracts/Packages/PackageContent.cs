@@ -7,7 +7,7 @@ namespace DigitalBrain.Apps;
 public sealed record PackageContent(
     [property: Id(0)] PackageManifest Manifest,
     [property: Id(1)] string Source,
-    [property: Id(2)] IReadOnlyDictionary<string, string>? Files = null)
+    [property: Id(2)] Dictionary<string, string>? Files = null)
 {
     public const string SpecPath = "app.spec.md";
     public const string TestsPath = "tests.cs";

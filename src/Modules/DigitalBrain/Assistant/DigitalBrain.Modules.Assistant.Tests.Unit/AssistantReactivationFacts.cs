@@ -58,16 +58,23 @@ public sealed class AssistantReactivationFacts
         await ui.AssertExplicitControls();
         // The saved window talks only to its primitives; no app-start endpoint or Watch is needed.
         Assert.Equal("saved draft", (await input.Read()).Value);
-        await input.Input("after-reactivation");
+        await input.Input("tools");
         await send.Click();
         await ui.Until(state => state.Messages.Any(message => message.Text == "Hello world") && state.TurnId is null, ct);
-        Assert.Equal(1, runner.Count("after-reactivation"));
+        Assert.Equal(1, runner.Count("tools"));
         Assert.Single((await app.ReadConversation(thread, ct)).Turns);
-        Assert.Equal(2, (await ui.Read()).Messages.Count);
+        Assert.Equal(2, (await ui.Read()).Messages.Length);
+        var completed = await ui.Read();
+        Assert.NotEmpty(completed.Receipts);
+        Assert.NotEmpty(completed.Results);
         await brain.DeactivateAsync(app, ct);
         await brain.DeactivateAsync(input, ct);
         await brain.DeactivateAsync(inputBinding, ct);
-        Assert.Equal(2, (await ui.Read()).Messages.Count);
+        var restored = await ui.Read();
+        Assert.Equal(completed.Messages, restored.Messages);
+        Assert.Equal(completed.Receipts, restored.Receipts);
+        Assert.Equal(completed.Results, restored.Results);
+        Assert.Equal(2, (await ui.Read()).Messages.Length);
         await brain.DeactivateAsync(app, ct);
         await ui.Input("new draft after reactivation");
         Assert.Equal(thread, (await ui.Read()).Id);

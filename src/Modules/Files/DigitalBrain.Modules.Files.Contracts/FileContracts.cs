@@ -41,7 +41,7 @@ public sealed record ImageDocumentState
     [Id(5)] public UiChildRef? Surface { get; init; }
     [Id(6)] public Dictionary<string, string> Receipts { get; init; } = [];
     [Id(7)] public Dictionary<string, SaveTicket> Saves { get; init; } = [];
-    [Id(8)] public IReadOnlyList<ImageVersion> Versions { get; init; } = [];
+    [Id(8)] public ImageVersion[] Versions { get; init; } = [];
 }
 [GenerateSerializer, Alias("intochat.image-version")]
 public sealed record ImageVersion([property: Id(0)] string VersionId, [property: Id(1)] string AssetId, [property: Id(2)] long Revision, [property: Id(3)] string Kind);

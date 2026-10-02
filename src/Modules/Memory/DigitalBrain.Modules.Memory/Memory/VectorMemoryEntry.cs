@@ -6,6 +6,6 @@ internal sealed record VectorMemoryEntry(
     [property: Id(1)] string Namespace,
     [property: Id(2)] string Key,
     [property: Id(3)] string Text,
-    [property: Id(4)] IReadOnlyList<MemoryTag> Tags,
+    [property: Id(4)] MemoryTag[] Tags,
     [property: Id(5)] ProtectedPayloadReference? Payload,
     [property: Id(6)] float[] Embedding);

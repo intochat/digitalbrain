@@ -6,7 +6,7 @@
                          Exclude="../../Modules/**/*.Tests*/**;../../Modules/**/*.Testing/**;../../Modules/**/*.Aspire.Hosting/**;../../Modules/**/*.Deployment/**;../../Modules/**/Deployment/**;../../Modules/**/*.Sandbox/**" />
     <ProjectReference Include="@(ArchitectureProject)" />
     <None Include="PersistedStateIds.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="LegacyCollectionMembers.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="CollectionCompatibilitySamples.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="WriteArchitectureAssemblies" AfterTargets="Build">
     <WriteLinesToFile File="$(OutDir)ArchitectureAssemblies.txt"

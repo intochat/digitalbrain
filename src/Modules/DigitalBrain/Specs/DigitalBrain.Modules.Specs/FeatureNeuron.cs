@@ -47,7 +47,7 @@ internal sealed class FeatureNeuron(
             results.Add(result);
             await PublishAsync(new ScenarioFinished(FeatureId, result));
         }
-        var run = new FeatureRun(feature.Revision, subject, results, startedAt, clock.GetUtcNow());
+        var run = new FeatureRun(feature.Revision, subject, results.ToArray(), startedAt, clock.GetUtcNow());
         await Save(feature with { LastRun = run }, new FeatureChanged(FeatureId, feature.Revision, feature.FullyBound),
             new FeatureVerified(FeatureId, feature.Revision, run.Green));
         return run;
@@ -68,7 +68,7 @@ internal sealed class FeatureNeuron(
                 Text = text,
                 Name = parsed.Name,
                 Background = [.. parsed.Background.Select(binder.Bind)],
-                Scenarios = [.. parsed.Scenarios.Select(scenario => new ScenarioOutline(scenario.Name, scenario.Line, [.. scenario.Steps.Select(binder.Bind)], scenario.Tags))],
+                Scenarios = [.. parsed.Scenarios.Select(scenario => new ScenarioOutline(scenario.Name, scenario.Line, [.. scenario.Steps.Select(binder.Bind)], scenario.Tags.ToArray()))],
             };
         }
         catch (SpecSyntaxException error)
@@ -104,6 +104,6 @@ internal sealed class FeatureNeuron(
                 results.Add(new(step.Line, Verdict.Failed, error is StepFailedException ? error.Message : $"{error.GetType().Name}: {error.Message}", watch.Elapsed));
             }
         }
-        return new(scenario.Name, scenario.Line, verdict, results);
+        return new(scenario.Name, scenario.Line, verdict, results.ToArray());
     }
 }

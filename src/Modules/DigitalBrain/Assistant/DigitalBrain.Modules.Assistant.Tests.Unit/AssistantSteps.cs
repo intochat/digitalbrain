@@ -116,7 +116,7 @@ internal sealed class AssistantSteps : StepLibrary
         Step("the table has {int} rows", "The table in the workspace window serves this many rows.", async (context, args) =>
         {
             var window = await FindTableWindow(context);
-            var rows = (await context.Grains.GetGrain<ISupabaseTable>(window.Reference.NeuronId).Read(new(0, 50)))?.Rows.Count ?? 0;
+            var rows = (await context.Grains.GetGrain<ISupabaseTable>(window.Reference.NeuronId).Read(new(0, 50)))?.Rows.Length ?? 0;
             if (rows != args.Int(0)) { throw new StepFailedException($"The table has {rows} rows."); }
         });
     }

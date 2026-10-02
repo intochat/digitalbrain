@@ -36,13 +36,19 @@ updating the baseline. Removing a field requires preserving its ID as retired, u
 `RetiredIds`, and a deliberate compatibility review. Changing the baseline can authorize a
 breaking change, so it must not be blindly regenerated to make a failure disappear.
 
-`LegacyCollectionMembers.txt` records the 48 pre-existing interface collection members found
-in persisted state when this gate was introduced. They span shared wire/persistence contracts;
-changing them all requires separate compatibility and reactivation work. The collection rule
-rejects every unlisted violation, and fails on stale exceptions when an existing member is
-fixed. Remove its exception with its fix. These are exact member exceptions, not excluded
-assemblies or namespaces. Ordinary wire DTOs outside the persisted graph are not subject to
-the concrete collection requirement.
+Persisted collection declarations are checked without exceptions. Shared persisted contracts use
+concrete arrays or dictionaries; ordinary wire DTOs outside the persisted graph are not subject
+to this requirement.
+
+`CollectionCompatibilitySamples.json` contains 96 immutable Orleans binary fixtures captured
+from commit `5d4041158` before migrating the 48 interface collection members. For each member,
+the old declaration was populated with a one-element array and a one-element list (dictionaries
+use a concrete dictionary in both cases); nested serialized members were populated recursively.
+Each entry records the original member JSON and the base64 serialized parent object. The test
+reads these historical bytes using today's serializers, checks the member contents, then saves
+and reads the object again. Do not regenerate these fixtures from the current declarations:
+that would replace the compatibility check with a new-format roundtrip. Module tests additionally
+exercise populated state through real grain deactivation/reactivation and JSON roundtrips.
 
 The existing packaging, Roslyn composition, catalog visibility, secrets behavior, and storage
 reactivation tests remain in their original suites.

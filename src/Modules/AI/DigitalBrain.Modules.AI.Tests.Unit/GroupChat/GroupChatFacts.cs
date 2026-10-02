@@ -38,6 +38,12 @@ public sealed class GroupChatFacts
         var conclusion = await concluded.NextAsync(ct: ct);
         Assert.Equal(2, conclusion.Rounds);
         Assert.Equal(state.Answer, conclusion.Answer);
+        await brain.DeactivateAsync(chat, ct);
+        var restored = await chat.Read();
+        Assert.Equal(state.Turns, restored.Turns);
+        Assert.Equal(LunaAndGemma.Participants, restored.Setup!.Participants);
+        Assert.Equal(state.Answer, restored.Answer);
+        Assert.Equal(GroupChatStatus.Concluded, restored.Status);
     }
 
     [Fact]
@@ -52,7 +58,7 @@ public sealed class GroupChatFacts
         await chat.Configure(LunaAndGemma);
         var state = await chat.Ask("Pick one");
 
-        Assert.Equal(6, state.Turns.Count);
+        Assert.Equal(6, state.Turns.Length);
         Assert.False(state.Agreed);
         Assert.Equal("Final: A.", state.Answer);
     }

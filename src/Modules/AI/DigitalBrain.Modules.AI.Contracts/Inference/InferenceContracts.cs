@@ -33,7 +33,7 @@ public sealed record InferenceOptions(
     [property: Id(1)] float? TopP = null,
     [property: Id(2)] int? MaxOutputTokens = null,
     [property: Id(3)] string? Reasoning = null,
-    [property: Id(4)] IReadOnlyDictionary<string, string>? ProviderOptions = null,
+    [property: Id(4)] Dictionary<string, string>? ProviderOptions = null,
     [property: Id(5)] string? ResponseSchemaJson = null,
     [property: Id(6)] ProviderInferenceOptions? Provider = null);
 [GenerateSerializer, Alias("ai.inference-request")]

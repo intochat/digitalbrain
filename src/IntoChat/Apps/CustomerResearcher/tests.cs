@@ -33,7 +33,7 @@ await Scenario("Opening the researcher composes its surface", async (app, scope)
     if (window.GetProperty("title").GetString() != "Customer Researcher")
     { throw new InvalidOperationException($"The window title was \"{window.GetProperty("title").GetString()}\"."); }
     var surface = await brain.Get<ISurface>(window.GetProperty("surface").GetString()!).Read();
-    if (surface.Definition.Title != "Customer Researcher" || surface.Definition.Children.Count == 0)
+    if (surface.Definition.Title != "Customer Researcher" || surface.Definition.Children.Length == 0)
     { throw new InvalidOperationException("The researcher surface is not composed."); }
 });
 

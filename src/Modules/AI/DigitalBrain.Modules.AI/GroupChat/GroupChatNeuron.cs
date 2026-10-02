@@ -18,14 +18,14 @@ internal sealed class GroupChatNeuron(
     public async Task<GroupChatState> Configure(GroupChatSetup setup)
     {
         ArgumentNullException.ThrowIfNull(setup);
-        if (setup.Participants.Count < 2) { throw new ArgumentException("A group chat needs at least two participants.", nameof(setup)); }
+        if (setup.Participants.Length < 2) { throw new ArgumentException("A group chat needs at least two participants.", nameof(setup)); }
         if (setup.MaxRounds < 1) { throw new ArgumentException("A group chat needs at least one round.", nameof(setup)); }
         foreach (var participant in setup.Participants)
         {
             if (!ModelAddress.IsKnown(participant.Model))
             { throw new ArgumentException($"Unknown model '{participant.Model}' for participant '{participant.Name}'.", nameof(setup)); }
         }
-        if (setup.Participants.Select(participant => participant.Name).Distinct(StringComparer.Ordinal).Count() != setup.Participants.Count)
+        if (setup.Participants.Select(participant => participant.Name).Distinct(StringComparer.Ordinal).Count() != setup.Participants.Length)
         { throw new ArgumentException("Participant names must be unique.", nameof(setup)); }
         var next = new GroupChatState { Revision = Snapshot.Revision + 1, Setup = setup };
         await Save(next, Changed(next));

@@ -166,7 +166,7 @@ internal sealed class AppService(
     private async Task ValidateAccounts(PackageRevisionRef revision, IReadOnlyDictionary<string, string> selected)
     {
         var declared = (await Package(revision.Package).ReadRevision(revision.Revision)).Content.Manifest.Accounts ?? [];
-        if (declared.Count == 0 && selected.Count == 0) { return; }
+        if (declared.Length == 0 && selected.Count == 0) { return; }
         var scope = CurrentScope();
         var available = ScopedAccounts.Visible(scope, await brain.Get<IIntegrationAccounts>(scope.Id).List());
         foreach (var slot in declared)

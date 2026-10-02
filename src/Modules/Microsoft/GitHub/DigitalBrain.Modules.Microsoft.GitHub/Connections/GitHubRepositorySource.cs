@@ -90,7 +90,7 @@ internal sealed class GitHubRepositorySource : IGitHubRepositorySource, IDisposa
         complete &= confirmation.Complete && ci.SourceRevision == confirmation.SourceRevision;
         var revision = Hash(JsonSerializer.Serialize(new { binding.RepositoryId, number, head, @base, merge, state = pull.GetProperty("state").GetString(), draft = pull.GetProperty("draft").GetBoolean(), }));
         var ciRevision = Hash(JsonSerializer.Serialize(new { revision, ciSha, complete, checks = ci.Checks }));
-        return new PullRequestSnapshot(number, BoundedString(pull, "title", 1024), BoundedString(pull, "html_url", 2048), pull.GetProperty("state").GetString() == "open", pull.GetProperty("draft").GetBoolean(), head, @base, merge, ciSha, ci.Checks, complete, _time.GetUtcNow(), pull.GetProperty("created_at").GetDateTimeOffset(), revision, ciRevision, binding.RepositoryId, OptionalString(pull.GetProperty("base"), "ref"));
+        return new PullRequestSnapshot(number, BoundedString(pull, "title", 1024), BoundedString(pull, "html_url", 2048), pull.GetProperty("state").GetString() == "open", pull.GetProperty("draft").GetBoolean(), head, @base, merge, ciSha, ci.Checks.ToArray(), complete, _time.GetUtcNow(), pull.GetProperty("created_at").GetDateTimeOffset(), revision, ciRevision, binding.RepositoryId, OptionalString(pull.GetProperty("base"), "ref"));
     }
 
     public async Task<IReadOnlyList<PullRequestSnapshot>> ListOpenPullRequestsAsync(GitHubRepositoryBinding binding, CancellationToken cancellationToken)

@@ -63,7 +63,7 @@ internal sealed class RegistryNeuron(NeuronTypes types, NeuronTypeSearch search,
                 || (!active && activity.ActivationId != existing.ActivationId)
                 || (activity.ActivationId == existing.ActivationId && activity.ObservedAt == existing.LastSeenAt && existing.LastKnownActive == active)))
             { continue; }
-            instances[activity.NeuronId] = new NeuronInstance(activity.NeuronId, activity.Key, activity.TypeIds, activity.ActivationId,
+            instances[activity.NeuronId] = new NeuronInstance(activity.NeuronId, activity.Key, activity.TypeIds.ToArray(), activity.ActivationId,
                 existing?.FirstSeenAt ?? activity.ObservedAt, activity.ObservedAt, active);
             changed = true;
         }

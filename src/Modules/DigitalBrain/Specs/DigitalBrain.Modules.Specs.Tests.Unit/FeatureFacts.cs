@@ -101,6 +101,22 @@ public sealed class FeatureFacts
         Assert.Contains(vocabulary, pattern => pattern.Pattern == "I add {int}" && pattern.Library == nameof(ArithmeticSteps));
     }
 
+    [Fact]
+    public async Task BoundFeatureAndRunCollectionsSurviveReactivation()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartAsync(ct);
+        var feature = brain.Get<IFeature>("durable-adding");
+        await feature.Set(Arithmetic.Replace("Scenario: Two additions", "@smoke\n  Scenario: Two additions", StringComparison.Ordinal));
+        await feature.Run("calculator");
+        var before = await feature.Read();
+        Assert.Equal("@smoke", Assert.Single(before.Scenarios[0].Tags));
+        Assert.Single(Assert.Single(before.Background).Parameters);
+        await brain.DeactivateAsync(feature, ct);
+        var after = await feature.Read();
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(before), System.Text.Json.JsonSerializer.Serialize(after));
+        Assert.Equal([Verdict.Passed, Verdict.Failed], after.LastRun!.Scenarios.Select(scenario => scenario.Verdict));
+    }
     private static Task<UnitBrain> StartAsync(CancellationToken ct) => UnitTest.Create().WithModule<SpecsModule>()
         .ConfigureSilo(silo => silo.Services.AddSingleton<StepLibrary, ArithmeticSteps>())
         .StartAsync(ct);

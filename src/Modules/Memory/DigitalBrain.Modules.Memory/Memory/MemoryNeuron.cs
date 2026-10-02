@@ -26,7 +26,7 @@ internal sealed class MemoryNeuron(TimeProvider time,
         var key = RequireKey(note.Namespace, note.Key);
         if (string.IsNullOrWhiteSpace(note.Text)) { throw new ArgumentException("Provide non-blank text to remember.", nameof(note)); }
         var generated = await Embeddings().GenerateAsync([note.Text]);
-        var entry = new VectorMemoryEntry(Owner, key.Namespace, key.Key, note.Text, note.Tags, note.Payload, generated[0].Vector.ToArray());
+        var entry = new VectorMemoryEntry(Owner, key.Namespace, key.Key, note.Text, note.Tags.ToArray(), note.Payload, generated[0].Vector.ToArray());
         MemoryPageNeuron.Validate(entry);
         await (await EnsurePage(key.Namespace, key.Key)).Put(entry);
         await Save(Current with { RememberedCount = Current.RememberedCount + 1, LastChangedAt = time.GetUtcNow() });

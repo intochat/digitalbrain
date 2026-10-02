@@ -183,7 +183,7 @@ public sealed class AssistantStreamFacts
         var context = new StepContext("stream-toolcardsret/applications/assistant", brain.Grains, brain.SiloServices, ct);
         var ui = await StartUi(context);
         await ui.Submit("card-actions");
-        await ui.Until(thread => thread.Results.Count > 0 && thread.Messages.Any(message => message.Text == "Hello world") && thread.TurnId is null, ct);
+        await ui.Until(thread => thread.Results.Length > 0 && thread.Messages.Any(message => message.Text == "Hello world") && thread.TurnId is null, ct);
         await App(context).Activate();
         var buttons = new List<ButtonState>();
         foreach (var node in (await ui.Tree()).Where(node => node.Kind == "button"))
@@ -245,7 +245,7 @@ public sealed class AssistantStreamFacts
         await ui.Select(AssistantSurface.ThreadsPart).Choose(first);
         var restored = await ui.Until(state => state.Id == first, ct);
         Assert.Equal("keep first draft", restored.Draft);
-        Assert.Equal(2, restored.Messages.Count);
+        Assert.Equal(2, restored.Messages.Length);
         await ui.Select(AssistantSurface.ThreadsPart).Choose(second.Id);
         var restoredSecond = await ui.Until(state => state.Id == second.Id, ct);
         Assert.Equal("second draft", restoredSecond.Draft);
@@ -280,7 +280,7 @@ public sealed class AssistantStreamFacts
         var ui = await StartUi(context);
         await ui.Submit("window-handles");
         var state = await ui.Until(state => state.Messages.Any(message => message.Text == "Hello world") && state.TurnId is null, ct);
-        Assert.Equal(2, state.Results.Count);
+        Assert.Equal(2, state.Results.Length);
         foreach (var expected in new[] { (Id: "table-result", Kind: "table", Title: "Customers"), (Id: "form-result", Kind: "surface", Title: "Details") })
         {
             using var document = System.Text.Json.JsonDocument.Parse(state.Results.Single(json => json.Contains(expected.Id, StringComparison.Ordinal)));
@@ -320,7 +320,7 @@ public sealed class AssistantStreamFacts
         Assert.Null(state.Error);
         Assert.Contains(expected, await ui.VisibleText());
         Assert.Equal(expected, string.Concat(state.Messages.Where(message => message.Role == ChatRole.Assistant).Select(message => message.Text)));
-        Assert.Equal(state.Messages.Count, state.Messages.Select(message => message.Id).Distinct().Count());
+        Assert.Equal(state.Messages.Length, state.Messages.Select(message => message.Id).Distinct().Count());
         Assert.Equal(expected, Assert.Single((await App(context).ReadConversation(state.Id, ct)).Turns).AssistantText);
         await App(context).Activate();
         Assert.Equal(expected, string.Concat((await ui.Read()).Messages.Where(message => message.Role == ChatRole.Assistant).Select(message => message.Text)));

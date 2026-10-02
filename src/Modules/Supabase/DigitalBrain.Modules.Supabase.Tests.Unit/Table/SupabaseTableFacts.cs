@@ -119,7 +119,12 @@ public sealed class SupabaseTableFacts
         Assert.Equal(2, updated.Revision);
         Assert.Equal("id", Assert.Single(updated.VisibleColumns));
         Assert.Equal(2, (await changed.NextAsync(ct: ct)).Revision);
-        await table.Read(new(0, 50));
+        await brain.DeactivateAsync(table, ct);
+        var restored = (await table.Read(new(0, 50)))!;
+        Assert.Equal(updated.Columns, restored.Columns);
+        Assert.Equal(updated.Filters, restored.Filters);
+        Assert.Equal(updated.VisibleColumns, restored.VisibleColumns);
+        Assert.Equal("7", Assert.Single(Assert.Single(restored.Rows).Cells));
         Assert.Equal("id", Assert.Single(provider.LastPlan!.Filters).ColumnId);
     }
 

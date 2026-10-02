@@ -21,7 +21,7 @@ internal sealed partial class AssistantNeuron
 
     public async Task SetDraft(string draft)
     {
-        if (Snapshot.Threads.Count == 0) { await InitializePresentation(); }
+        if (Snapshot.Threads.Length == 0) { await InitializePresentation(); }
         await ChangeThread(Snapshot.SelectedThread, thread => thread with { Draft = Bounded(draft) });
         await Present();
     }
@@ -42,7 +42,7 @@ internal sealed partial class AssistantNeuron
 
     private async Task InitializePresentation()
     {
-        if (Snapshot.Threads.Count == 0)
+        if (Snapshot.Threads.Length == 0)
         {
             var id = "conversation-" + Guid.NewGuid().ToString("N");
             var draft = (await Draft.Read()).Value;
@@ -62,7 +62,7 @@ internal sealed partial class AssistantNeuron
     {
         try
         {
-            if (Snapshot.Threads.Count == 0) { await InitializePresentation(); }
+            if (Snapshot.Threads.Length == 0) { await InitializePresentation(); }
             var id = Snapshot.SelectedThread;
             switch (action)
             {
@@ -124,7 +124,7 @@ internal sealed partial class AssistantNeuron
         catch (Exception error) when (error is not OperationCanceledException)
         {
             services.GetRequiredService<ILoggerFactory>().CreateLogger("Assistant").LogWarning(error, "Conversation action {Action} failed", action);
-            if (Snapshot.Threads.Count > 0)
+            if (Snapshot.Threads.Length > 0)
             { await ChangeThread(Snapshot.SelectedThread, thread => thread with { Error = error is ArgumentException or ProviderUnavailableException or DigitalBrain.Apps.AppRequirementsException or DigitalBrain.Sdk.Capacity.CapacityUnavailableException ? error.Message : "The action could not be completed. Please try again." }); }
         }
         await Present();
@@ -132,7 +132,7 @@ internal sealed partial class AssistantNeuron
 
     private async Task Send(string message)
     {
-        if (Snapshot.Threads.Count == 0) { await InitializePresentation(); }
+        if (Snapshot.Threads.Length == 0) { await InitializePresentation(); }
         message = Bounded(message.Trim());
         if (message.Length == 0) { return; }
         var id = Snapshot.SelectedThread;
@@ -149,7 +149,7 @@ internal sealed partial class AssistantNeuron
                 Error = null,
                 Status = "Thinking…",
                 TurnId = run,
-                Title = thread.Messages.Count == 0 ? message[..Math.Min(60, message.Length)] : thread.Title,
+                Title = thread.Messages.Length == 0 ? message[..Math.Min(60, message.Length)] : thread.Title,
                 Messages = [.. thread.Messages.TakeLast(998), new(run + "-user", ChatRole.User, message), new(run + "-reply", ChatRole.Assistant, "")],
             });
             await Present();
@@ -212,17 +212,6 @@ internal sealed partial class AssistantNeuron
         try
         {
             var next = change(Snapshot);
-            // Persist concrete arrays: collection expressions targeting IReadOnlyList can
-            // create compiler-private types which the storage serializer cannot restore.
-            next = next with
-            {
-                Threads = next.Threads.Select(thread => thread with
-                {
-                    Messages = thread.Messages.ToArray(),
-                    Receipts = thread.Receipts.ToArray(),
-                    Results = thread.Results.ToArray(),
-                }).ToArray(),
-            };
             await Save(next, new AssistantConfigured(Key));
         }
         finally { _changes.Release(); }
