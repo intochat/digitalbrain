@@ -16,6 +16,66 @@ namespace DigitalBrain.Modules.Apps.Tests.Unit;
 public sealed class AppDraftFacts
 {
     [Fact]
+    public async Task StructuredBuildsPreserveTheDocumentAndEditsMakeResultsHistorical()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var runner = new ScriptedTestRunner();
+        await using var brain = await StartAsync(ct, runner);
+        var document = AppDocumentFacts.Document();
+        var authored = System.Text.Json.Nodes.JsonNode.Parse(Authored(Spec))!;
+        authored["document"] = System.Text.Json.Nodes.JsonNode.Parse(AppDocumentCodec.Encode(document));
+        await brain.Get<IScriptedLLM>("author").Script([authored.ToJsonString()]);
+        await brain.Get<IScriptedLLM>("builder").Script([Built("// structured", "Reply.")]);
+        runner.BySourceMarker["// structured"] = (0, "dbtest:pass Research saves");
+        StampAlice();
+        var draft = brain.Get<IAppDraft>("alice/drafts/" + Guid.NewGuid().ToString("N"));
+        await draft.Draft("Research.");
+        var built = await draft.Build();
+        Assert.NotNull(built.Draft.Document);
+        Assert.Equal(AppDocumentCodec.Hash(built.Draft.Document), built.Draft.VerifiedDocumentHash);
+        var content = (await brain.Get<IPackage>(built.Draft.Published!.Package.ToString()).ReadRevision(built.Draft.Published.Revision)).Content;
+        Assert.Equal(document.Behaviors[0].Id, AppDocumentCodec.Read(content).Document!.Behaviors[0].Id);
+        Assert.Contains("Read observed pages.", Assert.Single(await brain.Get<IScriptedLLM>("builder").Prompts()));
+        var edited = await draft.SaveDocument(new(built.Draft.Revision, document with { Preamble = "Changed" }));
+        Assert.Null(edited.Draft.VerifiedDocumentHash);
+        Assert.NotNull(edited.Verification);
+    }
+
+    [Fact]
+    public async Task ConversionIsOnlyAProposalUntilExplicitlySaved()
+    {
+        await using var brain = await StartAsync(TestContext.Current.CancellationToken);
+        await brain.Get<IScriptedLLM>("author").Script([Authored(Spec)]);
+        StampAlice();
+        var draft = brain.Get<IAppDraft>("alice/drafts/" + Guid.NewGuid().ToString("N"));
+        var original = await draft.Draft("Shout.");
+        var proposal = await draft.ProposeConversion(original.Draft.Revision);
+        Assert.Equal("It shouts", Assert.Single(proposal.Scenarios).Name);
+        Assert.Empty(proposal.Behaviors);
+        Assert.Null((await draft.Read()).Draft.Document);
+        Assert.Equal(original.Draft.Spec, (await draft.Read()).Draft.Spec);
+    }
+
+    [Fact]
+    public async Task StructuredDraftsSurviveReactivationAndRejectStaleOrLegacyOverwrites()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartAsync(ct);
+        await brain.Get<IScriptedLLM>("author").Script([Authored(Spec)]);
+        StampAlice();
+        var draft = brain.Get<IAppDraft>("alice/drafts/" + Guid.NewGuid().ToString("N"));
+        var original = await draft.Draft("Shout.");
+        var document = AppDocumentFacts.Document();
+        var saved = await draft.SaveDocument(new(original.Draft.Revision, document));
+        Assert.True(saved.Draft.Revision > original.Draft.Revision);
+        await Assert.ThrowsAsync<AppDraftConflictException>(() => draft.SaveDocument(new(original.Draft.Revision, document with { Preamble = "Lost edit" })));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => draft.EditSpec("Overwrite"));
+        await brain.DeactivateAsync(draft, ct);
+        Assert.Equal(document.Behaviors[0].Id, (await draft.Read()).Draft.Document!.Behaviors[0].Id);
+        Assert.Null((await draft.Read()).Draft.VerifiedDocumentHash);
+    }
+
+    [Fact]
     public async Task ARegisteredRuntimeCanBeAuthoredFromItsOwnDescription()
     {
         var ct = TestContext.Current.CancellationToken;

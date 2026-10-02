@@ -15,5 +15,8 @@ public sealed record AppDraftState
     [Id(8)] public AppDraftAttempt[] Attempts { get; init; } = [];
     [Id(9)] public PackageRevisionRef? Published { get; init; }
     [Id(10)] public string Error { get; init; } = "";
+    [Id(11)] public AppAuthoringDocument? Document { get; init; }
+    [Id(12)] public PackageRevisionRef? SourceRevision { get; init; }
+    [Id(13)] public string? VerifiedDocumentHash { get; init; }
 }
 

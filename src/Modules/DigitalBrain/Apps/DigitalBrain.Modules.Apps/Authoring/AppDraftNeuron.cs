@@ -12,7 +12,7 @@ using Orleans.Runtime;
 namespace DigitalBrain.Apps;
 
 [GrainType("intochat.app-draft")]
-internal sealed class AppDraftNeuron(
+internal sealed partial class AppDraftNeuron(
     [PersistentState("intochat.app-draft", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<AppDraftState> store,
     IConfiguration configuration,
     ILogger<AppDraftNeuron> logger,
@@ -39,6 +39,9 @@ internal sealed class AppDraftNeuron(
 
     public async Task<AppDraftView> Draft(string request)
     {
+        RequireOwner();
+        if (Snapshot.Status == AppDraftStatus.Building) { throw new AppDraftConflictException("The app is being built."); }
+        if (Snapshot.Document is not null) { throw new InvalidOperationException("Edit behavior blocks instead of restarting this structured draft."); }
         ArgumentException.ThrowIfNullOrWhiteSpace(request);
         if (request.Length > MaxRequestLength) { throw new ArgumentException($"Describe the app in at most {MaxRequestLength} characters."); }
         return await Author(Snapshot with { Request = request.Trim() },
@@ -47,6 +50,8 @@ internal sealed class AppDraftNeuron(
 
     public Task<AppDraftView> Revise(string instruction)
     {
+        RequireOwner();
+        if (Snapshot.Document is not null) { throw new InvalidOperationException("Edit behavior blocks instead of replacing the document."); }
         ArgumentException.ThrowIfNullOrWhiteSpace(instruction);
         RequireSpec();
         return Author(Snapshot,
@@ -55,6 +60,8 @@ internal sealed class AppDraftNeuron(
 
     public async Task<AppDraftView> EditSpec(string spec)
     {
+        RequireOwner();
+        if (Snapshot.Document is not null) { throw new InvalidOperationException("Edit behavior blocks instead of replacing the document."); }
         ArgumentException.ThrowIfNullOrWhiteSpace(spec);
         RequireSpec();
         await Persist(Snapshot with { Spec = spec, Status = AppDraftStatus.Drafted, Error = "" });
@@ -63,12 +70,13 @@ internal sealed class AppDraftNeuron(
 
     public async Task<AppDraftView> Build()
     {
+        RequireOwner();
         RequireSpec();
         // Verification runs tests.cs as a sandbox script whatever the app's own runtime is, so a
         // sandbox-less host refuses here instead of burning build attempts that can only fail.
         policy.RequireSandbox();
         policy.RequireRuntime(Snapshot.Runtime);
-        await Persist(Snapshot with { Status = AppDraftStatus.Building, Attempts = [], Error = "" });
+        await Persist(Snapshot with { Status = AppDraftStatus.Building, Attempts = [], Error = "", VerifiedDocumentHash = null });
         var failures = "";
         for (var attempt = 1; attempt <= MaxBuildAttempts; attempt++)
         {
@@ -81,7 +89,8 @@ internal sealed class AppDraftNeuron(
                 await Persist(Snapshot with { Attempts = [.. Snapshot.Attempts, new(reference.Revision, verification.Green, failures)] });
                 if (verification.Green)
                 {
-                    await Persist(Snapshot with { Status = AppDraftStatus.Published, Published = reference });
+                    var document = AppDocumentCodec.Read(content).Document;
+                    await Persist(Snapshot with { Status = AppDraftStatus.Published, Published = reference, Document = document, VerifiedDocumentHash = document is null ? null : AppDocumentCodec.Hash(document) });
                     return await Read();
                 }
             }
@@ -99,6 +108,7 @@ internal sealed class AppDraftNeuron(
 
     public async Task<AppDraftView> Read()
     {
+        RequireOwner();
         var last = Snapshot.Name.Length == 0 ? null : Snapshot.Attempts.LastOrDefault(attempt => attempt.Revision.Length > 0);
         var verification = last is null
             ? null
@@ -118,6 +128,7 @@ internal sealed class AppDraftNeuron(
                 authored = Parse<AuthoredApp>(await ModelAddress.Complete(GrainFactory, AuthorModel, AgentPrompts.Author + "\n\n" + RuntimeDescriptions, prompt));
                 if (!Runtimes.Contains(authored.Runtime)) { throw new InvalidDataException($"'{authored.Runtime}' is not one of the runtimes {string.Join(", ", Runtimes)}."); }
                 package = PackageId.Create(Owner, authored.Name);
+                if (authored.Document is not null) { AppDocumentCodec.Validate(authored.Document); }
             }
             catch (Exception error) when (error is JsonException or InvalidDataException or ArgumentException && retry < MaxAuthorRetries)
             {
@@ -130,7 +141,9 @@ internal sealed class AppDraftNeuron(
                 Title = authored.Title,
                 Description = authored.Description,
                 Runtime = authored.Runtime,
-                Spec = authored.Spec,
+                Spec = authored.Document is null ? authored.Spec : AppDocumentCodec.ExportSpec(authored.Document),
+                Document = authored.Document,
+                VerifiedDocumentHash = null,
                 Status = AppDraftStatus.Drafted,
                 Attempts = [],
                 Error = "",
@@ -147,6 +160,7 @@ internal sealed class AppDraftNeuron(
             .AppendLine($"What the person wants: {Snapshot.Request}")
             .AppendLine().AppendLine("Specification:").AppendLine(Snapshot.Spec);
         if (failures.Length > 0) { task.AppendLine().AppendLine("The previous attempt failed:").AppendLine(failures); }
+        if (Snapshot.Document is not null) { task.AppendLine("Authoring document (preserve IDs and prose):").AppendLine(AppDocumentCodec.Encode(Snapshot.Document)); }
         var built = Parse<BuiltApp>(await BuilderConversation(task.ToString()));
         var files = new Dictionary<string, string>(built.Files ?? new Dictionary<string, string>(), StringComparer.Ordinal)
         {
@@ -154,9 +168,24 @@ internal sealed class AppDraftNeuron(
         };
         if (!files.ContainsKey(PackageContent.TestsPath))
         { throw new InvalidDataException($"The implementation must include {PackageContent.TestsPath}, the scenarios' proof."); }
+        if (Snapshot.Document is { } document)
+        {
+            var bindings = built.BehaviorSources ?? [];
+            if (bindings.Select(b => b.BehaviorId).Distinct(StringComparer.Ordinal).Count() != bindings.Length || bindings.Any(b => !document.Behaviors.Any(d => d.Id == b.BehaviorId)))
+            { throw new InvalidDataException("Builder source bindings must refer to unique existing behavior IDs."); }
+            document = document with { Behaviors = document.Behaviors.Select(b => b with { SourcePaths = bindings.FirstOrDefault(x => x.BehaviorId == b.Id)?.SourcePaths ?? [] }).ToArray() };
+            var sources = new Dictionary<string, string>(files);
+            if (!string.IsNullOrWhiteSpace(built.Source)) { sources[PackageContent.SourcePath] = built.Source; }
+            AppDocumentCodec.Validate(document, sources, true);
+            files[AppDocumentCodec.Path] = AppDocumentCodec.Encode(document);
+        }
+        else { files.Remove(AppDocumentCodec.Path); }
+        PackageManifest? originalManifest = Snapshot.SourceRevision is { } origin
+            ? (await GrainFactory.GetGrain<IPackage>(origin.Package.ToString()).ReadRevision(origin.Revision)).Content.Manifest : null;
         return new PackageContent(
-            new PackageManifest(Snapshot.Title, Snapshot.Description, [new PackageOperation("ask", "Ask the app.")],
+            new PackageManifest(Snapshot.Title, Snapshot.Description, built.Operations ?? originalManifest?.Operations ?? [new PackageOperation("ask", "Ask the app.")],
                 [.. (built.Settings ?? []).Select(setting => new PackageSetting(setting.Name, setting.Description ?? "", setting.Default ?? ""))],
+                Accounts: originalManifest?.Accounts,
                 Runtime: Snapshot.Runtime),
             built.Source ?? "",
             files);
@@ -249,7 +278,8 @@ internal sealed class AppDraftNeuron(
         { logger.LogWarning(error, "The drafts index for {Owner} missed {DraftId}.", Owner, DraftId); }
     }
 
-    private sealed record AuthoredApp(string Name, string Title, string Description, string Runtime, string Spec);
-    private sealed record BuiltApp(IReadOnlyList<BuiltSetting>? Settings, IReadOnlyDictionary<string, string>? Files, string? Source);
+    private sealed record AuthoredApp(string Name, string Title, string Description, string Runtime, string Spec, AppAuthoringDocument? Document = null);
+    private sealed record BuiltApp(IReadOnlyList<BuiltSetting>? Settings, IReadOnlyDictionary<string, string>? Files, string? Source, BehaviorSourceBinding[]? BehaviorSources = null, PackageOperation[]? Operations = null);
+    private sealed record BehaviorSourceBinding(string BehaviorId, string[] SourcePaths);
     private sealed record BuiltSetting(string Name, string? Description, string? Default);
 }

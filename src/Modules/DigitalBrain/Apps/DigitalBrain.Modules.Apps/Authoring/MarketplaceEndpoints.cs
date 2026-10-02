@@ -10,6 +10,7 @@ using DigitalBrain.Core.Enforcement;
 namespace DigitalBrain.Apps;
 
 internal sealed record DraftRequest(string Text);
+internal sealed record ConvertDraftRequest(long ExpectedRevision);
 
 internal static class MarketplaceEndpoints
 {
@@ -27,6 +28,15 @@ internal static class MarketplaceEndpoints
             => Draft(brain, id).Revise(request.Text));
         packages.MapPut("/drafts/{id}/spec", (string id, DraftRequest request, IDigitalBrain brain)
             => Draft(brain, id).EditSpec(request.Text));
+        packages.MapPut("/drafts/{id}/document", (string id, SaveAppDocument request, IDigitalBrain brain)
+            => DocumentResult(() => Draft(brain, id).SaveDocument(request)));
+        packages.MapPost("/drafts/{id}/import", (string id, ImportAppDocument request, IDigitalBrain brain)
+            => DocumentResult(() => Draft(brain, id).ImportRevision(request.Revision, request.ExpectedRevision)));
+        packages.MapPost("/drafts/{id}/conversion", async (string id, ConvertDraftRequest request, IDigitalBrain brain) =>
+        {
+            try { return Results.Ok(await Draft(brain, id).ProposeConversion(request.ExpectedRevision)); }
+            catch (AppDraftConflictException e) { return Results.Problem(e.Message, statusCode: 409); }
+        });
         packages.MapPost("/drafts/{id}/build", (string id, IDigitalBrain brain) => Draft(brain, id).Build());
         packages.MapGet("/{owner}/{name}/spec", (string owner, string name, string? revision, MarketplaceService marketplace)
             => marketplace.Spec(PackageId.Create(owner, name), revision));
@@ -43,6 +53,12 @@ internal static class MarketplaceEndpoints
     {
         if (!Guid.TryParse(id, out var draftId)) { throw new ArgumentException("A draft id is a GUID."); }
         return brain.Get<IAppDraft>($"{CallerContextStamper.Require().PrincipalId}/drafts/{draftId:N}");
+    }
+
+    private static async Task<IResult> DocumentResult(Func<Task<AppDraftView>> action)
+    {
+        try { return Results.Ok(await action()); }
+        catch (AppDraftConflictException e) { return Results.Problem(e.Message, statusCode: 409); }
     }
 }
 
