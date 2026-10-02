@@ -25,21 +25,27 @@ A **brain** is the space neurons live in. It resolves, it does not switch — sy
 neurons, the brain only finds them by identity.
 
 ```csharp
+// An observer is the receiving endpoint: implement it on whatever signals arrive at.
+sealed class Log : INeuronObserver
+{
+    public Task OnSignalAsync(Signal signal)
+    {
+        Console.WriteLine($"{signal.Publisher} published {signal}");
+        return Task.CompletedTask;
+    }
+}
+
 // Resolve a neuron by identity, watch it to form a synapse, sever by disposing.
 var button = brain.Get<INeuron>(new NeuronId("button-1"));
-await using var synapse = await button.Watch();
+await using var synapse = await button.Watch(new Log());
 
-// The signals crossing the synapse, as a stream.
+// The same signals, pulled as a stream from the synapse instead of pushed to the observer.
 await foreach (var signal in synapse.Signals())
 {
     // signal.Publisher is a NeuronId — a value, never a capability;
     // brain.Get turns it back into the neuron it names.
 }
 ```
-
-Passing an observer to `Watch` is the push form of the same synapse, used when the receiver is
-addressable — a UI surface, a script neuron. You rarely implement one by hand; kernels and SDKs
-supply them.
 
 ## The laws
 

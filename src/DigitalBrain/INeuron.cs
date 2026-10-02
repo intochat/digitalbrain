@@ -8,17 +8,13 @@ namespace DigitalBrain;
 public interface INeuron
 {
     /// <summary>
-    /// Forms a synapse between this neuron and a receiver. Every signal published from now on
+    /// Forms a synapse between this neuron and the observer. Every signal published from now on
     /// — or, when the observer is itself a neuron, from that synapse's watermark — crosses it
     /// until it is severed.
     /// </summary>
-    /// <param name="observer">
-    /// The receiving endpoint for push delivery, when the receiver is addressable — a UI
-    /// surface, a script neuron. Omit it to pull instead: the synapse's own
-    /// <see cref="ISynapse.Signals"/> stream is then the only consumer.
-    /// </param>
+    /// <param name="observer">The receiving endpoint the synapse delivers to.</param>
     /// <returns>The formed synapse; disposing it severs the connection.</returns>
-    Task<ISynapse> Watch(INeuronObserver? observer = null);
+    Task<ISynapse> Watch(INeuronObserver observer);
 
     /// <summary>
     /// Severs this observer's synapse without needing its handle, so anyone cleaning up — an
