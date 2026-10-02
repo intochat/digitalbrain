@@ -163,4 +163,8 @@
     <Project Path="src/Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
     <Project Path="src/Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
   </Folder>
+  <Folder Name="/DigitalBrain/">
+    <Project Path="src/DigitalBrain/DigitalBrain.csproj" />
+    <Project Path="src/DigitalBrain.Tests/DigitalBrain.Tests.csproj" />
+  </Folder>
 </Solution>
