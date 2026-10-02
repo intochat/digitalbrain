@@ -12,6 +12,38 @@ namespace DigitalBrain.Modules.Postgres.Tests.Unit;
 public sealed class LegacyPostgresStateFacts
 {
     [Fact]
+    public async Task StartupBackfillReclaimsALegacyTableWithoutAnyNewDefine()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var provider = new PostgresWriteTableFacts.MemoryTables();
+        await using var brain = await UnitTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>
+        {
+            silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=sample;Username=reader";
+            silo.Services.AddSingleton<IPostgresTableProvider>(provider);
+            silo.Services.AddSingleton<IPostgresLegacyTables>(new UntouchedLegacyTable());
+            silo.Services.AddKeyedSingleton<IGrainStorage>(DigitalBrainNames.DefaultGrainStorage, (services, _) =>
+                new LegacyStorage(new OrleansGrainStorageSerializer(services.GetRequiredService<Serializer>())));
+        }).StartAsync(ct);
+        CallerContextStamper.Stamp(new() { PrincipalId = "alice", AccountId = "alice", BrainId = "brain", AppId = "app", Kind = CallerKind.App, StampedBy = TrustedEdge.AppProxy });
+
+        var app = brain.Get<IPostgresLifecycleTestApp>("untouched-install");
+        await app.Uninstall("brain", "app");
+        await app.Uninstall("brain", "app");
+
+        Assert.Equal(("platform", "legacy_table"), Assert.Single(provider.Drops));
+        Assert.Equal(0, provider.Definitions);
+        var storage = (LegacyStorage)brain.SiloServices.GetRequiredKeyedService<IGrainStorage>(DigitalBrainNames.DefaultGrainStorage);
+        Assert.Null(storage.Last!.Owner);
+        Assert.Null(storage.Last.Accepted);
+    }
+
+    private sealed class UntouchedLegacyTable : IPostgresLegacyTables
+    {
+        public Task<LegacyPostgresTable[]> Read(CancellationToken ct)
+            => Task.FromResult<LegacyPostgresTable[]>([new("legacy", System.Text.Json.JsonSerializer.Serialize(new[] { BrainScope.Create("alice", "brain").Id, "app" }))]);
+    }
+
+    [Fact]
     public async Task LegacyNullOriginStateReactivatesAndTeardownRetriesAfterTheDropWasSavedOnlyInPostgres()
     {
         var ct = TestContext.Current.CancellationToken;

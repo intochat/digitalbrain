@@ -2,6 +2,7 @@ using System.Text.Json;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Postgres;
+using DigitalBrain.Sdk.Capacity;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Orleans;
@@ -12,6 +13,50 @@ namespace DigitalBrain.Modules.Postgres.Tests.Unit;
 
 public sealed class PostgresWriteTableFacts
 {
+    [Fact]
+    public async Task TeardownReclaimsPendingDdlAtItsPinnedOriginAfterCapacityChangesAndRestart()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var provider = new MemoryTables { LoseDefineResponse = true };
+        var capacity = new ChangingCapacity();
+        await using var brain = await UnitTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>
+        {
+            silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=sample;Username=reader";
+            silo.Services.AddSingleton<IPostgresTableProvider>(provider);
+            silo.Services.AddSingleton<ICapacity>(capacity);
+        }).StartAsync(ct);
+        Stamp();
+        var table = brain.Get<IPostgresTable>("pending-ddl");
+        await Assert.ThrowsAsync<IOException>(() => table.Define(Definition));
+        capacity.Origin = "db:replacement";
+        await brain.DeactivateAsync(table, ct);
+
+        var owner = brain.Get<IPostgresLifecycleTestApp>("pending-install");
+        await owner.Uninstall("brain", "app");
+        await owner.Uninstall("brain", "app");
+
+        Assert.Equal(("db:original", PostgresTablePolicy.PhysicalName(JsonSerializer.Serialize(new[] { BrainScope.CurrentId(), "app" }), "pending-ddl")), Assert.Single(provider.Drops));
+        Assert.Equal(1, capacity.Resolutions);
+    }
+
+    [Fact]
+    public async Task UninstallLeavesAnotherInstallOfTheSameSchemaIntact()
+    {
+        await using var brain = await Start(new MemoryTables());
+        Stamp();
+        var first = brain.Get<IPostgresTable>("first-install");
+        await first.Define(Definition);
+        await first.Upsert(Key(), Values("first"));
+        Stamp("brain", "fork-file");
+        var fork = brain.Get<IPostgresTable>("fork-install");
+        await fork.Define(Definition);
+        await fork.Upsert(Key(), Values("fork"));
+
+        await brain.Get<IPostgresLifecycleTestApp>("first-app").Uninstall("brain", "app");
+
+        Assert.Equal("\"fork\"", (await fork.Read(Key()))!.Single(value => value.Column == "value").Json);
+    }
+
     [Fact]
     public async Task RetirementCannotDeadlockARegistrationAlreadyInFlight()
     {
@@ -295,11 +340,17 @@ public sealed class PostgresWriteTableFacts
     {
         private readonly Dictionary<string, Dictionary<string, TableValue[]>> tables = [];
         public int Definitions { get; private set; }
+        public bool LoseDefineResponse { get; set; }
         public List<(string Origin, string Table)> Drops { get; } = [];
         public Task DropAsync(string origin, string table, CancellationToken ct)
         { Drops.Add((origin, table)); tables.Remove(table); return Task.CompletedTask; }
         public Task DefineAsync(string origin, string table, TableDefinition definition, CancellationToken ct)
-        { Definitions++; tables.TryAdd(table, []); return Task.CompletedTask; }
+        {
+            Definitions++;
+            tables.TryAdd(table, []);
+            if (LoseDefineResponse) { LoseDefineResponse = false; throw new IOException("Lost the response after DDL."); }
+            return Task.CompletedTask;
+        }
         private static string RowKey(TableValue[] key) => JsonSerializer.Serialize(key);
         public Task<bool> UpsertAsync(string origin, string table, TableDefinition definition, TableValue[] key, TableValue[] values, CancellationToken ct)
         {
@@ -314,6 +365,16 @@ public sealed class PostgresWriteTableFacts
             => Task.FromResult(tables[table].GetValueOrDefault(RowKey(key)));
         public Task<TableValue[][]> PageAsync(string origin, string table, TableDefinition definition, int offset, int limit, CancellationToken ct)
             => Task.FromResult(tables[table].OrderBy(p => p.Key, StringComparer.Ordinal).Skip(offset).Take(limit).Select(p => p.Value).ToArray());
+    }
+
+    private sealed class ChangingCapacity : ICapacity
+    {
+        public string Origin { get; set; } = "db:original";
+        public int Resolutions { get; private set; }
+        public ValueTask<ResolvedCapacity> Resolve(string kind, CapacityScope scope, CancellationToken ct = default)
+        { Resolutions++; return ValueTask.FromResult(new ResolvedCapacity(kind, Origin)); }
+        public ValueTask<ResolvedCapacity> Provision(string kind, CapacityScope scope, CancellationToken ct = default)
+            => throw new InvalidOperationException("Teardown must never provision capacity.");
     }
 
     private sealed class RetirementRace : IIncomingGrainCallFilter, IGrainStorage

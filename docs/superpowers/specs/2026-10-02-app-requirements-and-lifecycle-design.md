@@ -18,8 +18,8 @@ its state lists table neurons. Apps asks it to retire those neurons through Post
 No module references another module's implementation or a Platform implementation. Kernel gains
 no policy. Customer Researcher uses precisely the same paths as every other package.
 
-This document is Phase 1 only. Implementation, implementation commits, smoke verification and
-the PR wait for explicit user approval.
+The user approved all phases before implementation. The sections below describe the implemented
+design and the verification required before opening the PR.
 
 ## Requirements are parsed package data
 
@@ -38,16 +38,16 @@ project's final filename, remove `.csproj`, and match that exact assembly simple
 convention; a renamed project or custom assembly name that cannot match is refused, not guessed.
 Relative and `/brain/...` paths with the same filename have the same identity.
 
-Map a matched assembly to its declaring composed module using
-`ModuleInventory.ContractAssembliesOf(module.Assembly)`. The inventory, not assemblies that
+`ModuleInventory.ContractAssemblies()` uses `ContractAssembliesOf(module.Assembly)` to discover
+each composed module's own companion contracts. The inventory, not assemblies that
 happen to be loaded in the process, defines availability. Kernel contracts are always present.
 Non-neuron SDK/client support references must match an explicit existing script support
 assembly set; they do not invent optional Platform modules. Arbitrary implementation projects,
-unknown projects and ambiguous mappings fail closed. A load failure in inventory discovery
+unknown projects fail closed. A load failure in inventory discovery
 becomes an unresolved-contract refusal, never an empty inventory or an unhandled load error.
 
 For absent conventional `DigitalBrain.Modules.<name>.Contracts` references, report `<name>`
-as the missing module, retaining the assembly identity in structured details. For an unknown or
+as the missing module. For an unknown or
 renamed assembly, report its full simple name as unresolved. Sort and deduplicate names ordinally
 so the same revision and composition give the same result. A reference present only transitively
 through another module's implementation does not count as a composed module.
@@ -87,7 +87,10 @@ installation, including retired generations. Persist planned IDs before starting
 retry deploys the same generation and IDs. Configure/upgrade retain earlier IDs. Record durable
 pending-operation data with the existing operation ID and request hash so a crash between
 deployment and final save cannot choose a different generation or forget an owner. Reserve
-the next free IDs starting after 11; never reuse the missing historical Id(2).
+the next free IDs starting after 11; never reuse the missing historical Id(2). The additions are
+StorageFiles (12), PendingDeployment (13), PendingUninstall (14), StorageHistoryKnown (15),
+LifecycleReceipts (16) and PostgresScopes (17). The last flag remembers whether any behavior
+generation required Postgres, so removing that module cannot falsely complete teardown.
 
 Postgres.Contracts adds `IPostgresTables`, a neuron keyed by the encoded brain/file owner scope,
 with module-authorized registration and retirement calls. Postgres implements it with a durable
@@ -97,12 +100,14 @@ only and calls this path only when Postgres is composed. Removing Postgres from 
 with owned storage must refuse cleanup rather than declare success; restore the module first.
 
 Registration is performed by Postgres before physical DDL. Append pending-definition information
-to PostgresTableState: pin Owner, Origin and normalized definition durably before DDL; register
-the table ID durably; then create the physical table and persist Accepted. Retry uses that pin.
+to PostgresTableState: register the table ID durably, then pin Owner, Origin and normalized
+definition durably, then create the physical table and persist Accepted. Retry uses that pin.
 This closes the current create-before-save orphan window. A pending definition is teardown
 input too: its hashed physical name is deterministically derived inside Postgres.
 
-Registration and retirement serialize on the collection neuron. Retirement first persists its
+Registration and retirement's state writes serialize on the collection neuron. Registration can
+interleave with retirement's table calls, so a table finishing Define promptly observes the closed
+scope rather than deadlocking against its own teardown. Retirement first persists its
 closed flag and table list, then calls table teardown. New registration against a closed scope
 fails. Table operations verify that their scope is open before effects. Avoid a grain cycle:
 registration never calls a table; table teardown called by the collection does not call back
@@ -138,7 +143,7 @@ request a no-op; it cannot erase the new definition. Keep retired collections as
 tombstones, rather than evictable recent-operation receipts.
 
 An uninstall of NotInstalled or Uninstalled is a successful no-op even with a fresh operation
-ID. Replaying a completed uninstall after reinstall returns the current snapshot without
+ID. Retain a receipt even for a no-op uninstall. Replaying a completed uninstall after reinstall returns the current snapshot without
 effects. Replaying an old successful install after restart likewise does not deploy again.
 Reinstall with a new operation ID uses higher file generations, never reopens retired scopes,
 and can Define the same logical table key with a different schema against empty storage.
@@ -158,8 +163,11 @@ existing `postgres.table` state before enabling lifecycle completion for legacy 
 For the deployed Azure Blob store it enumerates table-state blobs in `digitalbrain-v2-state`,
 decodes them with the existing Orleans serializer, and registers each grain ID under its stored
 Owner. It does not infer ownership from SQL names or load other modules' implementation types.
-Run the scan with app execution quiesced; persist its completion in a Postgres neuron and
+Run the scan as a silo startup task before serving app execution; Apps also awaits Ensure before
+retirement. Persist its completion in a Postgres neuron and
 fail closed on unreadable records. Restarting an incomplete scan repeats registration safely.
+For the first upgrade, stop old-version silos before starting the new version: legacy writers
+must be quiesced while their ownership is backfilled.
 Fresh stores record an empty completed scan. Test storage supplies equivalent legacy records.
 This is migration code, not a new Kernel enumeration API or script-visible storage service.
 
@@ -198,7 +206,8 @@ or the resulting typed error message, never duplicate literals or format a repla
 
 Map requirement refusals to the existing ProblemDetails response with status 409 and exact
 message in detail; capacity refusals use status 503 and exact detail. Preserve a stable typed
-error code/message across the CSharp edge, whose client reconstructs the known refusal rather
+error code/message across the CSharp edge, whose client reconstructs `ScriptRefusalException`
+with the message and original exception type name as Code, rather
 than handing scripts an opaque transport exception. No stack trace is a user-facing response.
 
 The normal package install UI renders the returned detail verbatim. Assistant tool failures
@@ -226,7 +235,7 @@ that passes it. Reviewable commit groups, each building and passing affected pro
 Apps facts cover all present, one missing, and renamed/unresolvable contract assembly. Each
 asserts the actual user-visible success/refusal, with missing requirements leaving no script,
 receipt or installation mutation. Include tests-only requirements, duplicate/path variants,
-comment/string false positives, inventory assembly-load failure, and upgrade preserving the
+comment/string false positives, and upgrade preserving the
 running revision. Prove sandbox scratch installation uses the same check.
 
 Postgres facts cover define -> upsert -> teardown -> redefine -> empty, teardown twice,
@@ -241,8 +250,9 @@ Facts have sentence-shaped names, use TestContext.Current.CancellationToken and 
 fakes belong at connector boundaries. No new InternalsVisibleTo, no model in verification.
 Requirement tests live in Apps; table lifecycle in Postgres; seeding in ClickHouse/its consumer;
 composition in IntoChat unit. Transport/presentation tests live with CSharp/Assistant/Flutter
-where changed, including matching Dart wire changes if required. Run the existing ring-law
-project-reference fact and confirm no module-to-module implementation reference was added.
+where changed, including matching Dart wire changes if required. Run the existing project-reference
+facts and audit production project references to confirm no module-to-module implementation
+reference was added.
 
 Run `dotnet test` separately for affected Apps, Postgres, ClickHouse and IntoChat unit projects,
 plus affected owner projects and module E2E suites; never run the `.slnx`. Compile live-gated
