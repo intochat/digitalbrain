@@ -242,12 +242,20 @@ class _AppsScreenState extends State<AppsScreen> {
     }
   }
 
-  void _openSpec(String id, String title) => Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      builder: (_) =>
-          AppSpecScreen(packageId: id, title: title, request: widget.request),
-    ),
-  );
+  void _openSpec(String id, String title, String revision, bool canOpen) =>
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => AppSpecScreen(
+            packageId: id,
+            title: title,
+            request: widget.request,
+            revision: revision,
+            onOpen: canOpen && widget.onOpen != null
+                ? () => widget.onOpen!(id)
+                : null,
+          ),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -457,8 +465,15 @@ class _AppsScreenState extends State<AppsScreen> {
                   ),
                 OutlinedButton(
                   key: ValueKey('scenarios-$id'),
-                  onPressed: () => _openSpec(id, '${listing['title'] ?? id}'),
-                  child: const Text('Scenarios'),
+                  onPressed: () => _openSpec(
+                    id,
+                    '${listing['title'] ?? id}',
+                    installed ? running : published,
+                    installed &&
+                        !uninstallPending &&
+                        operations.any((o) => o['name'] == 'open'),
+                  ),
+                  child: const Text('Behaviors'),
                 ),
                 OutlinedButton(
                   key: ValueKey('fork-$id'),

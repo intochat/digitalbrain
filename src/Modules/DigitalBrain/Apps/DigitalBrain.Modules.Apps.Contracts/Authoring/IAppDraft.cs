@@ -12,6 +12,9 @@ public interface IAppDraft : INeuron
     [ResponseTimeout("00:10:00")] Task<AppDraftView> Draft(string request);
     [ResponseTimeout("00:10:00")] Task<AppDraftView> Revise(string instruction);
     Task<AppDraftView> EditSpec(string spec);
+    Task<AppDraftView> SaveDocument(SaveAppDocument request);
+    Task<AppDraftView> ImportRevision(PackageRevisionRef revision, long expectedRevision);
+    Task<AppAuthoringDocument> ProposeConversion(long expectedRevision);
     [ResponseTimeout("02:00:00")] Task<AppDraftView> Build();
     [ReadOnly, AlwaysInterleave] Task<AppDraftView> Read();
 }

@@ -8,6 +8,10 @@ public sealed record AppSpecView(
     IReadOnlyDictionary<string, string> Files,
     string? Spec,
     string? Tests,
-    AppVerification? Verification);
+    AppVerification? Verification,
+    PackageManifest? Manifest = null,
+    AppDocumentReadResult? DocumentReadResult = null,
+    SpecToken[]? Vocabulary = null,
+    bool CanEdit = false);
 
 

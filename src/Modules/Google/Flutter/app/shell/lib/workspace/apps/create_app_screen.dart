@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 
 import 'app_spec_view.dart';
 import 'apps_screen.dart';
+import 'app_document.dart';
+import 'behavior_authoring_view.dart';
+import 'spec_vocabulary.dart';
 
 // Numeric values of DigitalBrain.Apps.AppDraftStatus on the wire.
 const _drafted = 1;
@@ -15,10 +18,16 @@ const _failed = 4;
 // Create an app by describing it: the Author writes its spec, you read and adjust it, and the
 // Builder writes the tests and implementation. The app reaches the marketplace only when its tests pass.
 class CreateAppScreen extends StatefulWidget {
-  const CreateAppScreen({super.key, required this.request, this.draftId});
+  const CreateAppScreen({
+    super.key,
+    required this.request,
+    this.draftId,
+    this.initialRevision,
+  });
 
   final AppsRequest request;
   final String? draftId;
+  final Map<String, dynamic>? initialRevision;
 
   @override
   State<CreateAppScreen> createState() => _CreateAppScreenState();
@@ -52,10 +61,78 @@ class _CreateAppScreenState extends State<CreateAppScreen> {
   void initState() {
     super.initState();
     // Reopening an existing draft picks up where the person left off.
-    if (widget.draftId != null) {
+    if (widget.initialRevision != null) {
+      unawaited(
+        _perform(
+          'Opening an editable draft…',
+          () => widget.request('POST', '$_path/import', {
+            'revision': widget.initialRevision,
+            'expectedRevision': 0,
+          }),
+        ),
+      );
+    } else if (widget.draftId != null) {
       unawaited(
         _perform('Loading the draft…', () => widget.request('GET', _path)),
       );
+    }
+  }
+
+  Future<void> _convert() async {
+    try {
+      final proposal = AppDocument.fromJson(
+        _map(
+          await widget.request('POST', '$_path/conversion', {
+            'expectedRevision': _map(_view?['draft'])['revision'],
+          }),
+        ),
+      );
+      if (!mounted) return;
+      final accepted = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Convert to behavior blocks?'),
+          content: SizedBox(
+            width: 560,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Your scenarios are preserved. Add behaviors and link scenarios explicitly; no source links are guessed.',
+                  ),
+                  const SizedBox(height: 12),
+                  for (final s in proposal.scenarios)
+                    ListTile(title: Text(s.name), subtitle: Text(s.body)),
+                  if (proposal.scenarios.isEmpty) Text(proposal.preamble),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Convert'),
+            ),
+          ],
+        ),
+      );
+      if (accepted == true) {
+        await _perform(
+          'Saving blocks…',
+          () => widget.request('PUT', '$_path/document', {
+            'expectedRevision': _map(_view?['draft'])['revision'],
+            'document': proposal.toJson(),
+          }),
+        );
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
     }
   }
 
@@ -103,6 +180,13 @@ class _CreateAppScreenState extends State<CreateAppScreen> {
   @override
   Widget build(BuildContext context) {
     final draft = _map(_view?['draft']);
+    if (draft['document'] != null) {
+      return BehaviorAuthoringView(
+        draftId: _draftId,
+        request: widget.request,
+        initial: _view!,
+      );
+    }
     final verification = _map(_view?['verification']);
     final specText = '${draft['spec'] ?? ''}';
     final status = draft['status'] as int? ?? 0;
@@ -177,10 +261,18 @@ class _CreateAppScreenState extends State<CreateAppScreen> {
               AppSpecView(
                 spec: specText,
                 run: verification.isEmpty ? null : _map(verification['run']),
+                vocabulary: SpecToken.read(_view?['vocabulary']),
+                current:
+                    _view?['verificationCurrent'] == true ||
+                    status == _published,
               ),
             Wrap(
               spacing: 8,
               children: [
+                TextButton(
+                  onPressed: _busy ? null : _convert,
+                  child: const Text('Convert to behavior blocks'),
+                ),
                 if (_editing)
                   FilledButton.tonal(
                     key: const ValueKey('save-spec'),
@@ -234,7 +326,7 @@ class _CreateAppScreenState extends State<CreateAppScreen> {
                             'The Builder is making every scenario pass. This can take a few minutes…',
                             () => widget.request('POST', '$_path/build'),
                           ),
-                    child: const Text('Build app'),
+                    child: const Text('Build and publish'),
                   ),
                 ],
               ),

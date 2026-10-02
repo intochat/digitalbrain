@@ -30,6 +30,7 @@ public sealed class CSharpModule : IModule<CSharpOptions>
         builder.Services.TryAddSingleton<ScriptRunEnvironment>();
         // Explicit: DI would resolve the assemblies parameter as an empty IEnumerable<Assembly>.
         builder.Services.TryAddSingleton(provider => new ScriptContracts(provider.GetRequiredService<ModuleInventory>().ContractAssemblies()));
+        builder.Services.TryAddSingleton<IContractVocabulary>(provider => new ContractVocabulary(provider.GetRequiredService<ModuleInventory>().ContractAssemblies()));
         builder.Services.TryAddTransient<ScriptEdge>();
         builder.Services.TryAddSingleton<CSharpDirectives>();
         builder.Services.TryAddSingleton<CSharpContractDiscovery>();

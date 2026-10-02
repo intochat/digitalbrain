@@ -25,6 +25,12 @@ internal static class AgentPrompts
         - The app has one operation, "ask".
         - Model settings take this brain's model names, such as "IGpt56Luna" or "IGemma4".
 
+        For new apps, also return a document object, version 1, containing preamble, behaviors and scenarios.
+        Each behavior has id (a new GUID in N format), title, description, sourcePaths (empty), scenarioIds.
+        Each scenario has id (a new GUID in N format), name (exact unique name without the live suffix), body,
+        isLive (boolean). Several scenarios may describe one behavior; a scenario may link to several behaviors.
+        Keep descriptions small, natural and precise. These are document records, not executable grammar.
+        Never embed scenario headings inside a description. Do not assign source paths; the Builder does that.
         Reply with JSON only, no prose and no code fences:
         {"name": "lowercase-words-with-hyphens", "title": "Short title", "description": "One sentence for people.",
          "runtime": "<registered runtime name>", "spec": "...full Markdown spec..."}
@@ -113,6 +119,11 @@ internal static class AgentPrompts
         implementation so they pass.
 
         Your final reply is JSON only, no prose and no code fences:
+        If an authoring document is provided, also return behaviorSources: an array of
+        {"behaviorId":"exact existing ID","sourcePaths":["behaviors/file.cs"]}.
+        Reference only source files you actually return. Do not change any document IDs or prose.
+        Return operations as [{"name":"operation","description":"What it does"}] when the app has
+        operations beyond ask. Descriptions are the intended behavior, scenarios are its verification examples.
         {"settings": [{"name": "Model", "description": "...", "default": "IGemma4"}],
          "files": {"tests.cs": "...", "prompts/system.md": "..."}, "source": ""}
         """;

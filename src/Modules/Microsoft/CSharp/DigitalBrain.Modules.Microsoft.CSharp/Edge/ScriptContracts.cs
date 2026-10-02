@@ -7,11 +7,8 @@ namespace DigitalBrain.Microsoft.CSharp;
 // assemblies, nothing else. Composing a module is what exposes its contracts to scripts.
 internal sealed class ScriptContracts(IEnumerable<Assembly> assemblies)
 {
-    private readonly IReadOnlyDictionary<string, Type> _contracts = assemblies
-        .Where(assembly => !PlatformAssemblyAttribute.IsPlatform(assembly))
-        .SelectMany(assembly => assembly.GetExportedTypes())
-        .Where(type => type.IsInterface && typeof(INeuron).IsAssignableFrom(type) && type != typeof(INeuron))
-        .Where(type => !PlatformOnlyAttribute.AppliesTo(type))
+    private readonly IReadOnlyDictionary<string, Type> _contracts = ContractVocabulary.VisibleTypes(assemblies)
+        .Where(ContractVocabulary.IsNeuron)
         // Double filter (assembly + per-type) is deliberate defense-in-depth: credential-bearing contracts protected at both levels.
         .ToDictionary(type => type.FullName!, StringComparer.Ordinal);
 
