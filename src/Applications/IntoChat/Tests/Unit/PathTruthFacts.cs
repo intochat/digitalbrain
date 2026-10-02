@@ -1,11 +1,41 @@
 using System.Xml.Linq;
 using System.Text.RegularExpressions;
 using System.Text.Json;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace IntoChat.Tests.Unit;
 
 public sealed class PathTruthFacts
 {
+    [Fact]
+    public void AppHostConfiguresCapacityWithoutContent()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var root = CSharpSyntaxTree.ParseText(Read("src/Applications/IntoChat/AppHost/AppHost.cs"), cancellationToken: ct).GetRoot(ct);
+        var modules = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
+            .Where(call => call.Expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax { Identifier.Text: "WithModule" } });
+        var permittedCalls = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "WithLlm", "WithDefaultLlm", "WithDefaultEmbedding", "WithVoiceToText", "WithTavilySearch",
+            "WithHostedQdrant", "WithClickHouse", "WithConnection", "WithPostgres", "WithGmail", "WithHostedMcp", "RunDesktopApp"
+        };
+        foreach (var module in modules)
+        {
+            foreach (var call in module.ArgumentList.DescendantNodes().OfType<InvocationExpressionSyntax>())
+            {
+                var member = Assert.IsType<MemberAccessExpressionSyntax>(call.Expression);
+                Assert.Contains(member.Name.Identifier.ValueText, permittedCalls);
+                if (member.Name.Identifier.ValueText == "WithClickHouse") { Assert.Empty(call.ArgumentList.Arguments); }
+            }
+            foreach (var literal in module.ArgumentList.DescendantNodes().OfType<LiteralExpressionSyntax>().Where(value => value.IsKind(SyntaxKind.StringLiteralExpression)))
+            { Assert.Contains(literal.Token.ValueText, new[] { "supabase", "digitalbrain" }); }
+            foreach (var assignment in module.ArgumentList.DescendantNodes().OfType<AssignmentExpressionSyntax>())
+            { Assert.Contains(assignment.Left.ToString(), new[] { "options.DatabaseName", "ai.Telemetry.EnableSensitiveData" }); }
+        }
+    }
+
     private static readonly string RepositoryRoot = FindRepositoryRoot();
 
     private static string FindRepositoryRoot()
