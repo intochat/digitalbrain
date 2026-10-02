@@ -35,15 +35,34 @@ class ResearchWindowClient extends FirstRunClient {
   );
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
-    if (request.url.path.endsWith('/applications/customer-researcher/open')) {
+    if (request.url.path.endsWith('/apps')) {
+      return json([
+        {
+          'id': 'intochat/customer-researcher',
+          'title': 'Customer Researcher',
+          'description': 'Research companies',
+          'app': {
+            'operations': [
+              {'name': 'open'},
+            ],
+          },
+        },
+      ]);
+    }
+    if (request.url.path ==
+        Uri.parse(
+          DigitalBrainUiClient.appOpenPath(
+            store.currentProject.id,
+            'intochat/customer-researcher',
+          ),
+        ).path) {
       // Server publishes workspace membership before its open response arrives.
       opened = true;
       store.reconcileWorkspace(store.currentProject, snapshot);
       return json({
         'id': 'research-window',
         'title': 'Customer Researcher',
-        'kind': 'surface',
-        'surface': {'kind': 'surface', 'name': surface},
+        'surface': surface,
       });
     }
     if (request.url.path.endsWith('/apps/node') &&

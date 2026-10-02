@@ -10,7 +10,6 @@ import 'application_fixture.dart';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_app.dart';
 import 'package:flutter/material.dart';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_islands.dart';
-import 'package:digitalbrain_flutter_shell/workspace/app_launcher.dart';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -142,8 +141,4 @@ void main() {
     },
   );
 
-  test('the main assistant is offered in the launcher', () {
-    expect(assistantLauncherEntry.launchKey, 'assistant');
-    expect(assistantLauncherEntry.title, 'Assistant');
-  });
 }

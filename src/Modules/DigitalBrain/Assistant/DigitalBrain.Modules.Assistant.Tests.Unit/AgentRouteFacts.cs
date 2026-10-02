@@ -12,44 +12,14 @@ namespace DigitalBrain.Modules.Assistant.Tests.Unit;
 public sealed class AgentRouteFacts
 {
     [Fact]
-    public async Task AHostWithoutABuiltInSettingsPackageReportsItAsUnavailable()
-    {
-        var result = await BuiltInSettingsEndpoints.OpenSettings(null!, null!, new BuiltInSettingsOptions());
-        Assert.Equal(StatusCodes.Status503ServiceUnavailable, ((IStatusCodeHttpResult)result).StatusCode);
-    }
-
-    [Fact]
-    public void ProductCompositionKeepsInstalledPackagesWithoutMappingTheAuthoringRegistry()
+    public void AssistantDoesNotOwnAppOrPackageRoutes()
     {
         var snapshot = RouteSnapshot.Map(services =>
         {
             services.AddSingleton(typeof(IDigitalBrain), _ => null!);
-            services.AddSingleton(typeof(PackageService), _ => null!);
             services.AddSingleton<DigitalBrain.Compute.Usage.IUsageStore>(_ => null!);
         }, app => new AssistantModule().Configure(app));
-        Assert.Contains("/brains/{brainId}/packages/{owner}/{name}/invocations", snapshot.Routes);
-        Assert.DoesNotContain(snapshot.Routes, route => route.StartsWith("/packages", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void ConversationsVoiceAndInstalledPackagesAreServedUnderTheBrainRouteAndRegistryStaysGlobal()
-    {
-        var snapshot = RouteSnapshot.Map(services =>
-        {
-            services.AddSingleton(typeof(IDigitalBrain), _ => null!);
-            services.AddSingleton(typeof(PackageService), _ => null!);
-        }, app => { AgentEndpoints.Map(app); PackageEndpoints.Map(app); PackageEndpoints.MapAuthoring(app); });
-
-        snapshot.AssertEveryMethodAndRouteIsDistinct();
-        var routes = snapshot.Routes;
-        Assert.Contains("/brains/{brainId}/conversations/{threadId}", routes);
-        Assert.Contains("/brains/{brainId}/voice", routes);
-        Assert.Contains("/brains/{brainId}/packages/{owner}/{name}/invocations", routes);
-        Assert.Contains("/brains/{brainId}/built-in/settings/open", routes);
-        Assert.Contains("/packages/{owner}/{name}/publish", routes);
-        Assert.Contains("/agent", routes);
-        Assert.Contains("/ai/models", routes);
-        Assert.DoesNotContain(routes, route => route.StartsWith("/workspaces", StringComparison.Ordinal));
+        Assert.DoesNotContain(snapshot.Routes, route => route.Contains("/packages", StringComparison.Ordinal) || route.Contains("/apps", StringComparison.Ordinal));
     }
 
     [Fact]

@@ -27,7 +27,6 @@ public sealed class ComputeUsageRouteFacts
         var builder = WebApplication.CreateBuilder();
         builder.Services.AddSingleton<IDigitalBrain>(brain.SiloServices.GetRequiredService<IDigitalBrain>());
         builder.Services.AddSingleton(store);
-        builder.Services.AddSingleton<PackageService>(_ => null!);
         await using var app = builder.Build();
         new AssistantModule().Configure(app);
         var endpoint = ((IEndpointRouteBuilder)app).DataSources.SelectMany(source => source.Endpoints)

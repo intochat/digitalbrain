@@ -1,6 +1,7 @@
-using DigitalBrain.Sdk.Http;
+using System.Text.Json;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Sdk.Http;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -11,49 +12,53 @@ internal static class AppsEndpoints
 {
     public static void Map(IEndpointRouteBuilder endpoints)
     {
-        var apps = BrainRoutes.Group(endpoints, "/apps");
-        apps.MapGet("", (IDigitalBrain brain, CancellationToken ct) => ModuleHttp.Respond(async () =>
+        var apps = BrainRoutes.Group(endpoints, "/apps").AddEndpointFilter(ModuleRouteGuard.Guard);
+        apps.MapGet("", (IDigitalBrain brain, CancellationToken ct) => InstalledApps.List(brain, BrainScope.CurrentId(), ct));
+        apps.MapPost("/{appId}/open", (string appId, HttpRequest request, IDigitalBrain brain, CancellationToken ct)
+            => ModuleHttp.Respond(() => Invoke(appId, "open", request, brain, ct)));
+        apps.MapPost("/{appId}/invoke/{operation}", (string appId, string operation, HttpRequest request, IDigitalBrain brain, CancellationToken ct)
+            => ModuleHttp.Respond(() => Invoke(appId, operation, request, brain, ct)));
+    }
+
+    private static async Task<IResult> Invoke(string appId, string operation, HttpRequest request, IDigitalBrain brain, CancellationToken ct)
+    {
+        // ASP.NET keeps an encoded slash inside a single route segment.
+        appId = Uri.UnescapeDataString(appId);
+        PackageId id;
+        if (appId.Contains('/', StringComparison.Ordinal)) { id = PackageId.Parse(appId); }
+        else
         {
-            var scope = BrainScope.CurrentId();
-            var installed = await brain.Get<IAppCatalog>(scope).List().WaitAsync(ct);
-            var manifests = installed.Select(installation => installation.Manifest)
-                .OrderBy(manifest => manifest.Name, StringComparer.Ordinal)
-                .Select(manifest => new
-                {
-                    id = manifest.Id,
-                    name = manifest.Name,
-                    description = manifest.DescriptionForPeople,
-                    kind = manifest.Kind.ToString().ToLowerInvariant(),
-                    uiEntry = manifest.UiEntry,
-                    examplePrompts = manifest.ExamplePrompts,
-                    permissions = manifest.Permissions.Select(permission => new
-                    {
-                        semanticTypeId = permission.SemanticTypeId,
-                        reason = permission.Reason,
-                        write = permission.Write,
-                    }),
-                    meters = manifest.Meters.Select(meter => new
-                    {
-                        meterId = meter.MeterId,
-                        unit = meter.Unit,
-                        aggregation = meter.Aggregation,
-                        proposedPriceInCompute = meter.ProposedPriceInCompute,
-                    }),
-                })
-                .ToArray();
-            return Results.Ok(manifests);
-        }));
-        apps.MapGet("/{appId}/consent", (string appId, IDigitalBrain brain, CancellationToken ct) => ModuleHttp.Respond(async () =>
+            var installed = await InstalledApps.List(brain, BrainScope.CurrentId(), ct);
+            var matches = installed.Where(app => app.Package.Name == appId).ToArray();
+            if (matches.Length == 0) { return Results.NotFound(new { error = $"App '{appId}' is not installed in this brain." }); }
+            if (matches.Length > 1) { return Results.Conflict(new { error = $"App '{appId}' is ambiguous; use its owner/name id." }); }
+            id = matches[0].Package;
+        }
+        var app = brain.Get<IApp>(InstalledPackages.AppKey(id));
+        var snapshot = await app.Read().WaitAsync(ct);
+        if (snapshot.Status != AppStatus.Installed || snapshot.UninstallPending)
+        { return Results.NotFound(new { error = $"App '{appId}' is not installed in this brain." }); }
+        if (!snapshot.Operations.Any(item => item.Name == operation))
+        { return Results.UnprocessableEntity(new { error = $"App '{appId}' has no '{operation}' operation." }); }
+        using var reader = new StreamReader(request.Body);
+        var input = await reader.ReadToEndAsync(ct);
+        var invocation = await app.Invoke(new(Guid.NewGuid(), operation, input.Length == 0 ? "{}" : input)).WaitAsync(ct);
+        var started = TimeProvider.System.GetTimestamp();
+        while (invocation.Status == InvocationStatus.Pending && TimeProvider.System.GetElapsedTime(started) < TimeSpan.FromSeconds(30))
         {
-            var scope = BrainScope.CurrentId();
-            var sheet = await brain.Get<IAppConsent>(scope).Review(appId).WaitAsync(ct);
-            return Results.Ok(sheet);
-        }));
-        apps.MapPost("/{appId}/consent/approve", (string appId, IDigitalBrain brain, CancellationToken ct) => ModuleHttp.Respond(async () =>
+            await Task.Delay(100, ct);
+            invocation = await app.ReadInvocation(invocation.Id).WaitAsync(ct);
+        }
+        if (invocation.Status == InvocationStatus.Pending)
+        { return Results.Json(new { error = "The app has not answered yet.", invocationId = invocation.Id }, statusCode: 408); }
+        if (invocation.Status != InvocationStatus.Completed || invocation.Output is null)
+        { return Results.UnprocessableEntity(new { error = invocation.Error ?? "The app returned no output.", invocationId = invocation.Id }); }
+        try
         {
-            var scope = BrainScope.CurrentId();
-            var sheet = await brain.Get<IAppConsent>(scope).Approve(appId).WaitAsync(ct);
-            return Results.Ok(sheet);
-        }));
+            using var output = JsonDocument.Parse(invocation.Output);
+            return Results.Ok(output.RootElement.Clone());
+        }
+        catch (JsonException)
+        { return Results.UnprocessableEntity(new { error = "The app returned invalid JSON.", invocationId = invocation.Id }); }
     }
 }

@@ -15,6 +15,7 @@ internal static class MarketplaceEndpoints
     public static void MapMarketplace(this IEndpointRouteBuilder routes)
     {
         var packages = routes.MapGroup("/packages").AddEndpointFilter(ModuleRouteGuard.Guard);
+        PackageEndpoints.MapAuthoring(packages);
         packages.MapGet("/drafts", (IDigitalBrain brain)
             => brain.Get<IAppDrafts>(CallerContextStamper.Require().PrincipalId).List());
         packages.MapPost("/drafts/{id}", (string id, DraftRequest request, IDigitalBrain brain)

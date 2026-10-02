@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
 using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
@@ -19,7 +18,6 @@ internal sealed class ShippedAppPublisher(IDigitalBrain brain, MarketplaceServic
     // names ships only those.
     public const string ShipOnStartupKey = "DigitalBrain:Apps:ShipOnStartup";
 
-    private static readonly JsonSerializerOptions CanonicalJson = new(JsonSerializerDefaults.Web);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -58,33 +56,9 @@ internal sealed class ShippedAppPublisher(IDigitalBrain brain, MarketplaceServic
     }
     private async Task Ship(ShippedApp app)
     {
-        var package = brain.Get<IPackage>(app.Package.ToString());
-        var snapshot = await package.Read();
-        var revisionId = snapshot.Head;
-        if (revisionId is null || !Same((await package.ReadRevision(revisionId)).Content, app.Content))
-        {
-            revisionId = (await package.Commit(new CommitPackage(Guid.NewGuid(), snapshot.Head, app.Content, $"Ship {app.Content.Manifest.Title}"))).Id;
-            logger.LogInformation("Committed {Package}@{Revision}.", app.Package, revisionId);
-        }
-        var revision = new PackageRevisionRef(app.Package, revisionId);
-        var verifier = brain.Get<IAppVerification>(IAppVerification.Key(revision));
-        var verification = await verifier.Read();
-        if (verification is null)
-        {
-            await marketplace.RequireRunnable(revision);
-            verification = await verifier.Verify();
-        }
+        var verification = await new AppPublishing(brain, marketplace).Publish(app.Package, app.Content, $"Ship {app.Content.Manifest.Title}");
         if (!verification.Green)
-        {
-            logger.LogWarning("{Package}@{Revision} stays unpublished: {Failed} of {Total} scenarios did not pass.", app.Package, revisionId,
-                verification.Run.Scenarios.Count(scenario => !scenario.Passed), verification.Run.Scenarios.Length);
-            return;
-        }
-        if (snapshot.Published != revisionId)
-        {
-            await package.Publish(new PublishPackage(Guid.NewGuid(), revisionId));
-            logger.LogInformation("Published {Package}@{Revision}.", app.Package, revisionId);
-        }
+        { logger.LogWarning("{Package} stays unpublished: verification failed.", app.Package); }
     }
 
     // null means every package; an empty set means none.
@@ -95,15 +69,4 @@ internal sealed class ShippedAppPublisher(IDigitalBrain brain, MarketplaceServic
         var names => [.. names.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)],
     };
 
-    private static bool Same(PackageContent left, PackageContent right) => Canonical(left) == Canonical(right);
-
-    private static string Canonical(PackageContent content) => JsonSerializer.Serialize(new
-    {
-        content.Manifest,
-        content.Source,
-        files = new SortedDictionary<string, string>(content.Files?.ToDictionary() ?? [], StringComparer.Ordinal),
-    }, CanonicalJson);
 }
-
-
-

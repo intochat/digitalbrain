@@ -198,7 +198,7 @@ class _CSharpManagerState extends State<CSharpManager> {
       if (mounted && selected == id) {
         setState(
           () => notice =
-              'Shared as ${shared['owner']}/${shared['name']}. Anyone can install it from Packages.',
+              'Shared as ${shared['owner']}/${shared['name']}. Anyone can install it from Apps.',
         );
       }
     } catch (error) {

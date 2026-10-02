@@ -3,7 +3,6 @@ import 'dart:ui';
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:flutter/material.dart';
 
-import 'app_launcher.dart';
 import 'workspace_store.dart';
 
 class WorkspaceIslands extends StatelessWidget {
@@ -19,14 +18,14 @@ class WorkspaceIslands extends StatelessWidget {
     required this.onSettings,
     this.onCompute,
     this.onSwitchAccount,
-    this.onPackages,
+    this.onApps,
   });
   final WorkspaceStore store;
-  final List<AppManifestSummary> apps;
+  final List<InstalledAppSummary> apps;
   final ValueChanged<String> onLaunch, onRestore;
   final VoidCallback onNewWorkspace, onSavedWork, onSearch, onSettings;
   final VoidCallback? onCompute;
-  final VoidCallback? onSwitchAccount, onPackages;
+  final VoidCallback? onSwitchAccount, onApps;
   Widget island(BuildContext context, Widget child) => ClipRRect(
     borderRadius: BorderRadius.circular(19),
     child: BackdropFilter(
@@ -213,47 +212,66 @@ class WorkspaceIslands extends StatelessWidget {
               position: PopupMenuPosition.over,
               icon: const Icon(Icons.apps_rounded, size: 23),
               onSelected: (value) {
-                if (value == 'manage-packages') {
-                  onPackages?.call();
+                if (value == 'manage-apps') {
+                  onApps?.call();
                 } else {
                   onLaunch(value);
                 }
               },
               itemBuilder: (_) => [
                 for (final entry in [
-                  ...launcherEntries(apps),
-                  assistantLauncherEntry,
-                  customerResearcherLauncherEntry,
+                  (
+                    id: 'files',
+                    title: 'Files',
+                    description: 'Workspace assets',
+                    icon: Icons.folder_outlined,
+                  ),
+                  (
+                    id: 'images',
+                    title: 'Image Editor',
+                    description: 'Draw, crop and export',
+                    icon: Icons.tune,
+                  ),
+                  (
+                    id: 'assistant',
+                    title: 'Assistant',
+                    description: 'Chat or talk with the assistant',
+                    icon: Icons.assistant_outlined,
+                  ),
+                  if (store.developerMode)
+                    (
+                      id: 'csharp',
+                      title: 'C# files',
+                      description: 'Write and run single-file C# apps',
+                      icon: Icons.code,
+                    ),
+                  for (final app in apps.where(
+                    (app) => app.operations.contains('open'),
+                  ))
+                    (
+                      id: app.id,
+                      title: app.title,
+                      description: app.description,
+                      icon: Icons.web_asset_outlined,
+                    ),
                 ])
                   PopupMenuItem(
-                    value: entry.launchKey,
+                    value: entry.id,
                     child: ListTile(
                       leading: Icon(entry.icon),
                       title: Text(entry.title),
-                      subtitle: Text(entry.subtitle),
+                      subtitle: Text(entry.description),
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),
-                if (store.developerMode) ...[
-                  const PopupMenuDivider(),
-                  PopupMenuItem(
-                    value: csharpLauncherEntry.launchKey,
-                    child: ListTile(
-                      leading: Icon(csharpLauncherEntry.icon),
-                      title: Text(csharpLauncherEntry.title),
-                      subtitle: Text(csharpLauncherEntry.subtitle),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                ],
-                if (onPackages != null) ...[
+                if (onApps != null) ...[
                   const PopupMenuDivider(),
                   const PopupMenuItem(
-                    value: 'manage-packages',
+                    value: 'manage-apps',
                     child: ListTile(
                       leading: Icon(Icons.extension_outlined),
-                      title: Text('Packages'),
-                      subtitle: Text('Browse and manage packages'),
+                      title: Text('Apps'),
+                      subtitle: Text('Browse and manage apps'),
                       contentPadding: EdgeInsets.zero,
                     ),
                   ),

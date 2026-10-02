@@ -27,8 +27,7 @@ internal sealed class MarketplaceService(IDigitalBrain brain, AppAuthoringPolicy
     public async Task<AppSpecView> Verify(PackageId id, string? revisionId)
     {
         var revision = await Revision(id, revisionId);
-        await RequireRunnable(revision);
-        await brain.Get<IAppVerification>(IAppVerification.Key(revision)).Verify();
+        await new AppPublishing(brain, this).Verify(revision, force: true);
         return await Spec(id, revision.Revision);
     }
 

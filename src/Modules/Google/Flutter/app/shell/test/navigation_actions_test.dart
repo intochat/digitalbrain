@@ -1,5 +1,5 @@
 import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
-import 'package:digitalbrain_flutter_shell/workspace/apps/packages_screen.dart';
+import 'package:digitalbrain_flutter_shell/workspace/apps/apps_screen.dart';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_app.dart';
 import 'package:digitalbrain_flutter_shell/workspace/workspace_store.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +10,7 @@ import 'workspace_remote_controller_test.dart' show MemoryPersistence;
 
 void main() {
   for (final width in [1440.0, 390.0]) {
-    testWidgets('account and package actions live in their menus at $width', (
+    testWidgets('account and app actions live in their menus at $width', (
       tester,
     ) async {
       tester.view.physicalSize = Size(width, 900);
@@ -35,7 +35,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Switch account'), findsNothing);
-      expect(find.byTooltip('Packages'), findsNothing);
+      expect(find.byTooltip('Apps'), findsNothing);
       expect(find.text('Send'), findsOneWidget);
 
       await tester.tap(find.byTooltip('Profile'));
@@ -48,15 +48,15 @@ void main() {
 
       await tester.tap(find.byTooltip('Applications'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Packages'));
+      await tester.tap(find.text('Apps'));
       await tester.pumpAndSettle();
-      final packages = tester.widget<PackagesScreen>(
-        find.byType(PackagesScreen),
+      final packages = tester.widget<AppsScreen>(
+        find.byType(AppsScreen),
       );
       expect(packages.workspaceId, store.currentProject.id);
       packages.onClose();
       await tester.pumpAndSettle();
-      expect(find.byType(PackagesScreen), findsNothing);
+      expect(find.byType(AppsScreen), findsNothing);
       expect(store.currentProject.presentation.openArtifactIds, isEmpty);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());

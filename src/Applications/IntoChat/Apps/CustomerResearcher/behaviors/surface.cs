@@ -29,7 +29,8 @@ async Task<AppResponse> OpenAsync(Guid id)
 {
     await ComposeAsync();
     var surface = new UiChildRef(UIVocabulary.SurfaceType, appKey + "/surface");
-    var workspace = appKey[..appKey.LastIndexOf('/', StringComparison.Ordinal)];
+    var installed = appKey.IndexOf("/packages/", StringComparison.Ordinal);
+    var workspace = appKey[..(installed >= 0 ? installed : appKey.LastIndexOf('/', StringComparison.Ordinal))];
     await brain.Get<IWorkspace>(workspace)
         .EnsureOpenAsync("customer-researcher", "Customer Researcher", WindowReference.For(surface), CancellationToken.None);
     return new AppResponse(id, JsonSerializer.Serialize(new { id = "customer-researcher", title = "Customer Researcher", surface = surface.Name }), null);
