@@ -69,8 +69,8 @@ Scripts never see: `Kernel`, `Kernel.Sdk`, `Platform`.
 
 ### DigitalBrain (pure) — contents
 
-Implemented at `src/Modules/DigitalBrain/Kernel/DigitalBrain/`; the files are the normative
-definition. One role per type:
+Implemented at `src/DigitalBrain/` — top level, above `Modules/`: the model sits above the
+kernel ring, not inside it. The files are the normative definition. One role per type:
 
 - `INeuron` — `Task<ISynapse> Watch(INeuronObserver)` / `Task Unwatch(INeuronObserver)`.
   Unwatch exists beside disposal so a connection can be severed by anyone cleaning up (an app
@@ -108,12 +108,10 @@ contracts, v1, on purpose.
 
 Create the structure without migrating modules:
 
-1. New project `src/Modules/DigitalBrain/Kernel/DigitalBrain/` (`DigitalBrain.csproj`), package-
-   shaped, no Orleans reference: `INeuron` (pure), `INeuronObserver` (pure), `Synapse`, plus the
-   laws in XML docs/README. The pure `Signal` and `IBrain` land here as far as they can move
-   without breaking serialization; where the existing Orleans-attributed `Signal` cannot yet
-   inherit cleanly, the pure layer documents the concept and the type stays in the ABI with a
-   `// ABI-bound, see spec` note — no type is duplicated with diverging meaning.
+1. New project `src/DigitalBrain/` (`DigitalBrain.csproj`), package-shaped, no Orleans
+   reference — done; contents as described above. Where the existing Orleans-attributed types
+   cannot yet re-derive cleanly, the pure layer documents the concept and the type stays in the
+   ABI with a `// ABI-bound, see spec` note — no type is duplicated with diverging meaning.
 2. Existing `DigitalBrain.Contracts` takes the **role** of `Kernel.Contracts`: it references
    `DigitalBrain`, and its `INeuron`/`INeuronObserver` re-derive from the pure interfaces
    (`INeuron : DigitalBrain.INeuron, IGrainWithStringKey`). Type names and namespaces that
