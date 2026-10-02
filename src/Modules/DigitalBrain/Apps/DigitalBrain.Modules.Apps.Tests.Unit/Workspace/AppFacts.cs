@@ -6,6 +6,23 @@ namespace DigitalBrain.Modules.Apps.Tests.Unit.Workspace;
 
 public sealed class AppFacts
 {
+    [Fact]
+    public async Task UninstallTwiceAndInstallReplayAfterReactivationDoNotDeployAgain()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await PackageBrain.StartAsync(ct);
+        var revision = await Publish(brain, "Research");
+        var app = brain.Get<IApp>(Key());
+        var install = new InstallApp(Guid.NewGuid(), new(Researcher, revision.Id), new Dictionary<string, string>());
+        var installed = await app.Install(install);
+        await brain.Brain.DeactivateAsync(app, ct);
+        Assert.Equal(installed.CSharpFiles, (await app.Install(install)).CSharpFiles);
+        await app.Uninstall(new(Guid.NewGuid()));
+        await brain.Brain.DeactivateAsync(app, ct);
+        Assert.Equal(AppStatus.Uninstalled, (await app.Uninstall(new(Guid.NewGuid()))).Status);
+        Assert.Equal(AppStatus.Uninstalled, (await app.Install(install)).Status);
+    }
+
     private static readonly PackageId Researcher = PackageId.Parse("alice/researcher");
 
     [Fact]

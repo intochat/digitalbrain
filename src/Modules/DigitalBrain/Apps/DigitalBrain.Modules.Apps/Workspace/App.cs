@@ -1,9 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using DigitalBrain.Apps.Signals;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
+using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Microsoft.CSharp;
+using DigitalBrain.Postgres;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Apps;
@@ -11,7 +14,7 @@ namespace DigitalBrain.Apps;
 [GrainType("apps.app")]
 internal sealed class App(
     [PersistentState("app", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<AppState> store,
-    TimeProvider clock, AppRequirements requirements)
+    TimeProvider clock, AppRequirements requirements, ModuleInventory modules)
     : Neuron<AppState>(store), IApp
 {
     private const int MaxInvocations = 256;
@@ -23,6 +26,7 @@ internal sealed class App(
     public async Task<AppSnapshot> Install(InstallApp request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        await Resume();
         if (Replay(request.OperationId, request)) { return Describe(Snapshot); }
         if (Snapshot.Status == AppStatus.Installed)
         { throw new InvalidOperationException($"{Snapshot.Revision!.Package} is already installed here; configure or upgrade it instead."); }
@@ -32,8 +36,8 @@ internal sealed class App(
         var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], request.Accounts ?? new Dictionary<string, string>());
         var runtime = revision.Content.Manifest.RuntimeName;
         var generation = Snapshot.ProgramGeneration + 1;
-        var programs = await Deploy(runtime, generation, revision.Content, settings, accounts);
-        await Persist(Snapshot with
+        var programs = runtime == PackageManifest.CSharpRuntime ? revision.Content.Programs().Keys.ToArray() : [];
+        await DeployAndPersist(Snapshot with
         {
             Status = AppStatus.Installed,
             Runtime = runtime,
@@ -45,6 +49,9 @@ internal sealed class App(
             ProgramGeneration = generation,
             ScriptPaths = programs,
             Receipts = Receipted(request.OperationId, request),
+            StorageFiles = programs.Select(path => FileKey(generation, path)).ToArray(),
+            StorageHistoryKnown = true,
+            LifecycleReceipts = [.. Snapshot.LifecycleReceipts, new(request.OperationId, CommandHash(request), "")],
         });
         return Describe(Snapshot);
     }
@@ -52,6 +59,7 @@ internal sealed class App(
     public async Task<AppSnapshot> Configure(ConfigureApp request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        await Resume();
         if (Replay(request.OperationId, request)) { return Describe(Snapshot); }
         RequireInstalled();
         var settings = Resolve(Snapshot.Declared, Snapshot.Settings, request.Settings);
@@ -60,15 +68,17 @@ internal sealed class App(
         var selected = new Dictionary<string, string>(Snapshot.Accounts);
         foreach (var (slot, account) in request.Accounts ?? new Dictionary<string, string>()) { selected[slot] = account; }
         var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], selected);
-        await Retire(Snapshot.Runtime, Snapshot.ProgramGeneration);
-        var programs = await Deploy(Snapshot.Runtime, Snapshot.ProgramGeneration + 1, revision.Content, settings, accounts);
-        await Persist(Snapshot with { Settings = settings, Accounts = accounts, ProgramGeneration = Snapshot.ProgramGeneration + 1, ScriptPaths = programs, Receipts = Receipted(request.OperationId, request) });
+        await BackfillStorageFiles();
+        var programs = Snapshot.RunsScript ? revision.Content.Programs().Keys.ToArray() : [];
+        await DeployAndPersist(Snapshot with { Settings = settings, Accounts = accounts, ProgramGeneration = Snapshot.ProgramGeneration + 1, ScriptPaths = programs, Receipts = Receipted(request.OperationId, request),
+            StorageFiles = [.. Snapshot.StorageFiles, .. programs.Select(path => FileKey(Snapshot.ProgramGeneration + 1, path))] });
         return Describe(Snapshot);
     }
 
     public async Task<AppSnapshot> Upgrade(UpgradeApp request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        await Resume();
         if (Replay(request.OperationId, request)) { return Describe(Snapshot); }
         RequireInstalled();
         var installed = Snapshot.Revision!.Package;
@@ -82,9 +92,9 @@ internal sealed class App(
         var settings = Resolve(declared, kept, new Dictionary<string, string>());
         var accounts = ResolveAccounts(revision.Content.Manifest.Accounts ?? [], request.Accounts ?? Snapshot.Accounts);
         var runtime = revision.Content.Manifest.RuntimeName;
-        await Retire(Snapshot.Runtime, Snapshot.ProgramGeneration);
-        var programs = await Deploy(runtime, Snapshot.ProgramGeneration + 1, revision.Content, settings, accounts);
-        await Persist(Snapshot with
+        await BackfillStorageFiles();
+        var programs = runtime == PackageManifest.CSharpRuntime ? revision.Content.Programs().Keys.ToArray() : [];
+        await DeployAndPersist(Snapshot with
         {
             Runtime = runtime,
             Revision = request.Revision,
@@ -95,6 +105,7 @@ internal sealed class App(
             Operations = [.. revision.Content.Manifest.Operations],
             ScriptPaths = programs,
             Receipts = Receipted(request.OperationId, request),
+            StorageFiles = [.. Snapshot.StorageFiles, .. programs.Select(path => FileKey(Snapshot.ProgramGeneration + 1, path))],
         });
         return Describe(Snapshot);
     }
@@ -102,20 +113,38 @@ internal sealed class App(
     public async Task<AppSnapshot> Uninstall(UninstallApp request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        await Resume();
         if (Replay(request.OperationId, request)) { return Describe(Snapshot); }
-        RequireInstalled();
-        await Retire(Snapshot.Runtime, Snapshot.ProgramGeneration);
+        if (Snapshot.Status != AppStatus.Installed) { return Describe(Snapshot); }
+        await BackfillStorageFiles();
+        await Persist(Snapshot with { PendingUninstall = request });
+        await CompleteUninstall();
+        return Describe(Snapshot);
+    }
+
+    private async Task CompleteUninstall()
+    {
+        var request = Snapshot.PendingUninstall!;
+        foreach (var file in Snapshot.StorageFiles) { await GrainFactory.GetGrain<ICSharpFile>(file).Delete(); }
+        if (modules.ContractAssemblies().Contains(typeof(IPostgresTable).Assembly))
+        {
+            await GrainFactory.GetGrain<IPostgresStorageMigration>("table-owners-v1").Ensure();
+            var brain = BrainScope.CurrentId();
+            foreach (var file in Snapshot.StorageFiles)
+            { await GrainFactory.GetGrain<IPostgresTables>(JsonSerializer.Serialize(new[] { brain, file })).Retire(); }
+        }
         var now = clock.GetUtcNow();
         var invocations = Snapshot.Invocations
             .Select(item => item.Status == InvocationStatus.Pending ? item with { Status = InvocationStatus.Failed, Error = "The app was uninstalled.", CompletedAt = now } : item)
             .ToList();
-        await Persist(Snapshot with { Status = AppStatus.Uninstalled, Invocations = invocations, Receipts = Receipted(request.OperationId, request) });
-        return Describe(Snapshot);
+        await Persist(Snapshot with { Status = AppStatus.Uninstalled, Invocations = invocations, Receipts = Receipted(request.OperationId, request), PendingUninstall = null,
+            LifecycleReceipts = [.. Snapshot.LifecycleReceipts, new(request.OperationId, CommandHash(request), "")] });
     }
 
     public async Task<AppInvocation> Invoke(InvokeApp request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        await Resume();
         if (Snapshot.Invocations.Find(item => item.Id == request.InvocationId) is { } existing) { return existing; }
         RequireInstalled();
         if (!Snapshot.Operations.Any(operation => operation.Name == request.Operation))
@@ -194,6 +223,49 @@ internal sealed class App(
         }
     }
 
+    private async Task Resume()
+    {
+        if (Snapshot.PendingDeployment is not null) { await CompleteDeployment(); }
+        if (Snapshot.PendingUninstall is not null) { await CompleteUninstall(); }
+    }
+
+    private async Task DeployAndPersist(AppState target)
+    {
+        await Persist(Snapshot with { PendingDeployment = new(target) });
+        await CompleteDeployment();
+    }
+
+    private async Task CompleteDeployment()
+    {
+        var target = Snapshot.PendingDeployment!.Target;
+        var revision = await GrainFactory.GetGrain<IPackage>(target.Revision!.Package.ToString()).ReadRevision(target.Revision.Revision);
+        await Retire(Snapshot.Runtime, Snapshot.ProgramGeneration);
+        await Deploy(target.Runtime, target.ProgramGeneration, revision.Content, target.Settings, target.Accounts);
+        await Persist(target);
+    }
+
+    private async Task BackfillStorageFiles()
+    {
+        if (Snapshot.StorageHistoryKnown) { return; }
+        var paths = new HashSet<string>(Snapshot.ScriptPaths, StringComparer.Ordinal) { PackageContent.SourcePath };
+        if (Snapshot.Revision is { } installed)
+        {
+            var package = GrainFactory.GetGrain<IPackage>(installed.Package.ToString());
+            var remaining = new Stack<string>();
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            remaining.Push(installed.Revision);
+            while (remaining.TryPop(out var id))
+            {
+                if (!visited.Add(id)) { continue; }
+                var revision = await package.ReadRevision(id);
+                paths.UnionWith(revision.Content.Programs().Keys);
+                foreach (var parent in revision.Parents) { remaining.Push(parent); }
+            }
+        }
+        var files = Enumerable.Range(1, Snapshot.ProgramGeneration).SelectMany(generation => paths.Select(path => FileKey(generation, path)));
+        await Persist(Snapshot with { StorageFiles = files.Distinct(StringComparer.Ordinal).ToArray(), StorageHistoryKnown = true });
+    }
+
     // The script reads brain.Setting("App") to find this neuron, brain.Setting(name) for each setting
     // and brain.Setting("Account__" + slot) for each connected account.
     private Dictionary<string, string> Configuration(IReadOnlyDictionary<string, string> settings, IReadOnlyDictionary<string, string> accounts)
@@ -242,7 +314,8 @@ internal sealed class App(
 
     private bool Replay(Guid operationId, object request)
     {
-        var receipt = Snapshot.Receipts.Find(item => item.OperationId == operationId);
+        var receipt = Snapshot.LifecycleReceipts.FirstOrDefault(item => item.OperationId == operationId)
+            ?? Snapshot.Receipts.Find(item => item.OperationId == operationId);
         if (receipt is null) { return false; }
         return receipt.RequestHash == CommandHash(request)
             ? true
