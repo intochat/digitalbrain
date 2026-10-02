@@ -7,6 +7,25 @@ namespace DigitalBrain.Modules.Apps.Tests.Unit.Workspace;
 public sealed class AppFacts
 {
     [Fact]
+    public async Task ReplayingAnUninstallThatWasAlreadyANoOpCannotRemoveALaterInstall()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await PackageBrain.StartAsync(ct);
+        var revision = await Publish(brain, "Research");
+        var app = brain.Get<IApp>(Key());
+        var uninstall = new UninstallApp(Guid.NewGuid());
+        Assert.Equal(AppStatus.NotInstalled, (await app.Uninstall(uninstall)).Status);
+        var installed = await app.Install(new(Guid.NewGuid(), new(Researcher, revision.Id), new Dictionary<string, string>()));
+        await brain.Brain.DeactivateAsync(app, ct);
+
+        var replayed = await app.Uninstall(uninstall);
+
+        Assert.Equal(AppStatus.Installed, replayed.Status);
+        Assert.Equal(installed.CSharpFiles, replayed.CSharpFiles);
+        Assert.Equal(CSharpFileStatus.Running, File(replayed).Status);
+    }
+
+    [Fact]
     public async Task UninstallTwiceAndInstallReplayAfterReactivationDoNotDeployAgain()
     {
         var ct = TestContext.Current.CancellationToken;

@@ -62,6 +62,52 @@ public sealed class AppRequirementFacts
         Assert.Equal(AppStatus.Installed, (await app.Install(request)).Status);
     }
 
+    [Fact]
+    public async Task VerificationRefusesMissingTestContractsBeforeLaunchingTheSandbox()
+    {
+        await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
+        var (_, request) = await Prepare(brain, "// behavior", "#:project /brain/DigitalBrain.Modules.Postgres.Contracts.csproj\n// test");
+        var verification = brain.Get<IAppVerification>(IAppVerification.Key(request.Revision));
+
+        var error = await Assert.ThrowsAnyAsync<InvalidOperationException>(verification.Verify);
+
+        Assert.Equal("Cannot install this app. Missing modules: Postgres.", error.Message);
+        Assert.Null(await verification.Read());
+        Assert.DoesNotContain(RecordingCSharpFile.Files.Keys, key => key.StartsWith($"specs/{request.Revision.Package}@{request.Revision.Revision}", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AMissingUpgradeRequirementLeavesTheRunningRevisionAndFilesUntouched()
+    {
+        await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
+        var (app, request) = await Prepare(brain, "// behavior");
+        var installed = await app.Install(request);
+        Caller.As("alice");
+        var package = brain.Get<IPackage>(request.Revision.Package.ToString());
+        var current = await package.ReadRevision(request.Revision.Revision);
+        var next = await package.Commit(brain.Commit(current.Id, current.Content with { Source = "#:project /brain/DigitalBrain.Modules.Postgres.Contracts.csproj\n// upgraded" }));
+        Caller.Clear();
+
+        var error = await Assert.ThrowsAnyAsync<InvalidOperationException>(() => app.Upgrade(new(Guid.NewGuid(), new(request.Revision.Package, next.Id))));
+
+        Assert.Equal("Cannot install this app. Missing modules: Postgres.", error.Message);
+        Assert.Equal(installed.Revision, (await app.Read()).Revision);
+        Assert.Equal(installed.CSharpFiles, (await app.Read()).CSharpFiles);
+        Assert.All(installed.CSharpFiles, file => Assert.False(RecordingCSharpFile.Deleted.ContainsKey(file)));
+    }
+
+    [Fact]
+    public async Task DuplicateQuotedAndWindowsPathsNameEachMissingModuleOnce()
+    {
+        await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
+        var (app, request) = await Prepare(brain, "#:project \"/brain/DigitalBrain.Modules.Postgres.Contracts.csproj\"\r\n#:project ..\\DigitalBrain.Modules.Postgres.Contracts.csproj\r\n// behavior");
+
+        var error = await Assert.ThrowsAnyAsync<InvalidOperationException>(() => app.Install(request));
+
+        Assert.Equal("Cannot install this app. Missing modules: Postgres.", error.Message);
+        Assert.Empty((await app.Read()).CSharpFiles);
+    }
+
     private static async Task<(IApp, InstallApp)> Prepare(PackageBrain brain, string source, string? tests = null)
     {
         Caller.As("alice");

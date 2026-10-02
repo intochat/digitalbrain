@@ -117,7 +117,12 @@ internal sealed class App(
         ArgumentNullException.ThrowIfNull(request);
         await Resume();
         if (Replay(request.OperationId, request)) { return Describe(Snapshot); }
-        if (Snapshot.Status != AppStatus.Installed) { return Describe(Snapshot); }
+        if (Snapshot.Status != AppStatus.Installed)
+        {
+            // Even a no-op must remain a no-op when delivery repeats after a later install.
+            await Persist(Snapshot with { LifecycleReceipts = [.. Snapshot.LifecycleReceipts, new(request.OperationId, CommandHash(request), "")] });
+            return Describe(Snapshot);
+        }
         await BackfillStorageFiles();
         await Persist(Snapshot with { PendingUninstall = request });
         await CompleteUninstall();
