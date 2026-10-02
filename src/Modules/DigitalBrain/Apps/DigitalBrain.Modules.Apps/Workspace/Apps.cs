@@ -30,8 +30,7 @@ internal sealed class Apps(
         // Backfill installations predating this index once. Normal reads never scan the
         // marketplace or activation registry; IApp tracks every new installation itself.
         var prefix = this.GetPrimaryKeyString() + "/packages/";
-        var candidates = (await GrainFactory.GetGrain<IPackageDirectory>(PackageDirectory.Key).List())
-            .Select(listing => listing.Package).ToHashSet();
+        var candidates = new HashSet<PackageId>();
         if (modules.Types.Any(module => module.FullName == "DigitalBrain.Registry.RegistryModule"))
         {
             var registry = GrainFactory.GetGrain<IRegistry>(IRegistry.Key);
