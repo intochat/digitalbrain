@@ -1,109 +1,103 @@
 import 'package:flutter/material.dart';
 
-Map<String, dynamic> _map(dynamic value) =>
-    value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
+import 'app_document.dart';
+import 'app_verification_summary.dart';
+import 'behavior_block.dart';
+import 'scenario_list.dart';
+import 'spec_document.dart';
+import 'spec_vocabulary.dart';
+import 'registry_token_sheet.dart';
 
-List<Map<String, dynamic>> _list(dynamic value) =>
-    value is List ? value.map(_map).toList() : <Map<String, dynamic>>[];
-
-const _scenarioHeading = '## Scenario:';
-
-// An app as its spec: the plain-language text the Author wrote, with the verdict of the last test
-// run next to every scenario heading and the failure message under a red one.
 class AppSpecView extends StatelessWidget {
-  const AppSpecView({super.key, required this.spec, this.run});
-
-  // The spec's Markdown text and the AppTestRun as the brain serializes it.
+  const AppSpecView({
+    super.key,
+    required this.spec,
+    this.run,
+    this.document,
+    this.vocabulary = const [],
+    this.files = const {},
+    this.sourceRevision,
+    this.current = true,
+    this.onEdit,
+    this.onDuplicate,
+    this.onDelete,
+  });
   final String spec;
   final Map<String, dynamic>? run;
+  final AppDocument? document;
+  final List<SpecToken> vocabulary;
+  final Map<String, String> files;
+  final String? sourceRevision;
+  final bool current;
+  final ValueChanged<AppBehavior>? onEdit, onDuplicate, onDelete;
 
   @override
-  Widget build(BuildContext context) {
-    final verdicts = {
-      for (final scenario in _list(run?['scenarios']))
-        '${scenario['name']}': scenario,
-    };
-    final children = <Widget>[];
-    for (final rawLine in spec.split('\n')) {
-      final line = rawLine.trimRight();
-      if (line.startsWith(_scenarioHeading)) {
-        final name = line.substring(_scenarioHeading.length).trim();
-        final verdict = verdicts[name];
-        children.add(
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: Row(
-              children: [
-                _VerdictDot(verdict: verdict),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Scenario: $name',
-                    key: ValueKey('scenario-$name'),
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: childrenFor(context),
+  );
+
+  List<Widget> childrenFor(BuildContext context) {
+    final parsed = document == null ? parseSpec(spec) : null;
+    final all = document?.scenarios ?? parsed!.scenarios;
+    final result = run == null ? null : VerificationRun.fromJson(run!);
+    final linked =
+        document?.behaviors.expand((b) => b.scenarioIds).toSet() ?? <String>{};
+    final unlinked = all.where((s) => !linked.contains(s.id)).toList();
+    final preamble = document?.preamble ?? parsed!.preamble;
+    return [
+      if (!current && result != null)
+        const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: Text(
+            'Changes need checking. Previous results do not cover these changes.',
           ),
-        );
-        final message = '${verdict?['message'] ?? ''}';
-        if (verdict?['passed'] == false && message.isNotEmpty) {
-          children.add(
-            Padding(
-              padding: const EdgeInsets.only(left: 18, top: 2),
-              child: Text(
-                message,
-                key: ValueKey('scenario-message-$name'),
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-            ),
-          );
-        }
-      } else if (line.startsWith('# ')) {
-        children.add(
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text(
-              line.substring(2).trim(),
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+        ),
+      if (current && result != null && !result.green)
+        const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: Text('The app check did not pass. Review the results below.'),
+        ),
+      for (final paragraph
+          in preamble
+              .trim()
+              .split(RegExp(r'\r?\n\s*\r?\n'))
+              .where((p) => p.isNotEmpty))
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: SpecProse(
+            paragraph.startsWith('# ') ? paragraph.substring(2) : paragraph,
+            vocabulary: vocabulary,
           ),
-        );
-      } else if (line.isNotEmpty) {
-        children.add(Text(line));
-      } else {
-        children.add(const SizedBox(height: 8));
-      }
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: children,
-    );
-  }
-}
-
-class _VerdictDot extends StatelessWidget {
-  const _VerdictDot({required this.verdict});
-
-  final Map<String, dynamic>? verdict;
-  static const double size = 10;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final (color, label) = switch (verdict?['passed']) {
-      true => (Colors.green, 'Passed'),
-      false => (scheme.error, 'Failed'),
-      _ => (scheme.outlineVariant, 'Not run yet'),
-    };
-    return Tooltip(
-      message: label,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      ),
-    );
+        ),
+      if (document != null) ...[
+        for (final behavior in document!.behaviors)
+          BehaviorBlock(
+            key: ValueKey('behavior-${behavior.id}'),
+            behavior: behavior,
+            scenarios: all,
+            run: result,
+            current: current,
+            vocabulary: vocabulary,
+            files: files,
+            sourceRevision: sourceRevision,
+            onEdit: onEdit == null ? null : () => onEdit!(behavior),
+            onDuplicate: onDuplicate == null
+                ? null
+                : () => onDuplicate!(behavior),
+            onDelete: onDelete == null ? null : () => onDelete!(behavior),
+          ),
+        if (unlinked.isNotEmpty)
+          Text('App scenarios', style: Theme.of(context).textTheme.titleMedium),
+      ],
+      for (final scenario in unlinked)
+        ScenarioList(
+          scenarios: [scenario],
+          all: all,
+          run: result,
+          current: current,
+          vocabulary: vocabulary,
+        ),
+    ];
   }
 }

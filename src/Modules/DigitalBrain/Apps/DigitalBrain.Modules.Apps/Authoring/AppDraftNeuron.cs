@@ -8,6 +8,7 @@ using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
 using DigitalBrain.Core;
 using Orleans.Runtime;
+using DigitalBrain.Microsoft.CSharp;
 
 namespace DigitalBrain.Apps;
 
@@ -19,7 +20,8 @@ internal sealed partial class AppDraftNeuron(
     IEnumerable<IAppRuntime> runtimes,
     AppAuthoringPolicy policy,
     AppPublishing publishing,
-    IScriptSandbox? csharp = null)
+    IScriptSandbox? csharp = null,
+    IContractVocabulary? vocabulary = null)
     : Neuron<AppDraftState>(store), IAppDraft
 {
     private const int MaxAuthorRetries = 2;
@@ -113,7 +115,14 @@ internal sealed partial class AppDraftNeuron(
         var verification = last is null
             ? null
             : await GrainFactory.GetGrain<IAppVerification>(IAppVerification.Key(new(PackageId.Create(Owner, Snapshot.Name), last.Revision))).Read();
-        return new(Snapshot, verification);
+        var source = verification?.Revision ?? Snapshot.SourceRevision;
+        var content = source is null ? null : (await GrainFactory.GetGrain<IPackage>(source.Package.ToString()).ReadRevision(source.Revision)).Content;
+        var files = new Dictionary<string, string>(content?.Files ?? new Dictionary<string, string>());
+        if (!string.IsNullOrEmpty(content?.Source)) { files[PackageContent.SourcePath] = content.Source; }
+        var current = Snapshot.Document is { } document
+            ? Snapshot.VerifiedDocumentHash == AppDocumentCodec.Hash(document) && Snapshot.Status == AppDraftStatus.Published
+            : Snapshot.Status == AppDraftStatus.Published;
+        return new(Snapshot, verification, AppSpecVocabulary.Read(content?.Manifest, vocabulary), files, source, current);
     }
 
     private async Task<AppDraftView> Author(AppDraftState draft, string task)

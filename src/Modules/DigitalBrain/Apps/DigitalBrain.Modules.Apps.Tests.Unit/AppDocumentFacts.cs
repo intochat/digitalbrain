@@ -51,4 +51,13 @@ public sealed class AppDocumentFacts
         Assert.NotNull(read.Error);
         Assert.Equal(original, AppDocumentCodec.Read(original, null).OriginalSpec);
     }
+
+    [Fact]
+    public void MetadataCannotClaimDifferentProseThanTheVerifiedSpec()
+    {
+        var d = Document();
+        var content = new PackageContent(new("App", "", [], []), "", new Dictionary<string, string> { [AppDocumentCodec.Path] = AppDocumentCodec.Encode(d), [PackageContent.SpecPath] = "Different program" });
+        Assert.False(AppDocumentCodec.Read(content).CanEdit);
+        Assert.Null(AppDocumentCodec.Read(content).Document);
+    }
 }

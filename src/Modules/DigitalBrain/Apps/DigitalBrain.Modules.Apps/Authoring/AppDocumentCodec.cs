@@ -15,7 +15,7 @@ internal static class AppDocumentCodec
 
     public static void Validate(AppAuthoringDocument d, IReadOnlyDictionary<string, string>? files = null, bool requireSources = false)
     {
-        if (d.Version != 1 || d.Behaviors is null || d.Scenarios is null || d.Preamble is null)
+        if (d is null || d.Version != 1 || d.Behaviors is null || d.Scenarios is null || d.Preamble is null)
             { throw new ArgumentException("Unsupported or incomplete authoring document."); }
         var ids = new HashSet<string>(StringComparer.Ordinal);
         var names = new HashSet<string>(StringComparer.Ordinal);
@@ -60,7 +60,19 @@ internal static class AppDocumentCodec
         return text.ToString();
     }
 
-    public static AppDocumentReadResult Read(PackageContent content) => Read(content.File(PackageContent.SpecPath) ?? "", content.File(Path));
+    public static AppDocumentReadResult Read(PackageContent content)
+    {
+        var read = Read(content.File(PackageContent.SpecPath) ?? "", content.File(Path));
+        if (read.Document is not { } document) { return read; }
+        try
+        {
+            Validate(document, content.Programs(), true);
+            if (ExportSpec(document) != read.OriginalSpec)
+            { throw new ArgumentException("The authoring metadata does not match this revision's specification."); }
+            return read;
+        }
+        catch (ArgumentException e) { return new(null, read.OriginalSpec, false, e.Message); }
+    }
     public static AppDocumentReadResult Read(string spec, string? metadata)
     {
         if (metadata is null) { return new(null, spec, false, null); }

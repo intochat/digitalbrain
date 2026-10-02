@@ -1,10 +1,12 @@
 using DigitalBrain.AI.GroupChat;
 using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
+using DigitalBrain.Microsoft.CSharp;
+using DigitalBrain.Core.Enforcement;
 
 namespace DigitalBrain.Apps;
 
-internal sealed class MarketplaceService(IDigitalBrain brain, AppPublishing publishing)
+internal sealed class MarketplaceService(IDigitalBrain brain, AppPublishing publishing, IContractVocabulary? vocabulary = null)
 {
 
     // Verifying any revision runs its tests.cs in the sandbox, so it is allowed exactly when running scripts is.
@@ -15,8 +17,12 @@ internal sealed class MarketplaceService(IDigitalBrain brain, AppPublishing publ
         var revision = await Revision(id, revisionId);
         var content = (await brain.Get<IPackage>(id.ToString()).ReadRevision(revision.Revision)).Content;
         var verification = await brain.Get<IAppVerification>(IAppVerification.Key(revision)).Read();
-        return new(revision, content.Manifest.RuntimeName, content.Files ?? new Dictionary<string, string>(),
-            content.File(PackageContent.SpecPath), content.File(PackageContent.TestsPath), verification);
+        var files = new Dictionary<string, string>(content.Files ?? new Dictionary<string, string>());
+        if (!string.IsNullOrEmpty(content.Source)) { files[PackageContent.SourcePath] = content.Source; }
+        return new(revision, content.Manifest.RuntimeName, files,
+            content.File(PackageContent.SpecPath), content.File(PackageContent.TestsPath), verification,
+            content.Manifest, AppDocumentCodec.Read(content), AppSpecVocabulary.Read(content.Manifest, vocabulary),
+            CallerContextStamper.Require().PrincipalId == id.Owner);
     }
 
     public async Task<AppSpecView> Verify(PackageId id, string? revisionId)
