@@ -1,6 +1,6 @@
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Identity;
-using DigitalBrain.Identity.Grants;
+using DigitalBrain.Platform.Identity.Grants;
 using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;

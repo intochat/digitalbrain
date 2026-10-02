@@ -1,6 +1,7 @@
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Identity;
+using DigitalBrain.Platform.Hosting;
 using DigitalBrain.Sdk.Capacity;
 using DigitalBrain.Sdk.Identity;
 using DigitalBrain.Sdk.Integrations;

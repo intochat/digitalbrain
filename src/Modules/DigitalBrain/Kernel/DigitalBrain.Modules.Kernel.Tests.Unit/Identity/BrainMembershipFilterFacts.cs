@@ -1,7 +1,7 @@
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Identity;
-using DigitalBrain.Identity.Grants;
+using DigitalBrain.Platform.Identity.Grants;
 using Xunit;
 
 namespace DigitalBrain.Core.Tests.Unit.Identity;

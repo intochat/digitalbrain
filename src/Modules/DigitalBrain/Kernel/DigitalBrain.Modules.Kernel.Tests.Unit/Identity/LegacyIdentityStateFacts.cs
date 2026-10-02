@@ -1,7 +1,7 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Identity;
-using DigitalBrain.Identity.Directory;
-using DigitalBrain.Identity.Grants;
+using DigitalBrain.Platform.Identity.Directory;
+using DigitalBrain.Platform.Identity.Grants;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;

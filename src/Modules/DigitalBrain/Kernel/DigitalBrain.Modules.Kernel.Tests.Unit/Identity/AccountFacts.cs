@@ -1,4 +1,5 @@
 using DigitalBrain.Identity;
+using DigitalBrain.Platform.Identity;
 using DigitalBrain.Testing.Unit;
 using Xunit;
 

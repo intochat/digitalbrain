@@ -2,7 +2,7 @@ using System.Security.Claims;
 using Aspire.Hosting.Testing;
 using Azure.Storage.Blobs;
 using DigitalBrain.Contracts;
-using DigitalBrain.Identity.Configuration;
+using DigitalBrain.Platform.Identity.Configuration;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.DependencyInjection;

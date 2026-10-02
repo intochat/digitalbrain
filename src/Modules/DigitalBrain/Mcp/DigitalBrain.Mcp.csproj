@@ -3,7 +3,7 @@
     <RootNamespace>DigitalBrain.Mcp</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../Kernel/DigitalBrain.Modules.Kernel.Client/DigitalBrain.Modules.Kernel.Client.csproj" />
+    <ProjectReference Include="..\Kernel\DigitalBrain.Modules.Kernel.Client\DigitalBrain.Client.csproj" />
     <ProjectReference Include="../../Time/DigitalBrain.Modules.Time.Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <ProjectReference Include="../Registry/DigitalBrain.Modules.Registry.Contracts/DigitalBrain.Modules.Registry.Contracts.csproj" />
     <ProjectReference Include="../Apps/DigitalBrain.Modules.Apps.Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
