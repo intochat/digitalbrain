@@ -239,12 +239,14 @@ comment/string false positives, and upgrade preserving the
 running revision. Prove sandbox scratch installation uses the same check.
 
 Postgres facts cover define -> upsert -> teardown -> redefine -> empty, teardown twice,
-reactivation between drop and state save, pinned origin after capacity changes, null-origin
-legacy state, pending DDL recovery, concurrent registration/retirement, old teardown after
+reactivation, pinned origin after capacity changes, null-origin source selection,
+pending DDL recovery, concurrent registration/retirement, old teardown after
 reuse, and another install/fork remaining intact. Apps facts exercise uninstall twice with
 different IDs, install replay after restart, failed final saves and every behavior generation.
-Any changed serialized type gets a frozen LegacyState-style reactivation fact, following
-Supabase's precedent; test both preserved fields and the new operation after reactivation.
+At the user's subsequent request, this change carries no LegacyState folders, capture scripts,
+or frozen binary fixtures. Their dependent fixture tests are removed. Current-state lifecycle
+facts continue to exercise reactivation and replay; historical serialized-byte compatibility
+is no longer verified by this change.
 
 Facts have sentence-shaped names, use TestContext.Current.CancellationToken and real neurons;
 fakes belong at connector boundaries. No new InternalsVisibleTo, no model in verification.
