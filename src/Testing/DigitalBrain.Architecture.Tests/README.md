@@ -22,7 +22,8 @@ an otherwise normally named production operation is used exclusively by tests.
 
 ## Persisted state compatibility
 
-The persisted graph starts at `IPersistentState<T>` constructor parameters/fields and follows
+The persisted graph starts at `IPersistentState<T>` constructor parameters/fields and closed
+`Grain<TState>` bases (including indirect generic inheritance), then follows
 serialized members, collection elements, base classes, and serializable polymorphic descendants.
 ID checks cover all production `[GenerateSerializer]` types, including records held inside JSON
 envelopes and wire contracts. IDs are checked per declaring type, including private fields and record properties.

@@ -81,6 +81,17 @@ internal static class PersistedStateRules
                 .Concat(type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Select(field => field.FieldType)))
             .Where(type => type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IPersistentState<>))
             .Select(type => type.GetGenericArguments()[0]));
+        foreach (var type in types)
+        {
+            for (var ancestor = type.BaseType; ancestor is not null; ancestor = ancestor.BaseType)
+            {
+                if (ancestor.IsGenericType && !ancestor.ContainsGenericParameters
+                    && ancestor.GetGenericTypeDefinition() == typeof(Grain<>))
+                {
+                    pending.Enqueue(ancestor.GetGenericArguments()[0]);
+                }
+            }
+        }
         HashSet<Type> visited = [];
         HashSet<Type> states = [];
         while (pending.TryDequeue(out var type))

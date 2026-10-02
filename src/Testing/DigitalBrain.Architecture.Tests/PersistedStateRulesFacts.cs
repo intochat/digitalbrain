@@ -5,6 +5,31 @@ namespace DigitalBrain.Architecture.Tests;
 
 public sealed class PersistedStateRulesFacts
 {
+    [Theory]
+    [InlineData(typeof(DirectStateGrain))]
+    [InlineData(typeof(InheritedStateGrain))]
+    public void GrainBaseStateAndItsNestedMembersAreValidated(Type grainType)
+    {
+        var states = PersistedStateRules.Discover(
+            [grainType, typeof(GrainState), typeof(PolymorphicState), typeof(Content), typeof(TextContent)]);
+        Assert.Contains(typeof(GrainState), states);
+        Assert.Contains(typeof(PolymorphicState), states);
+        Assert.Contains(typeof(TextContent), states);
+        Assert.Contains(states.SelectMany(type => PersistedStateRules.ShapeViolations(type, [])),
+            violation => violation.Contains("GrainState.Values: persisted collections", StringComparison.Ordinal));
+    }
+
+    internal sealed class DirectStateGrain : Grain<GrainState>;
+    internal abstract class StateGrain<TState> : Grain<TState> where TState : class, new();
+    internal sealed class InheritedStateGrain : StateGrain<GrainState>;
+
+    [GenerateSerializer]
+    internal sealed class GrainState
+    {
+        [Id(0)] public IReadOnlyList<string> Values { get; set; } = [];
+        [Id(1)] public PolymorphicState Nested { get; set; } = new();
+    }
+
     [Fact]
     public void PersistedPolymorphicMembersIncludeTheirConcreteSerializedTypes()
     {
