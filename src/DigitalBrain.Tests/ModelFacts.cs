@@ -1,3 +1,4 @@
+using System.Xml.Linq;
 using ArchUnitNET.Domain;
 using ArchUnitNET.Loader;
 using ArchUnitNET.xUnitV3;
@@ -33,10 +34,18 @@ public class ModelFacts
     [Fact]
     public void The_model_assembly_references_only_the_runtime()
     {
-        // ArchUnitNET sees what types USE; this sees what the assembly LINKS — an unused
-        // reference still widens what a future edit can reach without anyone noticing.
+        // ArchUnitNET sees type dependencies; this also checks emitted assembly links.
         Assert.All(Model.GetReferencedAssemblies(),
             reference => Assert.StartsWith("System", reference.Name));
+    }
+
+    [Fact]
+    public void The_model_project_declares_no_dependencies()
+    {
+        // Unused build references may disappear from the compiled assembly altogether.
+        var project = XDocument.Load(Path.Combine(AppContext.BaseDirectory, "Model.csproj"));
+        Assert.DoesNotContain(project.Descendants(), element => element.Name.LocalName is
+            "PackageReference" or "ProjectReference" or "FrameworkReference");
     }
 
     [Fact]

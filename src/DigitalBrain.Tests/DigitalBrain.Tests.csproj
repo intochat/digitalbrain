@@ -3,6 +3,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="../DigitalBrain/DigitalBrain.csproj" Link="Model.csproj" CopyToOutputDirectory="Always" />
     <Using Remove="DigitalBrain.Testing" />
     <PackageReference Include="TngTech.ArchUnitNET.xUnitV3" />
     <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />

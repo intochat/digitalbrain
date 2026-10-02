@@ -262,3 +262,22 @@ git commit -m "Record the phase-1 reference deferral and its namespace-shadowing
 
 Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ```
+
+## Execution notes
+
+- Completed on `digitalbrain-v0.2`; no model source or module-visible API changed.
+- Shared props supply xUnit v3; ArchUnitNET.xUnitV3 0.13.4 is centrally pinned. The new
+  project removes the inherited `DigitalBrain.Testing` using without referencing that library.
+- ArchUnitNET's default loaded-type set missed external dependency targets. The architecture
+  now includes `ReferencedTypes`, with rule subjects restricted to the model assembly. The
+  prescribed System-excluding pattern failed on all six model types before the correct
+  pattern passed. The reflection Assembly alias and inferred default satisfy compiler/analyzer rules.
+- Final review found that emitted assembly references cannot detect unused declared references.
+  A sixth fact parses a copied model csproj and rejects PackageReference, ProjectReference, and
+  FrameworkReference declarations. Each kind was injected into the test-output copy and produced
+  one failing fact; rebuilding restored the original input and all six facts passed. SDK-implicit
+  runtime references are not authored declarations. The model source remained unchanged.
+- Contracts built with zero warnings; kernel unit tests passed 192/192 before and after edits.
+- Deferred review minor: the spec's Testing section still describes interface re-derivation as
+  completed, although Phase 1 item 2 now explicitly defers it. AppHost smoke was not part of
+  this execution plan and was not run.
