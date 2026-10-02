@@ -104,6 +104,11 @@ metadata. Full Orleans independence of module contracts would need an own attrib
 source generator — a future front, not a phase of this spec. The kernel's ABI leaks into
 contracts, v1, on purpose.
 
+Phase 1 additionally defers the `Contracts → DigitalBrain` reference itself (namespace
+shadowing, see Phase 1 item 2); the migration phase's first step is Signal unification —
+`Publisher` becomes `NeuronId` at its thirteen string-comparison call sites — which unlocks
+that reference and the `IKernelNeuron`/`IKernelNeuronObserver` re-derivation.
+
 ## Phase 1 — the split (approved; this change)
 
 Create the structure without migrating modules:
@@ -112,10 +117,14 @@ Create the structure without migrating modules:
    reference — done; contents as described above. Where the existing Orleans-attributed types
    cannot yet re-derive cleanly, the pure layer documents the concept and the type stays in the
    ABI with a `// ABI-bound, see spec` note — no type is duplicated with diverging meaning.
-2. Existing `DigitalBrain.Contracts` takes the **role** of `Kernel.Contracts`: it references
-   `DigitalBrain`, and its `INeuron`/`INeuronObserver` re-derive from the pure interfaces
-   (`INeuron : DigitalBrain.INeuron, IGrainWithStringKey`). Type names and namespaces that
-   modules consume do **not** change in phase 1 — modules keep compiling untouched.
+2. Existing `DigitalBrain.Contracts` takes the **role** of `Kernel.Contracts`, but the project
+   reference to `DigitalBrain` is deferred: the pure package's `DigitalBrain` namespace is
+   resolved from enclosing namespaces *before* `using DigitalBrain.Contracts;`, so a transitive
+   reference would silently rebind `Signal`/`INeuron`/`INeuronObserver` in every module type
+   declared under a `DigitalBrain.*` namespace — worst case rebasing a module's signal record
+   onto the attribute-free pure `Signal` and breaking Orleans serialization at runtime. The
+   reference edge lands together with Signal unification in the migration phase; until then the
+   seam is named by `// ABI-bound` notes in `INeuron.cs`, `Signal.cs` and the Contracts csproj.
 3. Project renames (`Contracts` → `Kernel.Contracts`, `Core` → `Kernel`, `Sdk` → `Kernel.Sdk`)
    are deferred to the module-migration phase; phase 1 establishes the dependency shape, not the
    final file names.

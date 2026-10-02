@@ -1,6 +1,6 @@
 # DigitalBrain / Kernel Split — Phase 1 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Lock the pure `src/DigitalBrain` model package in place — purity enforced by test, model behavior pinned by facts, the ABI seam documented in code — without changing anything modules compile against.
 
@@ -228,7 +228,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Consumes: the discovery documented in Task 2's comments.
 - Produces: the spec's phase-1 section matches what was actually shipped; migration phase inherits the Signal-unification keystone as its named first step.
 
-- [ ] **Step 1: Amend the Phase 1 section**
+- [x] **Step 1: Amend the Phase 1 section**
 
 In the spec, replace phase-1 item 2 (the sentence beginning "Existing `DigitalBrain.Contracts` takes the **role** of `Kernel.Contracts`: it references `DigitalBrain`…") with:
 
@@ -243,7 +243,7 @@ In the spec, replace phase-1 item 2 (the sentence beginning "Existing `DigitalBr
    seam is named by `// ABI-bound` notes in `INeuron.cs`, `Signal.cs` and the Contracts csproj.
 ```
 
-- [ ] **Step 2: Add one line to Declared debt**
+- [x] **Step 2: Add one line to Declared debt**
 
 Append to the "Declared debt" section:
 
@@ -254,7 +254,7 @@ shadowing, see Phase 1 item 2); the migration phase's first step is Signal unifi
 that reference and the `IKernelNeuron`/`IKernelNeuronObserver` re-derivation.
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/superpowers/specs/2026-10-02-digitalbrain-kernel-split-design.md
