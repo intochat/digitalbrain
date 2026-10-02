@@ -6,9 +6,11 @@
 
 **Architecture:** The pure package already exists (committed). Phase 1 adds a dependency-free test project proving the package's laws, and `// ABI-bound` seam notes in `DigitalBrain.Contracts`. The planned `Contracts → DigitalBrain` project reference is **deliberately deferred**: the pure namespace is `DigitalBrain`, and C# resolves enclosing namespaces before `using` directives, so the transitive reference would silently rebind `Signal`/`INeuron`/`INeuronObserver` in every module type declared under `namespace DigitalBrain.*` — worst case `record Foo : Signal` rebasing onto the attribute-free pure `Signal` and breaking Orleans serialization at runtime. The reference edge therefore lands together with Signal unification in the migration phase. Task 3 records this in the spec.
 
-**Tech Stack:** .NET / xunit v3 (repo style: facts with sentence-shaped names, `TestContext.Current.CancellationToken` where async — not needed here, all facts are synchronous).
+**Tech Stack:** .NET / xunit (repo style: facts with sentence-shaped names) / NetArchTest.Rules (architecture facts over the compiled assembly — stronger than csproj parsing, and the future home of the spec's ring rules: Contracts never depends on Sdk, modules never touch Platform).
 
 **Spec:** `docs/superpowers/specs/2026-10-02-digitalbrain-kernel-split-design.md`
+
+**Scope — explicit:** Phase 1 touches the model package, its new test project, and comments/doc text in the kernel ring ONLY. No module is migrated, and the kernel/Sdk runtime is not yet rewired onto the pure types — that rewiring requires Signal unification (string `Publisher` → `NeuronId`), which is the migration phase's named first step. Nothing any module compiles against changes in this plan.
 
 ## Global Constraints
 
@@ -20,10 +22,10 @@
 
 ## Review Focus
 
-- A test project referencing the pure package *and* `DigitalBrain.Contracts` under a `DigitalBrain.*` namespace hits the shadowing hazard itself — Task 1's test project must reference ONLY the model package (plus xunit), and Task 1 Step 6 asserts that.
+- A test project referencing the pure package *and* `DigitalBrain.Contracts` under a `DigitalBrain.*` namespace hits the shadowing hazard itself — Task 1's test project must reference ONLY the model package (plus xunit and NetArchTest.Rules), and Task 1 Step 5 asserts that.
 - `NeuronId` default value: `new NeuronId()` leaves `Id` null; `ToString()` must not throw and `Publisher` of a default `Signal` must behave (Task 1 pins `default(NeuronId).ToString()` and default-`Signal` equality).
 - `Signal` is a non-sealed record: derived records must get value equality including `Publisher` (Task 1 pins equality for a derived record).
-- The purity test must fail when a reference is *added*, not only pass today — Task 1 Step 3 verifies the test actually reads the csproj on disk by asserting item counts, and Step 2 runs it red first against a wrong path to prove it can fail.
+- The purity facts must fail when a dependency is *added*, not only pass today — Task 1 Step 2 runs the NetArchTest rule red first with a deliberately wrong allow-list to prove it can fail.
 - Future editors deleting the "do not add a ProjectReference to src/DigitalBrain" warning in `Contracts` — Task 2 places the note in `INeuron.cs`, `Signal.cs`, and the csproj itself, so the warning sits where the edit would happen.
 
 ---
@@ -40,7 +42,7 @@
 
 - [ ] **Step 1: Create the test project**
 
-`src/DigitalBrain.Tests/DigitalBrain.Tests.csproj` — mirror the xunit package set from `src/Modules/DigitalBrain/Kernel/DigitalBrain.Core.Tests.Unit/DigitalBrain.Core.Tests.Unit.csproj` (open it and copy the exact xunit/test-sdk `PackageReference` lines and any shared test props import), with exactly one ProjectReference:
+`src/DigitalBrain.Tests/DigitalBrain.Tests.csproj` — mirror the xunit package set from `src/Modules/DigitalBrain/Kernel/DigitalBrain.Core.Tests.Unit/DigitalBrain.Core.Tests.Unit.csproj` (open it and copy the exact xunit/test-sdk `PackageReference` lines and any shared test props import), plus NetArchTest, with exactly one ProjectReference:
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -49,10 +51,13 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- xunit + test-sdk PackageReference lines copied verbatim from DigitalBrain.Core.Tests.Unit -->
+    <PackageReference Include="NetArchTest.Rules" Version="1.3.2" />
     <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
   </ItemGroup>
 </Project>
 ```
+
+If the repo uses central package management (check for `Directory.Packages.props` at the root), add the `NetArchTest.Rules` version there instead and keep the versionless `PackageReference` here.
 
 The root namespace defaults to `DigitalBrain.Tests` — that is fine: its enclosing namespace chain reaches `DigitalBrain`, which is exactly the pure package, and it references nothing else, so no shadowing is possible.
 
@@ -61,19 +66,32 @@ The root namespace defaults to `DigitalBrain.Tests` — that is fine: its enclos
 `src/DigitalBrain.Tests/ModelFacts.cs`:
 
 ```csharp
-using System.Xml.Linq;
+using NetArchTest.Rules;
+using System.Reflection;
 
 namespace DigitalBrain.Tests;
 
 public class ModelFacts
 {
+    private static readonly Assembly Model = typeof(Signal).Assembly;
+
     [Fact]
-    public void The_model_package_references_nothing()
+    public void The_model_depends_on_nothing_but_the_runtime()
     {
-        var csproj = XDocument.Load(ModelProjectPath());
-        Assert.Empty(csproj.Descendants("PackageReference"));
-        Assert.Empty(csproj.Descendants("ProjectReference"));
-        Assert.Empty(csproj.Descendants("FrameworkReference"));
+        var result = Types.InAssembly(Model)
+            .Should().OnlyHaveDependenciesOn("System", "DigitalBrain")
+            .GetResult();
+        Assert.True(result.IsSuccessful,
+            "Model types escaped the runtime: " + string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    [Fact]
+    public void The_model_assembly_references_only_the_runtime()
+    {
+        // NetArchTest sees what types USE; this sees what the assembly LINKS — an unused
+        // reference still widens what a future edit can reach without anyone noticing.
+        Assert.All(Model.GetReferencedAssemblies(),
+            reference => Assert.StartsWith("System", reference.Name));
     }
 
     [Fact]
@@ -99,31 +117,24 @@ public class ModelFacts
     }
 
     private sealed record Clicked : Signal;
-
-    private static string ModelProjectPath()
-    {
-        var directory = AppContext.BaseDirectory;
-        while (!File.Exists(Path.Combine(directory, "DigitalBrain", "DigitalBrain.csproj")))
-        {
-            directory = Path.GetDirectoryName(directory)
-                ?? throw new InvalidOperationException("src root with DigitalBrain/DigitalBrain.csproj not found above " + AppContext.BaseDirectory);
-        }
-        return Path.Combine(directory, "DigitalBrain", "DigitalBrain.csproj");
-    }
 }
 ```
 
-First prove the purity fact *can* fail: temporarily change `"DigitalBrain.csproj"` in `ModelProjectPath` to `"DigitalBrain.Tests.csproj"` (which has references) — pointing the walk at this test project's own csproj.
+First prove the architecture facts *can* fail: temporarily change the allow-list in
+`The_model_depends_on_nothing_but_the_runtime` to `.OnlyHaveDependenciesOn("DigitalBrain")`
+(excluding `System`, which every type uses).
 
 Run: `dotnet test src/DigitalBrain.Tests`
-Expected: `The_model_package_references_nothing` FAILS (ProjectReference present); other facts PASS.
+Expected: `The_model_depends_on_nothing_but_the_runtime` FAILS listing the model's types; other facts PASS.
 
-- [ ] **Step 3: Restore the real path, run green**
+- [ ] **Step 3: Restore the allow-list, run green**
 
-Revert the filename to `"DigitalBrain.csproj"`.
+Revert to `.OnlyHaveDependenciesOn("System", "DigitalBrain")`.
 
 Run: `dotnet test src/DigitalBrain.Tests`
-Expected: all 4 facts PASS.
+Expected: all 5 facts PASS. If `The_model_assembly_references_only_the_runtime` fails on a
+non-System name the SDK injects (e.g. `netstandard` or `mscorlib` facades), widen the assertion
+to the exact observed set — list the names explicitly rather than loosening to a prefix soup.
 
 - [ ] **Step 4: Confirm note on default NeuronId behavior**
 
@@ -131,7 +142,7 @@ Expected: all 4 facts PASS.
 
 - [ ] **Step 5: Assert the test project itself cannot shadow**
 
-Open `src/DigitalBrain.Tests/DigitalBrain.Tests.csproj` and confirm the only `ProjectReference` is `../DigitalBrain/DigitalBrain.csproj` and there is no reference to `DigitalBrain.Contracts` or any module. This is a review step, not a code change; the Review Focus explains why it matters.
+Open `src/DigitalBrain.Tests/DigitalBrain.Tests.csproj` and confirm the only `ProjectReference` is `../DigitalBrain/DigitalBrain.csproj` and there is no reference to `DigitalBrain.Contracts` or any module (xunit/test-sdk/NetArchTest.Rules packages are fine). This is a review step, not a code change; the Review Focus explains why it matters.
 
 - [ ] **Step 6: Commit**
 
