@@ -7,6 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Neuron interfaces and signals use the Kernel wire vocabulary. -->
-    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Modules.Kernel.Contracts/DigitalBrain.Modules.Kernel.Contracts.csproj" />
   </ItemGroup>
 </Project>

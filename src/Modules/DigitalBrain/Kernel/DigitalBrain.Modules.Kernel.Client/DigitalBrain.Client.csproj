@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Connects single-file C# apps to a DigitalBrain cluster: neuron calls and live signal subscriptions.</Description>
+    <RootNamespace>DigitalBrain.Client</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Kernel" />
+    <InternalsVisibleTo Include="DigitalBrain.Platform" />
+    <InternalsVisibleTo Include="DigitalBrain.Testing" />
+    <InternalsVisibleTo Include="DigitalBrain.Testing.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Testing.E2E" />
+    <!-- The script edge speaks the same protocol records as the client. -->
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.CSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Aspire.Azure.Data.Tables" />
+    <PackageReference Include="Microsoft.Extensions.ServiceDiscovery" />
+    <PackageReference Include="Microsoft.Orleans.Client" />
+    <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
+  </ItemGroup>
+  <ItemGroup><ProjectReference Include="../DigitalBrain.Modules.Kernel.Contracts/DigitalBrain.Modules.Kernel.Contracts.csproj" /></ItemGroup>
+</Project>

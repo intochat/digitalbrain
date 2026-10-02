@@ -2,6 +2,6 @@
   <ItemGroup>
     <ProjectReference Include="../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
     <ProjectReference Include="../DigitalBrain.Modules.Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
-    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/Platform/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
   </ItemGroup>
 </Project>

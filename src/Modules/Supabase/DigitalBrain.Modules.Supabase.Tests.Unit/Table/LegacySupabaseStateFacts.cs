@@ -46,7 +46,7 @@ public sealed class LegacySupabaseStateFacts
         Assert.Single((await table.Read(new(0, 50)))!.Rows);
         Assert.True(storage.TableReads >= 2);
         Assert.True(storage.TableWrites >= 1);
-        Assert.Equal("DigitalBrain.LiveTables", typeof(SupabaseTableState).Assembly.GetName().Name);
+        Assert.Equal("DigitalBrain.Modules.Supabase", typeof(SupabaseTableState).Assembly.GetName().Name);
     }
 
     private sealed class LegacyStorage(IGrainStorageSerializer serializer) : IGrainStorage

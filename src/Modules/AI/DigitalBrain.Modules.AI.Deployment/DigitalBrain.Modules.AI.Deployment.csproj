@@ -5,7 +5,7 @@
     <RootNamespace>DigitalBrain.AI</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Deployment/DigitalBrain.Deployment.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/Deployment/DigitalBrain.Deployment/DigitalBrain.Deployment.csproj" />
     <ProjectReference Include="../DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj" />
   </ItemGroup>
 </Project>

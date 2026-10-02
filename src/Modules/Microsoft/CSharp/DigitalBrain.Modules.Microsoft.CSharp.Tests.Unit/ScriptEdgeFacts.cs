@@ -146,6 +146,24 @@ public sealed class ScriptEdgeFacts
     }
 
     [Fact]
+    public void RowSourcesAndScriptAccountsAreVisibleAndTheCredentialRegistryIsNot()
+    {
+        var contracts = new ScriptContracts([
+            typeof(DigitalBrain.Contracts.Data.IRowSource).Assembly,
+            typeof(DigitalBrain.Sdk.Integrations.Accounts.IIntegrationAccounts).Assembly,
+        ]);
+
+        Assert.Equal(typeof(DigitalBrain.Contracts.Data.IRowSource), contracts.Find(typeof(DigitalBrain.Contracts.Data.IRowSource).FullName!));
+        Assert.Equal(
+            typeof(DigitalBrain.Contracts.Data.IStoredRows),
+            contracts.Find(typeof(DigitalBrain.Contracts.Data.IStoredRows).FullName!));
+        Assert.Equal(
+            typeof(DigitalBrain.Contracts.Integrations.IIntegrationAccounts),
+            contracts.Find(typeof(DigitalBrain.Contracts.Integrations.IIntegrationAccounts).FullName!));
+        Assert.Throws<ArgumentException>(() => contracts.Find(typeof(DigitalBrain.Sdk.Integrations.Accounts.IIntegrationAccounts).FullName!));
+    }
+
+    [Fact]
     public void ThePlatformAssemblyIsNeverAContractsAssemblyOfAComposedModule()
     {
         var inventory = new DigitalBrain.Core.ModuleInventory([typeof(DigitalBrain.Platform.PlatformHosting)]);
