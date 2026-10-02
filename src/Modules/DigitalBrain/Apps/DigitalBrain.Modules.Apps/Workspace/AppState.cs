@@ -20,6 +20,7 @@ public sealed record AppState
     [Id(14)] public UninstallApp? PendingUninstall { get; init; }
     [Id(15)] public bool StorageHistoryKnown { get; init; }
     [Id(16)] public OperationReceipt[] LifecycleReceipts { get; init; } = [];
+    [Id(17)] public bool PostgresScopes { get; init; }
     public bool RunsScript => Runtime == PackageManifest.CSharpRuntime;
 }
 

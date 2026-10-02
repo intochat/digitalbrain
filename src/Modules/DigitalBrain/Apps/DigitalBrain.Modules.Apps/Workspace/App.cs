@@ -51,6 +51,7 @@ internal sealed class App(
             Receipts = Receipted(request.OperationId, request),
             StorageFiles = programs.Select(path => FileKey(generation, path)).ToArray(),
             StorageHistoryKnown = true,
+            PostgresScopes = AppRequirements.ReferencesAssembly(revision.Content, typeof(IPostgresTable).Assembly.GetName().Name!),
             LifecycleReceipts = [.. Snapshot.LifecycleReceipts, new(request.OperationId, CommandHash(request), "")],
         });
         return Describe(Snapshot);
@@ -106,6 +107,7 @@ internal sealed class App(
             ScriptPaths = programs,
             Receipts = Receipted(request.OperationId, request),
             StorageFiles = [.. Snapshot.StorageFiles, .. programs.Select(path => FileKey(Snapshot.ProgramGeneration + 1, path))],
+            PostgresScopes = Snapshot.PostgresScopes || AppRequirements.ReferencesAssembly(revision.Content, typeof(IPostgresTable).Assembly.GetName().Name!),
         });
         return Describe(Snapshot);
     }
@@ -125,8 +127,10 @@ internal sealed class App(
     private async Task CompleteUninstall()
     {
         var request = Snapshot.PendingUninstall!;
+        var postgresAvailable = modules.ContractAssemblies().Contains(typeof(IPostgresTable).Assembly);
+        if (Snapshot.PostgresScopes && !postgresAvailable) { throw new InvalidOperationException(AppRequirementsException.RestorePostgres); }
         foreach (var file in Snapshot.StorageFiles) { await GrainFactory.GetGrain<ICSharpFile>(file).Delete(); }
-        if (modules.ContractAssemblies().Contains(typeof(IPostgresTable).Assembly))
+        if (postgresAvailable)
         {
             await GrainFactory.GetGrain<IPostgresStorageMigration>("table-owners-v1").Ensure();
             var brain = BrainScope.CurrentId();
@@ -248,6 +252,7 @@ internal sealed class App(
     {
         if (Snapshot.StorageHistoryKnown) { return; }
         var paths = new HashSet<string>(Snapshot.ScriptPaths, StringComparer.Ordinal) { PackageContent.SourcePath };
+        var postgres = Snapshot.PostgresScopes;
         if (Snapshot.Revision is { } installed)
         {
             var package = GrainFactory.GetGrain<IPackage>(installed.Package.ToString());
@@ -259,11 +264,12 @@ internal sealed class App(
                 if (!visited.Add(id)) { continue; }
                 var revision = await package.ReadRevision(id);
                 paths.UnionWith(revision.Content.Programs().Keys);
+                postgres |= AppRequirements.ReferencesAssembly(revision.Content, typeof(IPostgresTable).Assembly.GetName().Name!);
                 foreach (var parent in revision.Parents) { remaining.Push(parent); }
             }
         }
         var files = Enumerable.Range(1, Snapshot.ProgramGeneration).SelectMany(generation => paths.Select(path => FileKey(generation, path)));
-        await Persist(Snapshot with { StorageFiles = files.Distinct(StringComparer.Ordinal).ToArray(), StorageHistoryKnown = true });
+        await Persist(Snapshot with { StorageFiles = files.Distinct(StringComparer.Ordinal).ToArray(), StorageHistoryKnown = true, PostgresScopes = postgres });
     }
 
     // The script reads brain.Setting("App") to find this neuron, brain.Setting(name) for each setting

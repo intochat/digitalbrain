@@ -7,6 +7,9 @@ namespace DigitalBrain.Apps;
 
 internal sealed class AppRequirements(ModuleInventory inventory)
 {
+    public static bool ReferencesAssembly(PackageContent content, string assembly)
+        => content.Programs().Any(file => References(file.Key, file.Value).Contains(assembly, StringComparer.Ordinal));
+
     public void Check(PackageContent content)
     {
         var references = content.Programs().Concat(content.File(PackageContent.TestsPath) is { } tests
