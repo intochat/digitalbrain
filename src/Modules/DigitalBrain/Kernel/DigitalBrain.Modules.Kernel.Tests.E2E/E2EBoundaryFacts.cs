@@ -12,8 +12,8 @@ public sealed class E2EBoundaryFacts
             BrowserConfiguration.Configure(browser => browser.Headed().SlowMo(75)));
         Assert.False(headed.BrowserOptions.Headless);
         Assert.Equal(75, headed.BrowserOptions.SlowMoMilliseconds);
-        Assert.DoesNotContain("Headless", headed.SerializeOverrides(), StringComparison.Ordinal);
-        Assert.DoesNotContain("SlowMo", headed.SerializeOverrides(), StringComparison.Ordinal);
+        Assert.DoesNotContain(headed.OptionOverrides.Keys, key => key.Contains("Headless", StringComparison.Ordinal));
+        Assert.DoesNotContain(headed.OptionOverrides.Keys, key => key.Contains("SlowMo", StringComparison.Ordinal));
         Assert.Throws<InvalidOperationException>(() => BrowserConfiguration.Configure(_ => { }));
     }
 

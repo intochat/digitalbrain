@@ -38,7 +38,7 @@ public sealed class ModuleOptionsFacts
         Assert.Throws<ArgumentException>(() =>
             ModuleOptionsSerialization.Compile<FakeModule, FakeOptions>(new() { Endpoint = new Uri("/relative", UriKind.Relative) }));
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-        { ["DigitalBrain:Modules:FakeModule:Options"] = """{"Endpoint":"/relative"}""" }).Build();
+        { ["DigitalBrain:Modules:FakeModule:Options:Endpoint"] = "/relative" }).Build();
         Assert.Throws<ArgumentException>(() => configuration.GetModuleOptions<FakeOptions>(nameof(FakeModule)));
     }
 
@@ -100,15 +100,12 @@ public sealed class ModuleOptionsFacts
     }
 
     [Fact]
-    public void BindRefusesLiteralJsonNullAndMalformedJson()
+    public void BindRefusesAValueTheOptionTypeCannotConvert()
     {
-        foreach (var json in new[] { "null", "{bad" })
-        {
-            var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
-            { ["DigitalBrain:Modules:FakeModule:Options"] = json }).Build();
-            var failure = Assert.Throws<InvalidOperationException>(() => configuration.GetModuleOptions<FakeOptions>(nameof(FakeModule)));
-            Assert.Contains(nameof(FakeModule), failure.Message);
-        }
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        { ["DigitalBrain:Modules:FakeModule:Options:Flag"] = "not-a-bool" }).Build();
+        var failure = Assert.Throws<InvalidOperationException>(() => configuration.GetModuleOptions<FakeOptions>(nameof(FakeModule)));
+        Assert.Contains(nameof(FakeModule), failure.Message);
     }
 
     private sealed class IgnoredOptions : IModuleOptions
@@ -135,11 +132,18 @@ public sealed class ModuleOptionsFacts
     [InlineData("DigitalBrain:Modules:0:Options")]
     [InlineData("DigitalBrain:Modules:Options")]
     [InlineData("DigitalBrain:Modules:A:B:Options")]
-    [InlineData("DigitalBrain:Modules:X:Options:Sub")]
     [InlineData("DigitalBrain:Modules:A__B:Options")]
-    public void OnlyTheExactOptionsKeyShapeIsExemptFromHostOwnedSettings(string key)
+    public void OnlyTheOptionsKeyShapeIsExemptFromHostOwnedSettings(string key)
     {
-        var definition = new ModuleDefinition(typeof(FakeModule), new Dictionary<string, string?> { [key] = "{}" });
+        var definition = new ModuleDefinition(typeof(FakeModule), new Dictionary<string, string?> { [key] = "x" });
         Assert.Throws<ArgumentException>(() => ModuleSettingsValidation.ValidatePublicSettings([definition]));
     }
+
+    [Theory]
+    [InlineData("DigitalBrain:Modules:X:Options")]
+    [InlineData("DigitalBrain:Modules:X:Options:Endpoint")]
+    [InlineData("DigitalBrain:Modules:X:Options:Bindings:a:0")]
+    public void FlattenedOptionKeysArePublicSettings(string key)
+        => ModuleSettingsValidation.ValidatePublicSettings(
+            [new(typeof(FakeModule), new Dictionary<string, string?> { [key] = "x" })]);
 }

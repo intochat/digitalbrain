@@ -53,12 +53,6 @@ public sealed class DigitalBrainBuilder
     internal void Materialize()
     {
         if (_materialized) { return; }
-        if (_hasDeclarations && ApplicationBuilder.Configuration[CompositionOverrideTransport.ConfigurationKey] is { } overrides)
-        {
-            if (!ApplicationBuilder.Configuration.GetValue<bool>("DigitalBrain:Testing:Enabled"))
-            { throw new InvalidOperationException("Composition overrides require an explicitly enabled test deployment."); }
-            _composition.ApplyOverrides(overrides);
-        }
         var composition = _composition.Build();
         if (composition.RequiresLocalServices)
         { throw new NotSupportedException("Local service substitutions are only supported by in-process tests."); }

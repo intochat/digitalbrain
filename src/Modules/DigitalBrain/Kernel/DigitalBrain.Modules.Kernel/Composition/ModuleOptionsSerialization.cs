@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json.Serialization;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Core;
@@ -9,6 +10,9 @@ public static class ModuleOptionsSerialization
 {
     public const string OptionsKeySuffix = ":Options";
 
+    // Options are ordinary configuration: every property flattens to a key under
+    // DigitalBrain:Modules:{Name}:Options, so a host's own configuration (env, args, files)
+    // overrides a code-declared default by standard precedence — no side channel.
     public static ModuleDefinition Compile<TModule, TOptions>(TOptions options)
         where TModule : IModule<TOptions> where TOptions : class, IModuleOptions, new()
     {
@@ -29,18 +33,22 @@ public static class ModuleOptionsSerialization
         }
 
         options.Validate();
-        return new ModuleDefinition(typeof(TModule), new Dictionary<string, string?>
-        {
-            [OptionsKey(typeof(TModule).Name)] = JsonSerializer.Serialize(options),
-        });
+        return new ModuleDefinition(typeof(TModule), FlattenOptions(options, typeof(TModule).Name));
+    }
+
+    public static Dictionary<string, string?> FlattenOptions<TOptions>(TOptions options, string moduleName)
+        where TOptions : class
+    {
+        var keys = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        Flatten(JsonSerializer.SerializeToNode(options), OptionsKey(moduleName), keys);
+        return keys;
     }
 
     public static TOptions GetModuleOptions<TOptions>(this IConfiguration configuration, string moduleName)
         where TOptions : class, IModuleOptions, new()
     {
         ArgumentNullException.ThrowIfNull(configuration);
-        var json = configuration[OptionsKey(moduleName)];
-        var options = string.IsNullOrWhiteSpace(json) ? new TOptions() : Deserialize<TOptions>(json, moduleName);
+        var options = configuration.GetSection(OptionsKey(moduleName)).Get<TOptions>() ?? new TOptions();
         options.Validate();
         return options;
     }
@@ -65,23 +73,25 @@ public static class ModuleOptionsSerialization
     }
 
     internal static bool IsOptionsKey(string key)
-    {
-        var segments = key.Split(':');
-        return segments is ["DigitalBrain", "Modules", var name, "Options"]
-            && name.Length > 0 && !name.Contains("__", StringComparison.Ordinal) && !int.TryParse(name, out _)
-            && string.Equals(segments[0], "DigitalBrain", StringComparison.OrdinalIgnoreCase);
-    }
+        => key.Split(':') is ["DigitalBrain", "Modules", var name, "Options", ..]
+            && name.Length > 0 && !name.Contains("__", StringComparison.Ordinal) && !int.TryParse(name, out _);
 
-    private static TOptions Deserialize<TOptions>(string json, string moduleName) where TOptions : class
+    private static void Flatten(JsonNode? node, string prefix, Dictionary<string, string?> into)
     {
-        try
+        switch (node)
         {
-            return JsonSerializer.Deserialize<TOptions>(json)
-                ?? throw new InvalidOperationException($"Options for module {moduleName} are JSON null.");
-        }
-        catch (JsonException exception)
-        {
-            throw new InvalidOperationException($"Options for module {moduleName} are not valid JSON.", exception);
+            case JsonObject members:
+                foreach (var (name, value) in members) { Flatten(value, $"{prefix}:{name}", into); }
+                break;
+            case JsonArray items:
+                for (var i = 0; i < items.Count; i++) { Flatten(items[i], $"{prefix}:{i}", into); }
+                break;
+            case JsonValue value:
+                into[prefix] = value.GetValueKind() == JsonValueKind.String ? value.GetValue<string>() : value.ToJsonString();
+                break;
+            case null:
+                into[prefix] = null;
+                break;
         }
     }
 

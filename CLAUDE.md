@@ -68,9 +68,11 @@ behaviors/*.cs   the implementation: one script per concern (plus legacy single 
   `src/Applications/IntoChat/Apps/`).
 - **Module contract:** a module ships contracts + signals + connector + fakes (Testing package) +
   renderables. Modules never ship step definitions or test-only methods on production interfaces.
-  A module declares `IModule<TOptions>`: `Validate()` runs once and the options cross the AppHost
-  boundary as one JSON value; no secrets in options (credential-shaped names are refused at
-  compile). Modules also ship `IntegrationDefinition`s; their registrations are deployment-scoped
+  A module declares `IModule<TOptions>`: options are ordinary configuration — code-declared values
+  compile to flat keys under `DigitalBrain:Modules:{Name}:Options:{Property}`, so the AppHost's own
+  configuration (args, env, files) overrides any option by standard precedence and tests need no
+  side channel; `Validate()` runs at compile and at bind; no secrets in options (credential-shaped
+  names are refused at compile). Modules also ship `IntegrationDefinition`s; their registrations are deployment-scoped
   `[PlatformOnly]` neurons seeded from `DigitalBrain:Integrations:{id}:{Field}` (catalog:
   `GET /integrations`). A user's connectors are integration accounts, per brain, under
   `/brains/{id}/integrations/accounts`.

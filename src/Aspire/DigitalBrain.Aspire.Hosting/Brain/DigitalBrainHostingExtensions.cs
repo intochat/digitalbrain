@@ -20,13 +20,47 @@ public static class DigitalBrainHostingExtensions
 
     public static DigitalBrainBuilder AddModules(this DigitalBrainBuilder brain, IReadOnlyList<ModuleDefinition> modules)
     {
-        var resolved = ModuleComposition.Resolve(modules);
+        // Code-declared module settings are defaults; the AppHost's own configuration (args, env,
+        // files) wins by standard precedence, so a host or test overrides any option without a side channel.
+        var resolved = ModuleComposition.Resolve(modules)
+            .Select(module => Overlay(module, brain.ApplicationBuilder.Configuration)).ToArray();
         foreach (var module in resolved) { brain.SetModuleConfiguration(module); }
         var settings = resolved.SelectMany(m => m.Configuration).DistinctBy(p => p.Key, StringComparer.OrdinalIgnoreCase).ToArray();
         brain.ApplicationBuilder.Configuration.AddInMemoryCollection(settings);
         brain.AddProjection(new ModuleSettingsProjection(settings));
         foreach (var module in resolved) { brain.AddModuleType(module.ModuleType); }
         return brain;
+    }
+
+    private static ModuleDefinition Overlay(ModuleDefinition module, IConfiguration configuration)
+    {
+        var overlaid = new Dictionary<string, string?>(module.Configuration, StringComparer.OrdinalIgnoreCase);
+        var changed = false;
+        foreach (var key in module.Configuration.Keys)
+        {
+            if (configuration[key] is { } value && value != overlaid[key]) { overlaid[key] = value; changed = true; }
+        }
+        // Keys the host adds under the options section (new list or dictionary entries) have no
+        // code-declared counterpart; merge every configured leaf, not just known keys.
+        foreach (var (key, value) in Leaves(configuration.GetSection(ModuleOptionsSerialization.OptionsKey(module.ModuleType.Name))))
+        {
+            if (!overlaid.TryGetValue(key, out var existing) || existing != value) { overlaid[key] = value; changed = true; }
+        }
+        return changed ? new ModuleDefinition(module.ModuleType, overlaid, module.Dependencies) : module;
+    }
+
+    private static IEnumerable<KeyValuePair<string, string?>> Leaves(IConfigurationSection section)
+    {
+        var children = section.GetChildren().ToArray();
+        if (children.Length == 0)
+        {
+            if (section.Value is not null) { yield return new(section.Path, section.Value); }
+            yield break;
+        }
+        foreach (var child in children)
+        {
+            foreach (var leaf in Leaves(child)) { yield return leaf; }
+        }
     }
 
     private sealed class ModuleSettingsProjection(KeyValuePair<string, string?>[] settings) : DigitalBrainModuleProjection

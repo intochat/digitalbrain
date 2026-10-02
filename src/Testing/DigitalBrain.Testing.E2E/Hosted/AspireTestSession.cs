@@ -106,7 +106,7 @@ public sealed class AspireTestSession : IAsyncDisposable
                 if (privateSettings is not null)
                 {
                     resource.Annotations.Add(new EnvironmentCallbackAnnotation(context =>
-                        context.EnvironmentVariables["DigitalBrain__Testing__PrivateConfiguration"] = privateSettings.FilePath));
+                        context.EnvironmentVariables[DigitalBrainNames.ConfigurationFileEnvironmentVariable] = privateSettings.FilePath));
                 }
                 if (options.ResourceEnvironment.Count > 0)
                 {

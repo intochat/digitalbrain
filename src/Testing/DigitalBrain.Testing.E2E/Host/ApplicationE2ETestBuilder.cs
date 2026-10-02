@@ -4,46 +4,32 @@ namespace DigitalBrain.Testing.E2E;
 
 public sealed class E2ETestBuilder<TAppHost> where TAppHost : class
 {
-    private readonly CompositionOverrides _overrides = new();
+    // Option edits become plain configuration keys passed to the AppHost as arguments; the
+    // AppHost's configuration overrides its code-declared defaults by standard precedence.
+    private readonly Dictionary<string, string?> _optionOverrides = new(StringComparer.OrdinalIgnoreCase);
     private TestExecutionOptions _execution = new();
     private BrowserOptions _browser = new() { Headless = true };
     private bool _started;
-
-    public E2ETestBuilder<TAppHost> WithoutModule<TModule>() where TModule : class, IModule, new()
-    {
-        EnsureMutable();
-        _overrides.WithoutModule<TModule>();
-        return this;
-    }
 
     public E2ETestBuilder<TAppHost> ConfigureModule<TModule, TOptions>(Action<TOptions> configureOptions)
         where TModule : class, IModule<TOptions>, new() where TOptions : class, IModuleOptions, new()
     {
         EnsureMutable();
         ArgumentNullException.ThrowIfNull(configureOptions);
-        var browserAtDeclaration = _browser;
         using var scope = BrowserConfiguration.Begin(_browser);
-        // The edit runs once here so ambient browser choices apply and a throwing edit fails at the call site;
-        // it runs again later against the AppHost's own options, where browser choices are already taken.
-        configureOptions(new TOptions());
+        var edited = new TOptions();
+        configureOptions(edited);
         _browser = scope.Options;
-        _overrides.ConfigureModule<TModule, TOptions>(options =>
+        // Only the keys the edit changed override the AppHost's own values. An edit that clears
+        // a default collection entry cannot be expressed as configuration and keeps the default.
+        var defaults = ModuleOptionsSerialization.FlattenOptions(new TOptions(), typeof(TModule).Name);
+        foreach (var (key, value) in ModuleOptionsSerialization.FlattenOptions(edited, typeof(TModule).Name))
         {
-            using var discarded = BrowserConfiguration.Begin(browserAtDeclaration);
-            configureOptions(options);
-        });
+            if (!defaults.TryGetValue(key, out var baseline) || baseline != value) { _optionOverrides[key] = value; }
+        }
         return this;
     }
 
-    public E2ETestBuilder<TAppHost> ConfigureModule<TModule>(Action<ModuleConfiguration<TModule>> configure)
-        where TModule : class, IModule, new()
-    {
-        EnsureMutable();
-        using var scope = BrowserConfiguration.Begin(_browser);
-        _overrides.ConfigureModule(configure);
-        _browser = scope.Options;
-        return this;
-    }
     // A startup budget for hosts whose resources compile at start (a CI runner building the
     // web shell needs more than the default); merges into the composition's execution options.
     public E2ETestBuilder<TAppHost> WithStartupTimeout(TimeSpan timeout)
@@ -74,6 +60,7 @@ public sealed class E2ETestBuilder<TAppHost> where TAppHost : class
         _execution = _execution with { ResourceEnvironment = merged };
         return this;
     }
+
     public E2ETestBuilder<TAppHost> WithBrowser(BrowserOptions browser)
     {
         EnsureMutable();
@@ -85,12 +72,13 @@ public sealed class E2ETestBuilder<TAppHost> where TAppHost : class
     public Task<E2EBrain> StartAsync(CancellationToken cancellationToken = default)
     {
         EnsureMutable();
-        var overrides = SerializeOverrides();
         _started = true;
-        return E2ETest.StartAsync<TAppHost>(overrides, _execution, _browser, cancellationToken);
+        return E2ETest.StartAsync<TAppHost>(_optionOverrides, _execution, _browser, cancellationToken);
     }
-    internal string SerializeOverrides() => _overrides.Serialize();
+
+    internal IReadOnlyDictionary<string, string?> OptionOverrides => _optionOverrides;
     internal BrowserOptions BrowserOptions => _browser;
+
     private void EnsureMutable()
     {
         if (_started) { throw new InvalidOperationException("A test builder starts one session. Create another builder for a new session."); }

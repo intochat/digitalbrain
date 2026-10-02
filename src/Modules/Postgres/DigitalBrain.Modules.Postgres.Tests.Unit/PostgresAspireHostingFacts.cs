@@ -29,7 +29,7 @@ public sealed class PostgresAspireHostingFacts
         Assert.Equal(persistent, server.Annotations.OfType<ContainerLifetimeAnnotation>().Any(lifetime => lifetime.Lifetime == ContainerLifetime.Persistent));
         var environment = await EnvironmentOf(builder, consumer.Resource);
         Assert.Contains("ConnectionStrings__reporting", environment.Keys);
-        Assert.Contains("\"ConnectionName\":\"reporting\"", Assert.IsType<string>(environment["DigitalBrain__Modules__PostgresModule__Options"]));
+        Assert.Equal("reporting", Assert.IsType<string>(environment["DigitalBrain__Modules__PostgresModule__Options__ConnectionName"]));
     }
 
     [Fact]
@@ -81,8 +81,7 @@ public sealed class PostgresAspireHostingFacts
         builder.AddExecutable("consumer", "unused", ".").WithReference(brain);
         Assert.Single(builder.Resources.OfType<PostgresServerResource>());
         Assert.Single(builder.Resources.OfType<PostgresDatabaseResource>());
-        brain.GetModuleConfiguration<PostgresModule>()["DigitalBrain:Modules:PostgresModule:Options"] =
-            """{"ConnectionName":"reporting","Hosting":{"Enabled":true,"DatabaseName":"different","PersistentStorage":false}}""";
+        brain.GetModuleConfiguration<PostgresModule>()["DigitalBrain:Modules:PostgresModule:Options:Hosting:DatabaseName"] = "different";
         Assert.Throws<InvalidOperationException>(() => hosting.Configure(brain));
         Assert.Single(builder.Resources.OfType<PostgresDatabaseResource>());
     }

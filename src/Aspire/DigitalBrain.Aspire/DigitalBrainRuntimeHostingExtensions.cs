@@ -21,12 +21,8 @@ public static class DigitalBrainRuntimeHostingExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        if (builder.Configuration["DigitalBrain:Testing:PrivateConfiguration"] is { Length: > 0 } privatePath)
-        {
-            var settings = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string?>>(File.ReadAllText(privatePath))
-                ?? throw new InvalidOperationException("Invalid private configuration.");
-            builder.Configuration.AddInMemoryCollection(settings);
-        }
+        if (builder.Configuration[DigitalBrainNames.ConfigurationFileKey] is { Length: > 0 } configurationFile)
+        { builder.Configuration.AddJsonFile(configurationFile, optional: false, reloadOnChange: false); }
 
         builder.AddKeyedAzureTableServiceClient(DigitalBrainNames.Clustering);
         builder.AddKeyedAzureTableServiceClient(DigitalBrainNames.Reminders);

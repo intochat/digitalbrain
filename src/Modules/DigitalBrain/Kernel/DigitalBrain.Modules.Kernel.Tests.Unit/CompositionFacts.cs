@@ -57,19 +57,15 @@ public sealed class CompositionFacts
     }
 
     [Fact]
-    public void BuildsAnImmutableSnapshotAndFreezesAllCapturedDrafts()
+    public void BuildSnapshotsOptionsByValueSoLaterMutationOfACapturedInstanceChangesNothing()
     {
         ExampleOptions? captured = null;
-        ModuleConfiguration<ExampleModule>? module = null;
         var draft = new BrainCompositionBuilder().WithModule<ExampleModule, ExampleOptions>(
-            o => { captured = o; o.Endpoint = "chosen"; }, m => module = m);
+            o => { captured = o; o.Endpoint = "chosen"; });
         var snapshot = draft.Build();
         captured!.Endpoint = "mutated";
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(Assert.Single(snapshot.Modules).Configuration).Build();
         Assert.Equal("chosen", configuration.GetModuleOptions<ExampleOptions>(nameof(ExampleModule)).Endpoint);
-        Assert.Same(snapshot, draft.Build());
-        Assert.Throws<InvalidOperationException>(() => draft.ConfigureModule<ExampleModule, ExampleOptions>(_ => { }));
-        Assert.Throws<InvalidOperationException>(() => module!.ConfigureLocalServices(_ => { }));
     }
 
     [Fact]
@@ -94,34 +90,22 @@ public sealed class CompositionFacts
     }
 
     [Fact]
-    public void OverridesEditTheApplicationsOwnOptionsIncludingResetsToDefaults()
+    public void OptionsCompileToConfigurationKeysSoAHostOverridesThemByPrecedence()
     {
         var application = new BrainCompositionBuilder().WithModule<ExampleModule, ExampleOptions>(
             o => { o.Endpoint = "old"; o.Enabled = true; o.Delay = 250; });
-        var token = new CompositionOverrides()
-            .ConfigureModule<ExampleModule, ExampleOptions>(o => { o.Endpoint = null; o.Enabled = false; }).Serialize();
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(
-            Assert.Single(application.ApplyOverrides(token).Build().Modules).Configuration).Build();
+        // A later configuration source (a host's env, args, or files) wins over the compiled defaults.
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(Assert.Single(application.Build().Modules).Configuration)
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["DigitalBrain:Modules:ExampleModule:Options:Endpoint"] = null,
+                ["DigitalBrain:Modules:ExampleModule:Options:Enabled"] = "false",
+            }).Build();
         var applied = configuration.GetModuleOptions<ExampleOptions>(nameof(ExampleModule));
         Assert.Null(applied.Endpoint);
         Assert.False(applied.Enabled);
         Assert.Equal(250, applied.Delay);
-    }
-
-    [Fact]
-    public void OverridesCanOmitAnAuthoringModuleWithoutChangingExecutionModules()
-    {
-        var application = new BrainCompositionBuilder().WithModule<ExampleModule, ExampleOptions>().WithModule<OtherModule>();
-        var token = new CompositionOverrides().WithoutModule<OtherModule>().Serialize();
-        Assert.Equal(typeof(ExampleModule), Assert.Single(application.ApplyOverrides(token).Build().Modules).ModuleType);
-    }
-
-    [Fact]
-    public void OverridesForUndeclaredModulesAndUnknownTokensFail()
-    {
-        var token = new CompositionOverrides().ConfigureModule<ExampleModule, ExampleOptions>(_ => { }).Serialize();
-        Assert.Throws<ArgumentException>(() => new BrainCompositionBuilder().WithModule<OtherModule>().ApplyOverrides(token));
-        Assert.Throws<ArgumentException>(() => new BrainCompositionBuilder().ApplyOverrides("not-a-token"));
     }
 
     [Fact]
@@ -138,20 +122,13 @@ public sealed class CompositionFacts
     [Theory]
     [InlineData("Orleans:ClusterId")]
     [InlineData("ConnectionStrings:storage")]
-    [InlineData("DigitalBrain:Testing:Overrides")]
+    [InlineData("DigitalBrain:Testing:AnyKey")]
     [InlineData("DigitalBrain:Modules:0")]
     [InlineData("DigitalBrain:AI:OpenAI:ApiKey")]
     [InlineData("Provider:PrivateKeyPem")]
     public void HarnessAndCredentialKeysCannotBePublicSettings(string key)
         => Assert.Throws<ArgumentException>(() => ModuleSettingsValidation.ValidatePublicSettings(
             [new(typeof(ExampleModule), new Dictionary<string, string?> { [key] = "override" })]));
-
-    [Fact]
-    public void LocalSubstitutionsCannotCrossProcess()
-    {
-        var overrides = new CompositionOverrides().ConfigureModule<OtherModule>(m => m.ConfigureLocalServices(_ => { }));
-        Assert.Throws<NotSupportedException>(overrides.Serialize);
-    }
 
     public sealed class Marker;
     public sealed class OtherModule : IModule { public void Configure(ISiloBuilder silo) { } }
