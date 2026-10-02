@@ -5,6 +5,7 @@ namespace DigitalBrain.Postgres;
 [PlatformOnly]
 public interface IPostgresTables : INeuron
 {
+    [Orleans.Concurrency.AlwaysInterleave]
     Task Register(string tableId);
     [Orleans.Concurrency.AlwaysInterleave]
     Task RequireOpen();

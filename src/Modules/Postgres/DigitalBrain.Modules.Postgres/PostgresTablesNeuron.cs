@@ -18,6 +18,8 @@ internal sealed class PostgresTablesNeuron(
     [PersistentState("tables", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<PostgresTablesState> state)
     : Neuron, IPostgresTables, IPostgresTablesImport
 {
+    private readonly SemaphoreSlim writes = new(1, 1);
+
     public Task RequireOpen()
     {
         if (state.State.Retired) { throw new InvalidOperationException("This app's storage has been retired."); }
@@ -26,19 +28,42 @@ internal sealed class PostgresTablesNeuron(
 
     public async Task Register(string tableId)
     {
-        await RequireOpen();
-        if (state.State.Tables.Contains(tableId, StringComparer.Ordinal)) { return; }
-        await Persist(state.State with { Tables = [.. state.State.Tables, tableId] });
+        await writes.WaitAsync();
+        try
+        {
+            await RequireOpen();
+            if (state.State.Tables.Contains(tableId, StringComparer.Ordinal)) { return; }
+            await Persist(state.State with { Tables = [.. state.State.Tables, tableId] });
+        }
+        finally { writes.Release(); }
     }
 
-    public Task Import(string tableId) => state.State.Tables.Contains(tableId, StringComparer.Ordinal)
-        ? Task.CompletedTask : Persist(state.State with { Tables = [.. state.State.Tables, tableId] });
+    public async Task Import(string tableId)
+    {
+        await writes.WaitAsync();
+        try
+        {
+            if (!state.State.Tables.Contains(tableId, StringComparer.Ordinal))
+            { await Persist(state.State with { Tables = [.. state.State.Tables, tableId] }); }
+        }
+        finally { writes.Release(); }
+    }
 
     public async Task Retire()
     {
-        if (!state.State.Retired) { await Persist(state.State with { Retired = true }); }
+        await writes.WaitAsync();
+        try { if (!state.State.Retired) { await Persist(state.State with { Retired = true }); } }
+        finally { writes.Release(); }
+        // Registration must still answer while a table is finishing its in-flight Define.
+        // The write gate is released before calls back to tables, so closed scopes refuse promptly.
         foreach (var table in state.State.Tables)
         { await GrainFactory.GetGrain<IPostgresTableLifetime>(table).Retire(this.GetPrimaryKeyString()); }
+    }
+
+    public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+    {
+        writes.Dispose();
+        return base.OnDeactivateAsync(reason, cancellationToken);
     }
 
     private async Task Persist(PostgresTablesState next)
