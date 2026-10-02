@@ -5,12 +5,33 @@ using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Core.Enforcement;
 using DigitalBrain.Microsoft.CSharp;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Xunit;
 
 namespace DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit;
 
 public sealed class ScriptEdgeFacts
 {
+    [Fact]
+    public async Task CapacityRefusalTravelsThroughTheScriptHttpClientVerbatim()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sandbox = new FakeSandbox();
+        await using var brain = await Brain(sandbox, ct);
+        var token = await StartAsAlice(brain, sandbox, "workspace-a/refusal", ct);
+        var builder = WebApplication.CreateBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Services.AddSingleton(brain.SiloServices.GetRequiredService<ScriptEdge>());
+        await using var host = builder.Build();
+        host.MapScriptEdge();
+        await host.StartAsync(ct);
+        await using var client = await DigitalBrainClient.ConnectAsync(["--DigitalBrain:Edge=" + host.Urls.Single(), "--DigitalBrain:Token=" + token], ct);
+        var error = await Assert.ThrowsAnyAsync<InvalidOperationException>(() => client.Get<IPinger>("pinger").RefuseCapacity());
+        Assert.Equal(DigitalBrain.Sdk.Capacity.CapacityUnavailableException.RefusalMessage, error.Message);
+        await host.StopAsync(ct);
+    }
+
     private static readonly CallerContext Alice = new()
     {
         PrincipalId = "alice",

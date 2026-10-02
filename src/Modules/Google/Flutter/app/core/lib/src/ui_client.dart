@@ -900,8 +900,25 @@ final class DigitalBrainUiClient {
 /// Includes status without requiring callers to parse server error text.
 final class UiRequestException extends StateError {
   UiRequestException(String method, String path, this.statusCode, String body)
-    : super('$method $path failed: $statusCode $body');
+    : detail = _problemDetail(body),
+      super('$method $path failed: $statusCode $body');
   final int statusCode;
+  final String? detail;
+
+  static String? _problemDetail(String body) {
+    try {
+      final problem = jsonDecode(body);
+      if (problem is Map && problem['detail'] is String) {
+        return problem['detail'] as String;
+      }
+    } on FormatException {
+      // Non-JSON failures keep their existing diagnostic text.
+    }
+    return null;
+  }
+
+  @override
+  String toString() => detail ?? super.toString();
 }
 
 final class ModelUnavailableException implements Exception {

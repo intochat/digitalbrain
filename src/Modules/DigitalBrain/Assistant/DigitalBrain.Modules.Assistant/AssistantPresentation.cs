@@ -125,7 +125,7 @@ internal sealed partial class AssistantNeuron
         {
             services.GetRequiredService<ILoggerFactory>().CreateLogger("Assistant").LogWarning(error, "Conversation action {Action} failed", action);
             if (Snapshot.Threads.Count > 0)
-            { await ChangeThread(Snapshot.SelectedThread, thread => thread with { Error = error is ArgumentException or ProviderUnavailableException ? error.Message : "The action could not be completed. Please try again." }); }
+            { await ChangeThread(Snapshot.SelectedThread, thread => thread with { Error = error is ArgumentException or ProviderUnavailableException or DigitalBrain.Apps.AppRequirementsException or DigitalBrain.Sdk.Capacity.CapacityUnavailableException ? error.Message : "The action could not be completed. Please try again." }); }
         }
         await Present();
     }

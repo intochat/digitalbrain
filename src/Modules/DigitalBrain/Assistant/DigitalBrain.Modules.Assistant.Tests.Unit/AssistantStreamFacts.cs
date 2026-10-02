@@ -19,6 +19,20 @@ namespace DigitalBrain.Modules.Assistant.Tests.Unit;
 
 public sealed class AssistantStreamFacts
 {
+    [Fact]
+    public async Task KnownRefusalsReachThePersonWithoutModelRewriting()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartBrain(ct);
+        var context = new StepContext("stream-refusal/applications/assistant", brain.Grains, brain.SiloServices, ct);
+        var app = App(context);
+        foreach (var message in new[] { DigitalBrain.Sdk.Capacity.CapacityUnavailableException.RefusalMessage, "Cannot install this app. Missing modules: Postgres." })
+        {
+            var events = await Collect(app, new("one", Guid.NewGuid().ToString("N"), "refuse:" + message, "owner"), ct);
+            Assert.Equal(message, Assert.Single(events, item => Type(item) == "RUN_ERROR").GetProperty("message").GetString());
+        }
+    }
+
     private static async Task<UnitBrain> StartBrain(CancellationToken ct) => await UnitTest.Create().WithExecution(new TestExecutionOptions
     {
         PrivateConfiguration = new Dictionary<string, string?> { ["DigitalBrain:Integrations:openai:ApiKey"] = "test-no-network" },
@@ -410,6 +424,7 @@ internal sealed class StreamScenarioRunner : IAgentTurnRunner
             finally { Cancelled.TrySetResult(); }
         }
         if (request.Message == "fail") { yield return new AgentTurnEvent.Failed("scripted failure"); yield break; }
+        if (request.Message.StartsWith("refuse:", StringComparison.Ordinal)) { yield return new AgentTurnEvent.Failed(request.Message[7..]); yield break; }
         if (request.Message == "long-answer")
         {
             yield return new AgentTurnEvent.Text(new string('a', 32_000));

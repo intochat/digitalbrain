@@ -1,8 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:digitalbrain_flutter/digitalbrain_flutter.dart';
 import 'package:digitalbrain_flutter_shell/workspace/apps/packages_screen.dart';
 
 void main() {
+  testWidgets('install refusals are displayed verbatim', (tester) async {
+    final server = _FakePackagesServer();
+    const refusal = 'Cannot install this app. Missing modules: Postgres.';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PackagesScreen(
+          workspaceId: 'workspace-bob',
+          request: (method, path, [body]) async {
+            if (method == 'POST') {
+              throw UiRequestException(
+                method,
+                path,
+                409,
+                '{"detail":"$refusal"}',
+              );
+            }
+            return server.request(method, path, body);
+          },
+          onClose: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('install-alice/researcher')));
+    await tester.pumpAndSettle();
+    expect(find.text(refusal), findsOneWidget);
+    expect(server.installedRevision, isNull);
+  });
+
   testWidgets('installs a shared C# app in one tap, runs it and forks it', (
     tester,
   ) async {

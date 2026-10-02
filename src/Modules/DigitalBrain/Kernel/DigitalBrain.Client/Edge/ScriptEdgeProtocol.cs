@@ -9,6 +9,7 @@ internal static class ScriptEdgeProtocol
     public const string EdgeSetting = "DigitalBrain:Edge";
     public const string TokenSetting = "DigitalBrain:Token";
     public const string Invoke = "scripts/v1/invoke";
+    public const string RefusalHeader = "X-DigitalBrain-Refusal";
     public const string Signals = "scripts/v1/signals";
     // Sent first on every signal stream: a server-sent events response flushes its headers only with
     // its first event, and the client returns the subscription once the headers arrive.
