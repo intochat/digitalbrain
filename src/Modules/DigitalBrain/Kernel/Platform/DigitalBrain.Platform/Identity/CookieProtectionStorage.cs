@@ -8,9 +8,9 @@ using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Platform.Identity;
 
-internal static class CookieProtectionStorage
+public static class CookieProtectionStorage
 {
-    internal static IServiceCollection AddCookieProtection(this IServiceCollection services)
+    public static IServiceCollection AddCookieProtection(this IServiceCollection services)
     {
         services.AddSingleton(provider => provider
             .GetRequiredKeyedService<BlobServiceClient>(DigitalBrainNames.GrainState)

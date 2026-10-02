@@ -40,12 +40,6 @@ public static class IdentityHosting
         services.AddKernelCors();
     }
 
-    public static void AddIdentityStorage(this IServiceCollection services)
-    {
-        services.AddMasterKeyWrapper();
-        services.AddCookieProtection();
-    }
-
     public static void UsePlatformHttp(this WebApplication app)
     {
         app.UseKernelCors();

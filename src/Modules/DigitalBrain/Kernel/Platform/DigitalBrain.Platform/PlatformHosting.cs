@@ -25,9 +25,7 @@ public static class PlatformHosting
         if (services.Any(service => service.ServiceType == typeof(PlatformRegistration))) { return; }
         services.AddSingleton<PlatformRegistration>();
         services.AddIdentity();
-        services.TryAddSingleton<IKeyVault, FakeKeyVault>();
-        if (OperatingSystem.IsWindows()) { services.TryAddSingleton<IKeyWrapper, DpapiKeyWrapper>(); }
-        else { services.TryAddSingleton<IKeyWrapper, KeyVaultKeyWrapper>(); }
+        services.AddMasterKeyWrapper();
         services.TryAddSingleton<IReadOnlyList<IntegrationDefinition>>(provider =>
             IntegrationDiscovery.Collect(provider.GetRequiredService<ModuleInventory>().Types));
         services.TryAddSingleton<IAccountProbe, CredentialPresenceProbe>();

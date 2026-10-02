@@ -1,7 +1,7 @@
 namespace DigitalBrain.Platform.Secrets;
 
-// Wraps the per-owner data key so only ciphertext is persisted. Local runs use DPAPI; hosted runs
-// substitute the Key Vault adapter backed by IKeyVault.
+// Wraps the per-owner data key so only ciphertext is persisted. The platform registers the
+// master-key wrapper and refuses to start without a configured master key.
 public interface IKeyWrapper
 {
     string Wrap(byte[] key);

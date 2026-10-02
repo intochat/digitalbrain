@@ -18,7 +18,7 @@ public sealed class SecretsFacts
     public void StoresCiphertextAndResolvesByReference()
     {
         var state = new SecretsState { Owner = Owner };
-        var store = new SecretsStore(new KeyVaultKeyWrapper(new FakeKeyVault()));
+        var store = MasterKeyStore("first master key");
 
         var reference = store.Set(state, "api.key", "API key", Canary);
 
@@ -31,7 +31,7 @@ public sealed class SecretsFacts
     public void RejectsReferenceForAnotherOwner()
     {
         var state = new SecretsState { Owner = Owner };
-        var store = new SecretsStore(new KeyVaultKeyWrapper(new FakeKeyVault()));
+        var store = MasterKeyStore("first master key");
         store.Set(state, "api.key", "API key", Canary);
 
         Assert.Throws<InvalidOperationException>(() => store.Resolve(state, DigitalBrain.Contracts.Types.SecretRef.For("other", "api.key", "API key", true)));

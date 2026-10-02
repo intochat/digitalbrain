@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using DigitalBrain.Contracts;
 
 namespace DigitalBrain.Platform.Secrets;
@@ -11,7 +12,7 @@ public static class MasterKeyServiceCollectionExtensions
             .Validate(options => !string.IsNullOrWhiteSpace(options.MasterKey),
                 $"Configure {DigitalBrainNames.MasterKeyConfigurationKey} via the {DigitalBrainNames.MasterKeyEnvironmentVariable} environment secret before starting the host.")
             .ValidateOnStart();
-        services.AddSingleton<IKeyWrapper, MasterKeyWrapper>();
+        services.TryAddSingleton<IKeyWrapper, MasterKeyWrapper>();
         return services;
     }
 }

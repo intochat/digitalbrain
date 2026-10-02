@@ -31,7 +31,7 @@ public static class DigitalBrainRuntimeHostingExtensions
         builder.AddKeyedAzureTableServiceClient(DigitalBrainNames.Clustering);
         builder.AddKeyedAzureTableServiceClient(DigitalBrainNames.Reminders);
         builder.AddKeyedAzureBlobServiceClient(DigitalBrainNames.GrainState);
-        builder.Services.AddIdentityStorage();
+        builder.Services.AddCookieProtection();
         var modules = LoadModules(builder.Configuration);
         builder.UseOrleans(silo =>
         {

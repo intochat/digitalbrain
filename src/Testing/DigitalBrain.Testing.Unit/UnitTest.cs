@@ -26,6 +26,12 @@ public static class UnitTest
         builder.ConfigureHost(host =>
         {
             host.Configuration.AddInMemoryCollection(TestLogging.QuietDefaults);
+            // The platform refuses to start without a master key; each cluster gets a throwaway one.
+            host.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [DigitalBrainNames.MasterKeyConfigurationKey] =
+                    Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
+            });
             foreach (var definition in modules)
             {
                 host.Configuration.AddInMemoryCollection(definition.Configuration);
