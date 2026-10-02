@@ -18,8 +18,8 @@
     <Project Path="src/IntoChat/Tests/E2E/IntoChat.Tests.E2E.csproj" />
   </Folder>
   <Folder Name="/Aspire/">
-    <Project Path="src/Modules/DigitalBrain/Kernel/Aspire/DigitalBrain.Kernel.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
-    <Project Path="src/Modules/DigitalBrain/Kernel/Aspire/DigitalBrain.Kernel.Aspire/DigitalBrain.Aspire.csproj" />
+    <Project Path="src/Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
+    <Project Path="src/Aspire/DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
   </Folder>
   <Folder Name="/Modules/" />
   <Folder Name="/Modules/AI/">
