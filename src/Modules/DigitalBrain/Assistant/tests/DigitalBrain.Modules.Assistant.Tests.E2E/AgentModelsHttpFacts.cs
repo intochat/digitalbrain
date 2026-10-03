@@ -16,6 +16,7 @@ public sealed class AgentModelsHttpFacts
         await using var brain = await ReferenceBrain.Create(modelApiKey: apiKey)
             .WithResourceEnvironment(new Dictionary<string, string>
             {
+                ["DigitalBrain__Auth__Posture"] = "Secured",
                 ["DigitalBrain__Auth__Username"] = "owner",
                 ["DigitalBrain__Auth__Password"] = "catalog-test-password",
             }).StartAsync(ct);
