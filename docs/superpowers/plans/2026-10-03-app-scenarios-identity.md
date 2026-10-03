@@ -69,7 +69,7 @@ Affected: `IntoChat/Apps/CustomerResearcher` manifest/spec/behaviors/tests; Apps
 
 - [x] Run affected C# unit and E2E projects, Flutter analyze/tests, IntoChat composition checks, and attempt Aspire smoke.
 - [x] Review all changes for privilege escalation, storage loss, retry/restart behavior, stale verification, and mismatched Dart/C# contracts.
-- [ ] Record actual results and limitations below, commit on `codex/app-scenarios-identity`, push and create a PR. Do not merge.
+- [x] Record actual results and limitations below, commit on `codex/app-scenarios-identity`, push and create a PR. Do not merge.
 
 ## Review focus
 
@@ -81,6 +81,7 @@ Affected: `IntoChat/Apps/CustomerResearcher` manifest/spec/behaviors/tests; Apps
 
 ## Execution record
 
+- Pull request: https://github.com/intochat/digitalbrain/pull/131 (base `master`; not merged).
 - Initial checkout clean on `master`; created `codex/app-scenarios-identity` in the existing checkout as requested.
 - Ruling: user explicitly requested document then implementation and PR; proceed without another design-approval round.
 - Ruling: use existing C# behaviors and signals for scenario execution; earlier fluent API examples were sketches, not a mandate to introduce a competing workflow language.
