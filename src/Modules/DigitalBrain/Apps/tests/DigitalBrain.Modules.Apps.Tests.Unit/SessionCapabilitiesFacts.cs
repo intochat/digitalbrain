@@ -17,7 +17,7 @@ public sealed class SessionCapabilitiesFacts
     [InlineData(true, true)]
     public async Task DeveloperModeReflectsWhetherTheComposedSandboxCanRun(bool? canRun, bool expected)
     {
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>().StartAsync(TestContext.Current.CancellationToken);
+        await using var brain = await ModuleTest.Create().WithModule<AppsModule>().StartAsync(TestContext.Current.CancellationToken);
         var builder = WebApplication.CreateBuilder();
         builder.Services.AddSingleton<IDigitalBrain>(brain);
         builder.Services.AddSingleton<MarketplaceService>();

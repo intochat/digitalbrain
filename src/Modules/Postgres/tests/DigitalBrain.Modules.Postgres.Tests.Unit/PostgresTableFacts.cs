@@ -14,7 +14,7 @@ public sealed class PostgresTableFacts
         var ct = TestContext.Current.CancellationToken;
         var postgres = new Source("postgres");
         var supabase = new Source("supabase");
-        await using var brain = await UnitTest.Create().WithModule<DigitalBrain.Flutter.FlutterModule>().WithModule<PostgresModule>()
+        await using var brain = await ModuleTest.Create().WithModule<DigitalBrain.Flutter.FlutterModule>().WithModule<PostgresModule>()
             .ConfigureSilo(silo =>
             {
                 silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=sample;Username=reader";

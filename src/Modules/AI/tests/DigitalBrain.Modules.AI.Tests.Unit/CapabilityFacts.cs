@@ -24,7 +24,7 @@ public sealed class CapabilityFacts
     public async Task CapabilitiesListOnlyReadyProvidersModels()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create()
+        await using var brain = await ModuleTest.Create()
             .WithRegistrations(AiRegistrationSeeds.OpenAI())
             .WithModule<AIModule>().StartAsync(ct);
         var capabilities = brain.SiloServices.GetRequiredService<ICapabilities>();

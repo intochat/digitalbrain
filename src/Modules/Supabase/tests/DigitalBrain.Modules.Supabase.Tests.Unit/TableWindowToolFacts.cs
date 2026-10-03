@@ -16,7 +16,7 @@ public sealed class TableWindowToolFacts
     public async Task StorageIdsRequireOpeningAWindowAndDoNotMeanTheDatabaseTableIsMissing(string name)
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().WithModule<SupabaseModule>()
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>().WithModule<SupabaseModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<ISupabaseProvider>(new FakeSupabaseProvider())).StartAsync(ct);
         var tools = brain.SiloServices.GetServices<IAgentToolFactory>().SelectMany(factory => factory.Create(() => new("workspace", "run", "call")));
         var tool = tools.Single(tool => tool.Name == name);

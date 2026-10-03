@@ -17,7 +17,7 @@ public sealed class ShippedAppPublisherFacts
         var runner = new ScriptedTestRunner();
         runner.BySourceMarker["passing"] = (0, "dbtest:pass Echo");
         runner.BySourceMarker["failing"] = (1, "dbtest:fail Echo\tWrong answer");
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AppsModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<ITestScriptRunner>(runner)).StartAsync(ct);
         var sources = new IShippedAppSource[] { new Source("first"), new Source("second"), new Source("red") };
         var publishing = new AppPublishing(brain.SiloServices.GetRequiredService<IDigitalBrain>(), new AppAuthoringPolicy([], new Sandbox()));

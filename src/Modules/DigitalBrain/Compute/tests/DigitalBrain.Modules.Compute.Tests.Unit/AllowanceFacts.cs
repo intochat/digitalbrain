@@ -12,7 +12,7 @@ public sealed class AllowanceFacts
     public async Task UsageSummaryKeepsWalletChargesSettlementsAndReservationsSeparateAfterReload()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var ledger = brain.Get<IAllowanceLedger>("account");
         await ledger.GrantAsync(AllowanceOf("budget", "ws-1", ApprovalLevel.StandingBudget, AllowanceScope.Always, 100m), ct);
         var settled = await ledger.AuthorizeAsync(Paid("account", "ws-1", "chat", 5m, intent: "settled"), ct);
@@ -203,7 +203,7 @@ public sealed class AllowanceFacts
     public async Task PendingApprovalsSurviveARestart()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var ledger = brain.Get<IAllowanceLedger>("account");
 
         var decision = await ledger.AuthorizeAsync(Paid("account", "ws-1", "chat-1", 5m), ct);
@@ -218,7 +218,7 @@ public sealed class AllowanceFacts
     public async Task ConcurrentRetriesReserveAChargeOnce()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var ledger = brain.Get<IAllowanceLedger>("account");
         await ledger.GrantAsync(AllowanceOf("budget", "ws-1", ApprovalLevel.StandingBudget, AllowanceScope.Always, 100m), ct);
         var request = Paid("account", "ws-1", "chat-1", 5m, intent: "intent-chaos", operation: "Render");
@@ -233,7 +233,7 @@ public sealed class AllowanceFacts
     public async Task LimitLevelIsStoredInTheAllowanceLedger()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var ledger = brain.Get<IAllowanceLedger>("account");
         await ledger.SetLimitsAsync(new LimitPolicy { AccountLimitCompute = 100m }, ct);
         await ledger.GrantAsync(AllowanceOf("budget", "ws-1", ApprovalLevel.StandingBudget, AllowanceScope.Always, 100m), ct);
@@ -251,7 +251,7 @@ public sealed class AllowanceFacts
     public async Task SettledActualNeverExceedsTheLimit()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var ledger = brain.Get<IAllowanceLedger>("account");
         await ledger.SetLimitsAsync(new LimitPolicy { AccountLimitCompute = 10m }, ct);
         await ledger.GrantAsync(AllowanceOf("budget", "ws-1", ApprovalLevel.StandingBudget, AllowanceScope.Always, 10m), ct);
@@ -269,7 +269,7 @@ public sealed class AllowanceFacts
     public async Task PlatformFaultsAndProviderOutagesAreNotCharged()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var ledger = brain.Get<IAllowanceLedger>("account");
         await ledger.GrantAsync(AllowanceOf("budget", "ws-1", ApprovalLevel.StandingBudget, AllowanceScope.Always, 10m), ct);
 

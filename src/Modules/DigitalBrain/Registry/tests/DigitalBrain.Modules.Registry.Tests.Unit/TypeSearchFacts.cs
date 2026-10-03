@@ -16,7 +16,7 @@ public sealed class TypeSearchFacts
     public async Task SearchDegradesWithoutAComposedVectorStoreEvenWhenEmbeddingsAreAvailable()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<RegistryModule>().WithModule<RegistryFixtureModule>()
+        await using var brain = await ModuleTest.Create().WithModule<RegistryModule>().WithModule<RegistryFixtureModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new ClockEmbeddings()))
             .StartAsync(ct);
         var registry = brain.Get<IRegistry>(RegistryModule.Key);
@@ -30,7 +30,7 @@ public sealed class TypeSearchFacts
         var connection = Environment.GetEnvironmentVariable("DIGITALBRAIN_QDRANT_TEST_CONNECTION");
         Assert.SkipWhen(string.IsNullOrWhiteSpace(connection), "Set DIGITALBRAIN_QDRANT_TEST_CONNECTION for the real vector-store contract.");
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<RegistryModule>().WithModule<QdrantModule>()
+        await using var brain = await ModuleTest.Create().WithModule<RegistryModule>().WithModule<QdrantModule>()
             .WithModule<RegistryFixtureModule>()
             .ConfigureSilo(silo => { silo.Configuration["ConnectionStrings:qdrant"] = connection; silo.Services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new ClockEmbeddings()); })
             .StartAsync(ct);
@@ -43,7 +43,7 @@ public sealed class TypeSearchFacts
     public async Task VectorSearchReturnsTypesAndCanBeRebuiltAfterAnEmbeddingFailure()
     {
         var embedder = new ClockEmbeddings { Fail = true };
-        await using var brain = await UnitTest.Create().WithModule<RegistryModule>().WithModule<QdrantModule>()
+        await using var brain = await ModuleTest.Create().WithModule<RegistryModule>().WithModule<QdrantModule>()
             .WithModule<RegistryFixtureModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(embedder))
             .StartAsync(TestContext.Current.CancellationToken);
@@ -63,13 +63,13 @@ public sealed class TypeSearchFacts
     {
         var vectors = new InMemoryQdrant();
         var ct = TestContext.Current.CancellationToken;
-        await using (var first = await UnitTest.Create().WithModule<RegistryModule>().WithModule<RegistryFixtureModule>()
+        await using (var first = await ModuleTest.Create().WithModule<RegistryModule>().WithModule<RegistryFixtureModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IVectorStore>(vectors)
                 .AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new ClockEmbeddings())).StartAsync(ct))
         {
             Assert.Equal("test.registry-clock", Assert.Single(await first.Get<IRegistry>(RegistryModule.Key).Search("wake me", 1, ct)).Type.Id);
         }
-        await using var second = await UnitTest.Create().WithModule<RegistryModule>()
+        await using var second = await ModuleTest.Create().WithModule<RegistryModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IVectorStore>(vectors)
                 .AddSingleton<IEmbeddingGenerator<string, Embedding<float>>>(new ClockEmbeddings())).StartAsync(ct);
 
@@ -79,7 +79,7 @@ public sealed class TypeSearchFacts
     [Fact]
     public async Task ModuleAnnouncementsDoNotChangeTheSelectedComposition()
     {
-        await using var brain = await UnitTest.Create().WithModule<RegistryModule>().StartAsync(TestContext.Current.CancellationToken);
+        await using var brain = await ModuleTest.Create().WithModule<RegistryModule>().StartAsync(TestContext.Current.CancellationToken);
         var registry = brain.Get<IRegistry>(RegistryModule.Key);
         Assert.DoesNotContain(await registry.Types(), type => type.Id == "test.registry-clock");
         var hub = brain.SiloServices.GetRequiredService<LocalSignalHub>();

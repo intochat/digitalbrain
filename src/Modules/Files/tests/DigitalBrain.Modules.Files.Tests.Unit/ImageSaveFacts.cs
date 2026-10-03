@@ -1,5 +1,5 @@
 using DigitalBrain.Files;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 namespace DigitalBrain.Modules.Files.Tests.Unit;
 
 public sealed class ImageSaveFacts
@@ -10,7 +10,7 @@ public sealed class ImageSaveFacts
     public async Task SaveSurvivesFreshServiceAndRetriesWithoutDuplicate()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var blobs = new MemoryAssetBlobStore();
         var files = new WorkspaceFileStore(blobs, brain.Grains);
         var asset = await files.UploadImageAsync("scope", "Untitled.png", new MemoryStream(Png), ct);
@@ -38,7 +38,7 @@ public sealed class ImageSaveFacts
     public async Task UploadsAreScopedToTheirWorkspaceAndRejectNonImages()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var files = new WorkspaceFileStore(new MemoryAssetBlobStore(), brain.Grains);
         var asset = await files.UploadImageAsync("workspace-a", "Untitled.png", new MemoryStream(Png), ct);
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => files.OpenAssetAsync("workspace-b", asset.Id, ct));

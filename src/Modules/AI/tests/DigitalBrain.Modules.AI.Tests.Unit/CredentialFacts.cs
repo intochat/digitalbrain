@@ -22,7 +22,7 @@ public sealed class CredentialFacts
     public async Task AnUnregisteredProviderReportsUnavailableInsteadOfThrowing()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithRegistrations().WithModule<AIModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithRegistrations().WithModule<AIModule>().StartAsync(ct);
 
         var catalogRow = await brain.Get<IIntegrationRegistration>("integration/openai").Read();
         var factory = new OpenAIProviderFactory();
@@ -42,7 +42,7 @@ public sealed class CredentialFacts
     {
         var ct = TestContext.Current.CancellationToken;
         using var provider = new LoopbackServer();
-        await using var brain = await UnitTest.Create()
+        await using var brain = await ModuleTest.Create()
             .WithRegistrations(AiRegistrationSeeds.OpenAI(Canary, provider.Url))
             .WithModule<AIModule>()
             .ConfigureSilo(silo => silo.Services.Configure<AIOptions>(options =>
@@ -70,7 +70,7 @@ public sealed class CredentialFacts
     public async Task SeedingOnlyTheApiKeyIsReadyAndTheDefaultEndpointIsUsed()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create()
+        await using var brain = await ModuleTest.Create()
             .WithRegistrations(new TestExecutionOptions
             {
                 PrivateConfiguration = new Dictionary<string, string?> { ["DigitalBrain:Integrations:openai:ApiKey"] = Canary },
@@ -93,7 +93,7 @@ public sealed class CredentialFacts
         const string Rotated = "canary-rotated-key-2c9e4d";
         var clock = new SteppingTimeProvider();
         using var provider = new LoopbackServer();
-        await using var brain = await UnitTest.Create()
+        await using var brain = await ModuleTest.Create()
             .WithRegistrations(AiRegistrationSeeds.OpenAI(Canary, provider.Url))
             .WithModule<AIModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<TimeProvider>(clock)).StartAsync(ct);
@@ -122,7 +122,7 @@ public sealed class CredentialFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var clock = new SteppingTimeProvider();
-        await using var brain = await UnitTest.Create()
+        await using var brain = await ModuleTest.Create()
             .WithRegistrations(AiRegistrationSeeds.OpenAI(Canary))
             .WithModule<AIModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<TimeProvider>(clock)).StartAsync(ct);
@@ -148,7 +148,7 @@ public sealed class CredentialFacts
         var logs = new CapturingLoggerProvider();
         var clock = new SteppingTimeProvider();
         using var provider = new LoopbackServer();
-        await using var brain = await UnitTest.Create()
+        await using var brain = await ModuleTest.Create()
             .WithRegistrations(AiRegistrationSeeds.OpenAI(Canary, provider.Url))
             .WithModule<AIModule>()
             .ConfigureSilo(silo =>

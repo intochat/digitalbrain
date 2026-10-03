@@ -4,7 +4,7 @@ using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -31,7 +31,7 @@ public sealed class AppsRouteFacts
     public async Task OpenUsesTheInstalledRevisionAndReturnsItsInvocationResult(string scenario, int expected)
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AppsModule>().StartAsync(ct);
         CallerContextStamper.Stamp(new CallerContext
         {
             PrincipalId = "alice",
@@ -117,7 +117,7 @@ public sealed class AppsRouteFacts
     public async Task AuthoringRoutesScopeDraftsToTheCallerAndRejectInvalidIdsAndForeignBrains()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AppsModule>().StartAsync(ct);
         await brain.Get<IAppDrafts>("alice").Record("alice-draft", "Alice", AppDraftStatus.Drafted);
         await brain.Get<IAppDrafts>("bob").Record("bob-draft", "Bob", AppDraftStatus.Drafted);
         var builder = WebApplication.CreateBuilder();

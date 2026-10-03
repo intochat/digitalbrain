@@ -1,5 +1,5 @@
 using DigitalBrain.Kernel;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -7,7 +7,7 @@ namespace DigitalBrain.Client.Orleans.Tests.Unit;
 
 public sealed class SubscriptionLifetimeFacts
 {
-    internal static UnitTestBuilder Options(int capacity = 256) => UnitTest.Create().WithFastSubscriptions(capacity);
+    internal static ModuleTestBuilder Options(int capacity = 256) => ModuleTest.Create().WithFastSubscriptions(capacity);
 
     [Fact]
     public async Task OverflowIsVisibleEvenWithoutDrainingTheBuffer()

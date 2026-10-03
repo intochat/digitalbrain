@@ -10,7 +10,7 @@ public sealed class SupabaseQueryFacts
     public async Task QueryReturnsTypedRows()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<SupabaseModule>(m => m.WithProvider<FakeSupabaseProvider>()).StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<SupabaseModule>(m => m.WithProvider<FakeSupabaseProvider>()).StartAsync(ct);
         var supabase = brain.Get<ISupabase>(SupabaseNames.DefaultNeuron);
 
         var result = await supabase.Query(new("select id from people"));
@@ -62,8 +62,8 @@ public sealed class SupabaseQueryFacts
         await Assert.ThrowsAsync<SupabaseQueryException>(() => supabase.Query(new("select 1", 0)));
     }
 
-    private static Task<UnitBrain> StartAsync(FakeSupabaseProvider provider, CancellationToken ct)
-        => UnitTest.Create().WithModule<SupabaseModule>()
+    private static Task<ModuleBrain> StartAsync(FakeSupabaseProvider provider, CancellationToken ct)
+        => ModuleTest.Create().WithModule<SupabaseModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<ISupabaseProvider>(provider))
             .StartAsync(ct);
 }

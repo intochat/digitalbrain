@@ -1,6 +1,6 @@
 using DigitalBrain.Microsoft.GitHub;
 using DigitalBrain.Microsoft.GitHub.Signals;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -61,8 +61,8 @@ public sealed class RepositoryFacts
         Assert.Equal("The connection does not match its authorized binding.", (await refused.NextAsync(ct: ct)).Reason);
     }
 
-    private static Task<UnitBrain> StartAsync(IGitHubRepositorySource source, CancellationToken ct)
-        => UnitTest.Create().WithModule<GitHubModule>()
+    private static Task<ModuleBrain> StartAsync(IGitHubRepositorySource source, CancellationToken ct)
+        => ModuleTest.Create().WithModule<GitHubModule>()
             .ConfigureSilo(silo =>
             {
                 silo.Services.AddSingleton(new GitHubRepositoryBindings([Binding()]));

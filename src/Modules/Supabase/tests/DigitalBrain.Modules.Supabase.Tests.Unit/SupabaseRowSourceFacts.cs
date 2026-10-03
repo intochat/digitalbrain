@@ -1,7 +1,7 @@
 using DigitalBrain.Contracts.Data;
 using DigitalBrain.Supabase;
 using DigitalBrain.Supabase.Tables;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -14,7 +14,7 @@ public sealed class SupabaseRowSourceFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var provider = new RecordingSupabaseProvider();
-        await using var brain = await UnitTest.Create().ConfigureSilo(silo =>
+        await using var brain = await ModuleTest.Create().ConfigureSilo(silo =>
             silo.Services.AddSingleton<ISupabaseProvider>(provider)).StartAsync(ct);
         var source = brain.Get<ISupabaseRows>("people");
 

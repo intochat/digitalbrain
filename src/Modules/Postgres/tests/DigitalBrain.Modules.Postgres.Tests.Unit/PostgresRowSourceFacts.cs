@@ -1,6 +1,6 @@
 using DigitalBrain.Contracts.Data;
 using DigitalBrain.Postgres;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -13,7 +13,7 @@ public sealed class PostgresRowSourceFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var provider = new RecordingPostgresProvider();
-        await using var brain = await UnitTest.Create().ConfigureSilo(silo =>
+        await using var brain = await ModuleTest.Create().ConfigureSilo(silo =>
             silo.Services.AddSingleton<IPostgresProvider>(provider)).StartAsync(ct);
         var source = brain.Get<IPostgresRows>("public.people");
 

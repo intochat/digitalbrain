@@ -153,14 +153,14 @@ public sealed class CSharpFileNeuronFacts
     public async Task AnUnsetSourceRootFallsBackToTheRepository()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<CSharpModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<CSharpModule>().StartAsync(ct);
 
         var options = brain.SiloServices.GetRequiredService<IOptions<CSharpOptions>>().Value;
 
         Assert.Equal(CSharpModule.FindRepositoryRoot(), options.SourceRoot);
     }
 
-    private static async Task<ICSharpFile> Started(UnitBrain brain, string id, CancellationToken ct)
+    private static async Task<ICSharpFile> Started(ModuleBrain brain, string id, CancellationToken ct)
     {
         var file = brain.Get<ICSharpFile>(id);
         await file.Write("Console.WriteLine(1);", ct);
@@ -172,5 +172,5 @@ public sealed class CSharpFileNeuronFacts
     private static Task Reconcile(ICSharpFile file)
         => file.AsReference<IRemindable>().ReceiveReminder(CSharpFileNeuron.ReconcileReminder, default);
 
-    private static Task<UnitBrain> Brain(FakeSandbox sandbox, CancellationToken ct) => SandboxBrain.StartAsync(sandbox, ct);
+    private static Task<ModuleBrain> Brain(FakeSandbox sandbox, CancellationToken ct) => SandboxBrain.StartAsync(sandbox, ct);
 }

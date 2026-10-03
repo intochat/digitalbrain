@@ -1,7 +1,7 @@
 using DigitalBrain.Compute;
 using DigitalBrain.Compute.Allowances;
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 
 namespace DigitalBrain.Modules.Compute.Tests.Unit;
 
@@ -14,7 +14,7 @@ public sealed class ChaosChargeFacts
     public async Task ChaosFindsNoDoubleChargesAndActualNeverExceedsTheLimit()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var ledger = brain.Get<IAllowanceLedger>("account-chaos");
         await ledger.SetLimitsAsync(new LimitPolicy { AccountLimitCompute = 100m }, ct);
         await ledger.GrantAsync(Allowance("account-chaos", "ws-chaos", 100m), ct);

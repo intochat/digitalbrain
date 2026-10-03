@@ -17,7 +17,7 @@ public sealed class PostgresLegacyScanFacts
     public async Task TheScanUsesTheConfiguredContainerAndReportsUnreadableBlobsAlongsideValidTables()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var serializer = new OrleansGrainStorageSerializer(brain.SiloServices.GetRequiredService<Serializer>());
         var blobs = new ScanBlobs(new()
         {
@@ -38,7 +38,7 @@ public sealed class PostgresLegacyScanFacts
     public async Task AScanWithOnlyUnreadableBlobsRefusesCompletion()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var serializer = new OrleansGrainStorageSerializer(brain.SiloServices.GetRequiredService<Serializer>());
         await using var services = Services(new ScanBlobs(new() { ["state-postgres.table/broken.json"] = BinaryData.FromString("broken") }), serializer);
 

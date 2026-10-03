@@ -9,15 +9,15 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 
-namespace DigitalBrain.Testing.Unit;
+namespace DigitalBrain.Testing.Module;
 
-public sealed class UnitBrain : IDigitalBrain, ITrackedBrain
+public sealed class ModuleBrain : IDigitalBrain, ITrackedBrain
 {
     private readonly InProcessTestCluster cluster;
     private readonly IDigitalBrain _brain;
     private readonly TestSessionLifetime _lifetime;
     private readonly TestExecutionOptions _execution;
-    internal UnitBrain(InProcessTestCluster cluster, TestExecutionOptions execution, TestSessionLifetime lifetime)
+    internal ModuleBrain(InProcessTestCluster cluster, TestExecutionOptions execution, TestSessionLifetime lifetime)
     {
         this.cluster = cluster;
         _execution = execution;
@@ -29,6 +29,27 @@ public sealed class UnitBrain : IDigitalBrain, ITrackedBrain
     TestExecutionOptions ITrackedBrain.Execution => _execution;
 
     public IGrainFactory Grains => cluster.Client;
+
+    private HttpClient? _http;
+
+    // The composed modules' HTTP endpoints, when the builder asked for WithHttpEdge().
+    public HttpClient HttpClient => _http ?? throw new InvalidOperationException(
+        "This brain has no HTTP edge. Start it with ModuleTest.Create()...WithHttpEdge().");
+
+    internal void AttachHttpEdge(Microsoft.AspNetCore.Builder.WebApplication edge)
+    {
+        _http = new HttpClient { BaseAddress = new Uri(edge.Urls.Single()) };
+        _lifetime.Own("http-client", new DisposableClient(_http));
+    }
+
+    private sealed class DisposableClient(HttpClient client) : IAsyncDisposable
+    {
+        public ValueTask DisposeAsync()
+        {
+            client.Dispose();
+            return ValueTask.CompletedTask;
+        }
+    }
 
     // The active silo's service provider. Lets a test reach module-registered singletons that are
     // not grains (for example the broker gateway or a certification service).

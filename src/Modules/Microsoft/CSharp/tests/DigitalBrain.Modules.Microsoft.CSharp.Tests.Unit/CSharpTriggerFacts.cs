@@ -95,7 +95,7 @@ public sealed class CSharpTriggerFacts
         await Assert.ThrowsAsync<ArgumentException>(() => file.Arm(new("not a grain id", nameof(Pinged)), ct));
     }
 
-    private static async Task<ICSharpFile> Armed(UnitBrain brain, string id, IPinger source, CancellationToken ct)
+    private static async Task<ICSharpFile> Armed(ModuleBrain brain, string id, IPinger source, CancellationToken ct)
     {
         var file = brain.Get<ICSharpFile>(id);
         await file.Write("Console.WriteLine(1);", ct);
@@ -113,5 +113,5 @@ public sealed class CSharpTriggerFacts
         while (!await condition()) { await Task.Delay(TimeSpan.FromMilliseconds(50), deadline.Token); }
     }
 
-    private static Task<UnitBrain> Brain(FakeSandbox sandbox, CancellationToken ct) => SandboxBrain.StartAsync(sandbox, ct);
+    private static Task<ModuleBrain> Brain(FakeSandbox sandbox, CancellationToken ct) => SandboxBrain.StartAsync(sandbox, ct);
 }

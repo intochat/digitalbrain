@@ -124,7 +124,7 @@ public sealed class InferenceFacts
     public async Task GenericAndTypedNeuronsResolveAndRejectMismatchedProfiles()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithRegistrations(AiRegistrationSeeds.OpenAI()).WithModule<AIModule>()
+        await using var brain = await ModuleTest.Create().WithRegistrations(AiRegistrationSeeds.OpenAI()).WithModule<AIModule>()
             .ConfigureSilo(silo => silo.Services.Configure<AIOptions>(options =>
             {
                 options.ModelProfiles["custom"] = new() { Provider = "OpenAI", Model = "custom-model" };

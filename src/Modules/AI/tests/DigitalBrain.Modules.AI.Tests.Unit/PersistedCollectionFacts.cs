@@ -34,7 +34,7 @@ public sealed class PersistedCollectionFacts
     public async Task ScriptedRepliesAndPromptsSurviveReactivation()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AIModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>().StartAsync(ct);
         var model = brain.Get<IScriptedLLM>("persisted-script");
         await model.Script(["first reply", "second reply"]);
         await model.Generate(new([new("user", [new AiText("first prompt")])]), ct);

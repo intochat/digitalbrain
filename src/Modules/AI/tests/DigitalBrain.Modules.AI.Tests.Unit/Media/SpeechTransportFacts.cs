@@ -14,7 +14,7 @@ public sealed class SpeechTransportFacts
         deadline.CancelAfter(TimeSpan.FromSeconds(30));
         var ct = deadline.Token;
         using var endpoint = new LoopbackServer();
-        await using var brain = await UnitTest.Create().WithRegistrations(AiRegistrationSeeds.OpenAI(endpoint: endpoint.Url)).WithModule<AIModule>()
+        await using var brain = await ModuleTest.Create().WithRegistrations(AiRegistrationSeeds.OpenAI(endpoint: endpoint.Url)).WithModule<AIModule>()
             .ConfigureSilo(silo =>
             {
                 silo.Services.AddOpenAISpeechSynthesis("fixture-tts");

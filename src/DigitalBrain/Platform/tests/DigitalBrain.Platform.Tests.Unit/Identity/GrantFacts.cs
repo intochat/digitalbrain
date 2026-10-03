@@ -3,7 +3,7 @@ using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Platform.Contracts.Identity;
 using DigitalBrain.Platform.Identity.Authority;
 using DigitalBrain.Platform.Identity.Grants;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Xunit;
@@ -116,7 +116,7 @@ public sealed class GrantFacts
     public async Task RevokingAOnceGrantEmptiesTheStoreAndTheNextReadLooksMissing()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var store = brain.Get<IGrantStore>(IdentityGrains.Grants("ws-1"));
         await store.GrantAsync(Grant(GrantMode.Once, "person.birthDate", "app-1", "ws-1"), ct);
         Assert.Single(await store.ListAsync(ct));
@@ -134,7 +134,7 @@ public sealed class GrantFacts
     public async Task ConcurrentCallsCannotSpendTheSameOnceGrant()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var authority = brain.Get<IBrainAuthority>(BrainScope.Create("account-1", "ws-1").Id);
         await authority.Initialize("account-1", "ws-1");
         await authority.Grant(Grant(GrantMode.Once, "person.birthDate", "app-1", "ws-1"));
@@ -148,7 +148,7 @@ public sealed class GrantFacts
     public async Task GrantStoreGrantsRevokesAndRelists()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var store = brain.Get<IGrantStore>(IdentityGrains.Grants("ws-1"));
         await store.GrantAsync(Grant(GrantMode.Always, "person.birthDate", "app-1", "ws-1"), ct);
         Assert.Single(await store.ListAsync(ct));
@@ -160,7 +160,7 @@ public sealed class GrantFacts
     public async Task RevokingOneModeKeepsTheOthersAndARevokedValueLooksEmpty()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var store = brain.Get<IGrantStore>(IdentityGrains.Grants("ws-1"));
         await store.GrantAsync(Grant(GrantMode.Always, "person.birthDate", "app-1", "ws-1"), ct);
         await store.GrantAsync(Grant(GrantMode.ThisChat, "person.birthDate", "app-1", "ws-1") with { ConversationId = "chat-1" }, ct);

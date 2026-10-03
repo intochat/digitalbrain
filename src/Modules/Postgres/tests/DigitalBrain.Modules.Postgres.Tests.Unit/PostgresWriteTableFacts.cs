@@ -19,7 +19,7 @@ public sealed class PostgresWriteTableFacts
         var ct = TestContext.Current.CancellationToken;
         var provider = new MemoryTables { LoseDefineResponse = true };
         var capacity = new ChangingCapacity();
-        await using var brain = await UnitTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>
+        await using var brain = await ModuleTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>
         {
             silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=sample;Username=reader";
             silo.Services.AddSingleton<IPostgresTableProvider>(provider);
@@ -71,7 +71,7 @@ public sealed class PostgresWriteTableFacts
         var ct = TestContext.Current.CancellationToken;
         var provider = new MemoryTables { LoseDefineResponse = true };
         var capacity = new ChangingCapacity();
-        await using var brain = await UnitTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>
+        await using var brain = await ModuleTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>
         {
             silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=sample;Username=reader";
             silo.Services.AddSingleton<IPostgresTableProvider>(provider);
@@ -117,7 +117,7 @@ public sealed class PostgresWriteTableFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var race = new RetirementRace();
-        await using var brain = await UnitTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>
+        await using var brain = await ModuleTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>
         {
             silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=sample;Username=reader";
             silo.Services.AddSingleton<IPostgresTableProvider>(new MemoryTables());
@@ -397,8 +397,8 @@ public sealed class PostgresWriteTableFacts
             AppId = app
         });
 
-    private static Task<UnitBrain> Start(IPostgresTableProvider? provider, string connection = "Host=localhost;Database=sample;Username=reader")
-        => UnitTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>
+    private static Task<ModuleBrain> Start(IPostgresTableProvider? provider, string connection = "Host=localhost;Database=sample;Username=reader")
+        => ModuleTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>
         {
             silo.Configuration["ConnectionStrings:postgres"] = connection;
             if (provider is not null) { silo.Services.AddSingleton(provider); }

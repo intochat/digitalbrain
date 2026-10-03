@@ -24,7 +24,7 @@ public sealed class PackedCompositionFacts
         var roots = new[]
         {
             "src/Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj",
-            "src/Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj",
+            "src/Testing/DigitalBrain.Testing.Module/DigitalBrain.Testing.Module.csproj",
             "src/Aspire/DigitalBrain.Aspire.Server/DigitalBrain.Aspire.Server.csproj",
             "src/Aspire/DigitalBrain.Aspire.Client/DigitalBrain.Aspire.Client.csproj",
         };
@@ -91,7 +91,7 @@ public sealed class PackedCompositionFacts
         {
             ("DigitalBrain.Modules.AI.Contracts", "_ = typeof(DigitalBrain.AI.ILLM);"),
             ("DigitalBrain.Client", "_ = typeof(DigitalBrain.Client.DigitalBrainClient);"),
-            ("DigitalBrain.Testing.Unit", "await using var brain = await DigitalBrain.Testing.Unit.UnitTest.Create().StartAsync();"),
+            ("DigitalBrain.Testing.Module", "await using var brain = await DigitalBrain.Testing.Module.ModuleTest.Create().StartAsync();"),
             ("DigitalBrain.Aspire.Server", "var builder = Microsoft.AspNetCore.Builder.WebApplication.CreateBuilder(); DigitalBrain.Aspire.Server.DigitalBrainRuntimeHostingExtensions.AddDigitalBrainServer(builder, _ => { });"),
         })
         {

@@ -5,7 +5,7 @@ using DigitalBrain.Compute.Usage;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -19,7 +19,7 @@ public sealed class ComputeUsageRouteFacts
     public async Task UsageRejectsZeroLimitsAndAnotherBrainsCursor()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         await brain.Get<DigitalBrain.Platform.Contracts.Identity.IIdentityDirectory>(DigitalBrain.Platform.Contracts.Identity.IdentityGrains.Directory)
             .ShareBrainAsync("account", "own", "owner", "Owner", DigitalBrain.Platform.Contracts.Identity.MemberRole.Owner, ct);
         var store = brain.SiloServices.GetRequiredService<IUsageStore>();

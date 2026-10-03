@@ -131,8 +131,7 @@ DigitalBrain.slnx
 │   │   │   └── DigitalBrain.Modules.Flutter.Testing
 │   │   └── Gmail/
 │   │       ├── tests/
-│   │       │   ├── DigitalBrain.Modules.Google.Gmail.Tests.E2E
-│   │       │   └── DigitalBrain.Modules.Google.Gmail.Tests.Unit
+│   │       │   └── DigitalBrain.Modules.Google.Gmail.Tests
 │   │       ├── DigitalBrain.Modules.Google.Gmail
 │   │       ├── DigitalBrain.Modules.Google.Gmail.Aspire.Hosting
 │   │       └── DigitalBrain.Modules.Google.Gmail.Contracts
@@ -200,8 +199,8 @@ DigitalBrain.slnx
 └── Testing/
     ├── tests/
     │   ├── DigitalBrain.Architecture.Tests
-    │   └── DigitalBrain.Testing.Unit.Tests.Unit
+    │   └── DigitalBrain.Testing.Module.Tests.Unit
     ├── DigitalBrain.Testing
     ├── DigitalBrain.Testing.E2E
-    └── DigitalBrain.Testing.Unit
+    └── DigitalBrain.Testing.Module
 ```

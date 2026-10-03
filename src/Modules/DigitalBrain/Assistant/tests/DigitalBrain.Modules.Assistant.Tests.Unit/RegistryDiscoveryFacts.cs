@@ -17,7 +17,7 @@ public sealed class RegistryDiscoveryFacts
     public async Task MissingRegistryIsAnExplicitDiscoveryFailureNotAnUnavailableGrainCall()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         CallerContextStamper.Stamp(new CallerContext
         {
             PrincipalId = "alice",
@@ -42,7 +42,7 @@ public sealed class RegistryDiscoveryFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var database = new DatabaseFixture();
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>().WithModule<RegistryModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AppsModule>().WithModule<RegistryModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IRegistryResourceProvider>(database)).StartAsync(ct);
         CallerContextStamper.Stamp(new CallerContext
         {

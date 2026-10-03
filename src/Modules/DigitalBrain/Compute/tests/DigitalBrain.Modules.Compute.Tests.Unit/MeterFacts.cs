@@ -45,7 +45,7 @@ public sealed class MeterFacts
     public async Task ConcurrentDuplicateAppendsRecordOneEvent()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var store = new NeuronMeterStore(brain.SiloServices.GetRequiredService<IGrainFactory>());
 
         var results = await Task.WhenAll(Enumerable.Range(0, 64)

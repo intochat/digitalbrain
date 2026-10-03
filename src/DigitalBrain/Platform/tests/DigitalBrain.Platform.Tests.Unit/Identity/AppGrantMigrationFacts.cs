@@ -16,7 +16,7 @@ public sealed class AppGrantMigrationFacts
     public async Task MigrationPreservesGrantModesConversationsAndRevocationsWithoutReissuingConsumedGrants()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var authority = brain.Get<IBrainAuthority>(BrainScope.Create("account", "brain").Id);
         await authority.Initialize("account", "brain");
         var always = await authority.Grant(Grant("file-one", "email", GrantMode.Always));
@@ -49,7 +49,7 @@ public sealed class AppGrantMigrationFacts
     [Fact]
     public async Task AGrantMoveWhoseSavedResponseWasLostResumesWithoutRestoringLaterRevocations()
     {
-        await using var brain = await UnitTest.Create().ConfigureSilo(silo =>
+        await using var brain = await ModuleTest.Create().ConfigureSilo(silo =>
             silo.Services.AddKeyedSingleton<IGrainStorage>(DigitalBrain.Contracts.DigitalBrainNames.DefaultGrainStorage,
                 (services, _) => new LostMigrationResponse(new OrleansGrainStorageSerializer(services.GetRequiredService<Serializer>()))))
             .StartAsync(TestContext.Current.CancellationToken);
@@ -89,7 +89,7 @@ public sealed class AppGrantMigrationFacts
     [Fact]
     public async Task OnlyTheOriginatingAppsGrainCanMigrateItsCurrentBrainGrants()
     {
-        await using var brain = await UnitTest.Create().StartAsync(TestContext.Current.CancellationToken);
+        await using var brain = await ModuleTest.Create().StartAsync(TestContext.Current.CancellationToken);
         Stamp();
         var migration = brain.Get<IAppGrantMigration>(BrainScope.CurrentId());
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => migration.Migrate("stable-app", ["file"]));

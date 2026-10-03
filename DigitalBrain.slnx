@@ -144,8 +144,7 @@
     <Project Path="src/Modules/Google/Gmail/DigitalBrain.Modules.Google.Gmail/DigitalBrain.Modules.Google.Gmail.csproj" />
   </Folder>
   <Folder Name="/Modules/Google/Gmail/tests/">
-    <Project Path="src/Modules/Google/Gmail/tests/DigitalBrain.Modules.Google.Gmail.Tests.E2E/DigitalBrain.Modules.Google.Gmail.Tests.E2E.csproj" />
-    <Project Path="src/Modules/Google/Gmail/tests/DigitalBrain.Modules.Google.Gmail.Tests.Unit/DigitalBrain.Modules.Google.Gmail.Tests.Unit.csproj" />
+    <Project Path="src/Modules/Google/Gmail/tests/DigitalBrain.Modules.Google.Gmail.Tests/DigitalBrain.Modules.Google.Gmail.Tests.csproj" />
   </Folder>
   <Folder Name="/Modules/Microsoft/Aspire/">
     <Project Path="src/Modules/Microsoft/Aspire/DigitalBrain.Modules.Microsoft.Aspire.Aspire.Hosting/DigitalBrain.Modules.Microsoft.Aspire.Aspire.Hosting.csproj" />
@@ -224,12 +223,12 @@
   </Folder>
   <Folder Name="/Testing/">
     <Project Path="src/Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
-    <Project Path="src/Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
+    <Project Path="src/Testing/DigitalBrain.Testing.Module/DigitalBrain.Testing.Module.csproj" />
     <Project Path="src/Testing/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
   </Folder>
   <Folder Name="/Testing/tests/">
     <Project Path="src/Testing/tests/DigitalBrain.Architecture.Tests/DigitalBrain.Architecture.Tests.csproj" />
-    <Project Path="src/Testing/tests/DigitalBrain.Testing.Unit.Tests.Unit/DigitalBrain.Testing.Unit.Tests.Unit.csproj" />
+    <Project Path="src/Testing/tests/DigitalBrain.Testing.Module.Tests.Unit/DigitalBrain.Testing.Module.Tests.Unit.csproj" />
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />

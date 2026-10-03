@@ -9,7 +9,7 @@ public sealed class TargetAccessFacts
     [Fact]
     public async Task PublicContractsImplementedInPlatformStillEnforceTheirTargetBrain()
     {
-        await using var brain = await UnitTest.Create().StartAsync(TestContext.Current.CancellationToken);
+        await using var brain = await ModuleTest.Create().StartAsync(TestContext.Current.CancellationToken);
         CallerContextStamper.Stamp(new() { PrincipalId = "owner", AccountId = "owner", BrainId = "alice", Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp });
         try
         {
@@ -24,7 +24,7 @@ public sealed class TargetAccessFacts
     [Fact]
     public async Task SelectedBrainCannotReadOrCreateAForeignAppThroughRawGrainCalls()
     {
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>().StartAsync(TestContext.Current.CancellationToken);
+        await using var brain = await ModuleTest.Create().WithModule<AppsModule>().StartAsync(TestContext.Current.CancellationToken);
         CallerContextStamper.Stamp(new() { PrincipalId = "owner", AccountId = "owner", BrainId = "alice", Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp });
         try
         {
@@ -40,7 +40,7 @@ public sealed class TargetAccessFacts
     [Fact]
     public async Task PublicPackageReadDoesNotMakePackageMutationPublic()
     {
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>().StartAsync(TestContext.Current.CancellationToken);
+        await using var brain = await ModuleTest.Create().WithModule<AppsModule>().StartAsync(TestContext.Current.CancellationToken);
         CallerContextStamper.Stamp(new() { PrincipalId = "owner", AccountId = "owner", BrainId = "alice", Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp });
         try
         {

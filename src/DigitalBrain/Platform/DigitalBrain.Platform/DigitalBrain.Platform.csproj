@@ -13,5 +13,5 @@
   </ItemGroup>
   <ItemGroup><ProjectReference Include="../../Kernel/DigitalBrain.Kernel.AspNetCore/DigitalBrain.Kernel.AspNetCore.csproj" /></ItemGroup>
   <ItemGroup><InternalsVisibleTo Include="DigitalBrain.Platform.Tests.Unit" /><InternalsVisibleTo Include="DigitalBrain.Platform.Tests.E2E" /></ItemGroup>
-  <ItemGroup><InternalsVisibleTo Include="DigitalBrain.Testing.Unit" /></ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="DigitalBrain.Testing.Module" /></ItemGroup>
 </Project>

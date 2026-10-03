@@ -11,7 +11,7 @@ public sealed class ScriptSandboxFacts
     public async Task TheSandboxContractDiscoversComposedContractsAndReportsCompilationErrors()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<CSharpModule>().WithModule<RegistryModule>()
+        await using var brain = await ModuleTest.Create().WithModule<CSharpModule>().WithModule<RegistryModule>()
             .WithReminders().StartAsync(ct);
         var sandbox = brain.SiloServices.GetRequiredService<IScriptSandbox>();
         Assert.True(sandbox.CanRun);

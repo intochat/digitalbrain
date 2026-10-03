@@ -63,7 +63,7 @@ public sealed class AuthPostureFacts
     public async Task Registering_the_reserved_bootstrap_username_conflicts()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithExecution(new DigitalBrain.Testing.TestExecutionOptions
+        await using var brain = await ModuleTest.Create().WithExecution(new DigitalBrain.Testing.TestExecutionOptions
         {
             PrivateConfiguration = new Dictionary<string, string?>
             {

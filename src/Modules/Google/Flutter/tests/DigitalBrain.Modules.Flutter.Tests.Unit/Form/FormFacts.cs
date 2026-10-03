@@ -2,7 +2,7 @@ using DigitalBrain.Contracts.Types;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Form;
 using DigitalBrain.Sdk.Types;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Xunit;
 
 namespace DigitalBrain.Modules.Flutter.Tests.Unit.Form;
@@ -20,7 +20,7 @@ public sealed class FormFacts
     public async Task DefineAndMultiFieldSubmitLandInOneWriteEach()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>().StartAsync(ct);
         var form = brain.Get<IForm>("owner/a/apps/forms/intake");
         var defined = await form.Define(Intake);
         Assert.Equal(1, defined.Revision);
@@ -44,7 +44,7 @@ public sealed class FormFacts
     public async Task InvalidDateNamesTheAllowedValues()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>().StartAsync(ct);
         var form = brain.Get<IForm>("owner/a/apps/forms/intake");
         await form.Define(Intake);
         var error = await Assert.ThrowsAsync<TypeValidationException>(() => form.Submit(new(
@@ -61,7 +61,7 @@ public sealed class FormFacts
     public async Task ChoiceRejectsUndeclaredValueNamingTheChoices()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>().StartAsync(ct);
         var form = brain.Get<IForm>("owner/a/apps/forms/plan");
         await form.Define(new("Plan", [new("tier", "Tier", FieldKind.Choice, true, ["free", "pro"])]));
         var error = await Assert.ThrowsAsync<TypeValidationException>(() => form.Submit(new([new("tier", "gold")], 1)));
@@ -73,7 +73,7 @@ public sealed class FormFacts
     public async Task SecretFieldHoldsOnlyAReferenceAndRendersMasked()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>().StartAsync(ct);
         var form = brain.Get<IForm>("owner/a/apps/forms/login");
         await form.Define(new("Login", [new("password", "Password", FieldKind.Secret)]));
         var secret = SecretReferences.For("owner", "login-password", "Password", isSet: true);
@@ -95,7 +95,7 @@ public sealed class FormFacts
     public async Task ReferenceKindDeclaresTheFallback()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>().StartAsync(ct);
         var form = brain.Get<IForm>("owner/a/apps/forms/ref");
         var state = await form.Define(new("Ref", [new("customer", "Customer", FieldKind.Reference)]));
         var field = state.Fields.Single();
@@ -107,7 +107,7 @@ public sealed class FormFacts
     public async Task SubmittedValuesSurviveReactivationInOneGrain()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>().StartAsync(ct);
         var form = brain.Get<IForm>("owner/a/apps/forms/intake");
         var defined = await form.Define(Intake);
         await form.Submit(new([new("name", "Ada"), new("surname", "Lovelace"), new("birthDate", "1815-12-10")], defined.Revision));

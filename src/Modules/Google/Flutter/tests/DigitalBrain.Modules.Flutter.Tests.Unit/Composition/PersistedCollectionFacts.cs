@@ -13,7 +13,7 @@ public sealed class PersistedCollectionFacts
     public async Task CollectionAndLayoutPreserveOrderAndExtentsAfterReactivation()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>().StartAsync(ct);
         var collection = brain.Get<ICollectionView>("collections/items");
         await collection.Set(new([new("b", "Second", "file"), new("a", "First", "file")], Cursor: "next"), 0);
         await brain.DeactivateAsync(collection, ct);

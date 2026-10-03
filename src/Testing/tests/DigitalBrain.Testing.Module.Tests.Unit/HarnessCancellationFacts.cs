@@ -1,8 +1,8 @@
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Xunit;
-namespace DigitalBrain.Testing.Unit.Tests.Unit;
+namespace DigitalBrain.Testing.Module.Tests.Unit;
 
 public sealed class HarnessCancellationFacts
 {
@@ -12,7 +12,7 @@ public sealed class HarnessCancellationFacts
         var ct = TestContext.Current.CancellationToken;
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var service = new HeldStartup();
-        var starting = UnitTest.Create()
+        var starting = ModuleTest.Create()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IHostedService>(service))
             .StartAsync(cancel.Token);
         try
@@ -35,7 +35,7 @@ public sealed class HarnessCancellationFacts
     public async Task CancellationCallbacksCannotBypassTheShutdownDeadline(bool throws)
     {
         var ct = TestContext.Current.CancellationToken;
-        var brain = await UnitTest.Create()
+        var brain = await ModuleTest.Create()
             .WithExecution(new() { CleanupTimeout = TimeSpan.FromSeconds(2) })
             .StartAsync(ct);
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

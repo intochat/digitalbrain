@@ -18,7 +18,7 @@ public sealed class GroupChatFacts
     public async Task ParticipantsTakeTurnsAndConcludeWhenTheyAgree()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AIModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>().StartAsync(ct);
         await brain.Get<IScriptedLLM>("luna").Script(["Idea: a smart dog bowl.", "AGREE: the smart bowl, with a feeding log.", "Final: a smart dog bowl that logs feeding."]);
         await brain.Get<IScriptedLLM>("gemma").Script(["Building on the bowl: add a feeding log.", "AGREE: bowl plus log."]);
 
@@ -50,7 +50,7 @@ public sealed class GroupChatFacts
     public async Task DiscussionStopsAtMaxRoundsWithoutAgreement()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AIModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>().StartAsync(ct);
         await brain.Get<IScriptedLLM>("luna").Script(["A", "B", "C", "Final: A."]);
         await brain.Get<IScriptedLLM>("gemma").Script(["not A", "not B", "not C"]);
 
@@ -67,7 +67,7 @@ public sealed class GroupChatFacts
     public async Task AFailingParticipantLeavesTheChatFailedWithTheTurnsSoFar()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AIModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>().StartAsync(ct);
         await brain.Get<IScriptedLLM>("luna").Script(["A"]);
         await brain.Get<IScriptedLLM>("gemma").Script([]);
 
@@ -84,7 +84,7 @@ public sealed class GroupChatFacts
     public async Task AskingBeforeConfiguringIsRejected()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AIModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>().StartAsync(ct);
         await Assert.ThrowsAsync<InvalidOperationException>(() => brain.Get<IGroupChat>("chat-3").Ask("anything"));
     }
 
@@ -92,7 +92,7 @@ public sealed class GroupChatFacts
     public async Task UnknownModelsAreRejectedAtConfiguration()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AIModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>().StartAsync(ct);
         await Assert.ThrowsAsync<ArgumentException>(() => brain.Get<IGroupChat>("chat-4")
             .Configure(new([new("Ghost", "INoSuchModel"), new("Gemma", nameof(IGemma4))])));
     }

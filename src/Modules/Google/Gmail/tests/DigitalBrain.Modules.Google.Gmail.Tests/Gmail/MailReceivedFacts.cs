@@ -1,8 +1,8 @@
 using DigitalBrain.Google.Gmail;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Xunit;
 
-namespace DigitalBrain.Modules.Google.Gmail.Tests.Unit;
+namespace DigitalBrain.Modules.Google.Gmail.Tests;
 
 public sealed class MailReceivedFacts
 {
@@ -10,7 +10,7 @@ public sealed class MailReceivedFacts
     public async Task WatchPushPublishesMailReceived()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<GmailModule>()
+        await using var brain = await ModuleTest.Create().WithModule<GmailModule>()
             .StartAsync(ct);
         var gmail = brain.Get<IGmail>("me");
         await using var mail = await brain.Observe<MailReceived>(gmail, ct);

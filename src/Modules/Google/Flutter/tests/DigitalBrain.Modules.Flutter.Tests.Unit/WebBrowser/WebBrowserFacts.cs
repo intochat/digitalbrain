@@ -5,7 +5,7 @@ using DigitalBrain.Flutter.Text;
 using DigitalBrain.Flutter.WebBrowser;
 using DigitalBrain.Flutter.WebBrowser.Signals;
 using DigitalBrain.Microsoft.Playwright;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -14,7 +14,7 @@ namespace DigitalBrain.Modules.Flutter.Tests.Unit.WebBrowser;
 public sealed class WebBrowserFacts
 {
     private const string Session = "0123456789abcdef0123456789abcdef";
-    private static Task<UnitBrain> Start(Provider provider) => UnitTest.Create().WithModule<FlutterModule>()
+    private static Task<ModuleBrain> Start(Provider provider) => ModuleTest.Create().WithModule<FlutterModule>()
         .RequireModules([typeof(PlaywrightModule)])
         .ConfigureSilo(silo => silo.Services.AddSingleton<IBrowserSessionProvider>(provider))
         .StartAsync(TestContext.Current.CancellationToken);
@@ -286,7 +286,7 @@ public sealed class WebBrowserFacts
     public async Task Navigating_publishes_the_uri()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>().StartAsync(ct);
         var browser = brain.Get<IWebBrowser>("docs");
         await using var nav = await brain.Observe<BrowserNavigated>(browser, ct);
         await browser.Navigate("https://learn.microsoft.com/winui", "WinUI");

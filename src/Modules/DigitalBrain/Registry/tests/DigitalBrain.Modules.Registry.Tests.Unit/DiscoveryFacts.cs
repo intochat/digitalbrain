@@ -67,7 +67,7 @@ public sealed class DiscoveryFacts
     [Fact]
     public async Task TheNeuronSerializesDescriptionsAndExplicitSelections()
     {
-        await using var brain = await UnitTest.Create().WithModule<RegistryModule>()
+        await using var brain = await ModuleTest.Create().WithModule<RegistryModule>()
             .ConfigureSilo(silo => Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
                 .AddSingleton<IRegistryResourceProvider>(silo.Services, new ScopedProvider()))
             .StartAsync(TestContext.Current.CancellationToken);

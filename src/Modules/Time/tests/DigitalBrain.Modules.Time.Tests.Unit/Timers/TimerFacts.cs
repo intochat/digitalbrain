@@ -1,7 +1,7 @@
 using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Testing;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using DigitalBrain.Time;
 using DigitalBrain.Time.Timers.Signals;
 using Orleans;
@@ -149,7 +149,7 @@ public sealed class TimerFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var control = new ControlledTimers();
-        await using var brain = await UnitTest.Create().WithModule<TimeModule>().WithReminders()
+        await using var brain = await ModuleTest.Create().WithModule<TimeModule>().WithReminders()
             .ConfigureSilo(silo => { silo.UseControlledTimers(control); silo.UseFastCollection(); })
             .StartAsync(ct);
         var timer = brain.Get<ITimer>("long-delay");
@@ -182,8 +182,8 @@ public sealed class TimerFacts
         Assert.Equal(settled, ticks.Snapshot.Count);
     }
 
-    private static Task<UnitBrain> StartAsync(CancellationToken ct, ControlledTimers? timers = null)
-        => UnitTest.Create().WithModule<TimeModule>().WithReminders()
+    private static Task<ModuleBrain> StartAsync(CancellationToken ct, ControlledTimers? timers = null)
+        => ModuleTest.Create().WithModule<TimeModule>().WithReminders()
             .ConfigureSilo(silo => { if (timers is not null) { silo.UseControlledTimers(timers); } })
             .StartAsync(ct);
 }

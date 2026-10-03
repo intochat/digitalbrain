@@ -13,7 +13,7 @@ public sealed class AppAgentToolFacts
     public async Task BoundSelectionRejectsUpgradeAndUninstallBeforeInvoking()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AppsModule>().StartAsync(ct);
         Caller.As("alice");
         await brain.AuthorizeCallerAsync();
         var scope = BrainScope.CurrentId();
@@ -42,7 +42,7 @@ public sealed class AppAgentToolFacts
     public async Task PendingAppToolReturnsAnErrorWithoutExternalCancellation()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AppsModule>().StartAsync(ct);
         Caller.As("alice");
         await brain.AuthorizeCallerAsync();
         var scope = BrainScope.CurrentId();
@@ -72,7 +72,7 @@ public sealed class AppAgentToolFacts
         var ct = TestContext.Current.CancellationToken;
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(TimeSpan.FromSeconds(15));
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AppsModule>().StartAsync(ct);
         Caller.As("alice");
         await brain.AuthorizeCallerAsync();
         var scope = BrainScope.CurrentId();

@@ -2,7 +2,7 @@ using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Platform.Contracts.Identity;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Xunit;
 
 namespace DigitalBrain.Platform.Tests.Unit.Identity;
@@ -13,7 +13,7 @@ public sealed class BrainEstablishmentFacts
     public async Task RegisteringAMemberEstablishesTheirBrainNeuron()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var directory = brain.Get<IIdentityDirectory>(IdentityGrains.Directory);
         var member = await directory.RegisterAsync("alice", "correct-password", "Alice", ct);
         // renamed to BrainId in the identity rename task

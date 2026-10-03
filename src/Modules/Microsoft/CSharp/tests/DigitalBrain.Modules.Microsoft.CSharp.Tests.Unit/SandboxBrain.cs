@@ -8,8 +8,8 @@ namespace DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit;
 // listener, so the script edge address is configured rather than derived.
 internal static class SandboxBrain
 {
-    public static Task<UnitBrain> StartAsync(FakeSandbox sandbox, CancellationToken ct, Action<ISiloBuilder>? configure = null)
-        => UnitTest.Create().WithModule<CSharpModule>().WithReminders()
+    public static Task<ModuleBrain> StartAsync(FakeSandbox sandbox, CancellationToken ct, Action<ISiloBuilder>? configure = null)
+        => ModuleTest.Create().WithModule<CSharpModule>().WithReminders()
             .ConfigureSilo(silo =>
             {
                 silo.Services.AddHttpClient<ICSharpRunner, AspireSandboxRunner>().ConfigurePrimaryHttpMessageHandler(() => sandbox);

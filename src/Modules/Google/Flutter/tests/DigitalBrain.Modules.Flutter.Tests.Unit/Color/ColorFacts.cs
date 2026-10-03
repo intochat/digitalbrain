@@ -1,6 +1,6 @@
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Color;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Xunit;
 
 namespace DigitalBrain.Modules.Flutter.Tests.Unit.Color;
@@ -11,7 +11,7 @@ public sealed class ColorFacts
     public async Task SetNormalizesHex()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>()
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>()
             .StartAsync(ct);
         await brain.Get<IColor>("accent").Set("#0a84ff");
         Assert.Equal("#0A84FF", (await brain.Get<IColor>("accent").Read()).Hex);

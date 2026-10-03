@@ -31,7 +31,7 @@ public sealed class PostgresAppSourceFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var provider = new PostgresWriteTableFacts.MemoryTables { LoseDefineResponse = true };
-        await using var brain = await UnitTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>
+        await using var brain = await ModuleTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>
         {
             silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=platform;Username=reader";
             silo.Services.AddSingleton<IPostgresTableProvider>(provider);
@@ -77,7 +77,7 @@ public sealed class PostgresAppSourceFacts
     {
         var ct = TestContext.Current.CancellationToken;
         const string resource = "postgres-app:discovered-resource";
-        await using var brain = await UnitTest.Create().WithModule<DigitalBrain.Flutter.FlutterModule>().WithModule<PostgresModule>()
+        await using var brain = await ModuleTest.Create().WithModule<DigitalBrain.Flutter.FlutterModule>().WithModule<PostgresModule>()
             .ConfigureSilo(silo =>
             {
                 silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=sample;Username=reader";
@@ -94,7 +94,7 @@ public sealed class PostgresAppSourceFacts
     public async Task HostDiscoveryRetainsPinnedOriginAndRejectsAppAndOtherBrainCallers()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>
+        await using var brain = await ModuleTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>
         {
             silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=platform;Username=reader";
             silo.Services.AddSingleton<IPostgresTableProvider>(new PostgresWriteTableFacts.MemoryTables());

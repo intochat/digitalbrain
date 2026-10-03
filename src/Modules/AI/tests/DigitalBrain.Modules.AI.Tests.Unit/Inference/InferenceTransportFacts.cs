@@ -94,7 +94,7 @@ public sealed class InferenceTransportFacts
     {
         var ct = TestContext.Current.CancellationToken;
         using var endpoint = new LoopbackServer();
-        await using var brain = await UnitTest.Create().WithRegistrations(AiRegistrationSeeds.OpenAI(endpoint: endpoint.Url)).WithModule<AIModule>()
+        await using var brain = await ModuleTest.Create().WithRegistrations(AiRegistrationSeeds.OpenAI(endpoint: endpoint.Url)).WithModule<AIModule>()
             .ConfigureSilo(silo => silo.Services.Configure<AIOptions>(Configure))
             .StartAsync(ct);
         var serve = endpoint.ReplyOnce("application/json", """

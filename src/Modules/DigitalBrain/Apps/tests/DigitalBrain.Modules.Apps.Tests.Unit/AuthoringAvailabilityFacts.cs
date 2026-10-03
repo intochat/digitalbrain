@@ -33,7 +33,7 @@ public sealed class AuthoringAvailabilityFacts
     public async Task MarketplacePackagesDoNotBecomeTrackedInstallsInAnotherBrain()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AppsModule>().StartAsync(ct);
         Caller.As("alice");
         await brain.AuthorizeCallerAsync();
         var id = PackageId.Create("alice", "public");
@@ -61,7 +61,7 @@ public sealed class AuthoringAvailabilityFacts
     public async Task OnlyRevisionsThatRunScriptsNeedASandbox(string runtime, bool hasTests, bool requiresSandbox)
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AppsModule>().StartAsync(ct);
         Caller.As("alice");
         await brain.AuthorizeCallerAsync();
         var id = PackageId.Create("alice", "availability");

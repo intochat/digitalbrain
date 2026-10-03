@@ -314,7 +314,7 @@ public sealed class AppDraftFacts
         files = new Dictionary<string, string> { ["tests.cs"] = testsMarker, ["prompts/system.md"] = systemPrompt },
     });
 
-    private static async Task<IReadOnlyList<string>> Prompts(UnitBrain brain, string model)
+    private static async Task<IReadOnlyList<string>> Prompts(ModuleBrain brain, string model)
     {
         CallerContextStamper.Stamp(CallerContextStamper.Require() with { Kind = CallerKind.Platform, StampedBy = TrustedEdge.Platform });
         return await brain.Get<IScriptedLLM>(model).Prompts();
@@ -328,7 +328,7 @@ public sealed class AppDraftFacts
         StampedBy = TrustedEdge.AuthenticatedHttp,
     });
 
-    private static Task<UnitBrain> StartAsync(CancellationToken ct, DigitalBrain.Apps.ITestScriptRunner? runner = null, bool canRun = true, IAppRuntime? runtime = null) => UnitTest.Create()
+    private static Task<ModuleBrain> StartAsync(CancellationToken ct, DigitalBrain.Apps.ITestScriptRunner? runner = null, bool canRun = true, IAppRuntime? runtime = null) => ModuleTest.Create()
         .WithModule<AIModule>()
         .WithModule<AppsModule>()
         // Extra keys join the host configuration; replacing the IConfiguration singleton would

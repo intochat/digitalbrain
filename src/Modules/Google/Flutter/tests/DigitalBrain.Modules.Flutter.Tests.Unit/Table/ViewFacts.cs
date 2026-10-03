@@ -2,7 +2,7 @@ using DigitalBrain.Contracts.Data;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Chart;
 using DigitalBrain.Flutter.Table;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Xunit;
 
 namespace DigitalBrain.Modules.Flutter.Tests.Unit.Table;
@@ -13,7 +13,7 @@ public sealed class ViewFacts
     public async Task ABoundTableAndChartReadTheSourceWithoutReplacingItsRows()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>().StartAsync(ct);
         var rows = brain.Get<IStoredRows>("people");
         await rows.Replace(
             new RowSchema([new("country", "text"), new("n", "number")]),

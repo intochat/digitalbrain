@@ -11,7 +11,7 @@ using DigitalBrain.Platform.Integrations;
 using DigitalBrain.Platform.Secrets;
 using DigitalBrain.Sdk.Types;
 using DigitalBrain.Testing;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
@@ -439,14 +439,14 @@ public sealed class RegistrationFacts
         Assert.Throws<ArgumentException>(() => IntegrationDefinition.For("Bad:Id", "X"));
     }
 
-    private static Task<UnitBrain> StartAsync(CancellationToken cancellationToken, IReadOnlyDictionary<string, string?>? configuration = null)
-        => UnitTest.Create()
+    private static Task<ModuleBrain> StartAsync(CancellationToken cancellationToken, IReadOnlyDictionary<string, string?>? configuration = null)
+        => ModuleTest.Create()
             .WithExecution(new TestExecutionOptions { PrivateConfiguration = configuration ?? new Dictionary<string, string?>() })
             .WithModule<FakeGoogleModule>()
             .WithModule<FakeAiModule>()
             .StartAsync(cancellationToken);
 
-    private static IIntegrationRegistration Registration(UnitBrain brain, string id) => brain.Get<IIntegrationRegistration>($"integration/{id}");
+    private static IIntegrationRegistration Registration(ModuleBrain brain, string id) => brain.Get<IIntegrationRegistration>($"integration/{id}");
 
     private static ConfigureRegistration Values(params (string Field, string Value)[] values)
         => new() { Values = values.ToDictionary(pair => pair.Field, pair => pair.Value) };

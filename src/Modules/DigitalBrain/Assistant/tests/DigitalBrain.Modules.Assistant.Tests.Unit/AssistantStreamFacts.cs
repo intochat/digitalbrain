@@ -11,7 +11,7 @@ using DigitalBrain.Flutter.FileInput;
 using DigitalBrain.Flutter.Surface;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Specs;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -33,7 +33,7 @@ public sealed class AssistantStreamFacts
         }
     }
 
-    private static async Task<UnitBrain> StartBrain(CancellationToken ct) => await UnitTest.Create().WithExecution(new TestExecutionOptions
+    private static async Task<ModuleBrain> StartBrain(CancellationToken ct) => await ModuleTest.Create().WithExecution(new TestExecutionOptions
     {
         PrivateConfiguration = new Dictionary<string, string?> { ["DigitalBrain:Integrations:openai:ApiKey"] = "test-no-network" },
     }).WithModule<AssistantModule>()

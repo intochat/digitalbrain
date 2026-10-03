@@ -17,7 +17,7 @@ public sealed class LegacySupabaseStateFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var provider = new FakeSupabaseProvider();
-        await using var brain = await UnitTest.Create().WithModule<SupabaseModule>().ConfigureSilo(silo =>
+        await using var brain = await ModuleTest.Create().WithModule<SupabaseModule>().ConfigureSilo(silo =>
         {
             silo.Services.AddSingleton<ISupabaseProvider>(provider);
             // The production Azure Blob provider uses the same Orleans storage serializer.

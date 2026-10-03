@@ -149,8 +149,8 @@ public sealed class PostgresFacts
         Assert.Equal(HealthStatus.Healthy, report.Entries["postgres"].Status);
     }
 
-    private static Task<UnitBrain> StartAsync(string connectionName = "postgres")
-        => UnitTest.Create().WithModule<PostgresModule, PostgresModuleOptions>(module => module.WithConnection(connectionName))
+    private static Task<ModuleBrain> StartAsync(string connectionName = "postgres")
+        => ModuleTest.Create().WithModule<PostgresModule, PostgresModuleOptions>(module => module.WithConnection(connectionName))
             .ConfigureSilo(silo =>
             {
                 silo.Configuration[$"ConnectionStrings:{connectionName}"] = "Host=localhost;Database=sample;Username=reader";

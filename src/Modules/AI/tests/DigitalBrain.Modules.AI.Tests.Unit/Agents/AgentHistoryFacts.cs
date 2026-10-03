@@ -2,7 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
@@ -16,7 +16,7 @@ public sealed class AgentHistoryFacts
     public async Task ConfigurationAndHistorySurviveReactivationAndClearIsExplicit()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IChatClient>(HistoryClient())).StartAsync(ct);
         var agent = brain.Get<IAgent>("durable");
         await agent.Configure(new() { DisplayName = "Writer", Instructions = "Write carefully" }, 0, ct);
@@ -34,7 +34,7 @@ public sealed class AgentHistoryFacts
     public async Task StreamingCommitsHistoryOnlyAfterCompletion()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IChatClient>(HistoryClient())).StartAsync(ct);
         var agent = brain.Get<IAgent>("stream");
         var text = "";
@@ -48,7 +48,7 @@ public sealed class AgentHistoryFacts
     public async Task SubsequentQuestionsIncludeCommittedHistoryAndOtherAgentsRemainIsolated()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IChatClient>(HistoryClient()))
             .StartAsync(ct);
         var agent = brain.Get<IAgent>("history");

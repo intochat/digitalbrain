@@ -309,7 +309,7 @@ public sealed class CSharpSubscriptionFacts
         => file.AsReference<IRemindable>().ReceiveReminder(CSharpFileNeuron.ReconcileReminder, default);
 
     // Starts the file (always-on) so a real run id exists, then registers the subscription as that run.
-    internal static async Task<ICSharpFile> Subscribed(UnitBrain brain, FakeSandbox sandbox, string id, IPinger source, CancellationToken ct)
+    internal static async Task<ICSharpFile> Subscribed(ModuleBrain brain, FakeSandbox sandbox, string id, IPinger source, CancellationToken ct)
     {
         var file = brain.Get<ICSharpFile>(id);
         await file.Write("Console.WriteLine(1);", ct);

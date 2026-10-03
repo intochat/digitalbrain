@@ -12,7 +12,7 @@ public sealed class CSharpCompositionFacts
     [InlineData(true)]
     public async Task ExecutionKeepsPackageServicesWhileOnlyAuthoringRegistersConsoleTools(bool authoring)
     {
-        var builder = UnitTest.Create().WithModule<CSharpModule>().WithReminders();
+        var builder = ModuleTest.Create().WithModule<CSharpModule>().WithReminders();
         if (authoring) { builder.WithModule<CSharpAuthoringModule>(); }
         await using var brain = await builder.StartAsync(TestContext.Current.CancellationToken);
         Assert.True(brain.SiloServices.GetRequiredService<CSharpToolService>().CanRun);

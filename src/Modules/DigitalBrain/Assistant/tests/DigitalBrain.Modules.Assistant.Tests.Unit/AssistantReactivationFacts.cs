@@ -6,7 +6,7 @@ using DigitalBrain.Flutter.Button;
 using DigitalBrain.Flutter.Layout;
 using DigitalBrain.Flutter.Surface;
 using DigitalBrain.Flutter.TextField;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -19,7 +19,7 @@ public sealed class AssistantReactivationFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var runner = new StreamScenarioRunner();
-        await using var brain = await UnitTest.Create().WithExecution(new TestExecutionOptions
+        await using var brain = await ModuleTest.Create().WithExecution(new TestExecutionOptions
         {
             PrivateConfiguration = new Dictionary<string, string?> { ["DigitalBrain:Integrations:openai:ApiKey"] = "test-no-network" },
         }).WithModule<AssistantModule>().RequireModules([typeof(DigitalBrain.Apps.AppsModule), typeof(DigitalBrain.AI.AIModule), typeof(DigitalBrain.Compute.ComputeModule), typeof(DigitalBrain.Flutter.FlutterModule)])

@@ -15,7 +15,7 @@ public sealed class InstalledAppPageFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var storage = new FlakyGrainStorage();
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>().WithModule<RegistryModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AppsModule>().WithModule<RegistryModule>()
             .ConfigureSilo(silo => silo.Services.AddKeyedSingleton<IGrainStorage>("Default", storage)).StartAsync(ct);
         Caller.As("alice");
         await brain.AuthorizeCallerAsync();

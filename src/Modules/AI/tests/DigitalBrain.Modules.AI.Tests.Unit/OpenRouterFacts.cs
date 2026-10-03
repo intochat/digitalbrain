@@ -11,7 +11,7 @@ public sealed class OpenRouterFacts
     public async Task DeepSeekPresetUsesRegisteredOpenRouterCredentialsAndDefaultEndpoint()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithRegistrations(new TestExecutionOptions
+        await using var brain = await ModuleTest.Create().WithRegistrations(new TestExecutionOptions
         {
             PrivateConfiguration = new Dictionary<string, string?>
             { ["DigitalBrain:Integrations:openrouter:ApiKey"] = "test-only" },

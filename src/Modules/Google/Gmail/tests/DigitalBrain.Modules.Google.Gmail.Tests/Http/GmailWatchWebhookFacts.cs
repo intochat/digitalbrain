@@ -6,7 +6,7 @@ using DigitalBrain.Google.Gmail;
 using DigitalBrain.Testing;
 using Xunit;
 
-namespace DigitalBrain.Modules.Google.Gmail.Tests.E2E;
+namespace DigitalBrain.Modules.Google.Gmail.Tests;
 
 [Collection(GmailHostCollection.Name)]
 public sealed class GmailWatchWebhookFacts(GmailHostFixture host)
@@ -15,7 +15,7 @@ public sealed class GmailWatchWebhookFacts(GmailHostFixture host)
     public async Task GmailWatchHttpPublishesMailReceived()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await host.LeaseAsync(ct);
+        var brain = host.Brain;
         var gmail = brain.Get<IGmail>("user@gmail.com");
         await using var mail = await brain.Observe<MailReceived>(gmail, ct);
         var data = Convert.ToBase64String(Encoding.UTF8.GetBytes(

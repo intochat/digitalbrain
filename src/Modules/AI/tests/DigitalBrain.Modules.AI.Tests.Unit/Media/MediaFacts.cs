@@ -14,7 +14,7 @@ public sealed class MediaFacts
     public async Task EmbeddingsRecognitionAndSynthesisUseConfiguredServices()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>()
             .ConfigureSilo(s =>
             {
                 s.Services.AddMediaNeurons();
@@ -38,7 +38,7 @@ public sealed class MediaFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var provider = new Images();
-        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>()
             .ConfigureSilo(s => { s.Services.AddMediaNeurons(); s.Services.AddSingleton<IImageGeneration>(provider); })
             .StartAsync(ct);
         var image = brain.Get<IImageGenerator>("invalid");
@@ -53,7 +53,7 @@ public sealed class MediaFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var service = new BlockingImages();
-        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>()
             .ConfigureSilo(s => { s.Services.AddMediaNeurons(); s.Services.AddSingleton<IImageGeneration>(service); })
             .StartAsync(ct);
         var neuron = brain.Get<IImageGenerator>("cancel");
@@ -70,7 +70,7 @@ public sealed class MediaFacts
     public async Task ImageGenerationReturnsSerializableBytesAndPublishesCompletion()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>()
             .ConfigureSilo(s => { s.Services.AddMediaNeurons(); s.Services.AddSingleton<IImageGeneration>(new Images()); })
             .StartAsync(ct);
         var neuron = brain.Get<IImageGenerator>("image");
@@ -85,7 +85,7 @@ public sealed class MediaFacts
     public async Task SynthesisReportsUnavailableAndPublishesTypedFailure()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>()
             .ConfigureSilo(s => s.Services.AddMediaNeurons()).StartAsync(ct);
         var neuron = brain.Get<ISpeechSynthesizer>("speech");
         Assert.False((await neuron.Describe()).Available);

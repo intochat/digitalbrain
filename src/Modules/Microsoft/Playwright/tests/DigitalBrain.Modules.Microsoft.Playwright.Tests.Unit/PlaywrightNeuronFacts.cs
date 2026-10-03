@@ -1,6 +1,6 @@
 using DigitalBrain.Microsoft.Playwright;
 using DigitalBrain.Testing;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 
@@ -148,7 +148,7 @@ public sealed class PlaywrightNeuronFacts
         Assert.Single((await browser.Snapshot(ct)).Links);
     }
 
-    private static Task<UnitBrain> Start(Provider provider) => UnitTest.Create().WithModule<PlaywrightModule>()
+    private static Task<ModuleBrain> Start(Provider provider) => ModuleTest.Create().WithModule<PlaywrightModule>()
         .ConfigureSilo(silo => silo.Services.AddSingleton<IBrowserSessionProvider>(provider))
         .StartAsync(TestContext.Current.CancellationToken);
 

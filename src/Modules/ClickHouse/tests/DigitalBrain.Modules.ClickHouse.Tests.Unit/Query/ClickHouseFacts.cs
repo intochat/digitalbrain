@@ -1,6 +1,6 @@
 using DigitalBrain.ClickHouse;
 using DigitalBrain.ClickHouse.Query;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -60,8 +60,8 @@ public sealed class ClickHouseFacts
         Assert.Equal("Fake", connection.Provider);
     }
 
-    private static Task<UnitBrain> Start(FakeClickHouseProvider provider, CancellationToken ct)
-        => UnitTest.Create().WithModule<ClickHouseModule>()
+    private static Task<ModuleBrain> Start(FakeClickHouseProvider provider, CancellationToken ct)
+        => ModuleTest.Create().WithModule<ClickHouseModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IClickHouseProvider>(provider))
             .StartAsync(ct);
 }

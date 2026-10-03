@@ -1,11 +1,11 @@
 using DigitalBrain.Google.Gmail;
 using DigitalBrain.Platform.Contracts.Secrets;
 using DigitalBrain.Platform.Secrets;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Modules.Google.Gmail.Tests.Unit;
+namespace DigitalBrain.Modules.Google.Gmail.Tests;
 
 public sealed class GmailConnectedFacts
 {
@@ -13,7 +13,7 @@ public sealed class GmailConnectedFacts
     public async Task AuthorizationCodePublishesGmailConnected()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<GmailModule>()
+        await using var brain = await ModuleTest.Create().WithModule<GmailModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IGmailTokenExchange>(new FakeGmailTokens()))
             .StartAsync(ct);
         var gmail = brain.Get<IGmail>("gmail");

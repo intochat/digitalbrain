@@ -4,7 +4,7 @@ using DigitalBrain.AI.Agents;
 using DigitalBrain.Assistant;
 using DigitalBrain.Specs;
 using DigitalBrain.Supabase;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -17,7 +17,7 @@ public sealed class AssistantFeatureFacts
     public async Task TheAssistantFeatureIsGreen()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithExecution(new TestExecutionOptions
+        await using var brain = await ModuleTest.Create().WithExecution(new TestExecutionOptions
         {
             PrivateConfiguration = new Dictionary<string, string?> { ["DigitalBrain:Integrations:openai:ApiKey"] = "test-no-network" },
         })

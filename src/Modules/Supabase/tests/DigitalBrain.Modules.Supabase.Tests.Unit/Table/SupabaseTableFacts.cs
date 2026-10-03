@@ -240,8 +240,8 @@ public sealed class SupabaseTableFacts
         Assert.NotNull(await table.Aggregate(new("id", "sum")));
     }
 
-    private static Task<UnitBrain> StartAsync(FakeSupabaseProvider provider, CancellationToken ct)
-        => UnitTest.Create().WithModule<SupabaseModule>()
+    private static Task<ModuleBrain> StartAsync(FakeSupabaseProvider provider, CancellationToken ct)
+        => ModuleTest.Create().WithModule<SupabaseModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<ISupabaseProvider>(provider))
             .StartAsync(ct);
 }

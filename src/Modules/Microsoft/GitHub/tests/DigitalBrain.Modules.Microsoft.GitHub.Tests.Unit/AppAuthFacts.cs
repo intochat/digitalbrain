@@ -7,7 +7,7 @@ using DigitalBrain.Platform.Contracts.Integrations;
 using DigitalBrain.Platform.Contracts.Secrets;
 using DigitalBrain.Platform.Secrets;
 using DigitalBrain.Testing;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -59,7 +59,7 @@ public sealed class AppAuthFacts
         Assert.Null(handler.Path);
     }
 
-    private static Task<UnitBrain> Start(string? privateKeyPem, string? appId, CancellationToken cancellationToken)
+    private static Task<ModuleBrain> Start(string? privateKeyPem, string? appId, CancellationToken cancellationToken)
     {
         var seeds = new Dictionary<string, string?>();
         if (privateKeyPem is not null)
@@ -68,7 +68,7 @@ public sealed class AppAuthFacts
             seeds["DigitalBrain:Integrations:github:AppId"] = appId;
         }
 
-        return UnitTest.Create()
+        return ModuleTest.Create()
             .WithExecution(new TestExecutionOptions { PrivateConfiguration = seeds })
             .WithModule<GitHubModule>()
             .StartAsync(cancellationToken);

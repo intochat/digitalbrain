@@ -12,7 +12,7 @@ public sealed class CompositionFacts
     [Fact]
     public async Task HostInventoryListsTheSelectedModulesInDependencyOrder()
     {
-        await using var brain = await UnitTest.Create().WithModule<Dependency>().WithModule<Dependent, DependentOptions>()
+        await using var brain = await ModuleTest.Create().WithModule<Dependency>().WithModule<Dependent, DependentOptions>()
             .StartAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal([typeof(Dependency), typeof(Dependent)],
@@ -52,7 +52,7 @@ public sealed class CompositionFacts
     [Fact]
     public async Task TransitiveDependencyRegistersExactlyOnce()
     {
-        await using var brain = await UnitTest.Create().WithModule<Dependency>().WithModule<Dependent>()
+        await using var brain = await ModuleTest.Create().WithModule<Dependency>().WithModule<Dependent>()
             .ConfigureSilo(silo => Assert.Single(silo.Services, s => s.ServiceType == typeof(Marker)))
             .StartAsync(TestContext.Current.CancellationToken);
     }

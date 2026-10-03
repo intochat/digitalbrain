@@ -1,5 +1,5 @@
 using DigitalBrain.Contracts.Data;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Xunit;
 
 namespace DigitalBrain.Kernel.Tests.Unit.Data;
@@ -10,7 +10,7 @@ public sealed class StoredRowsFacts
     public async Task ReplaceThenFilterAndGroupByCount()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var rows = brain.Get<IStoredRows>("people");
         await rows.Replace(
             new RowSchema([new("name", "text"), new("country", "text"), new("age", "number")]),
@@ -35,7 +35,7 @@ public sealed class StoredRowsFacts
     public async Task APageReportsTruncation()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var rows = brain.Get<IStoredRows>("ids");
         await rows.Replace(new RowSchema([new("id", "number")]), [new(["1"]), new(["2"]), new(["3"])]);
 

@@ -6,7 +6,7 @@ using DigitalBrain.Platform.Secrets;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Signals;
 using DigitalBrain.Sdk;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -173,7 +173,7 @@ public sealed class SalesforceFacts
     private static async Task<Fixture> StartAsync(FakeSalesforceProvider provider, FakeTokenExchange? exchange, CancellationToken cancellationToken)
     {
         var handoff = new TokenHandoff(TimeProvider.System);
-        var brain = await UnitTest.Create().WithModule<SalesforceModule>()
+        var brain = await ModuleTest.Create().WithModule<SalesforceModule>()
             .ConfigureSilo(silo =>
             {
                 silo.Services.AddSingleton<ISalesforceProvider>(provider);
@@ -187,9 +187,9 @@ public sealed class SalesforceFacts
         return new Fixture(brain, handoff);
     }
 
-    private sealed class Fixture(UnitBrain brain, TokenHandoff handoff) : IAsyncDisposable
+    private sealed class Fixture(ModuleBrain brain, TokenHandoff handoff) : IAsyncDisposable
     {
-        internal UnitBrain Brain { get; } = brain;
+        internal ModuleBrain Brain { get; } = brain;
 
         internal TokenHandoff Handoff { get; } = handoff;
 

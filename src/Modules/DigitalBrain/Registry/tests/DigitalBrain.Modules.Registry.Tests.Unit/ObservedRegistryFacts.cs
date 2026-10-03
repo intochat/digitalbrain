@@ -16,7 +16,7 @@ public sealed class ObservedRegistryFacts
     [Fact]
     public async Task TypesAreDiscoveredFromSelectedModulesWithoutVectorServices()
     {
-        await using var brain = await UnitTest.Create().WithModule<RegistryModule>().WithModule<TimeModule>().WithReminders()
+        await using var brain = await ModuleTest.Create().WithModule<RegistryModule>().WithModule<TimeModule>().WithReminders()
             .StartAsync(TestContext.Current.CancellationToken);
         var types = await brain.Get<IRegistry>(RegistryModule.Key).Types();
 
@@ -33,7 +33,7 @@ public sealed class ObservedRegistryFacts
     [Fact]
     public async Task TheIntegrationRegistrationContractIsExcludedFromTheNeuronTypeCatalog()
     {
-        await using var brain = await UnitTest.Create().WithModule<RegistryModule>()
+        await using var brain = await ModuleTest.Create().WithModule<RegistryModule>()
             .StartAsync(TestContext.Current.CancellationToken);
         var types = await brain.Get<IRegistry>(RegistryModule.Key).Types();
 
@@ -43,7 +43,7 @@ public sealed class ObservedRegistryFacts
     [Fact]
     public async Task TheWholePlatformAssemblyContributesNoNeuronTypesToTheCatalog()
     {
-        await using var brain = await UnitTest.Create().WithModule<RegistryModule>()
+        await using var brain = await ModuleTest.Create().WithModule<RegistryModule>()
             .StartAsync(TestContext.Current.CancellationToken);
         var types = await brain.Get<IRegistry>(RegistryModule.Key).Types();
 
@@ -112,7 +112,7 @@ public sealed class ObservedRegistryFacts
         Assert.Empty(await registry.Instances("test.registry-clock", skip: 1));
     }
 
-    private static Task<UnitBrain> Start() => UnitTest.Create().WithModule<RegistryModule>().WithModule<RegistryFixtureModule>()
+    private static Task<ModuleBrain> Start() => ModuleTest.Create().WithModule<RegistryModule>().WithModule<RegistryFixtureModule>()
         .StartAsync(TestContext.Current.CancellationToken);
 
     [Fact]

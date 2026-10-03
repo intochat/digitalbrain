@@ -3,7 +3,7 @@ using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Collection;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Platform.Contracts.Identity;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 namespace DigitalBrain.Modules.Files.Tests.Unit;
 
@@ -14,7 +14,7 @@ public sealed class LocalAppNeuronFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var blobs = new MemoryAssetBlobStore();
-        await using var brain = await UnitTest.Create().WithModule<FilesModule>().WithModule<FlutterModule>()
+        await using var brain = await ModuleTest.Create().WithModule<FilesModule>().WithModule<FlutterModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IAssetBlobStore>(blobs)).StartAsync(ct);
         const string scope = "files-owner";
         var store = new WorkspaceFileStore(blobs, brain.Grains);

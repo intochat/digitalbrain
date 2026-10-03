@@ -2,7 +2,7 @@ using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Kernel;
 using DigitalBrain.Testing;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Orleans;
 using Orleans.Runtime;
 using Xunit;
@@ -72,7 +72,7 @@ public sealed class PersistenceFacts
     public async Task ClusterDocumentStoreWritesThroughGrainState()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var store = new GrainDocumentStore<CounterState>(brain.Grains(), "persistence-facts");
         await store.UpdateAsync("doc", state => state.Value = 42, ct);
         var (_, payload) = await brain.Grains().GetGrain<IDocumentGrain>("persistence-facts/doc").ReadAsync();
@@ -84,7 +84,7 @@ public sealed class PersistenceFacts
     public async Task ReservedButUncommittedDocumentsRemainInvisibleAndCanBeRetried()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var store = new GrainDocumentStore<CounterState>(brain.Grains(), "reservation-facts");
         await Assert.ThrowsAsync<IOException>(() => store.UpdateAsync<int>("doc", _ => throw new IOException("Interrupted before commit"), ct));
         Assert.Empty(await store.ListIdsAsync(ct));
@@ -97,7 +97,7 @@ public sealed class PersistenceFacts
     public async Task DeactivationKeepsStateAndDoesNotReplaySignals()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var counter = brain.Get<ICounter>("saved");
         await counter.SetWithoutPublishing(23);
         await brain.DeactivateAsync(counter, ct);

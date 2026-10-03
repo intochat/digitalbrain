@@ -13,7 +13,7 @@ public sealed class AspireNeuronFacts
     public async Task EveryReportedStateChangeIsSignalledOnceAndListed()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AspireModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AspireModule>().StartAsync(ct);
         var aspire = brain.Get<IAspire>(Application);
         var reporter = brain.Grains.GetGrain<IAspireResourceReporter>(Application);
         await using var changes = await brain.Observe<ResourceStateChanged>(aspire, ct);
@@ -32,7 +32,7 @@ public sealed class AspireNeuronFacts
     public async Task CommandsFailClearlyWithoutAConnectedAppHost()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AspireModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AspireModule>().StartAsync(ct);
         brain.SiloServices.GetRequiredService<AspireBridge>().ConnectTimeout = TimeSpan.FromMilliseconds(200);
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => brain.Get<IAspire>(Application).StartResource("csharp-sandbox", ct));
@@ -44,7 +44,7 @@ public sealed class AspireNeuronFacts
     public async Task CommandsTravelToTheAppHostAndReturnItsResult()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AspireModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AspireModule>().StartAsync(ct);
         var bridge = brain.SiloServices.GetRequiredService<AspireBridge>();
         using var appHost = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var served = ServeAsync(bridge, command => command.Command == "start" ? new(true, null) : new(false, "no such command"), appHost.Token);

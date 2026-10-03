@@ -17,7 +17,7 @@ public sealed class AppStorageFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var provider = new SavedTable();
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>().WithModule<PostgresModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AppsModule>().WithModule<PostgresModule>()
             .ConfigureSilo(silo =>
             {
                 silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=sample;Username=reader";
@@ -74,7 +74,7 @@ public sealed class AppStorageFacts
         var ct = TestContext.Current.CancellationToken;
         var storage = new FlakyGrainStorage();
         var key = BrainScope.Create("account-alice", "workspace-alice").Id + "/apps/requires-postgres";
-        await using (var brain = await UnitTest.Create().WithModule<AppsModule>().WithModule<PostgresModule>()
+        await using (var brain = await ModuleTest.Create().WithModule<AppsModule>().WithModule<PostgresModule>()
             .ConfigureSilo(silo =>
             {
                 silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=sample;Username=reader";

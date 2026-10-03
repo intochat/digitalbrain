@@ -37,7 +37,7 @@ public sealed class AgentStreamingFacts
         deadline.CancelAfter(TimeSpan.FromSeconds(15));
         var ct = deadline.Token;
         var provider = new WaitingStreamProvider();
-        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>()
             .ConfigureSilo(s => s.Services.AddSingleton<IChatClient>(provider.Client)).StartAsync(ct);
         var agent = brain.Get<IAgent>("abandoned");
         await using var changes = await brain.Observe<AgentRunChanged>(agent, ct);

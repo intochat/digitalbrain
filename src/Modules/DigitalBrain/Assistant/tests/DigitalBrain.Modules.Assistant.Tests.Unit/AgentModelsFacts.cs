@@ -113,8 +113,8 @@ public sealed class AgentModelsFacts
         Assert.Null(Catalog(brain.SiloServices).Select(null));
     }
 
-    private static Task<UnitBrain> StartAsync(Action<AIOptions> configure, string? apiKey = null, string? endpoint = null, string? model = null)
-        => UnitTest.Create().WithModule<AIModule>().WithModule<AssistantModule>()
+    private static Task<ModuleBrain> StartAsync(Action<AIOptions> configure, string? apiKey = null, string? endpoint = null, string? model = null)
+        => ModuleTest.Create().WithModule<AIModule>().WithModule<AssistantModule>()
             .WithExecution(new TestExecutionOptions
             {
                 PrivateConfiguration = apiKey is null ? new Dictionary<string, string?>() : new Dictionary<string, string?>

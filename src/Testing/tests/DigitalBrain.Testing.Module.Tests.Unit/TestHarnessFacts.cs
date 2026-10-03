@@ -1,9 +1,9 @@
 using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Kernel;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Xunit;
-namespace DigitalBrain.Testing.Unit.Tests.Unit;
+namespace DigitalBrain.Testing.Module.Tests.Unit;
 
 public sealed class TestHarnessFacts
 {
@@ -11,7 +11,7 @@ public sealed class TestHarnessFacts
     public async Task ReadinessBelongsToEachBehaviorAndTheTriggerRunsOnce()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var source = brain.Get<ITestEmitter>("behavior");
         var a = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         var b = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -32,7 +32,7 @@ public sealed class TestHarnessFacts
     public async Task EarlyBehaviorFailureIsNotReportedAsReadiness()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var run = brain.RunBehavior((_, _) => Task.FromException(new IOException("behavior failed")), ct);
         await Assert.ThrowsAsync<IOException>(() => run.WaitForSubscriptionAsync<Number>(brain.Get<ITestEmitter>("x"), ct));
         await Assert.ThrowsAsync<IOException>(() => run.DisposeAsync().AsTask());
@@ -52,7 +52,7 @@ public sealed class TestHarnessFacts
     public async Task ProbeObservesOneTypedFact()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var source = brain.Get<ITestEmitter>("probe");
         await using var probe = await brain.Observe<Number>(source, ct);
         await source.Emit(4);
@@ -64,7 +64,7 @@ public sealed class TestHarnessFacts
     public async Task ProbeTimeoutIsBoundedAndNoncooperativeBehaviorCannotHangTeardown()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         await using var probe = await brain.Observe<Number>(brain.Get<ITestEmitter>("silent"), ct);
         var never = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var run = brain.RunBehavior((_, _) => never.Task, ct);

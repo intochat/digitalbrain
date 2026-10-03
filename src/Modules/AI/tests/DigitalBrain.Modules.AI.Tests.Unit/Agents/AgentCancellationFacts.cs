@@ -16,7 +16,7 @@ public sealed class AgentCancellationFacts
         var tool = new WaitingTool();
         var client = new StubChatClient((_, _, _) => Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
             [new FunctionCallContent("pending", "wait", new Dictionary<string, object?>())]))));
-        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>()
             .ConfigureSilo(s => { s.Services.AddSingleton<IChatClient>(client); s.Services.AddSingleton<IAgentToolFactory>(tool); }).StartAsync(ct);
         var agent = brain.Get<IAgent>("cancel-tool");
         await agent.Configure(new() { Tools = ["wait"] }, 0, ct);
@@ -49,7 +49,7 @@ public sealed class AgentCancellationFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var provider = new WaitingProvider();
-        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>()
             .ConfigureSilo(s => s.Services.AddSingleton<IChatClient>(provider.Client)).StartAsync(ct);
         var agent = brain.Get<IAgent>("cancel");
         var response = agent.GetResponse("wait", ct);
@@ -66,7 +66,7 @@ public sealed class AgentCancellationFacts
     public async Task ProviderFailureIsFailedAndNeverCommitsHistory()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>()
             .ConfigureSilo(s => s.Services.AddSingleton<IChatClient>(new WaitingProvider(fail: true).Client)).StartAsync(ct);
         var agent = brain.Get<IAgent>("failed");
         await Assert.ThrowsAsync<InvalidOperationException>(() => agent.GetResponse("fail", ct));

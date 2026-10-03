@@ -2,7 +2,7 @@ using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Button;
 using DigitalBrain.Flutter.Button.Signals;
 using DigitalBrain.Testing;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Xunit;
 
 namespace DigitalBrain.Modules.Flutter.Tests.Unit.Button;
@@ -13,10 +13,10 @@ public sealed class ExecutionBudgetFacts
     public async Task DifferentRunBudgetsDoNotLeakBetweenSessions()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var longer = await UnitTest.Create().WithModule<FlutterModule>()
+        await using var longer = await ModuleTest.Create().WithModule<FlutterModule>()
             .WithExecution(new() { AssertionTimeout = TimeSpan.FromSeconds(10) })
             .StartAsync(ct);
-        await using var shorter = await UnitTest.Create().WithModule<FlutterModule>()
+        await using var shorter = await ModuleTest.Create().WithModule<FlutterModule>()
             .WithExecution(new() { AssertionTimeout = TimeSpan.FromMilliseconds(100) })
             .StartAsync(ct);
         var button = longer.Get<IButton>("longer");
@@ -34,7 +34,7 @@ public sealed class ExecutionBudgetFacts
     public async Task ProbeUsesItsRunBudgetInsteadOfFixedFiveSeconds()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>()
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>()
             .WithExecution(new() { AssertionTimeout = TimeSpan.FromMilliseconds(100) })
             .StartAsync(ct);
         await using var probe = await brain.Observe<ButtonClicked>(brain.Get<IButton>("unused"), ct);

@@ -15,7 +15,7 @@ public sealed class AgentToolSelectionFacts
     public async Task ToolsComeFromTheInstalledRevisionInTheCurrentBrain()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>().WithModule<RegistryModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AppsModule>().WithModule<RegistryModule>().StartAsync(ct);
         CallerContextStamper.Stamp(new CallerContext
         {
             PrincipalId = "alice",
@@ -62,7 +62,7 @@ public sealed class AgentToolSelectionFacts
     public async Task PrivateInstallsAreDiscoverableWithoutPublicationOrActivationHistory()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>().WithModule<RegistryModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AppsModule>().WithModule<RegistryModule>().StartAsync(ct);
         CallerContextStamper.Stamp(new CallerContext
         {
             PrincipalId = "alice",

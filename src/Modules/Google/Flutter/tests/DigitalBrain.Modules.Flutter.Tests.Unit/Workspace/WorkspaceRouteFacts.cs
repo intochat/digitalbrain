@@ -1,7 +1,7 @@
 using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Flutter.Workspace;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -38,7 +38,7 @@ public sealed class WorkspaceRouteFacts
     public async Task AReportKeepsTheIntentIdAndSurvivesReactivation()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var reports = brain.Get<IProblemReports>("workspace-scope-1");
 
         var report = await reports.Add("workspace-1", "run-42", "The table did not open.");
@@ -52,7 +52,7 @@ public sealed class WorkspaceRouteFacts
     public async Task AnEmptyIntentIdIsRejected()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         await Assert.ThrowsAsync<ArgumentException>(() =>
             brain.Get<IProblemReports>("workspace-scope-1").Add("workspace-1", "  ", "something broke"));
     }

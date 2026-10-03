@@ -117,7 +117,7 @@ public sealed class FeatureFacts
         Assert.Equal(System.Text.Json.JsonSerializer.Serialize(before), System.Text.Json.JsonSerializer.Serialize(after));
         Assert.Equal([Verdict.Passed, Verdict.Failed], after.LastRun!.Scenarios.Select(scenario => scenario.Verdict));
     }
-    private static Task<UnitBrain> StartAsync(CancellationToken ct) => UnitTest.Create().WithModule<SpecsModule>()
+    private static Task<ModuleBrain> StartAsync(CancellationToken ct) => ModuleTest.Create().WithModule<SpecsModule>()
         .ConfigureSilo(silo => silo.Services.AddSingleton<StepLibrary, ArithmeticSteps>())
         .StartAsync(ct);
 

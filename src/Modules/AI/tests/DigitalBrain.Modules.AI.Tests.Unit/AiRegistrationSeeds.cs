@@ -2,7 +2,7 @@ using DigitalBrain.Platform.Contracts.Integrations;
 using DigitalBrain.Platform.Contracts.Secrets;
 using DigitalBrain.Platform.Secrets;
 using DigitalBrain.Testing;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 
 namespace DigitalBrain.Modules.AI.Tests.Unit;
 
@@ -20,6 +20,6 @@ internal static class AiRegistrationSeeds
             },
         };
 
-    internal static UnitTestBuilder WithRegistrations(this UnitTestBuilder builder, TestExecutionOptions? seeds = null)
+    internal static ModuleTestBuilder WithRegistrations(this ModuleTestBuilder builder, TestExecutionOptions? seeds = null)
         => builder.WithExecution(seeds ?? new TestExecutionOptions());
 }

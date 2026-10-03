@@ -18,7 +18,7 @@ public sealed class SessionCookieFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var keys = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "pr131-cookie-" + Guid.NewGuid().ToString("N")));
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AppsModule>().StartAsync(ct);
         await using var runtime = await Host(false, keys, brain);
         await using var mcp = await Host(true, keys, brain);
         using var client = new HttpClient(new HttpClientHandler { UseCookies = false });
@@ -62,7 +62,7 @@ public sealed class SessionCookieFacts
         }
     }
 
-    private static async Task<WebApplication> Host(bool mcp, DirectoryInfo keys, UnitBrain brain)
+    private static async Task<WebApplication> Host(bool mcp, DirectoryInfo keys, ModuleBrain brain)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ApplicationName = mcp ? "DigitalBrain.Mcp" : "IntoChat" });
         builder.Configuration["DigitalBrain:Auth:Posture"] = "Secured";

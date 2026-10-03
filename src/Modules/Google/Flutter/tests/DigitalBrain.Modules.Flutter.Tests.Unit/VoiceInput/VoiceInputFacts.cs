@@ -1,7 +1,7 @@
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.VoiceInput;
 using DigitalBrain.Flutter.VoiceInput.Signals;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Xunit;
 
 namespace DigitalBrain.Modules.Flutter.Tests.Unit.VoiceInput;
@@ -12,7 +12,7 @@ public sealed class VoiceInputFacts
     public async Task CapturedAudioIsAnnouncedWithoutTranscribing()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>().StartAsync(ct);
         var voice = brain.Get<IVoiceInput>("mic");
         await voice.Configure("Hold to talk");
         await using var captured = await brain.Observe<VoiceCaptured>(voice, ct);

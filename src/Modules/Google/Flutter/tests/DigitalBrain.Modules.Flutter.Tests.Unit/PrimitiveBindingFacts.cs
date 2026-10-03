@@ -10,7 +10,7 @@ using DigitalBrain.Flutter.TextField.Signals;
 using DigitalBrain.Flutter.VoiceInput;
 using DigitalBrain.Flutter.VoiceInput.Signals;
 using DigitalBrain.Kernel;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Orleans;
 using Orleans.Runtime;
 using Xunit;
@@ -23,7 +23,7 @@ public sealed class PrimitiveBindingFacts
     public async Task UserEventsReachDurableHandlerWhileProjectionDoesNot()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>().StartAsync(ct);
         var handler = brain.Get<IPrimitiveTestHandler>("handler");
         var field = brain.Get<ITextField>("field");
         var binding = brain.Get<IUiBinding>("field");
@@ -48,7 +48,7 @@ public sealed class PrimitiveBindingFacts
     public async Task SelectFileButtonAndVoiceDispatchTypedSignals()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>().StartAsync(ct);
         var handler = brain.Get<IPrimitiveTestHandler>("handler");
         foreach (var key in new[] { "select", "file", "button", "voice" }) { await brain.Get<IUiBinding>(key).Bind(handler); }
         var select = brain.Get<ISelect>("select");
@@ -80,7 +80,7 @@ public sealed class PrimitiveBindingFacts
     public async Task UnboundInputsWorkAndNavigationPayloadsAreValidated()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>().StartAsync(ct);
         await brain.Get<ITextField>("field").Input("edit");
         await brain.Get<IFileInput>("file").Capture("empty.txt", "");
         var select = brain.Get<ISelect>("select");
@@ -103,7 +103,7 @@ public sealed class PrimitiveBindingFacts
     public async Task HandlerCanProjectAnEditWithoutRedispatchingIt()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>().StartAsync(ct);
         var handler = brain.Get<IPrimitiveTestHandler>("projecting-handler");
         var field = brain.Get<ITextField>("projection-field");
         await handler.ProjectTo("projection-field");

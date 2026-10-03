@@ -1,7 +1,7 @@
 using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Testing;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using DigitalBrain.Time;
 using DigitalBrain.Time.Reminders;
 using DigitalBrain.Time.Reminders.Signals;
@@ -133,14 +133,14 @@ public sealed class ReminderFacts
     {
         var error = await Assert.ThrowsAnyAsync<Exception>(async () =>
         {
-            await using var brain = await UnitTest.Create().WithModule<TimeModule>()
+            await using var brain = await ModuleTest.Create().WithModule<TimeModule>()
             .StartAsync(TestContext.Current.CancellationToken);
         });
         Assert.Contains("reminder", error.ToString(), StringComparison.OrdinalIgnoreCase);
     }
 
-    private static Task<UnitBrain> StartAsync(CancellationToken ct, ReminderControl? reminders = null)
-        => UnitTest.Create().WithModule<TimeModule>().WithReminders()
+    private static Task<ModuleBrain> StartAsync(CancellationToken ct, ReminderControl? reminders = null)
+        => ModuleTest.Create().WithModule<TimeModule>().WithReminders()
             .ConfigureSilo(silo => { if (reminders is not null) { silo.UseReminderControl(reminders); } })
             .StartAsync(ct);
 }

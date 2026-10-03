@@ -10,7 +10,7 @@ public sealed class PostgresCapacityFacts
     public async Task AComposedPostgresModuleResolvesThePlatformOriginForTables()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<PostgresModule>()
+        await using var brain = await ModuleTest.Create().WithModule<PostgresModule>()
             .ConfigureSilo(silo => silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=sample;Username=reader")
             .StartAsync(ct);
         var capacity = brain.SiloServices.GetRequiredService<ICapacity>();
@@ -22,7 +22,7 @@ public sealed class PostgresCapacityFacts
     public async Task ProvisioningIsRefusedWhenOnlyThePlatformConnectionExists()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<PostgresModule>()
+        await using var brain = await ModuleTest.Create().WithModule<PostgresModule>()
             .ConfigureSilo(silo => silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=sample;Username=reader")
             .StartAsync(ct);
         var capacity = brain.SiloServices.GetRequiredService<ICapacity>();
@@ -45,7 +45,7 @@ public sealed class PostgresCapacityFacts
     public async Task AnAdminConnectionActivatesTheProvisionerAndDeactivatesThePlatformSource()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<PostgresModule>()
+        await using var brain = await ModuleTest.Create().WithModule<PostgresModule>()
             .ConfigureSilo(silo =>
             {
                 silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=sample;Username=reader";

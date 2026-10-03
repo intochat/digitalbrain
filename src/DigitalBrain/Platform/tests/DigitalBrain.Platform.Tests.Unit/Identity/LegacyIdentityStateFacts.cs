@@ -17,7 +17,7 @@ public sealed class LegacyIdentityStateFacts
     public async Task IncompleteGrantOnlyMigrationBlocksNormalUseEvenWithoutDirectoryRecords()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().ConfigureSilo(silo =>
+        await using var brain = await ModuleTest.Create().ConfigureSilo(silo =>
         {
             silo.Services.Configure<IdentityMigrationOptions>(options => options.Maintenance = true);
             silo.Services.AddKeyedSingleton<IGrainStorage>(DigitalBrainNames.DefaultGrainStorage, (services, _) =>
@@ -30,7 +30,7 @@ public sealed class LegacyIdentityStateFacts
     public async Task CompletedCheckpointWithoutPlanIdNeverReimports()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().ConfigureSilo(silo =>
+        await using var brain = await ModuleTest.Create().ConfigureSilo(silo =>
         {
             silo.Services.Configure<IdentityMigrationOptions>(options => options.Maintenance = true);
             silo.Services.AddKeyedSingleton<IGrainStorage>(DigitalBrainNames.DefaultGrainStorage, (services, _) =>
@@ -46,7 +46,7 @@ public sealed class LegacyIdentityStateFacts
     public async Task IdentityStateWrittenBeforeTheAssemblyMoveLoadsAndSurvivesReactivation()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().ConfigureSilo(silo =>
+        await using var brain = await ModuleTest.Create().ConfigureSilo(silo =>
         {
             silo.Services.Configure<IdentityMigrationOptions>(options => { options.Maintenance = true; options.SourceSnapshotId = "legacy-fixtures"; options.LegacyGrantBrainIds = ["legacy-brain"]; });
             // The persisted Azure Blob provider uses this serializer in AddDigitalBrainRuntime.

@@ -5,11 +5,11 @@ using Orleans.Storage;
 
 namespace DigitalBrain.Modules.Apps.Tests.Unit;
 
-internal sealed class PackageBrain(UnitBrain brain, FlakyGrainStorage storage) : IAsyncDisposable
+internal sealed class PackageBrain(ModuleBrain brain, FlakyGrainStorage storage) : IAsyncDisposable
 {
     public FlakyGrainStorage Storage => storage;
 
-    public UnitBrain Brain => brain;
+    public ModuleBrain Brain => brain;
     public Task AuthorizeCallerAsync() => brain.AuthorizeCallerAsync();
 
     public T Get<T>(string key) where T : class, IGrainWithStringKey => brain.Get<T>(key);
@@ -20,7 +20,7 @@ internal sealed class PackageBrain(UnitBrain brain, FlakyGrainStorage storage) :
     public static async Task<PackageBrain> StartAsync(CancellationToken cancellationToken, Action<ISiloBuilder>? configureSilo = null, Action<IClientBuilder>? configureClient = null)
     {
         var storage = new FlakyGrainStorage();
-        var brain = await UnitTest.Create()
+        var brain = await ModuleTest.Create()
             .WithModule<AppsModule>()
             .ConfigureClient(client => configureClient?.Invoke(client))
             .ConfigureSilo(silo =>

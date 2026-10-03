@@ -13,7 +13,7 @@ public sealed class PostgresMigrationFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var legacy = new LegacyTables();
-        await using var brain = await UnitTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>
+        await using var brain = await ModuleTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>
         {
             silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=sample;Username=reader";
             silo.Services.AddSingleton<IPostgresLegacyTables>(legacy);

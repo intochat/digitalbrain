@@ -365,7 +365,7 @@ public sealed class ScriptEdgeFacts
     private static (string Contract, string Key, string Method, JsonElement[] Arguments) Call(string method, params int[] arguments)
         => (typeof(IPinger).FullName!, "pinger", method, [.. arguments.Select(argument => JsonSerializer.SerializeToElement(argument))]);
 
-    private static async Task<string> StartAsAlice(UnitBrain brain, FakeSandbox sandbox, string fileId, CancellationToken ct)
+    private static async Task<string> StartAsAlice(ModuleBrain brain, FakeSandbox sandbox, string fileId, CancellationToken ct)
     {
         var file = brain.Get<ICSharpFile>(fileId);
         CallerContextStamper.Stamp(Alice);
@@ -378,6 +378,6 @@ public sealed class ScriptEdgeFacts
     }
 
     // The test's own IPinger stands in for an installed module contract.
-    private static Task<UnitBrain> Brain(FakeSandbox sandbox, CancellationToken ct)
+    private static Task<ModuleBrain> Brain(FakeSandbox sandbox, CancellationToken ct)
         => SandboxBrain.StartAsync(sandbox, ct, silo => silo.Services.AddSingleton(new ScriptContracts([typeof(IPinger).Assembly])));
 }

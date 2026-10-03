@@ -17,7 +17,7 @@ public sealed class AgentExecutionFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var model = StubChatClient.Replying("scoped answer");
-        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IChatClient>(model)).StartAsync(ct);
         CallerContextStamper.Stamp(new CallerContext
         {
@@ -49,7 +49,7 @@ public sealed class AgentExecutionFacts
     {
         var ct = TestContext.Current.CancellationToken;
         var sink = new FailingUsageSink();
-        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IChatClient>(StubChatClient.Replying("kept answer"))
                 .AddSingleton<IIntentUsageSink>(sink)).StartAsync(ct);
         var events = new List<AgentTurnEvent>();
@@ -78,7 +78,7 @@ public sealed class AgentExecutionFacts
     public async Task ExecutionContractStreamsScriptedModelOutputAndSurvivesReactivation()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IChatClient>(StubChatClient.Replying("answer"))).StartAsync(ct);
         var execution = brain.Get<IAgentExecution>("execution");
         var events = new List<AgentTurnEvent>();
@@ -96,7 +96,7 @@ public sealed class AgentExecutionFacts
     public async Task ExecutionWithoutAProviderReturnsFailureInsteadOfSuccess()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AIModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<AIModule>().StartAsync(ct);
         var events = new List<AgentTurnEvent>();
         await foreach (var item in brain.Get<IAgentExecution>("unavailable").Run(new("agent", "run", "scope", [], "question", null), "intent", ct))
         { events.Add(item); }

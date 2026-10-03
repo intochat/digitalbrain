@@ -12,7 +12,7 @@ public sealed class ContractDiscoveryFacts
     public async Task DiscoveryListsComposedModulesAndReadsTheirContractsFromTheRegistry()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<CSharpModule>().WithModule<RegistryModule>().WithReminders()
+        await using var brain = await ModuleTest.Create().WithModule<CSharpModule>().WithModule<RegistryModule>().WithReminders()
             .StartAsync(ct);
         var discovery = brain.SiloServices.GetRequiredService<CSharpContractDiscovery>();
 

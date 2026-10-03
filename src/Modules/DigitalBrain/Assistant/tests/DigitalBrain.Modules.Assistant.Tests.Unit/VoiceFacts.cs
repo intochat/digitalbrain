@@ -1,7 +1,7 @@
 using DigitalBrain.AI;
 using DigitalBrain.AI.Media;
 using DigitalBrain.Assistant;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -56,8 +56,8 @@ public sealed class VoiceFacts
             transcription.Transcribe(Wav(), cancellation.Token));
     }
 
-    private static Task<UnitBrain> Start(IAudioTranscriptionService service)
-        => UnitTest.Create().WithModule<AIModule>()
+    private static Task<ModuleBrain> Start(IAudioTranscriptionService service)
+        => ModuleTest.Create().WithModule<AIModule>()
             .ConfigureSilo(silo => silo.Services.AddSingleton(service))
             .StartAsync(TestContext.Current.CancellationToken);
 

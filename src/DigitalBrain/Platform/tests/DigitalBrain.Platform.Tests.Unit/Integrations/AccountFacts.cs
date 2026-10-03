@@ -12,7 +12,7 @@ using DigitalBrain.Platform.Integrations.Accounts;
 using DigitalBrain.Platform.Secrets;
 using DigitalBrain.Sdk.Integrations.Accounts;
 using DigitalBrain.Sdk.Types;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -71,7 +71,7 @@ public sealed class AccountFacts : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         var scripted = new ScriptedProbe(AccountProbeOutcome.Expired, AccountProbeOutcome.Failing);
-        await using var brain = await UnitTest.Create()
+        await using var brain = await ModuleTest.Create()
             .ConfigureSilo(silo => silo.Services.AddSingleton<IAccountProbe>(scripted))
             .StartAsync(ct);
         var accounts = brain.Get<IConnectionRegistry>(Owner);
@@ -252,8 +252,8 @@ public sealed class AccountFacts : IDisposable
         Assert.Equal(["new"], result.Select(account => account.Id));
     }
 
-    private static Task<UnitBrain> StartAsync(CancellationToken cancellationToken)
-        => UnitTest.Create().StartAsync(cancellationToken);
+    private static Task<ModuleBrain> StartAsync(CancellationToken cancellationToken)
+        => ModuleTest.Create().StartAsync(cancellationToken);
 
     private static CallerContext UserCaller() => new()
     {

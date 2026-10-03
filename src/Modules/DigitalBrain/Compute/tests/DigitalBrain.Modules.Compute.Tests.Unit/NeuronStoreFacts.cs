@@ -3,7 +3,7 @@ using DigitalBrain.Compute.Ledger;
 using DigitalBrain.Compute.Metering;
 using DigitalBrain.Compute.Storage;
 using DigitalBrain.Compute.Usage;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -32,7 +32,7 @@ public sealed class NeuronStoreFacts
     public async Task UsageContractPreservesRowsAcrossReactivationAndRejectsForeignCursors()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var usage = brain.Get<IComputeUsage>("account");
         await usage.Append("workspace", "one", "first", DateTimeOffset.UnixEpoch, ct);
         await usage.Append("workspace", "two", "second", DateTimeOffset.UnixEpoch, ct);
@@ -51,7 +51,7 @@ public sealed class NeuronStoreFacts
     public async Task ANewAccountReadsAndWrites()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var ledger = new NeuronLedgerStore(brain.Grains);
         Assert.Empty(await ledger.ReadAsync("account", ct));
         var appended = await ledger.AppendAsync(new LedgerEntry
@@ -91,7 +91,7 @@ public sealed class NeuronStoreFacts
     public async Task NeuronRecordsSurviveDeactivationAndDeduplicateBatches()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var records = brain.Get<IComputeRecords>("test-records");
         var row = new ComputeStoredRecord("one", "original", "001", 10);
         Assert.Equal(1, await records.Put([row, row], false));
@@ -109,7 +109,7 @@ public sealed class NeuronStoreFacts
     public async Task ProductionStoresUseGrainPersistenceWithoutDatabaseOrFilesystemFallback()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         Assert.DoesNotContain("InMemory", brain.SiloServices.GetRequiredService<ILedgerStore>().GetType().Name);
         Assert.DoesNotContain("InMemory", brain.SiloServices.GetRequiredService<IMeterStore>().GetType().Name);
         Assert.DoesNotContain("File", brain.SiloServices.GetRequiredService<IUsageStore>().GetType().Name);

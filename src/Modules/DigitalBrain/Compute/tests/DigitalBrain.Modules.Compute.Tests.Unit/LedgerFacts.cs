@@ -1,7 +1,7 @@
 using DigitalBrain.Compute;
 using DigitalBrain.Compute.Ledger;
 using DigitalBrain.Compute.Storage;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Xunit;
@@ -14,7 +14,7 @@ public sealed class LedgerFacts
     public async Task ChargeTotalsExcludeOtherAccountsIntentsAndPlatformCost()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var store = new NeuronLedgerStore(brain.SiloServices.GetRequiredService<IGrainFactory>());
         await store.AppendAsync(Charge("a", 7m) with { IntentId = "run" }, ct);
         await store.AppendAsync(Charge("b", 3m) with { IntentId = "other" }, ct);
@@ -28,7 +28,7 @@ public sealed class LedgerFacts
     public async Task ConcurrentWritersNeverDoubleCharge()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var store = new NeuronLedgerStore(brain.SiloServices.GetRequiredService<IGrainFactory>());
 
         var results = await Task.WhenAll(Enumerable.Range(0, 64)
@@ -44,7 +44,7 @@ public sealed class LedgerFacts
     public async Task WalletGrainChargesOnceForARepeatedKey()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var wallet = brain.Get<IWallet>("account-a");
 
         var results = await Task.WhenAll(Enumerable.Range(0, 32)
@@ -61,7 +61,7 @@ public sealed class LedgerFacts
     public async Task WalletKeepsChargesAndPlatformCostsSeparate()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var wallet = brain.Get<IWallet>("account-b");
 
         await wallet.ChargeAsync(Charge("charge-intent-2", 10m), ct);
@@ -78,7 +78,7 @@ public sealed class LedgerFacts
     public async Task CostLedgerIsItsOwnWriterSeparateFromTheWallet()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<ComputeModule>().StartAsync(ct);
         var costs = brain.Get<ICostLedger>("account-c");
         var wallet = brain.Get<IWallet>("account-c");
 

@@ -10,7 +10,7 @@ public sealed class GitHubConnectionsFacts
     public async Task RegisterAddsConnectionAndPublishesSignal()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<GitHubModule>()
+        await using var brain = await ModuleTest.Create().WithModule<GitHubModule>()
             .StartAsync(ct);
         var connections = brain.Get<IGitHubConnections>("connections");
         await using var registered = await brain.Observe<GitHubConnectionRegistered>(connections, ct);
@@ -25,7 +25,7 @@ public sealed class GitHubConnectionsFacts
     public async Task RegisterReplacesAnExistingConnection()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<GitHubModule>()
+        await using var brain = await ModuleTest.Create().WithModule<GitHubModule>()
             .StartAsync(ct);
         var connections = brain.Get<IGitHubConnections>("connections");
         await connections.Register(new("conn-1", 7, 9, 11, "intochat", "digitalbrain", "epoch-1"));
@@ -37,7 +37,7 @@ public sealed class GitHubConnectionsFacts
     public async Task RegisterRejectsInvalidIdentifiers()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<GitHubModule>()
+        await using var brain = await ModuleTest.Create().WithModule<GitHubModule>()
             .StartAsync(ct);
         var connections = brain.Get<IGitHubConnections>("connections");
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(

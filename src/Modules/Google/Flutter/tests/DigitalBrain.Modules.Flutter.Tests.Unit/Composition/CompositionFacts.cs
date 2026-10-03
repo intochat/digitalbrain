@@ -11,7 +11,7 @@ public sealed class CompositionFacts
     public async Task SurfacePreservesOrderedChildrenAndRejectsStaleWritesAfterReactivation()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>().StartAsync(ct);
         var surface = brain.Get<ISurface>("owner/a/apps/files/surface");
         await surface.Set(new("Files", [new("layout", "owner/a/apps/files/root"), new("text", "owner/a/apps/files/status")]), 0);
         await brain.DeactivateAsync(surface, ct);
@@ -26,7 +26,7 @@ public sealed class CompositionFacts
     public async Task InvalidCompositionDoesNotReplacePersistedLayout()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>().StartAsync(ct);
         var layout = brain.Get<ILayout>("owner/a/apps/files/root");
         await layout.Set(new("column", [new("collection", "owner/a/apps/files/items")]), 0);
         await Assert.ThrowsAsync<ArgumentException>(() => layout.Set(new("unknown", []), 1));
