@@ -10,6 +10,7 @@
     { "name": "result", "description": "Answer the stored research row for a company query, or null." }
   ],
   "settings": [
+    { "name": "Model", "description": "Uses the host default LLM. Scenario tests may override with scripted/<key>.", "default": "" },
     { "name": "Browser", "description": "The browser driver: empty for the window's own driven browser, or scripted/<key>.", "default": "" }
   ]
 }

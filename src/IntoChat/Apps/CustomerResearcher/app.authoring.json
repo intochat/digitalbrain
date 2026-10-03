@@ -29,7 +29,7 @@
     {
       "id": "10000000000000000000000000000003",
       "title": "Research and store evidence",
-      "description": "When research is requested, run the bounded browser/model algorithm and save verified evidence. Stop cancels the current run; result reads the stored company.",
+      "description": "When research is requested, run the bounded browser/model algorithm and save verified evidence. Stop cancels the current run; result reads the stored company.\n\nProduction research uses the host's default LLM. Legacy Model settings do not pin a provider.\nScratch scenario installs may supply scripted/<key> as Model to run deterministic checks.",
       "sourcePaths": [
         "behaviors/research.cs"
       ],
