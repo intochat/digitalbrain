@@ -14,6 +14,14 @@ internal sealed class GmailNeuron(
     [PersistentState("gmail-vault", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<GmailState> store)
     : Neuron<GmailState>(store), IGmail
 {
+    // The connector's inbound edge: the webhook and OAuth-callback endpoints are the gates,
+    // and both operations validate their payloads, so any trusted caller may deliver them.
+    // Everything else keeps the default brain-scope rule.
+    public override DigitalBrain.Kernel.Enforcement.NeuronAccess Access(string operation)
+        => operation is nameof(AcceptWatchPush) or nameof(AcceptAuthorizationCode)
+            ? DigitalBrain.Kernel.Enforcement.NeuronAccess.PublicOperation
+            : base.Access(operation);
+
     public Task AcceptWatchPush(GmailWatchPush push)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(push.EmailAddress);
