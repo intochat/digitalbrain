@@ -24,12 +24,11 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serv
     {
         ai.Telemetry.EnableSensitiveData = true;
 
-        ai.WithLlm<IGpt56Luna>()
-            .WithLlm<IGemma4>()
-            .WithDefaultLlm<IDeepSeekV41Flash>()
-            .WithDefaultEmbedding<ITextEmbedding3Small>()
-            .WithVoiceToText<IWhisperLargeV3Turbo>()
-            .WithTavilySearch();
+        ai.WithLlm<IGpt56Luna>();
+        ai.WithDefaultLlm<IDeepSeekV41Flash>();
+        ai.WithDefaultEmbedding<ITextEmbedding3Small>();
+        ai.WithVoiceToText<IWhisperLargeV3Turbo>();
+        ai.WithTavilySearch();
     })
     .WithModule<DigitalBrain.Qdrant.Aspire.Hosting.QdrantModuleHosting, QdrantModuleOptions>(qdrant => qdrant.WithHostedQdrant())
     .WithModule<DigitalBrain.ClickHouse.Aspire.Hosting.ClickHouseModuleHosting, ClickHouseModuleOptions>(database => database.WithClickHouse())
