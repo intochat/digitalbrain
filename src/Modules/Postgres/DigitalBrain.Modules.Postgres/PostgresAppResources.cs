@@ -6,6 +6,9 @@ using DigitalBrain.Contracts.Enforcement;
 
 namespace DigitalBrain.Postgres;
 
+internal sealed record PostgresAppDiscovery(PostgresAppTableResource[] Resources, PostgresAppDiscoveryError[] Errors);
+internal sealed record PostgresAppDiscoveryError(string AppId, string TableId, string Message);
+
 internal sealed class PostgresAppResources(DigitalBrain.IDigitalBrain brain)
 {
     public const string SourcePrefix = "postgres-app:";
@@ -34,17 +37,24 @@ internal sealed class PostgresAppResources(DigitalBrain.IDigitalBrain brain)
         return installed.ToArray();
     }
 
-    public async Task<PostgresAppTableResource[]> List(CancellationToken ct)
+    public async Task<PostgresAppDiscovery> List(CancellationToken ct)
+        => await CollectInstalled(await Installed(Scope(), ct), ct);
+
+    internal async Task<PostgresAppDiscovery> CollectInstalled(string[] installed, CancellationToken ct)
     {
         var scope = Scope();
         var resources = new List<PostgresAppTableResource>();
-        foreach (var app in await Installed(scope, ct))
+        var errors = new List<PostgresAppDiscoveryError>();
+        foreach (var app in installed)
         {
             var owner = JsonSerializer.Serialize(new[] { scope, app });
             foreach (var table in await brain.Get<IPostgresAppStorage>(owner).ReadTables().WaitAsync(ct))
-            { resources.Add(await brain.Get<IPostgresTableResource>(table).DescribeResource(owner).WaitAsync(ct)); }
+            {
+                try { resources.Add(await brain.Get<IPostgresTableResource>(table).DescribeResource(owner).WaitAsync(ct)); }
+                catch (PostgresQueryException error) { errors.Add(new(app, table, error.Message)); }
+            }
         }
-        return resources.ToArray();
+        return new(resources.ToArray(), errors.ToArray());
     }
 
     public async Task<PostgresAppTableResource> Resolve(string source, CancellationToken ct)

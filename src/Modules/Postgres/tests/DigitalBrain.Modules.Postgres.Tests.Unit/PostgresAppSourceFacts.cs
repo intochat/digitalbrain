@@ -13,6 +13,34 @@ namespace DigitalBrain.Modules.Postgres.Tests.Unit;
 public sealed class PostgresAppSourceFacts
 {
     [Fact]
+    public async Task PendingDefinitionDoesNotHideHealthyTablesInAnotherApp()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var provider = new PostgresWriteTableFacts.MemoryTables { LoseDefineResponse = true };
+        await using var brain = await UnitTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>
+        {
+            silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=platform;Username=reader";
+            silo.Services.AddSingleton<IPostgresTableProvider>(provider);
+            silo.Services.AddSingleton<ICapacity>(new ResearchCapacity());
+        }).StartAsync(ct);
+        Stamp(CallerKind.App);
+        await Assert.ThrowsAsync<IOException>(() => brain.Get<IPostgresTable>("pending-discovery").Define(new([new("id", "text")], ["id"])));
+        var scope = BrainScope.CurrentId();
+        CallerContextStamper.Stamp(new() { PrincipalId = "alice", AccountId = "alice", BrainId = "brain",
+            Kind = CallerKind.App, AppId = "healthy-install", StampedBy = TrustedEdge.AppProxy });
+        await brain.Get<IPostgresTable>("healthy-discovery").Define(new([new("id", "text")], ["id"]));
+        Stamp(CallerKind.Platform);
+        var result = await new PostgresAppResources(brain).CollectInstalled(["install", "healthy-install"], ct);
+        Assert.Equal("healthy-discovery", Assert.Single(result.Resources).TableId);
+        var failure = Assert.Single(result.Errors);
+        Assert.Equal("install", failure.AppId);
+        Assert.Equal("pending-discovery", failure.TableId);
+        Assert.Contains("not finished", failure.Message, StringComparison.Ordinal);
+        await Assert.ThrowsAsync<PostgresQueryException>(() => brain.Get<IPostgresTableResource>("pending-discovery")
+            .DescribeResource(JsonSerializer.Serialize(new[] { scope, "install" })));
+    }
+
+    [Fact]
     public async Task AnUnavailablePinnedSourceReturnsAnActionableWindowError()
     {
         var resource = new PostgresAppTableResource("install", "results", "db:research", new("db_results", new([new("name", "text")], ["name"]), 1));
