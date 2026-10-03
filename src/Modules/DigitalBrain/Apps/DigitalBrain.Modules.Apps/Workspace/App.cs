@@ -8,6 +8,7 @@ using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.Postgres;
+using DigitalBrain.Platform.Contracts.Identity;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Apps;
@@ -290,6 +291,10 @@ internal sealed class App(
         var target = Snapshot.PendingDeployment!.Target;
         var revision = await GrainFactory.GetGrain<IPackage>(target.Revision!.Package.ToString()).ReadRevision(target.Revision.Revision);
         await Retire(Snapshot.Runtime, Snapshot.ProgramGeneration);
+        if (CallerContextStamper.TryGet(out _))
+        {
+            await GrainFactory.GetGrain<IAppGrantMigration>(BrainScope.CurrentId()).Migrate(this.GetPrimaryKeyString(), Snapshot.StorageFiles);
+        }
         if (modules.ContractAssemblies().Contains(typeof(IPostgresTable).Assembly))
         {
             await GrainFactory.GetGrain<IPostgresStorageMigration>("table-owners-v1").Ensure();

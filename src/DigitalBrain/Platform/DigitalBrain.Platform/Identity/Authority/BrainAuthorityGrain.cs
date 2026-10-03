@@ -20,14 +20,58 @@ internal sealed record BrainAuthorityState
     [Id(4)] public Invitation[] Invitations { get; init; } = [];
     [Id(5)] public bool Imported { get; init; }
     [Id(6)] public bool OwnerProvisioned { get; init; }
+    [Id(7)] public AppGrantMigrationReceipt[] AppGrantMigrations { get; init; } = [];
 }
+
+[GenerateSerializer]
+internal sealed record AppGrantMigrationReceipt([property: Id(0)] string FileId, [property: Id(1)] string AppId);
 
 // Deliberately non-reentrant: a Once grant is checked and persisted in one turn.
 [GrainType("identity.brain-access.v2")]
 internal sealed class BrainAuthorityGrain(
     [PersistentState("access", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<BrainAuthorityState> storage,
-    TimeProvider clock, IOptions<AuthOptions> auth) : IdentityStateGrain<BrainAuthorityState>(storage), IBrainAuthority
+    TimeProvider clock, IOptions<AuthOptions> auth) : IdentityStateGrain<BrainAuthorityState>(storage), IBrainAuthority, IAppGrantMigration, IIncomingGrainCallFilter
 {
+    public async Task Invoke(IIncomingGrainCallContext context)
+    {
+        if (context.InterfaceMethod.DeclaringType == typeof(IAppGrantMigration))
+        {
+            var source = context.SourceId;
+            var caller = CallerContextStamper.Require();
+            if (!CallerContextStamper.IsTrusted(caller) || source?.Type.ToString() != "apps.app"
+                || source?.Key.ToString() != (string)context.Request.GetArgument(0)!
+                || BrainScope.Create(caller.AccountId, caller.BrainId).Id != this.GetPrimaryKeyString())
+            { throw new UnauthorizedAccessException("Only the originating Apps grain may migrate grants in its current brain."); }
+        }
+        await context.Invoke();
+    }
+
+    public async Task Migrate(string appId, string[] legacyFiles)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(appId);
+        ArgumentNullException.ThrowIfNull(legacyFiles);
+        if (legacyFiles.Any(string.IsNullOrWhiteSpace)) { throw new ArgumentException("Legacy file IDs must not be empty.", nameof(legacyFiles)); }
+        var files = legacyFiles.Where(file => file != appId).Distinct(StringComparer.Ordinal).ToArray();
+        if (State.AppGrantMigrations.Any(receipt => files.Contains(receipt.FileId, StringComparer.Ordinal) && receipt.AppId != appId))
+        { throw new UnauthorizedAccessException("A legacy file's grants already belong to another app."); }
+        var pending = files.Except(State.AppGrantMigrations.Select(receipt => receipt.FileId), StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
+        if (pending.Count == 0) { return; }
+        var caller = CallerContextStamper.Require();
+        await Initialize(caller.AccountId, caller.BrainId);
+        // Reuse the authority's stored grants, not Grant(): migration retains dates, chat scopes,
+        // and revoked values. A revoked collision wins; an existing stable grant takes precedence.
+        var migrated = State.Grants.OrderBy(grant => pending.Contains(grant.AppId) ? 1 : 0)
+            .Select(grant => pending.Contains(grant.AppId) ? grant with { AppId = appId } : grant)
+            .GroupBy(grant => (grant.AppId, grant.SemanticTypeId, grant.Mode, Conversation: grant.Mode == GrantMode.ThisChat ? grant.ConversationId : null))
+            .Select(group => group.FirstOrDefault(grant => grant.Revoked) ?? group.First()).ToArray();
+        // One atomic save records each retired file with the move. Repeating a deployment after
+        // a stable grant is revoked or spent cannot import that file again.
+        await Persist(State with
+        {
+            Grants = migrated,
+            AppGrantMigrations = [.. State.AppGrantMigrations, .. pending.Select(file => new AppGrantMigrationReceipt(file, appId))]
+        });
+    }
     public async Task Initialize(string accountId, string brainId)
     {
         if (BrainScope.Create(accountId, brainId).Id != this.GetPrimaryKeyString()) { throw new InvalidOperationException("Brain authority key mismatch."); }
