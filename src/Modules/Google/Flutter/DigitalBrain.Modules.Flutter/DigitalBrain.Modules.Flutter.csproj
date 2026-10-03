@@ -10,7 +10,7 @@
     <ProjectReference Include="../../../Microsoft/Playwright/DigitalBrain.Modules.Microsoft.Playwright.Contracts/DigitalBrain.Modules.Microsoft.Playwright.Contracts.csproj" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Flutter.Tests.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Flutter.Tests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Modules.Flutter.Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />

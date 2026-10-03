@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Playwright" />
+    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
+    <ProjectReference Include="../../DigitalBrain.OS/DigitalBrain.OS.csproj" />
+    <None Update="testconfig.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

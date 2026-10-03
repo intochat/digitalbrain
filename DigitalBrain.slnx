@@ -44,6 +44,7 @@
     <Project Path="src/DigitalBrain/OS/DigitalBrain.OS/DigitalBrain.OS.csproj" />
   </Folder>
   <Folder Name="/DigitalBrain/OS/tests/">
+    <Project Path="src/DigitalBrain/OS/tests/DigitalBrain.OS.Tests.E2E/DigitalBrain.OS.Tests.E2E.csproj" />
     <Project Path="src/DigitalBrain/OS/tests/DigitalBrain.OS.Tests.Unit/DigitalBrain.OS.Tests.Unit.csproj" />
   </Folder>
   <Folder Name="/DigitalBrain/Platform/">
@@ -141,8 +142,7 @@
     <Project Path="src/Modules/Google/Flutter/DigitalBrain.Modules.Flutter/DigitalBrain.Modules.Flutter.csproj" />
   </Folder>
   <Folder Name="/Modules/Google/Flutter/tests/">
-    <Project Path="src/Modules/Google/Flutter/tests/DigitalBrain.Modules.Flutter.Tests.E2E/DigitalBrain.Modules.Flutter.Tests.E2E.csproj" />
-    <Project Path="src/Modules/Google/Flutter/tests/DigitalBrain.Modules.Flutter.Tests.Unit/DigitalBrain.Modules.Flutter.Tests.Unit.csproj" />
+    <Project Path="src/Modules/Google/Flutter/tests/DigitalBrain.Modules.Flutter.Tests/DigitalBrain.Modules.Flutter.Tests.csproj" />
   </Folder>
   <Folder Name="/Modules/Google/Gmail/">
     <Project Path="src/Modules/Google/Gmail/DigitalBrain.Modules.Google.Gmail.Aspire.Hosting/DigitalBrain.Modules.Google.Gmail.Aspire.Hosting.csproj" />

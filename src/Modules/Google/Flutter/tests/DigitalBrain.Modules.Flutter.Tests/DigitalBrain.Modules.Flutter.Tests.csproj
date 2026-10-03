@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <Using Include="DigitalBrain.Testing.Module" />
+    <ProjectReference Include="../../../../../Testing/DigitalBrain.Testing.Module/DigitalBrain.Testing.Module.csproj" />
+    <ProjectReference Include="../../DigitalBrain.Modules.Flutter/DigitalBrain.Modules.Flutter.csproj" />
+    <ProjectReference Include="../../../../Microsoft/Playwright/DigitalBrain.Modules.Microsoft.Playwright/DigitalBrain.Modules.Microsoft.Playwright.csproj" />
+  </ItemGroup>
+</Project>
