@@ -1,10 +1,10 @@
-using DigitalBrain.Contracts.Edge.V1;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using DigitalBrain.Client;
 using DigitalBrain;
+using DigitalBrain.Client;
 using DigitalBrain.Contracts;
+using DigitalBrain.Contracts.Edge.V1;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
 
@@ -36,7 +36,7 @@ internal sealed class ScriptEdge(RunTokens tokens, ScriptContracts contracts, IG
                 : cancellationToken;
         }
         var neuron = grains.GetGrain(contract, invocation.Key);
-        Stamp(owner, claims);
+        Stamp(owner);
         object? returned;
         try { returned = method.Invoke(neuron, values); }
         catch (TargetInvocationException error) when (error.InnerException is not null) { throw error.InnerException; }
@@ -59,7 +59,7 @@ internal sealed class ScriptEdge(RunTokens tokens, ScriptContracts contracts, IG
         var signalContract = contracts.Find(contract);
         if (PlatformOnlyAttribute.AppliesTo(signalContract)) { throw new ArgumentException($"{contract} is not a neuron contract scripts may call."); }
         if (grains.GetGrain(signalContract, key) is not INeuron source) { throw new ArgumentException($"{contract} is not a neuron."); }
-        Stamp(owner, claims);
+        Stamp(owner);
         var file = grains.GetGrain<ICSharpFileEdge>(claims.File);
         await file.Subscribed(claims.Run, source.GetGrainId().ToString(), signal).ConfigureAwait(false);
         var doorbell = await brain.SubscribeAsync<Signal>(grains.GetGrain<ICSharpFile>(claims.File), cancellationToken).ConfigureAwait(false);
@@ -117,9 +117,9 @@ internal sealed class ScriptEdge(RunTokens tokens, ScriptContracts contracts, IG
     }
 
     // A file started without a caller (tests, the platform) calls without a stamp, as grain code does.
-    private static void Stamp(CallerContext? owner, RunTokenClaims claims)
+    private static void Stamp(CallerContext? owner)
     {
-        if (owner is not null) { CallerContextStamper.Stamp(owner with { Kind = CallerKind.App, StampedBy = TrustedEdge.AppProxy, AppId = claims.File }); }
+        if (owner is not null) { CallerContextStamper.Stamp(owner with { Kind = CallerKind.App, StampedBy = TrustedEdge.AppProxy }); }
     }
 
     private static bool IsArgument(ParameterInfo parameter) => parameter.ParameterType != typeof(CancellationToken);

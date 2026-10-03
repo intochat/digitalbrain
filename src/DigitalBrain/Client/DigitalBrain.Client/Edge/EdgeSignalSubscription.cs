@@ -1,10 +1,10 @@
-using DigitalBrain.Contracts.Edge.V1;
 using System.Net.ServerSentEvents;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Channels;
 using DigitalBrain;
 using DigitalBrain.Contracts;
+using DigitalBrain.Contracts.Edge.V1;
 
 namespace DigitalBrain.Client;
 

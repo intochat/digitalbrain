@@ -1,7 +1,7 @@
 using DigitalBrain.Contracts;
 using DigitalBrain.Kernel;
-using Orleans.Hosting;
 using Microsoft.Extensions.Configuration;
+using Orleans.Hosting;
 
 namespace DigitalBrain.Kernel.Tests.E2E;
 

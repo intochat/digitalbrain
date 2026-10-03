@@ -1,12 +1,12 @@
-using DigitalBrain.Kernel.Enforcement;
-using DigitalBrain.Assistant;
 using System.Net.Http.Json;
 using System.Text.Json;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Metering;
+using DigitalBrain.Assistant;
+using DigitalBrain.Kernel.Enforcement;
+using DigitalBrain.Platform.Contracts.Identity;
 using DigitalBrain.Testing.E2E.Agent;
 using DigitalBrain.Testing.E2E.Workspace;
-using DigitalBrain.Platform.Contracts.Identity;
 
 namespace DigitalBrain.Modules.Assistant.Tests.E2E;
 

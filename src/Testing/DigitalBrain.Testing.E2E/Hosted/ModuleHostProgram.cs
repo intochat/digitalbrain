@@ -1,7 +1,7 @@
+using DigitalBrain.Aspire.Server;
+using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.Platform;
 using DigitalBrain.Platform.Identity;
-using DigitalBrain.Kernel.AspNetCore;
-using DigitalBrain.Aspire.Server;
 using DigitalBrain.Testing.E2E;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;

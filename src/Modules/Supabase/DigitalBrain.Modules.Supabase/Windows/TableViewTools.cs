@@ -10,7 +10,7 @@ internal sealed class TableViewTools(LiveTableWindows windows) : IAgentToolFacto
 {
     public IReadOnlyList<AIFunction> Create(Func<AgentToolContext> context)
     {
-        async Task<object> Read([Description("The table id returned when the window opened (its windowId).")] string tableId,
+        async Task<object> Read([Description("Exact windowId returned by a successful table-open tool. A storage table ID, SQL table name or discovered resource handle is not a windowId. Open the resource first.")] string tableId,
             [Description("Optional aggregate to compute instead of returning rows: count, sum, avg, min or max.")] string? aggregate = null,
             [Description("Column the aggregate applies to; omit for count.")] string? aggregateColumn = null,
             [Description("Optional column ids to project; omit for every readable Public column.")] IReadOnlyList<string>? columns = null,
@@ -25,7 +25,7 @@ internal sealed class TableViewTools(LiveTableWindows windows) : IAgentToolFacto
             }
         }
 
-        async Task<object> Refine([Description("The table id returned when the window opened (its windowId).")] string tableId,
+        async Task<object> Refine([Description("Exact windowId returned by a successful table-open tool. A storage table ID, SQL table name or discovered resource handle is not a windowId. Open the resource first.")] string tableId,
             [Description("Filters to apply to the same window; replaces the window's current filters.")] IReadOnlyList<TableFilterArgument>? filters = null,
             [Description("Sort column id; omit to keep the current order.")] string? sortColumn = null,
             [Description("Sort descending when true.")] bool sortDescending = false,
@@ -50,7 +50,9 @@ internal sealed class TableViewTools(LiveTableWindows windows) : IAgentToolFacto
             AIFunctionFactory.Create(Refine, "table_refine", "Refine the existing table window (same window, not a new one) with filters, sort or visible columns. If isError=true, repair the arguments and retry."),
         ];
     }
-    private static object Failure(Exception error) => new { isError = true, message = error.Message };
+    private static object Failure(Exception error) => error is SupabaseTableNotFoundException
+        ? new { isError = true, code = "table_window_required", message = "No open table window matches this ID in the current workspace. This does not establish that the database table is missing. Call discover_capabilities for the requested data, use its resource handle with the source's table-open tool, then retry with the returned windowId. Do not pass a storage table ID to table_read or table_refine." }
+        : new { isError = true, message = error.Message };
 }
 
 internal sealed record TableFilterArgument(string ColumnId, string Operator, JsonElement Value);

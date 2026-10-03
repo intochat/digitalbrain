@@ -1,7 +1,7 @@
-using DigitalBrain.Sdk.Integrations.Accounts;
-using DigitalBrain.Platform.Contracts.Integrations.Accounts;
 using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.Kernel.Enforcement;
+using DigitalBrain.Platform.Contracts.Integrations.Accounts;
+using DigitalBrain.Sdk.Integrations.Accounts;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;

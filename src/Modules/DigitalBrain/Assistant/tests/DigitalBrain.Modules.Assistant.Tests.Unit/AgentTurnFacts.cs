@@ -1,13 +1,13 @@
-using DigitalBrain.Kernel;
 using System.Runtime.CompilerServices;
 using System.Text;
+using DigitalBrain;
 using DigitalBrain.AI;
-using DigitalBrain.Assistant;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.AI.Metering;
+using DigitalBrain.Assistant;
 using DigitalBrain.Compute;
-using DigitalBrain;
 using DigitalBrain.Contracts;
+using DigitalBrain.Kernel;
 using Xunit;
 
 namespace DigitalBrain.Modules.Assistant.Tests.Unit;

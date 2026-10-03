@@ -1,6 +1,6 @@
-using System.Xml.Linq;
-using System.Text.RegularExpressions;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace IntoChat.Tests.Unit;
 

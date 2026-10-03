@@ -1,7 +1,7 @@
 using DigitalBrain.Platform.Identity.Configuration;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Platform.Identity;

@@ -10,17 +10,19 @@ internal sealed class PackageBrain(UnitBrain brain, FlakyGrainStorage storage) :
     public FlakyGrainStorage Storage => storage;
 
     public UnitBrain Brain => brain;
+    public Task AuthorizeCallerAsync() => brain.AuthorizeCallerAsync();
 
     public T Get<T>(string key) where T : class, IGrainWithStringKey => brain.Get<T>(key);
 
     public CommitPackage Commit(string? expectedHead, PackageContent content, string message = "Change", PackageRevisionRef? mergeFrom = null)
         => new(Guid.NewGuid(), expectedHead, content, message, mergeFrom);
 
-    public static async Task<PackageBrain> StartAsync(CancellationToken cancellationToken, Action<ISiloBuilder>? configureSilo = null)
+    public static async Task<PackageBrain> StartAsync(CancellationToken cancellationToken, Action<ISiloBuilder>? configureSilo = null, Action<IClientBuilder>? configureClient = null)
     {
         var storage = new FlakyGrainStorage();
         var brain = await UnitTest.Create()
             .WithModule<AppsModule>()
+            .ConfigureClient(client => configureClient?.Invoke(client))
             .ConfigureSilo(silo =>
             {
                 silo.Services.AddKeyedSingleton<IGrainStorage>("Default", storage);

@@ -37,14 +37,8 @@ void main() {
           ),
         ),
       );
-      expect(find.text('Read pages'), findsOneWidget);
-      expect(find.text('Only observed facts.'), findsNothing);
-      await tester.tap(find.text('1 scenario'));
-      await tester.pumpAndSettle();
       expect(find.text('Only observed facts.'), findsOneWidget);
-      await tester.tap(find.byTooltip('Options for Research'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('View source'));
+      await tester.tap(find.byKey(const ValueKey('scenario-source-s')));
       await tester.pumpAndSettle();
       expect(find.text('exact revision source'), findsOneWidget);
       expect(find.text('Revision abc'), findsOneWidget);

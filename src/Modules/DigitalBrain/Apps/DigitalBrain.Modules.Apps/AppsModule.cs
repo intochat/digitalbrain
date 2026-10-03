@@ -1,6 +1,6 @@
-using DigitalBrain.Kernel.AspNetCore;
-using DigitalBrain.Kernel;
 using DigitalBrain.AI.Agents;
+using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.AspNetCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -18,6 +18,7 @@ public sealed class AppsModule : IModule, IHttpModule
         ArgumentNullException.ThrowIfNull(silo);
         silo.Services.TryAddSingleton(TimeProvider.System);
         silo.Services.TryAddSingleton<AppRequirements>();
+        silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<DigitalBrain.Registry.IRegistryResourceProvider, AppsRegistryResources>());
         silo.Services.TryAddSingleton<ITestScriptRunner, CSharpFileTestRunner>();
         silo.Services.TryAddSingleton<MarketplaceService>();
         silo.Services.TryAddSingleton<AppService>();

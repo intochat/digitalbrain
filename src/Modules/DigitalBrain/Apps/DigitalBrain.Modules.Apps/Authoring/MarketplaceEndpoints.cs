@@ -1,13 +1,13 @@
+using DigitalBrain;
+using DigitalBrain.Apps;
+using DigitalBrain.Contracts;
 using DigitalBrain.Kernel.AspNetCore;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Sdk.Http;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
-using DigitalBrain.Apps;
-using DigitalBrain;
-using DigitalBrain.Contracts;
-using DigitalBrain.Kernel.Enforcement;
 
 namespace DigitalBrain.Apps;
 

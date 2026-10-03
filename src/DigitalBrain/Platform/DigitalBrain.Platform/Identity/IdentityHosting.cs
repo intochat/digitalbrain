@@ -1,17 +1,20 @@
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Platform.Identity.Configuration;
+using DigitalBrain.Platform.Identity.Directory;
 using DigitalBrain.Platform.Secrets;
 using DigitalBrain.Sdk;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Platform.Identity;
 
 public static class IdentityHosting
 {
-    internal static void AddIdentity(this IServiceCollection services)
+    public static void AddIdentity(this IServiceCollection services)
     {
         services.AddOptions<AuthOptions>().BindConfiguration(AuthOptions.SectionName)
             .Validate(options => options.Posture is not null,
@@ -22,6 +25,9 @@ public static class IdentityHosting
         services.AddOptions<IdentityHostOptions>().BindConfiguration(IdentityHostOptions.SectionName)
             .Validate(options => options.Validate(), "Identity host names must not be empty.")
             .ValidateOnStart();
+        services.AddDataProtection();
+        services.AddOptions<Microsoft.AspNetCore.DataProtection.DataProtectionOptions>()
+            .Configure<IOptions<IdentityHostOptions>>((protection, host) => protection.ApplicationDiscriminator = host.Value.ProtectionApplicationName);
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie();
         services.AddOptions<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme)
             .Configure<IOptions<IdentityHostOptions>>((cookie, host) =>
@@ -43,6 +49,12 @@ public static class IdentityHosting
                 };
             });
         services.AddKernelCors();
+        services.TryAddSingleton<IBrainAccess>(provider =>
+        {
+            var directory = new DirectoryBrainAccess(provider.GetRequiredService<Orleans.IGrainFactory>());
+            return provider.GetRequiredService<IOptions<AuthOptions>>().Value.Posture == IdentityPosture.Open
+                ? new OpenOwnerBrainAccess(directory) : directory;
+        });
     }
 
     public static void UsePlatformHttp(this WebApplication app)

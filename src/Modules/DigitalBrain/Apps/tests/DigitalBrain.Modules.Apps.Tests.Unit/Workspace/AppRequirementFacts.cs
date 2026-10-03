@@ -83,6 +83,7 @@ public sealed class AppRequirementFacts
         var (app, request) = await Prepare(brain, "// behavior");
         var installed = await app.Install(request);
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         var package = brain.Get<IPackage>(request.Revision.Package.ToString());
         var current = await package.ReadRevision(request.Revision.Revision);
         var next = await package.Commit(brain.Commit(current.Id, current.Content with { Source = "#:project /brain/DigitalBrain.Modules.Postgres.Contracts.csproj\n// upgraded" }));
@@ -111,6 +112,7 @@ public sealed class AppRequirementFacts
     private static async Task<(IApp, InstallApp)> Prepare(PackageBrain brain, string source, string? tests = null)
     {
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         var id = PackageId.Parse("alice/requirements");
         var content = PackageSamples.Researcher("Research") with { Source = source };
         if (tests is not null) { content = content with { Files = new Dictionary<string, string> { [PackageContent.TestsPath] = tests } }; }

@@ -89,6 +89,10 @@ void main() {
         ),
       ),
     );
+    await tester.tap(find.text('Behavior implementations'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byTooltip('Options for Research'));
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Options for Research'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Edit description'));

@@ -110,6 +110,23 @@ public sealed partial class ScriptedModelServer : IAsyncDisposable
         var ownerText = lastUser.Split("\n\n[Conversation agent:", 2, StringSplitOptions.None)[0];
         var wantsCount = ownerText.Contains("how many", StringComparison.OrdinalIgnoreCase);
         var wantsRefine = RefineValue is not null && ownerText.Contains("only", StringComparison.OrdinalIgnoreCase);
+        // Default assistants rediscover module tools on each turn, including read/refine follow-ups.
+        // Explicit custom definitions may already include the tool.
+        var toolNames = request.TryGetProperty("tools", out var offeredTools)
+            ? offeredTools.EnumerateArray().Select(tool => tool.GetProperty("function").GetProperty("name").GetString()).ToArray() : [];
+        var nextTool = wantsCount ? "table_read" : wantsRefine ? "table_refine" : "supabase_schema";
+        if (!toolNames.Contains(nextTool))
+        {
+            Assert.Contains("discover_capabilities", toolNames);
+            if (results.Any(result => result.TryGetProperty("tool_call_id", out var id) && id.GetString() == "discovery-call"))
+            {
+                Assert.Contains("select_capability", toolNames);
+                return Completion(Call("selection-call", "select_capability", "{\"id\":\"supabase\"}"), "tool_calls");
+            }
+            return Completion(Call("discovery-call", "discover_capabilities", "{\"query\":\"Supabase tables\"}"), "tool_calls");
+        }
+        results = results.Where(result => !result.TryGetProperty("tool_call_id", out var callId)
+            || callId.GetString() is not ("discovery-call" or "selection-call")).ToArray();
         object message;
         var reason = "tool_calls";
         if (results.Length == 0)
@@ -216,7 +233,8 @@ public sealed partial class ScriptedModelServer : IAsyncDisposable
         foreach (var message in messages.Reverse())
         {
             if (message.GetProperty("role").GetString() != "assistant") { continue; }
-            var content = message.GetProperty("content").GetString() ?? "";
+            if (!message.TryGetProperty("content", out var text) || text.ValueKind != JsonValueKind.String) { continue; }
+            var content = text.GetString()!;
             var match = TableIdPattern().Match(content);
             if (match.Success) { return match.Value; }
         }
@@ -233,7 +251,10 @@ public sealed partial class ScriptedModelServer : IAsyncDisposable
     {
         Assert.True(Errors.IsEmpty, string.Join("\n", Errors));
         Assert.True(_completed > 0, "The model never received a real query-window tool result.");
-        Assert.Equal(_completed * 3 + RepairCount, Requests.Count);
+        var discoveryRequests = Requests.Count(request => request.TryGetProperty("tools", out var tools)
+            && tools.EnumerateArray().Any(tool => tool.GetProperty("function").GetProperty("name").GetString() == "discover_capabilities")
+            && !tools.EnumerateArray().Any(tool => tool.GetProperty("function").GetProperty("name").GetString() == "supabase_schema"));
+        Assert.Equal(_completed * 3 + RepairCount + discoveryRequests, Requests.Count);
     }
     public void AssertNoProtocolErrors() => Assert.Empty(Errors);
     public ValueTask DisposeAsync() => _app.DisposeAsync();

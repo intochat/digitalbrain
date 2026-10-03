@@ -1,5 +1,5 @@
-using DigitalBrain.Contracts.Types;
 using System.Text.Json.Nodes;
+using DigitalBrain.Contracts.Types;
 
 namespace DigitalBrain.Sdk.Types;
 

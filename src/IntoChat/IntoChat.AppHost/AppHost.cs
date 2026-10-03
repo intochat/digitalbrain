@@ -1,33 +1,35 @@
-using DigitalBrain.Postgres;
 using Aspire.Hosting;
 using DigitalBrain.AI;
 using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
+using DigitalBrain.AI.OpenRouter;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.ClickHouse;
-using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google.Gmail;
-using DigitalBrain.Qdrant;
 using DigitalBrain.Microsoft.Aspire;
+using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.Microsoft.GitHub;
+using DigitalBrain.Postgres;
+using DigitalBrain.Qdrant;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 using IntoChat;
 
 var builder = DistributedApplication.CreateBuilder(args);
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serviceId: "intochat", options: new() { UseAzureStorage = true, Dashboard = true })
+    .WithHttpIdentity(new("intochat.session", "IntoChat.v1", IntoChatConfiguration.ProtectionContainerName))
     .WithModule<DigitalBrain.AI.Aspire.Hosting.AIModuleHosting, AIOptions>(ai =>
     {
         ai.Telemetry.EnableSensitiveData = true;
 
-        ai.WithLlm<IGpt56Luna>()
-            .WithDefaultLlm<IGemma4>()
-            .WithDefaultEmbedding<ITextEmbedding3Small>()
-            .WithVoiceToText<IWhisperLargeV3Turbo>()
-            .WithTavilySearch();
+        ai.WithLlm<IGpt56Luna>();
+        ai.WithDefaultLlm<IDeepSeekV41Flash>();
+        ai.WithDefaultEmbedding<ITextEmbedding3Small>();
+        ai.WithVoiceToText<IWhisperLargeV3Turbo>();
+        ai.WithTavilySearch();
     })
     .WithModule<DigitalBrain.Qdrant.Aspire.Hosting.QdrantModuleHosting, QdrantModuleOptions>(qdrant => qdrant.WithHostedQdrant())
     .WithModule<DigitalBrain.ClickHouse.Aspire.Hosting.ClickHouseModuleHosting, ClickHouseModuleOptions>(database => database.WithClickHouse())
@@ -61,7 +63,7 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
     .WithHttpHealthCheck("/health", endpointName: "http");
 
 builder.AddProject<Projects.DigitalBrain_Mcp>("digitalbrain-mcp")
-    .WithReference(digitalBrain.AsClient())
+    .WithReference(digitalBrain.AsClient(shareHttpIdentity: true))
     .WithHttpEndpoint(port: ProductSurfaceResources.McpHttpPort, name: "http", isProxied: false)
     .WithHttpHealthCheck("/health", endpointName: "http")
     .WaitFor(runtime);

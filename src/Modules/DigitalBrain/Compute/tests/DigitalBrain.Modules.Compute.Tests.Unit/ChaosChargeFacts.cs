@@ -1,7 +1,7 @@
-using DigitalBrain.Testing.Unit;
 using DigitalBrain.Compute;
-using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Compute.Allowances;
+using DigitalBrain.Contracts.Enforcement;
+using DigitalBrain.Testing.Unit;
 
 namespace DigitalBrain.Modules.Compute.Tests.Unit;
 

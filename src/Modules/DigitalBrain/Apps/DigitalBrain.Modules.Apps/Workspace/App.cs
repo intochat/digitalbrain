@@ -1,12 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using DigitalBrain.Apps.Signals;
 using DigitalBrain;
+using DigitalBrain.Apps.Signals;
 using DigitalBrain.Contracts;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Microsoft.CSharp;
+using DigitalBrain.Platform.Contracts.Identity;
 using DigitalBrain.Postgres;
 using Orleans.Runtime;
 
@@ -18,6 +19,18 @@ internal sealed class App(
     TimeProvider clock, AppRequirements requirements, ModuleInventory modules)
     : Neuron<AppState>(store), IApp
 {
+    public override NeuronAccess Access(string operation)
+    {
+        var key = this.GetPrimaryKeyString();
+        var caller = CallerContextStamper.Require();
+        var addressScope = NeuronAccess.ForBrainKey(key).Scope;
+        var creating = operation == nameof(Install) && Snapshot.BrainScopeId is null && Snapshot.Revision is null && Snapshot.Receipts.Count == 0;
+        if (caller.Kind == DigitalBrain.Contracts.Enforcement.CallerKind.App && caller.AppId != key
+            && caller.AppId != Snapshot.InstallerAppId && !creating)
+        { throw new UnauthorizedAccessException("An app cannot address another installed app."); }
+        return new(Snapshot.BrainScopeId ?? addressScope ?? (creating ? BrainScope.CurrentId() : null));
+    }
+
     private const int MaxInvocations = 256;
     private const int MaxSettingLength = 4096;
     private const int MaxPayloadLength = 64 * 1024;
@@ -41,6 +54,14 @@ internal sealed class App(
     public async Task<AppSnapshot> Install(InstallApp request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (Snapshot.BrainScopeId is null && CallerContextStamper.TryGet(out var installer))
+        {
+            await Persist(Snapshot with
+            {
+                BrainScopeId = BrainScope.CurrentId(),
+                InstallerAppId = installer.Kind == DigitalBrain.Contracts.Enforcement.CallerKind.App ? installer.AppId : null,
+            });
+        }
         await Resume();
         if (Replay(request.OperationId, request)) { return Describe(Snapshot); }
         if (Snapshot.Status == AppStatus.Installed)
@@ -168,6 +189,7 @@ internal sealed class App(
         {
             await GrainFactory.GetGrain<IPostgresStorageMigration>("table-owners-v1").Ensure();
             var brain = BrainScope.CurrentId();
+            await GrainFactory.GetGrain<IPostgresTables>(JsonSerializer.Serialize(new[] { brain, this.GetPrimaryKeyString() })).Retire();
             foreach (var file in Snapshot.StorageFiles)
             { await GrainFactory.GetGrain<IPostgresTables>(JsonSerializer.Serialize(new[] { brain, file })).Retire(); }
         }
@@ -192,6 +214,8 @@ internal sealed class App(
     {
         ArgumentNullException.ThrowIfNull(request);
         await Resume();
+        if (request.ExpectedRevision is { } expected && expected != Snapshot.Revision)
+        { throw new UnauthorizedAccessException("The selected app revision changed. Discover and select it again."); }
         if (Snapshot.Invocations.Find(item => item.Id == request.InvocationId) is { } existing) { return existing; }
         RequireInstalled();
         if (!Snapshot.Operations.Any(operation => operation.Name == request.Operation))
@@ -252,7 +276,9 @@ internal sealed class App(
         var programs = content.Programs();
         foreach (var (path, source) in programs)
         {
-            var file = GrainFactory.GetGrain<ICSharpFile>(FileKey(generation, path));
+            var key = FileKey(generation, path);
+            await GrainFactory.GetGrain<ICSharpAppBinding>(key).BindApp(this.GetPrimaryKeyString());
+            var file = GrainFactory.GetGrain<ICSharpFile>(key);
             await file.Write(source);
             await file.Configure(Configuration(settings, accounts));
             await file.Start();
@@ -287,6 +313,16 @@ internal sealed class App(
         var target = Snapshot.PendingDeployment!.Target;
         var revision = await GrainFactory.GetGrain<IPackage>(target.Revision!.Package.ToString()).ReadRevision(target.Revision.Revision);
         await Retire(Snapshot.Runtime, Snapshot.ProgramGeneration);
+        if (CallerContextStamper.TryGet(out _))
+        {
+            await GrainFactory.GetGrain<IAppGrantMigration>(BrainScope.CurrentId()).Migrate(this.GetPrimaryKeyString(), Snapshot.StorageFiles);
+        }
+        if (modules.ContractAssemblies().Contains(typeof(IPostgresTable).Assembly))
+        {
+            await GrainFactory.GetGrain<IPostgresStorageMigration>("table-owners-v1").Ensure();
+            var owner = JsonSerializer.Serialize(new[] { BrainScope.CurrentId(), this.GetPrimaryKeyString() });
+            await GrainFactory.GetGrain<IPostgresAppStorage>(owner).Migrate(target.StorageFiles);
+        }
         await Deploy(target.Runtime, target.ProgramGeneration, revision.Content, target.Settings, target.Accounts);
         await Persist(target);
     }

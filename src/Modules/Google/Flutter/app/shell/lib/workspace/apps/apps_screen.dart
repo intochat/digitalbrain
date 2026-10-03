@@ -47,6 +47,7 @@ class _AppsScreenState extends State<AppsScreen> {
   final Map<String, TextEditingController> _inputs = {};
   final Map<String, String> _outputs = {};
   final Map<String, List<Map<String, dynamic>>> _discussions = {};
+  String _search = '';
   bool _busy = false;
   String? _error;
   String? _notice;
@@ -305,6 +306,18 @@ class _AppsScreenState extends State<AppsScreen> {
             ),
           if (_notice != null)
             Padding(padding: const EdgeInsets.all(12), child: Text(_notice!)),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: TextField(
+              key: const ValueKey('search-apps'),
+              decoration: const InputDecoration(
+                labelText: 'Search apps by owner/name or description',
+                prefixIcon: Icon(Icons.search),
+              ),
+              onChanged: (value) =>
+                  setState(() => _search = value.trim().toLowerCase()),
+            ),
+          ),
           Expanded(
             child: _listings.isEmpty && _drafts.isEmpty && !_busy
                 ? const Center(child: Text('No one has published an app yet.'))
@@ -322,7 +335,30 @@ class _AppsScreenState extends State<AppsScreen> {
                         for (final draft in _drafts) _draftTile(draft),
                         const SizedBox(height: 12),
                       ],
-                      for (final listing in _listings) _card(listing),
+                      for (final installed in [true, false]) ...[
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            installed ? 'Installed apps' : 'Published catalog',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
+                        for (final listing in _listings)
+                          if ((_apps[_id(listing)]?['status'] == _installed) ==
+                                  installed &&
+                              '${_id(listing)} ${listing['title'] ?? ''} ${listing['description'] ?? ''}'
+                                  .toLowerCase()
+                                  .contains(_search))
+                            _card(listing),
+                      ],
+                      if (_search.isNotEmpty &&
+                          !_listings.any(
+                            (listing) =>
+                                '${_id(listing)} ${listing['title'] ?? ''} ${listing['description'] ?? ''}'
+                                    .toLowerCase()
+                                    .contains(_search),
+                          ))
+                        const Text('No apps match your search.'),
                     ],
                   ),
           ),
@@ -393,6 +429,11 @@ class _AppsScreenState extends State<AppsScreen> {
             ),
             Text(
               '$id · ${published.length > 12 ? published.substring(0, 12) : published}',
+            ),
+            Text(
+              installed
+                  ? 'Installed in this brain'
+                  : 'Published · available to install',
             ),
             if (origin.isNotEmpty)
               Text('Forked from ${origin['owner']}/${origin['name']}'),
@@ -473,7 +514,7 @@ class _AppsScreenState extends State<AppsScreen> {
                         !uninstallPending &&
                         operations.any((o) => o['name'] == 'open'),
                   ),
-                  child: const Text('Behaviors'),
+                  child: const Text('Scenarios'),
                 ),
                 OutlinedButton(
                   key: ValueKey('fork-$id'),

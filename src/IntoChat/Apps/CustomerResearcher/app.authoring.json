@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "preamble": "# Customer Researcher\n\nSmall signal-driven scenarios compose a researcher window, submit commands and verify company details against observed pages. UI buttons and assistant tools invoke the same operations. The installed app owns its Postgres table across behavior files and upgrades.",
+  "behaviors": [
+    {
+      "id": "10000000000000000000000000000001",
+      "title": "Show the researcher",
+      "description": "When the open operation arrives, compose the window and return its surface.",
+      "sourcePaths": [
+        "behaviors/surface.cs"
+      ],
+      "scenarioIds": [
+        "00000000000000000000000000000001"
+      ]
+    },
+    {
+      "id": "10000000000000000000000000000002",
+      "title": "Submit UI commands",
+      "description": "When Research or Stop is clicked, invoke the corresponding app operation.",
+      "sourcePaths": [
+        "behaviors/controls.cs"
+      ],
+      "scenarioIds": [
+        "00000000000000000000000000000002",
+        "00000000000000000000000000000003",
+        "00000000000000000000000000000005"
+      ]
+    },
+    {
+      "id": "10000000000000000000000000000003",
+      "title": "Research and store evidence",
+      "description": "When research is requested, run the bounded browser/model algorithm and save verified evidence. Stop cancels the current run; result reads the stored company.\n\nProduction research uses the host's default LLM. Legacy Model settings do not pin a provider.\nScratch scenario installs may supply scripted/<key> as Model to run deterministic checks.",
+      "sourcePaths": [
+        "behaviors/research.cs"
+      ],
+      "scenarioIds": [
+        "00000000000000000000000000000002",
+        "00000000000000000000000000000003",
+        "00000000000000000000000000000004",
+        "00000000000000000000000000000005",
+        "00000000000000000000000000000006"
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "00000000000000000000000000000001",
+      "name": "Opening the researcher composes its surface",
+      "body": "Invoking \"open\" answers a window whose surface is named and titled \"Customer Researcher\", with the\ncompany field, the research and stop buttons, the status text and the browser paired to its driver.",
+      "isLive": false
+    },
+    {
+      "id": "00000000000000000000000000000002",
+      "name": "Stopping an idle researcher is safe",
+      "body": "Invoking \"stop\" with nothing running answers \"Stopped.\" and does not fail.",
+      "isLive": false
+    },
+    {
+      "id": "00000000000000000000000000000003",
+      "name": "Research verifies the company against observed pages and saves it",
+      "body": "Invoking \"research\" with a company name drives the browser from a search page to the official\nsite, extracts details with the model, keeps only values found verbatim on observed official\npages, and upserts the row — keyed by the query, so a retry updates the same record. \"result\"\nanswers the stored row with its evidence.",
+      "isLive": false
+    },
+    {
+      "id": "00000000000000000000000000000004",
+      "name": "An unverifiable company is refused and saves nothing",
+      "body": "When no official page can be observed, research answers a refusal and no row is stored.",
+      "isLive": false
+    },
+    {
+      "id": "00000000000000000000000000000005",
+      "name": "Stop during research cancels it or the research completes, never half-saves",
+      "body": "A stop raced against a running research either cancels it (\"Stopped.\", nothing stored) or loses\nthe race to a completed save; there is no half-written state either way.",
+      "isLive": false
+    },
+    {
+      "id": "00000000000000000000000000000006",
+      "name": "Research runs live",
+      "body": "With a connected window browser and a real model, \"research\" drives the visible browser and saves\nfindings to Postgres. Live scenarios document the app; they are not part of the deterministic gate.",
+      "isLive": true
+    }
+  ]
+}

@@ -16,8 +16,11 @@ public interface IAgentToolFactory
 
 public interface IAgentToolSource
 {
+    string? SourceId => null;
     Task<IAgentToolSession> OpenAsync(IReadOnlyList<string> selectedToolNames,
         Func<AgentToolContext> context, CancellationToken ct);
+    Task<IAgentToolSession> OpenBoundAsync(string resource, IReadOnlyList<string> selectedToolNames,
+        Func<AgentToolContext> context, CancellationToken ct) => OpenAsync(selectedToolNames, context, ct);
 }
 
 // Owns live tool connections until the execution completes.
@@ -41,4 +44,5 @@ public interface IAgentContextProvider
 }
 
 // A tool result that also offers more registered tools to the rest of the turn; the model sees Result.
-public sealed record AgentToolOffer(IReadOnlyList<string> Tools, object? Result);
+public sealed record AgentToolOffer(IReadOnlyList<string> Tools, object? Result, AgentToolBinding? Binding = null, bool ReplaceSelection = false);
+public sealed record AgentToolBinding(string Source, string Resource);

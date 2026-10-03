@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text.Json;
-using DigitalBrain.Platform.Contracts.Identity;
 using DigitalBrain.Kernel.Enforcement;
+using DigitalBrain.Platform.Contracts.Identity;
 
 namespace DigitalBrain.Platform.Identity.Directory;
 

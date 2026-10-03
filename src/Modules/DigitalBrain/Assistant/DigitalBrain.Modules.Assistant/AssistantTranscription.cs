@@ -1,5 +1,5 @@
-using DigitalBrain.AI.Media;
 using DigitalBrain.AI;
+using DigitalBrain.AI.Media;
 
 namespace DigitalBrain.Assistant;
 

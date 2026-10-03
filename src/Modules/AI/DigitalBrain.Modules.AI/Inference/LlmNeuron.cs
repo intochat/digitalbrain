@@ -1,11 +1,13 @@
-using DigitalBrain.Kernel;
 using System.Runtime.CompilerServices;
+using DigitalBrain.Kernel;
 using Orleans.Runtime;
 
 namespace DigitalBrain.AI;
 
 public abstract class LlmNeuronBase(InferenceService inference, Type? marker = null) : Neuron, ILLM
 {
+    public override DigitalBrain.Kernel.Enforcement.NeuronAccess Access(string operation)
+        => new(DigitalBrain.Kernel.Enforcement.BrainScope.CurrentId());
     public Task<ModelDescriptor> Describe(AgentModelSelection? selection = null)
         => Task.FromResult(inference.Describe(Selection(selection), marker));
     public async Task<InferenceResult> Generate(InferenceRequest request, CancellationToken cancellationToken = default)

@@ -1,13 +1,13 @@
-using DigitalBrain.Platform.Contracts.Auth;
+using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.Kernel.Enforcement;
-using DigitalBrain.Kernel;
-using DigitalBrain.Sdk;
+using DigitalBrain.Platform.Contracts.Auth;
 using DigitalBrain.Platform.Contracts.Integrations;
+using DigitalBrain.Sdk;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;

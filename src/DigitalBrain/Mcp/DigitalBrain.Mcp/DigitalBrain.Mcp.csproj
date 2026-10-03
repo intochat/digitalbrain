@@ -3,6 +3,7 @@
     <RootNamespace>DigitalBrain.Mcp</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../Platform/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
     <ProjectReference Include="../../../Aspire/DigitalBrain.Aspire.Client/DigitalBrain.Aspire.Client.csproj" />
     <ProjectReference Include="../../../Modules/Time/DigitalBrain.Modules.Time.Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
     <ProjectReference Include="../../../Modules/DigitalBrain/Registry/DigitalBrain.Modules.Registry.Contracts/DigitalBrain.Modules.Registry.Contracts.csproj" />
@@ -12,5 +13,6 @@
     <ProjectReference Include="../../../Modules/AI/DigitalBrain.Modules.AI.Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../../../Modules/Postgres/DigitalBrain.Modules.Postgres.Contracts/DigitalBrain.Modules.Postgres.Contracts.csproj" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
+    <PackageReference Include="Aspire.Azure.Storage.Blobs" />
   </ItemGroup>
 </Project>

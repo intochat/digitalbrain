@@ -1,6 +1,6 @@
-using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.Supabase.Windows;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
@@ -38,6 +38,7 @@ public sealed class SupabaseModule : IModule<SupabaseModuleOptions>, IHttpModule
         services.TryAddSingleton(CreateDataSource);
         services.TryAddSingleton<ISupabaseProvider, SupabaseProvider>();
         services.AddLiveTables();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<DigitalBrain.Registry.IRegistryResourceProvider, SupabaseRegistryResources>());
         services.AddSingleton<IAgentToolFactory, LiveTableTools>();
         services.TryAddSingleton<ILiveTableSource>(services => services.GetRequiredService<ISupabaseProvider>());
         services.AddHealthChecks().AddCheck<SupabaseHealthCheck>("supabase", tags: ["ready"]);

@@ -1,11 +1,21 @@
 # Customer Researcher
 
-Live company research composed entirely from platform neurons: a driven browser (`IPlaywright`
-behind the window's `IWebBrowser`), a model, and a scoped Postgres table behind one surface. The
-app is two behaviors: the surface composes the window, and the research behavior owns the loop,
-Stop and the table. Research and Stop arrive ordered on the app's invocation stream; the surface
-buttons raise the same intents. Stop cancels an in-flight research in-process and takes effect at
-once; a research request replayed after a restart simply runs again and can be stopped again.
+Small signal-driven scenarios compose a researcher window, submit commands and verify company details against observed pages. UI buttons and assistant tools invoke the same operations. The installed app owns its Postgres table across behavior files and upgrades.
+
+### Show the researcher
+
+When the open operation arrives, compose the window and return its surface.
+
+### Submit UI commands
+
+When Research or Stop is clicked, invoke the corresponding app operation.
+
+### Research and store evidence
+
+When research is requested, run the bounded browser/model algorithm and save verified evidence. Stop cancels the current run; result reads the stored company.
+
+Production research uses the host's default LLM. Legacy Model settings do not pin a provider.
+Scratch scenario installs may supply scripted/<key> as Model to run deterministic checks.
 
 ## Scenario: Opening the researcher composes its surface
 

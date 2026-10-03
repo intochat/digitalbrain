@@ -1,8 +1,7 @@
+using DigitalBrain.Kernel.Enforcement;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-
-using DigitalBrain.Kernel.Enforcement;
 
 namespace DigitalBrain.Kernel.AspNetCore;
 

@@ -7,6 +7,7 @@ import 'scenario_list.dart';
 import 'spec_document.dart';
 import 'spec_vocabulary.dart';
 import 'registry_token_sheet.dart';
+import 'app_source_sheet.dart';
 
 class AppSpecView extends StatelessWidget {
   const AppSpecView({
@@ -21,6 +22,10 @@ class AppSpecView extends StatelessWidget {
     this.onEdit,
     this.onDuplicate,
     this.onDelete,
+    this.onEditScenario,
+    this.onDuplicateScenario,
+    this.onDeleteScenario,
+    this.onMoveScenario,
   });
   final String spec;
   final Map<String, dynamic>? run;
@@ -30,6 +35,18 @@ class AppSpecView extends StatelessWidget {
   final String? sourceRevision;
   final bool current;
   final ValueChanged<AppBehavior>? onEdit, onDuplicate, onDelete;
+  final ValueChanged<AppScenario>? onEditScenario,
+      onDuplicateScenario,
+      onDeleteScenario;
+  final void Function(AppScenario, int)? onMoveScenario;
+
+  List<String> sourcePaths(AppScenario scenario) => document == null
+      ? files.keys.toList()
+      : document!.behaviors
+            .where((b) => b.scenarioIds.contains(scenario.id))
+            .expand((b) => b.sourcePaths)
+            .toSet()
+            .toList();
 
   @override
   Widget build(BuildContext context) => Column(
@@ -41,9 +58,7 @@ class AppSpecView extends StatelessWidget {
     final parsed = document == null ? parseSpec(spec) : null;
     final all = document?.scenarios ?? parsed!.scenarios;
     final result = run == null ? null : VerificationRun.fromJson(run!);
-    final linked =
-        document?.behaviors.expand((b) => b.scenarioIds).toSet() ?? <String>{};
-    final unlinked = all.where((s) => !linked.contains(s.id)).toList();
+
     final preamble = document?.preamble ?? parsed!.preamble;
     return [
       if (!current && result != null)
@@ -70,33 +85,99 @@ class AppSpecView extends StatelessWidget {
             vocabulary: vocabulary,
           ),
         ),
-      if (document != null) ...[
-        for (final behavior in document!.behaviors)
-          BehaviorBlock(
-            key: ValueKey('behavior-${behavior.id}'),
-            behavior: behavior,
-            scenarios: all,
-            run: result,
-            current: current,
-            vocabulary: vocabulary,
-            files: files,
-            sourceRevision: sourceRevision,
-            onEdit: onEdit == null ? null : () => onEdit!(behavior),
-            onDuplicate: onDuplicate == null
-                ? null
-                : () => onDuplicate!(behavior),
-            onDelete: onDelete == null ? null : () => onDelete!(behavior),
+      for (final (index, scenario) in all.indexed)
+        Card(
+          key: ValueKey('scenario-block-${scenario.id}'),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ScenarioList(
+                  scenarios: [scenario],
+                  all: all,
+                  run: result,
+                  current: current,
+                  vocabulary: vocabulary,
+                ),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    if (sourcePaths(scenario).isNotEmpty)
+                      TextButton.icon(
+                        key: ValueKey('scenario-source-${scenario.id}'),
+                        onPressed: () => showAppSource(
+                          context,
+                          sourcePaths(scenario),
+                          files,
+                          sourceRevision,
+                        ),
+                        icon: const Icon(Icons.code),
+                        label: Text(
+                          document == null
+                              ? 'Package source'
+                              : 'View linked source',
+                        ),
+                      ),
+                    if (onEditScenario != null)
+                      TextButton(
+                        onPressed: () => onEditScenario!(scenario),
+                        child: const Text('Edit'),
+                      ),
+                    if (onDuplicateScenario != null)
+                      TextButton(
+                        onPressed: () => onDuplicateScenario!(scenario),
+                        child: const Text('Duplicate'),
+                      ),
+                    if (onDeleteScenario != null)
+                      TextButton(
+                        onPressed: () => onDeleteScenario!(scenario),
+                        child: const Text('Remove'),
+                      ),
+                    if (onMoveScenario != null) ...[
+                      IconButton(
+                        tooltip: 'Move scenario up',
+                        onPressed: index == 0
+                            ? null
+                            : () => onMoveScenario!(scenario, -1),
+                        icon: const Icon(Icons.arrow_upward),
+                      ),
+                      IconButton(
+                        tooltip: 'Move scenario down',
+                        onPressed: index == all.length - 1
+                            ? null
+                            : () => onMoveScenario!(scenario, 1),
+                        icon: const Icon(Icons.arrow_downward),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
           ),
-        if (unlinked.isNotEmpty)
-          Text('App scenarios', style: Theme.of(context).textTheme.titleMedium),
-      ],
-      for (final scenario in unlinked)
-        ScenarioList(
-          scenarios: [scenario],
-          all: all,
-          run: result,
-          current: current,
-          vocabulary: vocabulary,
+        ),
+      if (document != null && document!.behaviors.isNotEmpty)
+        ExpansionTile(
+          title: const Text('Behavior implementations'),
+          initiallyExpanded: all.isEmpty,
+          children: [
+            for (final behavior in document!.behaviors)
+              BehaviorBlock(
+                key: ValueKey('behavior-${behavior.id}'),
+                behavior: behavior,
+                scenarios: all,
+                run: result,
+                current: current,
+                vocabulary: vocabulary,
+                files: files,
+                sourceRevision: sourceRevision,
+                onEdit: onEdit == null ? null : () => onEdit!(behavior),
+                onDuplicate: onDuplicate == null
+                    ? null
+                    : () => onDuplicate!(behavior),
+                onDelete: onDelete == null ? null : () => onDelete!(behavior),
+              ),
+          ],
         ),
     ];
   }

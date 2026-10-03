@@ -1,5 +1,6 @@
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Microsoft.CSharp;
+using DigitalBrain.Registry;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit;
@@ -17,14 +18,18 @@ public sealed class CSharpCompositionFacts
         Assert.True(brain.SiloServices.GetRequiredService<CSharpToolService>().CanRun);
         Assert.NotNull(brain.SiloServices.GetRequiredService<CSharpCatalogStore>());
         var factories = brain.SiloServices.GetServices<IAgentToolFactory>().OfType<CSharpAgentTools>();
+        var capabilities = brain.SiloServices.GetServices<IRegistryResourceProvider>().OfType<CSharpRegistryResources>();
         if (authoring)
         {
             Assert.Single(factories);
+            var discovery = await Assert.Single(capabilities).Discover(TestContext.Current.CancellationToken);
+            Assert.Equal(CSharpAgentTools.Names.Order(StringComparer.Ordinal), Assert.Single(discovery.Capabilities).Tools.Order(StringComparer.Ordinal));
             Assert.NotNull(brain.SiloServices.GetRequiredService<CSharpSharing>());
         }
         else
         {
             Assert.Empty(factories);
+            Assert.Empty(capabilities);
             Assert.Null(brain.SiloServices.GetService<CSharpSharing>());
         }
     }

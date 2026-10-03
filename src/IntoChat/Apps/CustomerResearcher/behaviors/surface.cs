@@ -18,10 +18,7 @@ await using var brain = await DigitalBrainClient.ConnectAsync(args);
 var appKey = brain.Setting("App")!;
 var app = brain.Get<IApp>(appKey);
 
-await using var invocations = await brain.SubscribeAsync<AppInvoked>(app, brain.Stopping);
-foreach (var missed in await app.Pending())
-{ if (missed.Operation == "open") { await app.Respond(await OpenAsync(missed.Id)); } }
-await foreach (var invoked in invocations.ReadAllAsync(brain.Stopping))
+await foreach (var invoked in app.Invocations(brain, brain.Stopping))
 { if (invoked.Operation == "open") { await app.Respond(await OpenAsync(invoked.InvocationId)); } }
 return;
 

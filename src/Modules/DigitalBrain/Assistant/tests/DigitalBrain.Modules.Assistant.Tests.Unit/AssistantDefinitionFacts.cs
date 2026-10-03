@@ -5,9 +5,15 @@ namespace DigitalBrain.Modules.Assistant.Tests.Unit;
 public sealed class AssistantDefinitionFacts
 {
     [Fact]
+    public void DefaultDefinitionStartsWithDiscoveryInsteadOfSelectingInstalledTools()
+    {
+        var definition = AssistantDefinition.For();
+        Assert.Equal(["discover_capabilities", "select_capability", "show_form", "show_view"], definition.Tools);
+    }
+    [Fact]
     public void TheHostCanSupplyTheAssistantNameAndPackageGuidance()
     {
-        var definition = AssistantDefinition.For([], [], options: new AssistantOptions
+        var definition = AssistantDefinition.For(options: new AssistantOptions
         {
             DisplayName = "Example assistant",
             Instructions = "Look for results in the installed research package.",

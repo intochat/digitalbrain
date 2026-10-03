@@ -1,7 +1,7 @@
-using DigitalBrain.Platform.Identity.Authority;
-using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Contracts.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Platform.Contracts.Identity;
+using DigitalBrain.Platform.Identity.Authority;
 using DigitalBrain.Platform.Identity.Grants;
 using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;

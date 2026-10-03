@@ -1,18 +1,92 @@
-using DigitalBrain.Platform.Contracts.Integrations;
 using System.Text.Json;
 using DigitalBrain.Client;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Microsoft.CSharp;
-using Microsoft.Extensions.DependencyInjection;
+using DigitalBrain.Platform.Contracts.Integrations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime;
 using Xunit;
 
 namespace DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit;
 
 public sealed class ScriptEdgeFacts
 {
+    [Fact]
+    public async Task SameBrainScriptsCannotReplaceOrRestartAnotherAppsBoundBehavior()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await Brain(new FakeSandbox(), ct);
+        CallerContextStamper.Stamp(Alice);
+        await brain.AuthorizeCallerAsync();
+        var host = brain.Get<IAppBindingTestHost>("victim-app");
+        await host.Bind("predictable-behavior");
+        await host.Start("predictable-behavior");
+        var file = brain.Get<ICSharpFile>("predictable-behavior");
+        CallerContextStamper.Stamp(Alice with { Kind = CallerKind.App, StampedBy = TrustedEdge.AppProxy, AppId = "victim-app" });
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => file.Write("malicious source", ct));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => file.Configure(new Dictionary<string, string>(), ct));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => file.Start(ct));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => file.Stop(ct));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => file.Delete(ct));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => file.Arm(new("tests/trigger", "Signal"), ct));
+        Orleans.Runtime.RequestContext.Clear();
+    }
+
+    [Fact]
+    public async Task APreviousStandaloneTokenCannotSpeakForANewlyBoundSubscribedBehavior()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sandbox = new FakeSandbox();
+        await using var brain = await Brain(sandbox, ct);
+        var oldToken = await StartAsAlice(brain, sandbox, "reused-file", ct);
+        CallerContextStamper.Stamp(Alice);
+        await brain.AuthorizeCallerAsync();
+        await brain.Get<IAppBindingTestHost>("bound-app").Bind("reused-file");
+        Orleans.Runtime.RequestContext.Clear();
+        CallerContextStamper.Stamp(Alice);
+        await brain.AuthorizeCallerAsync();
+        await brain.Get<IAppBindingTestHost>("bound-app").Start("reused-file");
+        Orleans.Runtime.RequestContext.Clear();
+        var currentToken = sandbox.Requests.Last(FakeSandbox.IsStart).Body!["environment"]!["DigitalBrain__Token"]!.GetValue<string>();
+        var run = brain.SiloServices.GetRequiredService<RunTokens>().Validate(currentToken)!;
+        await brain.Get<ICSharpFileEdge>("reused-file").Subscribed(run.Run, brain.Get<IPinger>("pinger").GetGrainId().ToString(), nameof(Pinged));
+        var edge = brain.SiloServices.GetRequiredService<ScriptEdge>();
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => edge.InvokeAsync(oldToken, Call("Caller"), ct));
+        Assert.Equal("alice App AppProxy bound-app", (await edge.InvokeAsync(currentToken, Call("Caller"), ct))!.Value.GetString());
+    }
+
+    [Fact]
+    public async Task BehaviorsShareTheVerifiedAppIdentityWhileSettingsAndInheritedCallersCannotBindIt()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var sandbox = new FakeSandbox();
+        await using var brain = await Brain(sandbox, ct);
+        CallerContextStamper.Stamp(Alice);
+        await brain.AuthorizeCallerAsync();
+        var host = brain.Get<IAppBindingTestHost>("stable-app");
+        await host.Bind("behavior-one");
+        await host.Bind("behavior-two");
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => host.Bind("behavior-three", "someone-else"));
+        Orleans.Runtime.RequestContext.Clear();
+        var edge = brain.SiloServices.GetRequiredService<ScriptEdge>();
+        foreach (var file in new[] { "behavior-one", "behavior-two" })
+        {
+            CallerContextStamper.Stamp(Alice);
+            await brain.AuthorizeCallerAsync();
+            await host.Start(file);
+            Orleans.Runtime.RequestContext.Clear();
+            var token = sandbox.Requests.Last(FakeSandbox.IsStart).Body!["environment"]!["DigitalBrain__Token"]!.GetValue<string>();
+            Assert.Equal("alice App AppProxy stable-app", (await edge.InvokeAsync(token, Call("Caller"), ct))!.Value.GetString());
+        }
+        var standalone = brain.Get<ICSharpFile>("standalone");
+        await standalone.Configure(new Dictionary<string, string> { ["App"] = "someone-else" }, ct);
+        var standaloneToken = await StartAsAlice(brain, sandbox, "standalone", ct);
+        Assert.Equal("alice App AppProxy standalone", (await edge.InvokeAsync(standaloneToken, Call("Caller"), ct))!.Value.GetString());
+    }
+
     [Fact]
     public async Task CapacityRefusalTravelsThroughTheScriptHttpClientVerbatim()
     {
@@ -294,8 +368,10 @@ public sealed class ScriptEdgeFacts
     private static async Task<string> StartAsAlice(UnitBrain brain, FakeSandbox sandbox, string fileId, CancellationToken ct)
     {
         var file = brain.Get<ICSharpFile>(fileId);
-        await file.Write("Console.WriteLine(1);", ct);
         CallerContextStamper.Stamp(Alice);
+        await brain.AuthorizeCallerAsync();
+        await brain.AuthorizeCallerAsync();
+        await file.Write("Console.WriteLine(1);", ct);
         try { await file.Start(ct); }
         finally { Orleans.Runtime.RequestContext.Clear(); }
         return sandbox.Requests.Last(FakeSandbox.IsStart).Body!["environment"]!["DigitalBrain__Token"]!.GetValue<string>();

@@ -10,6 +10,33 @@ public sealed class AppVerificationFacts
     private static readonly PackageId Echo = PackageId.Parse("alice/echo");
 
     [Fact]
+    public async Task StructuredVerificationRequiresEveryScenarioAndBindsItsStableId()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartAsync(ct);
+        Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
+        var document = AppDocumentFacts.Document() with { Behaviors = [] };
+        document = document with { Scenarios = [document.Scenarios[0], new("22222222222222222222222222222222", "Opening the app", "When opened, show the UI.", false)] };
+        var content = new PackageContent(new("Echo", "", [new("ask", "Ask")], [], Runtime: "echo"), "",
+            new Dictionary<string, string>
+            {
+                [PackageContent.SpecPath] = AppDocumentCodec.ExportSpec(document),
+                [AppDocumentCodec.Path] = AppDocumentCodec.Encode(document),
+                [PackageContent.TestsPath] = "// partial coverage",
+            });
+        var revision = await brain.Get<IPackage>(Echo.ToString()).Commit(brain.Commit(null, content));
+        RecordingCSharpFile.ScriptedRuns[$"specs/{Echo}@{revision.Id}"] = (0, "dbtest:pass Research saves");
+
+        var verification = await brain.Get<IAppVerification>(IAppVerification.Key(new(Echo, revision.Id))).Verify();
+
+        Assert.False(verification.Green);
+        var missing = Assert.Single(verification.Run.Scenarios, s => !s.Passed);
+        Assert.Equal("Opening the app", missing.Name);
+        Assert.Contains("not report", missing.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task AConfigurationAppAnswersThroughItsRuntimeWithoutAScript()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -34,10 +61,12 @@ public sealed class AppVerificationFacts
         var package = brain.Get<IPackage>(Echo.ToString());
         RecordingCSharpFile.ScriptedRuns[$"specs/{Echo}@{revision.Id}"] = (0, "noise\ndbtest:pass It repeats what I say\nmore noise");
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => package.Publish(new(Guid.NewGuid(), revision.Id)));
         var verification = await brain.Get<IAppVerification>(IAppVerification.Key(new(Echo, revision.Id))).Verify();
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         var published = await package.Publish(new(Guid.NewGuid(), revision.Id));
 
         Assert.True(verification.Green);
@@ -62,6 +91,7 @@ public sealed class AppVerificationFacts
         Assert.Equal("It repeats", failed.Name);
         Assert.Contains("you said: hi", failed.Message, StringComparison.Ordinal);
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => brain.Get<IPackage>(Echo.ToString()).Publish(new(Guid.NewGuid(), revision.Id)));
     }
@@ -110,6 +140,7 @@ public sealed class AppVerificationFacts
     private static async Task<PackageRevision> Commit(PackageBrain brain, string? tests)
     {
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         var files = new Dictionary<string, string> { [PackageContent.SpecPath] = "## Scenario: It repeats what I say" };
         if (tests is not null) { files[PackageContent.TestsPath] = tests; }
         var content = new PackageContent(

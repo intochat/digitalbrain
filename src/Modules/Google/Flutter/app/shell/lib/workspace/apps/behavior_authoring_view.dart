@@ -143,7 +143,7 @@ class _BehaviorAuthoringViewState extends State<BehaviorAuthoringView> {
                     minLines: 3,
                     maxLines: 8,
                     decoration: const InputDecoration(
-                      labelText: 'What must be true?',
+                      labelText: 'When does it run and what should happen?',
                     ),
                   ),
                   CheckboxListTile(
@@ -261,7 +261,7 @@ class _BehaviorAuthoringViewState extends State<BehaviorAuthoringView> {
             padding: const EdgeInsets.all(24),
             children: [
               Text(
-                'Small behaviors that work together.',
+                'Small scenarios that work together.',
                 style: Theme.of(context).textTheme.bodyLarge,
               ),
               const SizedBox(height: 16),
@@ -316,6 +316,31 @@ class _BehaviorAuthoringViewState extends State<BehaviorAuthoringView> {
                 sourceRevision:
                     appMap(controller.view['filesRevision'])['revision']
                         as String?,
+                onEditScenario: busy ? null : editScenario,
+                onDuplicateScenario: busy
+                    ? null
+                    : (s) => perform(
+                        () => controller.save(
+                          doc.duplicateScenario(
+                            s,
+                            const Uuid().v4().replaceAll('-', ''),
+                          ),
+                        ),
+                      ),
+                onDeleteScenario: busy
+                    ? null
+                    : (s) => perform(
+                        () => controller.save(
+                          doc.withScenarios(
+                            doc.scenarios.where((x) => x.id != s.id).toList(),
+                          ),
+                        ),
+                      ),
+                onMoveScenario: busy
+                    ? null
+                    : (s, offset) => perform(
+                        () => controller.save(doc.moveScenario(s, offset)),
+                      ),
                 onEdit: busy ? null : (b) => edit(b),
                 onDelete: busy ? null : delete,
                 onDuplicate: busy

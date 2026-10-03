@@ -1,6 +1,6 @@
-using DigitalBrain.Sdk.Types;
 using System.Text.Json.Nodes;
 using DigitalBrain.Contracts.Types;
+using DigitalBrain.Sdk.Types;
 
 namespace DigitalBrain.Sdk.Tests.Unit;
 

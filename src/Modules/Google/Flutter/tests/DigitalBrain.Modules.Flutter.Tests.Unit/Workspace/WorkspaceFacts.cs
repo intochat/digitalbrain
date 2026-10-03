@@ -1,8 +1,8 @@
-using Microsoft.Extensions.DependencyInjection;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Surface;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Flutter.Workspace.Signals;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace DigitalBrain.Modules.Flutter.Tests.Unit.Workspace;

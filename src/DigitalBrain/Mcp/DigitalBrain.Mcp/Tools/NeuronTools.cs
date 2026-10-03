@@ -9,7 +9,7 @@ using Orleans;
 namespace DigitalBrain.Mcp;
 
 [McpServerToolType]
-internal sealed class NeuronTools(IDigitalBrain brain)
+internal sealed class NeuronTools(IDigitalBrain brain, McpCaller caller)
 {
     private static readonly NeuronContracts Contracts = new(NeuronContracts.Deployed());
     private static readonly HashSet<string> ObserverMethods = [nameof(INeuron.Watch), nameof(INeuron.Unwatch)];
@@ -17,15 +17,23 @@ internal sealed class NeuronTools(IDigitalBrain brain)
     private static readonly MethodInfo GetNeuron = typeof(IDigitalBrain).GetMethod(nameof(IDigitalBrain.Get))!;
 
     [McpServerTool(Name = "neurons_list"), Description("List neuron contracts this host can address. Pass the full type name to neurons_get and neurons_call.")]
-    public IReadOnlyList<string> List() => [.. Contracts.Names.Order(StringComparer.Ordinal)];
+    public IReadOnlyList<string> List()
+    {
+        caller.Stamp();
+        return [.. Contracts.Names.Order(StringComparer.Ordinal)];
+    }
 
     [McpServerTool(Name = "neurons_search"), Description("Search the brain's registry for neuron types by what they do. Returns each match's contract type name, methods and signals; the brain must compose RegistryModule.")]
     public async Task<IReadOnlyList<DigitalBrain.Registry.NeuronTypeHit>> Search(string query, CancellationToken cancellationToken = default)
-        => await brain.Get<DigitalBrain.Registry.IRegistry>(DigitalBrain.Registry.IRegistry.Key).Search(query, cancellationToken: cancellationToken);
+    {
+        caller.Stamp();
+        return await brain.Get<DigitalBrain.Registry.IRegistry>(DigitalBrain.Registry.IRegistry.Key).Search(query, cancellationToken: cancellationToken);
+    }
 
     [McpServerTool(Name = "neurons_get"), Description("Resolve a neuron. contract is a full type name from neurons_list, key is the grain key, for example a timer name.")]
     public string Get(string contract, string key)
     {
+        caller.Stamp();
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         return Neuron(contract, key).GetGrainId().ToString();
     }
@@ -33,6 +41,7 @@ internal sealed class NeuronTools(IDigitalBrain brain)
     [McpServerTool(Name = "neurons_call"), Description("Call a neuron method. arguments is a JSON array, one element per method argument, omitting CancellationToken. Watch and Unwatch are not callable.")]
     public async Task<JsonElement?> Call(string contract, string key, string method, string arguments = "[]", CancellationToken cancellationToken = default)
     {
+        caller.Stamp();
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
         ArgumentException.ThrowIfNullOrWhiteSpace(method);
         var type = Contracts.Find(contract);

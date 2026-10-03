@@ -1,7 +1,7 @@
+using System.Text.Json;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.AI.Scripted;
-using System.Text.Json;
 using Xunit;
 
 namespace DigitalBrain.Modules.AI.Tests.Unit;

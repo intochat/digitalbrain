@@ -1,10 +1,10 @@
-using static DigitalBrain.Testing.E2E.Diagnostics.TraceAssertions;
 using System.Net.Http.Json;
 using Aspire.Hosting;
 using Aspire.Hosting.Testing;
 using DigitalBrain.AI;
 using DigitalBrain.Testing.E2E.Agent;
 using Npgsql;
+using static DigitalBrain.Testing.E2E.Diagnostics.TraceAssertions;
 
 namespace DigitalBrain.Kernel.Tests.E2E;
 

@@ -1,10 +1,10 @@
-using DigitalBrain.Contracts.Edge.V1;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using DigitalBrain.Client;
 using DigitalBrain;
+using DigitalBrain.Client;
 using DigitalBrain.Contracts;
+using DigitalBrain.Contracts.Edge.V1;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Enforcement;
@@ -21,8 +21,14 @@ internal sealed partial class CSharpFileNeuron(
     ICSharpRunner runner,
     ScriptRunEnvironment environment,
     IReminderRegistry reminders)
-    : Neuron<CSharpFileState>(store), ICSharpFile, ICSharpFileTrigger, ICSharpFileEdge, IRemindable, INeuronObserver
+    : Neuron<CSharpFileState>(store), ICSharpFile, ICSharpAppBinding, ICSharpFileTrigger, ICSharpFileEdge, IRemindable, INeuronObserver
 {
+    public override NeuronAccess Access(string operation) => Snapshot.AppBrain is { } appScope ? new(appScope)
+        : Snapshot.OwnerContext is { } owner ? new(BrainScope.Create(owner.AccountId, owner.BrainId).Id)
+        : base.Access(operation) is { Scope: not null } scoped ? scoped
+        : operation == nameof(Write) && Snapshot.Source.Length == 0
+            ? new(BrainScope.CurrentId()) : NeuronAccess.Unclassified;
+
     internal const int MaximumSourceBytes = 128 * 1024;
     internal const int MaximumFailures = 5;
     internal const int MaximumPending = 64;
@@ -34,6 +40,27 @@ internal sealed partial class CSharpFileNeuron(
     private IGrainTimer? _watchRenewal;
     private string FileId => this.GetPrimaryKeyString();
     private bool IsArmed => Snapshot is { ShouldRun: true, Trigger: not null };
+
+    internal void RequireBoundAccess(GrainId? source, string method)
+    {
+        if (Snapshot.AppId is not { } app) { return; }
+        if (Snapshot.AppBrain != BrainScope.CurrentId())
+        { throw new UnauthorizedAccessException("This behavior belongs to another brain."); }
+        if (method is nameof(Write) or nameof(Configure) or nameof(Start) or nameof(Arm) or nameof(Stop) or nameof(Delete)
+            && (source?.Type.ToString() != "apps.app" || source?.Key.ToString() != app))
+        { throw new UnauthorizedAccessException("Only the owning Apps grain may change a bound behavior."); }
+    }
+
+    public async Task BindApp(string appId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(appId);
+        var brain = BrainScope.CurrentId();
+        if (Snapshot.AppId is not null && (Snapshot.AppId != appId || Snapshot.AppBrain != brain))
+        { throw new UnauthorizedAccessException("The behavior is already bound to another app."); }
+        if (Snapshot.AppId is not null) { return; }
+        await StopCurrentRunAsync(CancellationToken.None);
+        await Save(Snapshot with { AppId = appId, AppBrain = brain, ShouldRun = false, RunId = "", Subscriptions = [] }, new CSharpFileChanged(FileId));
+    }
 
     public override async Task OnActivateAsync(CancellationToken cancellationToken)
     {
@@ -50,7 +77,8 @@ internal sealed partial class CSharpFileNeuron(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
         if (Encoding.UTF8.GetByteCount(source) > MaximumSourceBytes) { throw new ArgumentException($"Source exceeds {MaximumSourceBytes} bytes.", nameof(source)); }
-        return Save(Snapshot with { Source = source }, new CSharpFileChanged(FileId));
+        var owner = CallerContextStamper.TryGet(out var caller) ? caller : Snapshot.OwnerContext;
+        return Save(Snapshot with { Source = source, OwnerContext = Snapshot.OwnerContext ?? owner }, new CSharpFileChanged(FileId));
     }
 
     public Task Configure(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)
@@ -265,6 +293,9 @@ internal sealed partial class CSharpFileNeuron(
     private async Task<string> StartRunAsync(CSharpFileState next, Signal? trigger, CancellationToken cancellationToken)
     {
         var runId = Guid.NewGuid().ToString("N");
+        // Bound behaviors authorize only their current run. Record it before launching because
+        // the sandbox can reach the edge before StartAsync returns.
+        if (next.AppId is not null) { await Save(next with { RunId = runId }, new CSharpFileChanged(FileId)); }
         await runner.StartAsync(new CSharpRun(next.Owner, runId, next.Source, environment.Create(FileId, runId, next.Settings, trigger)), cancellationToken);
         await Save(next with { RunId = runId }, new CSharpFileChanged(FileId));
         return runId;
@@ -312,8 +343,10 @@ internal sealed partial class CSharpFileNeuron(
     public Task<RunAuthorization> Authorize(string runId)
         => Task.FromResult(new RunAuthorization(
             runId.Length > 0 && Snapshot.ShouldRun
-                && (runId == Snapshot.RunId || Snapshot.Trigger is not null || Snapshot.Subscriptions.Length > 0),
-            Snapshot.OwnerContext));
+                && (runId == Snapshot.RunId || (Snapshot.AppId is null && (Snapshot.Trigger is not null || Snapshot.Subscriptions.Length > 0))),
+            Snapshot.OwnerContext is { } owner
+                ? owner with { AppId = Snapshot.AppId is { } app && Snapshot.AppBrain == BrainScope.Create(owner.AccountId, owner.BrainId).Id ? app : FileId }
+                : null));
 
     private Task StopCurrentRunAsync(CancellationToken cancellationToken)
         => Snapshot.RunId.Length > 0 ? runner.StopAsync(Snapshot.Owner, Snapshot.RunId, cancellationToken) : Task.CompletedTask;
@@ -328,6 +361,8 @@ internal sealed partial class CSharpFileNeuron(
 
     private void RequireSource()
     {
+        if (Snapshot.AppId is not null && Snapshot.AppBrain != BrainScope.CurrentId())
+        { throw new UnauthorizedAccessException("This behavior belongs to another brain."); }
         if (string.IsNullOrWhiteSpace(Snapshot.Source)) { throw new InvalidOperationException("Write the C# source before starting it."); }
     }
 

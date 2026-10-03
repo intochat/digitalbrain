@@ -1,7 +1,7 @@
-using DigitalBrain.Kernel;
 using System.Runtime.CompilerServices;
 using DigitalBrain;
 using DigitalBrain.Contracts;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.AI.Metering;

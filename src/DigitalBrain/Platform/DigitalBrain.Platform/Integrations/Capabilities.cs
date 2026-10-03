@@ -1,7 +1,7 @@
-using DigitalBrain.Kernel.AspNetCore;
-using DigitalBrain.Platform.Contracts.Integrations;
 using DigitalBrain.Contracts.Enforcement;
+using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.Kernel.Enforcement;
+using DigitalBrain.Platform.Contracts.Integrations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;

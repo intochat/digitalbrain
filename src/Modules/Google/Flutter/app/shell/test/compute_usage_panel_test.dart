@@ -35,6 +35,34 @@ Map<String, dynamic> usage(String id) => {
 };
 
 void main() {
+  testWidgets('failed tool details retain the reason and code', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ComputeUsageDetails(
+            item: ComputeUsageItem.fromJson({
+              ...usage('failed'),
+              'calls': [
+                {
+                  'operation': 'research',
+                  'succeeded': false,
+                  'errorCode': 'tool_unavailable',
+                  'errorMessage': 'Select this capability first.',
+                },
+              ],
+            }),
+          ),
+        ),
+      ),
+    );
+    expect(find.textContaining('research · Failed'), findsOneWidget);
+    expect(
+      find.textContaining('Select this capability first.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('tool_unavailable'), findsOneWidget);
+  });
+
   test('mixed usage shows charges and estimates as separate labels', () {
     expect(
       usageAmountLabel(

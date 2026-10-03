@@ -1,6 +1,6 @@
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Enforcement;
 using Orleans;
 using Orleans.Runtime;
 
@@ -9,6 +9,11 @@ namespace DigitalBrain.Compute.Usage;
 [GrainType("compute.usage")]
 internal sealed class ComputeUsageNeuron(IUsageStore store) : Neuron, IComputeUsage
 {
+    public override NeuronAccess Access(string operation)
+    {
+        RequireScope(BrainScope.CurrentId());
+        return new(BrainScope.CurrentId());
+    }
     public async Task Append(string workspace, string id, string payload, DateTimeOffset revision, CancellationToken ct = default)
     {
         RequireScope(workspace);

@@ -1,6 +1,6 @@
-using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.AspNetCore;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -15,6 +15,7 @@ public sealed class AssistantModule : IModule, IHttpModule
     {
         ArgumentNullException.ThrowIfNull(silo);
         silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IAgentToolFactory, WorkspaceFormTools>());
+        silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IAgentToolFactory, RegistryDiscoveryTools>());
         silo.Services.AddOptions<AssistantOptions>().BindConfiguration("Assistant");
     }
 

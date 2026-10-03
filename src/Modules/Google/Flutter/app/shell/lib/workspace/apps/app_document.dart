@@ -31,6 +31,57 @@ class AppDocument {
     'behaviors': behaviors.map((b) => b.toJson()).toList(),
     'scenarios': scenarios.map((s) => s.toJson()).toList(),
   };
+  AppDocument withScenarios(List<AppScenario> values) => AppDocument(
+    preamble: preamble,
+    behaviors: behaviors
+        .map(
+          (b) => b.edit(
+            b.title,
+            b.description,
+            b.scenarioIds.where((id) => values.any((s) => s.id == id)).toList(),
+          ),
+        )
+        .toList(),
+    scenarios: values,
+  );
+  AppDocument duplicateScenario(AppScenario original, String newId) {
+    final names = scenarios.map((s) => s.name).toSet();
+    final baseName = '${original.name} copy';
+    var name = baseName;
+    var suffix = 2;
+    while (names.contains(name)) {
+      name = '$baseName ${suffix++}';
+    }
+    return AppDocument(
+      preamble: preamble,
+      behaviors: behaviors
+          .map(
+            (b) => b.scenarioIds.contains(original.id)
+                ? b.edit(b.title, b.description, [...b.scenarioIds, newId])
+                : b,
+          )
+          .toList(),
+      scenarios: [
+        ...scenarios,
+        AppScenario(
+          id: newId,
+          name: name,
+          body: original.body,
+          isLive: original.isLive,
+        ),
+      ],
+    );
+  }
+
+  AppDocument moveScenario(AppScenario scenario, int offset) {
+    final values = [...scenarios];
+    final index = values.indexWhere((s) => s.id == scenario.id);
+    final target = index + offset;
+    if (index < 0 || target < 0 || target >= values.length) return this;
+    values.insert(target, values.removeAt(index));
+    return withScenarios(values);
+  }
+
   AppDocument withBehaviors(List<AppBehavior> values) =>
       AppDocument(preamble: preamble, behaviors: values, scenarios: scenarios);
 }

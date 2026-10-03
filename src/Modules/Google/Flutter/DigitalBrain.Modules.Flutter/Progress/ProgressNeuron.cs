@@ -1,9 +1,9 @@
 using System.Text.RegularExpressions;
 using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Kernel;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Progress.Signals;
+using DigitalBrain.Kernel;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 

@@ -1,5 +1,5 @@
-using DigitalBrain.Compute;
 using DigitalBrain;
+using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
 
 namespace DigitalBrain.AI.Metering;

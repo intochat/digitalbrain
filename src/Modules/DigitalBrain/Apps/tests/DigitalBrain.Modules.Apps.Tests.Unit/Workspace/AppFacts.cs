@@ -49,6 +49,7 @@ public sealed class AppFacts
     {
         await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         var package = brain.Get<IPackage>(Researcher.ToString());
         var content = PackageSamples.Researcher("Research");
         var withAccount = content with
@@ -82,6 +83,7 @@ public sealed class AppFacts
     {
         await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         var package = brain.Get<IPackage>(Researcher.ToString());
         var source = PackageSamples.Researcher("Research");
         var first = await package.Commit(brain.Commit(null, source with
@@ -224,8 +226,9 @@ public sealed class AppFacts
         Assert.Equal("bullets", upgraded.Settings["style"]);
         Assert.Equal(second.Content.Source, File(upgraded).Source);
         Caller.As("bob");
+        await brain.AuthorizeCallerAsync();
         await brain.Get<IPackage>("bob/researcher").Fork(new(Guid.NewGuid(), new(Researcher, second.Id)));
-        await Assert.ThrowsAsync<ArgumentException>(() => app.Upgrade(new(Guid.NewGuid(), new(PackageId.Parse("bob/researcher"), second.Id))));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => app.Upgrade(new(Guid.NewGuid(), new(PackageId.Parse("bob/researcher"), second.Id))));
     }
 
     [Fact]
@@ -283,6 +286,7 @@ public sealed class AppFacts
     {
         await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         var package = brain.Get<IPackage>("alice/tracker");
         var revision = await package.Commit(brain.Commit(null, PackageSamples.Tracker(), "Two behaviors"));
         await package.Publish(new(Guid.NewGuid(), revision.Id));
@@ -296,6 +300,7 @@ public sealed class AppFacts
         {
             Assert.Equal(CSharpFileStatus.Running, file.Status);
             Assert.Equal(key, file.Settings["App"]);
+            Assert.Equal(key, RecordingCSharpFile.AppBindings[file.Id]);
         }
         var sources = installed.CSharpFiles.Select(id => RecordingCSharpFile.Files[id].Source).Order().ToArray();
         Assert.Equal(["// renders the report", "// watches the feed"], sources);
@@ -306,6 +311,7 @@ public sealed class AppFacts
     {
         await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         var package = brain.Get<IPackage>("alice/tracker");
         var content = PackageSamples.Tracker();
 
@@ -321,6 +327,7 @@ public sealed class AppFacts
     {
         await using var brain = await PackageBrain.StartAsync(TestContext.Current.CancellationToken);
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         var package = brain.Get<IPackage>("alice/tracker");
         var revision = await package.Commit(brain.Commit(null, PackageSamples.Tracker(), "Two behaviors"));
         await package.Publish(new(Guid.NewGuid(), revision.Id));
@@ -337,6 +344,7 @@ public sealed class AppFacts
     private static async Task<PackageRevision> Publish(PackageBrain brain, string verb)
     {
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         var package = brain.Get<IPackage>(Researcher.ToString());
         var revision = await package.Commit(brain.Commit((await package.Read()).Head, PackageSamples.Researcher(verb), verb));
         await package.Publish(new(Guid.NewGuid(), revision.Id));

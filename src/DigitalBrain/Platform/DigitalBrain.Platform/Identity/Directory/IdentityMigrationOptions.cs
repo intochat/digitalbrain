@@ -1,8 +1,8 @@
 using DigitalBrain.Platform.Contracts.Identity;
-using Orleans;
 using DigitalBrain.Platform.Identity.Authority;
 using DigitalBrain.Platform.Identity.Configuration;
 using Microsoft.Extensions.Options;
+using Orleans;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Platform.Identity.Directory;

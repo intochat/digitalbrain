@@ -1,8 +1,8 @@
-using DigitalBrain.Contracts;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Orleans;
+using DigitalBrain.Contracts;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Aspire.Hosting;
@@ -41,6 +41,12 @@ public sealed class DigitalBrainBuilder
 
     private readonly Dictionary<string, string?> _settings = new(StringComparer.OrdinalIgnoreCase);
     internal IReadOnlyDictionary<string, string?> Settings => _settings;
+    internal HttpIdentity? Identity { get; private set; }
+    public DigitalBrainBuilder WithHttpIdentity(HttpIdentity identity)
+    {
+        Identity = identity;
+        return this;
+    }
     public DigitalBrainBuilder WithModule<THosting>() where THosting : IDigitalBrainModuleHosting, new()
     { var hosting = new THosting(); return WithModule(hosting.Id, hosting); }
     public DigitalBrainBuilder WithModule<THosting, TOptions>(Action<TOptions>? configure = null)
@@ -141,7 +147,7 @@ public sealed class DigitalBrainBuilder
         }
     }
 
-    public DigitalBrainClientReference AsClient() => new(this);
+    public DigitalBrainClientReference AsClient(bool shareHttpIdentity = false) => new(this, shareHttpIdentity);
 
     internal bool HasResource(string name)
         => ApplicationBuilder.Resources.Any(resource =>

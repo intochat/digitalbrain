@@ -1,7 +1,7 @@
-using DigitalBrain.Kernel.AspNetCore;
 using Azure.Core;
 using Azure.Identity;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.AspNetCore;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +17,7 @@ public sealed class CSharpModule : IModule<CSharpOptions>, IHttpModule
     public void Configure(ISiloBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
+        builder.AddIncomingGrainCallFilter<CSharpAppBindingGuard>();
         builder.Services.AddOptions<CSharpOptions>()
             .Configure<IConfiguration>((options, configuration) => configuration.PopulateModuleOptions("csharp", options))
             .PostConfigure(options =>

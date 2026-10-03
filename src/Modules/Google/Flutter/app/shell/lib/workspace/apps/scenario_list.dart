@@ -57,7 +57,7 @@ class ScenarioList extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: SelectableText(
-                    run!.verdict(scenario.name)!.message,
+                    run!.verdictFor(scenario)!.message,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onErrorContainer,
                     ),

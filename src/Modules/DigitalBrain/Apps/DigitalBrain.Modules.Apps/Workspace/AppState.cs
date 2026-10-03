@@ -23,6 +23,8 @@ public sealed record AppState
     [Id(17)] public bool PostgresScopes { get; init; }
     [Id(18)] public AbandonAppStorage? PendingAbandonStorage { get; init; }
     [Id(19)] public AbandonedAppStorage[] AbandonedStorage { get; init; } = [];
+    [Id(20)] public string? BrainScopeId { get; init; }
+    [Id(21)] public string? InstallerAppId { get; init; }
     public bool RunsScript => Runtime == PackageManifest.CSharpRuntime;
 }
 

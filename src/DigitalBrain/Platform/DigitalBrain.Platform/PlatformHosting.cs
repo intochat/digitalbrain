@@ -1,15 +1,15 @@
-using DigitalBrain.Platform.Contracts.Integrations.Accounts;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Enforcement;
+using DigitalBrain.Platform.Capacity;
+using DigitalBrain.Platform.Contracts.Identity;
+using DigitalBrain.Platform.Contracts.Integrations;
+using DigitalBrain.Platform.Contracts.Integrations.Accounts;
 using DigitalBrain.Platform.Identity;
 using DigitalBrain.Platform.Identity.Directory;
 using DigitalBrain.Platform.Identity.Grants;
-using DigitalBrain.Platform.Capacity;
 using DigitalBrain.Platform.Integrations;
 using DigitalBrain.Platform.Integrations.Accounts;
 using DigitalBrain.Platform.Secrets;
-using DigitalBrain.Platform.Contracts.Identity;
-using DigitalBrain.Platform.Contracts.Integrations;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -40,14 +40,6 @@ public static class PlatformHosting
         silo.AddStartupTask<RegistrationSeeder>();
         services.AddCapacity();
         services.TryAddSingleton<IGrantPolicySource, GrainGrantPolicySource>();
-        services.TryAddSingleton<IBrainAccess>(provider =>
-        {
-            var directory = new DirectoryBrainAccess(provider.GetRequiredService<Orleans.IGrainFactory>());
-            return provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Identity.Configuration.AuthOptions>>()
-                .Value.Posture == Identity.Configuration.IdentityPosture.Open
-                    ? new OpenOwnerBrainAccess(directory)
-                    : directory;
-        });
         services.TryAddSingleton<IIdentity, PlatformIdentity>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<ICallFilterStage, GrantCallFilterStage>());
     }

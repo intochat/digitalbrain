@@ -1,5 +1,3 @@
-using DigitalBrain.Sdk.Types;
-using DigitalBrain.Platform.Contracts.Integrations;
 using System.Security.Claims;
 using System.Text.Json;
 using DigitalBrain;
@@ -7,9 +5,11 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Contracts.Types;
 using DigitalBrain.Kernel;
-using DigitalBrain.Platform.Integrations;
+using DigitalBrain.Platform.Contracts.Integrations;
 using DigitalBrain.Platform.Contracts.Secrets;
+using DigitalBrain.Platform.Integrations;
 using DigitalBrain.Platform.Secrets;
+using DigitalBrain.Sdk.Types;
 using DigitalBrain.Testing;
 using DigitalBrain.Testing.Unit;
 using Microsoft.AspNetCore.Builder;

@@ -1,5 +1,5 @@
-using DigitalBrain.Platform.Contracts.Auth;
 using DigitalBrain.Kernel.Enforcement;
+using DigitalBrain.Platform.Contracts.Auth;
 using DigitalBrain.Sdk;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.AspNetCore.Http;

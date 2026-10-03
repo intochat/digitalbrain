@@ -1,7 +1,7 @@
-using DigitalBrain.Kernel;
-using DigitalBrain.Compute;
 using DigitalBrain;
+using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
+using DigitalBrain.Kernel;
 using Orleans;
 
 namespace DigitalBrain.AI.Metering;

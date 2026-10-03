@@ -141,6 +141,13 @@ public static partial class AIHostingExtensions
                     enableMarkdown: true);
             }
 
+            if (provider is AiProvider.OpenRouter)
+            {
+                apiKey.WithDescription(
+                    "Create an API key at [openrouter.ai/settings/keys](https://openrouter.ai/settings/keys).",
+                    enableMarkdown: true);
+            }
+
             _providerApiKeys[provider] = apiKey.WithParentRelationship(module);
         }
 

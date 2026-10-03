@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
-using DigitalBrain.AI.Scripted;
 using DigitalBrain;
+using DigitalBrain.AI.Scripted;
 using DigitalBrain.Contracts;
 using DigitalBrain.Kernel;
 using Orleans.Runtime;

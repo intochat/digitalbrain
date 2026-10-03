@@ -1,9 +1,9 @@
-using DigitalBrain.Kernel;
-using DigitalBrain.Assistant;
-using DigitalBrain.AI.Metering;
-using DigitalBrain.Compute;
 using DigitalBrain;
+using DigitalBrain.AI.Metering;
+using DigitalBrain.Assistant;
+using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
+using DigitalBrain.Kernel;
 using Xunit;
 
 namespace DigitalBrain.Modules.Assistant.Tests.Unit;

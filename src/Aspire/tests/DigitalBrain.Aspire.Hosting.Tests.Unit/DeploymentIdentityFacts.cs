@@ -10,6 +10,43 @@ namespace DigitalBrain.Aspire.Hosting.Tests.Unit;
 public sealed class DeploymentIdentityFacts
 {
     [Fact]
+    public async Task RuntimeAndHttpClientReceiveTheSameOverriddenSessionIdentity()
+    {
+        var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions { Args = [], DisableDashboard = true });
+        builder.Configuration["DigitalBrain:Identity:CookieName"] = "custom.session";
+        var brain = builder.AddDigitalBrain("memory", options: new() { UseAzureStorage = true })
+            .WithHttpIdentity(new("intochat.session", "IntoChat.v1", "intochat-protection-v1"));
+        var server = builder.AddExecutable("server", "unused", ".").WithReference(brain);
+        var client = builder.AddExecutable("mcp", "unused", ".").WithReference(brain.AsClient(shareHttpIdentity: true));
+        foreach (var resource in new[] { server.Resource, client.Resource })
+        {
+            var values = new Dictionary<string, object>();
+            var context = new EnvironmentCallbackContext(builder.ExecutionContext, resource, values, TestContext.Current.CancellationToken);
+            foreach (var annotation in resource.Annotations.OfType<EnvironmentCallbackAnnotation>()) { await annotation.Callback(context); }
+            Assert.Equal("custom.session", values["DigitalBrain__Identity__CookieName"]);
+            Assert.Equal("IntoChat.v1", values["DigitalBrain__Identity__ProtectionApplicationName"]);
+            Assert.Equal("intochat-protection-v1", values["DigitalBrain__Identity__ProtectionContainerName"]);
+            Assert.Contains("ConnectionStrings__" + DigitalBrainNames.GrainState, values.Keys);
+        }
+    }
+
+    [Theory]
+    [InlineData(null, "Open")]
+    [InlineData("Secured", "Secured")]
+    public async Task ClientsReceiveTheDeclaredAuthPosture(string? configured, string expected)
+    {
+        var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions { Args = [], DisableDashboard = true });
+        if (configured is not null) { builder.Configuration["DigitalBrain:Auth:Posture"] = configured; }
+        var brain = builder.AddDigitalBrain("memory");
+        var client = builder.AddExecutable("client", "unused", ".").WithReference(brain.AsClient());
+        var values = new Dictionary<string, object>();
+        var context = new EnvironmentCallbackContext(builder.ExecutionContext, client.Resource, values, TestContext.Current.CancellationToken);
+        foreach (var annotation in client.Resource.Annotations.OfType<EnvironmentCallbackAnnotation>())
+        { await annotation.Callback(context); }
+        Assert.Equal(expected, values["DigitalBrain__Auth__Posture"]);
+    }
+
+    [Fact]
     public void BlobContainerIdentityDoesNotInheritTheAspireResourcePrefix()
     {
         var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions { Args = [], DisableDashboard = true });

@@ -1,16 +1,18 @@
-using DigitalBrain.Client.Orleans;
 using DigitalBrain.Aspire.Client;
+using DigitalBrain.Client.Orleans;
 using DigitalBrain.Mcp;
-using ModelContextProtocol.AspNetCore;
+using DigitalBrain.Platform.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddDigitalBrainClient(useAzureClustering: true);
-builder.Services
-    .AddMcpServer()
-    .WithHttpTransport()
-    .WithTools<NeuronTools>();
+builder.AddKeyedAzureBlobServiceClient(DigitalBrain.Contracts.DigitalBrainNames.GrainState);
+builder.Services.AddCookieProtection();
+builder.Services.AddDigitalBrainMcp();
 
 var app = builder.Build();
+app.UseRouting();
+app.UseAuthentication();
+app.UseAccountSession();
 app.MapDefaultEndpoints();
-app.MapMcp("/mcp");
+app.MapDigitalBrainMcp();
 app.Run();

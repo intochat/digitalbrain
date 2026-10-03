@@ -1,6 +1,6 @@
-using DigitalBrain.Assistant;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Media;
+using DigitalBrain.Assistant;
 using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;

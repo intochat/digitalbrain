@@ -1,6 +1,6 @@
-using DigitalBrain.Contracts.Signals;
 using DigitalBrain;
 using DigitalBrain.Contracts;
+using DigitalBrain.Contracts.Signals;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;

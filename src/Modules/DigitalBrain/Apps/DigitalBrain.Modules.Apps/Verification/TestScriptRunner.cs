@@ -1,3 +1,4 @@
+using System.Text.Json;
 using DigitalBrain.Microsoft.CSharp;
 
 namespace DigitalBrain.Apps;
@@ -25,11 +26,14 @@ internal sealed class CSharpFileTestRunner(IGrainFactory grains, TimeProvider cl
         try
         {
             await file.Write(tests, cancellationToken);
-            await file.Configure(new Dictionary<string, string>
+            var settings = new Dictionary<string, string>
             {
                 ["Package"] = revision.Package.ToString(),
                 ["Revision"] = revision.Revision,
-            }, cancellationToken);
+            };
+            if (DigitalBrain.Kernel.Enforcement.CallerContextStamper.TryGet(out _))
+            { settings["BrainScope"] = DigitalBrain.Kernel.Enforcement.BrainScope.CurrentId(); }
+            await file.Configure(settings, cancellationToken);
             var snapshot = await file.Start(cancellationToken);
             var deadline = clock.GetUtcNow() + RunDeadline;
             while (snapshot.ExitCode is null && snapshot.Status is CSharpFileStatus.Running or CSharpFileStatus.Restarting)
@@ -53,7 +57,19 @@ internal sealed class CSharpFileTestRunner(IGrainFactory grains, TimeProvider cl
         foreach (var raw in logs.Split('\n'))
         {
             var line = raw.Trim();
-            if (line.StartsWith(PassLine, StringComparison.Ordinal))
+            if (line.StartsWith("dbtest:json ", StringComparison.Ordinal))
+            {
+                try
+                {
+                    var verdict = JsonSerializer.Deserialize<AppScenarioVerdict>(line[12..], new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                    if (verdict is null || string.IsNullOrWhiteSpace(verdict.Name) || string.IsNullOrWhiteSpace(verdict.ScenarioId))
+                    { throw new JsonException("A scenario report needs its ID and name."); }
+                    verdicts.Add(verdict);
+                }
+                catch (JsonException)
+                { verdicts.Add(new("Invalid scenario report", false, "The tests emitted an invalid JSON scenario report.")); }
+            }
+            else if (line.StartsWith(PassLine, StringComparison.Ordinal))
             {
                 verdicts.Add(new(line[PassLine.Length..].Trim(), true, ""));
             }

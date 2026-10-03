@@ -1,10 +1,10 @@
-using DigitalBrain.Apps;
 using DigitalBrain;
+using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Modules.Apps.Tests.Unit;
 

@@ -1,6 +1,6 @@
 using System.Text.Json;
-using Microsoft.Extensions.Configuration;
 using DigitalBrain.Contracts;
+using Microsoft.Extensions.Configuration;
 namespace DigitalBrain.Aspire.Hosting;
 
 public static class HostingModuleOptions

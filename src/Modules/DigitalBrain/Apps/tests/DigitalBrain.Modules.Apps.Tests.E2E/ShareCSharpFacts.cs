@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using DigitalBrain.Contracts.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Microsoft.CSharp;
 
 namespace DigitalBrain.Modules.Apps.Tests.E2E;
@@ -64,14 +65,27 @@ public sealed class ShareCSharpFacts(ReferenceBrainFixture host)
             new { accounts = new { twitter = "bob-twitter" } }, ct);
         Assert.Equal("bob-twitter", installed.GetProperty("app").GetProperty("accounts").GetProperty("twitter").GetString());
         var file = brain.Get<ICSharpFile>(installed.GetProperty("app").GetProperty("csharpFiles")[0].GetString()!);
-        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeout.CancelAfter(TimeSpan.FromMinutes(3));
-        string logs;
-        while (!(logs = await file.ReadLogs(200, timeout.Token)).Contains("GREETING:none ACCOUNT:bob-twitter", StringComparison.Ordinal))
+        // Direct test-client reads carry the same identity as Bob's authenticated requests.
+        CallerContextStamper.Stamp(new CallerContext
         {
-            Assert.True((await file.Read(timeout.Token)).Status != CSharpFileStatus.Exited, logs);
-            await Task.Delay(500, timeout.Token);
+            PrincipalId = bobName,
+            AccountId = bob.Account,
+            BrainId = bob.Workspace,
+            Kind = CallerKind.User,
+            StampedBy = TrustedEdge.AuthenticatedHttp,
+        });
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(TimeSpan.FromMinutes(3));
+            string logs;
+            while (!(logs = await file.ReadLogs(200, timeout.Token)).Contains("GREETING:none ACCOUNT:bob-twitter", StringComparison.Ordinal))
+            {
+                Assert.True((await file.Read(timeout.Token)).Status != CSharpFileStatus.Exited, logs);
+                await Task.Delay(500, timeout.Token);
+            }
         }
+        finally { Caller.Clear(); }
         await People.Send(bob.Client, HttpMethod.Delete, $"/brains/{bob.Workspace}/packages/{aliceName}/greeter", null, ct);
     }
 

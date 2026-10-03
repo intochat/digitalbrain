@@ -1,8 +1,8 @@
-using DigitalBrain.Platform.Identity.Configuration;
 using System.Security.Cryptography;
 using System.Text;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
+using DigitalBrain.Platform.Identity.Configuration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -60,6 +60,9 @@ public static class AccountSession
 
     // A cookie session wins; otherwise the configured Basic bootstrap credential; otherwise only
     // the declared Open posture lets the request act as the synthetic owner — Secured answers 401.
+    public static CallerContext? ResolveCaller(HttpContext context, AuthOptions options)
+        => ResolvePrincipal(context, options.Posture, BasicCredential.FromOptions(options));
+
     private static CallerContext? ResolvePrincipal(HttpContext context, IdentityPosture? posture, BasicCredential? credential)
     {
         if (context.User.Identity?.IsAuthenticated == true)

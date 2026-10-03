@@ -1,5 +1,5 @@
-using DigitalBrain.Apps.Signals;
 using DigitalBrain;
+using DigitalBrain.Apps.Signals;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel;
@@ -14,6 +14,9 @@ internal sealed class PackageNeuron(
     TimeProvider clock)
     : Neuron<PackageState>(store), IPackage
 {
+    // Mutations retain their operation-specific owner/proposal checks below.
+    public override NeuronAccess Access(string operation) => NeuronAccess.PublicOperation;
+
     private PackageId Id => PackageId.Parse(this.GetPrimaryKeyString());
 
     public Task<PackageSnapshot> Read() => Task.FromResult(Describe(Id));

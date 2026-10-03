@@ -39,6 +39,8 @@ public static class PostgresHosting
             return NpgsqlDataSource.Create(PostgresConnectionSettings.Parse(connection).ConnectionString);
         });
         services.TryAddSingleton<IPostgresSourceRegistry, PostgresSourceRegistry>();
+        services.TryAddSingleton<PostgresAppResources>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<DigitalBrain.Registry.IRegistryResourceProvider, PostgresRegistryResources>());
         services.AddSingleton<ICapacityConfiguredSource>(provider =>
             new PostgresConfiguredSource(active: provider.GetRequiredService<IConfiguration>()[PostgresCapacityKind.AdminConnectionKey] is null));
         services.AddSingleton<ICapacityProvisioner>(provider =>
@@ -50,6 +52,11 @@ public static class PostgresHosting
         services.AddLiveTables();
         services.TryAddKeyedSingleton<ILiveTableSource>("postgres", (provider, _) =>
             LiveTableHosting.CreatePostgresSource(provider.GetRequiredKeyedService<NpgsqlDataSource>(DataSourceKey)));
+        services.TryAddKeyedSingleton<ILiveTableSource>(KeyedService.AnyKey, (provider, key) =>
+            key is string name && name.StartsWith(PostgresAppResources.SourcePrefix, StringComparison.Ordinal) ? new PostgresAppLiveSource(
+                () => provider.GetRequiredService<PostgresAppResources>().Resolve((string)key!, CancellationToken.None),
+                origin => LiveTableHosting.CreatePostgresSource(provider.GetRequiredService<IPostgresSourceRegistry>().Get(origin)))
+                : throw new DigitalBrain.Supabase.Tables.SupabaseTableSourceException("The requested table source is not configured."));
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IAgentToolFactory, PostgresTools>());
         services.AddHealthChecks().AddCheck<PostgresHealthCheck>("postgres", tags: ["ready"]);
         return silo;

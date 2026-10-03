@@ -1,7 +1,7 @@
-using DigitalBrain.Assistant;
 using System.Text.Json;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
+using DigitalBrain.Assistant;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Xunit;

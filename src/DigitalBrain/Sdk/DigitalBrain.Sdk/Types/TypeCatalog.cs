@@ -1,7 +1,7 @@
-using DigitalBrain.Sdk.Types;
-using DigitalBrain.Contracts.Types;
 using System.Globalization;
 using System.Text.Json.Nodes;
+using DigitalBrain.Contracts.Types;
+using DigitalBrain.Sdk.Types;
 
 namespace DigitalBrain.Sdk.Types;
 

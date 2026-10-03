@@ -1,9 +1,9 @@
 using System.Text.Json;
 using DigitalBrain.AI;
-using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Chat;
 using DigitalBrain.Flutter.Workspace;
+using DigitalBrain.Kernel.Enforcement;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 

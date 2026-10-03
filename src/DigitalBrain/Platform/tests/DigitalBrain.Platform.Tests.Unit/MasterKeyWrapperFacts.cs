@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
-using DigitalBrain.Platform.Secrets;
 using DigitalBrain;
 using DigitalBrain.Contracts;
+using DigitalBrain.Platform.Secrets;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

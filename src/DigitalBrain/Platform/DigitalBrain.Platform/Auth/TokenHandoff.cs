@@ -1,6 +1,6 @@
-using DigitalBrain.Platform.Contracts.Auth;
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
+using DigitalBrain.Platform.Contracts.Auth;
 
 namespace DigitalBrain.Platform.Auth;
 

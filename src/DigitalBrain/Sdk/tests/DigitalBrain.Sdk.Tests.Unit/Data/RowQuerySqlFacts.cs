@@ -1,6 +1,6 @@
 using DigitalBrain.Contracts.Data;
-using DigitalBrain.Sdk.Data;
 using DigitalBrain.Kernel.Data;
+using DigitalBrain.Sdk.Data;
 using Xunit;
 
 namespace DigitalBrain.Sdk.Tests.Unit.Data;

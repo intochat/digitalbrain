@@ -1,11 +1,11 @@
-using Microsoft.Extensions.Logging;
-using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Kernel.Enforcement;
 using System.Runtime.CompilerServices;
 using DigitalBrain;
-using DigitalBrain.Contracts;
-using DigitalBrain.Kernel;
 using DigitalBrain.AI.Metering;
+using DigitalBrain.Contracts;
+using DigitalBrain.Contracts.Enforcement;
+using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Enforcement;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 
@@ -15,6 +15,8 @@ namespace DigitalBrain.AI.Agents;
 internal sealed class AgentExecutionNeuron(IAgentTurnRunner runner, IIntentUsageSink usage,
     ModelProfiles profiles, IOptionsMonitor<AIOptions> options, ILogger<AgentExecutionNeuron> logger) : Neuron, IAgentExecution
 {
+    public override NeuronAccess Access(string operation) => new(BrainScope.CurrentId());
+
     public Task<ModelCatalog> Models(string? defaultModel = null)
         => Task.FromResult(new AgentModelCatalog(profiles, options, defaultModel).Read());
     public Task<AgentModelSelection?> SelectModel(string? id, string? defaultModel = null)

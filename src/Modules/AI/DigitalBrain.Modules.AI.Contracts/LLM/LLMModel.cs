@@ -26,6 +26,7 @@ public abstract class LLMModel : AiModel
         new Google.Gemini36Pro(),
         new Google.Gemini36Flash(),
         new XAI.Grok46(),
+        new OpenRouter.DeepSeekV41Flash(),
         new Ollama.Gemma4(),
         new Ollama.Qwen35(),
     ];

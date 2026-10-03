@@ -1,8 +1,9 @@
+using DigitalBrain.AI.Agents;
 using DigitalBrain.Apps;
 using DigitalBrain.Assistant;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
-using DigitalBrain.AI.Agents;
+using DigitalBrain.Registry;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -14,7 +15,7 @@ public sealed class AgentToolSelectionFacts
     public async Task ToolsComeFromTheInstalledRevisionInTheCurrentBrain()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>().StartAsync(ct);
+        await using var brain = await UnitTest.Create().WithModule<AppsModule>().WithModule<RegistryModule>().StartAsync(ct);
         CallerContextStamper.Stamp(new CallerContext
         {
             PrincipalId = "alice",
@@ -23,6 +24,7 @@ public sealed class AgentToolSelectionFacts
             Kind = CallerKind.User,
             StampedBy = TrustedEdge.AuthenticatedHttp,
         });
+        await brain.AuthorizeCallerAsync();
         var id = PackageId.Create("alice", "tools");
         var package = brain.Get<IPackage>(id.ToString());
         var content = new PackageContent(new("Tools", "Installed tools", [new("old-tool", "Old")], [], Runtime: "prompt"), "");
@@ -33,10 +35,11 @@ public sealed class AgentToolSelectionFacts
         var scope = BrainScope.CurrentId();
         var installed = brain.Get<IApp>(scope + "/packages/" + id);
         await installed.Install(new(Guid.NewGuid(), new(id, revision.Id), new Dictionary<string, string>()));
-        var selection = new AgentToolSelection(brain.Grains);
+        var registry = brain.Get<IRegistry>(IRegistry.Key);
+        async Task<string[]> Discover() => (await registry.Select("apps:" + id, ct))?.Tools ?? [];
 
-        Assert.Equal([AppToolName.For(id, "installed-tool")], await selection.ResolveAsync(scope, ct));
-        var selected = await selection.ResolveAsync(scope, ct);
+        Assert.Equal([AppToolName.For(id, "installed-tool")], await Discover());
+        var selected = await Discover();
         var source = Assert.Single(brain.SiloServices.GetServices<IAgentToolSource>());
         await using (var session = await source.OpenAsync(selected, () => new(scope, "run", ""), ct))
         {
@@ -50,16 +53,16 @@ public sealed class AgentToolSelectionFacts
         { events.Add(item); }
         Assert.DoesNotContain(events, item => item is AgentTurnEvent.Failed);
         Assert.Contains(events, item => item is AgentTurnEvent.Completed);
-        Assert.Empty(await selection.ResolveAsync(BrainScope.Create("alice", "other").Id, ct));
+        // Discovery has no model-controlled scope argument; the Registry tests cover caller isolation.
         await installed.Uninstall(new(Guid.NewGuid()));
-        Assert.Empty(await selection.ResolveAsync(scope, ct));
+        Assert.Empty(await Discover());
     }
 
     [Fact]
-    public async Task PrivateInstallsAreImmediatelyDiscoverableWithoutTheOptionalRegistry()
+    public async Task PrivateInstallsAreDiscoverableWithoutPublicationOrActivationHistory()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<AppsModule>().StartAsync(ct);
+        await using var brain = await UnitTest.Create().WithModule<AppsModule>().WithModule<RegistryModule>().StartAsync(ct);
         CallerContextStamper.Stamp(new CallerContext
         {
             PrincipalId = "alice",
@@ -68,6 +71,7 @@ public sealed class AgentToolSelectionFacts
             Kind = CallerKind.User,
             StampedBy = TrustedEdge.AuthenticatedHttp,
         });
+        await brain.AuthorizeCallerAsync();
         var scope = BrainScope.CurrentId();
         var id = PackageId.Create("alice", "private");
         var content = new PackageContent(new("Private", "A private app", [new("ask", "Answer")], [], Runtime: "prompt"), "");
@@ -75,7 +79,7 @@ public sealed class AgentToolSelectionFacts
         var app = brain.Get<IApp>(scope + "/packages/" + id);
         await app.Install(new(Guid.NewGuid(), new(id, revision.Id), new Dictionary<string, string>()));
         Assert.Empty(await brain.Get<IPackageDirectory>(PackageDirectory.Key).List());
-        Assert.Equal([AppToolName.For(id, "ask")], await new AgentToolSelection(brain.Grains).ResolveAsync(scope, ct));
+        Assert.Equal([AppToolName.For(id, "ask")], (await brain.Get<IRegistry>(IRegistry.Key).Select("apps:" + id, ct))!.Tools);
         await brain.DeactivateAsync(app, ct);
         await brain.DeactivateAsync(brain.Get<IApps>(scope), ct);
         Assert.Equal(id, Assert.Single(await brain.Get<IApps>(scope).List()));
