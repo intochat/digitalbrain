@@ -101,35 +101,35 @@
     "Json": 0
   },
   "DigitalBrain.AI.Agents.AgentTurnEvent": {},
-  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BCompleted": {
+  "DigitalBrain.AI.Agents.AgentTurnEvent+Completed": {
     "Messages": 0,
     "Usage": 1
   },
-  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BFailed": {
+  "DigitalBrain.AI.Agents.AgentTurnEvent+Failed": {
     "Message": 0,
     "Cancelled": 1
   },
-  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BFinished": {},
-  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BModelSelected": {
+  "DigitalBrain.AI.Agents.AgentTurnEvent+Finished": {},
+  "DigitalBrain.AI.Agents.AgentTurnEvent+ModelSelected": {
     "Model": 0,
     "Descriptor": 1
   },
-  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BStarted": {
+  "DigitalBrain.AI.Agents.AgentTurnEvent+Started": {
     "RunId": 0
   },
-  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BText": {
+  "DigitalBrain.AI.Agents.AgentTurnEvent+Text": {
     "Content": 0
   },
-  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BToolCompleted": {
+  "DigitalBrain.AI.Agents.AgentTurnEvent+ToolCompleted": {
     "CallId": 0,
     "Name": 1,
     "Result": 2
   },
-  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BToolFailed": {
+  "DigitalBrain.AI.Agents.AgentTurnEvent+ToolFailed": {
     "CallId": 0,
     "Name": 1
   },
-  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BToolStarted": {
+  "DigitalBrain.AI.Agents.AgentTurnEvent+ToolStarted": {
     "CallId": 0,
     "Name": 1,
     "Arguments": 2
@@ -564,7 +564,7 @@
   "DigitalBrain.Apps.AppState": {
     "Status": 0,
     "Revision": 1,
-    "\u003Cretired:2\u003E": 2,
+    "<retired:2>": 2,
     "Declared": 3,
     "Settings": 4,
     "Operations": 5,
@@ -603,7 +603,7 @@
     "OperationId": 0,
     "ExpectedHead": 1,
     "Content": 2,
-    "\u003Cretired:3\u003E": 3,
+    "<retired:3>": 3,
     "Message": 4,
     "MergeFrom": 5
   },
@@ -685,7 +685,7 @@
     "Id": 0,
     "Parents": 1,
     "Content": 2,
-    "\u003Cretired:3\u003E": 3,
+    "<retired:3>": 3,
     "Author": 4,
     "Message": 5,
     "CommittedAt": 6
@@ -797,7 +797,7 @@
     "SelectedThread": 2,
     "Threads": 3,
     "Owner": 4,
-    "\u003Cretired:5\u003E": 5
+    "<retired:5>": 5
   },
   "DigitalBrain.Assistant.AssistantThread": {
     "Id": 0,
@@ -997,7 +997,7 @@
   },
   "DigitalBrain.Compute.Storage.ComputeRecordsState": {
     "Root": 0,
-    "\u003Cretired:1\u003E": 1
+    "<retired:1>": 1
   },
   "DigitalBrain.Compute.Storage.ComputeStoredRecord": {
     "Id": 0,
@@ -1722,7 +1722,7 @@
   },
   "DigitalBrain.Flutter.WebBrowser.Signals.BrowserConnected": {
     "Name": 0,
-    "\u003Cretired:1\u003E": 1,
+    "<retired:1>": 1,
     "SessionId": 2
   },
   "DigitalBrain.Flutter.WebBrowser.Signals.BrowserDisconnected": {
@@ -1770,7 +1770,7 @@
   "DigitalBrain.Flutter.Workspace.ShellHeadState": {
     "Revision": 0,
     "Root": 1,
-    "\u003Cretired:2\u003E": 2,
+    "<retired:2>": 2,
     "LastOperation": 3,
     "LastDigest": 4
   },
@@ -1845,8 +1845,8 @@
   "DigitalBrain.Google.Gmail.GmailState": {
     "Subject": 0,
     "Email": 1,
-    "\u003Cretired:2\u003E": 2,
-    "\u003Cretired:3\u003E": 3,
+    "<retired:2>": 2,
+    "<retired:3>": 3,
     "GrantedScopes": 4,
     "ExpiresAt": 5,
     "CanCompose": 6,
@@ -1883,97 +1883,6 @@
     "Payload": 2
   },
   "DigitalBrain.Kernel.Enforcement.UntrustedCallerException": {},
-  "DigitalBrain.Memory.Forget": {
-    "Namespace": 0,
-    "Key": 1
-  },
-  "DigitalBrain.Memory.MemoryDeletion": {
-    "Name": 0,
-    "Namespace": 1
-  },
-  "DigitalBrain.Memory.MemoryIndexResult": {
-    "Available": 0,
-    "Indexed": 1,
-    "Pending": 2
-  },
-  "DigitalBrain.Memory.MemoryKey": {
-    "Namespace": 0,
-    "Key": 1
-  },
-  "DigitalBrain.Memory.MemoryMatch": {
-    "Note": 0,
-    "Score": 1
-  },
-  "DigitalBrain.Memory.MemoryNamespace": {
-    "Generation": 0,
-    "Pages": 1,
-    "\u003Cretired:2\u003E": 2,
-    "IndexPurgePending": 3,
-    "RetiredPages": 4
-  },
-  "DigitalBrain.Memory.MemoryPageState": {
-    "Entries": 0,
-    "Deleted": 1,
-    "Pending": 2
-  },
-  "DigitalBrain.Memory.MemoryState": {
-    "RememberedCount": 0,
-    "ForgottenCount": 1,
-    "LastChangedAt": 2,
-    "Namespaces": 3
-  },
-  "DigitalBrain.Memory.MemoryTag": {
-    "Name": 0,
-    "Value": 1
-  },
-  "DigitalBrain.Memory.ProtectedPayloadReference": {
-    "Id": 0,
-    "ExpiresAt": 1
-  },
-  "DigitalBrain.Memory.PurgeNamespace": {
-    "Namespace": 0
-  },
-  "DigitalBrain.Memory.Recall": {
-    "Namespace": 0,
-    "Query": 1,
-    "Limit": 2,
-    "Tags": 3
-  },
-  "DigitalBrain.Memory.RecallResult": {
-    "Matches": 0
-  },
-  "DigitalBrain.Memory.RecalledMemory": {
-    "Key": 0,
-    "Text": 1,
-    "Tags": 2,
-    "Payload": 3
-  },
-  "DigitalBrain.Memory.Remember": {
-    "Namespace": 0,
-    "Key": 1,
-    "Text": 2,
-    "Tags": 3,
-    "Payload": 4
-  },
-  "DigitalBrain.Memory.Signals.Forgotten": {
-    "Key": 0
-  },
-  "DigitalBrain.Memory.Signals.NamespacePurged": {
-    "Namespace": 0,
-    "RemovedCount": 1
-  },
-  "DigitalBrain.Memory.Signals.Remembered": {
-    "Key": 0
-  },
-  "DigitalBrain.Memory.VectorMemoryEntry": {
-    "Name": 0,
-    "Namespace": 1,
-    "Key": 2,
-    "Text": 3,
-    "Tags": 4,
-    "Payload": 5,
-    "Embedding": 6
-  },
   "DigitalBrain.Microsoft.Aspire.AspireResource": {
     "Name": 0,
     "Type": 1,
@@ -2340,14 +2249,14 @@
     "Label": 3,
     "IsSet": 4,
     "SealedValue": 5,
-    "\u003Cretired:6\u003E": 6,
+    "<retired:6>": 6,
     "SealedSecret": 7
   },
   "DigitalBrain.Platform.Secrets.SecretsState": {
     "Owner": 0,
     "WrappedOwnerKey": 1,
     "Fields": 2,
-    "\u003Cretired:3\u003E": 3
+    "<retired:3>": 3
   },
   "DigitalBrain.Postgres.PostgresColumn": {
     "Name": 0,

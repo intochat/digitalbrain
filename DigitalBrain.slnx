@@ -75,11 +75,6 @@
     <Project Path="src/Modules/Qdrant/DigitalBrain.Modules.Qdrant.Deployment/DigitalBrain.Modules.Qdrant.Deployment.csproj" />
     <Project Path="src/Modules/Qdrant/DigitalBrain.Modules.Qdrant.Tests.Unit/DigitalBrain.Modules.Qdrant.Tests.Unit.csproj" />
   </Folder>
-  <Folder Name="/Modules/Memory/">
-    <Project Path="src/Modules/Memory/DigitalBrain.Modules.Memory.Tests.Unit/DigitalBrain.Modules.Memory.Tests.Unit.csproj" />
-    <Project Path="src/Modules/Memory/DigitalBrain.Modules.Memory.Contracts/DigitalBrain.Modules.Memory.Contracts.csproj" />
-    <Project Path="src/Modules/Memory/DigitalBrain.Modules.Memory/DigitalBrain.Modules.Memory.csproj" />
-  </Folder>
   <Folder Name="/Modules/Microsoft/" />
   <Folder Name="/Modules/Microsoft/Aspire/">
     <Project Path="src/Modules/Microsoft/Aspire/DigitalBrain.Modules.Microsoft.Aspire.Aspire.Hosting/DigitalBrain.Modules.Microsoft.Aspire.Aspire.Hosting.csproj" />

@@ -244,7 +244,7 @@ BrainAuthority(account, brain) membership + invitations + grants + atomic author
 - No-op webhook wrapper removed; IO status handling no longer depends on exception prose. Existing domain-conflict mappings remain compatible.
 - Aspire scopes infrastructure, parameters, module nodes and hosted AI resources by brain. Per-brain configuration overrides global/code defaults. A two-brain PostgreSQL model test pins resource isolation. Silo discovery uses an explicit composition annotation. The memory-only AppHost path now configures development clustering and can be referenced by a server.
 - Six package-owned test suites replace the mixed ownership in the Kernel suite; duplicate brain-establishment coverage and a brittle exact-prose capacity assertion were removed.
-- `eng/Verify-NuGetConsumers.ps1` builds five consumers from a fresh cache and checks package dependency boundaries.
+- The former package-consumer script verified five consumers from a fresh cache and checked dependency boundaries; that script has since been removed (see status below).
 
 Deliberate compatibility decisions:
 
@@ -260,16 +260,23 @@ Validation (2026-10-03):
 - All **522 existing serialized type baselines** retain their field IDs. Three new state types and two additive migration fields are reviewed in the baseline (525 types total).
 - `git diff --check` passed. Container-backed E2E and a production-state upgrade rehearsal were not run.
 
-**Next release priority:** rehearse the upgrade on a copy of the actual deployment's state and keys, then publish the verified artifacts. The synthetic upgrade and packed-composition gates are now automated; see the lifecycle implementation below.
+**Current release status — script removal:** the standalone release verifier, package-consumer
+verifier and publishing scripts have been removed at the user's request. Their CI invocation
+and evidence uploads have also been removed. The successful runs recorded below are
+historical evidence, not ongoing automated release gates.
 
-Release gate status:
-1. **Complete and verified:** automated persistent upgrade rehearsal and packed AppHost/server/client composition in `eng/Verify-Release.ps1`: 73 packages, five isolated consumer builds and 14 lifecycle checks, including interruption, resume, revocation, key checks and rollback with a pinned old reader.
-2. **Next priority — deployment-specific rehearsal:** use an isolated copy of the actual deployment's state, original master key, stable service ID, complete legacy grant-store inventory and ownership mappings. Verify the saved-plan migration, retry, login, revocation, key reuse and snapshot rollback. The synthetic dataset cannot establish production inventory completeness or validate the original production key.
-3. **Pending — broader CI and publication:** require the external-provider/product E2E suite to pass, then publish through `eng/Publish-VerifiedNuGet.ps1` using the verification manifest. Every package hash is checked before the first push; do not repack between verification and publication.
+**Next priority:** run the existing build/pack/test CI and decide which package-consumer
+checks belong in normal test projects. Rehearsal with actual state is conditional on having
+an existing legacy deployment to upgrade; it is not a prerequisite for fresh installations.
+Publishing and package verification manifests are no longer automated by this workflow.
+The `eng/ReleaseRehearsal` sources remain, without a supported entry point.
 
 Legacy `.orleans` files are retained compatibility fixtures from the old source revision, moved with the Platform tests. Their purpose and capture provenance are documented in `Identity/LegacyState/README.md` beside the fixtures.
 
 ## Unified deployment and release lifecycle — 2026-10-03
+
+Historical implementation and validation before the script removal described above. Runtime
+identity and migration changes remain; the standalone release automation does not.
 
 The remaining gates shared one problem: independently reconstructed deployment identities,
 resource names, persistence assumptions and process lifetimes. They now use resolved AppHost
@@ -322,3 +329,9 @@ Validation:
   rehearsal were not run locally; CI retains its existing broader E2E suite.
 - `git diff --check` passed. Release commands, prerequisites, and storage-adoption semantics
   are documented in `docs/IDENTITY-UPGRADE.md`.
+
+## Memory module removal
+
+Removed the Memory implementation, contracts and tests, plus application/test-host registrations
+and project references. Qdrant remains the vector-store module. This removes the separate
+Memory API and its neuron-backed state; Qdrant is not an automatic migration of that data.

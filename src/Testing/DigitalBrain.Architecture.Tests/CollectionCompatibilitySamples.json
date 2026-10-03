@@ -434,20 +434,6 @@
     "Expected": "[\"legacy-value\"]"
   },
   {
-    "Type": "DigitalBrain.Memory.VectorMemoryEntry",
-    "Member": "Tags",
-    "Representation": "array",
-    "Payload": "MAE/ddAhJ21lbW9yeS52ZWN0b3ItZW50cnnowAHBAcEBwQExASRFfI4ZbWVtb3J5LnRhZ1tdAAMh6EAZbGVnYWN5LXZhbHVlwRPg4MEBwQHg",
-    "Expected": "[{\"Name\":\"legacy-value\",\"Value\":\"legacy-value\"}]"
-  },
-  {
-    "Type": "DigitalBrain.Memory.VectorMemoryEntry",
-    "Member": "Tags",
-    "Representation": "list",
-    "Payload": "MAE/ddAhJ21lbW9yeS52ZWN0b3ItZW50cnnowAHBAcEBwQExAUKbVjtfU3lzdGVtLkNvbGxlY3Rpb25zLkdlbmVyaWMuTGlzdGAxW1ttZW1vcnkudGFnXV0AAyHoQBlsZWdhY3ktdmFsdWXBE+DgwQHBAeA=",
-    "Expected": "[{\"Name\":\"legacy-value\",\"Value\":\"legacy-value\"}]"
-  },
-  {
     "Type": "DigitalBrain.Microsoft.Aspire.AspireResource",
     "Member": "Urls",
     "Representation": "array",

@@ -16,7 +16,6 @@ public sealed class PersistedStateFacts
         ["DigitalBrain.Flutter.WebBrowser.Signals.BrowserConnected"] = [1],
         ["DigitalBrain.Flutter.Workspace.ShellHeadState"] = [2],
         ["DigitalBrain.Google.Gmail.GmailState"] = [2, 3],
-        ["DigitalBrain.Memory.MemoryNamespace"] = [2],
         ["DigitalBrain.Platform.Secrets.SecretsState"] = [3],
         ["DigitalBrain.Platform.Secrets.SecretRecord"] = [6]
     };

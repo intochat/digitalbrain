@@ -132,11 +132,9 @@ coordinated public-key and friend-assembly change.
 
 ```powershell
 dotnet pack DigitalBrain.slnx -c Release --no-build -o $feed
-./eng/Verify-NuGetConsumers.ps1 -Feed $feed
 ```
 
-The verifier creates an isolated cache, resolves every DigitalBrain package from the supplied
-feed, builds five consumer profiles, and checks their dependency boundaries.
+Packing creates the NuGet artifacts. It does not by itself verify consumers of those packages.
 
 ## Deployment identity and release verification
 
@@ -167,25 +165,20 @@ Orleans provider service keys and projected connection aliases remain stable.
 ```powershell
 dotnet build DigitalBrain.slnx -c Release -p:CodeGraphRefresh=false
 dotnet pack DigitalBrain.slnx -c Release --no-build -o artifacts
-./eng/Verify-Release.ps1 -Feed artifacts -Output /path/to/fresh-verification-directory
-# Only when publishing is intended, with NUGET_API_KEY configured:
-./eng/Publish-VerifiedNuGet.ps1 -Feed artifacts `
-    -Manifest /path/to/fresh-verification-directory/verified-packages.json `
-    -Source https://api.nuget.org/v3/index.json
 ```
 
-The release verifier builds isolated package consumers, runs packed composition, and
-rehearses an interrupted migration on Azurite using an old writer/reader compiled from
-pinned revision `e39ecb35df23b80ef2f9340ea80a8bd6c8f8e3a5`. It verifies restart/revocation,
-encryption key reuse, and coordinated snapshot rollback. This synthetic deployment is
-repeatable CI evidence; the production maintenance window still requires rehearsal on a
-copy of that deployment's own state and keys.
+The standalone release verification, package-consumer verification and publishing scripts
+were removed. CI still builds, packs and runs the existing test suites; it no longer runs
+the standalone packed-consumer and persistent-upgrade rehearsal or creates a verified
+package manifest. Publication is not automated by this workflow.
 
-Docker and the pinned Git history are required. A failed rehearsal retains its owned
-volume for inspection. Successful cleanup never force-removes attached containers.
-The verified manifest records package SHA-256 hashes; publishing checks every hash before
-pushing any package. Do not repack between verification and publishing.
+The source files in `eng/ReleaseRehearsal` remain from the previous synthetic rehearsal;
+they currently have no supported entry point. They are not a production upgrade tool.
+
+A rehearsal on a copy of existing deployment state is relevant only when upgrading a
+deployment that already has persisted legacy identity data. A fresh installation has no
+legacy state to migrate. Preserve the original keys and follow the maintenance procedure
+above when an existing deployment does need migration.
 
 Hosted test consumers declare Aspire orchestration/dashboard packages for their build
 platform explicitly; NuGet does not restore dependencies injected by package build imports.
-See the generated consumer project in `eng/Verify-Release.ps1` for the exact setup.

@@ -54,30 +54,6 @@ jobs:
       - name: Validate NuGet packages
         run: dotnet pack DigitalBrain.slnx -c Release --no-build -v quiet -o artifacts
 
-      - name: Verify packed deployment and persistent upgrade
-        shell: pwsh
-        run: ./eng/Verify-Release.ps1 -Feed artifacts -Output "${{ runner.temp }}/release-verification"
-
-      - name: Preserve verified packages and release evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: verified-nuget
-          path: |
-            artifacts/*.nupkg
-            ${{ runner.temp }}/release-verification/verified-packages.json
-            ${{ runner.temp }}/release-verification/rehearsal-passed.json
-
-      - name: Preserve release diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-verification-logs
-          if-no-files-found: ignore
-          path: |
-            ${{ runner.temp }}/release-verification/*.log
-            ${{ runner.temp }}/release-verification/consumers/*.log
-            ${{ runner.temp }}/release-verification/*volume.txt
-
       # The one shared E2E host (IntoChatHostFixture) serves the web shell, so the suite
       # compiles Flutter once per run and drives it with Playwright.
       - name: Install Flutter for the shared E2E web host

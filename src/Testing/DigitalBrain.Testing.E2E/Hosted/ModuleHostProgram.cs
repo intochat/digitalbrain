@@ -32,7 +32,6 @@ builder.AddDigitalBrainServer(server =>
     server.AddModule<DigitalBrain.Files.FilesModule>("files");
     server.AddModule<DigitalBrain.Flutter.FlutterModule>("flutter");
     server.AddModule<DigitalBrain.Google.Gmail.GmailModule>("gmail");
-    server.AddModule<DigitalBrain.Memory.MemoryModule>("memory");
     server.AddModule<DigitalBrain.Microsoft.Aspire.AspireModule>("aspire");
     server.AddModule<DigitalBrain.Microsoft.CSharp.CSharpAuthoringModule>("csharp-authoring");
     server.AddModule<DigitalBrain.Microsoft.CSharp.CSharpModule>("csharp");

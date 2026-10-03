@@ -40,7 +40,7 @@ Persisted collection declarations are checked without exceptions. Shared persist
 concrete arrays or dictionaries; ordinary wire DTOs outside the persisted graph are not subject
 to this requirement.
 
-`CollectionCompatibilitySamples.json` contains 96 immutable Orleans binary fixtures captured
+`CollectionCompatibilitySamples.json` contains 94 immutable Orleans binary fixtures captured
 from commit `5d4041158` before migrating the 48 interface collection members. For each member,
 the old declaration was populated with a one-element array and a one-element list (dictionaries
 use a concrete dictionary in both cases); nested serialized members were populated recursively.

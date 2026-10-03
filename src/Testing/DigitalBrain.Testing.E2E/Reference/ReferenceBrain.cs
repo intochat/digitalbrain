@@ -12,7 +12,6 @@ using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google.Gmail;
-using DigitalBrain.Memory;
 using DigitalBrain.Qdrant;
 using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.GitHub;
@@ -44,7 +43,6 @@ public static class ReferenceBrain
                     .WithTavilySearch();
             })
             .WithModule<QdrantModule, QdrantModuleOptions>(qdrant => qdrant.WithHostedQdrant())
-            .WithModule<MemoryModule>()
             .WithModule<ClickHouseModule, ClickHouseModuleOptions>(database => database.WithClickHouse())
             .WithModule<SupabaseModule, SupabaseModuleOptions>(database => database.WithConnection("supabase"))
             .WithModule<PostgresModule, PostgresModuleOptions>(database => database.WithPostgres(options => options.DatabaseName = "digitalbrain"))
