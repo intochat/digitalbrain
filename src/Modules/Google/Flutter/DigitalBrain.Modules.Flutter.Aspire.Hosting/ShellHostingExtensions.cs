@@ -12,18 +12,18 @@ namespace DigitalBrain.Flutter.Aspire.Hosting;
 
 public static class ShellHostingExtensions
 {
-    public static DigitalBrainModuleBuilder<FlutterModule> RunDesktopApp(
-        this DigitalBrainModuleBuilder<FlutterModule> module,
+    public static DigitalBrainModuleBuilder<DigitalBrain.Flutter.Aspire.Hosting.FlutterModuleHosting> RunDesktopApp(
+        this DigitalBrainModuleBuilder<DigitalBrain.Flutter.Aspire.Hosting.FlutterModuleHosting> module,
         Action<FlutterHostOptions>? configure = null)
         => ConfigureFlutterHost(module, FlutterHostKind.Window, configure);
 
-    public static DigitalBrainModuleBuilder<FlutterModule> RunWebApp(
-        this DigitalBrainModuleBuilder<FlutterModule> module,
+    public static DigitalBrainModuleBuilder<DigitalBrain.Flutter.Aspire.Hosting.FlutterModuleHosting> RunWebApp(
+        this DigitalBrainModuleBuilder<DigitalBrain.Flutter.Aspire.Hosting.FlutterModuleHosting> module,
         Action<FlutterHostOptions>? configure = null)
         => ConfigureFlutterHost(module, FlutterHostKind.Web, configure);
 
-    private static DigitalBrainModuleBuilder<FlutterModule> ConfigureFlutterHost(
-        DigitalBrainModuleBuilder<FlutterModule> module,
+    private static DigitalBrainModuleBuilder<DigitalBrain.Flutter.Aspire.Hosting.FlutterModuleHosting> ConfigureFlutterHost(
+        DigitalBrainModuleBuilder<DigitalBrain.Flutter.Aspire.Hosting.FlutterModuleHosting> module,
         FlutterHostKind kind,
         Action<FlutterHostOptions>? configure)
     {
@@ -42,7 +42,7 @@ public static class ShellHostingExtensions
         return module;
     }
 
-    private static ShellHostingState GetOrCreateState(DigitalBrainModuleBuilder<FlutterModule> module)
+    private static ShellHostingState GetOrCreateState(DigitalBrainModuleBuilder<DigitalBrain.Flutter.Aspire.Hosting.FlutterModuleHosting> module)
     {
         var state = module.DigitalBrainBuilder.GetOrAddState(
             static brain => new ShellHostingState(brain),
@@ -86,7 +86,7 @@ public static class ShellHostingExtensions
             }
 
             var resourceName = string.IsNullOrWhiteSpace(options.ResourceName)
-                ? ShellNames.DefaultFlutterResourceName
+                ? brain.ResourceName(ShellNames.DefaultFlutterResourceName)
                 : options.ResourceName;
             var shell = string.IsNullOrWhiteSpace(options.ShellName)
                 ? ShellNames.DefaultShellName

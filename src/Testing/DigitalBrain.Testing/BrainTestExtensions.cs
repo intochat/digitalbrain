@@ -1,6 +1,8 @@
+using DigitalBrain.Client.Orleans;
 using DigitalBrain.Client;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Testing;
 
@@ -11,7 +13,7 @@ public static class BrainTestExtensions
         ArgumentNullException.ThrowIfNull(brain);
         var subscription = await brain.SubscribeAsync<T>(source, cancellationToken).ConfigureAwait(false);
         var tracked = brain as ITrackedBrain;
-        var probe = new SignalProbe<T>(subscription, tracked?.BufferCapacity ?? new BrainOptions().BufferCapacity, tracked?.Execution ?? new());
+        var probe = new SignalProbe<T>(subscription, tracked?.BufferCapacity ?? new SubscriptionOptions().BufferCapacity, tracked?.Execution ?? new());
         tracked?.Track(probe);
         return probe;
     }

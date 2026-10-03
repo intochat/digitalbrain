@@ -1,0 +1,44 @@
+using DigitalBrain;
+using DigitalBrain.Aspire.Client;
+using DigitalBrain.Aspire.Server;
+using DigitalBrain.Platform;
+using DigitalBrain.Platform.Contracts.Identity;
+using DigitalBrain.Platform.Identity;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Orleans.Hosting;
+
+internal static class CompositionHost
+{
+    internal static async Task Run(string mode)
+    {
+        var builder = WebApplication.CreateBuilder([]);
+        builder.Configuration["DigitalBrain:Auth:Posture"] = "Secured";
+        if (mode == "client")
+        {
+            builder.AddDigitalBrainClient(useAzureClustering: true);
+            await using var client = builder.Build();
+            client.MapGet("/health", () => Results.Ok());
+            client.MapGet("/verify", async (IDigitalBrain brain) =>
+                await brain.Get<IIdentityDirectory>(IdentityGrains.Directory).AuthenticateAsync("packed-user", "package-test-password") is not null
+                    ? Results.Ok() : Results.Unauthorized());
+            await client.RunAsync();
+            return;
+        }
+        builder.AddDigitalBrainServer(server => { if (mode == "server") { server.UseAzureStorage(); } });
+        if (mode == "memory-server")
+        {
+            builder.UseOrleans(silo => silo.AddDigitalBrainPlatform());
+            builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
+        }
+        else { builder.AddDigitalBrainPlatform(); }
+        await using var app = builder.Build();
+        app.UsePlatformHttp();
+        app.MapDigitalBrainPlatform();
+        app.MapGet("/health", () => Results.Ok());
+        await app.RunAsync();
+    }
+}

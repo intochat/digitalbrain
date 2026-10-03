@@ -1,6 +1,7 @@
+using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.Sdk.Http;
 using DigitalBrain.Apps;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;

@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Supabase;

@@ -1,14 +1,14 @@
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Google.Gmail;
 
 public sealed class GmailModuleHosting : IDigitalBrainModuleHosting
 {
+    public string Id => "gmail";
     public void Configure(DigitalBrainBuilder brain)
     {
-        var options = brain.GetModuleConfiguration<GmailModule>().GetModuleOptions<GmailModuleOptions>(nameof(GmailModule));
-        if (options.HostGmail) { new DigitalBrainModuleBuilder<GmailModule>(brain).WithGmail(); }
+        var options = brain.GetModuleConfiguration("gmail").GetModuleOptions<GmailModuleOptions>("gmail");
+        if (options.HostGmail) { new DigitalBrainModuleBuilder<DigitalBrain.Google.Gmail.GmailModuleHosting>(brain).WithGmail(); }
     }
 }

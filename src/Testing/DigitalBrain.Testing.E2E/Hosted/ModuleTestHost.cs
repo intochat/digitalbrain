@@ -1,7 +1,7 @@
 using System.Reflection;
 using Aspire.Hosting;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Testing.E2E;
 
@@ -19,12 +19,13 @@ internal static class ModuleTestHost
         if (modules.Count == 0) { throw new ArgumentException("Select at least one module.", nameof(selectedModules)); }
 
         var launch = ResolveModuleHostLaunch(modules);
-        return AspireTestSession.StartAsync(identity, execution, builder =>
+        return AspireTestSession.StartAsync(execution, builder =>
         {
             builder.Configuration["Orleans:ClusterId"] = identity;
-            var brain = builder.AddDigitalBrain("modules", persistentStorage: false, dataVolume: durableStorageKey);
+            var brain = builder.AddDigitalBrain("modules", persistentStorage: false, dataVolume: durableStorageKey, serviceId: durableStorageKey ?? identity, options: new() { UseAzureStorage = true });
             brain.AddModules(modules);
             builder.AddExecutable("runtime", "dotnet", launch.WorkingDirectory, launch.Arguments)
+                .WithEnvironment("DigitalBrain__Testing__ModuleTypes", System.Text.Json.JsonSerializer.Serialize(modules.Select(m => m.ModuleType.AssemblyQualifiedName)))
                 .WithReference(brain)
                 .WithHttpEndpoint(name: "http", env: "ASPNETCORE_HTTP_PORTS")
                 .WithHttpHealthCheck(ModuleHostEndpoints.Health);

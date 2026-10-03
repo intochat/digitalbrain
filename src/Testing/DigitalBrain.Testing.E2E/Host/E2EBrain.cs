@@ -1,8 +1,10 @@
+using DigitalBrain.Client.Orleans;
 using DigitalBrain.Client;
 using System.Diagnostics;
 using Aspire.Hosting;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using Microsoft.Playwright;
 using Orleans;
 
@@ -40,10 +42,13 @@ public sealed class E2EBrain : IDigitalBrain, ITrackedBrain
     public HttpClient HttpClient => _session.HttpClient;
     public DistributedApplication Application => _session.App;
 
+    public ValueTask<string?> GetConnectionStringAsync(string resourceName, CancellationToken cancellationToken = default)
+        => _session.GetConnectionStringAsync(resourceName, cancellationToken);
+
     public IPage Page => _primaryBrowser?.Page
         ?? throw new InvalidOperationException("This test exposes no browser endpoint. Configure a module to run its web app.");
 
-    int ITrackedBrain.BufferCapacity => new BrainOptions().BufferCapacity;
+    int ITrackedBrain.BufferCapacity => new SubscriptionOptions().BufferCapacity;
     TestExecutionOptions ITrackedBrain.Execution => _session.Options;
     void ITrackedBrain.Track(IAsyncDisposable resource) => _lifetime.Own("observation", resource);
 

@@ -4,7 +4,7 @@ DigitalBrain is a personal "alive OS": an Orleans-based brain whose every capabi
 **neuron** (a stateful, addressable grain) publishing **signals** (typed facts stamped with their
 publisher). Users program it at runtime by talking to it — the system writes itself — and what
 they build is shareable, forkable and verified before it reaches anyone else. IntoChat
-(`src/Applications/IntoChat`) is the product host; the Flutter shell
+(`src/IntoChat`) is the product host; the Flutter shell
 (`src/Modules/Google/Flutter/app/shell`) is its workspace UI.
 
 Everything is made of four words. Anything that looks like a fifth concept is a design smell.
@@ -65,12 +65,14 @@ behaviors/*.cs   the implementation: one script per concern (plus legacy single 
   connected accounts — a shared email summarizer runs against each user's Gmail. Each
   `behaviors/*.cs` becomes its own `ICSharpFile`; failure isolation is per behavior. First-party
   apps ship through the same commit→verify→publish pipeline (`ShippedAppPublisher`, folders under
-  `src/Applications/IntoChat/Apps/`).
+  `src/IntoChat/Apps/`).
 - **Module contract:** a module ships contracts + signals + connector + fakes (Testing package) +
   renderables. Modules never ship step definitions or test-only methods on production interfaces.
-  A module declares `IModule<TOptions>`: `Validate()` runs once and the options cross the AppHost
-  boundary as one JSON value; no secrets in options (credential-shaped names are refused at
-  compile). Modules also ship `IntegrationDefinition`s; their registrations are deployment-scoped
+  A module declares `IModule<TOptions>`: options are ordinary configuration — code-declared values
+  compile to flat keys under `DigitalBrain:Modules:{Name}:Options:{Property}`, so the AppHost's own
+  configuration (args, env, files) overrides any option by standard precedence and tests need no
+  side channel; `Validate()` runs at compile and at bind; no secrets in options (credential-shaped
+  names are refused at compile). Modules also ship `IntegrationDefinition`s; their registrations are deployment-scoped
   `[PlatformOnly]` neurons seeded from `DigitalBrain:Integrations:{id}:{Field}` (catalog:
   `GET /integrations`). A user's connectors are integration accounts, per brain, under
   `/brains/{id}/integrations/accounts`.
@@ -80,16 +82,16 @@ renderable palette v1 / UiPart; run-token tightening.
 
 ## Working in this repo
 
-- Layout: Kernel = the privileged ring of projects under `Modules/DigitalBrain/Kernel/`; Core
-  (`DigitalBrain.Core`) = the neuron runtime; Platform (phase 2) = the credential ring scripts can
+- Layout: Kernel = the privileged ring of projects under `DigitalBrain/Kernel/`; Core
+  (`DigitalBrain.Kernel`) = the neuron runtime; Platform (phase 2) = the credential ring scripts can
   never see.
 - Build/tests per project (never the `.slnx` — Windows handshake bug):
   `dotnet test src/<path-to-test-project>`. After changes: build, run the relevant unit suites,
-  and smoke with `aspire run` from `src/Applications/IntoChat/AppHost` (all resources Healthy).
+  and smoke with `aspire run` from `src/IntoChat/IntoChat.AppHost` (all resources Healthy).
   Run module E2E suites alongside their module's unit suite; compile live-gated scenarios when
   their credentials are unavailable. IntoChat E2E contains composition, shipped-content routes,
   and the live-gated product golden journeys only. The former 18-minute monolith is dissolved.
-- `src/Applications/IntoChat/Tests/Unit` covers host composition and wiring; module behavior
+- `src/IntoChat/tests/IntoChat.Tests.Unit` covers host composition and wiring; module behavior
   belongs in the module's test project. Packaging manifests are checked as one parsed module set.
 - Flutter shell: `flutter analyze` and `flutter test` from `src/Modules/Google/Flutter/app/shell`.
   Wire-shape changes in C# records must be mirrored in the Dart screens in the same change.

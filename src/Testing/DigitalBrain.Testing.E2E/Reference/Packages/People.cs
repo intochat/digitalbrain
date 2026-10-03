@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using DigitalBrain.Identity;
+using DigitalBrain.Platform.Contracts.Identity;
 
 namespace DigitalBrain.Testing.E2E.Packages;
 
@@ -20,7 +20,7 @@ public static class People
         using var registered = await client.PostAsJsonAsync("/identity/register",
             new { principalId = principal, displayName = principal, password = principal + "-password-123" }, Json, ct);
         Assert.Equal(HttpStatusCode.OK, registered.StatusCode);
-        var member = await registered.Content.ReadFromJsonAsync<DigitalBrain.Identity.Member>(Json, ct);
+        var member = await registered.Content.ReadFromJsonAsync<DigitalBrain.Platform.Contracts.Identity.Member>(Json, ct);
         return new(client, member!.BrainId, member.AccountId);
     }
 

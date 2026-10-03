@@ -1,6 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <ProjectReference Include="../../../Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
-    <ProjectReference Include="../DigitalBrain.Modules.Files/DigitalBrain.Modules.Files.csproj" />
-  </ItemGroup>
-</Project>

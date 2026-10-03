@@ -1,3 +1,4 @@
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Data;
 using Orleans.Concurrency;

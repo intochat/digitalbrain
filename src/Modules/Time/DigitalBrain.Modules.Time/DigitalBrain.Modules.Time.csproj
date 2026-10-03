@@ -2,13 +2,13 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>Activation-local timers and persistent periodic reminders with live typed ticks.</Description>
-    <RootNamespace>DigitalBrain.Time</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Time</RootNamespace>
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Reminders" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.Time.Tests.Unit" />
     <ProjectReference Include="../DigitalBrain.Modules.Time.Contracts/DigitalBrain.Modules.Time.Contracts.csproj" />
-    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Modules.Kernel/DigitalBrain.Modules.Kernel.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
   </ItemGroup>
 </Project>

@@ -7,7 +7,7 @@ public static class LeadData
 {
     public static async Task CreateWideCustomersAsync(E2EBrain brain, CancellationToken ct)
     {
-        await using var connection = new NpgsqlConnection(await brain.Application.GetConnectionStringAsync("supabase-database", ct));
+        await using var connection = new NpgsqlConnection(await brain.GetConnectionStringAsync("supabase-database", ct));
         await connection.OpenAsync(ct);
         var columns = string.Join(", ", Enumerable.Range(1, 58).Select(i => $"{i} AS extra_{i}"));
         await using var command = new NpgsqlCommand(
@@ -18,7 +18,7 @@ public static class LeadData
     // Facts share one database; resetting the fixture tables keeps each fact's data its own.
     public static async Task CreateCustomersAsync(E2EBrain brain, CancellationToken ct)
     {
-        await using var connection = new NpgsqlConnection(await brain.Application.GetConnectionStringAsync("supabase-database", ct));
+        await using var connection = new NpgsqlConnection(await brain.GetConnectionStringAsync("supabase-database", ct));
         await connection.OpenAsync(ct);
         await using var seed = new NpgsqlCommand(
             "DROP TABLE IF EXISTS customers CASCADE; " +
@@ -30,7 +30,7 @@ public static class LeadData
 
     public static async Task SeedAsync(E2EBrain brain, string marker, CancellationToken ct)
     {
-        await using var connection = new NpgsqlConnection(await brain.Application.GetConnectionStringAsync("supabase-database", ct));
+        await using var connection = new NpgsqlConnection(await brain.GetConnectionStringAsync("supabase-database", ct));
         await connection.OpenAsync(ct);
         await using var schema = new NpgsqlCommand(
             "DROP TABLE IF EXISTS leads CASCADE; " +
@@ -44,7 +44,7 @@ public static class LeadData
 
     public static async Task DropAsync(E2EBrain brain, CancellationToken ct)
     {
-        await using var connection = new NpgsqlConnection(await brain.Application.GetConnectionStringAsync("supabase-database", ct));
+        await using var connection = new NpgsqlConnection(await brain.GetConnectionStringAsync("supabase-database", ct));
         await connection.OpenAsync(ct);
         await using var command = new NpgsqlCommand("DROP TABLE leads CASCADE", connection);
         await command.ExecuteNonQueryAsync(ct);

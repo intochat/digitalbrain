@@ -1,6 +1,7 @@
 using System.Text.Json;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Registry;
 
 namespace DigitalBrain.Microsoft.CSharp;
@@ -18,7 +19,7 @@ public sealed class CSharpContractDiscovery(IDigitalBrain brain, ModuleInventory
     public const string Example = """
         #:project /brain/src/Modules/Time/DigitalBrain.Modules.Time.Contracts/DigitalBrain.Modules.Time.Contracts.csproj
         // Add one #:project line per module whose contracts you use (copy them from Directive).
-        // DigitalBrain.Client is referenced for you; its namespace and DigitalBrain.Contracts are imported.
+        // DigitalBrain.Client is referenced for you; DigitalBrain, DigitalBrain.Client, and DigitalBrain.Contracts are imported.
         using ITimer = DigitalBrain.Time.Timers.ITimer;
         using DigitalBrain.Time.Timers.Signals;
 

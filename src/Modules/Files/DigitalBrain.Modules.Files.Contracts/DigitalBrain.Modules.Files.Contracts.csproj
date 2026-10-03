@@ -2,11 +2,12 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>Workspace files and image documents: explorer, edits and saved copies.</Description>
-    <RootNamespace>DigitalBrain.Files</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Files.Contracts</RootNamespace>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <!-- File surfaces expose Flutter UI bindings and image-canvas neuron contracts. -->
     <ProjectReference Include="../../Google/Flutter/DigitalBrain.Modules.Flutter.Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup><PackageReference Include="Microsoft.Orleans.Sdk" PrivateAssets="all" /></ItemGroup>
 </Project>

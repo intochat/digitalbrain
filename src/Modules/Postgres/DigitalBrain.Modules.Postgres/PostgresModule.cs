@@ -1,8 +1,9 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using Orleans.Hosting;
 
 namespace DigitalBrain.Postgres;
 
+[ModuleId("postgres")]
 public sealed class PostgresModule : IModule<PostgresModuleOptions>
 {
     public const string ConnectionName = "postgres";

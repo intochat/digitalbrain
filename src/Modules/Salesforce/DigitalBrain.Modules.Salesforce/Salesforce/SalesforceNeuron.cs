@@ -1,7 +1,9 @@
+using DigitalBrain.Platform.Contracts.Auth;
 using System.Text;
 using System.Text.Json;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Salesforce.Signals;
 using DigitalBrain.Sdk;
 using Orleans.Concurrency;
@@ -13,7 +15,7 @@ namespace DigitalBrain.Salesforce;
 internal sealed class SalesforceNeuron(
     ISalesforceProvider provider,
     SalesforceCredentialStore credentials,
-    TokenHandoff handoff,
+    ITokenHandoff handoff,
     SalesforceWriteAccess writeAccess,
     TimeProvider time,
     [PersistentState("salesforce-vault", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SalesforceState> state)
@@ -31,7 +33,7 @@ internal sealed class SalesforceNeuron(
         }
 
         var expiresAt = SalesforceTokenRefresh.Expiry(account.ExpiresInSeconds, time);
-        if (!handoff.TryPeek(account.Nonce, out var tokens))
+        if (!handoff.TryTake(account.Nonce, out var tokens))
         {
             await RejectAsync(new TokenHandoffExpiredException().Message);
             throw new SalesforceUnavailableException(new TokenHandoffExpiredException().Message);
@@ -51,7 +53,6 @@ internal sealed class SalesforceNeuron(
             await state.WriteStateAsync();
             var connection = Connection();
             await PublishAsync(new SalesforceConnected(connection));
-            handoff.Consume(account.Nonce);
             return connection;
         }
         catch (SalesforceUnavailableException error)

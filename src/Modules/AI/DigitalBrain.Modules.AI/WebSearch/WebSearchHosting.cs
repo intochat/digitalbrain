@@ -7,7 +7,7 @@ namespace DigitalBrain.AI.WebSearch;
 internal static class WebSearchHosting
 {
     internal static void Add(IServiceCollection services, IConfiguration configuration)
-        => Add(services, AIOptions.Read(configuration));
+        => Add(services, AIOptionsRuntime.Read(configuration));
 
     internal static void Add(IServiceCollection services, AIOptions configuration)
     {

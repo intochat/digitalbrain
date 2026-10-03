@@ -10,7 +10,7 @@ internal static class VoiceToTextHosting
     public const string DefaultTranscriptionKey = AIClients.DefaultTranscriptionKey;
 
     internal static void Add(IServiceCollection services, IConfiguration configuration)
-        => Add(services, AIOptions.Read(configuration));
+        => Add(services, AIOptionsRuntime.Read(configuration));
 
     internal static void Add(IServiceCollection services, AIOptions configuration)
     {

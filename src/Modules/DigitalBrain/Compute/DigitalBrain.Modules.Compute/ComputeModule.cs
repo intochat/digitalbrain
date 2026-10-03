@@ -1,11 +1,12 @@
+using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.Compute.Allowances;
 using DigitalBrain.Compute.Billing;
 using DigitalBrain.Compute.Ledger;
 using DigitalBrain.Compute.Metering;
 using DigitalBrain.Compute.Usage;
 using DigitalBrain.Compute.Storage;
-using DigitalBrain.Core;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Enforcement;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -13,7 +14,8 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Compute;
 
-public sealed class ComputeModule : IModule
+[ModuleId("compute")]
+public sealed class ComputeModule : IModule, IHttpModule
 {
     public void Configure(ISiloBuilder silo)
     {

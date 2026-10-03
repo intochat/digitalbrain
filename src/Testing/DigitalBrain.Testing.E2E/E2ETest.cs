@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Testing.E2E;
 
@@ -9,25 +9,24 @@ public static class E2ETest
     public static E2ETestBuilder Create() => new();
     public static E2ETestBuilder<TAppHost> For<TAppHost>() where TAppHost : class => new();
 
-    internal static async Task<E2EBrain> StartAsync<TAppHost>(string overrides, TestExecutionOptions options,
-        BrowserOptions browserOptions, CancellationToken cancellationToken) where TAppHost : class
+    internal static async Task<E2EBrain> StartAsync<TAppHost>(IReadOnlyDictionary<string, string?> optionOverrides,
+        TestExecutionOptions options, BrowserOptions browserOptions, CancellationToken cancellationToken) where TAppHost : class
     {
         cancellationToken.ThrowIfCancellationRequested();
         options.Validate();
         var browser = Resolve(browserOptions);
         var identity = NewIdentity();
-        var args = ComposeHostArguments(overrides, identity);
-        var session = await AspireTestSession.StartAsync<TAppHost>(args, identity, WithArtifacts(options, identity), cancellationToken).ConfigureAwait(false);
+        var args = ComposeHostArguments(optionOverrides, identity);
+        var session = await AspireTestSession.StartAsync<TAppHost>(args, WithArtifacts(options, identity), cancellationToken).ConfigureAwait(false);
         return await ReadyAsync(new E2EBrain(session, browser), brain => brain.StartBrowserAsync(cancellationToken)).ConfigureAwait(false);
     }
 
-    private static IReadOnlyList<string> ComposeHostArguments(string overrides, string identity)
+    private static IReadOnlyList<string> ComposeHostArguments(IReadOnlyDictionary<string, string?> optionOverrides, string identity)
         =>
         [
-            "DigitalBrain:Testing:Enabled=true",
             $"{DigitalBrainHostingNames.PersistentStorageKey}=false",
             $"Orleans:ClusterId={identity}",
-            $"{CompositionOverrideTransport.ConfigurationKey}={overrides}",
+            .. optionOverrides.Select(pair => $"{pair.Key}={pair.Value}"),
         ];
 
     internal static async Task<E2EBrain> StartModulesAsync(IReadOnlyList<ModuleDefinition> modules,

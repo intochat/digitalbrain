@@ -1,5 +1,5 @@
 using ClickHouse.Driver;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -9,6 +9,7 @@ using Orleans.Hosting;
 namespace DigitalBrain.ClickHouse;
 
 [ModuleDeployment("DigitalBrain.ClickHouse.ClickHouseDeployment, DigitalBrain.Modules.ClickHouse.Deployment")]
+[ModuleId("clickhouse")]
 public sealed class ClickHouseModule : IModule<ClickHouseModuleOptions>
 {
     public const string DriverProviderName = "ClickHouse";
@@ -18,7 +19,7 @@ public sealed class ClickHouseModule : IModule<ClickHouseModuleOptions>
         ArgumentNullException.ThrowIfNull(builder);
         var services = builder.Services;
         services.AddOptions<ClickHouseModuleOptions>()
-            .Configure<IConfiguration>(static (options, configuration) => configuration.PopulateModuleOptions(nameof(ClickHouseModule), options))
+            .Configure<IConfiguration>(static (options, configuration) => configuration.PopulateModuleOptions("clickhouse", options))
             .PostConfigure<IConfiguration>(static (options, configuration) => options.ResolveConnection(configuration))
             .Validate(static options => string.Equals(options.Provider, DriverProviderName, StringComparison.OrdinalIgnoreCase),
                 "ClickHouse requires the module option Provider=ClickHouse.")

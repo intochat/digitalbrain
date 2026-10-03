@@ -1,5 +1,6 @@
+using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.AI.Agents;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Supabase.Windows;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
@@ -11,7 +12,8 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Supabase;
 
-public sealed class SupabaseModule : IModule<SupabaseModuleOptions>
+[ModuleId("supabase")]
+public sealed class SupabaseModule : IModule<SupabaseModuleOptions>, IHttpModule
 {
     public const string ConnectionName = "supabase";
     public const string ProviderName = "Npgsql";
@@ -27,7 +29,7 @@ public sealed class SupabaseModule : IModule<SupabaseModuleOptions>
         ArgumentNullException.ThrowIfNull(builder);
         var services = builder.Services;
         services.AddOptions<SupabaseModuleOptions>()
-            .Configure<IConfiguration>(static (options, configuration) => configuration.PopulateModuleOptions(nameof(SupabaseModule), options))
+            .Configure<IConfiguration>(static (options, configuration) => configuration.PopulateModuleOptions("supabase", options))
             .PostConfigure<IConfiguration>(static (options, configuration) => options.ResolveConnection(configuration))
             .Validate(static options => string.Equals(options.Provider, ProviderName, StringComparison.OrdinalIgnoreCase),
                 "Supabase requires the Npgsql provider.")

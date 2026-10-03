@@ -2,10 +2,10 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>Azure deployment for the C# module: a Hyper-V session pool running the Sandbox image, isolated on its own network.</Description>
-    <RootNamespace>DigitalBrain.Microsoft.CSharp</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Microsoft.CSharp.Deployment</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../../DigitalBrain/Kernel/Deployment/DigitalBrain.Deployment/DigitalBrain.Deployment.csproj" />
+    <ProjectReference Include="../../../../DigitalBrain/Deployment/DigitalBrain.Deployment/DigitalBrain.Deployment.csproj" />
     <ProjectReference Include="../DigitalBrain.Modules.Microsoft.CSharp/DigitalBrain.Modules.Microsoft.CSharp.csproj" />
   </ItemGroup>
 </Project>

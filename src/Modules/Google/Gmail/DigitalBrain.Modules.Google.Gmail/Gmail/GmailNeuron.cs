@@ -1,7 +1,8 @@
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Core;
-using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Kernel;
+using DigitalBrain.Platform.Contracts.Secrets;
 using DigitalBrain.Sdk;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;

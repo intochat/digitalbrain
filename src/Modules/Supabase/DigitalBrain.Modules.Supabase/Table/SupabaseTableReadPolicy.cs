@@ -1,3 +1,4 @@
+using DigitalBrain.Sdk.Types;
 using DigitalBrain.Contracts.Types;
 using DigitalBrain.Supabase.Tables;
 

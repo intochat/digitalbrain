@@ -1,4 +1,7 @@
+using DigitalBrain.Sdk.Types;
+using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.Sdk.Http;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Types;
 using DigitalBrain.Flutter;
@@ -18,7 +21,7 @@ using DigitalBrain.Flutter.FileInput;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Flutter.WebBrowser;
 using DigitalBrain.Apps;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -89,12 +92,12 @@ internal static class AppUiEndpoints
                     }
                     else if (input.Action == "secret")
                     {
-                        if (!SecretRef.IsReference(input.Value))
+                        if (!SecretReferences.IsReference(input.Value))
                         {
                             throw new ArgumentException("A form secret carries the vault reference, never a raw secret value.");
                         }
 
-                        await form.SetSecret(input.Field ?? "", SecretRef.FromReference(input.Value!, input.Field ?? "")).WaitAsync(ct);
+                        await form.SetSecret(input.Field ?? "", SecretReferences.FromReference(input.Value!, input.Field ?? "")).WaitAsync(ct);
                     }
                     else { await form.SetDraft(input.Field ?? "", input.Value ?? "").WaitAsync(ct); }
                     break;

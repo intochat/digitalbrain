@@ -1,5 +1,6 @@
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Supabase.Tables;
 using DigitalBrain.Supabase.Tables.Signals;
 using Microsoft.Extensions.DependencyInjection;

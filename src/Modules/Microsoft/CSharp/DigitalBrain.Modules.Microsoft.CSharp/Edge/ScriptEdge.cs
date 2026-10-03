@@ -1,10 +1,12 @@
+using DigitalBrain.Contracts.Edge.V1;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using DigitalBrain.Client;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 
 namespace DigitalBrain.Microsoft.CSharp;
 

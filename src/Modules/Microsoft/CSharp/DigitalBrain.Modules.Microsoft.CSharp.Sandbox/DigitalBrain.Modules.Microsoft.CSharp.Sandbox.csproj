@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Description>Sandbox host: compiles and runs single-file C# apps it receives over HTTP.</Description>
-    <RootNamespace>DigitalBrain.Microsoft.CSharp.Sandbox</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Microsoft.CSharp.Sandbox</RootNamespace>
     <!-- The source-generated kill() import sends SIGTERM so dotnet run can stop the script gracefully. -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>

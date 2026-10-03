@@ -54,9 +54,9 @@ and the E2E suite are untouched, per the spec's out-of-scope list.
 - All three scripts compiled standalone against the real contracts projects plus
   `DigitalBrain.Client` (scratch csproj per script, 0 errors each) — semantic check beyond the
   parse-only shipped-app fact.
-- `dotnet test src/Applications/IntoChat/Tests/Unit` — 14/14 passed (includes the new
+- `dotnet test src/IntoChat/tests/IntoChat.Tests.Unit` — 14/14 passed (includes the new
   platform-contracts fact and the shipped-app parse facts over the new files).
-- `dotnet test src/Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps.Tests.Unit` — 59/59.
+- `dotnet test src/Modules/DigitalBrain/Apps/tests/DigitalBrain.Modules.Apps.Tests.Unit` — 59/59.
 - `dotnet test src/Modules/DigitalBrain/CustomerResearcher/...Tests.Unit` — 13/13 (1 live-gated
   skip). The module still builds and passes beside the package (coexistence, criterion 5).
 - `aspire run` smoke: all resources reached Running (sandbox started on demand);

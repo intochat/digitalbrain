@@ -2,10 +2,11 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>Aspire AppHost neuron contracts: resource state, commands and state signals.</Description>
-    <RootNamespace>DigitalBrain.Microsoft.Aspire</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Microsoft.Aspire.Contracts</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <!-- Neuron interfaces and signals use the Kernel wire vocabulary. -->
-    <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Modules.Kernel.Contracts/DigitalBrain.Modules.Kernel.Contracts.csproj" />
+    <ProjectReference Include="../../../../DigitalBrain/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup><PackageReference Include="Microsoft.Orleans.Sdk" PrivateAssets="all" /></ItemGroup>
 </Project>

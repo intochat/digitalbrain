@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using Orleans;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;

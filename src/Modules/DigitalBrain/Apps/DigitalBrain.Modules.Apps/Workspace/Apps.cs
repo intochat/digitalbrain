@@ -1,4 +1,5 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Apps.Signals;
 using DigitalBrain.Registry;

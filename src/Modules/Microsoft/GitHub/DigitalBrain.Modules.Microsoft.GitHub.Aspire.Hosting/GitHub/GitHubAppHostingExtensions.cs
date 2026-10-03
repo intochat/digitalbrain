@@ -6,8 +6,8 @@ namespace DigitalBrain.Microsoft.GitHub;
 
 public static class GitHubAppHostingExtensions
 {
-    public static DigitalBrainModuleBuilder<GitHubModule> WithGitHubApp(
-        this DigitalBrainModuleBuilder<GitHubModule> module, Action<GitHubAppHostingOptions> configure)
+    public static DigitalBrainModuleBuilder<DigitalBrain.Microsoft.GitHub.GitHubModuleHosting> WithGitHubApp(
+        this DigitalBrainModuleBuilder<DigitalBrain.Microsoft.GitHub.GitHubModuleHosting> module, Action<GitHubAppHostingOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(module);
         ArgumentNullException.ThrowIfNull(configure);
@@ -18,8 +18,8 @@ public static class GitHubAppHostingExtensions
         return module.WithGitHubApp(options.AppId, options.Slug, options.ClientId, options.PublicOrigin!, options.PublicWebhookUrl!);
     }
 
-    public static DigitalBrainModuleBuilder<GitHubModule> WithGitHubApp(
-        this DigitalBrainModuleBuilder<GitHubModule> module,
+    public static DigitalBrainModuleBuilder<DigitalBrain.Microsoft.GitHub.GitHubModuleHosting> WithGitHubApp(
+        this DigitalBrainModuleBuilder<DigitalBrain.Microsoft.GitHub.GitHubModuleHosting> module,
         long appId, string slug, string clientId, Uri publicOrigin, Uri publicWebhookUrl)
     {
         ArgumentNullException.ThrowIfNull(module);
@@ -56,11 +56,11 @@ public static class GitHubAppHostingExtensions
 
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
-            _privateKey ??= brain.ApplicationBuilder.AddParameter("github-app-private-key", secret: true)
+            _privateKey ??= brain.ApplicationBuilder.AddParameter(brain.ResourceName("github-app-private-key"), secret: true)
                 .WithDescription("PEM private key for the GitHub App; projected only to the kernel.");
-            _webhookSecret ??= brain.ApplicationBuilder.AddParameter("github-app-webhook-secret", secret: true)
+            _webhookSecret ??= brain.ApplicationBuilder.AddParameter(brain.ResourceName("github-app-webhook-secret"), secret: true)
                 .WithDescription("GitHub App HMAC webhook secret, at least 16 characters.");
-            _clientSecret ??= brain.ApplicationBuilder.AddParameter("github-app-client-secret", secret: true)
+            _clientSecret ??= brain.ApplicationBuilder.AddParameter(brain.ResourceName("github-app-client-secret"), secret: true)
                 .WithDescription("GitHub App OAuth client secret; user tokens are only used during authorization.");
             const string root = "DigitalBrain:Microsoft:GitHub:App";
             const string IntegrationRoot = "DigitalBrain:Integrations:github";

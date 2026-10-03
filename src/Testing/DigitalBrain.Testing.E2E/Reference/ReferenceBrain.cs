@@ -9,18 +9,16 @@ using DigitalBrain.Assistant;
 using DigitalBrain.Specs;
 using DigitalBrain.ClickHouse;
 using DigitalBrain.Microsoft.CSharp;
-using DigitalBrain.Core;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google.Gmail;
-using DigitalBrain.Memory;
 using DigitalBrain.Qdrant;
 using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.GitHub;
 using DigitalBrain.Compute;
 using DigitalBrain.Registry;
-using DigitalBrain.Sdk.Integrations;
-using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Contracts.Integrations;
+using DigitalBrain.Platform.Contracts.Secrets;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
 using DigitalBrain.Time;
@@ -45,7 +43,6 @@ public static class ReferenceBrain
                     .WithTavilySearch();
             })
             .WithModule<QdrantModule, QdrantModuleOptions>(qdrant => qdrant.WithHostedQdrant())
-            .WithModule<MemoryModule>()
             .WithModule<ClickHouseModule, ClickHouseModuleOptions>(database => database.WithClickHouse())
             .WithModule<SupabaseModule, SupabaseModuleOptions>(database => database.WithConnection("supabase"))
             .WithModule<PostgresModule, PostgresModuleOptions>(database => database.WithPostgres(options => options.DatabaseName = "digitalbrain"))
@@ -90,11 +87,11 @@ public static class ReferenceBrain
                 },
                 PrivateConfiguration = Merge(new Dictionary<string, string?>
                 {
-                    ["Parameters:openai-api-key"] = modelApiKey,
-                    ["Parameters:gmail-client-id"] = "fixture-client",
-                    ["Parameters:gmail-client-secret"] = "fixture-secret",
-                    ["Parameters:salesforce-consumer-key"] = "fixture-client",
-                    ["Parameters:salesforce-consumer-secret"] = "fixture-secret",
+                    ["Parameters:modules-openai-api-key"] = modelApiKey,
+                    ["Parameters:modules-gmail-client-id"] = "fixture-client",
+                    ["Parameters:modules-gmail-client-secret"] = "fixture-secret",
+                    ["Parameters:modules-salesforce-consumer-key"] = "fixture-client",
+                    ["Parameters:modules-salesforce-consumer-secret"] = "fixture-secret",
                 }, privateConfiguration),
             });
     private static Dictionary<string, string?> Merge(Dictionary<string, string?> defaults, Dictionary<string, string?>? extra)

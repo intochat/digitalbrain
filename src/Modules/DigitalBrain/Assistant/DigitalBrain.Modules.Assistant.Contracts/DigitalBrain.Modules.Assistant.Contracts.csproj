@@ -2,7 +2,7 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>The workspace assistant contract: threads, turns, models, voice and its surface.</Description>
-    <RootNamespace>DigitalBrain.Assistant</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Assistant.Contracts</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <!-- Assistant conversations expose AI agent definitions, history, and model choices. -->
@@ -10,4 +10,5 @@
     <!-- Assistant surfaces expose Flutter UI child references and bindings. -->
     <ProjectReference Include="../../../Google/Flutter/DigitalBrain.Modules.Flutter.Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup><PackageReference Include="Microsoft.Orleans.Sdk" PrivateAssets="all" /></ItemGroup>
 </Project>

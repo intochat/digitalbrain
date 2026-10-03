@@ -2,10 +2,10 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>Aspire hosting for the C# module: the on-demand csharp-sandbox container.</Description>
-    <RootNamespace>DigitalBrain.Microsoft.CSharp</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Microsoft.CSharp.Aspire.Hosting</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../DigitalBrain.Modules.Microsoft.CSharp/DigitalBrain.Modules.Microsoft.CSharp.csproj" />
-    <ProjectReference Include="..\..\..\..\Aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../DigitalBrain.Modules.Microsoft.CSharp.Contracts/DigitalBrain.Modules.Microsoft.CSharp.Contracts.csproj" />
+    <ProjectReference Include="../../../../Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

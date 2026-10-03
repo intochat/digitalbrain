@@ -1,4 +1,4 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Time.Reminders.Signals;
 using Orleans.Runtime;
 using Orleans.Timers;

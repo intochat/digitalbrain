@@ -7,8 +7,8 @@ namespace DigitalBrain.Postgres.Aspire.Hosting;
 
 internal static class PostgresHostingExtensions
 {
-    public static DigitalBrainModuleBuilder<PostgresModule> WithPostgres(
-        this DigitalBrainModuleBuilder<PostgresModule> module,
+    public static DigitalBrainModuleBuilder<DigitalBrain.Postgres.Aspire.Hosting.PostgresModuleHosting> WithPostgres(
+        this DigitalBrainModuleBuilder<DigitalBrain.Postgres.Aspire.Hosting.PostgresModuleHosting> module,
         Action<PostgresHostingOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(module);
@@ -20,13 +20,13 @@ internal static class PostgresHostingExtensions
         return module;
     }
 
-    internal static void WithExternalConnection(this DigitalBrainModuleBuilder<PostgresModule> module, string connectionName)
+    internal static void WithExternalConnection(this DigitalBrainModuleBuilder<DigitalBrain.Postgres.Aspire.Hosting.PostgresModuleHosting> module, string connectionName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionName);
         State(module).Enable(new(connectionName, null, false));
     }
 
-    private static PostgresHostingState State(DigitalBrainModuleBuilder<PostgresModule> module)
+    private static PostgresHostingState State(DigitalBrainModuleBuilder<DigitalBrain.Postgres.Aspire.Hosting.PostgresModuleHosting> module)
     {
         var state = module.DigitalBrainBuilder.GetOrAddState(brain => new PostgresHostingState(brain, module.Resource), out var added);
         if (added) { module.AddProjection(state); }
@@ -55,16 +55,16 @@ internal static class PostgresHostingExtensions
             // manually provisioned database, and without an admin connection no provisioner registers.
             if (configuration.DatabaseName is { } databaseName && !brain.ApplicationBuilder.ExecutionContext.IsPublishMode)
             {
-                var server = brain.ApplicationBuilder.AddPostgres("postgres-server")
+                var server = brain.ApplicationBuilder.AddPostgres(brain.ResourceName("postgres-server"))
                     .WithParentRelationship(module)
                     .WithRepl();
                 if (configuration.PersistentStorage) { server.WithDataVolume().WithLifetime(ContainerLifetime.Persistent); }
                 _server = server;
-                _database = server.AddDatabase("postgres-database", databaseName);
+                _database = server.AddDatabase(brain.ResourceName("postgres-database"), databaseName);
             }
             else
             {
-                _connection = brain.ApplicationBuilder.AddParameter("postgres-connection", () =>
+                _connection = brain.ApplicationBuilder.AddParameter(brain.ResourceName("postgres-connection"), () =>
                     brain.ApplicationBuilder.Configuration["Parameters:postgres-connection"]
                     ?? brain.ApplicationBuilder.Configuration.GetConnectionString(configuration.ConnectionName)
                     ?? throw new InvalidOperationException($"Connection string '{configuration.ConnectionName}' is required."), secret: true)

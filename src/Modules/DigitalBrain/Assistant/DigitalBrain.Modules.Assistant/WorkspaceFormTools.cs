@@ -1,8 +1,10 @@
+using DigitalBrain.Sdk.Types;
 using System.ComponentModel;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain.AI.Agents;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Types;
 using DigitalBrain.Flutter;

@@ -7,8 +7,8 @@ namespace DigitalBrain.ClickHouse.Aspire.Hosting;
 
 public static class ClickHouseHostingExtensions
 {
-    public static DigitalBrainModuleBuilder<ClickHouseModule> WithClickHouse(
-        this DigitalBrainModuleBuilder<ClickHouseModule> module,
+    public static DigitalBrainModuleBuilder<DigitalBrain.ClickHouse.Aspire.Hosting.ClickHouseModuleHosting> WithClickHouse(
+        this DigitalBrainModuleBuilder<DigitalBrain.ClickHouse.Aspire.Hosting.ClickHouseModuleHosting> module,
         Action<ClickHouseHostingOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(module);
@@ -18,7 +18,7 @@ public static class ClickHouseHostingExtensions
         return module;
     }
 
-    private static ClickHouseHostingState State(DigitalBrainModuleBuilder<ClickHouseModule> module)
+    private static ClickHouseHostingState State(DigitalBrainModuleBuilder<DigitalBrain.ClickHouse.Aspire.Hosting.ClickHouseModuleHosting> module)
     {
         var state = module.DigitalBrainBuilder.GetOrAddState(static brain => new ClickHouseHostingState(brain), out var added);
         if (added)
@@ -52,7 +52,7 @@ public static class ClickHouseHostingExtensions
             }
 
             var builder = brain.ApplicationBuilder;
-            _server = builder.AddClickHouse(ClickHouseNames.Server)
+            _server = builder.AddClickHouse(brain.ResourceName(ClickHouseNames.Server))
                 .WithParentRelationship(brain.Resource)
                 .WithUrlForEndpoint("http", static endpoint => new ResourceUrlAnnotation
                 {
@@ -61,7 +61,7 @@ public static class ClickHouseHostingExtensions
                     Endpoint = endpoint,
                 });
             if (options.PersistentStorage) { _server.WithDataVolume().WithLifetime(ContainerLifetime.Persistent); }
-            _database = _server.AddDatabase(ClickHouseNames.DatabaseResource, ClickHouseNames.DatabaseName);
+            _database = _server.AddDatabase(brain.ResourceName(ClickHouseNames.DatabaseResource), ClickHouseNames.DatabaseName);
 
             if (options.Seeds.Count > 0)
             {
@@ -92,7 +92,7 @@ public static class ClickHouseHostingExtensions
 
             // Waiting on the database resource covers server health and the CREATE DATABASE step.
             builder
-                .WithReference(_database, connectionName: ClickHouseRegistration.DefaultConnectionName)
+                .WithReference(_database, connectionName: "clickhouse")
                 .WithAnnotation(new WaitAnnotation(_database.Resource, WaitType.WaitUntilHealthy, exitCode: 0));
         }
     }

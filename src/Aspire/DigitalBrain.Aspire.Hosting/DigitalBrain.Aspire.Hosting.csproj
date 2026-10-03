@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <IsPackable>true</IsPackable>
+    <RootNamespace>DigitalBrain.Aspire.Hosting</RootNamespace>
     <Description>Core DigitalBrain AppHost composition: Orleans, stores, module selection, and silo/client projection.</Description>
   </PropertyGroup>
   <ItemGroup>
@@ -9,7 +10,7 @@
     <PackageReference Include="Aspire.Hosting.Orleans" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Modules.Kernel.Contracts/DigitalBrain.Modules.Kernel.Contracts.csproj" />
-    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Modules.Kernel/DigitalBrain.Modules.Kernel.csproj" />
+    <ProjectReference Include="../../DigitalBrain/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="DigitalBrain.Aspire.Hosting.Tests.Unit" /></ItemGroup>
 </Project>

@@ -8,11 +8,12 @@ namespace DigitalBrain.Microsoft.Aspire;
 
 public sealed class AspireModuleHosting : IDigitalBrainModuleHosting
 {
+    public string Id => "aspire";
     public void Configure(DigitalBrainBuilder brain)
     {
         ArgumentNullException.ThrowIfNull(brain);
         var bridgeKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        new DigitalBrainModuleBuilder<AspireModule>(brain).AddProjection(new BridgeKeyProjection(bridgeKey));
+        new DigitalBrainModuleBuilder<DigitalBrain.Microsoft.Aspire.AspireModuleHosting>(brain).AddProjection(new BridgeKeyProjection(bridgeKey));
         brain.ApplicationBuilder.Services.AddHostedService(services => ActivatorUtilities.CreateInstance<AspireBridgeClient>(services, bridgeKey));
     }
 
@@ -21,7 +22,7 @@ public sealed class AspireModuleHosting : IDigitalBrainModuleHosting
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
             ArgumentNullException.ThrowIfNull(builder);
-            builder.WithEnvironment(EnvironmentKeys.For(AspireModule.ConfigurationRoot, "BridgeKey"), bridgeKey);
+            builder.WithEnvironment(EnvironmentKeys.For("DigitalBrain:Microsoft:Aspire", "BridgeKey"), bridgeKey);
         }
     }
 }

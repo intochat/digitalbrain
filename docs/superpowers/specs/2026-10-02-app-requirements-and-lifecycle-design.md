@@ -275,7 +275,7 @@ reference was added.
 Run `dotnet test` separately for affected Apps, Postgres, ClickHouse and IntoChat unit projects,
 plus affected owner projects and module E2E suites; never run the `.slnx`. Compile live-gated
 scenarios when credentials are unavailable. Then `aspire run` from
-`src/Applications/IntoChat/AppHost`: all resources Healthy, install Customer Researcher,
+`src/IntoChat/IntoChat.AppHost`: all resources Healthy, install Customer Researcher,
 research into the locally provisioned database, uninstall, verify physical removal, reinstall,
 verify empty/redefinable storage and research again. Verify every shipped package's sandbox
 gate. Record actual commands, results and any unavailable verification in the PR body.

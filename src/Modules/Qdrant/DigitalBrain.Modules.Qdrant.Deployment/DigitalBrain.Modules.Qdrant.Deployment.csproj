@@ -2,10 +2,10 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>Azure deployment for the Qdrant module: the shared vector store.</Description>
-    <RootNamespace>DigitalBrain.Qdrant</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Qdrant.Deployment</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../DigitalBrain/Kernel/Deployment/DigitalBrain.Deployment/DigitalBrain.Deployment.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/Deployment/DigitalBrain.Deployment/DigitalBrain.Deployment.csproj" />
     <ProjectReference Include="../DigitalBrain.Modules.Qdrant/DigitalBrain.Modules.Qdrant.csproj" />
   </ItemGroup>
 </Project>

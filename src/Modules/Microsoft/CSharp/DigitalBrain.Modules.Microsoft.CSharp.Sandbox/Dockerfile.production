@@ -15,7 +15,7 @@ ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
 WORKDIR /brain
 COPY .editorconfig global.json Directory.Build.props Directory.Build.targets Directory.Packages.props ./
 COPY src/Modules/ src/Modules/
-RUN dotnet build src/Modules/DigitalBrain/Kernel/DigitalBrain.Client/DigitalBrain.Client.csproj -c Debug \
+RUN dotnet build src/DigitalBrain/Client/DigitalBrain.Client/DigitalBrain.Client.csproj -c Debug \
     && for contracts in $(find src/Modules -name '*.Contracts.csproj'); do dotnet build "$contracts" -c Debug || exit 1; done
 WORKDIR /app
 COPY --from=host /app .

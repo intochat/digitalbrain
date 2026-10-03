@@ -5,8 +5,8 @@ namespace DigitalBrain.Microsoft.GitHub;
 
 public static class GitHubConfigurationHostingExtensions
 {
-    public static DigitalBrainModuleBuilder<GitHubModule> WithConfiguredGitHubApp(
-        this DigitalBrainModuleBuilder<GitHubModule> module, IConfiguration configuration)
+    public static DigitalBrainModuleBuilder<DigitalBrain.Microsoft.GitHub.GitHubModuleHosting> WithConfiguredGitHubApp(
+        this DigitalBrainModuleBuilder<DigitalBrain.Microsoft.GitHub.GitHubModuleHosting> module, IConfiguration configuration)
     {
         var options = configuration.GetSection("DigitalBrain:Microsoft:GitHub:App").Get<GitHubAppHostingOptions>();
         if (options is not null)

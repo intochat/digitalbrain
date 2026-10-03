@@ -1,5 +1,6 @@
+using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.AI.Agents;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -7,7 +8,8 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Assistant;
 
-public sealed class AssistantModule : IModule
+[ModuleId("assistant")]
+public sealed class AssistantModule : IModule, IHttpModule
 {
     public void Configure(ISiloBuilder silo)
     {

@@ -1,5 +1,6 @@
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 

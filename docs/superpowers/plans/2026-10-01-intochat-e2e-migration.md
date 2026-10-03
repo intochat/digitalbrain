@@ -1,7 +1,7 @@
 # Prompt: dissolve the IntoChat E2E monolith into module suites
 
 In `E:\intochat\digitalbrain`, execute Phase 3 of the IntoChat cleanup: migrate the product E2E
-suite (`src/Applications/IntoChat/Tests/E2E`, ~2,600 lines) into the owning modules' E2E projects,
+suite (`src/IntoChat/tests/IntoChat.Tests.E2E`, ~2,600 lines) into the owning modules' E2E projects,
 so IntoChat keeps only composition facts and the product's golden journeys. Read `CLAUDE.md`
 first, then `docs/superpowers/specs/2026-10-01-intochat-cleanup-marketplace-design.md` (Phases 1–2,
 already landed — this continues their test-ownership rule: module behavior belongs in the owning
@@ -43,7 +43,7 @@ module suites can lease fully composed brains:
 ## Step 1 — dedup what already moved
 
 Diff `IntoChat.Tests.E2E/Packages/{PackageSharingFacts,ResearcherPackage}.cs` against
-`src/Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps.Tests.E2E/{PackageSharingFacts,ResearcherPackage}.cs`.
+`src/Modules/DigitalBrain/Apps/tests/DigitalBrain.Modules.Apps.Tests.E2E/{PackageSharingFacts,ResearcherPackage}.cs`.
 Port any assertions the module copy lacks, then delete the IntoChat copies. If the module copy
 tests through grain contracts while the IntoChat copy tests through the product HTTP routes,
 keep the HTTP-route half too — in Apps E2E, using the moved cookie-client helpers (`People`),
@@ -125,8 +125,8 @@ the report rather than silently dropping assertions.
 
 Per project, never the `.slnx`. For every receiving module: `dotnet test` its unit suite and
 compile its E2E; execute E2E projects that don't need live gates. Then `dotnet test
-src/Applications/IntoChat/Tests/Unit`, compile the shrunken IntoChat E2E, and smoke with
-`aspire run` from `src/Applications/IntoChat/AppHost` until all resources are Healthy. Finish by
+src/IntoChat/tests/IntoChat.Tests.Unit`, compile the shrunken IntoChat E2E, and smoke with
+`aspire run` from `src/IntoChat/IntoChat.AppHost` until all resources are Healthy. Finish by
 updating CLAUDE.md's testing guidance: the 18-minute monolith no longer exists; name the new rule
 (module E2E suites run with their module; IntoChat E2E is composition + golden journeys only).
 Record per-project results in `docs/superpowers/verification/2026-10-01-intochat-e2e-migration.md`,

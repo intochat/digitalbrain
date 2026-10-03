@@ -1,8 +1,9 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using global::Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
 namespace DigitalBrain.Microsoft.Playwright;
 
+[ModuleId("playwright")]
 public sealed class PlaywrightModule : IModule
 {
     public void Configure(ISiloBuilder silo) => silo.AddPlaywright();

@@ -7,8 +7,8 @@ namespace DigitalBrain.Supabase.Aspire.Hosting;
 
 public static class SupabaseHostingExtensions
 {
-    public static DigitalBrainModuleBuilder<SupabaseModule> WithSupabase(
-        this DigitalBrainModuleBuilder<SupabaseModule> module,
+    public static DigitalBrainModuleBuilder<DigitalBrain.Supabase.Aspire.Hosting.SupabaseModuleHosting> WithSupabase(
+        this DigitalBrainModuleBuilder<DigitalBrain.Supabase.Aspire.Hosting.SupabaseModuleHosting> module,
         Action<SupabaseHostingOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(module);
@@ -20,7 +20,7 @@ public static class SupabaseHostingExtensions
         return module;
     }
 
-    private static SupabaseHostingState State(DigitalBrainModuleBuilder<SupabaseModule> module)
+    private static SupabaseHostingState State(DigitalBrainModuleBuilder<DigitalBrain.Supabase.Aspire.Hosting.SupabaseModuleHosting> module)
     {
         var state = module.DigitalBrainBuilder.GetOrAddState(brain => new SupabaseHostingState(brain, module.Resource), out var added);
         if (added)
@@ -47,7 +47,7 @@ public static class SupabaseHostingExtensions
 
             _options = options;
             _connection = brain.ApplicationBuilder
-                .AddParameter("supabase-connection", () => brain.ApplicationBuilder.Configuration["Parameters:supabase-connection"]
+                .AddParameter(brain.ResourceName("supabase-connection"), () => brain.ApplicationBuilder.Configuration["Parameters:supabase-connection"]
                     ?? brain.ApplicationBuilder.Configuration.GetConnectionString(_options.ParameterName)
                     ?? throw new InvalidOperationException($"Connection string '{_options.ParameterName}' is required."), secret: true)
                 .WithParentRelationship(module);

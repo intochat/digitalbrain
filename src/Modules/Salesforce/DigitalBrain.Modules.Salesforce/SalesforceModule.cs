@@ -1,6 +1,8 @@
-using DigitalBrain.Core;
+using DigitalBrain.Platform.Contracts.Auth;
+using DigitalBrain.Kernel.AspNetCore;
+using DigitalBrain.Kernel;
 using DigitalBrain.Sdk;
-using DigitalBrain.Sdk.Integrations.Accounts;
+using DigitalBrain.Platform.Contracts.Integrations.Accounts;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -8,7 +10,8 @@ using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Salesforce;
 
-public sealed class SalesforceModule : IModule<SalesforceModuleOptions>
+[ModuleId("salesforce")]
+public sealed class SalesforceModule : IModule<SalesforceModuleOptions>, IHttpModule
 {
     public const string OAuthConfigurationRoot = "DigitalBrain:Salesforce:OAuth";
 
@@ -19,7 +22,6 @@ public sealed class SalesforceModule : IModule<SalesforceModuleOptions>
         ArgumentNullException.ThrowIfNull(silo);
         var services = silo.Services;
         services.TryAddSingleton(TimeProvider.System);
-        services.TryAddSingleton<TokenHandoff>();
         services.AddOptions<SalesforceOAuthOptions>().Bind(silo.Configuration.GetSection(SalesforceOAuthOptions.SectionName));
         services.TryAddSingleton(static services => new SalesforceOAuthConfiguration(services.GetRequiredService<IOptions<SalesforceOAuthOptions>>()));
         services.TryAddSingleton<SalesforceLogins>();
@@ -28,7 +30,7 @@ public sealed class SalesforceModule : IModule<SalesforceModuleOptions>
         services.TryAddSingleton<SalesforceTokenRefresh>();
         services.TryAddSingleton<SalesforceCredentialStore>();
         services.TryAddSingleton<SalesforceWriteAccess>();
-        var moduleOptions = silo.Configuration.GetModuleOptions<SalesforceModuleOptions>(nameof(SalesforceModule));
+        var moduleOptions = silo.Configuration.GetModuleOptions<SalesforceModuleOptions>("salesforce");
         services.AddOptions<SalesforceMcpOptions>()
             .Configure(mcp =>
             {

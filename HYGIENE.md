@@ -82,7 +82,7 @@ runtime-verified); "only Endpoint set → Partial" registration case; Dart core 
   `UiKitEndpoints.cs` with **32 types**; `ShellPersistence.cs`, `GrainDocumentStore.cs`,
   `ComputeRecordsNeuron.cs` 7–9 each. Dart: 58 multi-type files, 17 files >400 lines.
 - **Namespace rule missing**: 482 files match project+folder, 451 flatten to module root,
-  67 differ outright; kernel project `DigitalBrain` uses namespace `DigitalBrain.Core` (27 files).
+  67 differ outright; kernel project `DigitalBrain` uses namespace `DigitalBrain.Kernel` (27 files).
   **Decision needed**: adopt either folder-mirroring or module-root-flat as THE rule, then sweep.
   (Recommendation: module-root namespaces `DigitalBrain.<Module>` — matches the majority and the
   module-contract mental model; folders become organization, not identity.)

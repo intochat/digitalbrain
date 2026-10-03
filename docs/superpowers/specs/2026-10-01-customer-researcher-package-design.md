@@ -110,7 +110,7 @@ GUID-scoped installs, never a live model or browser:
    package do not fight over neurons or tables. Existing module unit tests stay green.
 6. **Suites and smoke.** Green: the Apps module unit suite, the IntoChat unit suite
    (including `ShippedAppFacts`), the Postgres and CustomerResearcher module suites
-   (untouched or adjusted), and `aspire run` from `src/Applications/IntoChat/AppHost` with
+   (untouched or adjusted), and `aspire run` from `src/IntoChat/IntoChat.AppHost` with
    all resources Healthy; the researcher window opens and composes against the running app.
 7. **Report delivered**: the Stop idiom as implemented and its observed granularity; any
    missing or awkward contract encountered (named precisely); the final list of `#:project`

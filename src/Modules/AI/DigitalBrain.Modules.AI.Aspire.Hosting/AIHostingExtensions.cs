@@ -13,7 +13,7 @@ public static partial class AIHostingExtensions
     private const string EnableSensitiveDataEnvironmentKey =
         "DigitalBrain__AI__Telemetry__EnableSensitiveData";
 
-    public static DigitalBrainModuleBuilder<AIModule> WithLlm<TModel>(this DigitalBrainModuleBuilder<AIModule> module)
+    public static DigitalBrainModuleBuilder<DigitalBrain.AI.Aspire.Hosting.AIModuleHosting> WithLlm<TModel>(this DigitalBrainModuleBuilder<DigitalBrain.AI.Aspire.Hosting.AIModuleHosting> module)
         where TModel : ILLM
     {
         ArgumentNullException.ThrowIfNull(module);
@@ -21,7 +21,7 @@ public static partial class AIHostingExtensions
         return module;
     }
 
-    public static DigitalBrainModuleBuilder<AIModule> WithEmbedding<TModel>(this DigitalBrainModuleBuilder<AIModule> module)
+    public static DigitalBrainModuleBuilder<DigitalBrain.AI.Aspire.Hosting.AIModuleHosting> WithEmbedding<TModel>(this DigitalBrainModuleBuilder<DigitalBrain.AI.Aspire.Hosting.AIModuleHosting> module)
         where TModel : IEmbedding
     {
         ArgumentNullException.ThrowIfNull(module);
@@ -29,7 +29,7 @@ public static partial class AIHostingExtensions
         return module;
     }
 
-    public static DigitalBrainModuleBuilder<AIModule> WithDefaultLlm<TModel>(this DigitalBrainModuleBuilder<AIModule> module)
+    public static DigitalBrainModuleBuilder<DigitalBrain.AI.Aspire.Hosting.AIModuleHosting> WithDefaultLlm<TModel>(this DigitalBrainModuleBuilder<DigitalBrain.AI.Aspire.Hosting.AIModuleHosting> module)
         where TModel : ILLM
     {
         ArgumentNullException.ThrowIfNull(module);
@@ -37,7 +37,7 @@ public static partial class AIHostingExtensions
         return module;
     }
 
-    public static DigitalBrainModuleBuilder<AIModule> WithDefaultEmbedding<TModel>(this DigitalBrainModuleBuilder<AIModule> module)
+    public static DigitalBrainModuleBuilder<DigitalBrain.AI.Aspire.Hosting.AIModuleHosting> WithDefaultEmbedding<TModel>(this DigitalBrainModuleBuilder<DigitalBrain.AI.Aspire.Hosting.AIModuleHosting> module)
         where TModel : IEmbedding
     {
         ArgumentNullException.ThrowIfNull(module);
@@ -47,8 +47,8 @@ public static partial class AIHostingExtensions
 
     // Speech-to-text, local or hosted. ITranscription constrains the marker, so a
     // marker of the wrong kind is a compile error rather than a runtime lookup miss.
-    public static DigitalBrainModuleBuilder<AIModule> WithVoiceToText<TModel>(
-        this DigitalBrainModuleBuilder<AIModule> module)
+    public static DigitalBrainModuleBuilder<DigitalBrain.AI.Aspire.Hosting.AIModuleHosting> WithVoiceToText<TModel>(
+        this DigitalBrainModuleBuilder<DigitalBrain.AI.Aspire.Hosting.AIModuleHosting> module)
         where TModel : ITranscription
     {
         ArgumentNullException.ThrowIfNull(module);
@@ -78,15 +78,15 @@ public static partial class AIHostingExtensions
         return module;
     }
 
-    public static DigitalBrainModuleBuilder<AIModule> WithTavilySearch(
-        this DigitalBrainModuleBuilder<AIModule> module)
+    public static DigitalBrainModuleBuilder<DigitalBrain.AI.Aspire.Hosting.AIModuleHosting> WithTavilySearch(
+        this DigitalBrainModuleBuilder<DigitalBrain.AI.Aspire.Hosting.AIModuleHosting> module)
     {
         ArgumentNullException.ThrowIfNull(module);
         State(module).EnableTavilySearch();
         return module;
     }
 
-    private static AIHostingState State(DigitalBrainModuleBuilder<AIModule> module)
+    private static AIHostingState State(DigitalBrainModuleBuilder<DigitalBrain.AI.Aspire.Hosting.AIModuleHosting> module)
     {
         ArgumentNullException.ThrowIfNull(module);
         var state = module.DigitalBrainBuilder.GetOrAddState(brain => new AIHostingState(brain, module.Resource), out var added);

@@ -1,6 +1,7 @@
+using DigitalBrain.Kernel.AspNetCore;
 using Azure.Core;
 using Azure.Identity;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,13 +11,14 @@ using Orleans.Hosting;
 namespace DigitalBrain.Microsoft.CSharp;
 
 [ModuleDeployment("DigitalBrain.Microsoft.CSharp.CSharpDeployment, DigitalBrain.Modules.Microsoft.CSharp.Deployment")]
-public sealed class CSharpModule : IModule<CSharpOptions>
+[ModuleId("csharp")]
+public sealed class CSharpModule : IModule<CSharpOptions>, IHttpModule
 {
     public void Configure(ISiloBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddOptions<CSharpOptions>()
-            .Configure<IConfiguration>((options, configuration) => configuration.PopulateModuleOptions(nameof(CSharpModule), options))
+            .Configure<IConfiguration>((options, configuration) => configuration.PopulateModuleOptions("csharp", options))
             .PostConfigure(options =>
         {
             if (string.IsNullOrWhiteSpace(options.SourceRoot)) { options.SourceRoot = FindRepositoryRoot(); }

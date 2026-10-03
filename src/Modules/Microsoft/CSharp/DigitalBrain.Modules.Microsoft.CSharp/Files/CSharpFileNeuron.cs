@@ -1,11 +1,13 @@
+using DigitalBrain.Contracts.Edge.V1;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using DigitalBrain.Client;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Core;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Enforcement;
 using Orleans.Runtime;
 using Orleans.Timers;
 

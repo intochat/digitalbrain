@@ -225,7 +225,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 - Modify: `src/Modules/Postgres/DigitalBrain.Modules.Postgres/PostgresTableNeuron.cs`
 - Modify: `src/Modules/Postgres/DigitalBrain.Modules.Postgres/PostgresHosting.cs`
 - Modify: `src/Modules/Postgres/DigitalBrain.Modules.Postgres/DigitalBrain.Modules.Postgres.csproj` (add `ProjectReference` to `../../DigitalBrain/Kernel/DigitalBrain.Platform/DigitalBrain.Platform.csproj`)
-- Test: `src/Modules/Postgres/DigitalBrain.Modules.Postgres.Tests.Unit/PostgresCapacityFacts.cs`
+- Test: `src/Modules/Postgres/tests/DigitalBrain.Modules.Postgres.Tests.Unit/PostgresCapacityFacts.cs`
 
 **Interfaces:**
 - Consumes: `ICapacity`, `CapacityScope`, `ICapacityConfiguredSource`, `AddCapacity()` from Task 1.
@@ -301,7 +301,7 @@ public sealed class PostgresCapacityFacts
 
 - [ ] **Step 2: Run to verify it fails**
 
-Run: `dotnet test src/Modules/Postgres/DigitalBrain.Modules.Postgres.Tests.Unit --filter PostgresCapacityFacts`
+Run: `dotnet test src/Modules/Postgres/tests/DigitalBrain.Modules.Postgres.Tests.Unit --filter PostgresCapacityFacts`
 Expected: compile failure (`PostgresCapacityKind` not defined).
 
 - [ ] **Step 3: Implement**
@@ -416,7 +416,7 @@ internal sealed class PostgresConfiguredSource(bool active) : ICapacityConfigure
 
 - [ ] **Step 4: Run the Postgres suite**
 
-Run: `dotnet test src/Modules/Postgres/DigitalBrain.Modules.Postgres.Tests.Unit`
+Run: `dotnet test src/Modules/Postgres/tests/DigitalBrain.Modules.Postgres.Tests.Unit`
 Expected: all pass, including pre-existing `PostgresTableFacts`/`PostgresWriteTableFacts` (they run with no admin connection configured → origin `"platform"` → identical behavior).
 
 - [ ] **Step 5: Commit**
@@ -435,7 +435,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 **Files:**
 - Create: `src/Modules/Postgres/DigitalBrain.Modules.Postgres/DockerPostgresProvisioner.cs`
 - Modify: `src/Modules/Postgres/DigitalBrain.Modules.Postgres/PostgresHosting.cs` (register it)
-- Test: `src/Modules/Postgres/DigitalBrain.Modules.Postgres.Tests.Unit/PostgresCapacityFacts.cs` (extend)
+- Test: `src/Modules/Postgres/tests/DigitalBrain.Modules.Postgres.Tests.Unit/PostgresCapacityFacts.cs` (extend)
 
 **Interfaces:**
 - Consumes: `ICapacityProvisioner`, `CapacityScope` (Task 1); `PostgresCapacityKind` (Task 2).
@@ -481,7 +481,7 @@ silo.Services.AddSingleton<ICapacityProvisioner>(new DockerPostgresProvisioner(
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `dotnet test src/Modules/Postgres/DigitalBrain.Modules.Postgres.Tests.Unit --filter PostgresCapacityFacts`
+Run: `dotnet test src/Modules/Postgres/tests/DigitalBrain.Modules.Postgres.Tests.Unit --filter PostgresCapacityFacts`
 Expected: compile failure (`DockerPostgresProvisioner` not defined).
 
 - [ ] **Step 3: Implement**
@@ -547,7 +547,7 @@ with a private `InactiveProvisioner : ICapacityProvisioner { Kind => "postgres:i
 
 - [ ] **Step 4: Run the suite**
 
-Run: `dotnet test src/Modules/Postgres/DigitalBrain.Modules.Postgres.Tests.Unit`
+Run: `dotnet test src/Modules/Postgres/tests/DigitalBrain.Modules.Postgres.Tests.Unit`
 Expected: all pass. The two-brains-isolation guarantee is carried by `DatabaseNamesAreStableHashedAndDistinctPerBrain` plus origin pinning (Task 2); a live two-database round trip lands in the aspire smoke (Task 5).
 
 - [ ] **Step 5: Commit**
@@ -565,7 +565,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `src/Modules/Postgres/DigitalBrain.Modules.Postgres.Aspire.Hosting/PostgresHostingExtensions.cs`
-- Test: `src/Modules/Postgres/DigitalBrain.Modules.Postgres.Tests.Unit/PostgresAspireHostingFacts.cs` (extend — follow the file's existing pattern for building a test `DistributedApplication` in run vs publish mode)
+- Test: `src/Modules/Postgres/tests/DigitalBrain.Modules.Postgres.Tests.Unit/PostgresAspireHostingFacts.cs` (extend — follow the file's existing pattern for building a test `DistributedApplication` in run vs publish mode)
 
 **Interfaces:**
 - Consumes: nothing from earlier tasks at compile time; produces the runtime configuration Task 2/3 read: env var `DigitalBrain__Capacity__Postgres__AdminConnection` (run mode, hosted only).
@@ -592,7 +592,7 @@ public async Task HostedPostgresInPublishModeEmitsTheSecretConnectionParameterIn
 
 - [ ] **Step 2: Run to verify failure**
 
-Run: `dotnet test src/Modules/Postgres/DigitalBrain.Modules.Postgres.Tests.Unit --filter PostgresAspireHostingFacts`
+Run: `dotnet test src/Modules/Postgres/tests/DigitalBrain.Modules.Postgres.Tests.Unit --filter PostgresAspireHostingFacts`
 Expected: the two new facts FAIL (publish mode currently creates the container; run mode sets no admin env).
 
 - [ ] **Step 3: Implement in `PostgresHostingExtensions.PostgresHostingState`**
@@ -632,13 +632,13 @@ Note the `WithRepl()` guard moves inside the run-mode branch (publish mode never
 
 - [ ] **Step 4: Run the suite**
 
-Run: `dotnet test src/Modules/Postgres/DigitalBrain.Modules.Postgres.Tests.Unit`
+Run: `dotnet test src/Modules/Postgres/tests/DigitalBrain.Modules.Postgres.Tests.Unit`
 Expected: all pass, including prior hosting facts.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/Modules/Postgres/DigitalBrain.Modules.Postgres.Aspire.Hosting src/Modules/Postgres/DigitalBrain.Modules.Postgres.Tests.Unit
+git add src/Modules/Postgres/DigitalBrain.Modules.Postgres.Aspire.Hosting src/Modules/Postgres/tests/DigitalBrain.Modules.Postgres.Tests.Unit
 git commit -m "feat(postgres): run mode passes the admin connection; publish mode emits the postgres-connection secret parameter
 
 Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
@@ -649,7 +649,7 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ### Task 5: Host cleanup, smoke, and deployment verification
 
 **Files:**
-- Modify: `src/Applications/IntoChat/AppHost/AppHost.cs:51` — `options.DatabaseName = "customer-research"` becomes `options.DatabaseName = "digitalbrain"`.
+- Modify: `src/IntoChat/IntoChat.AppHost/AppHost.cs:51` — `options.DatabaseName = "customer-research"` becomes `options.DatabaseName = "digitalbrain"`.
 - Modify: `docs/superpowers/specs/2026-10-01-postgres-capacity-and-provisioning-design.md` — in the Production section, replace the `DigitalBrain.Modules.Postgres.Deployment` sentence with: "No deployment project is needed: the publish-mode `postgres-connection` secret parameter is a `parameter.v0`, which `ManifestValues` resolves from stack configuration and the kernel deployment writes to Key Vault as a mounted `secretRef`."
 
 **Interfaces:** none new; this task proves the stack end to end.
@@ -658,21 +658,21 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 
 - [ ] **Step 2: Build the hosts**
 
-Run: `dotnet build src/Applications/IntoChat/AppHost && dotnet build src/Applications/IntoChat`
+Run: `dotnet build src/IntoChat/IntoChat.AppHost && dotnet build src/Applications/IntoChat`
 Expected: both succeed.
 
 - [ ] **Step 3: Run the IntoChat unit suite** (composition/packaging guards)
 
-Run: `dotnet test src/Applications/IntoChat/Tests/Unit`
+Run: `dotnet test src/IntoChat/tests/IntoChat.Tests.Unit`
 Expected: pass. If a fact pins the old database name, update that fact in the same change.
 
 - [ ] **Step 4: Aspire smoke with live provisioning check**
 
-Run `aspire run` from `src/Applications/IntoChat/AppHost` until all resources are Healthy. Then confirm in the postgres-server container that the shared database exists and that exercising a table (e.g. via the Customer Researcher journey or a REPL `SELECT datname FROM pg_database`) shows a `brain_<hash>` database appear after a first `Define`. Record the resource-health and `pg_database` evidence in the task notes.
+Run `aspire run` from `src/IntoChat/IntoChat.AppHost` until all resources are Healthy. Then confirm in the postgres-server container that the shared database exists and that exercising a table (e.g. via the Customer Researcher journey or a REPL `SELECT datname FROM pg_database`) shows a `brain_<hash>` database appear after a first `Define`. Record the resource-health and `pg_database` evidence in the task notes.
 
 - [ ] **Step 5: Publish-manifest verification (no cloud needed)**
 
-Run the AppHost manifest publish (`dotnet run --project src/Applications/IntoChat/AppHost -- --publisher manifest --output-path ../../../artifacts/manifest.json` or the repo's established publish command) and verify in the output: no `postgres-server` container resource; a secret `postgres-connection` parameter; the brain's `ConnectionStrings__postgres` references `{postgres-connection.value}`; no `DigitalBrain__Capacity__Postgres__AdminConnection` entry.
+Run the AppHost manifest publish (`dotnet run --project src/IntoChat/IntoChat.AppHost -- --publisher manifest --output-path ../../../artifacts/manifest.json` or the repo's established publish command) and verify in the output: no `postgres-server` container resource; a secret `postgres-connection` parameter; the brain's `ConnectionStrings__postgres` references `{postgres-connection.value}`; no `DigitalBrain__Capacity__Postgres__AdminConnection` entry.
 
 - [ ] **Step 6: Commit**
 

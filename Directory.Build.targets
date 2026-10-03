@@ -9,7 +9,8 @@
        which imports later. Evaluating the pack items there always saw false, so the declared
        README and icon were never packed and pack failed with NU5039. -->
   <ItemGroup Condition="'$(IsPackable)' == 'true'">
-    <None Include="$(MSBuildThisFileDirectory)src/Assets/nuget/icon.png" Pack="true" PackagePath="/" Visible="false" Condition="Exists('$(MSBuildThisFileDirectory)src/Assets/nuget/icon.png')" />
+    <!-- No Exists guard: a missing icon must fail the pack (NU5039), not silently ship without it. -->
+    <None Include="$(MSBuildThisFileDirectory)src/Assets/nuget/icon.png" Pack="true" PackagePath="/" Visible="false" />
   </ItemGroup>
 
   <!-- One file, two consumers: imported here for in-repo test projects and packed into the

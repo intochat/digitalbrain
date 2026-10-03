@@ -2,10 +2,10 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>Aspire AppHost integration for the DigitalBrain Google module.</Description>
-    <RootNamespace>DigitalBrain.Google.Gmail</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Google.Gmail.Aspire.Hosting</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../DigitalBrain.Modules.Google.Gmail/DigitalBrain.Modules.Google.Gmail.csproj" />
-    <ProjectReference Include="..\..\..\..\Aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../DigitalBrain.Modules.Google.Gmail.Contracts/DigitalBrain.Modules.Google.Gmail.Contracts.csproj" />
+    <ProjectReference Include="../../../../Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

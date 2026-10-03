@@ -1,9 +1,9 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Sdk;
 
 namespace DigitalBrain.Microsoft.GitHub;
 
-internal sealed class GitHubLogins(GitHubOAuthConfiguration configuration) : BrowserLogins(LoginDefinition)
+internal sealed class GitHubLogins(GitHubOAuthConfiguration configuration, TimeProvider clock) : BrowserLogins(LoginDefinition, clock)
 {
     internal static readonly BrowserLoginDefinition LoginDefinition = new(
         "github", "GitHub", "GitHubIntegration", "/integrations/github/login", "/integrations/github/callback",

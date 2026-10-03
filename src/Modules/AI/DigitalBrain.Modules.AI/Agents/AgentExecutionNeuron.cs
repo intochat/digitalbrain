@@ -1,9 +1,10 @@
 using Microsoft.Extensions.Logging;
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using System.Runtime.CompilerServices;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.AI.Metering;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
@@ -26,14 +27,28 @@ internal sealed class AgentExecutionNeuron(IAgentTurnRunner runner, IIntentUsage
         if (CallerContextStamper.TryGet(out var caller) && caller.Kind != CallerKind.Platform
             && request.ScopeId != BrainScope.CurrentId())
         { throw new UnauthorizedAccessException("Agent execution belongs to another brain."); }
-        using var intent = IntentContext.Begin(intentId, request.ScopeId);
+        using var intent = IntentContext.Create(intentId, request.ScopeId);
         try
         {
-            await foreach (var item in runner.RunAsync(request, ct)) { yield return item; }
+            var events = runner.RunAsync(request, ct).GetAsyncEnumerator(ct);
+            try
+            {
+                while (true)
+                {
+                    bool next;
+                    using (intent.Enter()) { next = await events.MoveNextAsync(); }
+                    if (!next) { break; }
+                    yield return events.Current;
+                }
+            }
+            finally
+            {
+                using (intent.Enter()) { await events.DisposeAsync(); }
+            }
         }
         finally
         {
-            try { await usage.FlushAsync(intent, CancellationToken.None); }
+            try { await usage.FlushAsync(intent.Snapshot(), CancellationToken.None); }
             catch (Exception error)
             { logger.LogWarning(error, "Agent usage flush failed for intent {IntentId}", intentId); }
         }

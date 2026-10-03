@@ -1,6 +1,7 @@
 using DigitalBrain.AI.Interactions;
 using DigitalBrain.AI.Metering;
 using DigitalBrain.Compute;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
@@ -183,7 +184,7 @@ internal static class AIClients
     }
 
     internal static void AddImageGeneration(IServiceCollection services, IConfiguration configuration)
-        => AddImageGeneration(services, AIOptions.Read(configuration));
+        => AddImageGeneration(services, AIOptionsRuntime.Read(configuration));
 
     internal static void AddImageGeneration(IServiceCollection services, AIOptions configuration)
     {

@@ -1,6 +1,6 @@
 using System.Text.Json;
 using DigitalBrain.AI;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Chat;
 using DigitalBrain.Flutter.Workspace;

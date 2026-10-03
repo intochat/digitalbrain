@@ -1,10 +1,10 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Sdk;
 
 namespace DigitalBrain.Salesforce;
 
-internal sealed class SalesforceLogins(SalesforceOAuthConfiguration configuration)
-    : BrowserLogins(LoginDefinition)
+internal sealed class SalesforceLogins(SalesforceOAuthConfiguration configuration, TimeProvider clock)
+    : BrowserLogins(LoginDefinition, clock)
 {
     internal static readonly BrowserLoginDefinition LoginDefinition = new(
         "salesforce",

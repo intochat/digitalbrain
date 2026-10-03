@@ -3,10 +3,11 @@
     <IsPackable>true</IsPackable>
     <Description>Google neuron contracts.</Description>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
-    <RootNamespace>DigitalBrain.Google.Gmail</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Google.Gmail.Contracts</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <!-- Neuron interfaces and signals use the Kernel wire vocabulary. -->
-    <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Modules.Kernel.Contracts/DigitalBrain.Modules.Kernel.Contracts.csproj" />
+    <ProjectReference Include="../../../../DigitalBrain/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup><PackageReference Include="Microsoft.Orleans.Sdk" PrivateAssets="all" /></ItemGroup>
 </Project>

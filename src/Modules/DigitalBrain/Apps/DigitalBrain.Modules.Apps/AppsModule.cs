@@ -1,4 +1,5 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel.AspNetCore;
+using DigitalBrain.Kernel;
 using DigitalBrain.AI.Agents;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -9,7 +10,8 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Apps;
 
-public sealed class AppsModule : IModule
+[ModuleId("apps")]
+public sealed class AppsModule : IModule, IHttpModule
 {
     public void Configure(ISiloBuilder silo)
     {

@@ -1,4 +1,5 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel.AspNetCore;
+using DigitalBrain.Kernel;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,7 +8,8 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Microsoft.Aspire;
 
-public sealed class AspireModule : IModule<AspireOptions>
+[ModuleId("aspire")]
+public sealed class AspireModule : IModule<AspireOptions>, IHttpModule
 {
     public const string ConfigurationRoot = "DigitalBrain:Microsoft:Aspire";
 
@@ -15,7 +17,7 @@ public sealed class AspireModule : IModule<AspireOptions>
     {
         ArgumentNullException.ThrowIfNull(builder);
         builder.Services.AddOptions<AspireOptions>()
-            .Configure<IConfiguration>((options, configuration) => configuration.PopulateModuleOptions(nameof(AspireModule), options));
+            .Configure<IConfiguration>((options, configuration) => configuration.PopulateModuleOptions("aspire", options));
         builder.Services.TryAddSingleton<AspireBridge>();
     }
 

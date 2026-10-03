@@ -1,4 +1,4 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Time.Reminders;
 using DigitalBrain.Time.Timers;
 using Microsoft.Extensions.Configuration;
@@ -9,6 +9,7 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Time;
 
+[ModuleId("time")]
 public sealed class TimeModule : IModule
 {
     public void Configure(ISiloBuilder silo)

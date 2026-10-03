@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using DigitalBrain.AI.Agents;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.AI;
 

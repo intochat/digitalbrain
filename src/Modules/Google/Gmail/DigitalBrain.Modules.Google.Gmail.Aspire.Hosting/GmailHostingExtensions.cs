@@ -6,8 +6,8 @@ namespace DigitalBrain.Google.Gmail;
 
 public static class GmailHostingExtensions
 {
-    public static DigitalBrainModuleBuilder<GmailModule> WithGmail(
-        this DigitalBrainModuleBuilder<GmailModule> module, Action<GmailHostingOptions> configure)
+    public static DigitalBrainModuleBuilder<DigitalBrain.Google.Gmail.GmailModuleHosting> WithGmail(
+        this DigitalBrainModuleBuilder<DigitalBrain.Google.Gmail.GmailModuleHosting> module, Action<GmailHostingOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(module);
         ArgumentNullException.ThrowIfNull(configure);
@@ -18,8 +18,8 @@ public static class GmailHostingExtensions
 
     // Only the kernel receives these values. The public origin defaults to the kernel's own
     // http endpoint; pass one explicitly when a reverse proxy fronts the callback.
-    public static DigitalBrainModuleBuilder<GmailModule> WithGmail(
-        this DigitalBrainModuleBuilder<GmailModule> module,
+    public static DigitalBrainModuleBuilder<DigitalBrain.Google.Gmail.GmailModuleHosting> WithGmail(
+        this DigitalBrainModuleBuilder<DigitalBrain.Google.Gmail.GmailModuleHosting> module,
         Uri? publicOrigin = null)
     {
         ArgumentNullException.ThrowIfNull(module);
@@ -58,13 +58,13 @@ public static class GmailHostingExtensions
                 return;
             }
 
-            _clientId ??= brain.ApplicationBuilder.AddParameter("gmail-client-id")
+            _clientId ??= brain.ApplicationBuilder.AddParameter(brain.ResourceName("gmail-client-id"))
                 .WithDescription(
                     "OAuth client ID for a Google web client configured for the [Gmail MCP server](https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server). "
                     + "Register http://localhost:5080/integrations/gmail/callback. Only the kernel receives this value.",
                     enableMarkdown: true)
                 .WithParentRelationship(module);
-            _clientSecret ??= brain.ApplicationBuilder.AddParameter("gmail-client-secret", secret: true)
+            _clientSecret ??= brain.ApplicationBuilder.AddParameter(brain.ResourceName("gmail-client-secret"), secret: true)
                 .WithDescription(
                     "OAuth client secret for the same Google web client configured for the [Gmail MCP server](https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server). "
                     + "Only the kernel receives this secret; Gmail sign-in happens in your browser when the assistant needs access.",

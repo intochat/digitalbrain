@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Card.Signals;
 using Orleans.Concurrency;

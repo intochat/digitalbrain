@@ -1,4 +1,4 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using System.Runtime.CompilerServices;
 using Orleans.Runtime;
 

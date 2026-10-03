@@ -1,7 +1,10 @@
+using Microsoft.Extensions.DependencyInjection;
+using DigitalBrain.Client.Orleans;
 using DigitalBrain.Client;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
-using DigitalBrain.Platform.Hosting;
+using DigitalBrain.Kernel;
+using DigitalBrain.Platform;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
@@ -26,6 +29,15 @@ public static class UnitTest
         builder.ConfigureHost(host =>
         {
             host.Configuration.AddInMemoryCollection(TestLogging.QuietDefaults);
+            // The platform refuses to start without a master key or a declared auth posture;
+            // each cluster gets a throwaway key and the Open test posture. A fact that needs
+            // Secured overrides the posture through its PrivateConfiguration.
+            host.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [DigitalBrainNames.MasterKeyConfigurationKey] =
+                    Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32)),
+                ["DigitalBrain:Auth:Posture"] = "Open",
+            });
             foreach (var definition in modules)
             {
                 host.Configuration.AddInMemoryCollection(definition.Configuration);
@@ -35,6 +47,8 @@ public static class UnitTest
         builder.ConfigureSilo((_, silo) =>
         {
             silo.AddDigitalBrain(modules.Select(module => module.ModuleType));
+            silo.Services.AddDigitalBrainClient();
+            silo.AddDigitalBrainPlatform();
             foreach (var module in modules) { module.Configure(silo); }
             silo.AddMemoryGrainStorage("Default");
             if (options.UseReminders) { silo.UseInMemoryReminderService(); }

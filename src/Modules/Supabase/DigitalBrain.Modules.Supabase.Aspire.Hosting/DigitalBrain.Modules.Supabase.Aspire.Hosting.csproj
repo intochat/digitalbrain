@@ -2,14 +2,14 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>Aspire AppHost integration for the DigitalBrain Supabase module.</Description>
-    <RootNamespace>DigitalBrain.Supabase.Aspire.Hosting</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Supabase.Aspire.Hosting</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting" />
     <PackageReference Include="Aspire.Hosting.PostgreSQL" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../DigitalBrain.Modules.Supabase/DigitalBrain.Modules.Supabase.csproj" />
-    <ProjectReference Include="..\..\..\Aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../DigitalBrain.Modules.Supabase.Contracts/DigitalBrain.Modules.Supabase.Contracts.csproj" />
+    <ProjectReference Include="../../../Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>
