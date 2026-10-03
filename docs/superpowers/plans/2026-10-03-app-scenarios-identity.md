@@ -139,3 +139,42 @@ An app is still published as `owner/name`. Its installed `IApp` key is its runti
 - Platform SQL still uses the configured database role's visibility. The new app-resource path enforces installation/brain/table ownership on every read, but does not redesign permissions for arbitrary legacy platform SQL.
 - Scenario prose remains editable description compiled into ordinary C# behavior/tests, not a runtime natural-language interpreter. Individual cards expose their linked code and verification status; package verification remains the publication gate.
 - Live external-model research is not part of the deterministic test gate.
+
+## Follow-up: Registry-backed assistant discovery
+
+Approved design comment: https://github.com/intochat/digitalbrain/pull/131#issuecomment-5969744867
+
+The running UI failure was traced to run `5cc95b4018094f678c3c17688b18a825`: the model requested `postgres_schema`, but it was absent from the selected tools. Customer Researcher's installed operations replaced database tools unless the user's message matched an exact database regex. The reported `postges` spelling did not match. No Postgres query ran; the generic connection message misclassified the failure.
+
+### Scope and responsibilities
+
+- Registry retains Types/Search and observed Instances, and adds Discover using trusted ambient SDK identity. Instances remain diagnostics, not an ownership catalog.
+- Registry module providers describe authoritative current-brain resources from installed-app state and Postgres ownership indexes. No duplicate resource state or identity system.
+- The Assistant starts with discovery and its basic presentation tools. Registry results explicitly offer module tools through AgentToolOffer. Installing apps and spelling no longer control tool availability.
+- The AI runner resolves offers through existing factories, NativeTools and dynamic IAgentToolSource sessions. It enforces registration, call identity, cancellation and budgets without parsing database names.
+- Actual module operations continue enforcing ownership and access. Discovery does not authorize unrestricted reflected neuron calls.
+- Unknown model tool calls return a bounded, recoverable tool_unavailable result. Generic assistant failures no longer blame database connectivity.
+
+### Affected projects and verification plan
+
+| Project | Change and required verification |
+| --- | --- |
+| Registry contracts/runtime/tests | Serialized discovery descriptors; trusted-caller checks; provider aggregation; partial failures; typo-safe ranking; grain invocation and scope isolation tests. |
+| Apps/Postgres/Supabase/CSharp | Module-owned discovery providers with explicit operation bindings and authoritative resource descriptions; existing module suites. |
+| AI runtime/tests | Generic dynamic offers, source-session lifetime, unique registration checks and recoverable unknown calls; unit tests. |
+| Assistant/runtime/tests | Remove app enumeration and database regex policy; Registry tool adapter; exact typo regression with installed app; explicit custom definitions remain supported. |
+| Testing.E2E reference fixture | Scripted model follows discovery before schema/open calls and validates offered tools. |
+| IntoChat | Composition and real UI/table E2E verification with existing identity enforcement. |
+
+Execution uses the existing PR branch. Tests establish failures before implementation. Independent review checks the combined discovery/execution boundary. Updates will be pushed to PR #131; no merge.
+
+### Follow-up review and results
+
+- Exact typo regression failed before replacing Assistant policy; real Registry/Apps/AI integration now discovers and invokes the database tool alongside an installed app.
+- Integration exposed `Registry.Discover → Apps.List → legacy index repair → Registry.Instances`. The synchronous, read-only Instances snapshot permits interleaving; Registry mutations remain serialized.
+- Failed app-table enumeration retains platform Postgres tool discovery and reports partial resource errors. Missing Registry produces an explicit discovery_unavailable result. CSharp discovery registers only alongside enabled CSharp authoring tools.
+- Independent review found no remaining substantive blocker after those repairs.
+- Unit suites: AI 82 passed; Assistant 61 passed; Registry 14 passed/1 live skip; Postgres 73 passed/3 live skips; Apps 98 passed; Supabase 57 passed; CSharp 77 passed; IntoChat composition 9 passed. The IntoChat test build used `--artifacts-path artifacts/registry-validation` to avoid locking assemblies in the running AppHost.
+- E2E suites: Assistant 8 passed; Apps 4 passed; CSharp 2 passed (including sandbox restart recovery); Supabase 2 passed (table display, filtering, empty and unavailable sources).
+- The running IntoChat service was rebuilt successfully. Computer Use verified the native "Show me my data" flow completed `discover_capabilities` and identified Postgres/Customer Researcher resources without the previous error. The native text-entry helper did not enter custom text, so the exact typo wording was verified through the deterministic integration regression rather than claimed as a manual replay. The browser helper refused localhost navigation; no browser bypass was attempted.
+- Intentional limit: discovery currently ranks and returns the complete provider catalog. Providers are queried serially; large catalogs or slow providers increase latency and response size. There is an overall agent-turn timeout, but no per-provider timeout or paging yet.
