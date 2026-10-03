@@ -4,7 +4,7 @@ using DigitalBrain.Testing.Module;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace DigitalBrain.Modules.Postgres.Tests.Unit;
+namespace DigitalBrain.Modules.Postgres.Tests;
 
 public sealed class PostgresRowSourceFacts
 {

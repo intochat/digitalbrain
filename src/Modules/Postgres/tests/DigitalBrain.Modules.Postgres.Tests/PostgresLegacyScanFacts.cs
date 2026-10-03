@@ -9,7 +9,7 @@ using Orleans.Configuration;
 using Orleans.Serialization;
 using Orleans.Storage;
 
-namespace DigitalBrain.Modules.Postgres.Tests.Unit;
+namespace DigitalBrain.Modules.Postgres.Tests;
 
 public sealed class PostgresLegacyScanFacts
 {

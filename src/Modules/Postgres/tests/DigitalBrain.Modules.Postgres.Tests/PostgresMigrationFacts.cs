@@ -4,7 +4,7 @@ using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Postgres;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Modules.Postgres.Tests.Unit;
+namespace DigitalBrain.Modules.Postgres.Tests;
 
 public sealed class PostgresMigrationFacts
 {

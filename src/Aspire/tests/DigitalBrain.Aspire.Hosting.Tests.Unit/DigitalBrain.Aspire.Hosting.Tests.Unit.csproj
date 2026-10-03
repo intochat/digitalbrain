@@ -6,6 +6,7 @@
     <ProjectReference Include="../../DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
     <None Update="Identity/LegacyState/*.orleans" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="../../../Modules/Postgres/DigitalBrain.Modules.Postgres.Aspire.Hosting/DigitalBrain.Modules.Postgres.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../../../Modules/Postgres/DigitalBrain.Modules.Postgres/DigitalBrain.Modules.Postgres.csproj" />
     <ProjectReference Include="../../../Modules/Google/Flutter/DigitalBrain.Modules.Flutter.Aspire.Hosting/DigitalBrain.Modules.Flutter.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

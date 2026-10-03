@@ -9,7 +9,7 @@ using Orleans;
 using Orleans.Runtime;
 using Orleans.Storage;
 
-namespace DigitalBrain.Modules.Postgres.Tests.Unit;
+namespace DigitalBrain.Modules.Postgres.Tests;
 
 public sealed class PostgresWriteTableFacts
 {

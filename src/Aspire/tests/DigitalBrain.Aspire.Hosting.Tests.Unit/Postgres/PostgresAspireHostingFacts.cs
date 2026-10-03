@@ -5,7 +5,7 @@ using DigitalBrain.Kernel;
 using DigitalBrain.Postgres;
 using DigitalBrain.Postgres.Aspire.Hosting;
 
-namespace DigitalBrain.Modules.Postgres.Tests.Unit;
+namespace DigitalBrain.Aspire.Hosting.Tests.Unit.Postgres;
 
 public sealed class PostgresAspireHostingFacts
 {

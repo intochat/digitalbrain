@@ -1,15 +1,7 @@
 {
-  "LegacyModuleTestProjects": [
-    "DigitalBrain.Modules.Microsoft.CSharp.Tests.E2E",
-    "DigitalBrain.Modules.Postgres.Tests.Unit"
-  ],
-  "LegacyEndToEndReferencers": [
-    "DigitalBrain.Modules.Microsoft.CSharp.Tests.E2E"
-  ],
-  "LegacyAspireReferencingModuleTests": [
-    "DigitalBrain.Modules.Microsoft.CSharp.Tests.E2E",
-    "DigitalBrain.Modules.Postgres.Tests.Unit"
-  ],
+  "LegacyModuleTestProjects": [],
+  "LegacyEndToEndReferencers": [],
+  "LegacyAspireReferencingModuleTests": [],
   "LegacyFullStackBootFacts": [
     "src/DigitalBrain/Kernel/tests/DigitalBrain.Kernel.Tests.E2E/ContentCaptureFacts.cs",
     "src/DigitalBrain/Kernel/tests/DigitalBrain.Kernel.Tests.E2E/E2EBoundaryFacts.cs",
@@ -17,7 +9,6 @@
     "src/DigitalBrain/Platform/tests/DigitalBrain.Platform.Tests.E2E/MigrationLifecycleFacts.cs",
     "src/IntoChat/Tests/IntoChat.Tests.E2E/Agent/GoldenJourneyFacts.cs",
     "src/IntoChat/Tests/IntoChat.Tests.Unit/CompositionFacts.cs",
-    "src/Modules/Microsoft/CSharp/tests/DigitalBrain.Modules.Microsoft.CSharp.Tests.E2E/AuthoringCompositionFacts.cs",
-    "src/Modules/Microsoft/CSharp/tests/DigitalBrain.Modules.Microsoft.CSharp.Tests.E2E/CSharpFileContainerFacts.cs"
+    "src/DigitalBrain/OS/tests/DigitalBrain.OS.Tests.E2E/CSharpFileContainerFacts.cs"
   ]
 }

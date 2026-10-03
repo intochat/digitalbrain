@@ -2,7 +2,7 @@ using DigitalBrain.Postgres;
 using DigitalBrain.Sdk.Capacity;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Modules.Postgres.Tests.Unit;
+namespace DigitalBrain.Modules.Postgres.Tests;
 
 public sealed class PostgresCapacityFacts
 {

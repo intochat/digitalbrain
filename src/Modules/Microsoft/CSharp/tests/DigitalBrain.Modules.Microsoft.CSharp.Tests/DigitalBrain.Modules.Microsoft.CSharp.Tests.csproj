@@ -2,6 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="../../../../../Testing/DigitalBrain.Testing.Module/DigitalBrain.Testing.Module.csproj" />
     <ProjectReference Include="../../DigitalBrain.Modules.Microsoft.CSharp/DigitalBrain.Modules.Microsoft.CSharp.csproj" />
+    <ProjectReference Include="../../../../Time/DigitalBrain.Modules.Time/DigitalBrain.Modules.Time.csproj" />
     <ProjectReference Include="../../../../../DigitalBrain/Sdk/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="../../../../../DigitalBrain/Platform/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
     <ProjectReference Include="../../DigitalBrain.Modules.Microsoft.CSharp.Sandbox/DigitalBrain.Modules.Microsoft.CSharp.Sandbox.csproj" />

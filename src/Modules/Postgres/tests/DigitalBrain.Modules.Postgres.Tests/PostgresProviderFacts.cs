@@ -1,7 +1,7 @@
 using DigitalBrain.Postgres;
 using Npgsql;
 
-namespace DigitalBrain.Modules.Postgres.Tests.Unit;
+namespace DigitalBrain.Modules.Postgres.Tests;
 
 public sealed class PostgresProviderFacts
 {

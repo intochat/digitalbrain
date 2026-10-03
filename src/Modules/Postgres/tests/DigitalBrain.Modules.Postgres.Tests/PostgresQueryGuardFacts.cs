@@ -1,6 +1,6 @@
 using DigitalBrain.Postgres;
 
-namespace DigitalBrain.Modules.Postgres.Tests.Unit;
+namespace DigitalBrain.Modules.Postgres.Tests;
 
 public sealed class PostgresQueryGuardFacts
 {

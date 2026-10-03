@@ -12,7 +12,7 @@
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Azure.Storage.Blobs" />
     <PackageReference Include="Microsoft.Orleans.Persistence.AzureStorage" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Postgres.Tests.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Postgres.Tests" />
     <ProjectReference Include="../DigitalBrain.Modules.Postgres.Contracts/DigitalBrain.Modules.Postgres.Contracts.csproj" />
     <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
     <ProjectReference Include="../../../DigitalBrain/Sdk/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />

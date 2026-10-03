@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 using Npgsql;
 using Orleans.Hosting;
 
-namespace DigitalBrain.Modules.Postgres.Tests.Unit;
+namespace DigitalBrain.Modules.Postgres.Tests;
 
 public sealed class PostgresFacts
 {

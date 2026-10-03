@@ -8,7 +8,7 @@ using DigitalBrain.Supabase.Tables;
 using DigitalBrain.Supabase.Windows;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DigitalBrain.Modules.Postgres.Tests.Unit;
+namespace DigitalBrain.Modules.Postgres.Tests;
 
 public sealed class PostgresAppSourceFacts
 {
