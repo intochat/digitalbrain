@@ -7,8 +7,10 @@ namespace DigitalBrain.Modules.Apps.Tests.Unit;
 
 // Replaces the container runner: records the source, settings and lifecycle an installed app asks for.
 [GrainType("microsoft.csharp.file")]
-public sealed class RecordingCSharpFile : Neuron, ICSharpFile
+public sealed class RecordingCSharpFile : Neuron, ICSharpFile, ICSharpAppBinding
 {
+    public static ConcurrentDictionary<string, string> AppBindings { get; } = new(StringComparer.Ordinal);
+    public Task BindApp(string appId) => Task.FromResult(AppBindings[this.GetPrimaryKeyString()] = appId);
     public static ConcurrentDictionary<string, CSharpFileSnapshot> Files { get; } = new(StringComparer.Ordinal);
 
     public static ConcurrentDictionary<string, bool> Deleted { get; } = new(StringComparer.Ordinal);

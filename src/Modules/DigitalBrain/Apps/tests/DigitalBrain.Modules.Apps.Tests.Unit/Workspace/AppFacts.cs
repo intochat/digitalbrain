@@ -296,6 +296,7 @@ public sealed class AppFacts
         {
             Assert.Equal(CSharpFileStatus.Running, file.Status);
             Assert.Equal(key, file.Settings["App"]);
+            Assert.Equal(key, RecordingCSharpFile.AppBindings[file.Id]);
         }
         var sources = installed.CSharpFiles.Select(id => RecordingCSharpFile.Files[id].Source).Order().ToArray();
         Assert.Equal(["// renders the report", "// watches the feed"], sources);

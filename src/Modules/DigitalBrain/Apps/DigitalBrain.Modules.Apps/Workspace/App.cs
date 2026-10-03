@@ -168,6 +168,7 @@ internal sealed class App(
         {
             await GrainFactory.GetGrain<IPostgresStorageMigration>("table-owners-v1").Ensure();
             var brain = BrainScope.CurrentId();
+            await GrainFactory.GetGrain<IPostgresTables>(JsonSerializer.Serialize(new[] { brain, this.GetPrimaryKeyString() })).Retire();
             foreach (var file in Snapshot.StorageFiles)
             { await GrainFactory.GetGrain<IPostgresTables>(JsonSerializer.Serialize(new[] { brain, file })).Retire(); }
         }
@@ -252,7 +253,9 @@ internal sealed class App(
         var programs = content.Programs();
         foreach (var (path, source) in programs)
         {
-            var file = GrainFactory.GetGrain<ICSharpFile>(FileKey(generation, path));
+            var key = FileKey(generation, path);
+            await GrainFactory.GetGrain<ICSharpAppBinding>(key).BindApp(this.GetPrimaryKeyString());
+            var file = GrainFactory.GetGrain<ICSharpFile>(key);
             await file.Write(source);
             await file.Configure(Configuration(settings, accounts));
             await file.Start();
@@ -287,6 +290,12 @@ internal sealed class App(
         var target = Snapshot.PendingDeployment!.Target;
         var revision = await GrainFactory.GetGrain<IPackage>(target.Revision!.Package.ToString()).ReadRevision(target.Revision.Revision);
         await Retire(Snapshot.Runtime, Snapshot.ProgramGeneration);
+        if (modules.ContractAssemblies().Contains(typeof(IPostgresTable).Assembly))
+        {
+            await GrainFactory.GetGrain<IPostgresStorageMigration>("table-owners-v1").Ensure();
+            var owner = JsonSerializer.Serialize(new[] { BrainScope.CurrentId(), this.GetPrimaryKeyString() });
+            await GrainFactory.GetGrain<IPostgresAppStorage>(owner).Migrate(target.StorageFiles);
+        }
         await Deploy(target.Runtime, target.ProgramGeneration, revision.Content, target.Settings, target.Accounts);
         await Persist(target);
     }

@@ -17,6 +17,7 @@ public sealed class CSharpModule : IModule<CSharpOptions>, IHttpModule
     public void Configure(ISiloBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
+        builder.AddIncomingGrainCallFilter<CSharpAppBindingGuard>();
         builder.Services.AddOptions<CSharpOptions>()
             .Configure<IConfiguration>((options, configuration) => configuration.PopulateModuleOptions("csharp", options))
             .PostConfigure(options =>

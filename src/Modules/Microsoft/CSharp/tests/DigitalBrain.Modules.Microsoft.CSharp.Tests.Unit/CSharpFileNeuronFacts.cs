@@ -9,6 +9,14 @@ namespace DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit;
 public sealed class CSharpFileNeuronFacts
 {
     [Fact]
+    public async Task CallersCannotBindAFileToAnInstalledApp()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await Brain(new FakeSandbox(), ct);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => brain.Get<ICSharpAppBinding>("file").BindApp("arbitrary-app"));
+    }
+
+    [Fact]
     public async Task StartsTheSandboxOnDemandAndRunsTheFileWithItsSettings()
     {
         var ct = TestContext.Current.CancellationToken;

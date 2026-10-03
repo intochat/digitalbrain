@@ -20,4 +20,6 @@ internal sealed record CSharpFileState
     [Id(7)] public CallerContext? OwnerContext { get; init; }
     // Durable subscriptions the current script registered by streaming; they outlive its runs.
     [Id(8)] public ScriptSubscription[] Subscriptions { get; init; } = [];
+    [Id(9)] public string? AppId { get; init; }
+    [Id(10)] public string? AppBrain { get; init; }
 }

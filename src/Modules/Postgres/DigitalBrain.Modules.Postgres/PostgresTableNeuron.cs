@@ -14,12 +14,25 @@ internal sealed record PostgresTableState
     [Id(1)] public PostgresTableDefinition? Accepted { get; init; }
     [Id(2)] public string? Origin { get; init; }
     [Id(3)] public TableDefinition? Pending { get; init; }
+    [Id(4)] public string? PhysicalTable { get; init; }
 }
 
 [GrainType("postgres.table")]
-internal sealed class PostgresTableNeuron(IPostgresTableProvider provider, DigitalBrain.Sdk.Capacity.ICapacity capacity,
-    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<PostgresTableState> state) : Neuron, IPostgresTable, IPostgresTableLifetime
+internal sealed partial class PostgresTableNeuron(IPostgresTableProvider provider, DigitalBrain.Sdk.Capacity.ICapacity capacity,
+    [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<PostgresTableState> state) : Neuron, IPostgresTable, IPostgresTableLifetime, IPostgresTableOwnership
 {
+    public async Task Transfer(string previousOwner, string owner)
+    {
+        if (state.State.Owner == owner || state.State.Owner is null) { return; }
+        if (state.State.Owner != previousOwner)
+        { throw new UnauthorizedAccessException("The legacy table belongs to an unrelated owner."); }
+        await Persist(state.State with
+        {
+            Owner = owner,
+            PhysicalTable = state.State.Accepted?.Table ?? state.State.PhysicalTable
+                ?? PostgresTablePolicy.PhysicalName(previousOwner, this.GetPrimaryKeyString())
+        });
+    }
     private string Scope()
     {
         var caller = CallerContextStamper.Require();
@@ -44,7 +57,7 @@ internal sealed class PostgresTableNeuron(IPostgresTableProvider provider, Digit
     public async Task Retire(string owner)
     {
         if (state.State.Owner != owner) { return; }
-        var table = state.State.Accepted?.Table ?? PostgresTablePolicy.PhysicalName(owner, this.GetPrimaryKeyString());
+        var table = state.State.Accepted?.Table ?? state.State.PhysicalTable ?? PostgresTablePolicy.PhysicalName(owner, this.GetPrimaryKeyString());
         await provider.DropAsync(PostgresCapacityKind.OriginOrPlatform(state.State.Origin), table, CancellationToken.None);
         await Persist(new());
     }
@@ -69,7 +82,7 @@ internal sealed class PostgresTableNeuron(IPostgresTableProvider provider, Digit
             await Tables(scope).Register(this.GetPrimaryKeyString());
             return accepted;
         }
-        var table = PostgresTablePolicy.PhysicalName(scope, this.GetPrimaryKeyString());
+        var table = state.State.PhysicalTable ?? PostgresTablePolicy.PhysicalName(scope, this.GetPrimaryKeyString());
         // The origin is pinned at first Define; later-registered capacity never migrates a table.
         if (state.State.Pending is { } pending && !PostgresTablePolicy.Compatible(pending, normalized))
         { throw new PostgresQueryException("Incompatible table redefinition; migrations are not supported."); }

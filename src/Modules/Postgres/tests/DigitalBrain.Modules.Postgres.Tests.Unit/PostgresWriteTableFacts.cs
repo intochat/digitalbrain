@@ -14,6 +14,53 @@ namespace DigitalBrain.Modules.Postgres.Tests.Unit;
 public sealed class PostgresWriteTableFacts
 {
     [Fact]
+    public async Task MigratingAnInterruptedDefinitionKeepsItsOriginalPhysicalNameAndCapacity()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var provider = new MemoryTables { LoseDefineResponse = true };
+        var capacity = new ChangingCapacity();
+        await using var brain = await UnitTest.Create().WithModule<PostgresModule>().ConfigureSilo(silo =>
+        {
+            silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=sample;Username=reader";
+            silo.Services.AddSingleton<IPostgresTableProvider>(provider);
+            silo.Services.AddSingleton<ICapacity>(capacity);
+        }).StartAsync(ct);
+        Stamp("brain", "pending-legacy-file");
+        var previous = JsonSerializer.Serialize(new[] { BrainScope.CurrentId(), "pending-legacy-file" });
+        var table = brain.Get<IPostgresTable>("pending-migration");
+        await Assert.ThrowsAsync<IOException>(() => table.Define(Definition));
+        await brain.Get<IPostgresLifecycleTestApp>("pending-stable-app").Migrate(["pending-legacy-file"]);
+        capacity.Origin = "db:replacement";
+        Stamp("brain", "pending-stable-app");
+        var accepted = await table.Define(Definition);
+        Assert.Equal(PostgresTablePolicy.PhysicalName(previous, "pending-migration"), accepted.Table);
+        Assert.Equal(1, capacity.Resolutions);
+        await brain.Get<IPostgresLifecycleTestApp>("pending-stable-app").Uninstall("brain", "pending-stable-app");
+        Assert.Equal(("db:original", accepted.Table), Assert.Single(provider.Drops));
+    }
+
+    [Fact]
+    public async Task MigratingLegacyFilesPreservesRowsPhysicalNamesAndPinnedOriginsAcrossRetries()
+    {
+        var provider = new MemoryTables();
+        await using var brain = await Start(provider);
+        Stamp("brain", "legacy-file");
+        var table = brain.Get<IPostgresTable>("migrated-table");
+        var original = await table.Define(Definition);
+        await table.Upsert(Key(), Values("saved"));
+        var app = brain.Get<IPostgresLifecycleTestApp>("stable-app");
+        await app.Migrate(["legacy-file"]);
+        await app.Migrate(["legacy-file"]);
+        await brain.DeactivateAsync(table, TestContext.Current.CancellationToken);
+        Stamp("brain", "stable-app");
+        Assert.Equal(original.Table, (await table.Define(Definition)).Table);
+        Assert.Equal("\"saved\"", (await table.Read(Key()))!.Single(v => v.Column == "value").Json);
+        Stamp("brain", "legacy-file");
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => table.Read(Key()));
+        await app.Uninstall("brain", "stable-app");
+        Assert.Equal(original.Table, Assert.Single(provider.Drops).Table);
+    }
+    [Fact]
     public async Task TeardownReclaimsPendingDdlAtItsPinnedOriginAfterCapacityChangesAndRestart()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -414,11 +461,15 @@ public sealed class PostgresWriteTableFacts
 public interface IPostgresLifecycleTestApp : DigitalBrain.INeuron
 {
     Task Uninstall(string brain, string file);
+    Task Migrate(string[] files);
 }
 
 [GrainType("apps.app")]
 public sealed class PostgresLifecycleTestApp : DigitalBrain.Kernel.Neuron, IPostgresLifecycleTestApp
 {
+    public Task Migrate(string[] files)
+        => GrainFactory.GetGrain<IPostgresAppStorage>(JsonSerializer.Serialize(new[] { BrainScope.CurrentId(), this.GetPrimaryKeyString() })).Migrate(files);
+
     public Task Uninstall(string brain, string file)
         => GrainFactory.GetGrain<IPostgresTables>(JsonSerializer.Serialize(new[] { BrainScope.Create("alice", brain).Id, file })).Retire();
 }
