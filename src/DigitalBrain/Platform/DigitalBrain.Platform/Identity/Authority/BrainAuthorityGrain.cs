@@ -62,13 +62,14 @@ internal sealed class BrainAuthorityGrain(
         // and revoked values. A revoked collision wins; an existing stable grant takes precedence.
         var migrated = State.Grants.OrderBy(grant => pending.Contains(grant.AppId) ? 1 : 0)
             .Select(grant => pending.Contains(grant.AppId) ? grant with { AppId = appId } : grant)
+            .Where(grant => grant.AppId == appId)
             .GroupBy(grant => (grant.AppId, grant.SemanticTypeId, grant.Mode, Conversation: grant.Mode == GrantMode.ThisChat ? grant.ConversationId : null))
             .Select(group => group.FirstOrDefault(grant => grant.Revoked) ?? group.First()).ToArray();
         // One atomic save records each retired file with the move. Repeating a deployment after
         // a stable grant is revoked or spent cannot import that file again.
         await Persist(State with
         {
-            Grants = migrated,
+            Grants = [.. State.Grants.Where(grant => grant.AppId != appId && !pending.Contains(grant.AppId)), .. migrated],
             AppGrantMigrations = [.. State.AppGrantMigrations, .. pending.Select(file => new AppGrantMigrationReceipt(file, appId))]
         });
     }
