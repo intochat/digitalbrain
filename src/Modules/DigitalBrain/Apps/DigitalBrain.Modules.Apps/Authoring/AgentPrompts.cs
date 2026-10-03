@@ -13,8 +13,8 @@ internal static class AgentPrompts
         Rules:
         - Write the spec as Markdown. Start with one short paragraph saying what the app does, then one
           `## Scenario: <short name>` section per behavior, each describing in 1-4 plain sentences what
-          happens and what must be true afterwards. No fixed phrasings: write for the person, precisely.
-        - Cover the main behavior with 2-4 scenarios. Prefer scenarios whose outcome is exact.
+          triggers it (When), what it does (Then), and what must be true afterwards. These are readable prose, not a parser grammar.
+        - Use one small scenario per meaningful trigger and outcome. Prefer exact outcomes and reusable implementation functions.
         - Extract the things a person would want to change without changing logic — model choices, names or
           accounts to watch, keywords, limits — into settings, and refer to them by setting name in the
           scenarios. That way most forks are just different settings.
@@ -49,63 +49,31 @@ internal static class AgentPrompts
           behavior before answering, and fix every error it reports; a file that does not compile
           cannot pass the gate.
 
-        The tests, always, as file "tests.cs": a C# file-based app that installs the app fresh per scenario,
-        drives it through contracts, and reports one line per scenario. Use exactly this skeleton and add
-        one Scenario call per spec scenario (skip scenarios marked "(live)"):
+        The tests, always, as file "tests.cs": use the script-side AppScenarioSuite from Apps contracts.
+        Each check receives a fresh installed app and scope; the suite uninstalls it even after failure.
+        Use the exact stable ID from the authoring document. It reports dbtest:json results. Every non-live
+        scenario must have exactly one result; missing, duplicate and unknown results fail verification.
 
-            // Copy the needed #:project directives from read_contracts.
-            // Copy the needed #:project directives from read_contracts.
+            // Copy the needed #:project directives from read_contracts, including Apps contracts.
             using DigitalBrain.Apps;
-
             await using var brain = await DigitalBrainClient.ConnectAsync(args);
-            var package = PackageId.Parse(brain.Setting("Package")!);
-            var revision = brain.Setting("Revision")!;
-            var failures = 0;
-
-            await Scenario("<scenario name>", async (app, scope) =>
+            var revision = new PackageRevisionRef(PackageId.Parse(brain.Setting("Package")!), brain.Setting("Revision")!);
+            var suite = new AppScenarioSuite(brain.Get<IApp>, revision);
+            await suite.Run("<existing scenario ID>", "<scenario name>", async (app, scope) =>
             {
-                // arrange: script models, change settings via app.Configure(...)
-                var answer = await Ask(app, "ask", "<input>");
-                if (answer != "<expected>") { throw new InvalidOperationException($"The answer was \"{answer}\"."); }
-            });
+                var answer = await app.Ask("ask", "<input>", brain.Stopping);
+                if (answer != "<expected>") { throw new InvalidOperationException($"The answer was {answer}."); }
+            }, brain.Stopping);
+            return suite.ExitCode;
 
-            return failures == 0 ? 0 : 1;
-
-            async Task Scenario(string name, Func<IApp, string, Task> run)
-            {
-                var scope = $"specs/{package}@{revision}/{Guid.NewGuid():N}";
-                var app = brain.Get<IApp>(scope + "/app");
-                try
-                {
-                    await app.Install(new InstallApp(Guid.NewGuid(), new(package, revision), new Dictionary<string, string>()));
-                    await run(app, scope);
-                    Console.WriteLine($"dbtest:pass {name}");
-                }
-                catch (Exception error)
-                {
-                    failures++;
-                    Console.WriteLine($"dbtest:fail {name}\t{error.Message.ReplaceLineEndings(" ")}");
-                }
-                finally
-                {
-                    try { await app.Uninstall(new UninstallApp(Guid.NewGuid())); } catch (Exception) { }
-                }
-            }
-
-            async Task<string> Ask(IApp app, string operation, string input)
-            {
-                var invocation = await app.Invoke(new InvokeApp(Guid.NewGuid(), operation, input));
-                var deadline = DateTimeOffset.UtcNow.AddMinutes(5);
-                while (invocation.Status == InvocationStatus.Pending)
-                {
-                    if (DateTimeOffset.UtcNow > deadline) { throw new TimeoutException("The app did not answer within 5 minutes."); }
-                    await Task.Delay(200);
-                    invocation = await app.ReadInvocation(invocation.Id);
-                }
-                if (invocation.Status == InvocationStatus.Failed) { throw new InvalidOperationException(invocation.Error ?? "The app failed."); }
-                return invocation.Output ?? "";
-            }
-
+        Keep each check small: arrange its fixture, send one trigger, assert its observable outcome.
+        Share fixture setup rather than copying installation, polling and cleanup into every test.
+        Legacy specs without a structured document may use stable IDs chosen once by the Builder.
+        For C# behavior scripts, app.Invocations(brain, brain.Stopping) subscribes before recovering
+        pending invocations. Handle only the operations belonging to that behavior, then app.Respond(...).
+        UI button signals should invoke the same app operation as assistant tools, not duplicate logic.
+        Files of an installed app share its host-verified identity and storage ownership. Standalone scripts
+        have file identity. Never derive authority from a setting or a scenario ID.
         Test recipes:
         - Scripted models (deterministic model scenarios): with the AI contracts referenced,
           brain.Get<IScriptedLLM>(scope + "/<name>").Script(new[] { "reply 1", "reply 2" }) scripts the

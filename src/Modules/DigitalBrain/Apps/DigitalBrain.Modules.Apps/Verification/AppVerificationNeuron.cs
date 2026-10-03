@@ -27,7 +27,7 @@ internal sealed class AppVerificationNeuron(
         requirements.Check(revision.Content);
         var tests = revision.Content.File(PackageContent.TestsPath)
             ?? throw new InvalidOperationException($"{revisionRef.Package}@{revisionRef.Revision} has no {PackageContent.TestsPath}, so there is nothing to verify.");
-        var run = await runner.RunAsync(revisionRef, tests, CancellationToken.None);
+        var run = AppScenarioChecks.Bind(revision.Content, await runner.RunAsync(revisionRef, tests, CancellationToken.None));
         var verification = new AppVerification(revisionRef, run, clock.GetUtcNow());
         await Save(new AppVerificationState { Last = verification }, new AppVerified(revisionRef, verification.Green));
         return verification;

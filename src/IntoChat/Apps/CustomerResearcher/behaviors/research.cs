@@ -13,16 +13,12 @@ using DigitalBrain.AI.Scripted;
 using DigitalBrain.Apps;
 using DigitalBrain.Apps.Signals;
 using DigitalBrain.Client;
-using DigitalBrain.Flutter.Button;
-using DigitalBrain.Flutter.Button.Signals;
 using DigitalBrain.Flutter.Text;
-using DigitalBrain.Flutter.TextField;
 using DigitalBrain.Microsoft.Playwright;
 using DigitalBrain.Postgres;
 
-// Research, Stop and all table access live in this one behavior: table ownership is stamped per
-// behavior file, and one process means Stop cancels an in-flight research directly. Research and
-// Stop arrive ordered on the app's own invocation stream; the button streams relay the same intents.
+// One invocation stream orders research and cancellation. UI controls submit the same operations
+// as assistant tools. Storage belongs to the installation, independent of this file's name.
 await using var brain = await DigitalBrainClient.ConnectAsync(args);
 var appKey = brain.Setting("App")!;
 var app = brain.Get<IApp>(appKey);
@@ -35,32 +31,8 @@ var defined = false;
 CancellationTokenSource? running = null;
 const string NotConnected = "The browser is not connected. Open or reconnect the browser and retry.";
 
-var operations = Task.Run(async () =>
-{
-    await using var invocations = await brain.SubscribeAsync<AppInvoked>(app, brain.Stopping);
-    foreach (var missed in await app.Pending())
-    { if (Handles(missed.Operation)) { await HandleAsync(missed.Id, missed.Operation, missed.Input); } }
-    await foreach (var invoked in invocations.ReadAllAsync(brain.Stopping))
-    { if (Handles(invoked.Operation)) { await HandleAsync(invoked.InvocationId, invoked.Operation, invoked.Input); } }
-});
-var researchClicks = Task.Run(async () =>
-{
-    await foreach (var _ in brain.On<ButtonClicked>(brain.Get<IButton>(appKey + "/research"), brain.Stopping))
-    {
-        var query = (await brain.Get<ITextField>(appKey + "/company").Read()).Value.Trim();
-        if (query.Length is >= 1 and <= 500) { Start(query, null); }
-        else { await status.Set("Enter a company name (at most 500 characters)."); }
-    }
-});
-var stopClicks = Task.Run(async () =>
-{
-    await foreach (var _ in brain.On<ButtonClicked>(brain.Get<IButton>(appKey + "/stop"), brain.Stopping))
-    {
-        Cancel();
-        await status.Set("Stopped");
-    }
-});
-await Task.WhenAll(operations, researchClicks, stopClicks);
+await foreach (var invoked in app.Invocations(brain, brain.Stopping))
+{ if (Handles(invoked.Operation)) { await HandleAsync(invoked.InvocationId, invoked.Operation, invoked.Input); } }
 return;
 
 bool Handles(string operation) => operation is "research" or "stop" or "result";

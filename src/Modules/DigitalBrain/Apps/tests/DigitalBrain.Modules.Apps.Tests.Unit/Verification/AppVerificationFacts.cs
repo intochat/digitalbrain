@@ -10,6 +10,32 @@ public sealed class AppVerificationFacts
     private static readonly PackageId Echo = PackageId.Parse("alice/echo");
 
     [Fact]
+    public async Task StructuredVerificationRequiresEveryScenarioAndBindsItsStableId()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await StartAsync(ct);
+        Caller.As("alice");
+        var document = AppDocumentFacts.Document() with { Behaviors = [] };
+        document = document with { Scenarios = [document.Scenarios[0], new("22222222222222222222222222222222", "Opening the app", "When opened, show the UI.", false)] };
+        var content = new PackageContent(new("Echo", "", [new("ask", "Ask")], [], Runtime: "echo"), "",
+            new Dictionary<string, string>
+            {
+                [PackageContent.SpecPath] = AppDocumentCodec.ExportSpec(document),
+                [AppDocumentCodec.Path] = AppDocumentCodec.Encode(document),
+                [PackageContent.TestsPath] = "// partial coverage",
+            });
+        var revision = await brain.Get<IPackage>(Echo.ToString()).Commit(brain.Commit(null, content));
+        RecordingCSharpFile.ScriptedRuns[$"specs/{Echo}@{revision.Id}"] = (0, "dbtest:pass Research saves");
+
+        var verification = await brain.Get<IAppVerification>(IAppVerification.Key(new(Echo, revision.Id))).Verify();
+
+        Assert.False(verification.Green);
+        var missing = Assert.Single(verification.Run.Scenarios, s => !s.Passed);
+        Assert.Equal("Opening the app", missing.Name);
+        Assert.Contains("not report", missing.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task AConfigurationAppAnswersThroughItsRuntimeWithoutAScript()
     {
         var ct = TestContext.Current.CancellationToken;

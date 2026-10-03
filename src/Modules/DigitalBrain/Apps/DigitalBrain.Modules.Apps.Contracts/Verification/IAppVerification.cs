@@ -20,7 +20,8 @@ public interface IAppVerification : INeuron
 public sealed record AppScenarioVerdict(
     [property: Id(0)] string Name,
     [property: Id(1)] bool Passed,
-    [property: Id(2)] string Message);
+    [property: Id(2)] string Message,
+    [property: Id(3)] string? ScenarioId = null);
 
 // The tests script's whole verdict: its dbtest lines and its exit code. A run that reported no
 // scenario is never green, so a script that crashes early cannot pass by silence.

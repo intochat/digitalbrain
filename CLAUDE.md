@@ -34,8 +34,9 @@ pull, proposals, publish — containing:
 
 ```
 app.spec.md      the program, in free natural language; "## Scenario: <name>" headings
-tests.cs         the spec's deterministic meaning: a C# file-based app driving scratch installs
+tests.cs         thin deterministic checks using AppScenarioSuite and scratch installs
 behaviors/*.cs   the implementation: one script per concern (plus legacy single Source as app.cs)
+app.authoring.json optional stable scenario IDs and scenario-to-source associations
 ```
 
 - **Spec is the program.** The Author agent turns a request into `app.spec.md`; the Builder agent
@@ -47,8 +48,10 @@ behaviors/*.cs   the implementation: one script per concern (plus legacy single 
 - **Tests are the publish gate.** `IAppVerification` runs `tests.cs` through `ITestScriptRunner`
   (default: an ordinary sandbox script). The script installs GUID-scoped scratch apps, drives them
   through real contracts (`IApp`, `IScriptedLLM`, `IGroupChat`, …), prints one
-  `dbtest:pass <name>` / `dbtest:fail <name>\t<message>` line per scenario and exits non-zero on
-  failure. Green requires exit 0 AND ≥1 scenario AND all passed — silence never passes. Tests play
+  `dbtest:json <AppScenarioVerdict>` line per scenario and exits non-zero on failure. Legacy
+  `dbtest:pass <name>` / `dbtest:fail <name>\t<message>` remains supported. Structured documents
+  require exactly one result for every non-live scenario; results bind to stable scenario IDs.
+  Green requires exit 0 AND ≥1 scenario AND all passed — silence never passes. Tests play
   the connector (scripted models, real timers); never a live model in the gate. `Publish` refuses
   any revision carrying a spec or tests until its verification is green. Verification runs
   scripts for every runtime, so it needs the host's C# sandbox (composing `CSharpModule` in a
@@ -63,7 +66,10 @@ behaviors/*.cs   the implementation: one script per concern (plus legacy single 
   `brain.Trigger<T>()`) still exists for single-trigger files.
 - **Install is per brain** (`IApp`): settings plus account slots bound to the installer's own
   connected accounts — a shared email summarizer runs against each user's Gmail. Each
-  `behaviors/*.cs` becomes its own `ICSharpFile`; failure isolation is per behavior. First-party
+  `behaviors/*.cs` becomes its own `ICSharpFile`; failure isolation is per behavior. The host binds
+  these files to the installed `IApp` identity, shared across scenarios and generations. Standalone
+  files retain file identity. Upgrade/reconfigure migrates legacy file-owned Postgres tables without
+  changing their physical names or pinned origins. First-party
   apps ship through the same commit→verify→publish pipeline (`ShippedAppPublisher`, folders under
   `src/IntoChat/Apps/`).
 - **Module contract:** a module ships contracts + signals + connector + fakes (Testing package) +
