@@ -1,6 +1,7 @@
 using DigitalBrain.Contracts.Signals;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 

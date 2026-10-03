@@ -1,8 +1,9 @@
 using DigitalBrain.Client;
 using System.Diagnostics;
 using Aspire.Hosting;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using Microsoft.Playwright;
 using Orleans;
 

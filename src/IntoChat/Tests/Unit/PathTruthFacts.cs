@@ -99,7 +99,7 @@ public sealed class PathTruthFacts
         Assert.All(docker.Concat(profile), entry =>
         {
             var type = Type.GetType(entry.Module, throwOnError: true)!;
-            Assert.True(typeof(DigitalBrain.Core.IModule).IsAssignableFrom(type));
+            Assert.True(typeof(DigitalBrain.Kernel.IModule).IsAssignableFrom(type));
             Assert.False(DigitalBrain.Contracts.PlatformAssemblyAttribute.IsPlatform(type.Assembly));
             Assert.DoesNotContain(type.Assembly.GetReferencedAssemblies(), reference => reference.Name == "DigitalBrain.Platform");
 

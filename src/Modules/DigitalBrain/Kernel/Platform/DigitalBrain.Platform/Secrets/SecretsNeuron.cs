@@ -1,9 +1,10 @@
 using DigitalBrain.Sdk.Secrets;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Contracts.Types;
-using DigitalBrain.Core;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Enforcement;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Platform.Secrets;

@@ -1,5 +1,5 @@
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 
 namespace DigitalBrain.Modules.Apps.Tests.Unit;
 

@@ -1,6 +1,6 @@
 using System.Text.Json;
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Postgres;
 using DigitalBrain.Sdk.Capacity;
 using Microsoft.Extensions.DependencyInjection;
@@ -411,13 +411,13 @@ public sealed class PostgresWriteTableFacts
     }
 }
 
-public interface IPostgresLifecycleTestApp : DigitalBrain.Contracts.INeuron
+public interface IPostgresLifecycleTestApp : DigitalBrain.INeuron
 {
     Task Uninstall(string brain, string file);
 }
 
 [GrainType("apps.app")]
-public sealed class PostgresLifecycleTestApp : DigitalBrain.Core.Neuron, IPostgresLifecycleTestApp
+public sealed class PostgresLifecycleTestApp : DigitalBrain.Kernel.Neuron, IPostgresLifecycleTestApp
 {
     public Task Uninstall(string brain, string file)
         => GrainFactory.GetGrain<IPostgresTables>(JsonSerializer.Serialize(new[] { BrainScope.Create("alice", brain).Id, file })).Retire();

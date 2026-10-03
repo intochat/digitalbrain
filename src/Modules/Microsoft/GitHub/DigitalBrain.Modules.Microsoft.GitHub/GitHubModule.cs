@@ -1,4 +1,4 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Sdk;
 using DigitalBrain.Sdk.Integrations;
 using Microsoft.Extensions.DependencyInjection;

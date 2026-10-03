@@ -1,4 +1,4 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.AI.Agents;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;

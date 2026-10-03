@@ -1,4 +1,4 @@
-namespace DigitalBrain.Contracts;
+namespace DigitalBrain;
 
 public interface IDigitalBrain : IAsyncDisposable
 {

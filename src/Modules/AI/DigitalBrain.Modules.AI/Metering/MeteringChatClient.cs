@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.AI;
 

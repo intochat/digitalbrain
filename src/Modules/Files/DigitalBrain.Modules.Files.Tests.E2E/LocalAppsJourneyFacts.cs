@@ -1,4 +1,4 @@
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using DigitalBrain.Flutter;
@@ -84,7 +84,7 @@ public sealed class LocalAppsJourneyFacts(ReferenceBrainFixture host) : BrainFac
             // Flutter mirrors the SnackBar text into an aria-live announcement; assert the visible node.
             await Assertions.Expect(page.Locator("flt-semantics").GetByText("Saved " + outputName, new() { Exact = true })).ToBeVisibleAsync();
             var assetChecksum = receipt.RootElement.GetProperty("file").GetProperty("checksum").GetString()!;
-            var assetId = DigitalBrain.Files.WorkspaceFileStore.AssetId(DigitalBrain.Core.Enforcement.BrainScope.Create("owner", workspaceId).Id, assetChecksum);
+            var assetId = DigitalBrain.Files.WorkspaceFileStore.AssetId(DigitalBrain.Kernel.Enforcement.BrainScope.Create("owner", workspaceId).Id, assetChecksum);
             var outputResponse = await brain.HttpClient.GetAsync($"/brains/{Uri.EscapeDataString(workspaceId)}/apps/assets/{assetId}", ct);
             outputResponse.EnsureSuccessStatusCode();
             var output = await outputResponse.Content.ReadAsByteArrayAsync(ct);

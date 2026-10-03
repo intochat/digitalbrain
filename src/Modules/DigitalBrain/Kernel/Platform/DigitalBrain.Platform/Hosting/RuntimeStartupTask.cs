@@ -1,6 +1,7 @@
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Signals;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Platform.Hosting;
 

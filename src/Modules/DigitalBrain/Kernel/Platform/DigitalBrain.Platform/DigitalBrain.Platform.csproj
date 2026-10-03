@@ -5,10 +5,10 @@
     <RootNamespace>DigitalBrain.Platform</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Kernel.Tests.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Kernel.Tests.Unit" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
     <PackageReference Include="Azure.Extensions.AspNetCore.DataProtection.Blobs" />
-    <ProjectReference Include="..\..\Sdk\DigitalBrain.Modules.Kernel.Sdk\DigitalBrain.Modules.Sdk.csproj" />
+    <ProjectReference Include="..\..\Sdk\DigitalBrain.Sdk\DigitalBrain.Sdk.csproj" />
   </ItemGroup>
 </Project>

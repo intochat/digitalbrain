@@ -5,7 +5,7 @@
   <ItemGroup>
     <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
     <ProjectReference Include="../DigitalBrain.Modules.Registry/DigitalBrain.Modules.Registry.csproj" />
-    <ProjectReference Include="..\..\Kernel\Sdk\DigitalBrain.Modules.Kernel.Sdk\DigitalBrain.Modules.Sdk.csproj" />
+    <ProjectReference Include="..\..\Kernel\Sdk\DigitalBrain.Sdk\DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="../../Kernel/Platform/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
     <ProjectReference Include="../../../Qdrant/DigitalBrain.Modules.Qdrant/DigitalBrain.Modules.Qdrant.csproj" />
     <ProjectReference Include="../../../Time/DigitalBrain.Modules.Time/DigitalBrain.Modules.Time.csproj" />

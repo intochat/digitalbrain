@@ -1,5 +1,5 @@
 using DigitalBrain.AI.Agents;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Sdk.Capacity;
 using DigitalBrain.Supabase;
 using DigitalBrain.Supabase.Windows;

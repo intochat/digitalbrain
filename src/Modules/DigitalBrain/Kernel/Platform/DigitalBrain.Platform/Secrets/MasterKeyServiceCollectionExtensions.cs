@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 
 namespace DigitalBrain.Platform.Secrets;

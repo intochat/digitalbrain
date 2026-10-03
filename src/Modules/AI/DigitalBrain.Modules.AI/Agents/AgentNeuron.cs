@@ -3,8 +3,9 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using DigitalBrain.AI.Agents.Signals;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 

@@ -1,9 +1,10 @@
 using DigitalBrain.Assistant;
 using DigitalBrain.Compute;
 using DigitalBrain.Compute.Usage;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Testing.Unit;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -26,6 +27,7 @@ public sealed class ComputeUsageRouteFacts
         Assert.NotNull(cursor);
         var builder = WebApplication.CreateBuilder();
         builder.Services.AddSingleton<IDigitalBrain>(brain.SiloServices.GetRequiredService<IDigitalBrain>());
+        builder.Services.AddSingleton(brain.SiloServices.GetRequiredService<IBrainAccess>());
         builder.Services.AddSingleton(store);
         await using var app = builder.Build();
         new AssistantModule().Configure(app);

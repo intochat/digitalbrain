@@ -1,6 +1,6 @@
 using DigitalBrain.Sdk.Integrations.Accounts;
-using DigitalBrain.Core;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Platform.Identity;
 using DigitalBrain.Platform.Identity.Directory;
 using DigitalBrain.Platform.Identity.Grants;

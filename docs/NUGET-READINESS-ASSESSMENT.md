@@ -44,6 +44,8 @@ Also: **`dotnet pack` is currently broken repo-wide** — `Directory.Build.props
 condition-guarded, so packing either fails (NU5046) or silently ships without the declared icon.
 No packable project has `PackageReadmeFile` or `GenerateDocumentationFile`.
 
+The findings above describe the original assessment; addressed status and the action plan below record subsequent changes.
+
 ---
 
 ## Critical findings
@@ -54,7 +56,7 @@ No packable project has `PackageReadmeFile` or `GenerateDocumentationFile`.
 | C2 | Client | `DigitalBrain.Client.csproj:17-27` | Two products in one package; script consumers inherit Orleans/Azure/OTel/ASP.NET. Split script-edge client into a lean package (needs ~`System.Net.Http.Json`). | |
 | C3 | Sdk | whole project | Grab-bag SDK: grains, middleware, SQL compiler, MCP client, identity, secrets APIs in one assembly. Split public module-author surface from unpublished platform contracts. | |
 | C4 | Sdk | `Secrets/ISecrets.cs:17`, `Integrations/IIntegrationRegistration.cs:33`, `Auth/TokenHandoff.cs`, `Identity/Accounts.cs:41` | Plaintext-credential-returning APIs on the public NuGet surface; only runtime `[PlatformOnly]` protects them. Move to a non-published platform-contracts assembly. | |
-| C5 | Aspire | `DigitalBrain.Aspire.csproj` | Misnamed (it's the silo runtime, not an Aspire client integration), product-coupled ("Silo host wiring for IntoChat"), and references `DigitalBrain.Platform` — publishing it publishes the credential ring. Rename (e.g. `DigitalBrain.Silo`) and cut the Platform dependency from the public graph. | |
+| C5 | Aspire | `DigitalBrain.Aspire.csproj` | Misnamed (it's the silo runtime, not an Aspire client integration), product-coupled ("Silo host wiring for IntoChat"), and references `DigitalBrain.Platform` — publishing it publishes the credential ring. Rename and cut the Platform dependency from the public graph. | Partial: renamed to `DigitalBrain.Aspire.Server`; the Platform dependency remains for Phase 2. |
 | C6 | repo | `Directory.Build.props` | `PackageIcon` without a packed icon file → `dotnet pack` fails/ships wrong. Add the icon + pack item or drop the property; add a pack smoke test to CI. | ✅ `1b65d23c7` |
 | C7 | Kernel | `Composition/CompositionOverrideTransport.cs` | Test-only global static in the shipped runtime; `Take` doesn't remove entries (unbounded growth, token reuse). Move to DigitalBrain.Testing; fix the leak regardless. | ✅ `3a724f8a4` (deleted, not moved — see note) |
 
@@ -80,7 +82,7 @@ No packable project has `PackageReadmeFile` or `GenerateDocumentationFile`.
 - **H15** Client `BrainClientHosting.cs:16`: Azure Tables clustering hardcoded in the public entry point; `BrainOptions` is internal yet registered via public API (unconfigurable). 
 - **H16** Kernel `Composition/ModuleDefinition.cs:24-25`: `CreateModule()` per Configure call — stateful modules silently get two instances. Cache or contract statelessness.
 - **H17** Sdk twin `IIntegrationAccounts` interfaces (Sdk.Integrations.Accounts vs Contracts.Integrations) — same name, different neurons; rename one.
-- **H18** Naming unification (systemic defect 5): one convention for package id = assembly = root namespace = folder, done before first publish. Includes `DigitalBrain` meta-package (ns `DigitalBrain.Contracts`) and the two Sdk files in `DigitalBrain.Identity`.
+- **H18** Naming unification (systemic defect 5): one convention for package id = assembly = root namespace = folder, done before first publish. Includes `DigitalBrain` meta-package (ns `DigitalBrain.Contracts`) and the two Sdk files in `DigitalBrain.Identity`. — ✅ Addressed: the nine approved projects now use matching folder, csproj, assembly, package ID, and root namespace. The vocabulary is in `DigitalBrain`; SDK identity contracts are in `DigitalBrain.Sdk.Identity`.
 
 ## Medium findings (abridged — see per-project notes below)
 
@@ -138,9 +140,29 @@ misleading.
 5. H7/H8: make both open-posture defaults explicit opt-in, with pinning tests. — ✅ Done: mandatory Open/Secured host configuration, fail-fast validation, secured anonymous rejection, and unconditional edge membership enforcement. The Open policy is composed explicitly; Aspire run mode and the unit harness select Open, while publish mode supplies no default. Bootstrap-username reservation now runs in the registration endpoint, and the integration operator gate uses the same auth options. Verified 2026-10-03: kernel-ring suite 205/205 passed (0 skipped), including header-less membership regressions and H9 encoding coverage; git diff --check passed. Broader module suites and live E2E were not run for this change.
 
 **Phase 1 — naming, once, before anything publishes**
-6. H18: ratify one naming convention (package id = assembly = namespace = folder) and apply across the ring; rename `DigitalBrain.Aspire` → silo/runtime name (C5 part 1).
+6. H18: ratify one naming convention (package id = assembly = namespace = folder) and apply across the ring; rename `DigitalBrain.Aspire` (C5 part 1). — ✅ Complete and verified on 2026-10-03.
+
+   Approved identities (each is the project folder, csproj stem, assembly, package ID, and root namespace):
+   - `DigitalBrain`
+   - `DigitalBrain.Contracts`
+   - `DigitalBrain.Kernel`
+   - `DigitalBrain.Client`
+   - `DigitalBrain.Sdk`
+   - `DigitalBrain.Platform`
+   - `DigitalBrain.Aspire.Hosting` — AppHost resource composition.
+   - `DigitalBrain.Aspire.Client` — consuming-process configuration, health endpoints, service discovery, and telemetry, extracted from Client.
+   - `DigitalBrain.Aspire.Server` — existing server-process integration, renamed from `DigitalBrain.Aspire`.
+
+   References, solution entries, friend assemblies, script imports, tests, and compatibility-baseline type names follow the new names. Kernel test projects are `DigitalBrain.Kernel.Tests.Unit` and `.Tests.E2E`. Existing parent grouping folders are retained. Orleans aliases and persisted field IDs are unchanged.
+
+   Validation: full solution Release build passed with zero warnings/errors; all 24 unit/architecture suites passed (906 passed, 6 skipped, 0 failed). Solution-wide NuGet packing passed; all nine package identities and packed DLL names match the naming rule. Live E2E was not run. The architecture baseline also records previously unrecorded, additive Apps/CSharp contracts after checking that existing field IDs remain unchanged; the Assistant route test now supplies the access policy required by H7.
+
+   Scope: this completes naming and the Aspire client-integration extraction. C2's transport split, C3/C4's SDK split, H1/H3's dependency inversions, and the remaining C5/H6 Platform publication decision are still pending. Aspire.Server still composes Platform; naming does not claim to remove that dependency.
 
 **Phase 2 — package shape (the big refactor)**
+
+**Next priority: H4 + H1 (step 7).** Move `ScriptEdgeProtocol` from `DigitalBrain.Client` into `DigitalBrain.Contracts`, update client/server consumers, remove the protocol-sharing production `InternalsVisibleTo`, and eliminate the Kernel → Client project reference. Preserve wire compatibility and verify the CSharp script-edge, kernel, and architecture suites. C5 is only partially addressed: the server integration name is fixed, but its Platform dependency remains.
+
 7. H4 + H1: move the script-edge wire protocol into Contracts; delete the Kernel→Client reference and the production IVT.
 8. C2: split Client into lean script-edge package vs cluster-client/host package; drop Azure/OTel/ASP.NET from the script package (H15, service-defaults relocation).
 9. H2: extract Kernel's ASP.NET enforcement into a hosting companion; Kernel loses the framework reference.

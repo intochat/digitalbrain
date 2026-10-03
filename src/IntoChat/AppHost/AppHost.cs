@@ -11,7 +11,7 @@ using DigitalBrain.Specs;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.ClickHouse;
 using DigitalBrain.Microsoft.CSharp;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google.Gmail;

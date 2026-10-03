@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Azure;
 using Azure.Storage.Blobs;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 

@@ -1,5 +1,5 @@
 using System.Reflection;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using Pulumi;
 using Pulumi.AzureNative.App;
 using Pulumi.AzureNative.App.Inputs;

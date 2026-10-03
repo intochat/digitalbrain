@@ -1,5 +1,5 @@
 using DigitalBrain.Flutter.Workspace;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using Microsoft.AspNetCore.Routing;
 using Orleans.Hosting;
 

@@ -1,8 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Memory.Signals;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;

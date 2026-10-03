@@ -1,6 +1,7 @@
 using DigitalBrain.Client;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Testing;
 

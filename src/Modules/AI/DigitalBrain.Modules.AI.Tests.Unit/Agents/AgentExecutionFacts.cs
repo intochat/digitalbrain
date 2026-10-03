@@ -1,5 +1,6 @@
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.AI.Metering;
 using DigitalBrain.AI;

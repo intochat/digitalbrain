@@ -39,7 +39,7 @@ public sealed class PersistedStateFacts
     public void PersistedStateHasStableIdsAndConcreteCollections()
     {
         Assert.NotEmpty(States);
-        Assert.Contains(States, type => type.FullName == "DigitalBrain.Core.BrainState");
+        Assert.Contains(States, type => type.FullName == "DigitalBrain.Kernel.BrainState");
         Assert.Contains(States, type => type.FullName == "DigitalBrain.Platform.Secrets.SecretsState");
         var violations = States.SelectMany(type => PersistedStateRules.ShapeViolations(type, RetiredIds.GetValueOrDefault(type.FullName!, []))).ToArray();
         Assert.True(violations.Length == 0, string.Join(Environment.NewLine, violations));

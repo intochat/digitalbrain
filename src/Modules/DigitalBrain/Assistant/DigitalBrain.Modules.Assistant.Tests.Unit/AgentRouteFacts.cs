@@ -1,7 +1,8 @@
 using DigitalBrain.Assistant;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using System.Text;

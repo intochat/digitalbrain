@@ -1,4 +1,5 @@
 using DigitalBrain.Supabase;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;

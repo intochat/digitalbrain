@@ -1,5 +1,6 @@
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Supabase.Tables;
 using Microsoft.AspNetCore.Builder;

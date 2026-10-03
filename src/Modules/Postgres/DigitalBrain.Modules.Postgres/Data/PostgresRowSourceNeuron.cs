@@ -1,5 +1,5 @@
 using DigitalBrain.Contracts.Data;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Sdk.Data;
 using Orleans.Concurrency;
 

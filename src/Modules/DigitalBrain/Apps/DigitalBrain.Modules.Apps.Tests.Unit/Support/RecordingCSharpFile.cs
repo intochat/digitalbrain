@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Microsoft.CSharp;
 using Orleans.Runtime;
 

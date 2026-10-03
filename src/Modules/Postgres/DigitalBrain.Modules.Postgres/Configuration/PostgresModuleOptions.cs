@@ -1,4 +1,4 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Postgres;
 

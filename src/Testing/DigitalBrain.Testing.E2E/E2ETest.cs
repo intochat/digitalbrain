@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Testing.E2E;
 

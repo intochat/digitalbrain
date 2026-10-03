@@ -1,7 +1,7 @@
 using DigitalBrain.Client;
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Core;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Platform;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;

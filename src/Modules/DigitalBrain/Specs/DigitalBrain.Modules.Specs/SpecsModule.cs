@@ -1,4 +1,4 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
 

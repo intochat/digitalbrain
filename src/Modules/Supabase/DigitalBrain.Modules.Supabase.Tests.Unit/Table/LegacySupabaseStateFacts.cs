@@ -1,3 +1,4 @@
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Supabase;
 using DigitalBrain.Supabase.Tables;

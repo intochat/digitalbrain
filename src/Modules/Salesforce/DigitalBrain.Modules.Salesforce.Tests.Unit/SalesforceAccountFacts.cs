@@ -1,4 +1,4 @@
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Sdk;
 using Microsoft.AspNetCore.Builder;

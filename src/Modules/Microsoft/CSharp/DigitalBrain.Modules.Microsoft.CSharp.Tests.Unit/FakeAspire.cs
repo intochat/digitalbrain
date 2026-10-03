@@ -1,4 +1,4 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.CSharp;
 using Orleans.Runtime;

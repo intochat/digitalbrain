@@ -24,6 +24,7 @@ public sealed class CSharpScriptCheck
         global using System.Threading;
         global using System.Threading.Tasks;
         global using DigitalBrain.Client;
+        global using DigitalBrain;
         global using DigitalBrain.Contracts;
         """;
 

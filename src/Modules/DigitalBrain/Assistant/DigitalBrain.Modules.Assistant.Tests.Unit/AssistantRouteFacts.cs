@@ -1,4 +1,5 @@
 using DigitalBrain.Assistant;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 using DigitalBrain.Compute.Usage;

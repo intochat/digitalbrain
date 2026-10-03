@@ -1,8 +1,9 @@
 using System.Security.Cryptography;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
-using DigitalBrain.Core.Enforcement;
-using DigitalBrain.Identity;
+using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Enforcement;
+using DigitalBrain.Sdk.Identity;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Platform.Identity.Directory;

@@ -1,9 +1,9 @@
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Supabase.Tables;
 using Microsoft.Playwright;
-using DigitalBrain.Identity;
+using DigitalBrain.Sdk.Identity;
 
 namespace DigitalBrain.Modules.Supabase.Tests.E2E;
 

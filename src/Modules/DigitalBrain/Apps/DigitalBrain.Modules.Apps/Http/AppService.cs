@@ -1,6 +1,7 @@
 using DigitalBrain.Apps;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Microsoft.CSharp;
 using DigitalBrain.Sdk.Integrations.Accounts;
 

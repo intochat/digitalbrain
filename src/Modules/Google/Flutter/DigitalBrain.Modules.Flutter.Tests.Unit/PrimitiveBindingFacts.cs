@@ -1,5 +1,6 @@
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Button;
 using DigitalBrain.Flutter.Button.Signals;

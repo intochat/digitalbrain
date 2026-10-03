@@ -1,5 +1,5 @@
-using DigitalBrain.Core.Enforcement;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel.Enforcement;
+using DigitalBrain.Kernel;
 using DigitalBrain.Sdk;
 using DigitalBrain.Sdk.Integrations;
 using Microsoft.AspNetCore.Builder;

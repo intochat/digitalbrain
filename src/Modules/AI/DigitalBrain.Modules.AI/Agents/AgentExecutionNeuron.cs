@@ -1,9 +1,10 @@
 using Microsoft.Extensions.Logging;
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using System.Runtime.CompilerServices;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.AI.Metering;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;

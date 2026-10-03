@@ -1,4 +1,4 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Sdk;
 using DigitalBrain.Sdk.Integrations.Accounts;
 using Microsoft.AspNetCore.Routing;

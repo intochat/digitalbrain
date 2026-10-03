@@ -1,4 +1,5 @@
 using Azure.Storage.Blobs;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Platform.Identity.Configuration;
 using Microsoft.AspNetCore.DataProtection;

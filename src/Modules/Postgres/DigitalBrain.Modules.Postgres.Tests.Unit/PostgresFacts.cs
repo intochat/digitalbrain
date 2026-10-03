@@ -142,7 +142,7 @@ public sealed class PostgresFacts
         services.AddSingleton<IConfiguration>(configuration);
         services.AddSingleton<IPostgresProvider, PostgresTestControls>();
         await using var brain = await StartAsync();
-        services.AddSingleton<DigitalBrain.Contracts.IDigitalBrain>(brain);
+        services.AddSingleton<DigitalBrain.IDigitalBrain>(brain);
         new PostgresTestSiloBuilder(services, configuration).AddPostgres();
         await using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
         var report = await provider.GetRequiredService<HealthCheckService>().CheckHealthAsync(TestContext.Current.CancellationToken);

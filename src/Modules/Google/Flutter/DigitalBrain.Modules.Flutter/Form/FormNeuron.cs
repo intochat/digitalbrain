@@ -1,7 +1,8 @@
 using System.Globalization;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Types;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Flutter.Form.Signals;
 using Orleans.Concurrency;
 using Orleans.Runtime;

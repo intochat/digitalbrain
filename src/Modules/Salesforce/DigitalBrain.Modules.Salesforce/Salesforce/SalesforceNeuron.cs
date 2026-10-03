@@ -1,7 +1,8 @@
 using System.Text;
 using System.Text.Json;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Salesforce.Signals;
 using DigitalBrain.Sdk;
 using Orleans.Concurrency;

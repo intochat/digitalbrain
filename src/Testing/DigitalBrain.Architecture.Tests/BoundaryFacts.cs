@@ -1,6 +1,6 @@
 using ArchUnitNET.xUnitV3;
-using DigitalBrain.Core;
-using DigitalBrain.Identity;
+using DigitalBrain.Kernel;
+using DigitalBrain.Sdk.Identity;
 using DigitalBrain.Sdk.Integrations;
 using DigitalBrain.Sdk.Integrations.Accounts;
 using DigitalBrain.Sdk.Secrets;
@@ -12,8 +12,8 @@ public sealed class BoundaryFacts
 {
     private static readonly string[] KernelLayers =
     [
-        "DigitalBrain", "DigitalBrain.Modules.Kernel.Contracts", "DigitalBrain.Client",
-        "DigitalBrain.Modules.Kernel", "DigitalBrain.Modules.Sdk", "DigitalBrain.Platform"
+        "DigitalBrain", "DigitalBrain.Contracts", "DigitalBrain.Client",
+        "DigitalBrain.Kernel", "DigitalBrain.Sdk", "DigitalBrain.Platform"
     ];
 
     [Fact]
@@ -83,7 +83,7 @@ public sealed class BoundaryFacts
 
     internal static bool IsCredentialContract(Type type) => type.IsInterface && (
         InNamespace(type, "DigitalBrain.Sdk.Secrets") || InNamespace(type, "DigitalBrain.Sdk.Identity")
-        || InNamespace(type, "DigitalBrain.Identity") || InNamespace(type, "DigitalBrain.Sdk.Integrations"));
+        || InNamespace(type, "DigitalBrain.Sdk.Integrations"));
 
     private static bool InNamespace(Type type, string name) =>
         type.Namespace == name || type.Namespace?.StartsWith(name + ".", StringComparison.Ordinal) == true;

@@ -38,8 +38,8 @@ public sealed class AgentModelsHttpFacts
 
         // With authentication on, brain routes require directory membership; grant the owner
         // this workspace so the fact measures model validation, not access control.
-        await brain.Get<DigitalBrain.Identity.IIdentityDirectory>(DigitalBrain.Identity.IdentityGrains.Directory)
-            .ShareBrainAsync("owner", "model-validation", "owner", "Owner", DigitalBrain.Identity.MemberRole.Owner, ct);
+        await brain.Get<DigitalBrain.Sdk.Identity.IIdentityDirectory>(DigitalBrain.Sdk.Identity.IdentityGrains.Directory)
+            .ShareBrainAsync("owner", "model-validation", "owner", "Owner", DigitalBrain.Sdk.Identity.MemberRole.Owner, ct);
 
         using var rejected = await brain.HttpClient.PostAsJsonAsync("/agent", new
         {

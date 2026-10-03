@@ -1,6 +1,6 @@
 using System.Net;
 using System.Text.Json;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Google.Gmail;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;

@@ -9,7 +9,7 @@ using DigitalBrain.Assistant;
 using DigitalBrain.Specs;
 using DigitalBrain.ClickHouse;
 using DigitalBrain.Microsoft.CSharp;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google.Gmail;

@@ -4,8 +4,9 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using DigitalBrain.Apps;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 
 namespace DigitalBrain.Apps;
 

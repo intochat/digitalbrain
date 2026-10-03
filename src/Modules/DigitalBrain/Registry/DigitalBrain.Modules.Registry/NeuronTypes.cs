@@ -1,7 +1,8 @@
 using System.ComponentModel;
 using System.Reflection;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Registry;
 

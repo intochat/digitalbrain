@@ -1,6 +1,7 @@
 using DigitalBrain.Apps;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Postgres;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Storage;

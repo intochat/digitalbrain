@@ -1,4 +1,5 @@
 using DigitalBrain.Sdk.Integrations;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Mcp;
 

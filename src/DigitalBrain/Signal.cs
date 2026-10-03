@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace DigitalBrain.Contracts;
+namespace DigitalBrain;
 
 [GenerateSerializer, Alias("brain.signal")]
 public record Signal

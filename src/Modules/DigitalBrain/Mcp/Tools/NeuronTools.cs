@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Reflection;
 using System.Text.Json;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using ModelContextProtocol.Server;
 using Orleans;

@@ -1,5 +1,5 @@
 using DigitalBrain.Client;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Hosting;

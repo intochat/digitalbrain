@@ -1,5 +1,6 @@
 using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Chat;

@@ -1,4 +1,4 @@
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Sdk;
 using DigitalBrain.Sdk.Integrations.Accounts;
 using Microsoft.AspNetCore.Builder;

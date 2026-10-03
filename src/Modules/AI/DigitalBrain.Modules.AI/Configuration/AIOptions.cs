@@ -1,5 +1,5 @@
 using System.Text.Json.Serialization;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 

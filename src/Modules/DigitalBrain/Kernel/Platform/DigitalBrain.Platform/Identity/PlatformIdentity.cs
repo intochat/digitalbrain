@@ -1,5 +1,5 @@
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Platform.Identity.Grants;
 using DigitalBrain.Sdk.Identity;
 

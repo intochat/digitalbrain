@@ -1,4 +1,4 @@
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Assistant;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -9,7 +9,7 @@ using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Supabase.Tables;
 using DigitalBrain.Testing.E2E;
 using Npgsql;
-using DigitalBrain.Identity;
+using DigitalBrain.Sdk.Identity;
 
 namespace IntoChat.Tests.E2E.Agent;
 

@@ -2,7 +2,7 @@ using DigitalBrain.AI.Web;
 using DigitalBrain.AI.Media;
 using DigitalBrain.AI.WebSearch;
 using DigitalBrain.AI.Agents;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Sdk.Integrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

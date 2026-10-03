@@ -1,6 +1,7 @@
 using DigitalBrain.AI.Interactions;
 using DigitalBrain.AI.Metering;
 using DigitalBrain.Compute;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;

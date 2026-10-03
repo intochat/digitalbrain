@@ -33,8 +33,8 @@
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Modules.AI.Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../../DigitalBrain/Compute/DigitalBrain.Modules.Compute.Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
-    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Modules.Kernel/DigitalBrain.Modules.Kernel.csproj" />
-    <ProjectReference Include="..\..\DigitalBrain\Kernel\Sdk\DigitalBrain.Modules.Kernel.Sdk\DigitalBrain.Modules.Sdk.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
+    <ProjectReference Include="..\..\DigitalBrain\Kernel\Sdk\DigitalBrain.Sdk\DigitalBrain.Sdk.csproj" />
   </ItemGroup>
 
   <ItemGroup>

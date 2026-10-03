@@ -1,4 +1,4 @@
-using DigitalBrain.Aspire;
+using DigitalBrain.Aspire.Server;
 using DigitalBrain.Testing.E2E;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;

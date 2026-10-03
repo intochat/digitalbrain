@@ -1,6 +1,7 @@
 using DigitalBrain.Sdk.Vectors;
 using DigitalBrain.Contracts.Signals;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Registry;
 using DigitalBrain.Qdrant;

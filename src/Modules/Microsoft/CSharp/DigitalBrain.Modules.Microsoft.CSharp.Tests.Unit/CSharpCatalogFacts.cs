@@ -1,6 +1,7 @@
 using System.Reflection;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Microsoft.CSharp;
 
 using Microsoft.Extensions.Options;

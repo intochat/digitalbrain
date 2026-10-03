@@ -1,6 +1,6 @@
 using System.Text.Json;
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Postgres;
 using Microsoft.Extensions.DependencyInjection;
 

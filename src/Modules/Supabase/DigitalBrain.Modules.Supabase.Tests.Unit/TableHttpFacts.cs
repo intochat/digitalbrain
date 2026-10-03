@@ -1,7 +1,8 @@
 using DigitalBrain.Contracts.Enforcement;
 using System.Reflection;
+using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Supabase;
 using DigitalBrain.Supabase.Tables;

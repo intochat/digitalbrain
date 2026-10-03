@@ -1,6 +1,7 @@
 using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Postgres;
 using Microsoft.Extensions.DependencyInjection;

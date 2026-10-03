@@ -1,4 +1,4 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Sdk;
 
 namespace DigitalBrain.Microsoft.GitHub;

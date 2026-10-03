@@ -1,4 +1,4 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using Orleans.Hosting;
 
 namespace DigitalBrain.Postgres;

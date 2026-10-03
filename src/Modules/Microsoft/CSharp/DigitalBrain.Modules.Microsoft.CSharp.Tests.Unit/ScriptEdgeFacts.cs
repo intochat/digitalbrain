@@ -2,7 +2,7 @@ using DigitalBrain.Sdk.Integrations;
 using System.Text.Json;
 using DigitalBrain.Client;
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Microsoft.CSharp;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Builder;
@@ -138,7 +138,7 @@ public sealed class ScriptEdgeFacts
         Assert.True(DigitalBrain.Contracts.PlatformAssemblyAttribute.IsPlatform(platform));
         var contracts = new ScriptContracts([platform]);
 
-        foreach (var neuronContract in platform.GetExportedTypes().Where(type => type.IsInterface && typeof(DigitalBrain.Contracts.INeuron).IsAssignableFrom(type)))
+        foreach (var neuronContract in platform.GetExportedTypes().Where(type => type.IsInterface && typeof(DigitalBrain.INeuron).IsAssignableFrom(type)))
         {
             Assert.Throws<ArgumentException>(() => contracts.Find(neuronContract.FullName!));
             Assert.True(DigitalBrain.Contracts.PlatformOnlyAttribute.AppliesTo(neuronContract));
@@ -166,10 +166,10 @@ public sealed class ScriptEdgeFacts
     [Fact]
     public void ThePlatformAssemblyIsNeverAContractsAssemblyOfAComposedModule()
     {
-        var inventory = new DigitalBrain.Core.ModuleInventory([typeof(DigitalBrain.Platform.PlatformHosting)]);
+        var inventory = new DigitalBrain.Kernel.ModuleInventory([typeof(DigitalBrain.Platform.PlatformHosting)]);
 
         Assert.DoesNotContain(typeof(DigitalBrain.Platform.PlatformHosting).Assembly, inventory.ContractAssemblies());
-        Assert.Empty(DigitalBrain.Core.ModuleInventory.ContractAssembliesOf(typeof(DigitalBrain.Platform.PlatformHosting).Assembly));
+        Assert.Empty(DigitalBrain.Kernel.ModuleInventory.ContractAssembliesOf(typeof(DigitalBrain.Platform.PlatformHosting).Assembly));
     }
 
     [Fact]

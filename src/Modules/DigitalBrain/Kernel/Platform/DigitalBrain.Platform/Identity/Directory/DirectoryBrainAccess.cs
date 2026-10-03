@@ -1,5 +1,5 @@
-using DigitalBrain.Core.Enforcement;
-using DigitalBrain.Identity;
+using DigitalBrain.Kernel.Enforcement;
+using DigitalBrain.Sdk.Identity;
 using Orleans;
 
 namespace DigitalBrain.Platform.Identity.Directory;

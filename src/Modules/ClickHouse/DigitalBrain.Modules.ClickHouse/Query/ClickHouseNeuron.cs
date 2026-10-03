@@ -1,4 +1,4 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using Orleans.Concurrency;
 
 namespace DigitalBrain.ClickHouse.Query;

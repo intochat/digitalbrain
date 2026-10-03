@@ -5,6 +5,7 @@ using DigitalBrain.Assistant;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.AI.Metering;
 using DigitalBrain.Compute;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using Xunit;
 

@@ -1,5 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 
 namespace DigitalBrain.Aspire.Hosting;

@@ -1,7 +1,8 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.AI.Agents;
-using DigitalBrain.Aspire;
+using DigitalBrain.Aspire.Server;
 using DigitalBrain.Compute;
+using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Sdk;
 using IntoChat;

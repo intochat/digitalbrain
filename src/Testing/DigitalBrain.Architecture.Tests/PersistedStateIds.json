@@ -455,8 +455,27 @@
     "OperationId": 0,
     "Number": 1
   },
+  "DigitalBrain.Apps.AppAuthoringDocument": {
+    "Version": 0,
+    "Preamble": 1,
+    "Behaviors": 2,
+    "Scenarios": 3
+  },
+  "DigitalBrain.Apps.AppBehaviorDocument": {
+    "Id": 0,
+    "Title": 1,
+    "Description": 2,
+    "SourcePaths": 3,
+    "ScenarioIds": 4
+  },
   "DigitalBrain.Apps.AppDeployment": {
     "Target": 0
+  },
+  "DigitalBrain.Apps.AppDocumentReadResult": {
+    "Document": 0,
+    "OriginalSpec": 1,
+    "CanEdit": 2,
+    "Error": 3
   },
   "DigitalBrain.Apps.AppDraftAttempt": {
     "Revision": 0,
@@ -468,6 +487,7 @@
     "Revision": 1,
     "Status": 2
   },
+  "DigitalBrain.Apps.AppDraftConflictException": {},
   "DigitalBrain.Apps.AppDraftEntry": {
     "Id": 0,
     "Title": 1,
@@ -485,11 +505,18 @@
     "Status": 7,
     "Attempts": 8,
     "Published": 9,
-    "Error": 10
+    "Error": 10,
+    "Document": 11,
+    "SourceRevision": 12,
+    "VerifiedDocumentHash": 13
   },
   "DigitalBrain.Apps.AppDraftView": {
     "Draft": 0,
-    "Verification": 1
+    "Verification": 1,
+    "Vocabulary": 2,
+    "Files": 3,
+    "FilesRevision": 4,
+    "VerificationCurrent": 5
   },
   "DigitalBrain.Apps.AppDraftsChanged": {
     "Owner": 0
@@ -512,6 +539,12 @@
     "InvocationId": 0,
     "Output": 1,
     "Error": 2
+  },
+  "DigitalBrain.Apps.AppScenarioDocument": {
+    "Id": 0,
+    "Name": 1,
+    "Body": 2,
+    "IsLive": 3
   },
   "DigitalBrain.Apps.AppScenarioVerdict": {
     "Name": 0,
@@ -703,6 +736,10 @@
     "OperationId": 0,
     "Source": 1
   },
+  "DigitalBrain.Apps.SaveAppDocument": {
+    "ExpectedRevision": 0,
+    "Document": 1
+  },
   "DigitalBrain.Apps.Signals.AppChanged": {
     "App": 0
   },
@@ -728,6 +765,13 @@
   },
   "DigitalBrain.Apps.Signals.PackageListed": {
     "Listing": 0
+  },
+  "DigitalBrain.Apps.SpecToken": {
+    "Name": 0,
+    "Kind": 1,
+    "QualifiedName": 2,
+    "Module": 3,
+    "Description": 4
   },
   "DigitalBrain.Apps.UninstallApp": {
     "OperationId": 0
@@ -776,6 +820,12 @@
     "Id": 0,
     "Title": 1,
     "Surface": 2
+  },
+  "DigitalBrain.BrainSnapshot": {
+    "BrainId": 0,
+    "Name": 1,
+    "OwnerAccountId": 2,
+    "EstablishedAt": 3
   },
   "DigitalBrain.ClickHouse.Query.ClickHouseColumn": {
     "Name": 0,
@@ -971,12 +1021,6 @@
     "CostCompute": 2,
     "EntryCount": 3
   },
-  "DigitalBrain.Contracts.BrainSnapshot": {
-    "BrainId": 0,
-    "Name": 1,
-    "OwnerAccountId": 2,
-    "EstablishedAt": 3
-  },
   "DigitalBrain.Contracts.Data.Row": {
     "Values": 0
   },
@@ -1049,10 +1093,6 @@
     "IntentId": 6,
     "ConversationId": 7
   },
-  "DigitalBrain.Contracts.EstablishBrain": {
-    "Name": 0,
-    "OwnerAccountId": 1
-  },
   "DigitalBrain.Contracts.Integrations.AccountRef": {
     "Kind": 0,
     "Id": 1
@@ -1064,9 +1104,6 @@
   "DigitalBrain.Contracts.Integrations.IntegrationKind": {
     "Id": 0,
     "DisplayName": 1
-  },
-  "DigitalBrain.Contracts.Signal": {
-    "Publisher": 0
   },
   "DigitalBrain.Contracts.Signals.ModuleLoaded": {
     "ModuleType": 0
@@ -1101,20 +1138,10 @@
     "AllowedValues": 1,
     "RejectedValue": 2
   },
-  "DigitalBrain.Core.BrainState": {
+  "DigitalBrain.EstablishBrain": {
     "Name": 0,
-    "OwnerAccountId": 1,
-    "EstablishedAt": 2
+    "OwnerAccountId": 1
   },
-  "DigitalBrain.Core.DocumentIndexState": {
-    "Ids": 0
-  },
-  "DigitalBrain.Core.DocumentState": {
-    "Written": 0,
-    "Version": 1,
-    "Payload": 2
-  },
-  "DigitalBrain.Core.Enforcement.UntrustedCallerException": {},
   "DigitalBrain.Files.FileExplorerState": {
     "FolderId": 0,
     "Revision": 1,
@@ -1838,38 +1865,20 @@
     "EmailAddress": 0,
     "HistoryId": 1
   },
-  "DigitalBrain.Identity.Account": {
-    "AccountId": 0,
-    "Name": 1,
-    "OwnerPrincipalId": 2,
-    "CreatedAt": 3
+  "DigitalBrain.Kernel.BrainState": {
+    "Name": 0,
+    "OwnerAccountId": 1,
+    "EstablishedAt": 2
   },
-  "DigitalBrain.Identity.Grant": {
-    "AppId": 0,
-    "SemanticTypeId": 1,
-    "Mode": 2,
-    "WorkspaceId": 3,
-    "ConversationId": 4,
-    "GrantedAt": 5,
-    "Revoked": 6
+  "DigitalBrain.Kernel.DocumentIndexState": {
+    "Ids": 0
   },
-  "DigitalBrain.Identity.Invitation": {
-    "Code": 0,
-    "AccountId": 1,
-    "WorkspaceId": 2,
-    "Role": 3,
-    "Email": 4,
-    "CreatedAt": 5,
-    "Accepted": 6
+  "DigitalBrain.Kernel.DocumentState": {
+    "Written": 0,
+    "Version": 1,
+    "Payload": 2
   },
-  "DigitalBrain.Identity.Member": {
-    "PrincipalId": 0,
-    "AccountId": 1,
-    "BrainId": 2,
-    "Role": 3,
-    "DisplayName": 4,
-    "JoinedAt": 5
-  },
+  "DigitalBrain.Kernel.Enforcement.UntrustedCallerException": {},
   "DigitalBrain.Memory.Forget": {
     "Namespace": 0,
     "Key": 1
@@ -2014,6 +2023,13 @@
   "DigitalBrain.Microsoft.CSharp.CSharpTrigger": {
     "Neuron": 0,
     "Signal": 1
+  },
+  "DigitalBrain.Microsoft.CSharp.ContractVocabularyEntry": {
+    "QualifiedName": 0,
+    "Name": 1,
+    "Kind": 2,
+    "Module": 3,
+    "Description": 4
   },
   "DigitalBrain.Microsoft.CSharp.RunAuthorization": {
     "Active": 0,
@@ -2431,6 +2447,38 @@
     "Columns": 0,
     "Rows": 1
   },
+  "DigitalBrain.Sdk.Identity.Account": {
+    "AccountId": 0,
+    "Name": 1,
+    "OwnerPrincipalId": 2,
+    "CreatedAt": 3
+  },
+  "DigitalBrain.Sdk.Identity.Grant": {
+    "AppId": 0,
+    "SemanticTypeId": 1,
+    "Mode": 2,
+    "WorkspaceId": 3,
+    "ConversationId": 4,
+    "GrantedAt": 5,
+    "Revoked": 6
+  },
+  "DigitalBrain.Sdk.Identity.Invitation": {
+    "Code": 0,
+    "AccountId": 1,
+    "WorkspaceId": 2,
+    "Role": 3,
+    "Email": 4,
+    "CreatedAt": 5,
+    "Accepted": 6
+  },
+  "DigitalBrain.Sdk.Identity.Member": {
+    "PrincipalId": 0,
+    "AccountId": 1,
+    "BrainId": 2,
+    "Role": 3,
+    "DisplayName": 4,
+    "JoinedAt": 5
+  },
   "DigitalBrain.Sdk.Integrations.Accounts.AccountDisconnected": {},
   "DigitalBrain.Sdk.Integrations.Accounts.AccountNotConfiguredException": {},
   "DigitalBrain.Sdk.Integrations.Accounts.AccountProbeResult": {},
@@ -2463,6 +2511,9 @@
   },
   "DigitalBrain.Sdk.Integrations.ReleasedRegistration": {
     "Values": 0
+  },
+  "DigitalBrain.Signal": {
+    "Publisher": 0
   },
   "DigitalBrain.Specs.BoundStep": {
     "Line": 0,

@@ -1,4 +1,4 @@
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using DigitalBrain.Google.Gmail;
 using DigitalBrain.Testing.E2E;
 using Xunit;

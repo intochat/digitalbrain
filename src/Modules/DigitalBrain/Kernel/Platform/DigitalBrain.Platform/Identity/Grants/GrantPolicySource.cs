@@ -1,5 +1,5 @@
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Identity;
+using DigitalBrain.Sdk.Identity;
 using Orleans;
 
 namespace DigitalBrain.Platform.Identity.Grants;

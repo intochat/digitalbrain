@@ -2,7 +2,7 @@ using DigitalBrain.Platform.Identity.Configuration;
 using System.Security.Cryptography;
 using System.Text;
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;

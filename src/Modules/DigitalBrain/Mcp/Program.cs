@@ -1,4 +1,4 @@
-using DigitalBrain.Client;
+using DigitalBrain.Aspire.Client;
 using DigitalBrain.Mcp;
 using ModelContextProtocol.AspNetCore;
 

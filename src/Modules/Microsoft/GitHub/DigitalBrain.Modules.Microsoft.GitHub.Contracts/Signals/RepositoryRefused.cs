@@ -1,3 +1,4 @@
+using DigitalBrain;
 using DigitalBrain.Contracts;
 
 namespace DigitalBrain.Microsoft.GitHub.Signals;

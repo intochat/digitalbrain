@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using DigitalBrain.Sdk.Vectors;
-using DigitalBrain.Core;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;

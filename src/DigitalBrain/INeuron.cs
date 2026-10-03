@@ -1,6 +1,6 @@
 using Orleans.Concurrency;
 
-namespace DigitalBrain.Contracts;
+namespace DigitalBrain;
 
 public interface INeuron : IGrainWithStringKey
 {

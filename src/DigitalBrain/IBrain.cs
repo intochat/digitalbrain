@@ -1,4 +1,4 @@
-namespace DigitalBrain.Contracts;
+namespace DigitalBrain;
 
 [Alias("brain"), Orleans.Metadata.DefaultGrainType("brain")]
 public interface IBrain : INeuron

@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using DigitalBrain.Core.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.TextField;
 using DigitalBrain.Testing;
