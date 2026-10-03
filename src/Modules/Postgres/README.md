@@ -38,6 +38,19 @@ ordinary tables in `public`. The existing general SQL read surface retains its
 configured database-role visibility; table-neuron ownership does not change that
 surface's read permissions.
 
+The assistant can call `postgres_schema(appTables: true)` to discover tables of currently
+installed apps in its brain. It receives a resource handle, installed app identity, declared
+columns, and the pinned capacity origin. `show_postgres_query_table(resource: handle, title: ...)`
+opens that table at its actual origin; use `table_read` and `table_refine` to read, filter,
+sort, and aggregate it. The resource path accepts no caller-selected origin or arbitrary SQL.
+Every read checks the current installation, owner index, table owner, and brain again.
+App callers cannot use this host-only discovery path.
+
+Omitting `appTables` or `resource` retains the existing administrator-configured platform
+SQL connection. Its database role still defines visibility, including platform-origin app
+tables. Resource ownership checks do not replace PostgreSQL role permissions on that legacy
+SQL connection. Provisioned app databases are reached only through validated resources.
+
 ## Assessment before implementation
 
 The existing unit suite covered read-query normalization and refusal of writes,

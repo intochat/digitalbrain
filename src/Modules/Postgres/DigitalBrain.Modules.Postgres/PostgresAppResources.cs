@@ -1,0 +1,70 @@
+using System.Text;
+using System.Text.Json;
+using DigitalBrain.Apps;
+using DigitalBrain.Kernel.Enforcement;
+using DigitalBrain.Contracts.Enforcement;
+
+namespace DigitalBrain.Postgres;
+
+internal sealed class PostgresAppResources(DigitalBrain.IDigitalBrain brain)
+{
+    public const string SourcePrefix = "postgres-app:";
+
+    public static string Source(PostgresAppTableResource resource)
+        => SourcePrefix + Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new[] { resource.AppId, resource.TableId })));
+
+    private static string Scope()
+    {
+        var caller = CallerContextStamper.Require();
+        if (!CallerContextStamper.IsTrusted(caller) || caller.Kind == CallerKind.App)
+        { throw new UnauthorizedAccessException("Only a trusted host may discover app storage."); }
+        return BrainScope.CurrentId();
+    }
+
+    private async Task<string[]> Installed(string scope, CancellationToken ct)
+    {
+        var packages = await brain.Get<IApps>(scope).List().WaitAsync(ct);
+        var installed = new List<string>();
+        foreach (var package in packages)
+        {
+            var id = scope + "/packages/" + package;
+            var snapshot = await brain.Get<IApp>(id).Read().WaitAsync(ct);
+            if (snapshot.Status == AppStatus.Installed && !snapshot.UninstallPending) { installed.Add(id); }
+        }
+        return installed.ToArray();
+    }
+
+    public async Task<PostgresAppTableResource[]> List(CancellationToken ct)
+    {
+        var scope = Scope();
+        var resources = new List<PostgresAppTableResource>();
+        foreach (var app in await Installed(scope, ct))
+        {
+            var owner = JsonSerializer.Serialize(new[] { scope, app });
+            foreach (var table in await brain.Get<IPostgresAppStorage>(owner).ReadTables().WaitAsync(ct))
+            { resources.Add(await brain.Get<IPostgresTableResource>(table).DescribeResource(owner).WaitAsync(ct)); }
+        }
+        return resources.ToArray();
+    }
+
+    public async Task<PostgresAppTableResource> Resolve(string source, CancellationToken ct)
+    {
+        var scope = Scope();
+        string[] identity;
+        try
+        {
+            if (!source.StartsWith(SourcePrefix, StringComparison.Ordinal) || source.Length > 8192) { throw new FormatException(); }
+            identity = JsonSerializer.Deserialize<string[]>(Encoding.UTF8.GetString(Convert.FromBase64String(source[SourcePrefix.Length..])))!;
+            if (identity is not { Length: 2 } || identity.Any(string.IsNullOrWhiteSpace)) { throw new FormatException(); }
+        }
+        catch (Exception error) when (error is FormatException or JsonException or ArgumentException)
+        { throw new PostgresQueryException("Select an app table resource returned by postgres_schema."); }
+        if (!(await Installed(scope, ct)).Contains(identity[0], StringComparer.Ordinal))
+        { throw new UnauthorizedAccessException("This app is not installed in the current brain."); }
+        var owner = JsonSerializer.Serialize(new[] { scope, identity[0] });
+        var tables = await brain.Get<IPostgresAppStorage>(owner).ReadTables().WaitAsync(ct);
+        if (!tables.Contains(identity[1], StringComparer.Ordinal))
+        { throw new UnauthorizedAccessException("This table is not owned by the installed app."); }
+        return await brain.Get<IPostgresTableResource>(identity[1]).DescribeResource(owner).WaitAsync(ct);
+    }
+}

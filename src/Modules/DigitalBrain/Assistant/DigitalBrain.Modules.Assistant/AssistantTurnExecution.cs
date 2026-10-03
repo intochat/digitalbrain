@@ -139,10 +139,11 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
             catch (Exception error)
             {
                 outcome = AgentRunOutcome.Failed;
-                services.GetRequiredService<ILoggerFactory>().CreateLogger("Assistant").LogWarning(error, "Workspace agent run failed");
+                services.GetRequiredService<ILoggerFactory>().CreateLogger("Assistant").LogWarning(error,
+                    "Workspace agent run failed for scope {ScopeId}, thread {ThreadId}, run {RunId}", workspace, input.ThreadId, input.RunId);
                 if (ownsRun) { await KeepFailedTurn(error.Message); }
                 if (!ct.IsCancellationRequested)
-                { await Emit(new { type = "RUN_ERROR", message = "The request could not be completed. Check the data connection or try again.", code = "AGENT_FAILED" }); }
+                { await Emit(new { type = "RUN_ERROR", message = "The request could not be completed. Check the data connection or try again.", code = "AGENT_FAILED", runId = input.RunId }); }
             }
         }
         finally

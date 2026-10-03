@@ -107,7 +107,10 @@ public sealed class AssistantStreamFacts
         await using var brain = await StartBrain(ct);
         var context = new StepContext("stream-failedrunsre/applications/assistant", brain.Grains, brain.SiloServices, ct);
         var app = App(context);
-        Assert.Contains(await Collect(app, new("one", "failed", "fail", "owner"), ct), item => Type(item) == "RUN_ERROR");
+        var error = Assert.Single(await Collect(app, new("one", "failed", "fail", "owner"), ct), item => Type(item) == "RUN_ERROR");
+        Assert.Equal("AGENT_FAILED", error.GetProperty("code").GetString());
+        Assert.Equal("failed", error.GetProperty("runId").GetString());
+        Assert.DoesNotContain("scripted failure", error.GetProperty("message").GetString()!, StringComparison.Ordinal);
         Assert.Null((await app.ReadConversation("one", ct)).ActiveRunId);
         Assert.Contains(await Collect(app, new("one", "next", "hello", "owner"), ct), item => Type(item) == "RUN_FINISHED");
     }

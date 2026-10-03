@@ -111,7 +111,7 @@ public sealed class LiveTableWindows(IDigitalBrain brain)
         if (expectedSource is not null)
         {
             var summary = await table.ReadSummary().WaitAsync(ct) ?? throw new SupabaseTableNotFoundException(tableId);
-            if (summary.Source != expectedSource)
+            if (summary.Source != expectedSource && !(expectedSource == "postgres" && summary.Source.StartsWith("postgres-app:", StringComparison.Ordinal)))
             { throw new SupabaseTableValidationException($"This window uses {summary.Source}, but the request specifies {expectedSource}. Open a table from the requested database."); }
         }
         return table;
