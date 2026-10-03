@@ -12,6 +12,8 @@ public interface IRegistry : INeuron
     Task<RegistryDiscovery> Discover(string query, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<NeuronType>> Types();
     Task<IReadOnlyList<NeuronTypeHit>> Search(string query, int take = 10, CancellationToken cancellationToken = default);
+    // Installed-app index migration reads this snapshot while discovery awaits its provider.
+    [Orleans.Concurrency.AlwaysInterleave]
     Task<IReadOnlyList<NeuronInstance>> Instances(string? typeId = null, bool activeOnly = false, int skip = 0, int take = 100);
 }
 
