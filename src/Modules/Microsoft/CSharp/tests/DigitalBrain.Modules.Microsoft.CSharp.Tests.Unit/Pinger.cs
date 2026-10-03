@@ -31,6 +31,7 @@ public sealed record Ignored([property: Id(0)] int Number) : Signal;
 // callable contract that reports the caller context the script edge stamped.
 public sealed class Pinger : Neuron, IPinger
 {
+    public override NeuronAccess Access(string operation) => NeuronAccess.PublicOperation;
     public Task RefuseCapacity() => throw new DigitalBrain.Sdk.Capacity.CapacityUnavailableException();
     public async Task Ping(int number)
     {

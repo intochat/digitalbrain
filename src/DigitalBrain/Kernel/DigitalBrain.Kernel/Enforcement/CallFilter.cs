@@ -29,6 +29,12 @@ public sealed class CallFilter(IEnumerable<ICallFilterStage> stages) : ICallFilt
             return CallDecision.Deny(CallDenial.UntrustedCaller, "The principal does not match the trusted edge stamp.");
         }
 
+        if (request.EnforceTarget && caller.Kind != CallerKind.Platform && !request.PublicOperation
+            && request.TargetScope != BrainScope.Create(caller.AccountId, caller.BrainId).Id)
+        {
+            return CallDecision.Deny(CallDenial.OutsideWorkspace, "The target operation is not available in the selected brain.");
+        }
+
         foreach (var stage in _stages)
         {
             var decision = await stage.EvaluateAsync(request, cancellationToken).ConfigureAwait(false);

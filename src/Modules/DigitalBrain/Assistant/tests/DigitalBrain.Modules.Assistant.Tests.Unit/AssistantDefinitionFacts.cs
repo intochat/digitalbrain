@@ -8,7 +8,7 @@ public sealed class AssistantDefinitionFacts
     public void DefaultDefinitionStartsWithDiscoveryInsteadOfSelectingInstalledTools()
     {
         var definition = AssistantDefinition.For();
-        Assert.Equal(["discover_capabilities", "show_form", "show_view"], definition.Tools);
+        Assert.Equal(["discover_capabilities", "select_capability", "show_form", "show_view"], definition.Tools);
     }
     [Fact]
     public void TheHostCanSupplyTheAssistantNameAndPackageGuidance()

@@ -12,6 +12,10 @@ internal sealed class PackageDirectoryNeuron(
     TimeProvider clock)
     : Neuron<PackageDirectoryState>(store), IPackageDirectory
 {
+    public override DigitalBrain.Kernel.Enforcement.NeuronAccess Access(string operation)
+        => operation is nameof(List) or nameof(Refresh)
+            ? DigitalBrain.Kernel.Enforcement.NeuronAccess.PublicOperation : base.Access(operation);
+
     public Task<IReadOnlyList<PackageListing>> List()
         => Task.FromResult<IReadOnlyList<PackageListing>>(Snapshot.Listings.Values.OrderBy(listing => listing.Package.ToString(), StringComparer.Ordinal).ToArray());
 

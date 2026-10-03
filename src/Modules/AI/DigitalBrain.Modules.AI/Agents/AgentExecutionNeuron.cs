@@ -15,6 +15,8 @@ namespace DigitalBrain.AI.Agents;
 internal sealed class AgentExecutionNeuron(IAgentTurnRunner runner, IIntentUsageSink usage,
     ModelProfiles profiles, IOptionsMonitor<AIOptions> options, ILogger<AgentExecutionNeuron> logger) : Neuron, IAgentExecution
 {
+    public override NeuronAccess Access(string operation) => new(BrainScope.CurrentId());
+
     public Task<ModelCatalog> Models(string? defaultModel = null)
         => Task.FromResult(new AgentModelCatalog(profiles, options, defaultModel).Read());
     public Task<AgentModelSelection?> SelectModel(string? id, string? defaultModel = null)

@@ -19,6 +19,7 @@ internal sealed class GrainGrantPolicySource(IGrainFactory grains, IOptions<Auth
     public ValueTask<CallDecision?> AuthorizeAsync(CallRequest request, CancellationToken cancellationToken)
     {
         var caller = request.Caller;
+        if (request.PublicOperation) { return ValueTask.FromResult<CallDecision?>(null); }
         if (caller.Kind == CallerKind.Platform) { return ValueTask.FromResult<CallDecision?>(null); }
         if (auth?.Value.Posture == IdentityPosture.Open && caller.PrincipalId == AccountSession.DefaultLogin
             && caller.AccountId == AccountSession.DefaultLogin && caller.Kind is CallerKind.User or CallerKind.Assistant)

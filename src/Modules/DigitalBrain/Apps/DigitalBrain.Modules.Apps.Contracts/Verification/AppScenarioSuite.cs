@@ -7,7 +7,8 @@ public sealed class AppScenarioSuite(
     Func<string, IApp> apps,
     PackageRevisionRef revision,
     TextWriter? output = null,
-    Func<string, IReadOnlyDictionary<string, string>>? settings = null)
+    Func<string, IReadOnlyDictionary<string, string>>? settings = null,
+    string? brainScope = null)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly HashSet<string> reported = new(StringComparer.Ordinal);
@@ -19,7 +20,7 @@ public sealed class AppScenarioSuite(
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         if (!reported.Add(id)) { throw new ArgumentException("Each scenario ID may run only once.", nameof(id)); }
-        var scope = $"specs/{revision.Package}@{revision.Revision}/{Guid.NewGuid():N}";
+        var scope = (brainScope is null ? "" : brainScope + "/") + $"specs/{revision.Package}@{revision.Revision}/{Guid.NewGuid():N}";
         var app = apps(scope + "/app");
         string? error = null;
         try

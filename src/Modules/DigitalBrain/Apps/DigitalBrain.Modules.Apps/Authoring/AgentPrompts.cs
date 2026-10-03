@@ -58,7 +58,7 @@ internal static class AgentPrompts
             using DigitalBrain.Apps;
             await using var brain = await DigitalBrainClient.ConnectAsync(args);
             var revision = new PackageRevisionRef(PackageId.Parse(brain.Setting("Package")!), brain.Setting("Revision")!);
-            var suite = new AppScenarioSuite(brain.Get<IApp>, revision);
+            var suite = new AppScenarioSuite(brain.Get<IApp>, revision, brainScope: brain.Setting("BrainScope"));
             await suite.Run("<existing scenario ID>", "<scenario name>", async (app, scope) =>
             {
                 var answer = await app.Ask("ask", "<input>", brain.Stopping);
@@ -96,5 +96,3 @@ internal static class AgentPrompts
          "files": {"tests.cs": "...", "prompts/system.md": "..."}, "source": ""}
         """;
 }
-
-

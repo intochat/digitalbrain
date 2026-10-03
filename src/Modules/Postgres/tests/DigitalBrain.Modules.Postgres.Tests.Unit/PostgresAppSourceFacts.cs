@@ -38,6 +38,7 @@ public sealed class PostgresAppSourceFacts
             silo.Services.AddSingleton<ICapacity>(new ResearchCapacity());
         }).StartAsync(ct);
         Stamp(CallerKind.App);
+        await brain.AuthorizeCallerAsync();
         await Assert.ThrowsAsync<IOException>(() => brain.Get<IPostgresTable>("pending-discovery").Define(new([new("id", "text")], ["id"])));
         var scope = BrainScope.CurrentId();
         CallerContextStamper.Stamp(new()
@@ -51,6 +52,7 @@ public sealed class PostgresAppSourceFacts
         });
         await brain.Get<IPostgresTable>("healthy-discovery").Define(new([new("id", "text")], ["id"]));
         Stamp(CallerKind.Platform);
+        await brain.AuthorizeCallerAsync();
         var result = await new PostgresAppResources(brain).CollectInstalled(["install", "healthy-install"], ct);
         Assert.Equal("healthy-discovery", Assert.Single(result.Resources).TableId);
         var failure = Assert.Single(result.Errors);
@@ -99,18 +101,21 @@ public sealed class PostgresAppSourceFacts
             silo.Services.AddSingleton<ICapacity>(new ResearchCapacity());
         }).StartAsync(ct);
         Stamp(CallerKind.App);
+        await brain.AuthorizeCallerAsync();
         var table = brain.Get<IPostgresTable>("research-resource");
         await table.Define(new([new("id", "text")], ["id"]));
         var owner = JsonSerializer.Serialize(new[] { BrainScope.CurrentId(), "install" });
         var resource = brain.Get<IPostgresTableResource>("research-resource");
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => resource.DescribeResource(owner));
         Stamp(CallerKind.Platform);
+        await brain.AuthorizeCallerAsync();
         var discovered = await resource.DescribeResource(owner);
         Assert.Equal("db:research", discovered.Origin);
         Assert.Equal("install", discovered.AppId);
         Assert.Equal(["research-resource"], await brain.Get<IPostgresAppStorage>(owner).ReadTables());
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => resource.DescribeResource(JsonSerializer.Serialize(new[] { BrainScope.CurrentId(), "other-install" })));
         Stamp(CallerKind.Platform, "other-brain");
+        await brain.AuthorizeCallerAsync();
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => resource.DescribeResource(owner));
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() => brain.Get<IPostgresAppStorage>(owner).ReadTables());
     }

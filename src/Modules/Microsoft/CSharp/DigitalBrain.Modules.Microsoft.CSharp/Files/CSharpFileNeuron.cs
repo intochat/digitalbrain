@@ -23,6 +23,12 @@ internal sealed partial class CSharpFileNeuron(
     IReminderRegistry reminders)
     : Neuron<CSharpFileState>(store), ICSharpFile, ICSharpAppBinding, ICSharpFileTrigger, ICSharpFileEdge, IRemindable, INeuronObserver
 {
+    public override NeuronAccess Access(string operation) => Snapshot.AppBrain is { } appScope ? new(appScope)
+        : Snapshot.OwnerContext is { } owner ? new(BrainScope.Create(owner.AccountId, owner.BrainId).Id)
+        : base.Access(operation) is { Scope: not null } scoped ? scoped
+        : operation == nameof(Write) && Snapshot.Source.Length == 0
+            ? new(BrainScope.CurrentId()) : NeuronAccess.Unclassified;
+
     internal const int MaximumSourceBytes = 128 * 1024;
     internal const int MaximumFailures = 5;
     internal const int MaximumPending = 64;
@@ -71,7 +77,8 @@ internal sealed partial class CSharpFileNeuron(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(source);
         if (Encoding.UTF8.GetByteCount(source) > MaximumSourceBytes) { throw new ArgumentException($"Source exceeds {MaximumSourceBytes} bytes.", nameof(source)); }
-        return Save(Snapshot with { Source = source }, new CSharpFileChanged(FileId));
+        var owner = CallerContextStamper.TryGet(out var caller) ? caller : Snapshot.OwnerContext;
+        return Save(Snapshot with { Source = source, OwnerContext = Snapshot.OwnerContext ?? owner }, new CSharpFileChanged(FileId));
     }
 
     public Task Configure(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default)

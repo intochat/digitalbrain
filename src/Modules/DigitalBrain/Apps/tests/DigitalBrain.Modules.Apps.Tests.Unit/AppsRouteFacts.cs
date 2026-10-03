@@ -40,6 +40,7 @@ public sealed class AppsRouteFacts
             Kind = CallerKind.User,
             StampedBy = TrustedEdge.AuthenticatedHttp,
         });
+        await brain.AuthorizeCallerAsync();
         var id = PackageId.Create("alice", "customer-researcher");
         var operation = scenario == "invoke-text" ? "research" : "open";
         var package = brain.Get<IPackage>(id.ToString());

@@ -10,6 +10,41 @@ namespace DigitalBrain.Modules.AI.Tests.Unit;
 public sealed class AgentCancellationFacts
 {
     [Fact]
+    public async Task CancellationClosesThePersistedToolAttempt()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var tool = new WaitingTool();
+        var client = new StubChatClient((_, _, _) => Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
+            [new FunctionCallContent("pending", "wait", new Dictionary<string, object?>())]))));
+        await using var brain = await UnitTest.Create().WithModule<AIModule>()
+            .ConfigureSilo(s => { s.Services.AddSingleton<IChatClient>(client); s.Services.AddSingleton<IAgentToolFactory>(tool); }).StartAsync(ct);
+        var agent = brain.Get<IAgent>("cancel-tool");
+        await agent.Configure(new() { Tools = ["wait"] }, 0, ct);
+        var response = agent.GetResponse("wait", ct);
+        await tool.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10), ct);
+        await agent.Cancel(ct);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => response);
+        var events = await agent.GetEventLog(ct);
+        Assert.Single(events, item => item.Kind == "tool-started");
+        var failed = Assert.Single(events, item => item.Kind == "tool-failed");
+        Assert.Equal("pending", failed.CallId);
+        Assert.Contains("tool_cancelled", failed.Result!);
+        await brain.DeactivateAsync(agent, ct);
+        Assert.Equal(failed, Assert.Single(await agent.GetEventLog(ct), item => item.Kind == "tool-failed"));
+    }
+
+    private sealed class WaitingTool : IAgentToolFactory
+    {
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public IReadOnlyList<AIFunction> Create(Func<AgentToolContext> context)
+        {
+            async Task<string> Wait(CancellationToken ct)
+            { Entered.TrySetResult(); await Task.Delay(Timeout.InfiniteTimeSpan, ct); return "done"; }
+            return [AIFunctionFactory.Create(Wait, "wait")];
+        }
+    }
+
+    [Fact]
     public async Task CancelInterleavesWithInferenceAndDoesNotCommitAnIncompleteTurn()
     {
         var ct = TestContext.Current.CancellationToken;

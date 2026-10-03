@@ -27,7 +27,14 @@ internal sealed class RegistryNeuron(NeuronTypes types, NeuronTypeSearch search,
     [PersistentState("registry", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<RegistryState> store)
     : Neuron, IRegistry, IRegistryObserver
 {
+    public override DigitalBrain.Kernel.Enforcement.NeuronAccess Access(string operation)
+        => operation is nameof(IRegistry.Types) or nameof(IRegistry.Search) or nameof(IRegistry.Discover) or nameof(IRegistry.Browse) or nameof(IRegistry.Select)
+            ? DigitalBrain.Kernel.Enforcement.NeuronAccess.PublicOperation : base.Access(operation);
+
     public Task<RegistryDiscovery> Discover(string query, CancellationToken cancellationToken = default) => discovery.Discover(query, cancellationToken);
+    public Task<RegistryDiscovery> Browse(string query, string? provider = null, int offset = 0, int limit = 10, CancellationToken cancellationToken = default)
+        => discovery.Browse(query, provider, offset, limit, cancellationToken);
+    public Task<RegistryCapability?> Select(string id, CancellationToken cancellationToken = default) => discovery.Select(id, cancellationToken);
 
     public Task<IReadOnlyList<NeuronType>> Types() => Task.FromResult(types.Read());
 

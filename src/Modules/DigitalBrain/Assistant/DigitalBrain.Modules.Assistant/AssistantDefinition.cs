@@ -13,7 +13,7 @@ public static class AssistantDefinition
     {
         DisplayName = options?.DisplayName ?? "Workspace assistant",
         Instructions = NeuronInstructions + "\n" + options?.Instructions,
-        Tools = ["discover_capabilities", "show_form", "show_view"],
+        Tools = ["discover_capabilities", "select_capability", "show_form", "show_view"],
     };
 
     private static string ReadInstructions()

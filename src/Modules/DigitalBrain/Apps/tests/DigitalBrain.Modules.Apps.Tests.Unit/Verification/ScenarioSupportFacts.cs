@@ -23,9 +23,10 @@ public sealed class ScenarioSupportFacts
         await using var brain = await PackageBrain.StartAsync(ct, configureClient: client =>
             client.Services.Configure<SubscriptionOptions>(options => options.BufferCapacity = 1024));
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         var id = PackageId.Parse("alice/invocation-support");
         var revision = await brain.Get<IPackage>(id.ToString()).Commit(brain.Commit(null, new(new("Test", "", [new("ask", "Ask")], []), "// source")));
-        var app = brain.Get<IApp>("scenario/invocations");
+        var app = brain.Get<IApp>(DigitalBrain.Kernel.Enforcement.BrainScope.CurrentId() + "/apps/scenario-invocations");
         await app.Install(new(Guid.NewGuid(), new(id, revision.Id), new Dictionary<string, string>()));
         var pending = await app.Invoke(new(Guid.NewGuid(), "ask", "before subscription"));
         await using var invocations = app.Invocations(brain.Brain, ct).GetAsyncEnumerator(ct);
@@ -55,6 +56,7 @@ public sealed class ScenarioSupportFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await PackageBrain.StartAsync(ct);
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         var id = PackageId.Parse("alice/scenario-support");
         var revision = await brain.Get<IPackage>(id.ToString()).Commit(brain.Commit(null, new(new("Test", "", [], []), "// source")));
         using var output = new StringWriter();

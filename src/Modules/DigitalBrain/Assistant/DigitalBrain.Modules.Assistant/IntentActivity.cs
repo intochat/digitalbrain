@@ -7,9 +7,22 @@ public sealed class IntentActivity
     public List<AgentCall> Calls { get; } = [];
     public IReadOnlyList<AgentTouchedData> Touched => [.. _touched.Values];
 
-    public void RecordTool(string name, bool succeeded, string? source, long rowsRead)
+    public void CancelPending()
     {
-        Calls.Add(new AgentCall(name, name, false, succeeded));
+        for (var i = 0; i < Calls.Count; i++)
+        {
+            if (Calls[i].ErrorCode == "tool_interrupted")
+            { Calls[i] = Calls[i] with { ErrorCode = "tool_cancelled", ErrorMessage = "The tool call was cancelled." }; }
+        }
+    }
+
+    public void RecordTool(string name, bool succeeded, string? source, long rowsRead,
+        string? callId = null, string? errorCode = null, string? errorMessage = null)
+    {
+        var call = new AgentCall(name, name, false, succeeded, callId, errorCode, errorMessage);
+        var existingCall = callId is null ? -1 : Calls.FindIndex(item => item.CallId == callId);
+        if (existingCall >= 0) { Calls[existingCall] = call; }
+        else { Calls.Add(call); }
         if (!succeeded)
         {
             return;

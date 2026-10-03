@@ -7,6 +7,12 @@ namespace DigitalBrain.Modules.Registry.Tests.Unit;
 
 public sealed class DiscoveryFacts
 {
+    private static void Caller(string brain = "brain") => CallerContextStamper.Stamp(new()
+    {
+        PrincipalId = "user", AccountId = "user", BrainId = brain,
+        Kind = CallerKind.Assistant, StampedBy = TrustedEdge.AuthenticatedHttp,
+    });
+
     [Fact]
     public async Task DiscoveryRequiresATrustedCaller()
     {
@@ -15,16 +21,37 @@ public sealed class DiscoveryFacts
     }
 
     [Fact]
-    public async Task ResourcesFollowTheCallerAndProviderFailuresPreserveOtherCapabilities()
+    public async Task DiscoveryIsBoundedMetadataAndNeverEnumeratesResources()
+    {
+        Caller();
+        var providers = Enumerable.Range(0, 30).Select(i => new ScopedProvider("provider" + i.ToString("D2"))).ToArray();
+        var service = new RegistryDiscoveryService(providers);
+        var first = await service.Discover("typpoo", TestContext.Current.CancellationToken);
+        Assert.Equal(10, first.Capabilities.Length);
+        Assert.Equal(10, first.NextOffset);
+        Assert.All(first.Capabilities, item => { Assert.Empty(item.Tools); Assert.Null(item.ResourcesJson); });
+        var second = await service.Browse("", null, first.NextOffset!.Value, 20, TestContext.Current.CancellationToken);
+        Assert.Equal(20, second.Capabilities.Length);
+        Assert.Null(second.NextOffset);
+        Assert.Empty(first.Capabilities.Select(x => x.Id).Intersect(second.Capabilities.Select(x => x.Id)));
+        Assert.All(providers, provider => Assert.Equal(0, provider.Reads));
+    }
+
+    [Fact]
+    public async Task SelectionResolvesTheCurrentCallerAndProviderFailureIsSanitized()
     {
         var service = new RegistryDiscoveryService([new ScopedProvider(), new FailedProvider()]);
         foreach (var scope in new[] { "alice-brain", "bob-brain" })
         {
-            CallerContextStamper.Stamp(new() { PrincipalId = "user", AccountId = "user", BrainId = scope, Kind = CallerKind.Assistant, StampedBy = TrustedEdge.AuthenticatedHttp });
-            var result = await service.Discover("typpoo", TestContext.Current.CancellationToken);
-            Assert.Equal(BrainScope.Create("user", scope).Id, Assert.Single(result.Capabilities).ResourcesJson);
-            Assert.Equal("failed", Assert.Single(result.Errors).Provider);
+            Caller(scope);
+            var result = await service.Select("scoped", TestContext.Current.CancellationToken);
+            Assert.Equal(BrainScope.Create("user", scope).Id, result!.ResourcesJson);
+            Assert.Equal(["read"], result.Tools);
         }
+        var failed = await service.Browse("", "failed", 0, 10, TestContext.Current.CancellationToken);
+        Assert.Empty(failed.Capabilities);
+        Assert.DoesNotContain("private", Assert.Single(failed.Errors).Message);
+        Assert.NotNull(await service.Select("scoped", TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -35,22 +62,28 @@ public sealed class DiscoveryFacts
     }
 
     [Fact]
-    public async Task TheNeuronReturnsSerializedDiscoveryForTheTrustedCaller()
+    public async Task TheNeuronSerializesDescriptionsAndExplicitSelections()
     {
         await using var brain = await UnitTest.Create().WithModule<RegistryModule>()
             .ConfigureSilo(silo => Microsoft.Extensions.DependencyInjection.ServiceCollectionServiceExtensions
-                .AddSingleton<IRegistryResourceProvider, ScopedProvider>(silo.Services))
+                .AddSingleton<IRegistryResourceProvider>(silo.Services, new ScopedProvider()))
             .StartAsync(TestContext.Current.CancellationToken);
-        CallerContextStamper.Stamp(new() { PrincipalId = "user", AccountId = "user", BrainId = "round-trip", Kind = CallerKind.Assistant, StampedBy = TrustedEdge.AuthenticatedHttp });
-        var result = await brain.Get<IRegistry>(IRegistry.Key).Discover("resources", TestContext.Current.CancellationToken);
-        Assert.Equal(BrainScope.CurrentId(), Assert.Single(result.Capabilities).ResourcesJson);
-        Assert.Empty(result.Errors);
+        Caller("round-trip");
+        var registry = brain.Get<IRegistry>(IRegistry.Key);
+        var result = await registry.Discover("resources", TestContext.Current.CancellationToken);
+        Assert.Null(Assert.Single(result.Capabilities).ResourcesJson);
+        Assert.Equal(BrainScope.CurrentId(), (await registry.Select("scoped", TestContext.Current.CancellationToken))!.ResourcesJson);
     }
 
-    private sealed class ScopedProvider : IRegistryResourceProvider
+    private sealed class ScopedProvider(string id = "scoped") : IRegistryResourceProvider
     {
-        public string Id => "scoped";
-        public Task<RegistryDiscovery> Discover(CancellationToken ct) => Task.FromResult(new RegistryDiscovery([new("scoped", "Available", ["read"], BrainScope.CurrentId())], []));
+        public string Id => id;
+        public int Reads { get; private set; }
+        public Task<RegistryDiscovery> Discover(CancellationToken ct)
+        {
+            Reads++;
+            return Task.FromResult(new RegistryDiscovery([new(Id, "Available", ["read"], BrainScope.CurrentId())], []));
+        }
     }
     private sealed class FailedProvider : IRegistryResourceProvider
     {

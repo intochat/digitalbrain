@@ -170,8 +170,9 @@ internal sealed class AgentNeuron(
                         break;
                     case AgentTurnEvent.Completed result: output = result; break;
                     case AgentTurnEvent.ToolStarted tool: await Record(run.RunId, "tool-started", tool.CallId, tool.Name); break;
-                    case AgentTurnEvent.ToolCompleted tool: await Record(run.RunId, "tool-completed", tool.CallId, tool.Name); break;
-                    case AgentTurnEvent.ToolFailed tool: await Record(run.RunId, "tool-failed", tool.CallId, tool.Name); break;
+                    case AgentTurnEvent.ToolCompleted tool: await Record(run.RunId, "tool-completed", tool.CallId, tool.Name, tool.Result); break;
+                    case AgentTurnEvent.ToolFailed tool: await Record(run.RunId, "tool-failed", tool.CallId, tool.Name,
+                        JsonSerializer.Serialize(new { isError = true, code = tool.Code, message = tool.Message })); break;
                     case AgentTurnEvent.Failed failed:
                         error = failed.Message;
                         cancelled = failed.Cancelled;
@@ -205,6 +206,16 @@ internal sealed class AgentNeuron(
             {
                 if (started && !completed)
                 {
+                    var terminalCalls = _state.Events.Where(item => item.RunId == run.RunId && item.Kind is "tool-completed" or "tool-failed")
+                        .Select(item => item.CallId).ToHashSet();
+                    foreach (var pending in _state.Events.Where(item => item.RunId == run.RunId && item.Kind == "tool-started"
+                        && !terminalCalls.Contains(item.CallId)).ToArray())
+                    {
+                        await Record(run.RunId, "tool-failed", pending.CallId, pending.Tool,
+                            JsonSerializer.Serialize(new { isError = true,
+                                code = cancelled || lifetime.IsCancellationRequested ? "tool_cancelled" : "tool_interrupted",
+                                message = "Execution ended before the tool call completed." }));
+                    }
                     run = run with
                     {
                         Status = cancelled || lifetime.IsCancellationRequested || suspended ? AgentRunStatus.Cancelled : AgentRunStatus.Failed,
@@ -335,9 +346,9 @@ internal sealed class AgentNeuron(
     public Task Cancel(CancellationToken ct = default)
     { ct.ThrowIfCancellationRequested(); _active?.Cancel(); return Task.CompletedTask; }
 
-    private async Task Record(string runId, string kind, string? callId = null, string? tool = null)
+    private async Task Record(string runId, string kind, string? callId = null, string? tool = null, string? result = null)
     {
-        var item = new AgentEvent(_state.EventSequence + 1, runId, kind, DateTimeOffset.UtcNow, callId, tool);
+        var item = new AgentEvent(_state.EventSequence + 1, runId, kind, DateTimeOffset.UtcNow, callId, tool, result);
         await Save(_state with { EventSequence = item.Sequence, Events = [.. _state.Events.TakeLast(255), item] });
         if (tool is not null) { await Notify(new AgentToolCallChanged(this.GetPrimaryKeyString(), item)); }
     }

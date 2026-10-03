@@ -72,7 +72,7 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
                 .Where(name => !requestedTools.Contains(name) && factoryTools.Any(tool => tool.Name == name))
                 .Distinct(StringComparer.Ordinal)];
             var tools = new List<AIFunction>();
-            async Task AddTools(IReadOnlyList<string> names)
+            async Task AddTools(IReadOnlyList<string> names, AgentToolBinding? binding = null)
             {
                 var pending = names.Where(name => tools.All(tool => tool.Name != name)).Distinct(StringComparer.Ordinal).ToArray();
                 if (pending.Length == 0) { return; }
@@ -81,8 +81,11 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
                 { available.AddRange(native.Resolve(pending)); }
                 foreach (var source in services.GetServices<IAgentToolSource>())
                 {
+                    if (binding is not null && source.SourceId != binding.Source) { continue; }
                     // Session tools read the live call identity when invoked, after discovery.
-                    var session = await source.OpenAsync(pending, () => new(request.ScopeId, request.RunId, currentCall ?? ""), ct).ConfigureAwait(false);
+                    var session = binding is null
+                        ? await source.OpenAsync(pending, () => new(request.ScopeId, request.RunId, currentCall ?? ""), ct).ConfigureAwait(false)
+                        : await source.OpenBoundAsync(binding.Resource, pending, () => new(request.ScopeId, request.RunId, currentCall ?? ""), ct).ConfigureAwait(false);
                     sessions.Add(session);
                     available.AddRange(session.Tools.Where(tool => pending.Contains(tool.Name)));
                 }
@@ -94,6 +97,7 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
                 tools.AddRange(resolved);
             }
             await AddTools(selected).ConfigureAwait(false);
+            var initialTools = tools.Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
 
             var configuration = services.GetService<IOptions<AIOptions>>()?.Value;
             var configured = configuration is not null && (configuration.Default.Profile is not null
@@ -183,40 +187,55 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
                 foreach (var call in requested)
                 {
                     if (string.IsNullOrWhiteSpace(call.CallId) || !calls.Add(call.CallId)) { throw new InvalidOperationException("The model reused or omitted a tool call identity."); }
+                    await WriteObserved(events, new AgentTurnEvent.ToolStarted(call.CallId, call.Name, JsonSerializer.Serialize(call.Arguments)), ct).ConfigureAwait(false);
                     var tool = tools.SingleOrDefault(t => t.Name == call.Name);
                     if (tool is null)
                     {
-                        var unavailable = new ChatMessage(ChatRole.Tool, [new FunctionResultContent(call.CallId, new
+                        var failure = new
                         {
-                            error = "tool_unavailable", tool = call.Name,
+                            isError = true, code = "tool_unavailable", tool = call.Name,
                             message = "This tool is not available in this turn. Use an advertised discovery tool to find registered capabilities before retrying.",
-                        })]);
+                        };
+                        var unavailable = new ChatMessage(ChatRole.Tool, [new FunctionResultContent(call.CallId, failure)]);
                         messages.Add(unavailable);
                         generated.Add(unavailable);
-                        await events.WriteAsync(new AgentTurnEvent.ToolFailed(call.CallId, call.Name), ct).ConfigureAwait(false);
+                        await events.WriteAsync(new AgentTurnEvent.ToolCompleted(call.CallId, call.Name, JsonSerializer.Serialize(failure)), ct).ConfigureAwait(false);
                         continue;
                     }
                     currentCall = call.CallId;
-                    await WriteObserved(events, new AgentTurnEvent.ToolStarted(call.CallId, call.Name, JsonSerializer.Serialize(call.Arguments)), ct).ConfigureAwait(false);
                     object? result;
-                    try { result = await tool.InvokeAsync(new AIFunctionArguments(call.Arguments ?? new Dictionary<string, object?>()), ct).ConfigureAwait(false); }
-                    catch
+                    string serializedResult;
+                    try
                     {
-                        await events.WriteAsync(new AgentTurnEvent.ToolFailed(call.CallId, call.Name), ct).ConfigureAwait(false);
+                        result = await tool.InvokeAsync(new AIFunctionArguments(call.Arguments ?? new Dictionary<string, object?>()), ct).ConfigureAwait(false);
+                        ct.ThrowIfCancellationRequested();
+                        if (result is AgentToolOffer offer)
+                        {
+                            if (offer.Tools.Count > 32) { throw new InvalidOperationException("A capability may offer at most 32 tools. Select a smaller operation group."); }
+                            if (offer.ReplaceSelection) { tools.RemoveAll(tool => !initialTools.Contains(tool.Name)); }
+                            if (tools.Where(tool => !initialTools.Contains(tool.Name)).Select(tool => tool.Name)
+                                .Union(offer.Tools, StringComparer.Ordinal).Count() > 32)
+                            { throw new InvalidOperationException("A turn may select at most 32 additional tools."); }
+                            await AddTools(offer.Tools, offer.Binding).ConfigureAwait(false);
+                            options.Tools = tools.Cast<AITool>().ToList();
+                            result = offer.Result;
+                        }
+                        serializedResult = JsonSerializer.Serialize(result);
+                    }
+                    catch (Exception error)
+                    {
+                        var failed = new AgentTurnEvent.ToolFailed(call.CallId, call.Name,
+                            error is OperationCanceledException ? "tool_cancelled" : "tool_failed",
+                            error is OperationCanceledException ? "The tool call was interrupted." : error.Message);
+                        if (ct.IsCancellationRequested) { events.TryWrite(failed); }
+                        else { await events.WriteAsync(failed, ct).ConfigureAwait(false); }
                         throw;
                     }
                     finally { currentCall = null; }
-                    ct.ThrowIfCancellationRequested();
-                    if (result is AgentToolOffer offer)
-                    {
-                        await AddTools(offer.Tools).ConfigureAwait(false);
-                        options.Tools = tools.Cast<AITool>().ToList();
-                        result = offer.Result;
-                    }
                     var resultMessage = new ChatMessage(ChatRole.Tool, [new FunctionResultContent(call.CallId, result)]);
                     messages.Add(resultMessage);
                     generated.Add(resultMessage);
-                    await events.WriteAsync(new AgentTurnEvent.ToolCompleted(call.CallId, call.Name, JsonSerializer.Serialize(result)), ct).ConfigureAwait(false);
+                    await events.WriteAsync(new AgentTurnEvent.ToolCompleted(call.CallId, call.Name, serializedResult), ct).ConfigureAwait(false);
                 }
             }
             throw new InvalidOperationException("The agent reached its model-call budget.");

@@ -26,11 +26,14 @@ internal sealed class CSharpFileTestRunner(IGrainFactory grains, TimeProvider cl
         try
         {
             await file.Write(tests, cancellationToken);
-            await file.Configure(new Dictionary<string, string>
+            var settings = new Dictionary<string, string>
             {
                 ["Package"] = revision.Package.ToString(),
                 ["Revision"] = revision.Revision,
-            }, cancellationToken);
+            };
+            if (DigitalBrain.Kernel.Enforcement.CallerContextStamper.TryGet(out _))
+            { settings["BrainScope"] = DigitalBrain.Kernel.Enforcement.BrainScope.CurrentId(); }
+            await file.Configure(settings, cancellationToken);
             var snapshot = await file.Start(cancellationToken);
             var deadline = clock.GetUtcNow() + RunDeadline;
             while (snapshot.ExitCode is null && snapshot.Status is CSharpFileStatus.Running or CSharpFileStatus.Restarting)

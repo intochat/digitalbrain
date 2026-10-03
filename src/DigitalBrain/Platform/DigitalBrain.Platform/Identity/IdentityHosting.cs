@@ -25,6 +25,9 @@ public static class IdentityHosting
         services.AddOptions<IdentityHostOptions>().BindConfiguration(IdentityHostOptions.SectionName)
             .Validate(options => options.Validate(), "Identity host names must not be empty.")
             .ValidateOnStart();
+        services.AddDataProtection();
+        services.AddOptions<Microsoft.AspNetCore.DataProtection.DataProtectionOptions>()
+            .Configure<IOptions<IdentityHostOptions>>((protection, host) => protection.ApplicationDiscriminator = host.Value.ProtectionApplicationName);
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie();
         services.AddOptions<CookieAuthenticationOptions>(CookieAuthenticationDefaults.AuthenticationScheme)
             .Configure<IOptions<IdentityHostOptions>>((cookie, host) =>

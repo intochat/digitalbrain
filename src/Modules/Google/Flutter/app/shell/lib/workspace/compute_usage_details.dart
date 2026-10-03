@@ -118,7 +118,7 @@ class ComputeUsageDetails extends StatelessWidget {
                   ? 'Succeeded'
                   : call['succeeded'] == false
                   ? 'Failed'
-                  : 'Status unreported'}',
+                  : 'Status unreported'}${call['errorMessage'] == null ? '' : '\n${call['errorMessage']}'}${call['errorCode'] == null ? '' : ' (${call['errorCode']})'}',
             ),
         ]),
         section('Data accessed', [

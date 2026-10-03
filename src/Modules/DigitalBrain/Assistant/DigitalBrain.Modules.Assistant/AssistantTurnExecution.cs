@@ -120,6 +120,7 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
             {
                 // The client disconnected; the run is interrupted and its turn is dropped.
                 outcome = AgentRunOutcome.Cancelled;
+                activity.CancelPending();
             }
             catch (Exception error) when (error.Message == DigitalBrain.Sdk.Capacity.CapacityUnavailableException.RefusalMessage
                 || DigitalBrain.Apps.AppRequirementsException.IsRefusal(error.Message))
@@ -204,7 +205,8 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
                         compute = receipt.Compute,
                         computeUsd = ComputeUnits.ToUsd(receipt.Compute),
                         shadow = true,
-                        calls = receipt.Calls.Select(call => new { appId = call.AppId, operation = call.Operation, discovered = call.Discovered, succeeded = call.Succeeded }),
+                        calls = receipt.Calls.Select(call => new { appId = call.AppId, operation = call.Operation, discovered = call.Discovered, succeeded = call.Succeeded,
+                            callId = call.CallId, errorCode = call.ErrorCode, errorMessage = call.ErrorMessage }),
                         touched = receipt.Touched.Select(entry => new { source = entry.Source, semanticTypeId = entry.SemanticTypeId, readOnly = entry.ReadOnly, rowsRead = entry.RowsRead }),
                     });
                 }
@@ -245,6 +247,7 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
                     await emit(new { type = "TEXT_MESSAGE_CONTENT", messageId, delta = delta.Content });
                     break;
                 case AgentTurnEvent.ToolStarted tool:
+                    activity.RecordTool(tool.Name, false, null, 0, tool.CallId, "tool_interrupted", "The tool call did not complete.");
                     await emit(new { type = "TOOL_CALL_START", toolCallId = tool.CallId, toolCallName = tool.Name, parentMessageId = messageId });
                     await emit(new { type = "TOOL_CALL_ARGS", toolCallId = tool.CallId, delta = tool.Arguments });
                     await emit(new { type = "TOOL_CALL_END", toolCallId = tool.CallId });
@@ -255,7 +258,8 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
                         using var payload = JsonDocument.Parse(tool.Result);
                         if (payload.RootElement.TryGetProperty("isError", out var isError) && isError.ValueKind == JsonValueKind.True)
                         {
-                            queryError = payload.RootElement.GetProperty("message").GetString();
+                            if (!payload.RootElement.TryGetProperty("code", out var code) || code.GetString() != "tool_unavailable")
+                            { queryError = payload.RootElement.GetProperty("message").GetString(); }
                         }
                         else
                         {
@@ -272,6 +276,11 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
                     RecordToolActivity(activity, tool);
                     await emit(new { type = "TOOL_CALL_RESULT", toolCallId = tool.CallId, messageId = tool.CallId + "-result", role = "tool", content = tool.Result });
                     await EmitUiCard(tool.Result, emit);
+                    break;
+                case AgentTurnEvent.ToolFailed tool:
+                    var failure = JsonSerializer.Serialize(new { isError = true, code = tool.Code, message = tool.Message });
+                    RecordToolActivity(activity, new(tool.CallId, tool.Name, failure));
+                    await emit(new { type = "TOOL_CALL_RESULT", toolCallId = tool.CallId, messageId = tool.CallId + "-result", role = "tool", content = failure });
                     break;
                 case AgentTurnEvent.Failed failed: throw new InvalidOperationException(failed.Message);
                 case AgentTurnEvent.Finished: finished = true; break;
@@ -302,6 +311,7 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
         var succeeded = true;
         string? title = null;
         string? message = null;
+        string? code = null;
         long rowsRead = 0;
         try
         {
@@ -311,6 +321,7 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
             {
                 succeeded = false;
                 if (root.TryGetProperty("message", out var reason) && reason.ValueKind == JsonValueKind.String) { message = reason.GetString(); }
+                if (root.TryGetProperty("code", out var errorCode) && errorCode.ValueKind == JsonValueKind.String) { code = errorCode.GetString(); }
             }
             if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("rowsRead", out var rows) && rows.ValueKind == JsonValueKind.Number && rows.TryGetInt64(out var count)) { rowsRead = count; }
             if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("title", out var windowTitle) && windowTitle.ValueKind == JsonValueKind.String) { title = windowTitle.GetString(); }
@@ -319,7 +330,7 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
         {
             // A non-JSON tool result is still a call, just without a row count.
         }
-        activity.RecordTool(tool.Name, succeeded, title, rowsRead);
+        activity.RecordTool(tool.Name, succeeded, title, rowsRead, tool.CallId, code, message);
     }
 }
 

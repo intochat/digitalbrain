@@ -20,6 +20,9 @@ public sealed record CallRequest
     [Id(3)] public string[] SemanticTypeIds { get; init; } = [];
     [Id(4)] public decimal EstimatedCompute { get; init; }
     [Id(5)] public bool HasSideEffects { get; init; }
+    [Id(6)] public bool EnforceTarget { get; init; }
+    [Id(7)] public string? TargetScope { get; init; }
+    [Id(8)] public bool PublicOperation { get; init; }
 }
 
 [GenerateSerializer, Alias("enforcement.call-decision")]

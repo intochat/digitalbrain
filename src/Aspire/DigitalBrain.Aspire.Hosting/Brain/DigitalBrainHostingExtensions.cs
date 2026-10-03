@@ -114,6 +114,7 @@ public static class DigitalBrainHostingExtensions
             builder.WithReference(grainState, DigitalBrainNames.GrainState);
             builder.WithEnvironment($"Orleans__GrainStorage__{DigitalBrainNames.DefaultGrainStorage}__ServiceKey", DigitalBrainNames.GrainState);
         }
+        brain.Identity?.Apply(builder, brain);
 
         for (var index = 0; index < brain.Modules.Count; index++)
         {
@@ -153,6 +154,13 @@ public static class DigitalBrainHostingExtensions
 
         builder.WithReference(client.Brain.Orleans.AsClient());
         AuthPosture.Provision(client.Brain.ApplicationBuilder)?.Apply(builder);
+        if (client.ShareHttpIdentity)
+        {
+            var identity = client.Brain.Identity ?? throw new InvalidOperationException("Configure the brain HTTP identity before sharing sessions.");
+            var storage = client.Brain.GrainState ?? throw new InvalidOperationException("Shared HTTP sessions require durable key storage.");
+            identity.Apply(builder, client.Brain);
+            builder.WithReference(storage, DigitalBrainNames.GrainState);
+        }
         if (client.Brain.Clustering is { } clustering)
         {
             builder.WithReference(clustering, DigitalBrainNames.Clustering);

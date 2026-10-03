@@ -15,6 +15,7 @@ public sealed class AppVerificationFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await StartAsync(ct);
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         var document = AppDocumentFacts.Document() with { Behaviors = [] };
         document = document with { Scenarios = [document.Scenarios[0], new("22222222222222222222222222222222", "Opening the app", "When opened, show the UI.", false)] };
         var content = new PackageContent(new("Echo", "", [new("ask", "Ask")], [], Runtime: "echo"), "",
@@ -60,10 +61,12 @@ public sealed class AppVerificationFacts
         var package = brain.Get<IPackage>(Echo.ToString());
         RecordingCSharpFile.ScriptedRuns[$"specs/{Echo}@{revision.Id}"] = (0, "noise\ndbtest:pass It repeats what I say\nmore noise");
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => package.Publish(new(Guid.NewGuid(), revision.Id)));
         var verification = await brain.Get<IAppVerification>(IAppVerification.Key(new(Echo, revision.Id))).Verify();
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         var published = await package.Publish(new(Guid.NewGuid(), revision.Id));
 
         Assert.True(verification.Green);
@@ -88,6 +91,7 @@ public sealed class AppVerificationFacts
         Assert.Equal("It repeats", failed.Name);
         Assert.Contains("you said: hi", failed.Message, StringComparison.Ordinal);
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => brain.Get<IPackage>(Echo.ToString()).Publish(new(Guid.NewGuid(), revision.Id)));
     }
@@ -136,6 +140,7 @@ public sealed class AppVerificationFacts
     private static async Task<PackageRevision> Commit(PackageBrain brain, string? tests)
     {
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         var files = new Dictionary<string, string> { [PackageContent.SpecPath] = "## Scenario: It repeats what I say" };
         if (tests is not null) { files[PackageContent.TestsPath] = tests; }
         var content = new PackageContent(

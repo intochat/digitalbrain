@@ -18,6 +18,7 @@ public static class BrainHosting
         silo.Services.TryAddSingleton(TimeProvider.System);
         silo.AddStartupTask<RuntimeStartupTask>();
         silo.Services.TryAddSingleton<ICallFilter, CallFilter>();
+        silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IIncomingGrainCallFilter, NeuronCallFilter>());
         silo.Services.TryAddSingleton<LocalSignalHub>();
         silo.Services.TryAddSingleton<DigitalBrain.Contracts.Signals.ILocalSignalHub>(sp => sp.GetRequiredService<LocalSignalHub>());
         silo.Services.AddOptions<ObserverOptions>().Validate(options => options.Lease > TimeSpan.Zero, "Observer lease must be positive.").ValidateOnStart();

@@ -35,6 +35,7 @@ public sealed class AuthoringAvailabilityFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<AppsModule>().StartAsync(ct);
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         var id = PackageId.Create("alice", "public");
         var package = brain.Get<IPackage>(id.ToString());
         var revision = await package.Commit(new(Guid.NewGuid(), null,
@@ -62,6 +63,7 @@ public sealed class AuthoringAvailabilityFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<AppsModule>().StartAsync(ct);
         Caller.As("alice");
+        await brain.AuthorizeCallerAsync();
         var id = PackageId.Create("alice", "availability");
         var files = new Dictionary<string, string>();
         if (hasTests) { files[PackageContent.TestsPath] = "Console.WriteLine(1);"; }

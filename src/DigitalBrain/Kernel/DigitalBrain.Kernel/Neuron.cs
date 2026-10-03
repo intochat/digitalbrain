@@ -13,6 +13,8 @@ namespace DigitalBrain.Kernel;
 
 public abstract class Neuron : Grain, INeuron, IGrainBase
 {
+    public virtual Enforcement.NeuronAccess Access(string operation) => Enforcement.NeuronAccess.ForBrainKey(this.GetPrimaryKeyString());
+
     private static readonly ConcurrentDictionary<Type, string[]> ActivityTypeIds = new();
     private readonly Guid _activation = Guid.NewGuid();
     private bool _observedActivation;

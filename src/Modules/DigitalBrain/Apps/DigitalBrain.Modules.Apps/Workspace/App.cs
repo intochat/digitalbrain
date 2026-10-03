@@ -19,6 +19,18 @@ internal sealed class App(
     TimeProvider clock, AppRequirements requirements, ModuleInventory modules)
     : Neuron<AppState>(store), IApp
 {
+    public override NeuronAccess Access(string operation)
+    {
+        var key = this.GetPrimaryKeyString();
+        var caller = CallerContextStamper.Require();
+        var addressScope = NeuronAccess.ForBrainKey(key).Scope;
+        var creating = operation == nameof(Install) && Snapshot.BrainScopeId is null && Snapshot.Revision is null && Snapshot.Receipts.Count == 0;
+        if (caller.Kind == DigitalBrain.Contracts.Enforcement.CallerKind.App && caller.AppId != key
+            && caller.AppId != Snapshot.InstallerAppId && !creating)
+        { throw new UnauthorizedAccessException("An app cannot address another installed app."); }
+        return new(Snapshot.BrainScopeId ?? addressScope ?? (creating ? BrainScope.CurrentId() : null));
+    }
+
     private const int MaxInvocations = 256;
     private const int MaxSettingLength = 4096;
     private const int MaxPayloadLength = 64 * 1024;
@@ -42,6 +54,14 @@ internal sealed class App(
     public async Task<AppSnapshot> Install(InstallApp request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        if (Snapshot.BrainScopeId is null && CallerContextStamper.TryGet(out var installer))
+        {
+            await Persist(Snapshot with
+            {
+                BrainScopeId = BrainScope.CurrentId(),
+                InstallerAppId = installer.Kind == DigitalBrain.Contracts.Enforcement.CallerKind.App ? installer.AppId : null,
+            });
+        }
         await Resume();
         if (Replay(request.OperationId, request)) { return Describe(Snapshot); }
         if (Snapshot.Status == AppStatus.Installed)
@@ -194,6 +214,8 @@ internal sealed class App(
     {
         ArgumentNullException.ThrowIfNull(request);
         await Resume();
+        if (request.ExpectedRevision is { } expected && expected != Snapshot.Revision)
+        { throw new UnauthorizedAccessException("The selected app revision changed. Discover and select it again."); }
         if (Snapshot.Invocations.Find(item => item.Id == request.InvocationId) is { } existing) { return existing; }
         RequireInstalled();
         if (!Snapshot.Operations.Any(operation => operation.Name == request.Operation))

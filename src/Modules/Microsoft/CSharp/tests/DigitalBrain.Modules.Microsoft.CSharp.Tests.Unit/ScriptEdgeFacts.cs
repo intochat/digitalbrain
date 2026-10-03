@@ -20,6 +20,7 @@ public sealed class ScriptEdgeFacts
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await Brain(new FakeSandbox(), ct);
         CallerContextStamper.Stamp(Alice);
+        await brain.AuthorizeCallerAsync();
         var host = brain.Get<IAppBindingTestHost>("victim-app");
         await host.Bind("predictable-behavior");
         await host.Start("predictable-behavior");
@@ -42,9 +43,11 @@ public sealed class ScriptEdgeFacts
         await using var brain = await Brain(sandbox, ct);
         var oldToken = await StartAsAlice(brain, sandbox, "reused-file", ct);
         CallerContextStamper.Stamp(Alice);
+        await brain.AuthorizeCallerAsync();
         await brain.Get<IAppBindingTestHost>("bound-app").Bind("reused-file");
         Orleans.Runtime.RequestContext.Clear();
         CallerContextStamper.Stamp(Alice);
+        await brain.AuthorizeCallerAsync();
         await brain.Get<IAppBindingTestHost>("bound-app").Start("reused-file");
         Orleans.Runtime.RequestContext.Clear();
         var currentToken = sandbox.Requests.Last(FakeSandbox.IsStart).Body!["environment"]!["DigitalBrain__Token"]!.GetValue<string>();
@@ -62,6 +65,7 @@ public sealed class ScriptEdgeFacts
         var sandbox = new FakeSandbox();
         await using var brain = await Brain(sandbox, ct);
         CallerContextStamper.Stamp(Alice);
+        await brain.AuthorizeCallerAsync();
         var host = brain.Get<IAppBindingTestHost>("stable-app");
         await host.Bind("behavior-one");
         await host.Bind("behavior-two");
@@ -71,6 +75,7 @@ public sealed class ScriptEdgeFacts
         foreach (var file in new[] { "behavior-one", "behavior-two" })
         {
             CallerContextStamper.Stamp(Alice);
+        await brain.AuthorizeCallerAsync();
             await host.Start(file);
             Orleans.Runtime.RequestContext.Clear();
             var token = sandbox.Requests.Last(FakeSandbox.IsStart).Body!["environment"]!["DigitalBrain__Token"]!.GetValue<string>();
@@ -363,8 +368,10 @@ public sealed class ScriptEdgeFacts
     private static async Task<string> StartAsAlice(UnitBrain brain, FakeSandbox sandbox, string fileId, CancellationToken ct)
     {
         var file = brain.Get<ICSharpFile>(fileId);
-        await file.Write("Console.WriteLine(1);", ct);
         CallerContextStamper.Stamp(Alice);
+        await brain.AuthorizeCallerAsync();
+        await brain.AuthorizeCallerAsync();
+        await file.Write("Console.WriteLine(1);", ct);
         try { await file.Start(ct); }
         finally { Orleans.Runtime.RequestContext.Clear(); }
         return sandbox.Requests.Last(FakeSandbox.IsStart).Body!["environment"]!["DigitalBrain__Token"]!.GetValue<string>();

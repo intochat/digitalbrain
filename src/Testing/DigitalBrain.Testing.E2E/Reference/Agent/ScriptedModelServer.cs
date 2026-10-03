@@ -118,9 +118,15 @@ public sealed partial class ScriptedModelServer : IAsyncDisposable
         if (!toolNames.Contains(nextTool))
         {
             Assert.Contains("discover_capabilities", toolNames);
+            if (results.Any(result => result.TryGetProperty("tool_call_id", out var id) && id.GetString() == "discovery-call"))
+            {
+                Assert.Contains("select_capability", toolNames);
+                return Completion(Call("selection-call", "select_capability", "{\"id\":\"supabase\"}"), "tool_calls");
+            }
             return Completion(Call("discovery-call", "discover_capabilities", "{\"query\":\"Supabase tables\"}"), "tool_calls");
         }
-        results = results.Where(result => !result.TryGetProperty("tool_call_id", out var callId) || callId.GetString() != "discovery-call").ToArray();
+        results = results.Where(result => !result.TryGetProperty("tool_call_id", out var callId)
+            || callId.GetString() is not ("discovery-call" or "selection-call")).ToArray();
         object message;
         var reason = "tool_calls";
         if (results.Length == 0)

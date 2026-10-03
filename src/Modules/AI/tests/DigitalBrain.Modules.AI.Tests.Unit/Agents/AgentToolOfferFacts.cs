@@ -64,7 +64,7 @@ public sealed class AgentToolOfferFacts
         await foreach (var item in new AgentTurnRunner(services).RunAsync(new("agent", "run", "scope", [], "ask", null, ToolNames: ["find"]), TestContext.Current.CancellationToken))
         { events.Add(item); }
         Assert.Empty(events.OfType<AgentTurnEvent.Failed>());
-        Assert.Empty(events.OfType<AgentTurnEvent.ToolStarted>());
+        Assert.Single(events.OfType<AgentTurnEvent.ToolStarted>());
         Assert.Contains(events.OfType<AgentTurnEvent.Text>(), item => item.Content == "recovered");
         var completed = Assert.Single(events.OfType<AgentTurnEvent.Completed>());
         Assert.Contains("tool_unavailable", System.Text.Json.JsonSerializer.Serialize(completed), StringComparison.Ordinal);

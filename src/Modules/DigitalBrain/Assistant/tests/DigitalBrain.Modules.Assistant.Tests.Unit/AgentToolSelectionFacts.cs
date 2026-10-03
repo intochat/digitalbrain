@@ -24,6 +24,7 @@ public sealed class AgentToolSelectionFacts
             Kind = CallerKind.User,
             StampedBy = TrustedEdge.AuthenticatedHttp,
         });
+        await brain.AuthorizeCallerAsync();
         var id = PackageId.Create("alice", "tools");
         var package = brain.Get<IPackage>(id.ToString());
         var content = new PackageContent(new("Tools", "Installed tools", [new("old-tool", "Old")], [], Runtime: "prompt"), "");
@@ -35,7 +36,7 @@ public sealed class AgentToolSelectionFacts
         var installed = brain.Get<IApp>(scope + "/packages/" + id);
         await installed.Install(new(Guid.NewGuid(), new(id, revision.Id), new Dictionary<string, string>()));
         var registry = brain.Get<IRegistry>(IRegistry.Key);
-        async Task<string[]> Discover() => (await registry.Discover("installed apps", ct)).Capabilities.SelectMany(item => item.Tools).Where(name => name.StartsWith("app_", StringComparison.Ordinal)).ToArray();
+        async Task<string[]> Discover() => (await registry.Select("apps:" + id, ct))?.Tools ?? [];
 
         Assert.Equal([AppToolName.For(id, "installed-tool")], await Discover());
         var selected = await Discover();
@@ -70,6 +71,7 @@ public sealed class AgentToolSelectionFacts
             Kind = CallerKind.User,
             StampedBy = TrustedEdge.AuthenticatedHttp,
         });
+        await brain.AuthorizeCallerAsync();
         var scope = BrainScope.CurrentId();
         var id = PackageId.Create("alice", "private");
         var content = new PackageContent(new("Private", "A private app", [new("ask", "Answer")], [], Runtime: "prompt"), "");
@@ -77,7 +79,7 @@ public sealed class AgentToolSelectionFacts
         var app = brain.Get<IApp>(scope + "/packages/" + id);
         await app.Install(new(Guid.NewGuid(), new(id, revision.Id), new Dictionary<string, string>()));
         Assert.Empty(await brain.Get<IPackageDirectory>(PackageDirectory.Key).List());
-        Assert.Equal([AppToolName.For(id, "ask")], (await brain.Get<IRegistry>(IRegistry.Key).Discover("private apps", ct)).Capabilities.SelectMany(item => item.Tools));
+        Assert.Equal([AppToolName.For(id, "ask")], (await brain.Get<IRegistry>(IRegistry.Key).Select("apps:" + id, ct))!.Tools);
         await brain.DeactivateAsync(app, ct);
         await brain.DeactivateAsync(brain.Get<IApps>(scope), ct);
         Assert.Equal(id, Assert.Single(await brain.Get<IApps>(scope).List()));

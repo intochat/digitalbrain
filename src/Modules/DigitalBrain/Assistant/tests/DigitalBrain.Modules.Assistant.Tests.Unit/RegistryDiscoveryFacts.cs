@@ -29,7 +29,7 @@ public sealed class RegistryDiscoveryFacts
         try
         {
             var factory = new RegistryDiscoveryTools(brain.Grains, brain.SiloServices.GetRequiredService<ModuleInventory>());
-            var tool = Assert.Single(factory.Create(() => new(BrainScope.CurrentId(), "run", "call")));
+            var tool = Assert.Single(factory.Create(() => new(BrainScope.CurrentId(), "run", "call")), item => item.Name == "discover_capabilities");
             var result = Assert.IsType<AgentToolOffer>(await tool.InvokeAsync(new AIFunctionArguments(new Dictionary<string, object?> { ["query"] = "tables" }), ct));
             Assert.Empty(result.Tools);
             Assert.Contains("discovery_unavailable", System.Text.Json.JsonSerializer.Serialize(result.Result));
@@ -54,6 +54,7 @@ public sealed class RegistryDiscoveryFacts
         });
         try
         {
+            await brain.AuthorizeCallerAsync();
             var scope = BrainScope.CurrentId();
             var packageId = PackageId.Create("alice", "researcher");
             var revision = await brain.Get<IPackage>(packageId.ToString()).Commit(new(Guid.NewGuid(), null,
@@ -67,11 +68,11 @@ public sealed class RegistryDiscoveryFacts
                 .AddSingleton(brain.SiloServices.GetRequiredService<IAgentToolSource>()).BuildServiceProvider();
             var events = new List<AgentTurnEvent>();
             await foreach (var item in new AgentTurnRunner(services).RunAsync(new("assistant", "run", scope, [],
-                "show me data from postges, wich tables are there?", null, ToolNames: ["discover_capabilities"]), ct))
+                "show me data from postges, wich tables are there?", null, ToolNames: ["discover_capabilities", "select_capability"]), ct))
             { events.Add(item); }
 
             Assert.Empty(events.OfType<AgentTurnEvent.Failed>());
-            Assert.Equal(["discover_capabilities", "postgres_schema"], events.OfType<AgentTurnEvent.ToolCompleted>().Select(item => item.Name));
+            Assert.Equal(["discover_capabilities", "select_capability", "postgres_schema"], events.OfType<AgentTurnEvent.ToolCompleted>().Select(item => item.Name));
             Assert.Contains(events.OfType<AgentTurnEvent.Text>(), item => item.Content == "research_results");
             Assert.Equal(scope, database.ReadScope);
         }
@@ -93,11 +94,12 @@ public sealed class RegistryDiscoveryFacts
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken ct = default)
         {
             var results = messages.SelectMany(message => message.Contents).OfType<FunctionResultContent>().ToArray();
-            var next = results.Length == 0 ? "discover_capabilities" : "postgres_schema";
-            if (results.Length >= 2) { return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "research_results"))); }
+            var next = results.Length switch { 0 => "discover_capabilities", 1 => "select_capability", _ => "postgres_schema" };
+            if (results.Length >= 3) { return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "research_results"))); }
             Assert.Contains(options!.Tools!, tool => tool.Name == next);
-            if (results.Length == 1) { Assert.Contains(options.Tools!, tool => tool.Name.StartsWith("app_", StringComparison.Ordinal)); }
-            Dictionary<string, object?> arguments = results.Length == 0 ? new() { ["query"] = "postges tables" } : [];
+            Assert.DoesNotContain(options.Tools!, tool => tool.Name.StartsWith("app_", StringComparison.Ordinal));
+            if (results.Length == 1) { Assert.DoesNotContain(options.Tools!, tool => tool.Name == "postgres_schema"); }
+            Dictionary<string, object?> arguments = results.Length switch { 0 => new() { ["query"] = "postges tables" }, 1 => new() { ["id"] = "postgres" }, _ => [] };
             return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
                 [new FunctionCallContent("call-" + results.Length, next, arguments)])));
         }

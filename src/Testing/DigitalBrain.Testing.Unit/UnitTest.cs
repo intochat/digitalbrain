@@ -17,6 +17,7 @@ public static class UnitTest
     public static UnitTestBuilder Create() => new();
     internal static async Task<UnitBrain> StartAsync(UnitOptions? options = null, CancellationToken cancellationToken = default)
     {
+        Orleans.Runtime.RequestContext.Remove(DigitalBrain.Kernel.Enforcement.CallerContextStamper.RequestContextKey);
         options ??= new();
         options.Execution.Validate();
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

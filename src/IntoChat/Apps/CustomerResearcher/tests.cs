@@ -14,7 +14,7 @@ using DigitalBrain.Microsoft.Playwright;
 await using var brain = await DigitalBrainClient.ConnectAsync(args);
 var package = PackageId.Parse(brain.Setting("Package")!);
 var revision = brain.Setting("Revision")!;
-var suite = new AppScenarioSuite(brain.Get<IApp>, new(package, revision), settings: scope => new Dictionary<string, string>
+var suite = new AppScenarioSuite(brain.Get<IApp>, new(package, revision), brainScope: brain.Setting("BrainScope"), settings: scope => new Dictionary<string, string>
 {
     ["Model"] = IScriptedLLM.ModelPrefix + scope + "/model",
     ["Browser"] = "scripted/" + scope + "/browser",

@@ -20,6 +20,7 @@ using IntoChat;
 
 var builder = DistributedApplication.CreateBuilder(args);
 var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serviceId: "intochat", options: new() { UseAzureStorage = true, Dashboard = true })
+    .WithHttpIdentity(new("intochat.session", "IntoChat.v1", IntoChatConfiguration.ProtectionContainerName))
     .WithModule<DigitalBrain.AI.Aspire.Hosting.AIModuleHosting, AIOptions>(ai =>
     {
         ai.Telemetry.EnableSensitiveData = true;
@@ -62,7 +63,7 @@ var runtime = builder.AddProject<Projects.IntoChat>(ProductSurfaceResources.Into
     .WithHttpHealthCheck("/health", endpointName: "http");
 
 builder.AddProject<Projects.DigitalBrain_Mcp>("digitalbrain-mcp")
-    .WithReference(digitalBrain.AsClient())
+    .WithReference(digitalBrain.AsClient(shareHttpIdentity: true))
     .WithHttpEndpoint(port: ProductSurfaceResources.McpHttpPort, name: "http", isProxied: false)
     .WithHttpHealthCheck("/health", endpointName: "http")
     .WaitFor(runtime);

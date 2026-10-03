@@ -8,6 +8,27 @@ namespace DigitalBrain.Modules.AI.Tests.Unit;
 public sealed class AgentToolFacts
 {
     [Fact]
+    public async Task AnUnserializableResultStillTerminatesTheToolAttempt()
+    {
+        using var services = new ServiceCollection().AddSingleton<IChatClient>(ScriptedClient())
+            .AddSingleton<IAgentToolFactory>(new UnserializableTool()).BuildServiceProvider();
+        var events = new List<AgentTurnEvent>();
+        await foreach (var item in new AgentTurnRunner(services).RunAsync(new("agent", "run", "scope", [], "ask", null, ToolNames: ["lookup"]), TestContext.Current.CancellationToken))
+        { events.Add(item); }
+        Assert.Single(events.OfType<AgentTurnEvent.ToolStarted>());
+        Assert.Single(events.OfType<AgentTurnEvent.ToolFailed>());
+        Assert.Single(events.OfType<AgentTurnEvent.Failed>());
+        Assert.Empty(events.OfType<AgentTurnEvent.ToolCompleted>());
+    }
+
+    private sealed class UnserializableTool : IAgentToolFactory
+    {
+        public IReadOnlyList<AIFunction> Create(Func<AgentToolContext> context) =>
+            [AIFunctionFactory.Create(() => new { unsupported = typeof(AgentToolFacts) }, new AIFunctionFactoryOptions
+            { Name = "lookup", MarshalResult = static (value, _, _) => ValueTask.FromResult(value) })];
+    }
+
+    [Fact]
     public async Task ToolDoesNotExecuteUntilCallerHasRecordedItsStart()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -91,8 +112,9 @@ public sealed class AgentToolFacts
         await foreach (var item in new AgentTurnRunner(services).RunAsync(new("agent", "run", "scope", [], "ask", null, ToolNames: ["lookup"], MaxModelCalls: 2), TestContext.Current.CancellationToken)) { events.Add(item); }
         Assert.Contains("budget", Assert.Single(events.OfType<AgentTurnEvent.Failed>()).Message, StringComparison.Ordinal);
         Assert.Equal(2, calls);
-        Assert.Equal(2, events.OfType<AgentTurnEvent.ToolFailed>().Count());
-        Assert.Empty(events.OfType<AgentTurnEvent.ToolCompleted>());
+        Assert.Equal(2, events.OfType<AgentTurnEvent.ToolStarted>().Count());
+        Assert.Equal(2, events.OfType<AgentTurnEvent.ToolCompleted>().Count());
+        Assert.All(events.OfType<AgentTurnEvent.ToolCompleted>(), item => Assert.Contains("tool_unavailable", item.Result));
         Assert.Empty(events.OfType<AgentTurnEvent.Finished>());
     }
 

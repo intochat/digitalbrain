@@ -42,4 +42,5 @@ public sealed record AgentEvent(
     [property: Id(2)] string Kind,
     [property: Id(3)] DateTimeOffset At,
     [property: Id(4)] string? CallId = null,
-    [property: Id(5)] string? Tool = null);
+    [property: Id(5)] string? Tool = null,
+    [property: Id(6)] string? Result = null);

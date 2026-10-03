@@ -10,6 +10,7 @@ internal sealed class PackageBrain(UnitBrain brain, FlakyGrainStorage storage) :
     public FlakyGrainStorage Storage => storage;
 
     public UnitBrain Brain => brain;
+    public Task AuthorizeCallerAsync() => brain.AuthorizeCallerAsync();
 
     public T Get<T>(string key) where T : class, IGrainWithStringKey => brain.Get<T>(key);
 

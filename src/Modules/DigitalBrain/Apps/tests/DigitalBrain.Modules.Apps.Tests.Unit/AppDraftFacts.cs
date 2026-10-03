@@ -72,7 +72,7 @@ public sealed class AppDraftFacts
         Assert.Equal(AppDocumentCodec.Hash(built.Draft.Document), built.Draft.VerifiedDocumentHash);
         var content = (await brain.Get<IPackage>(built.Draft.Published!.Package.ToString()).ReadRevision(built.Draft.Published.Revision)).Content;
         Assert.Equal(document.Behaviors[0].Id, AppDocumentCodec.Read(content).Document!.Behaviors[0].Id);
-        Assert.Contains("Read observed pages.", Assert.Single(await brain.Get<IScriptedLLM>("builder").Prompts()));
+        Assert.Contains("Read observed pages.", Assert.Single(await Prompts(brain, "builder")));
         var edited = await draft.SaveDocument(new(built.Draft.Revision, document with { Preamble = "Changed" }));
         Assert.Null(edited.Draft.VerifiedDocumentHash);
         Assert.NotNull(edited.Verification);
@@ -122,7 +122,7 @@ public sealed class AppDraftFacts
         var draft = brain.Get<IAppDraft>("alice/drafts/" + Guid.NewGuid().ToString("N"));
         var result = await draft.Draft("Echo my message.");
         Assert.Equal("test-echo", result.Draft.Runtime);
-        Assert.Contains(DescribedRuntime.Description, Assert.Single(await brain.Get<IScriptedLLM>("author").Prompts()), StringComparison.Ordinal);
+        Assert.Contains(DescribedRuntime.Description, Assert.Single(await Prompts(brain, "author")), StringComparison.Ordinal);
     }
 
     private sealed class DescribedRuntime : IAppRuntime
@@ -170,7 +170,7 @@ public sealed class AppDraftFacts
         Assert.Equal([false, true], built.Draft.Attempts.Select(attempt => attempt.Green));
         Assert.Contains("The answer was \"hello\".", built.Draft.Attempts[0].Failures, StringComparison.Ordinal);
         Assert.True(built.Verification?.Green);
-        var builderPrompts = await brain.Get<IScriptedLLM>("builder").Prompts();
+        var builderPrompts = await Prompts(brain, "builder");
         Assert.Contains("The answer was \"hello\".", builderPrompts[1], StringComparison.Ordinal);
         var listing = Assert.Single(await brain.Get<IPackageDirectory>(PackageDirectory.Key).List());
         Assert.Equal("alice/shouter", listing.Package.ToString());
@@ -238,9 +238,9 @@ public sealed class AppDraftFacts
         await Assert.ThrowsAsync<InvalidOperationException>(draft.Build);
 
         Assert.Equal(AppDraftStatus.Drafted, (await draft.Read()).Draft.Status);
-        Assert.Empty(await brain.Get<IScriptedLLM>("builder").Prompts());
+        Assert.Empty(await Prompts(brain, "builder"));
         Assert.DoesNotContain("csharp uses sandbox contracts.",
-            Assert.Single(await brain.Get<IScriptedLLM>("author").Prompts()), StringComparison.Ordinal);
+            Assert.Single(await Prompts(brain, "author")), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -296,7 +296,7 @@ public sealed class AppDraftFacts
 
         await draft.Revise("Also end with an exclamation mark.");
 
-        Assert.Contains("Current name: shouter", (await brain.Get<IScriptedLLM>("author").Prompts())[1], StringComparison.Ordinal);
+        Assert.Contains("Current name: shouter", (await Prompts(brain, "author"))[1], StringComparison.Ordinal);
     }
 
     private static string Authored(string spec) => System.Text.Json.JsonSerializer.Serialize(new
@@ -314,6 +314,11 @@ public sealed class AppDraftFacts
         files = new Dictionary<string, string> { ["tests.cs"] = testsMarker, ["prompts/system.md"] = systemPrompt },
     });
 
+    private static async Task<IReadOnlyList<string>> Prompts(UnitBrain brain, string model)
+    {
+        CallerContextStamper.Stamp(CallerContextStamper.Require() with { Kind = CallerKind.Platform, StampedBy = TrustedEdge.Platform });
+        return await brain.Get<IScriptedLLM>(model).Prompts();
+    }
     private static void StampAlice() => CallerContextStamper.Stamp(new CallerContext
     {
         PrincipalId = "alice",

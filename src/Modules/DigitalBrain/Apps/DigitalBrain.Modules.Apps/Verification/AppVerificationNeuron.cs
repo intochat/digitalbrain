@@ -20,6 +20,10 @@ internal sealed class AppVerificationNeuron(
     TimeProvider clock, AppRequirements requirements)
     : Neuron<AppVerificationState>(store), IAppVerification
 {
+    public override DigitalBrain.Kernel.Enforcement.NeuronAccess Access(string operation)
+        => operation is nameof(Read) or nameof(Verify)
+            ? DigitalBrain.Kernel.Enforcement.NeuronAccess.PublicOperation : base.Access(operation);
+
     public async Task<AppVerification> Verify()
     {
         var revisionRef = Parse(this.GetPrimaryKeyString());

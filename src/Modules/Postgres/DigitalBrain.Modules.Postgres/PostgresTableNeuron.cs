@@ -21,6 +21,16 @@ internal sealed record PostgresTableState
 internal sealed partial class PostgresTableNeuron(IPostgresTableProvider provider, DigitalBrain.Sdk.Capacity.ICapacity capacity,
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<PostgresTableState> state) : Neuron, IPostgresTable, IPostgresTableLifetime, IPostgresTableOwnership
 {
+    public override NeuronAccess Access(string operation)
+    {
+        if (operation is nameof(Define) or nameof(Upsert) or nameof(Delete) or nameof(Page) or nameof(Read) or nameof(Watch) or nameof(Unwatch))
+        {
+            _ = Scope();
+            return new(BrainScope.CurrentId());
+        }
+        return base.Access(operation);
+    }
+
     public async Task Transfer(string previousOwner, string owner)
     {
         if (state.State.Owner == owner || state.State.Owner is null) { return; }
