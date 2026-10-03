@@ -18,6 +18,19 @@ namespace DigitalBrain.Kernel.Tests.Unit;
 public sealed class CompositionBoundaryFacts
 {
     [Fact]
+    public void TwoBrainsHaveDistinctResourcesAndModuleNodes()
+    {
+        var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions { Args = [], DisableDashboard = true });
+        var first = builder.AddDigitalBrain("first", persistentStorage: false, options: new() { UseAzureStorage = true }).WithModule("sample");
+        var second = builder.AddDigitalBrain("second", persistentStorage: false, options: new() { UseAzureStorage = true }).WithModule("sample");
+        Assert.NotSame(first.GetOrAddModuleNode("sample").Resource, second.GetOrAddModuleNode("sample").Resource);
+        var names = builder.Resources.Select(r => r.Name).ToArray();
+        Assert.Equal(names.Length, names.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        Assert.Contains("first-sample", names);
+        Assert.Contains("second-sample", names);
+    }
+
+    [Fact]
     public void UnknownSelectionIsRejectedBeforeAnyFactoryRuns()
     {
         var builder = WebApplication.CreateBuilder();

@@ -106,7 +106,7 @@ public static partial class AIHostingExtensions
 
             if (provider == AiProvider.Ollama)
             {
-                _ollamaModels[marker] = EnsureOllama().AddModel(OllamaResourceName(id), id);
+                _ollamaModels[marker] = EnsureOllama().AddModel(brain.ResourceName(OllamaResourceName(id)), id);
             }
             else
             {
@@ -131,7 +131,7 @@ public static partial class AIHostingExtensions
             }
 
             var apiKey = brain.ApplicationBuilder.AddParameter(
-                $"{provider.ToString().ToLowerInvariant()}-api-key",
+                brain.ResourceName($"{provider.ToString().ToLowerInvariant()}-api-key"),
                 secret: true);
 
             if (provider is AiProvider.OpenAI)
@@ -147,7 +147,7 @@ public static partial class AIHostingExtensions
         internal void EnableTavilySearch()
         {
             _tavilyApiKey ??= brain.ApplicationBuilder
-                .AddParameter("tavily-api-key", secret: true)
+                .AddParameter(brain.ResourceName("tavily-api-key"), secret: true)
                 .WithDescription(TavilyApiKeyDescription, enableMarkdown: true)
                 .WithParentRelationship(module);
         }
@@ -157,7 +157,7 @@ public static partial class AIHostingExtensions
 
         private IResourceBuilder<OllamaResource> EnsureOllama()
             => _ollama ??= brain.ApplicationBuilder
-                .AddOllama("ollama")
+                .AddOllama(brain.ResourceName("ollama"))
                 .WithImageTag(OllamaImageTag)
                 .WithGPUSupport()
                 .WithDataVolume()
@@ -205,7 +205,7 @@ public static partial class AIHostingExtensions
             }
 
             _whisper ??= brain.ApplicationBuilder.AddFoundryLocalModel(
-                ResourceName(_model.Id),
+                brain.ResourceName(ResourceName(_model.Id)),
                 _model.Id,
                 module.Resource);
             builder.WithAnnotation(new WaitAnnotation(_whisper.Resource, WaitType.WaitUntilHealthy, exitCode: 0));

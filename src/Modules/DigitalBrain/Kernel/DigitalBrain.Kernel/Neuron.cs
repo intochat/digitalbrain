@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using DigitalBrain.Contracts.Signals;
 using DigitalBrain;
 using DigitalBrain.Contracts;
@@ -12,6 +13,7 @@ namespace DigitalBrain.Kernel;
 
 public abstract class Neuron : Grain, INeuron, IGrainBase
 {
+    private static readonly ConcurrentDictionary<Type, string[]> ActivityTypeIds = new();
     private readonly Guid _activation = Guid.NewGuid();
     private bool _observedActivation;
     private ObserverManager<INeuronObserver>? _observers;
@@ -37,16 +39,15 @@ public abstract class Neuron : Grain, INeuron, IGrainBase
 
     private void PublishActivity(bool active)
     {
-        var signals = ServiceProvider.GetService<LocalSignalHub>();
-        if (signals is null) { return; }
-        var typeIds = GetType().GetInterfaces()
+        var signals = ServiceProvider.GetRequiredService<LocalSignalHub>();
+        var typeIds = ActivityTypeIds.GetOrAdd(GetType(), static neuronType => neuronType.GetInterfaces()
             .Where(type => type != typeof(INeuron) && typeof(INeuron).IsAssignableFrom(type))
             .Select(type => type.GetCustomAttribute<AliasAttribute>()?.Alias)
-            .OfType<string>().Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
+            .OfType<string>().Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray());
         var now = ServiceProvider.GetRequiredService<TimeProvider>().GetUtcNow();
         NeuronActivity activity = active
-            ? new NeuronActivated { NeuronId = this.GetGrainId().ToString(), Key = this.GetPrimaryKeyString(), TypeIds = typeIds, ActivationId = _activation, ObservedAt = now }
-            : new NeuronDeactivated { NeuronId = this.GetGrainId().ToString(), Key = this.GetPrimaryKeyString(), TypeIds = typeIds, ActivationId = _activation, ObservedAt = now };
+            ? new NeuronActivated { NeuronId = this.GetGrainId().ToString(), Key = this.GetPrimaryKeyString(), TypeIds = [.. typeIds], ActivationId = _activation, ObservedAt = now }
+            : new NeuronDeactivated { NeuronId = this.GetGrainId().ToString(), Key = this.GetPrimaryKeyString(), TypeIds = [.. typeIds], ActivationId = _activation, ObservedAt = now };
         signals.Publish(activity);
     }
 
@@ -65,7 +66,7 @@ public abstract class Neuron : Grain, INeuron, IGrainBase
     protected Task PublishAsync(Signal signal)
     {
         var stamped = signal with { Publisher = this.GetGrainId().ToString() };
-        ServiceProvider.GetService<LocalSignalHub>()?.Publish(this.GetGrainId(), stamped);
+        ServiceProvider.GetRequiredService<LocalSignalHub>().Publish(this.GetGrainId(), stamped);
         return Observers.Notify(observer => observer.OnSignalAsync(stamped));
     }
 }

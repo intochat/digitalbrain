@@ -18,7 +18,7 @@ public sealed class ScriptAccountsState
 internal sealed class ScriptAccountsNeuron(
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ScriptAccountsState> store,
     IReadOnlyList<IntegrationDefinition> definitions)
-    : Neuron<ScriptAccountsState>(store), IIntegrationAccounts
+    : Neuron<ScriptAccountsState>(store), IConnectionRequests
 {
     [ReadOnly]
     public Task<IntegrationKind[]> ListKinds()

@@ -101,35 +101,35 @@
     "Json": 0
   },
   "DigitalBrain.AI.Agents.AgentTurnEvent": {},
-  "DigitalBrain.AI.Agents.AgentTurnEvent+Completed": {
+  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BCompleted": {
     "Messages": 0,
     "Usage": 1
   },
-  "DigitalBrain.AI.Agents.AgentTurnEvent+Failed": {
+  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BFailed": {
     "Message": 0,
     "Cancelled": 1
   },
-  "DigitalBrain.AI.Agents.AgentTurnEvent+Finished": {},
-  "DigitalBrain.AI.Agents.AgentTurnEvent+ModelSelected": {
+  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BFinished": {},
+  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BModelSelected": {
     "Model": 0,
     "Descriptor": 1
   },
-  "DigitalBrain.AI.Agents.AgentTurnEvent+Started": {
+  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BStarted": {
     "RunId": 0
   },
-  "DigitalBrain.AI.Agents.AgentTurnEvent+Text": {
+  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BText": {
     "Content": 0
   },
-  "DigitalBrain.AI.Agents.AgentTurnEvent+ToolCompleted": {
+  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BToolCompleted": {
     "CallId": 0,
     "Name": 1,
     "Result": 2
   },
-  "DigitalBrain.AI.Agents.AgentTurnEvent+ToolFailed": {
+  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BToolFailed": {
     "CallId": 0,
     "Name": 1
   },
-  "DigitalBrain.AI.Agents.AgentTurnEvent+ToolStarted": {
+  "DigitalBrain.AI.Agents.AgentTurnEvent\u002BToolStarted": {
     "CallId": 0,
     "Name": 1,
     "Arguments": 2
@@ -564,7 +564,7 @@
   "DigitalBrain.Apps.AppState": {
     "Status": 0,
     "Revision": 1,
-    "<retired:2>": 2,
+    "\u003Cretired:2\u003E": 2,
     "Declared": 3,
     "Settings": 4,
     "Operations": 5,
@@ -603,7 +603,7 @@
     "OperationId": 0,
     "ExpectedHead": 1,
     "Content": 2,
-    "<retired:3>": 3,
+    "\u003Cretired:3\u003E": 3,
     "Message": 4,
     "MergeFrom": 5
   },
@@ -685,7 +685,7 @@
     "Id": 0,
     "Parents": 1,
     "Content": 2,
-    "<retired:3>": 3,
+    "\u003Cretired:3\u003E": 3,
     "Author": 4,
     "Message": 5,
     "CommittedAt": 6
@@ -797,7 +797,7 @@
     "SelectedThread": 2,
     "Threads": 3,
     "Owner": 4,
-    "<retired:5>": 5
+    "\u003Cretired:5\u003E": 5
   },
   "DigitalBrain.Assistant.AssistantThread": {
     "Id": 0,
@@ -997,7 +997,7 @@
   },
   "DigitalBrain.Compute.Storage.ComputeRecordsState": {
     "Root": 0,
-    "<retired:1>": 1
+    "\u003Cretired:1\u003E": 1
   },
   "DigitalBrain.Compute.Storage.ComputeStoredRecord": {
     "Id": 0,
@@ -1722,7 +1722,7 @@
   },
   "DigitalBrain.Flutter.WebBrowser.Signals.BrowserConnected": {
     "Name": 0,
-    "<retired:1>": 1,
+    "\u003Cretired:1\u003E": 1,
     "SessionId": 2
   },
   "DigitalBrain.Flutter.WebBrowser.Signals.BrowserDisconnected": {
@@ -1770,7 +1770,7 @@
   "DigitalBrain.Flutter.Workspace.ShellHeadState": {
     "Revision": 0,
     "Root": 1,
-    "<retired:2>": 2,
+    "\u003Cretired:2\u003E": 2,
     "LastOperation": 3,
     "LastDigest": 4
   },
@@ -1845,8 +1845,8 @@
   "DigitalBrain.Google.Gmail.GmailState": {
     "Subject": 0,
     "Email": 1,
-    "<retired:2>": 2,
-    "<retired:3>": 3,
+    "\u003Cretired:2\u003E": 2,
+    "\u003Cretired:3\u003E": 3,
     "GrantedScopes": 4,
     "ExpiresAt": 5,
     "CanCompose": 6,
@@ -1907,7 +1907,7 @@
   "DigitalBrain.Memory.MemoryNamespace": {
     "Generation": 0,
     "Pages": 1,
-    "<retired:2>": 2,
+    "\u003Cretired:2\u003E": 2,
     "IndexPurgePending": 3,
     "RetiredPages": 4
   },
@@ -2292,14 +2292,34 @@
   "DigitalBrain.Platform.Contracts.Integrations.ReleasedRegistration": {
     "Values": 0
   },
+  "DigitalBrain.Platform.Identity.Authority.AccountState": {
+    "Account": 0,
+    "BrainOperations": 1
+  },
+  "DigitalBrain.Platform.Identity.Authority.BrainAuthorityState": {
+    "AccountId": 0,
+    "BrainId": 1,
+    "Members": 2,
+    "Grants": 3,
+    "Invitations": 4,
+    "Imported": 5,
+    "OwnerProvisioned": 6
+  },
+  "DigitalBrain.Platform.Identity.Authority.PrincipalState": {
+    "DefaultMembership": 0,
+    "PasswordHash": 1,
+    "RegistrationComplete": 2
+  },
   "DigitalBrain.Platform.Identity.Directory.IdentityDirectoryState": {
     "Accounts": 0,
     "Members": 1,
     "Invitations": 2,
-    "PasswordHashes": 3
+    "PasswordHashes": 3,
+    "MigrationComplete": 4
   },
   "DigitalBrain.Platform.Identity.Grants.GrantStoreState": {
-    "Grants": 0
+    "Grants": 0,
+    "Sealed": 1
   },
   "DigitalBrain.Platform.Integrations.Accounts.IntegrationAccountsState": {
     "Connections": 0
@@ -2319,14 +2339,14 @@
     "Label": 3,
     "IsSet": 4,
     "SealedValue": 5,
-    "<retired:6>": 6,
+    "\u003Cretired:6\u003E": 6,
     "SealedSecret": 7
   },
   "DigitalBrain.Platform.Secrets.SecretsState": {
     "Owner": 0,
     "WrappedOwnerKey": 1,
     "Fields": 2,
-    "<retired:3>": 3
+    "\u003Cretired:3\u003E": 3
   },
   "DigitalBrain.Postgres.PostgresColumn": {
     "Name": 0,

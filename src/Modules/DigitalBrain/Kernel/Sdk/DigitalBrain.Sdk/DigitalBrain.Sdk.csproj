@@ -5,12 +5,12 @@
     <RootNamespace>DigitalBrain.Sdk</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Kernel.Tests.Unit" />
+
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
     <ProjectReference Include="../../DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
   </ItemGroup>
   <ItemGroup><ProjectReference Include="../../DigitalBrain.Kernel.AspNetCore/DigitalBrain.Kernel.AspNetCore.csproj" /></ItemGroup>
   <ItemGroup><ProjectReference Include="../../Platform/DigitalBrain.Platform.Contracts/DigitalBrain.Platform.Contracts.csproj" /></ItemGroup>
-  <ItemGroup><EmbeddedResource Include="Types/TypeCatalog.v0.json" /></ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="DigitalBrain.Sdk.Tests.Unit" /></ItemGroup>
 </Project>

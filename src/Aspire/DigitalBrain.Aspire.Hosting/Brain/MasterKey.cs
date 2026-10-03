@@ -10,11 +10,17 @@ namespace DigitalBrain.Aspire.Hosting;
 // never receive it. The platform refuses to start without it.
 internal static class MasterKey
 {
-    public static DigitalBrainModuleProjection Provision(IDistributedApplicationBuilder builder)
+    public static DigitalBrainModuleProjection Provision(IDistributedApplicationBuilder builder, string brainName)
     {
+        var scopedName = $"{brainName}-{DigitalBrainHostingNames.MasterKeyParameter}";
+        if (builder.Configuration[$"Parameters:{DigitalBrainHostingNames.MasterKeyParameter}"] is not null
+            && builder.Configuration[$"Parameters:{scopedName}"] is null)
+        {
+            throw new InvalidOperationException($"Copy the existing master key to Parameters:{scopedName} before upgrading. Existing encrypted data must keep its original key.");
+        }
         var parameter = builder.ExecutionContext.IsRunMode
-            ? builder.AddParameter(DigitalBrainHostingNames.MasterKeyParameter, new GenerateParameterDefault { MinLength = 32 }, secret: true, persist: true)
-            : builder.AddParameter(DigitalBrainHostingNames.MasterKeyParameter, secret: true);
+            ? builder.AddParameter(scopedName, new GenerateParameterDefault { MinLength = 32 }, secret: true, persist: true)
+            : builder.AddParameter(scopedName, secret: true);
         return new Projection(parameter);
     }
 

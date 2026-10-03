@@ -3,7 +3,7 @@ using Orleans;
 namespace DigitalBrain.Kernel;
 
 [GrainType("brain-document")]
-public sealed class DocumentGrain([PersistentState("document", "Default")] IPersistentState<DocumentState> state) : Grain, IDocumentGrain
+internal sealed class DocumentGrain([PersistentState("document", "Default")] IPersistentState<DocumentState> state) : Grain, IDocumentGrain
 {
     public Task<(long Version, string? Payload)> ReadAsync()
         => Task.FromResult((state.State.Version, state.State.Written ? state.State.Payload : null));

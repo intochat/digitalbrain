@@ -60,7 +60,10 @@ public static class ModuleOptionsSerialization
     }
 
     internal static bool IsOptionsKey(string key)
-        => key.Split(':') is ["DigitalBrain", "Modules", var name, "Options", ..]
+        => key.Split(':') is [var root, var modules, var name, var options, ..]
+            && root.Equals("DigitalBrain", StringComparison.OrdinalIgnoreCase)
+            && modules.Equals("Modules", StringComparison.OrdinalIgnoreCase)
+            && options.Equals("Options", StringComparison.OrdinalIgnoreCase)
             && name.Length > 0 && !name.Contains("__", StringComparison.Ordinal) && !int.TryParse(name, out _);
 
     private static void Flatten(JsonNode? node, string prefix, Dictionary<string, string?> into)

@@ -32,6 +32,8 @@ public sealed record Grant
 // with an optional conversation for this-chat grants.
 public interface IGrantStore : IGrainWithStringKey
 {
+    Task SealAsync(CancellationToken cancellationToken = default);
+
     Task<Grant> GrantAsync(Grant grant, CancellationToken cancellationToken = default);
 
     Task RevokeAsync(string appId, string semanticTypeId, GrantMode mode, CancellationToken cancellationToken = default);

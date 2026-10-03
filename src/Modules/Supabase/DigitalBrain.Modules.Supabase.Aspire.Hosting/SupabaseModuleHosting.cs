@@ -17,8 +17,8 @@ public sealed class SupabaseModuleHosting : IDigitalBrainModuleHosting
             module.WithSupabase(o => { o.ParameterName = options.ConnectionName; o.ConnectionName = options.ConnectionName; });
             return;
         }
-        var server = brain.ApplicationBuilder.AddPostgres("supabase-postgres").WithParentRelationship(module.Resource);
-        var database = server.AddDatabase("supabase-database", options.ConnectionName);
+        var server = brain.ApplicationBuilder.AddPostgres(brain.ResourceName("supabase-postgres")).WithParentRelationship(module.Resource);
+        var database = server.AddDatabase(brain.ResourceName("supabase-database"), options.ConnectionName);
         brain.AddProjection(new PostgresProjection(database, options.ConnectionName));
     }
 

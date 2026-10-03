@@ -2,11 +2,20 @@ using System.Security.Cryptography;
 
 namespace DigitalBrain.Sdk;
 
-public abstract class BrowserLogins(BrowserLoginDefinition definition)
+public abstract class BrowserLogins(BrowserLoginDefinition definition, TimeProvider? clock = null)
 {
+    private readonly TimeProvider _clock = clock ?? TimeProvider.System;
     private readonly Dictionary<string, Pending> _pending = new(StringComparer.Ordinal);
 
-    public BrowserLoginDefinition Definition { get; } = definition ?? throw new ArgumentNullException(nameof(definition));
+    public BrowserLoginDefinition Definition { get; } = Validate(definition);
+
+    private static BrowserLoginDefinition Validate(BrowserLoginDefinition value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(value.Capacity);
+        if (value.Lifetime <= TimeSpan.Zero) { throw new ArgumentOutOfRangeException(nameof(value), "Login lifetime must be positive."); }
+        return value;
+    }
 
     // Null until the operator has supplied the provider's OAuth client; no login can start before.
     protected abstract Uri? PublicOrigin { get; }
@@ -25,7 +34,7 @@ public abstract class BrowserLogins(BrowserLoginDefinition definition)
 
         lock (_pending)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = _clock.GetUtcNow();
             foreach (var key in _pending.Where(p => p.Value.ExpiresAt <= now).Select(p => p.Key).ToArray())
             {
                 _pending.Remove(key);
@@ -48,7 +57,7 @@ public abstract class BrowserLogins(BrowserLoginDefinition definition)
         {
             scope = null;
             if (id is null || !_pending.TryGetValue(id, out var pending)
-                || pending.ExpiresAt <= DateTimeOffset.UtcNow || pending.Begun)
+                || pending.ExpiresAt <= _clock.GetUtcNow() || pending.Begun)
             {
                 return false;
             }
@@ -64,7 +73,7 @@ public abstract class BrowserLogins(BrowserLoginDefinition definition)
         lock (_pending)
         {
             if (id is null || !_pending.TryGetValue(id, out var pending)
-                || pending.ExpiresAt <= DateTimeOffset.UtcNow || !pending.Begun)
+                || pending.ExpiresAt <= _clock.GetUtcNow() || !pending.Begun)
             {
                 return false;
             }

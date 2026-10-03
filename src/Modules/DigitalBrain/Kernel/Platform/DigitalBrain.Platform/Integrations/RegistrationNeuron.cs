@@ -17,15 +17,17 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
 
     private readonly IReadOnlyList<IntegrationDefinition> _definitions;
     private readonly IGrainFactory _grains;
+    private readonly RegistrationCredentials _credentials;
     private IntegrationDefinition? _definition;
 
     public RegistrationNeuron(
         [PersistentState("registration", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<RegistrationState> store,
         IReadOnlyList<IntegrationDefinition> definitions,
-        IGrainFactory grains) : base(store)
+        IGrainFactory grains, RegistrationCredentials credentials) : base(store)
     {
         _definitions = definitions;
         _grains = grains;
+        _credentials = credentials;
     }
 
     private IntegrationDefinition Definition => _definition ??= Resolve();
@@ -67,11 +69,10 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
             throw new ArgumentException($"Every value must be non-empty and at most {MaxValueLength} characters.");
         }
 
-        var vault = _grains.GetGrain<ISecrets>(IntegrationVault.Owner);
         var next = CopyOf(Snapshot);
         foreach (var (field, value) in values)
         {
-            next.References[field] = await vault.Set(PlatformCaller(), IntegrationVault.SecretName(Definition.Id, field), $"{Definition.Id} {field}", value);
+            next.References[field] = await _credentials.Store(Definition, field, value);
             if (Definition.IsSetting(field))
             {
                 next.Settings[field] = value;
@@ -100,7 +101,7 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
         var next = CopyOf(Snapshot);
         next.References.Remove(field);
         next.Settings.Remove(field);
-        await _grains.GetGrain<ISecrets>(IntegrationVault.Owner).Remove(PlatformCaller(), IntegrationVault.SecretName(Definition.Id, field));
+        await _credentials.Remove(Definition, field);
         next.Revision++;
         var snapshot = SnapshotOf(next);
         await Save(next, new RegistrationChanged(Definition.Id, snapshot.Status));
@@ -177,13 +178,4 @@ internal sealed class RegistrationNeuron : Neuron<RegistrationState>, IIntegrati
         throw new InvalidOperationException("No composed module declares this integration.");
     }
 
-    private static CallerContext PlatformCaller() => new()
-    {
-        PrincipalId = IntegrationVault.CallerAppId,
-        AccountId = IntegrationVault.Owner,
-        BrainId = IntegrationVault.Owner,
-        Kind = CallerKind.Platform,
-        StampedBy = TrustedEdge.Platform,
-        AppId = IntegrationVault.CallerAppId,
-    };
 }

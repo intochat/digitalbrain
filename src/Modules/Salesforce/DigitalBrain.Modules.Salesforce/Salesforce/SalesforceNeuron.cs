@@ -33,7 +33,7 @@ internal sealed class SalesforceNeuron(
         }
 
         var expiresAt = SalesforceTokenRefresh.Expiry(account.ExpiresInSeconds, time);
-        if (!handoff.TryPeek(account.Nonce, out var tokens))
+        if (!handoff.TryTake(account.Nonce, out var tokens))
         {
             await RejectAsync(new TokenHandoffExpiredException().Message);
             throw new SalesforceUnavailableException(new TokenHandoffExpiredException().Message);
@@ -53,7 +53,6 @@ internal sealed class SalesforceNeuron(
             await state.WriteStateAsync();
             var connection = Connection();
             await PublishAsync(new SalesforceConnected(connection));
-            handoff.Consume(account.Nonce);
             return connection;
         }
         catch (SalesforceUnavailableException error)

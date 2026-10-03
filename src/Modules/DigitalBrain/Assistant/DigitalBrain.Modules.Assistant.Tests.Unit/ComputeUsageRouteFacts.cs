@@ -20,6 +20,8 @@ public sealed class ComputeUsageRouteFacts
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().WithModule<ComputeModule>().StartAsync(ct);
+        await brain.Get<DigitalBrain.Platform.Contracts.Identity.IIdentityDirectory>(DigitalBrain.Platform.Contracts.Identity.IdentityGrains.Directory)
+            .ShareBrainAsync("account", "own", "owner", "Owner", DigitalBrain.Platform.Contracts.Identity.MemberRole.Owner, ct);
         var store = brain.SiloServices.GetRequiredService<IUsageStore>();
         await store.AppendAsync("account", "foreign", "first", "{}", ct);
         await store.AppendAsync("account", "foreign", "second", "{}", ct);

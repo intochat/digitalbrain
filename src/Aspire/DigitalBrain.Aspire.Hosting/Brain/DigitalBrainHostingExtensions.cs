@@ -15,7 +15,7 @@ public static class DigitalBrainHostingExtensions
     {
         ArgumentNullException.ThrowIfNull(brain);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        return (brain.Storage ?? throw new InvalidOperationException("Blob containers require UseAzureStorage." )).AddBlobContainer(name);
+        return (brain.Storage ?? throw new InvalidOperationException("Blob containers require UseAzureStorage." )).AddBlobContainer(brain.ResourceName(name));
     }
 
     public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name, bool persistentStorage = true, string? dataVolume = null, string? serviceId = null, DigitalBrainHostingOptions? options = null)
@@ -44,19 +44,19 @@ public static class DigitalBrainHostingExtensions
         var resolvedServiceId = builder.Configuration["Orleans:ServiceId"]
             ?? (configuredClusterId is not null ? clusterId : stableServiceId);
         var orleans = builder
-            .AddOrleans(DigitalBrainHostingNames.Orleans)
+            .AddOrleans($"{name}-{DigitalBrainHostingNames.Orleans}")
             .WithClusterId(clusterId)
             .WithServiceId(resolvedServiceId);
         if (!options.UseAzureStorage)
         {
-            orleans.WithMemoryGrainStorage(DigitalBrainNames.DefaultGrainStorage).WithMemoryReminders();
+            orleans.WithDevelopmentClustering().WithMemoryGrainStorage(DigitalBrainNames.DefaultGrainStorage).WithMemoryReminders();
             var memory = new DigitalBrainBuilder(builder, name, resource, orleans, null, null) { Dashboard = options.Dashboard };
-            memory.AddProjection(MasterKey.Provision(builder));
+            memory.AddProjection(MasterKey.Provision(builder, name));
             if (AuthPosture.Provision(builder) is { } memoryPosture) { memory.AddProjection(memoryPosture); }
             return memory;
         }
         var storage = builder
-            .AddAzureStorage(DigitalBrainNames.Storage)
+            .AddAzureStorage($"{name}-{DigitalBrainNames.Storage}")
             .RunAsEmulator(emulator =>
             {
                 emulator.WithArgs("--silent");
@@ -65,13 +65,13 @@ public static class DigitalBrainHostingExtensions
                 else if (persist) { emulator.WithDataVolume(); }
             })
             .WithParentRelationship(resource);
-        var clustering = storage.AddTables(DigitalBrainNames.Clustering);
-        var reminders = storage.AddTables(DigitalBrainNames.Reminders);
-        var grainState = storage.AddBlobs(DigitalBrainNames.GrainState);
+        var clustering = storage.AddTables($"{name}-{DigitalBrainNames.Clustering}");
+        var reminders = storage.AddTables($"{name}-{DigitalBrainNames.Reminders}");
+        var grainState = storage.AddBlobs($"{name}-{DigitalBrainNames.GrainState}");
         orleans.WithClustering(clustering).WithReminders(reminders)
             .WithGrainStorage(DigitalBrainNames.DefaultGrainStorage, grainState);
         var brain = new DigitalBrainBuilder(builder, name, resource, orleans, storage, grainState) { Dashboard = options.Dashboard };
-        brain.AddProjection(MasterKey.Provision(builder));
+        brain.AddProjection(MasterKey.Provision(builder, name));
         if (AuthPosture.Provision(builder) is { } posture) { brain.AddProjection(posture); }
         storage.WithParentRelationship(brain.GetOrAddModuleNode(DigitalBrainHostingNames.Kernel));
         brain.RequireHealthyBeforeStart(storage.Resource);
@@ -87,6 +87,7 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(brain);
 
+        builder.WithAnnotation(new BrainSiloAnnotation(brain.Name));
         builder.WithReference(brain.Orleans);
         if (brain.GrainState is { } grainState) { builder.WithReference(grainState, DigitalBrainNames.GrainState); }
 

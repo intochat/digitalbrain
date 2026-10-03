@@ -150,7 +150,7 @@ public sealed class ScriptEdgeFacts
     {
         var contracts = new ScriptContracts([
             typeof(DigitalBrain.Contracts.Data.IRowSource).Assembly,
-            typeof(DigitalBrain.Platform.Contracts.Integrations.Accounts.IIntegrationAccounts).Assembly,
+            typeof(DigitalBrain.Platform.Contracts.Integrations.Accounts.IConnectionRegistry).Assembly,
         ]);
 
         Assert.Equal(typeof(DigitalBrain.Contracts.Data.IRowSource), contracts.Find(typeof(DigitalBrain.Contracts.Data.IRowSource).FullName!));
@@ -158,9 +158,9 @@ public sealed class ScriptEdgeFacts
             typeof(DigitalBrain.Contracts.Data.IStoredRows),
             contracts.Find(typeof(DigitalBrain.Contracts.Data.IStoredRows).FullName!));
         Assert.Equal(
-            typeof(DigitalBrain.Contracts.Integrations.IIntegrationAccounts),
-            contracts.Find(typeof(DigitalBrain.Contracts.Integrations.IIntegrationAccounts).FullName!));
-        Assert.Throws<ArgumentException>(() => contracts.Find(typeof(DigitalBrain.Platform.Contracts.Integrations.Accounts.IIntegrationAccounts).FullName!));
+            typeof(DigitalBrain.Contracts.Integrations.IConnectionRequests),
+            contracts.Find(typeof(DigitalBrain.Contracts.Integrations.IConnectionRequests).FullName!));
+        Assert.Throws<ArgumentException>(() => contracts.Find(typeof(DigitalBrain.Platform.Contracts.Integrations.Accounts.IConnectionRegistry).FullName!));
     }
 
     [Fact]

@@ -81,6 +81,19 @@ public sealed class PersistenceFacts
     }
 
     [Fact]
+    public async Task ReservedButUncommittedDocumentsRemainInvisibleAndCanBeRetried()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().StartAsync(ct);
+        var store = new GrainDocumentStore<CounterState>(brain.Grains(), "reservation-facts");
+        await Assert.ThrowsAsync<IOException>(() => store.UpdateAsync<int>("doc", _ => throw new IOException("Interrupted before commit"), ct));
+        Assert.Empty(await store.ListIdsAsync(ct));
+        await store.UpdateAsync("doc", state => state.Value = 42, ct);
+        Assert.Equal(["doc"], await store.ListIdsAsync(ct));
+        Assert.Equal(42, await store.ReadAsync("doc", state => state.Value, ct));
+    }
+
+    [Fact]
     public async Task DeactivationKeepsStateAndDoesNotReplaySignals()
     {
         var ct = TestContext.Current.CancellationToken;

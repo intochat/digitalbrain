@@ -32,7 +32,7 @@ public sealed class SalesforceFacts
         var published = await connected.NextAsync(ct: ct);
         Assert.True(published.Connection.Connected);
         Assert.Equal(connection.InstanceUrl, published.Connection.InstanceUrl);
-        Assert.False(fixture.Handoff.TryPeek(nonce, out _));
+        Assert.False(fixture.Handoff.TryTake(nonce, out _));
 
     }
 

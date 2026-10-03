@@ -24,7 +24,7 @@ internal static class AccountEndpoints
         group.MapGet("", async (IGrainFactory grains, IEnumerable<IExternalAccount> external, CancellationToken cancellationToken) =>
         {
             var scope = CurrentScope();
-            var rows = ScopedAccounts.Visible(scope, await grains.GetGrain<IIntegrationAccounts>(scope.Id).List(cancellationToken))
+            var rows = ScopedAccounts.Visible(scope, await grains.GetGrain<IConnectionRegistry>(scope.Id).List(cancellationToken))
                 .Select(Project).ToList();
             foreach (var account in external)
             {
@@ -35,7 +35,7 @@ internal static class AccountEndpoints
         });
 
         group.MapGet("/requests", async (IGrainFactory grains) =>
-            Results.Ok(await grains.GetGrain<DigitalBrain.Contracts.Integrations.IIntegrationAccounts>(CurrentScope().Id).ListPending()));
+            Results.Ok(await grains.GetGrain<DigitalBrain.Contracts.Integrations.IConnectionRequests>(CurrentScope().Id).ListPending()));
 
         group.MapPost("/connect", async (ConnectAccountInput input, IGrainFactory grains, CancellationToken cancellationToken) =>
         {
@@ -51,7 +51,7 @@ internal static class AccountEndpoints
                     Label = input.Label,
                     Value = input.Value,
                 };
-                return Results.Ok(Project(await grains.GetGrain<IIntegrationAccounts>(CurrentScope().Id).Connect(request, cancellationToken)));
+                return Results.Ok(Project(await grains.GetGrain<IConnectionRegistry>(CurrentScope().Id).Connect(request, cancellationToken)));
             }
             catch (ArgumentException error) { return Results.BadRequest(new { error = error.Message }); }
         });
@@ -85,7 +85,7 @@ internal static class AccountEndpoints
         return BrainScope.Create(caller.AccountId, caller.BrainId);
     }
 
-    private static IIntegrationAccounts Registry(IGrainFactory grains) => grains.GetGrain<IIntegrationAccounts>(CurrentScope().Id);
+    private static IConnectionRegistry Registry(IGrainFactory grains) => grains.GetGrain<IConnectionRegistry>(CurrentScope().Id);
 
     private static AccountRow Project(IntegrationAccount account)
         => new(account.Id, account.IntegrationId, Status(account.Status), account.LastProbedAt);

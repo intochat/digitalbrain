@@ -58,13 +58,13 @@ public static class GmailHostingExtensions
                 return;
             }
 
-            _clientId ??= brain.ApplicationBuilder.AddParameter("gmail-client-id")
+            _clientId ??= brain.ApplicationBuilder.AddParameter(brain.ResourceName("gmail-client-id"))
                 .WithDescription(
                     "OAuth client ID for a Google web client configured for the [Gmail MCP server](https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server). "
                     + "Register http://localhost:5080/integrations/gmail/callback. Only the kernel receives this value.",
                     enableMarkdown: true)
                 .WithParentRelationship(module);
-            _clientSecret ??= brain.ApplicationBuilder.AddParameter("gmail-client-secret", secret: true)
+            _clientSecret ??= brain.ApplicationBuilder.AddParameter(brain.ResourceName("gmail-client-secret"), secret: true)
                 .WithDescription(
                     "OAuth client secret for the same Google web client configured for the [Gmail MCP server](https://developers.google.com/workspace/gmail/api/guides/configure-mcp-server). "
                     + "Only the kernel receives this secret; Gmail sign-in happens in your browser when the assistant needs access.",

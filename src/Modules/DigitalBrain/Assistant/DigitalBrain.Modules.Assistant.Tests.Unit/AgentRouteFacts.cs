@@ -84,7 +84,7 @@ public sealed class AgentRouteFacts
 
     private sealed class AliceOwnsHerBrain : IBrainAccess
     {
-        public ValueTask<bool> CanAccessAsync(string principalId, string brainId, CancellationToken cancellationToken = default)
+        public ValueTask<bool> CanAccessAsync(string principalId, string accountId, string brainId, CancellationToken cancellationToken = default)
             => ValueTask.FromResult(principalId == "alice");
     }
 }

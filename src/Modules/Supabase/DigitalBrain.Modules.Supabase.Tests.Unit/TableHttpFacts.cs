@@ -67,7 +67,7 @@ public sealed class TableHttpFacts
 
     private sealed class FixedMembership(bool isMember) : IBrainAccess
     {
-        public ValueTask<bool> CanAccessAsync(string principalId, string brainId, CancellationToken cancellationToken = default)
+        public ValueTask<bool> CanAccessAsync(string principalId, string accountId, string brainId, CancellationToken cancellationToken = default)
             => ValueTask.FromResult(isMember);
     }
 

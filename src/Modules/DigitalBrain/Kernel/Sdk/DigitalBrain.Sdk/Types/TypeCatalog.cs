@@ -7,7 +7,9 @@ namespace DigitalBrain.Sdk.Types;
 
 public static class TypeCatalog
 {
-    private static readonly SemanticType[] Catalog = BuildCatalog();
+    private sealed record Definition(SemanticType Type, string[] Allowed, Func<object?, object> Validate);
+    private static readonly IReadOnlyDictionary<FieldKind, Definition> Definitions = BuildDefinitions().ToDictionary(d => d.Type.Kind);
+    private static readonly SemanticType[] Catalog = Definitions.Values.Select(d => d.Type).ToArray();
 
     private static readonly IReadOnlyDictionary<FieldKind, SemanticType> ByKind =
         Catalog.ToDictionary(type => type.Kind);
@@ -22,37 +24,11 @@ public static class TypeCatalog
             ? type
             : throw new ArgumentOutOfRangeException(nameof(kind), kind, "No semantic type is registered for this field kind.");
 
-    public static IReadOnlyList<string> AllowedFor(FieldKind kind) => kind switch
-    {
-        FieldKind.PlainText => ["text"],
-        FieldKind.LongText => ["long text"],
-        FieldKind.Number => ["a finite number"],
-        FieldKind.Date => ["an ISO 8601 date (yyyy-MM-dd)"],
-        FieldKind.DateTime => ["an ISO 8601 date-time"],
-        FieldKind.Boolean => ["true", "false"],
-        FieldKind.Choice => ["one of the declared choices"],
-        FieldKind.MultiChoice => ["one or more of the declared choices"],
-        FieldKind.Email => ["an email address"],
-        FieldKind.Url => ["an absolute http(s) URL"],
-        FieldKind.Secret => ["a SecretRef handle; raw secret values are never accepted"],
-        FieldKind.Reference => ["an entity reference or id"],
-        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "No semantic type is registered for this field kind."),
-    };
+    public static IReadOnlyList<string> AllowedFor(FieldKind kind) => DefinitionFor(kind).Allowed;
+    public static object Validate(object? value, FieldKind kind) => DefinitionFor(kind).Validate(value);
 
-    public static object Validate(object? value, FieldKind kind) => kind switch
-    {
-        FieldKind.PlainText or FieldKind.LongText or FieldKind.Choice => ValidateText(kind, value),
-        FieldKind.Number => ValidateNumber(value),
-        FieldKind.Date => ValidateDate(value),
-        FieldKind.DateTime => ValidateDateTime(value),
-        FieldKind.Boolean => ValidateBoolean(value),
-        FieldKind.MultiChoice => ValidateMultiChoice(value),
-        FieldKind.Email => ValidateEmail(value),
-        FieldKind.Url => ValidateUrl(value),
-        FieldKind.Secret => ValidateSecret(value),
-        FieldKind.Reference => ValidateReference(value),
-        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "No semantic type is registered for this field kind."),
-    };
+    private static Definition DefinitionFor(FieldKind kind) => Definitions.TryGetValue(kind, out var definition)
+        ? definition : throw new ArgumentOutOfRangeException(nameof(kind), kind, "No semantic type is registered for this field kind.");
 
     public static JsonObject ToJson()
     {
@@ -81,20 +57,20 @@ public static class TypeCatalog
         };
     }
 
-    private static SemanticType[] BuildCatalog() =>
+    private static Definition[] BuildDefinitions() =>
     [
-        new(FieldKind.PlainText, "plain-text", PrimitiveKind.String, SensitivityClass.Public, LlmExposure.Value, InputWidgetKind.TextBox, DisplayWidgetKind.Text, RedactorKind.Erase, true),
-        new(FieldKind.LongText, "long-text", PrimitiveKind.String, SensitivityClass.Public, LlmExposure.Value, InputWidgetKind.MultilineTextBox, DisplayWidgetKind.LongText, RedactorKind.Erase, true),
-        new(FieldKind.Number, "number", PrimitiveKind.Number, SensitivityClass.Public, LlmExposure.Value, InputWidgetKind.NumberBox, DisplayWidgetKind.Number, RedactorKind.Erase, true),
-        new(FieldKind.Date, "date", PrimitiveKind.Date, SensitivityClass.Public, LlmExposure.Value, InputWidgetKind.DatePicker, DisplayWidgetKind.Date, RedactorKind.Erase, true),
-        new(FieldKind.DateTime, "date-time", PrimitiveKind.DateTime, SensitivityClass.Public, LlmExposure.Value, InputWidgetKind.DateTimePicker, DisplayWidgetKind.DateTime, RedactorKind.Erase, true),
-        new(FieldKind.Boolean, "boolean", PrimitiveKind.Boolean, SensitivityClass.Public, LlmExposure.Value, InputWidgetKind.Checkbox, DisplayWidgetKind.Boolean, RedactorKind.Erase, true),
-        new(FieldKind.Choice, "choice", PrimitiveKind.String, SensitivityClass.Public, LlmExposure.Value, InputWidgetKind.Select, DisplayWidgetKind.Choice, RedactorKind.Erase, true),
-        new(FieldKind.MultiChoice, "multi-choice", PrimitiveKind.Array, SensitivityClass.Public, LlmExposure.Value, InputWidgetKind.MultiSelect, DisplayWidgetKind.MultiChoice, RedactorKind.Erase, true),
-        new(FieldKind.Email, "email", PrimitiveKind.String, SensitivityClass.Personal, LlmExposure.Value, InputWidgetKind.EmailBox, DisplayWidgetKind.Email, RedactorKind.Mask, false),
-        new(FieldKind.Url, "url", PrimitiveKind.String, SensitivityClass.Public, LlmExposure.Value, InputWidgetKind.UrlBox, DisplayWidgetKind.Link, RedactorKind.Erase, true),
-        new(FieldKind.Secret, "secret", PrimitiveKind.Reference, SensitivityClass.Credential, LlmExposure.ReferenceOnly, InputWidgetKind.OutOfBand, DisplayWidgetKind.Masked, RedactorKind.Mask, false),
-        new(FieldKind.Reference, "reference", PrimitiveKind.Reference, SensitivityClass.Public, LlmExposure.ReferenceOnly, InputWidgetKind.ReferencePicker, DisplayWidgetKind.Reference, RedactorKind.Erase, false),
+        new(new(FieldKind.PlainText, "plain-text", PrimitiveKind.String, SensitivityClass.Public, LlmExposure.Value, InputWidgetKind.TextBox, DisplayWidgetKind.Text, RedactorKind.Erase, true), ["text"], v => ValidateText(FieldKind.PlainText, v)),
+        new(new(FieldKind.LongText, "long-text", PrimitiveKind.String, SensitivityClass.Public, LlmExposure.Value, InputWidgetKind.MultilineTextBox, DisplayWidgetKind.LongText, RedactorKind.Erase, true), ["long text"], v => ValidateText(FieldKind.LongText, v)),
+        new(new(FieldKind.Number, "number", PrimitiveKind.Number, SensitivityClass.Public, LlmExposure.Value, InputWidgetKind.NumberBox, DisplayWidgetKind.Number, RedactorKind.Erase, true), ["a finite number"], v => ValidateNumber(v)),
+        new(new(FieldKind.Date, "date", PrimitiveKind.Date, SensitivityClass.Public, LlmExposure.Value, InputWidgetKind.DatePicker, DisplayWidgetKind.Date, RedactorKind.Erase, true), ["an ISO 8601 date (yyyy-MM-dd)"], v => ValidateDate(v)),
+        new(new(FieldKind.DateTime, "date-time", PrimitiveKind.DateTime, SensitivityClass.Public, LlmExposure.Value, InputWidgetKind.DateTimePicker, DisplayWidgetKind.DateTime, RedactorKind.Erase, true), ["an ISO 8601 date-time with an explicit UTC offset"], v => ValidateDateTime(v)),
+        new(new(FieldKind.Boolean, "boolean", PrimitiveKind.Boolean, SensitivityClass.Public, LlmExposure.Value, InputWidgetKind.Checkbox, DisplayWidgetKind.Boolean, RedactorKind.Erase, true), ["true", "false"], v => ValidateBoolean(v)),
+        new(new(FieldKind.Choice, "choice", PrimitiveKind.String, SensitivityClass.Public, LlmExposure.Value, InputWidgetKind.Select, DisplayWidgetKind.Choice, RedactorKind.Erase, true), ["one of the declared choices"], v => ValidateText(FieldKind.Choice, v)),
+        new(new(FieldKind.MultiChoice, "multi-choice", PrimitiveKind.Array, SensitivityClass.Public, LlmExposure.Value, InputWidgetKind.MultiSelect, DisplayWidgetKind.MultiChoice, RedactorKind.Erase, true), ["one or more of the declared choices"], ValidateMultiChoice),
+        new(new(FieldKind.Email, "email", PrimitiveKind.String, SensitivityClass.Personal, LlmExposure.Value, InputWidgetKind.EmailBox, DisplayWidgetKind.Email, RedactorKind.Mask, false), ["an email address"], ValidateEmail),
+        new(new(FieldKind.Url, "url", PrimitiveKind.String, SensitivityClass.Public, LlmExposure.Value, InputWidgetKind.UrlBox, DisplayWidgetKind.Link, RedactorKind.Erase, true), ["an absolute http(s) URL"], ValidateUrl),
+        new(new(FieldKind.Secret, "secret", PrimitiveKind.Reference, SensitivityClass.Credential, LlmExposure.ReferenceOnly, InputWidgetKind.OutOfBand, DisplayWidgetKind.Masked, RedactorKind.Mask, false), ["a SecretRef handle; raw secret values are never accepted"], ValidateSecret),
+        new(new(FieldKind.Reference, "reference", PrimitiveKind.Reference, SensitivityClass.Public, LlmExposure.ReferenceOnly, InputWidgetKind.ReferencePicker, DisplayWidgetKind.Reference, RedactorKind.Erase, false), ["an entity reference or id"], v => ValidateReference(v)),
     ];
 
     private static string ValidateText(FieldKind kind, object? value) =>
@@ -118,13 +94,17 @@ public static class TypeCatalog
         _ => throw new TypeValidationException(FieldKind.Date, value, AllowedFor(FieldKind.Date)),
     };
 
-    private static DateTime ValidateDateTime(object? value) => value switch
+    private static DateTimeOffset ValidateDateTime(object? value) => value switch
     {
-        DateTime dateTime => dateTime,
-        DateTimeOffset offset => offset.DateTime,
-        string text when DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed) => parsed,
+        DateTime dateTime when dateTime.Kind == DateTimeKind.Utc => new DateTimeOffset(dateTime),
+        DateTimeOffset offset => offset,
+        string text when HasOffset(text) && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed) => parsed,
         _ => throw new TypeValidationException(FieldKind.DateTime, value, AllowedFor(FieldKind.DateTime)),
     };
+
+    // Local/unspecified values depend on the machine timezone and are rejected.
+    private static bool HasOffset(string text) => text.EndsWith('Z')
+        || (text.Length >= 6 && text[^3] == ':' && (text[^6] == '+' || text[^6] == '-'));
 
     private static bool ValidateBoolean(object? value) => value switch
     {

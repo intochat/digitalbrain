@@ -52,7 +52,7 @@ public static class ClickHouseHostingExtensions
             }
 
             var builder = brain.ApplicationBuilder;
-            _server = builder.AddClickHouse(ClickHouseNames.Server)
+            _server = builder.AddClickHouse(brain.ResourceName(ClickHouseNames.Server))
                 .WithParentRelationship(brain.Resource)
                 .WithUrlForEndpoint("http", static endpoint => new ResourceUrlAnnotation
                 {
@@ -61,7 +61,7 @@ public static class ClickHouseHostingExtensions
                     Endpoint = endpoint,
                 });
             if (options.PersistentStorage) { _server.WithDataVolume().WithLifetime(ContainerLifetime.Persistent); }
-            _database = _server.AddDatabase(ClickHouseNames.DatabaseResource, ClickHouseNames.DatabaseName);
+            _database = _server.AddDatabase(brain.ResourceName(ClickHouseNames.DatabaseResource), ClickHouseNames.DatabaseName);
 
             if (options.Seeds.Count > 0)
             {

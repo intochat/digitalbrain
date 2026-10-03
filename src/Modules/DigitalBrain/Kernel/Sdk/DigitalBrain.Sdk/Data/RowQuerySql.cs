@@ -16,7 +16,7 @@ public static class RowQuerySql
         ArgumentNullException.ThrowIfNull(schema);
         ArgumentNullException.ThrowIfNull(query);
         query = query.Degrade(new SourceCapabilities());
-        query.Check();
+        query.Check(schema);
 
         var grouped = query.GroupBy.Length > 0 || query.Aggregates.Length > 0;
         var select = new List<string>();

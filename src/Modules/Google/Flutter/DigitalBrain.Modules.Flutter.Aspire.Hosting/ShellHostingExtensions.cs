@@ -86,7 +86,7 @@ public static class ShellHostingExtensions
             }
 
             var resourceName = string.IsNullOrWhiteSpace(options.ResourceName)
-                ? ShellNames.DefaultFlutterResourceName
+                ? brain.ResourceName(ShellNames.DefaultFlutterResourceName)
                 : options.ResourceName;
             var shell = string.IsNullOrWhiteSpace(options.ShellName)
                 ? ShellNames.DefaultShellName

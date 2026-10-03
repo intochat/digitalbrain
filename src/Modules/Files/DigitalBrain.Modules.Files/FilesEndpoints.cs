@@ -81,7 +81,7 @@ internal static class FilesEndpoints
         catch (KeyNotFoundException) { return Results.NotFound(new { error = "The requested image or operation was not found." }); }
         catch (ArgumentException error) { return Results.BadRequest(new { error = error.Message }); }
         catch (InvalidOperationException error) { return Results.Conflict(new { error = error.Message }); }
-        catch (IOException error) { return Results.Json(new { error = error.Message.Contains("changed since", StringComparison.Ordinal) ? error.Message : "The file could not be accessed. Check its permissions and retry." }, statusCode: 503); }
+        catch (IOException) { return Results.Json(new { error = "The file could not be accessed. Check its permissions and retry." }, statusCode: 503); }
     }
 
     internal sealed record OpenImage(string EntryId);

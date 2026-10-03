@@ -56,11 +56,11 @@ public static class GitHubAppHostingExtensions
 
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
-            _privateKey ??= brain.ApplicationBuilder.AddParameter("github-app-private-key", secret: true)
+            _privateKey ??= brain.ApplicationBuilder.AddParameter(brain.ResourceName("github-app-private-key"), secret: true)
                 .WithDescription("PEM private key for the GitHub App; projected only to the kernel.");
-            _webhookSecret ??= brain.ApplicationBuilder.AddParameter("github-app-webhook-secret", secret: true)
+            _webhookSecret ??= brain.ApplicationBuilder.AddParameter(brain.ResourceName("github-app-webhook-secret"), secret: true)
                 .WithDescription("GitHub App HMAC webhook secret, at least 16 characters.");
-            _clientSecret ??= brain.ApplicationBuilder.AddParameter("github-app-client-secret", secret: true)
+            _clientSecret ??= brain.ApplicationBuilder.AddParameter(brain.ResourceName("github-app-client-secret"), secret: true)
                 .WithDescription("GitHub App OAuth client secret; user tokens are only used during authorization.");
             const string root = "DigitalBrain:Microsoft:GitHub:App";
             const string IntegrationRoot = "DigitalBrain:Integrations:github";

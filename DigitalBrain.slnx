@@ -163,11 +163,26 @@
     <File Path="Directory.Packages.props" />
   </Folder>
   <Folder Name="/src/" />
+  <Folder Name="/src/Aspire/">
+    <Project Path="src/Aspire/DigitalBrain.Aspire.Hosting.Tests.Unit/DigitalBrain.Aspire.Hosting.Tests.Unit.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/" />
   <Folder Name="/src/Modules/DigitalBrain/" />
-  <Folder Name="/src/Modules/DigitalBrain/Kernel/" />
+  <Folder Name="/src/Modules/DigitalBrain/Kernel/">
+    <Project Path="src/Modules/DigitalBrain/Kernel/DigitalBrain.Client.Orleans.Tests.Unit/DigitalBrain.Client.Orleans.Tests.Unit.csproj" />
+    <Project Path="src/Modules/DigitalBrain/Kernel/DigitalBrain.Client.Tests.Unit/DigitalBrain.Client.Tests.Unit.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/DigitalBrain/Kernel/Platform/">
+    <Project Path="src/Modules/DigitalBrain/Kernel/Platform/DigitalBrain.Platform.Tests.Unit/DigitalBrain.Platform.Tests.Unit.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/DigitalBrain/Kernel/Sdk/">
+    <Project Path="src/Modules/DigitalBrain/Kernel/Sdk/DigitalBrain.Sdk.Tests.Unit/DigitalBrain.Sdk.Tests.Unit.csproj" />
+  </Folder>
   <Folder Name="/src/Modules/Qdrant/">
     <Project Path="src/Modules/Qdrant/DigitalBrain.Modules.Qdrant.Contracts/DigitalBrain.Modules.Qdrant.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/src/Testing/">
+    <Project Path="src/Testing/DigitalBrain.Testing.Unit.Tests.Unit/DigitalBrain.Testing.Unit.Tests.Unit.csproj" />
   </Folder>
   <Folder Name="/Testing/">
     <Project Path="src/Testing/DigitalBrain.Architecture.Tests/DigitalBrain.Architecture.Tests.csproj" />

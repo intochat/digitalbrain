@@ -3,8 +3,8 @@ using DigitalBrain.Sdk;
 
 namespace DigitalBrain.Google.Gmail;
 
-internal sealed class GmailLogins(GmailRegistration registration)
-    : BrowserLogins(LoginDefinition)
+internal sealed class GmailLogins(GmailRegistration registration, TimeProvider clock)
+    : BrowserLogins(LoginDefinition, clock)
 {
     internal const string ComposeScope = "compose";
 

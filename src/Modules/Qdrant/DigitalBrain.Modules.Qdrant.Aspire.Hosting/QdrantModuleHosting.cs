@@ -14,7 +14,7 @@ public sealed class QdrantModuleHosting : IDigitalBrainModuleHosting
         var options = brain.GetModuleConfiguration("qdrant").GetModuleOptions<QdrantModuleOptions>("qdrant");
         if (!options.Host) { return; }
         var module = new DigitalBrainModuleBuilder<DigitalBrain.Qdrant.Aspire.Hosting.QdrantModuleHosting>(brain);
-        var qdrant = brain.ApplicationBuilder.AddQdrant("qdrant" + "-server")
+        var qdrant = brain.ApplicationBuilder.AddQdrant(brain.ResourceName("qdrant-server"))
             .WithParentRelationship(module.Resource)
             .WithDataVolume()
             .WithLifetime(ContainerLifetime.Persistent);

@@ -25,11 +25,16 @@ public static class PlatformHosting
         if (services.Any(service => service.ServiceType == typeof(PlatformRegistration))) { return; }
         services.AddSingleton<PlatformRegistration>();
         services.AddIdentity();
+        services.AddOptions<IdentityMigrationOptions>().BindConfiguration(IdentityMigrationOptions.SectionName);
+        silo.AddStartupTask<IdentityMigrationStartup>();
         services.TryAddSingleton<DigitalBrain.Platform.Contracts.Auth.ITokenHandoff, Auth.TokenHandoff>();
+        services.TryAddSingleton<DigitalBrain.Platform.Contracts.Auth.IOAuthCredentials, Auth.OAuthCredentials>();
         services.AddMasterKeyWrapper();
         services.TryAddSingleton<IReadOnlyList<IntegrationDefinition>>(provider =>
             IntegrationDiscovery.Collect(provider.GetRequiredService<ModuleInventory>().Types));
         services.TryAddSingleton<IAccountProbe, CredentialPresenceProbe>();
+        services.TryAddSingleton<ConnectionCredentialProbe>();
+        services.TryAddSingleton<RegistrationCredentials>();
         services.TryAddSingleton<ICapabilities, Capabilities>();
         silo.AddStartupTask<RegistrationSeeder>();
         services.AddCapacity();

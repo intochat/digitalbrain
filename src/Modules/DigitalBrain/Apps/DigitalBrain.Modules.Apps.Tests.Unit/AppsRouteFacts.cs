@@ -166,7 +166,7 @@ public sealed class AppsRouteFacts
 
     private sealed class PersonalBrainAccess : IBrainAccess
     {
-        public ValueTask<bool> CanAccessAsync(string principalId, string brainId, CancellationToken cancellationToken = default)
+        public ValueTask<bool> CanAccessAsync(string principalId, string accountId, string brainId, CancellationToken cancellationToken = default)
             => ValueTask.FromResult(principalId == brainId);
     }
 

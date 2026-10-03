@@ -1,5 +1,8 @@
+using DigitalBrain.Platform.Identity.Authority;
 using DigitalBrain.Kernel.AspNetCore;
 using System.Security.Claims;
+using Microsoft.Extensions.Options;
+using DigitalBrain.Platform.Identity.Configuration;
 using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Kernel.Enforcement;
@@ -33,13 +36,20 @@ internal static class IdentityEndpoints
         routes.MapPost("/identity/brains", CreateBrainAsync);
         var grants = BrainRoutes.Group(routes, "/grants");
         grants.MapGet("", async (string brainId, IDigitalBrain brain, CancellationToken ct) =>
-            Results.Ok(await Grants(brain, brainId).ListAsync(ct)));
+            Results.Ok(await Grants(brain, brainId).ListGrants().WaitAsync(ct)));
         grants.MapPost("", async (string brainId, Grant input, IDigitalBrain brain, CancellationToken ct) =>
-            Results.Ok(await Grants(brain, brainId).GrantAsync(input, ct)));
+        {
+            try { return Results.Ok(await Grants(brain, brainId).GrantAsOwner(CallerContextStamper.Require() with { BrainId = brainId }, input).WaitAsync(ct)); }
+            catch (UnauthorizedAccessException) { return Results.StatusCode(StatusCodes.Status403Forbidden); }
+        });
         grants.MapPost("/revoke", async (string brainId, RevokeGrant input, IDigitalBrain brain, CancellationToken ct) =>
         {
-            await Grants(brain, brainId).RevokeAsync(input.AppId, input.SemanticTypeId, input.Mode, ct);
-            return Results.NoContent();
+            try
+            {
+                await Grants(brain, brainId).RevokeAsOwner(CallerContextStamper.Require() with { BrainId = brainId }, input.AppId, input.SemanticTypeId, input.Mode).WaitAsync(ct);
+                return Results.NoContent();
+            }
+            catch (UnauthorizedAccessException) { return Results.StatusCode(StatusCodes.Status403Forbidden); }
         });
     }
 
@@ -51,32 +61,30 @@ internal static class IdentityEndpoints
         {
             return Results.Unauthorized();
         }
-        var directory = Directory(brain);
-        var owner = await directory.FindMemberAsync(principal, ct);
-        if (owner is null || owner.AccountId != account || owner.Role != MemberRole.Owner)
-        {
-            return Results.StatusCode(StatusCodes.Status403Forbidden);
-        }
-        var brainId = "workspace-" + Guid.NewGuid().ToString("N");
-        var created = await directory.ShareBrainAsync(account, brainId, principal, owner.DisplayName, MemberRole.Owner, ct);
-        await brain.Get<IBrain>(BrainScope.Create(account, brainId).Id).Establish(new(brainId, account));
+        var owner = await brain.Get<IAccount>(account).Read().WaitAsync(ct);
+        if (owner?.OwnerPrincipalId != principal) { return Results.StatusCode(StatusCodes.Status403Forbidden); }
+        var operationId = http.Request.Headers["Idempotency-Key"].FirstOrDefault() ?? Guid.NewGuid().ToString("N");
+        if (operationId.Length > 200) { return Results.BadRequest(new { error = "Idempotency-Key is too long." }); }
+        var created = await brain.Get<IAccount>(account).CreateBrain(principal, operationId, owner.Name).WaitAsync(ct);
         return Results.Ok(created);
     }
 
     private static async Task<IResult> LoginAsync(LoginRequest input, HttpContext http, IDigitalBrain brain, CancellationToken ct)
     {
-        var member = await Directory(brain).AuthenticateAsync(input.PrincipalId, input.Password ?? "", ct);
+        if (string.IsNullOrWhiteSpace(input.PrincipalId)) { return Results.Unauthorized(); }
+        var member = await brain.Get<IPrincipal>(input.PrincipalId).Authenticate(input.Password ?? "").WaitAsync(ct);
         return member is null ? Results.Unauthorized() : await SignInAsync(member, http);
     }
 
     private static async Task<IResult> RegisterAsync(RegisterRequest input, HttpContext http, IDigitalBrain brain,
         Microsoft.Extensions.Options.IOptions<Configuration.AuthOptions> auth, CancellationToken ct)
     {
+        if (string.IsNullOrWhiteSpace(input.PrincipalId)) { return Results.BadRequest(new { error = "Username is required." }); }
         if (!string.IsNullOrEmpty(auth.Value.Username) && string.Equals(input.PrincipalId, auth.Value.Username, StringComparison.OrdinalIgnoreCase))
         { return Results.Conflict(new { error = "This username is reserved." }); }
         try
         {
-            var member = await Directory(brain).RegisterAsync(input.PrincipalId, input.Password ?? "", input.DisplayName ?? input.PrincipalId, ct);
+            var member = await brain.Get<IPrincipal>(input.PrincipalId).Register(input.Password ?? "", input.DisplayName ?? input.PrincipalId).WaitAsync(ct);
             return await SignInAsync(member, http);
         }
         catch (ArgumentException error) { return Results.BadRequest(new { error = error.Message }); }
@@ -111,9 +119,8 @@ internal static class IdentityEndpoints
         return Results.NoContent();
     }
 
-    private static IIdentityDirectory Directory(IDigitalBrain brain) => brain.Get<IIdentityDirectory>(IdentityGrains.Directory);
-
-    private static IGrantStore Grants(IDigitalBrain brain, string brainId) => brain.Get<IGrantStore>(IdentityGrains.Grants(brainId));
+    private static IBrainAuthority Grants(IDigitalBrain brain, string brainId)
+        => brain.Get<IBrainAuthority>(BrainScope.Create(CallerContextStamper.Require().AccountId, brainId).Id);
 
     internal sealed record LoginRequest(string PrincipalId, string? Password = null);
     internal sealed record RegisterRequest(string PrincipalId, string? Password = null, string? DisplayName = null);

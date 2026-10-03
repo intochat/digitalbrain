@@ -4,5 +4,5 @@ namespace DigitalBrain.Kernel.Enforcement;
 // reach a brain. Identity registers the directory-backed implementation.
 public interface IBrainAccess
 {
-    ValueTask<bool> CanAccessAsync(string principalId, string brainId, CancellationToken cancellationToken = default);
+    ValueTask<bool> CanAccessAsync(string principalId, string accountId, string brainId, CancellationToken cancellationToken = default);
 }

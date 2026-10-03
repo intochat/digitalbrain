@@ -10,4 +10,5 @@
 <PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" />
   </ItemGroup>
   <ItemGroup><ProjectReference Include="../DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" /></ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="DigitalBrain.Client.Tests.Unit" /></ItemGroup>
 </Project>

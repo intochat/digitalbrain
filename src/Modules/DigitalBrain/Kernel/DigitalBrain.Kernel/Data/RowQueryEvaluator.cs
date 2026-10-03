@@ -11,7 +11,7 @@ internal static class RowQueryEvaluator
         ArgumentNullException.ThrowIfNull(rows);
         ArgumentNullException.ThrowIfNull(query);
         query = query.Degrade(new SourceCapabilities());
-        query.Check();
+        query.Check(schema);
 
         var filtered = rows.Where(row => query.Filters.All(filter => Match(schema, row, filter))).ToArray();
         var grouped = query.GroupBy.Length > 0 || query.Aggregates.Length > 0;
@@ -31,8 +31,10 @@ internal static class RowQueryEvaluator
                 throw new ArgumentException("A grouped query needs a column.");
             }
 
-            var groups = filtered.GroupBy(row => string.Join('\u001f', query.GroupBy.Select(name => Cell(schema, row, name)))).ToArray();
-            columns = [.. query.GroupBy.Select(name => Column(schema, name)), .. query.Aggregates.Select(aggregate => new RowColumn(Name(aggregate), "number"))];
+            Row[][] groups = query.GroupBy.Length == 0
+                ? [filtered]
+                : filtered.GroupBy(row => System.Text.Json.JsonSerializer.Serialize(query.GroupBy.Select(name => Cell(schema, row, name)))).Select(group => group.ToArray()).ToArray();
+            columns = [.. query.GroupBy.Select(name => Column(schema, name)), .. query.Aggregates.Select(aggregate => new RowColumn(Name(aggregate), aggregate.Function.Trim().ToLowerInvariant() is "min" or "max" ? Column(schema, aggregate.Column!).Type : "number"))];
             projected = groups.Select(group =>
             {
                 var values = query.GroupBy.Select(name => Cell(schema, group.First(), name)).ToList();
@@ -56,7 +58,7 @@ internal static class RowQueryEvaluator
         var cell = Cell(schema, row, filter.Column);
         var op = filter.Operator.Trim().ToLowerInvariant();
         if (op == "contains") { return cell.Contains(filter.Value, StringComparison.Ordinal); }
-        var compared = Compare(cell, filter.Value);
+        var compared = Compare(cell, filter.Value, Column(schema, filter.Column).Type);
         return op switch
         {
             "eq" => compared == 0,
@@ -69,9 +71,9 @@ internal static class RowQueryEvaluator
         };
     }
 
-    private static int Compare(string left, string right)
+    private static int Compare(string left, string right, string type)
     {
-        if (double.TryParse(left, NumberStyles.Float, CultureInfo.InvariantCulture, out var leftNumber)
+        if (type == "number" && double.TryParse(left, NumberStyles.Float, CultureInfo.InvariantCulture, out var leftNumber)
             && double.TryParse(right, NumberStyles.Float, CultureInfo.InvariantCulture, out var rightNumber)
             && double.IsFinite(leftNumber) && double.IsFinite(rightNumber))
         {
@@ -92,29 +94,27 @@ internal static class RowQueryEvaluator
         var values = rows.Select(row => Cell(schema, row, aggregate.Column ?? "")).ToArray();
         if (function == "count")
         {
-            return values.Count(value => value.Length > 0).ToString(CultureInfo.InvariantCulture);
+            return values.Length.ToString(CultureInfo.InvariantCulture);
         }
 
         var numbers = new List<double>();
-        var nonEmpty = 0;
         foreach (var value in values)
         {
             if (value.Length == 0) { continue; }
-            nonEmpty++;
             if (double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) && double.IsFinite(number))
             {
                 numbers.Add(number);
             }
         }
 
-        if (function is "min" or "max" && numbers.Count != nonEmpty)
+        if (function is "min" or "max" && Column(schema, aggregate.Column!).Type != "number")
         {
             var text = values.Where(value => value.Length > 0).ToArray();
             if (text.Length == 0) { return ""; }
             return function == "min" ? text.Min(StringComparer.Ordinal)! : text.Max(StringComparer.Ordinal)!;
         }
 
-        if (numbers.Count == 0) { return "0"; }
+        if (numbers.Count == 0) { return ""; }
         var result = function switch
         {
             "sum" => numbers.Sum(),
@@ -133,7 +133,7 @@ internal static class RowQueryEvaluator
         {
             var index = Array.FindIndex(columns, column => column.Name == sort.Column);
             if (index < 0) { throw new ArgumentException($"Sort column '{sort.Column}' is not in the result."); }
-            var comparer = Comparer<string>.Create(Compare);
+            var comparer = Comparer<string>.Create((left, right) => Compare(left, right, columns[index].Type));
             ordered = ordered is null
                 ? sort.Descending
                     ? rows.OrderByDescending(row => row.Values[index], comparer)

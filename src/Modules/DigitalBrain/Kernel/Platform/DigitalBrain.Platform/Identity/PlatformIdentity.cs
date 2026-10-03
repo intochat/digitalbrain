@@ -9,10 +9,10 @@ internal sealed class PlatformIdentity(IBrainAccess access, IGrantPolicySource g
 {
     public CallerContext? CurrentPrincipal => CallerContextStamper.TryGet(out var caller) ? caller : null;
 
-    public string RequireOwner() => CallerContextStamper.Require().PrincipalId;
+    public string RequirePrincipal() => CallerContextStamper.Require().PrincipalId;
 
-    public ValueTask<bool> CanAccessAsync(string principalId, string brainId, CancellationToken cancellationToken = default)
-        => access.CanAccessAsync(principalId, brainId, cancellationToken);
+    public ValueTask<bool> CanAccessAsync(string principalId, string accountId, string brainId, CancellationToken cancellationToken = default)
+        => access.CanAccessAsync(principalId, accountId, brainId, cancellationToken);
 
     public async ValueTask<bool> HasGrantAsync(CallerContext caller, string semanticTypeId, CancellationToken cancellationToken = default)
     {

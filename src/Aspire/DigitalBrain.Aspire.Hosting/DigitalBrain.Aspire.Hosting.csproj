@@ -12,4 +12,5 @@
   <ItemGroup>
     <ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="DigitalBrain.Aspire.Hosting.Tests.Unit" /></ItemGroup>
 </Project>

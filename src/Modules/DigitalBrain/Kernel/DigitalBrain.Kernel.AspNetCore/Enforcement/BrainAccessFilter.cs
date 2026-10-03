@@ -28,7 +28,7 @@ public static class BrainAccessFilter
         if (!CallerContextStamper.TryGet(out var caller)) { return Results.Unauthorized(); }
 
         var access = http.RequestServices.GetRequiredService<IBrainAccess>();
-        return await access.CanAccessAsync(caller.PrincipalId, brainId, http.RequestAborted)
+        return await access.CanAccessAsync(caller.PrincipalId, caller.AccountId, brainId, http.RequestAborted)
             ? null
             : Results.StatusCode(StatusCodes.Status403Forbidden);
     }

@@ -9,7 +9,7 @@ namespace DigitalBrain.Client.Orleans;
 
 internal sealed class SignalSubscription<T>(IClusterClient cluster, INeuron source, SubscriptionOptions options,
     ILogger logger, Action<IAsyncDisposable> closed, ILocalSignalHub? hub, CancellationToken cancellationToken)
-    : ISignalSubscription<T>, INeuronObserver where T : Signal
+    : ISignalSubscription<T>, INeuronObserver, ILocalSignalFaultSink where T : Signal
 {
     private readonly Channel<T> _messages = Channel.CreateBounded<T>(new BoundedChannelOptions(options.BufferCapacity) { SingleReader = true });
     private readonly CancellationTokenSource _lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -94,6 +94,8 @@ internal sealed class SignalSubscription<T>(IClusterClient cluster, INeuron sour
         }
         finally { await DisposeAsync().ConfigureAwait(false); }
     }
+
+    void ILocalSignalFaultSink.OnError(Exception error) => Finish(error);
 
     private void Finish(Exception? error)
     {

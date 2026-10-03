@@ -48,14 +48,14 @@ public static class SalesforceHostingExtensions
                 return;
             }
 
-            _consumerKey ??= brain.ApplicationBuilder.AddParameter("salesforce-consumer-key", secret: true)
+            _consumerKey ??= brain.ApplicationBuilder.AddParameter(brain.ResourceName("salesforce-consumer-key"), secret: true)
                 .WithDescription(
                     "Consumer key (client ID) from your existing Salesforce "
                     + "[External Client App](https://developer.salesforce.com/docs/platform/hosted-mcp-servers/guide/create-external-client-app.html). "
                     + "Register http://localhost:5080/integrations/salesforce/callback, enable PKCE and JWT access tokens, and allow mcp_api and refresh_token.",
                     enableMarkdown: true)
                 .WithParentRelationship(module);
-            _consumerSecret ??= brain.ApplicationBuilder.AddParameter("salesforce-consumer-secret", secret: true)
+            _consumerSecret ??= brain.ApplicationBuilder.AddParameter(brain.ResourceName("salesforce-consumer-secret"), secret: true)
                 .WithDescription(
                     "Consumer secret from the same Salesforce External Client App. Enable Require Secret for Web Server Flow. "
                     + "Only the kernel receives this secret; Salesforce login happens in your browser when the assistant needs access.",

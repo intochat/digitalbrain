@@ -20,6 +20,37 @@ public sealed record RowQuery
         if (Limit is < 1 or > MaxPageSize) { throw new ArgumentOutOfRangeException(nameof(Limit)); }
     }
 
+    public void Check(RowSchema schema)
+    {
+        Check();
+        ArgumentNullException.ThrowIfNull(schema);
+        RowColumn Require(string name) => schema.Columns.FirstOrDefault(c => c.Name == name)
+            ?? throw new ArgumentException($"Column '{name}' is not in the schema.");
+        foreach (var filter in Filters)
+        {
+            var column = Require(filter.Column);
+            var op = filter.Operator.Trim().ToLowerInvariant();
+            if (op is not ("eq" or "ne" or "gt" or "gte" or "lt" or "lte" or "contains"))
+            { throw new ArgumentException($"Operator '{filter.Operator}' is not supported."); }
+            if (filter.Value is null || filter.Value.Contains('\\', StringComparison.Ordinal))
+            { throw new ArgumentException("A filter value is required and cannot contain a backslash."); }
+            if (column.Type == "number" && op != "contains"
+                && (!double.TryParse(filter.Value, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var number) || !double.IsFinite(number)))
+            { throw new ArgumentException("A numeric filter requires a finite number."); }
+        }
+        foreach (var name in Columns.Concat(GroupBy)) { Require(name); }
+        foreach (var aggregate in Aggregates)
+        {
+            var function = aggregate.Function.Trim().ToLowerInvariant();
+            if (function is not ("count" or "sum" or "avg" or "min" or "max"))
+            { throw new ArgumentException($"Aggregate '{aggregate.Function}' is not supported."); }
+            if (function == "count" && string.IsNullOrWhiteSpace(aggregate.Column)) { continue; }
+            var column = Require(aggregate.Column ?? "");
+            if (function is "sum" or "avg" && column.Type != "number")
+            { throw new ArgumentException("Sum and average require a numeric column."); }
+        }
+    }
+
     // A view drops the parts its source cannot answer instead of asking the source to pretend.
     public RowQuery Degrade(SourceCapabilities capabilities)
     {

@@ -10,4 +10,5 @@
   </ItemGroup>
   <ItemGroup><InternalsVisibleTo Include="DigitalBrain.Kernel.Tests.Unit" /></ItemGroup>
   <ItemGroup><InternalsVisibleTo Include="DigitalBrain.Architecture.Tests" /></ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="DigitalBrain.Sdk.Tests.Unit" /></ItemGroup>
 </Project>

@@ -24,6 +24,11 @@ public sealed class DigitalBrainBuilder
         var values = new Dictionary<string, string?>(settings ?? new Dictionary<string, string?>(), StringComparer.OrdinalIgnoreCase);
         foreach (var pair in ApplicationBuilder.Configuration.GetSection($"DigitalBrain:Modules:{id}:Options").AsEnumerable())
         { if (pair.Value is not null) { values[pair.Key] = pair.Value; } }
+        var scopedPrefix = $"DigitalBrain:Brains:{Name}:Modules:{id}:Options";
+        foreach (var pair in ApplicationBuilder.Configuration.GetSection(scopedPrefix).AsEnumerable())
+        {
+            if (pair.Value is not null) { values[$"DigitalBrain:Modules:{id}:Options" + pair.Key[scopedPrefix.Length..]] = pair.Value; }
+        }
         _compiledConfiguration[id] = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
         _modules.Add(id);
         Resource.WithAnnotation(new BrainModuleAnnotation(id));
@@ -71,6 +76,8 @@ public sealed class DigitalBrainBuilder
     internal bool Dashboard { get; init; }
 
     public string Name { get; }
+
+    public string ResourceName(string name) => $"{Name}-{name}";
 
     public IDistributedApplicationBuilder ApplicationBuilder { get; }
 
@@ -145,7 +152,7 @@ public sealed class DigitalBrainBuilder
             return existing;
         }
 
-        var node = ApplicationBuilder.AddResource(new DigitalBrainModuleResource(displayName))
+        var node = ApplicationBuilder.AddResource(new DigitalBrainModuleResource(ResourceName(displayName)))
             .ExcludeFromManifest();
         node.WithParentRelationship(Resource);
         node.WithInitialState(new CustomResourceSnapshot

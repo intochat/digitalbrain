@@ -34,23 +34,25 @@ public sealed record Invitation
     [Id(6)] public bool Accepted { get; init; }
 }
 
-// The workspace directory: accounts, their members, and pending invitations. Hosted as one
-// neuron so a login can resolve a principal without knowing which account it belongs to yet.
+// Compatibility facade and migration coordinator. Live identity and authorization state
+// are held by principal, account, and account/brain-scoped actors.
 public interface IIdentityDirectory : IGrainWithStringKey
 {
     Task<Member> RegisterAsync(string principalId, string password, string displayName, CancellationToken cancellationToken = default);
     Task<Member?> AuthenticateAsync(string principalId, string password, CancellationToken cancellationToken = default);
 
-    Task<Member?> FindMemberAsync(string principalId, CancellationToken cancellationToken = default);
+    Task PrepareAsync(CancellationToken cancellationToken = default);
+
+    Task<Member?> FindMemberAsync(string principalId, string accountId, string brainId, CancellationToken cancellationToken = default);
 
     // A principal may reach a brain only when it holds a member record for it, whether it owns
     // the account or the brain was shared with it.
-    Task<bool> CanAccessAsync(string principalId, string brainId, CancellationToken cancellationToken = default);
+    Task<bool> CanAccessAsync(string principalId, string accountId, string brainId, CancellationToken cancellationToken = default);
 
     Task<Member> ShareBrainAsync(string accountId, string brainId, string principalId, string displayName, MemberRole role, CancellationToken cancellationToken = default);
 }
 
-// Stable grain keys for the identity directory and per-workspace grant store.
+// Legacy grain keys retained for migration and persisted-state compatibility.
 public static class IdentityGrains
 {
     public const string Directory = "intochat-identity-directory";

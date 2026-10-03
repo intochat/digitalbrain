@@ -81,10 +81,10 @@ public static class GitHubHostingExtensions
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
             var microsoft = brain.GetOrAddModuleNode("github");
-            _privateKey ??= brain.ApplicationBuilder.AddParameter($"github-{id}-app-private-key", secret: true)
+            _privateKey ??= brain.ApplicationBuilder.AddParameter(brain.ResourceName($"github-{id}-app-private-key"), secret: true)
                 .WithDescription("PEM private key for the configured GitHub App. Only the kernel receives this secret.")
                 .WithParentRelationship(microsoft);
-            _webhookSecret ??= brain.ApplicationBuilder.AddParameter($"github-{id}-webhook-secret", secret: true)
+            _webhookSecret ??= brain.ApplicationBuilder.AddParameter(brain.ResourceName($"github-{id}-webhook-secret"), secret: true)
                 .WithDescription("GitHub webhook HMAC secret (at least 16 characters). Forward only /integrations/github/webhook through HTTPS.")
                 .WithParentRelationship(microsoft);
             var root = $"DigitalBrain:Microsoft:GitHub:Repositories:{id}";

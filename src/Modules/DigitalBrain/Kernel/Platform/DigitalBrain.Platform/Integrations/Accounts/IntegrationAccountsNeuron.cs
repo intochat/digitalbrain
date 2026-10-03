@@ -16,16 +16,16 @@ namespace DigitalBrain.Platform.Integrations.Accounts;
 // The owner's account registry. A credential is written to the shared secrets grain and the
 // record holds only its SecretRef; the value is released only inside the read-only probe.
 [GrainType(AccountNames.NeuronType)] // alias predates the integrations rename; persisted, do not touch
-internal sealed class IntegrationAccountsNeuron : Neuron<IntegrationAccountsState>, IIntegrationAccounts
+internal sealed class IntegrationAccountsNeuron : Neuron<IntegrationAccountsState>, IConnectionRegistry
 {
     private readonly IGrainFactory _grains;
-    private readonly IAccountProbe _probe;
+    private readonly ConnectionCredentialProbe _probe;
     private readonly TimeProvider _time;
 
     public IntegrationAccountsNeuron(
         [PersistentState("connections", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<IntegrationAccountsState> store,
         IGrainFactory grains,
-        IAccountProbe probe,
+        ConnectionCredentialProbe probe,
         TimeProvider time) : base(store)
     {
         _grains = grains;
@@ -53,7 +53,7 @@ internal sealed class IntegrationAccountsNeuron : Neuron<IntegrationAccountsStat
         }
 
         var credential = await StoreOrReferenceAsync(source, request, caller, cancellationToken);
-        var result = await RunProbeAsync(source, credential, caller, cancellationToken);
+        var result = await _probe.ProbeAsync(source, credential, caller, cancellationToken);
         var record = new IntegrationAccount
         {
             Id = request.ConnectionId,
@@ -77,7 +77,7 @@ internal sealed class IntegrationAccountsNeuron : Neuron<IntegrationAccountsStat
             throw new AccountNotConfiguredException($"Connection '{connectionId}' is not configured.");
         }
 
-        var result = await RunProbeAsync(current.IntegrationId, current.Credential, caller, cancellationToken);
+        var result = await _probe.ProbeAsync(current.IntegrationId, current.Credential, caller, cancellationToken);
         var record = current with { Status = ToStatus(result.Outcome), LastProbedAt = _time.GetUtcNow() };
         Snapshot.Connections[connectionId] = record;
         await Save(Snapshot, new AccountStatusChanged(record.Id, record.IntegrationId, record.Status));
@@ -143,36 +143,6 @@ internal sealed class IntegrationAccountsNeuron : Neuron<IntegrationAccountsStat
 
         return caller;
     }
-
-    private async Task<AccountProbeResult> RunProbeAsync(string source, SecretRef credential, CallerContext caller, CancellationToken cancellationToken)
-    {
-        string value;
-        try
-        {
-            value = await _grains.GetGrain<ISecrets>(credential.OwnerOf()).Resolve(Platform(caller), credential, cancellationToken);
-        }
-        catch (Exception) when (!cancellationToken.IsCancellationRequested)
-        {
-            return AccountProbeResult.Failing("The stored credential could not be resolved.");
-        }
-
-        try
-        {
-            return await _probe.ProbeAsync(source, value, cancellationToken);
-        }
-        catch (Exception) when (!cancellationToken.IsCancellationRequested)
-        {
-            return AccountProbeResult.Failing("The read-only probe failed.");
-        }
-    }
-
-    // The probe is the outbound call, so it runs as trusted platform code, never as the user turn.
-    private static CallerContext Platform(CallerContext caller) => caller with
-    {
-        Kind = CallerKind.Platform,
-        StampedBy = TrustedEdge.Platform,
-        AppId = string.IsNullOrEmpty(caller.AppId) ? AccountNames.NeuronType : caller.AppId,
-    };
 
     private static AccountStatus ToStatus(AccountProbeOutcome outcome) => outcome switch
     {

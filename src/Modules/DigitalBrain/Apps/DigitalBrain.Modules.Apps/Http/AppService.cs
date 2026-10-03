@@ -72,7 +72,7 @@ internal sealed class AppService(
         var revision = await Resolve(new(id.Owner, id.Name, revisionId), preferPublished: true);
         var declared = (await Package(id).ReadRevision(revision.Revision)).Content.Manifest.Accounts ?? [];
         var scope = CurrentScope();
-        var available = ScopedAccounts.Visible(scope, await brain.Get<IIntegrationAccounts>(scope.Id).List());
+        var available = ScopedAccounts.Visible(scope, await brain.Get<IConnectionRegistry>(scope.Id).List());
         return new(revision.Revision, declared.Select(slot => new AppAccountSlot(slot.Name, slot.Source, slot.Description,
             available.Where(account => account.IntegrationId == slot.Source && account.Status == AccountStatus.Connected)
                 .OrderBy(account => account.Id, StringComparer.Ordinal)
@@ -170,7 +170,7 @@ internal sealed class AppService(
         var declared = (await Package(revision.Package).ReadRevision(revision.Revision)).Content.Manifest.Accounts ?? [];
         if (declared.Length == 0 && selected.Count == 0) { return; }
         var scope = CurrentScope();
-        var available = ScopedAccounts.Visible(scope, await brain.Get<IIntegrationAccounts>(scope.Id).List());
+        var available = ScopedAccounts.Visible(scope, await brain.Get<IConnectionRegistry>(scope.Id).List());
         foreach (var slot in declared)
         {
             if (!selected.TryGetValue(slot.Name, out var id) || string.IsNullOrWhiteSpace(id))

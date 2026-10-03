@@ -55,16 +55,16 @@ internal static class PostgresHostingExtensions
             // manually provisioned database, and without an admin connection no provisioner registers.
             if (configuration.DatabaseName is { } databaseName && !brain.ApplicationBuilder.ExecutionContext.IsPublishMode)
             {
-                var server = brain.ApplicationBuilder.AddPostgres("postgres-server")
+                var server = brain.ApplicationBuilder.AddPostgres(brain.ResourceName("postgres-server"))
                     .WithParentRelationship(module)
                     .WithRepl();
                 if (configuration.PersistentStorage) { server.WithDataVolume().WithLifetime(ContainerLifetime.Persistent); }
                 _server = server;
-                _database = server.AddDatabase("postgres-database", databaseName);
+                _database = server.AddDatabase(brain.ResourceName("postgres-database"), databaseName);
             }
             else
             {
-                _connection = brain.ApplicationBuilder.AddParameter("postgres-connection", () =>
+                _connection = brain.ApplicationBuilder.AddParameter(brain.ResourceName("postgres-connection"), () =>
                     brain.ApplicationBuilder.Configuration["Parameters:postgres-connection"]
                     ?? brain.ApplicationBuilder.Configuration.GetConnectionString(configuration.ConnectionName)
                     ?? throw new InvalidOperationException($"Connection string '{configuration.ConnectionName}' is required."), secret: true)

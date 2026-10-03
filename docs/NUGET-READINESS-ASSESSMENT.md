@@ -85,6 +85,8 @@ The findings above describe the original assessment; addressed status and the ac
 - **H17** Sdk twin `IIntegrationAccounts` interfaces (Sdk.Integrations.Accounts vs Contracts.Integrations) — same name, different neurons; rename one.
 - **H18** Naming unification (systemic defect 5): one convention for package id = assembly = root namespace = folder, done before first publish. Includes `DigitalBrain` meta-package (ns `DigitalBrain.Contracts`) and the two Sdk files in `DigitalBrain.Identity`. — ✅ Addressed: the nine approved projects now use matching folder, csproj, assembly, package ID, and root namespace. The vocabulary is in `DigitalBrain`; Identity contracts now reside in `DigitalBrain.Platform.Contracts.Identity`.
 
+**Status note (2026-10-03):** the findings below describe the original audit. The coordinated implementation and current verification results are recorded at the end of this document; use that section for current progress.
+
 ## Medium findings (abridged — see per-project notes below)
 
 - Contracts `IntentContext.cs`: ✅ Moved to Kernel; locked usage collection, detached snapshots, nesting checks and explicit scopes across async iterator steps.
@@ -214,7 +216,55 @@ Validation (2026-10-03):
 
 **Phase 3 — API hardening**
 13. H12–H14, H16 — ✅ Explicit infrastructure options, stable module IDs, explicit hosting adapters/server factories, fully initialized builder and one module instance.
-14. **Next priority: H10** — redesign the global identity-directory grain and its persistence/migration boundaries. Then H17 (distinct names for privileged versus script account interfaces) and the remaining Medium findings.
+14. H10 + H17: complete and verified in the coordinated identity/reliability change below. Live identity is keyed by principal, account, and exact account/brain scope; the old directory is a migration facade.
 
 **Phase 4 — tests**
-15. Split the mono test suite along package lines; delete/fix the listed tests; close the High-priority gaps (BrowserLogins/TokenHandoff, RowQueryEvaluator, IntentContext), then Medium.
+15. Package-owned suites now cover Platform, SDK, HTTP Client, Orleans Client, Aspire.Hosting and Testing.Unit, with Kernel retaining runtime tests. Nonce concurrency, registration recovery, scoped grant ownership, local/HTTP overflow, and shared SQL/in-memory query vectors were added. IntentContext concurrency coverage remains in Kernel.
+
+
+## Coordinated identity and reliability implementation — 2026-10-03
+
+```text
+Principal(principalId)         password + stable registration allocation + checkpoint
+Account(accountId)             owner + idempotent brain provisioning
+BrainAuthority(account, brain) membership + invitations + grants + atomic authorization
+```
+
+- **H10:** normal login/membership/grant paths use directly keyed actors. All access checks carry account and brain. One-time grants are checked and consumed in one non-reentrant turn. Owner checks and grant mutations also share one turn; stale cookie roles cannot authorize them.
+- Configured Basic bootstrap credentials provision ownership of one explicit default scope, with no cross-account or arbitrary-brain bypass.
+- Registration persists allocation before provisioning and resumes after storage failure. `POST /identity/brains` accepts `Idempotency-Key`; retry cannot recreate revoked ownership.
+- Migration is maintenance-only, refuses ambiguous legacy ownership, preserves legacy snapshots/aliases/field IDs, seals old grant writers, and checkpoints imports. Repeated imports cannot restore revoked access. [Upgrade procedure](IDENTITY-UPGRADE.md).
+- **H17:** `IConnectionRequests` is the script API; `IConnectionRegistry` is privileged. Existing `integrations.accounts` and `connections` identities are retained.
+- Credential probes, provider-registration writes and OAuth token operations have named services. Elevated contexts remain internal; logs retain the initiating actor and never log credential values. `RequirePrincipal` no longer implies an ownership check.
+- OAuth uses explicit, separate browser-login and token-handoff state transitions with injected clocks. `TryTake` is atomic. Both stores remain bounded and process-local; failures after consumption require a fresh login.
+- Document writes reserve a durable index entry **before** committing a document. Listing filters incomplete reservations. CAS retries are bounded with backoff and a typed `DocumentConflictException`; in-memory storage moved to Testing. This replaces the proposed outbox worker with fewer moving parts.
+- Local and HTTP signal delivery is bounded; overflow and observer failures are visible. HTTP reader disposal closes the subscription; completion does not require draining the queue. Neuron type metadata is cached; missing hubs fail explicitly.
+- Type metadata, validators and accepted inputs come from one runtime registry. JSON is now a test snapshot. Date-time offsets survive validation; unspecified local times are rejected. Serialized activity/request type-ID collections are arrays.
+- Query validation is shared across SQL/in-memory paths. Text stays text, empty aggregate queries produce a row, and multi-column grouping cannot collide on embedded separator characters. Shared vectors cover both paths; this is not a live database equivalence test.
+- No-op webhook wrapper removed; IO status handling no longer depends on exception prose. Existing domain-conflict mappings remain compatible.
+- Aspire scopes infrastructure, parameters, module nodes and hosted AI resources by brain. Per-brain configuration overrides global/code defaults. A two-brain PostgreSQL model test pins resource isolation. Silo discovery uses an explicit composition annotation. The memory-only AppHost path now configures development clustering and can be referenced by a server.
+- Six package-owned test suites replace the mixed ownership in the Kernel suite; duplicate brain-establishment coverage and a brittle exact-prose capacity assertion were removed.
+- `eng/Verify-NuGetConsumers.ps1` builds five consumers from a fresh cache and checks package dependency boundaries.
+
+Deliberate compatibility decisions:
+
+- Keep existing `x-intochat-*` JSON extension keys. A cosmetic rename would create another migration without reducing runtime complexity.
+- Keep `IDigitalBrain.Get<T>` capable of addressing keyed Orleans actors: the new identity actors deliberately do not implement `INeuron`.
+- `Signal.Publisher` is documented as routing metadata, never authentication evidence; the publishing neuron overwrites it.
+- Keep one synchronized prerelease release train and `net11.0` until a tested multi-target runtime matrix exists. Signing remains off. See the upgrade document for policy and commands.
+
+Validation (2026-10-03):
+- Release solution build: **0 warnings, 0 errors**.
+- **30 unit/architecture suites: 949 passed, 6 skipped, 0 failed**, including targeted reruns after final changes.
+- **73 NuGet packages** produced. Five isolated consumers (HTTP script, Kernel, AppHost adapters, Server + Platform, all packages) restored and built from the new feed; dependency-boundary checks passed.
+- All **522 existing serialized type baselines** retain their field IDs. Three new state types and two additive migration fields are reviewed in the baseline (525 types total).
+- `git diff --check` passed. Container-backed E2E and a production-state upgrade rehearsal were not run.
+
+**Next release priority:** rehearse the maintenance upgrade against a backed-up persistent deployment, including key/storage reuse and rollback; then run container-backed E2E before publishing. Unit/model tests do not substitute for that deployment rehearsal.
+
+Remaining release gates, in order:
+1. Persistent upgrade rehearsal: migrate a copy of old state, interrupt and retry migration, verify login and grant revocation, preserve encryption keys and storage, and exercise rollback.
+2. Container-backed E2E: verify server/client/AppHost composition and real provider behavior with the packed packages.
+3. Publish only after those gates pass. The implementation and package smoke checks are complete; deployment verification remains open.
+
+Legacy `.orleans` files are retained compatibility fixtures from the old source revision, moved with the Platform tests. Their purpose and capture provenance are documented in `Identity/LegacyState/README.md` beside the fixtures.

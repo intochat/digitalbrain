@@ -10,6 +10,7 @@ namespace DigitalBrain.Platform.Identity.Grants;
 internal sealed record GrantStoreState
 {
     [Id(0)] public List<Grant> Grants { get; init; } = [];
+    [Id(1)] public bool Sealed { get; init; }
 }
 
 [GrainType("identity-grants")]
@@ -27,6 +28,7 @@ internal sealed class GrantStoreNeuron : Neuron<GrantStoreState>, IGrantStore
     public async Task<Grant> GrantAsync(Grant grant, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (Snapshot.Sealed) { throw new InvalidOperationException("Legacy grants have migrated; use the scoped authority."); }
         ArgumentNullException.ThrowIfNull(grant);
         if (string.IsNullOrWhiteSpace(grant.AppId) || string.IsNullOrWhiteSpace(grant.SemanticTypeId))
         {
@@ -47,6 +49,7 @@ internal sealed class GrantStoreNeuron : Neuron<GrantStoreState>, IGrantStore
     public async Task RevokeAsync(string appId, string semanticTypeId, GrantMode mode, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (Snapshot.Sealed) { throw new InvalidOperationException("Legacy grants have migrated; use the scoped authority."); }
         var next = Snapshot;
         var removed = next.Grants.RemoveAll(existing =>
             string.Equals(existing.AppId, appId, StringComparison.Ordinal)
@@ -56,6 +59,16 @@ internal sealed class GrantStoreNeuron : Neuron<GrantStoreState>, IGrantStore
         {
             await _store.WriteStateAsync();
         }
+    }
+
+    public async Task SealAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (Snapshot.Sealed) { return; }
+        var previous = _store.State;
+        _store.State = previous with { Sealed = true };
+        try { await _store.WriteStateAsync(); }
+        catch { _store.State = previous; throw; }
     }
 
     public Task<IReadOnlyList<Grant>> ListAsync(CancellationToken cancellationToken = default)

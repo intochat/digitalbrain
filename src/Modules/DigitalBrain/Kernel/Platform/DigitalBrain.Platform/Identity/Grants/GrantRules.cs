@@ -15,12 +15,13 @@ public static class GrantRules
         grants ??= [];
 
         var caller = request.Caller;
-        if (member is not null && !string.Equals(member.BrainId, caller.BrainId, StringComparison.Ordinal))
+        if (caller.Kind is CallerKind.User or CallerKind.Assistant
+            && (member is null || member.PrincipalId != caller.PrincipalId || member.AccountId != caller.AccountId || member.BrainId != caller.BrainId))
         {
-            return CallDecision.Deny(CallDenial.OutsideWorkspace, "The principal is not a member of this workspace.");
+            return CallDecision.Deny(CallDenial.OutsideWorkspace, "The principal is not a member of this account and brain.");
         }
 
-        if (caller.Kind != CallerKind.App || request.SemanticTypeIds.Count == 0)
+        if (caller.Kind != CallerKind.App || request.SemanticTypeIds.Length == 0)
         {
             return null;
         }
@@ -47,7 +48,7 @@ public static class GrantRules
     public static IReadOnlyList<Grant> OnceToConsume(CallRequest request, IReadOnlyList<Grant> grants)
     {
         ArgumentNullException.ThrowIfNull(request);
-        if (grants is null || grants.Count == 0 || request.SemanticTypeIds.Count == 0) { return []; }
+        if (grants is null || grants.Count == 0 || request.SemanticTypeIds.Length == 0) { return []; }
 
         var caller = request.Caller;
         if (caller.Kind != CallerKind.App || string.IsNullOrWhiteSpace(caller.AppId)) { return []; }
@@ -58,7 +59,10 @@ public static class GrantRules
                 && grant.Mode == GrantMode.Once
                 && string.Equals(grant.WorkspaceId, caller.BrainId, StringComparison.Ordinal)
                 && string.Equals(grant.AppId, caller.AppId, StringComparison.Ordinal)
-                && request.SemanticTypeIds.Contains(grant.SemanticTypeId, StringComparer.Ordinal)),
+                && request.SemanticTypeIds.Contains(grant.SemanticTypeId, StringComparer.Ordinal)
+                && !grants.Any(other => other.Mode != GrantMode.Once && !other.Revoked
+                    && other.WorkspaceId == grant.WorkspaceId && other.AppId == grant.AppId
+                    && other.SemanticTypeId == grant.SemanticTypeId && ModeSatisfied(other, caller))),
         ];
     }
 

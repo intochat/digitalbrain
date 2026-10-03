@@ -25,7 +25,8 @@ public sealed class GrainDocumentStore<T>(IGrainFactory grains, string name) : I
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         var grain = grains.GetGrain<IDocumentGrain>(DocumentKey(id));
-        for (var attempt = 0; attempt < 128; attempt++)
+        await grains.GetGrain<IDocumentIndexGrain>(IndexKey()).AddAsync(id).WaitAsync(ct).ConfigureAwait(false);
+        for (var attempt = 0; attempt < 16; attempt++)
         {
             ct.ThrowIfCancellationRequested();
             var (version, payload) = await grain.ReadAsync().WaitAsync(ct).ConfigureAwait(false);
@@ -33,15 +34,24 @@ public sealed class GrainDocumentStore<T>(IGrainFactory grains, string name) : I
             var result = update(document);
             if (await grain.TryWriteAsync(version, Serialize(document)).WaitAsync(ct).ConfigureAwait(false))
             {
-                await grains.GetGrain<IDocumentIndexGrain>(IndexKey()).AddAsync(id).WaitAsync(ct).ConfigureAwait(false);
                 return result;
             }
+            await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(1 << attempt, 50)), ct).ConfigureAwait(false);
         }
-        throw new InvalidOperationException("The document changed repeatedly; retry the operation.");
+        throw new DocumentConflictException();
     }
 
     public async Task<IReadOnlyList<string>> ListIdsAsync(CancellationToken ct)
-        => await grains.GetGrain<IDocumentIndexGrain>(IndexKey()).ListAsync().WaitAsync(ct).ConfigureAwait(false);
+    {
+        var candidates = await grains.GetGrain<IDocumentIndexGrain>(IndexKey()).ListAsync().WaitAsync(ct).ConfigureAwait(false);
+        var visible = new List<string>();
+        foreach (var id in candidates)
+        {
+            var (_, payload) = await grains.GetGrain<IDocumentGrain>(DocumentKey(id)).ReadAsync().WaitAsync(ct).ConfigureAwait(false);
+            if (payload is not null) { visible.Add(id); }
+        }
+        return visible;
+    }
 
     private static T Deserialize(string? payload)
         => payload is null ? new T() : JsonSerializer.Deserialize<T>(payload, Json) ?? new T();
