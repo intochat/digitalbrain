@@ -5,22 +5,24 @@ using System.Text.Json;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.AI.Agents.Signals;
-using DigitalBrain.Modules.AI.Tests;
 
-namespace DigitalBrain.Modules.AI.Tests.E2E;
+namespace DigitalBrain.Modules.AI.Tests.Agents;
 
 public sealed class HostedAgentFacts
 {
+    // Formerly the AI E2E suite's separate-host journey; the adapter, the integration
+    // configuration plumbing and the commit-before-signal ordering are host-agnostic, so the
+    // in-process brain proves them against the same loopback provider endpoint.
     [Theory]
     [InlineData("OpenAI")]
     [InlineData("OpenRouter")]
-    public async Task SeparateHostRunsRealProviderAdapterAndCommitsConversationBeforeSignal(string provider)
+    public async Task RealProviderAdapterAnswersAndCommitsConversationBeforeSignal(string provider)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         deadline.CancelAfter(TimeSpan.FromMinutes(5));
         var ct = deadline.Token;
         using var endpoint = new LoopbackServer();
-        await using var brain = await E2ETest.Create().WithModule<AIModule, AIOptions>(options =>
+        await using var brain = await ModuleTest.Create().WithModule<AIModule, AIOptions>(options =>
             {
                 options.Default.Profile = "fixture";
                 options.ModelProfiles.Add("fixture", new AIModelProfileOptions

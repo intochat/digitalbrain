@@ -77,7 +77,6 @@
     <Project Path="src/Modules/AI/DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj" />
   </Folder>
   <Folder Name="/Modules/AI/tests/">
-    <Project Path="src/Modules/AI/tests/DigitalBrain.Modules.AI.Tests.E2E/DigitalBrain.Modules.AI.Tests.E2E.csproj" />
     <Project Path="src/Modules/AI/tests/DigitalBrain.Modules.AI.Tests/DigitalBrain.Modules.AI.Tests.csproj" />
   </Folder>
   <Folder Name="/Modules/ClickHouse/">
