@@ -61,6 +61,18 @@ public sealed class AppDocumentFacts
     }
 
     [Fact]
+    public void AFinalBlankLineDoesNotChangeTheAuthoringDocument()
+    {
+        var document = Document();
+        var content = new PackageContent(new("App", "", [], []), "", new()
+        {
+            [AppDocumentCodec.Path] = AppDocumentCodec.Encode(document),
+            [PackageContent.SpecPath] = AppDocumentCodec.ExportSpec(document).TrimEnd('\n') + "\n",
+        });
+        Assert.True(AppDocumentCodec.Read(content).CanEdit);
+    }
+
+    [Fact]
     public void MetadataCannotClaimDifferentProseThanTheVerifiedSpec()
     {
         var d = Document();

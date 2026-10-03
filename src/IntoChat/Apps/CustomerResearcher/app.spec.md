@@ -43,4 +43,3 @@ the race to a completed save; there is no half-written state either way.
 
 With a connected window browser and a real model, "research" drives the visible browser and saves
 findings to Postgres. Live scenarios document the app; they are not part of the deterministic gate.
-

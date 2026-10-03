@@ -4,7 +4,8 @@ internal static class AppScenarioChecks
 {
     public static AppTestRun Bind(PackageContent content, AppTestRun run)
     {
-        if (content.File(AppDocumentCodec.Path) is null) { return run; }
+        if (content.File(AppDocumentCodec.Path) is null)
+        { return run with { Scenarios = run.Scenarios.Select(s => s with { ScenarioId = null }).ToArray() }; }
         var read = AppDocumentCodec.Read(content);
         if (read.Document is not { } document)
         { return run with { Scenarios = [.. run.Scenarios, new("Authoring document", false, read.Error ?? "Invalid authoring document.")] }; }

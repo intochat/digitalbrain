@@ -18,7 +18,9 @@ public static class AppInvocations
         await foreach (var invoked in subscription.ReadAllAsync(cancellationToken))
         {
             if (recovered.Remove(invoked.InvocationId)) { continue; }
-            if ((await app.ReadInvocation(invoked.InvocationId)).Status == InvocationStatus.Pending)
+            // Completed history may already be pruned. Pending is also safe over the script
+            // HTTP edge, which does not preserve the server's exception types.
+            if ((await app.Pending()).Any(current => current.Id == invoked.InvocationId))
             { yield return invoked; }
         }
     }

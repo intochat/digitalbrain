@@ -67,7 +67,7 @@ internal static class AppDocumentCodec
         try
         {
             Validate(document, content.Programs(), true);
-            if (ExportSpec(document) != read.OriginalSpec)
+            if (ExportSpec(document).TrimEnd('\r', '\n') != read.OriginalSpec.TrimEnd('\r', '\n'))
             { throw new ArgumentException("The authoring metadata does not match this revision's specification."); }
             return read;
         }
