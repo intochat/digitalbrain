@@ -14,6 +14,9 @@ When Research or Stop is clicked, invoke the corresponding app operation.
 
 When research is requested, run the bounded browser/model algorithm and save verified evidence. Stop cancels the current run; result reads the stored company.
 
+Production research uses the host's default LLM. Legacy Model settings do not pin a provider.
+Scratch scenario installs may supply scripted/<key> as Model to run deterministic checks.
+
 ## Scenario: Opening the researcher composes its surface
 
 Invoking "open" answers a window whose surface is named and titled "Customer Researcher", with the

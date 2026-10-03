@@ -8,7 +8,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using DigitalBrain.AI;
-using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.Scripted;
 using DigitalBrain.Apps;
 using DigitalBrain.Apps.Signals;
@@ -23,7 +22,7 @@ await using var brain = await DigitalBrainClient.ConnectAsync(args);
 var appKey = brain.Setting("App")!;
 var app = brain.Get<IApp>(appKey);
 var status = brain.Get<IText>(appKey + "/status");
-var modelSetting = brain.Setting("Model") is { Length: > 0 } chosen ? chosen : "IGemma4";
+var modelSetting = brain.Setting("Model") ?? "";
 var browserSetting = brain.Setting("Browser") ?? "";
 var table = brain.Get<IPostgresTable>(appKey + "/table");
 var sync = new object();
@@ -104,7 +103,7 @@ IPlaywright Browser() => browserSetting.StartsWith("scripted/", StringComparison
 
 ILLM Model() => modelSetting.StartsWith(IScriptedLLM.ModelPrefix, StringComparison.Ordinal)
     ? brain.Get<IScriptedLLM>(modelSetting[IScriptedLLM.ModelPrefix.Length..])
-    : brain.Get<IGemma4>("default");
+    : brain.Get<ILLM>("default");
 
 async Task<string> CompleteAsync(string system, string user, int maxTokens, CancellationToken ct)
 {
