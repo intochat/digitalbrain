@@ -1,25 +1,39 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
+using DigitalBrain.AI.OpenAI;
+using DigitalBrain.Assistant;
+using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
-namespace DigitalBrain.Modules.Assistant.Tests.E2E;
+namespace DigitalBrain.Modules.Assistant.Tests;
 
 public sealed class AgentModelsHttpFacts
 {
-    [Fact(Timeout = 240_000)]
+    [Fact(Timeout = 120_000)]
     public async Task CatalogIsGatedAndUnknownSelectionDoesNotCreateATurn()
     {
         var ct = TestContext.Current.CancellationToken;
         const string apiKey = "model-catalog-secret-canary";
-        await using var brain = await ReferenceBrain.Create(modelApiKey: apiKey)
-            .WithResourceEnvironment(new Dictionary<string, string>
+        await using var brain = await ModuleTest.Create()
+            .WithModule<AIModule>().WithModule<AssistantModule>()
+            .WithExecution(new()
             {
-                ["DigitalBrain__Auth__Posture"] = "Secured",
-                ["DigitalBrain__Auth__Username"] = "owner",
-                ["DigitalBrain__Auth__Password"] = "catalog-test-password",
-            }).StartAsync(ct);
+                PrivateConfiguration = new Dictionary<string, string?>
+                {
+                    ["DigitalBrain:Integrations:openai:ApiKey"] = apiKey,
+                    ["DigitalBrain:Auth:Posture"] = "Secured",
+                    ["DigitalBrain:Auth:Username"] = "owner",
+                    ["DigitalBrain:Auth:Password"] = "catalog-test-password",
+                },
+            })
+            .ConfigureSilo(silo => silo.Services.Configure<AIOptions>(ai => ai.WithLlm<IGpt56Luna>()))
+            .WithHttpEdge()
+            .StartAsync(ct);
 
         using var anonymous = await brain.HttpClient.GetAsync("/ai/models", ct);
         Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);

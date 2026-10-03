@@ -4,7 +4,7 @@ using DigitalBrain.AI;
 using DigitalBrain.Testing.E2E.Agent;
 using DigitalBrain.Testing.E2E.Workspace;
 
-namespace DigitalBrain.Modules.Assistant.Tests.E2E;
+namespace DigitalBrain.OS.Tests.E2E;
 
 public sealed class AssistantNeuronUiFacts(ReferenceBrainFixture host) : BrainFact(host)
 {

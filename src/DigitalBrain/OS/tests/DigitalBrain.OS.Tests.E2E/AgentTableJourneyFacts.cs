@@ -12,7 +12,7 @@ using DigitalBrain.Testing.E2E.Workspace;
 using Microsoft.Playwright;
 using Npgsql;
 
-namespace DigitalBrain.Modules.Assistant.Tests.E2E;
+namespace DigitalBrain.OS.Tests.E2E;
 
 public sealed class AgentTableJourneyFacts(ReferenceBrainFixture host) : BrainFact(host)
 {

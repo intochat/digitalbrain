@@ -8,7 +8,7 @@ using DigitalBrain.Platform.Contracts.Identity;
 using DigitalBrain.Testing.E2E.Agent;
 using DigitalBrain.Testing.E2E.Workspace;
 
-namespace DigitalBrain.Modules.Assistant.Tests.E2E;
+namespace DigitalBrain.OS.Tests.E2E;
 
 public sealed class ReceiptJourneyFacts(ReferenceBrainFixture host) : BrainFact(host)
 {

@@ -12,7 +12,7 @@ using DigitalBrain.Platform.Contracts.Identity;
 using DigitalBrain.Testing.E2E.Workspace;
 using Npgsql;
 
-namespace DigitalBrain.Modules.Assistant.Tests.E2E;
+namespace DigitalBrain.OS.Tests.E2E;
 
 public sealed class AgentWorkflowFacts(ReferenceBrainFixture host) : BrainFact(host)
 {

@@ -102,7 +102,6 @@
     <Project Path="src/Modules/DigitalBrain/Assistant/DigitalBrain.Modules.Assistant/DigitalBrain.Modules.Assistant.csproj" />
   </Folder>
   <Folder Name="/Modules/DigitalBrain/Assistant/tests/">
-    <Project Path="src/Modules/DigitalBrain/Assistant/tests/DigitalBrain.Modules.Assistant.Tests.E2E/DigitalBrain.Modules.Assistant.Tests.E2E.csproj" />
     <Project Path="src/Modules/DigitalBrain/Assistant/tests/DigitalBrain.Modules.Assistant.Tests/DigitalBrain.Modules.Assistant.Tests.csproj" />
   </Folder>
   <Folder Name="/Modules/DigitalBrain/Compute/">
