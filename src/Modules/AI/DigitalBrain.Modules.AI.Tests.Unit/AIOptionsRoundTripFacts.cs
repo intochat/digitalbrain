@@ -16,7 +16,7 @@ public sealed class AIOptionsRoundTripFacts
         var definition = ModuleOptionsSerialization.Compile<AIModule, AIOptions>(options);
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(definition.Configuration).Build();
 
-        var bound = configuration.GetModuleOptions<AIOptions>(nameof(AIModule));
+        var bound = configuration.GetModuleOptions<AIOptions>("ai");
 
         Assert.Equal("m1", bound.ModelProfiles["fast"].Model);
         Assert.Equal(1000, bound.ModelProfiles["Fast"].ContextWindowTokens);

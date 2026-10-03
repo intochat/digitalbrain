@@ -1,37 +1,25 @@
 using DigitalBrain.Postgres;
-using DigitalBrain.Microsoft.Playwright;
 using Aspire.Hosting;
 using DigitalBrain.AI;
 using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
-using DigitalBrain.Apps;
-using DigitalBrain.Assistant;
-using DigitalBrain.Specs;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.ClickHouse;
 using DigitalBrain.Microsoft.CSharp;
-using DigitalBrain.Kernel;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Aspire.Hosting;
 using DigitalBrain.Google.Gmail;
-using DigitalBrain.Memory;
 using DigitalBrain.Qdrant;
 using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.GitHub;
-using DigitalBrain.Compute;
-using DigitalBrain.Registry;
-using DigitalBrain.Sdk.Integrations;
-using DigitalBrain.Sdk.Secrets;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Supabase;
-using DigitalBrain.Time;
-using DigitalBrain.Files;
 using IntoChat;
 
 var builder = DistributedApplication.CreateBuilder(args);
-var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serviceId: "intochat")
-    .WithModule<AIModule, AIOptions>(ai =>
+var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serviceId: "intochat", options: new() { UseAzureStorage = true, Dashboard = true })
+    .WithModule<DigitalBrain.AI.Aspire.Hosting.AIModuleHosting, AIOptions>(ai =>
     {
         ai.Telemetry.EnableSensitiveData = true;
 
@@ -41,26 +29,26 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serv
             .WithVoiceToText<IWhisperLargeV3Turbo>()
             .WithTavilySearch();
     })
-    .WithModule<QdrantModule, QdrantModuleOptions>(qdrant => qdrant.WithHostedQdrant())
-    .WithModule<MemoryModule>()
-    .WithModule<ClickHouseModule, ClickHouseModuleOptions>(database => database.WithClickHouse())
-    .WithModule<SupabaseModule, SupabaseModuleOptions>(database => database.WithConnection("supabase"))
-    .WithModule<PostgresModule, PostgresModuleOptions>(database => database.WithPostgres(options => options.DatabaseName = "digitalbrain"))
-    .WithModule<PlaywrightModule>()
-    .WithModule<TimeModule>()
-    .WithModule<FilesModule>()
-    .WithModule<GmailModule, GmailModuleOptions>(gmail => gmail.WithGmail())
-    .WithModule<SalesforceModule, SalesforceModuleOptions>(salesforce => salesforce.WithHostedMcp())
-    .WithModule<GitHubModule>()
-    .WithModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunDesktopApp())
-    .WithModule<ComputeModule>()
-    .WithModule<RegistryModule>()
-    .WithModule<SpecsModule>()
-    .WithModule<AppsModule>()
-    .WithModule<AssistantModule>()
-    .WithModule<AspireModule>()
-    .WithModule<CSharpModule>()
-    .WithModule<CSharpAuthoringModule>();
+    .WithModule<DigitalBrain.Qdrant.Aspire.Hosting.QdrantModuleHosting, QdrantModuleOptions>(qdrant => qdrant.WithHostedQdrant())
+    .WithModule("memory")
+    .WithModule<DigitalBrain.ClickHouse.Aspire.Hosting.ClickHouseModuleHosting, ClickHouseModuleOptions>(database => database.WithClickHouse())
+    .WithModule<DigitalBrain.Supabase.Aspire.Hosting.SupabaseModuleHosting, SupabaseModuleOptions>(database => database.WithConnection("supabase"))
+    .WithModule<DigitalBrain.Postgres.Aspire.Hosting.PostgresModuleHosting, PostgresModuleOptions>(database => database.WithPostgres(options => options.DatabaseName = "digitalbrain"))
+    .WithModule("playwright")
+    .WithModule("time")
+    .WithModule("files")
+    .WithModule<DigitalBrain.Google.Gmail.GmailModuleHosting, GmailModuleOptions>(gmail => gmail.WithGmail())
+    .WithModule<DigitalBrain.Salesforce.Aspire.Hosting.SalesforceModuleHosting, SalesforceModuleOptions>(salesforce => salesforce.WithHostedMcp())
+    .WithModule<DigitalBrain.Microsoft.GitHub.GitHubModuleHosting>()
+    .WithModule<DigitalBrain.Flutter.Aspire.Hosting.FlutterModuleHosting, FlutterModuleOptions>(flutter => flutter.RunDesktopApp())
+    .WithModule("compute")
+    .WithModule("registry")
+    .WithModule("specs")
+    .WithModule("apps")
+    .WithModule("assistant")
+    .WithModule<DigitalBrain.Microsoft.Aspire.AspireModuleHosting>()
+    .WithModule<DigitalBrain.Microsoft.CSharp.CSharpModuleHosting>()
+    .WithModule<DigitalBrain.Microsoft.CSharp.CSharpAuthoringModuleHosting>();
 
 var cookieProtection = digitalBrain.AddBlobContainer(IntoChatConfiguration.ProtectionContainerName);
 

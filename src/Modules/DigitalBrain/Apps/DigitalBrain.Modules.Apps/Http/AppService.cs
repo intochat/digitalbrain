@@ -1,9 +1,10 @@
+using DigitalBrain.Sdk.Integrations.Accounts;
 using DigitalBrain.Apps;
 using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Microsoft.CSharp;
-using DigitalBrain.Sdk.Integrations.Accounts;
+using DigitalBrain.Platform.Contracts.Integrations.Accounts;
 
 namespace DigitalBrain.Apps;
 

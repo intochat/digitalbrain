@@ -1,12 +1,13 @@
 using DigitalBrain.Kernel;
 using DigitalBrain.Sdk;
-using DigitalBrain.Sdk.Integrations;
+using DigitalBrain.Platform.Contracts.Integrations;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 
 namespace DigitalBrain.Microsoft.GitHub;
 
+[ModuleId("github")]
 public sealed class GitHubModule : IModule<GitHubModuleOptions>
 {
     public static IntegrationDefinition Integration { get; } = IntegrationDefinition.For("github", "GitHub")

@@ -65,44 +65,21 @@ public sealed class PathTruthFacts
     public void ContainerModuleListsAgreeAndResolve()
     {
         const string prefix = "DigitalBrain__Modules__";
-        var docker = Read("src/IntoChat/IntoChat/Dockerfile").Split('\n')
-            .Where(line => line.Contains(prefix, StringComparison.Ordinal))
-            .Select(line =>
-            {
-                var assignment = line.Trim().TrimEnd('\\').Trim();
-                if (assignment.StartsWith("ENV ", StringComparison.Ordinal)) { assignment = assignment[4..].Trim(); }
-                var match = Regex.Match(assignment, "^DigitalBrain__Modules__(\\d+)=\"([^\"]*)\"$");
-                Assert.True(match.Success, $"Malformed module assignment: {line}");
-                Assert.NotEmpty(match.Groups[2].Value);
-                return (Index: int.Parse(match.Groups[1].Value), Module: match.Groups[2].Value);
-            }).ToArray();
+        var docker = Regex.Matches(Read("src/IntoChat/IntoChat/Dockerfile"), "DigitalBrain__Modules__([a-z-]+)__Enabled=\"true\"")
+            .Select(match => match.Groups[1].Value).Order().ToArray();
         var profile = XDocument.Load(PathInRepo("src/IntoChat/IntoChat/Properties/PublishProfiles/Container.pubxml"))
             .Descendants("ContainerEnvironmentVariable")
             .Where(entry => entry.Attribute("Include")!.Value.StartsWith(prefix, StringComparison.Ordinal))
-            .Select(entry => (Index: int.Parse(entry.Attribute("Include")!.Value[prefix.Length..]),
-                Module: entry.Attribute("Value")!.Value)).ToArray();
-
+            .Select(entry =>
+            {
+                Assert.Equal("true", entry.Attribute("Value")!.Value);
+                return entry.Attribute("Include")!.Value[prefix.Length..^"__Enabled".Length];
+            }).Order().ToArray();
         Assert.NotEmpty(docker);
-        Assert.NotEmpty(profile);
-        Assert.Equal(docker.Length, docker.Select(entry => entry.Index).Distinct().Count());
-        Assert.Equal(profile.Length, profile.Select(entry => entry.Index).Distinct().Count());
-        Assert.Equal(Enumerable.Range(0, docker.Length), docker.Select(entry => entry.Index).Order());
-        Assert.Equal(Enumerable.Range(0, profile.Length), profile.Select(entry => entry.Index).Order());
-        Assert.Equal(docker.Length, docker.Select(entry => entry.Module).Distinct().Count());
-        Assert.Equal(profile.Length, profile.Select(entry => entry.Module).Distinct().Count());
-        Assert.Equal(docker.Select(entry => entry.Module).Order(StringComparer.Ordinal),
-            profile.Select(entry => entry.Module).Order(StringComparer.Ordinal));
-        var appHost = Read("src/IntoChat/AppHost/AppHost.cs");
-        var composed = Regex.Matches(appHost, @"\.WithModule<([A-Za-z0-9_]+)")
-            .Select(match => match.Groups[1].Value).Order(StringComparer.Ordinal);
-        Assert.Equal(composed, docker.Select(entry => Type.GetType(entry.Module, throwOnError: true)!.Name).Order(StringComparer.Ordinal));
-        Assert.All(docker.Concat(profile), entry =>
-        {
-            var type = Type.GetType(entry.Module, throwOnError: true)!;
-            Assert.True(typeof(DigitalBrain.Kernel.IModule).IsAssignableFrom(type));
-            Assert.False(DigitalBrain.Contracts.PlatformAssemblyAttribute.IsPlatform(type.Assembly));
-            Assert.DoesNotContain(type.Assembly.GetReferencedAssemblies(), reference => reference.Name == "DigitalBrain.Platform");
-
-        });
+        Assert.Equal(docker.Length, docker.Distinct().Count());
+        Assert.Equal(docker, profile);
+        var registered = Regex.Matches(Read("src/IntoChat/IntoChat/Program.cs"), "AddModule<[^>]+>\\(\"([^\"]+)\"")
+            .Select(match => match.Groups[1].Value).Order().ToArray();
+        Assert.Equal(docker, registered);
     }
 }

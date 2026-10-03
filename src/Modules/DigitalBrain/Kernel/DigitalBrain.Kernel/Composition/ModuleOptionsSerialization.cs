@@ -1,3 +1,4 @@
+using DigitalBrain.Contracts;
 using System.Reflection;
 using System.Text.Json.Serialization;
 using System.Text.Json;
@@ -17,23 +18,9 @@ public static class ModuleOptionsSerialization
         where TModule : IModule<TOptions> where TOptions : class, IModuleOptions, new()
     {
         ArgumentNullException.ThrowIfNull(options);
-        var credentialProperty = typeof(TOptions).GetProperties().FirstOrDefault(p => ModuleSettingsValidation.IsCredentialName(p.Name));
-        if (credentialProperty is not null)
-        {
-            throw new ArgumentException(
-                $"{typeof(TOptions).Name}.{credentialProperty.Name} looks like a credential; credentials belong to the integrations registration, not module options.");
-        }
-
-        var ignoredProperty = typeof(TOptions).GetProperties().FirstOrDefault(property =>
-            property.SetMethod is { IsPublic: true }
-            && property.GetCustomAttribute<JsonIgnoreAttribute>() is { Condition: not JsonIgnoreCondition.Never });
-        if (ignoredProperty is not null)
-        {
-            throw new ArgumentException($"{typeof(TOptions).Name}.{ignoredProperty.Name} is writable but excluded from module options serialization.");
-        }
-
+        ModuleOptionsShape.Validate<TOptions>();
         options.Validate();
-        return new ModuleDefinition(typeof(TModule), FlattenOptions(options, typeof(TModule).Name));
+        return new ModuleDefinition(typeof(TModule), FlattenOptions(options, ModuleIdentity.Get(typeof(TModule))));
     }
 
     public static Dictionary<string, string?> FlattenOptions<TOptions>(TOptions options, string moduleName)

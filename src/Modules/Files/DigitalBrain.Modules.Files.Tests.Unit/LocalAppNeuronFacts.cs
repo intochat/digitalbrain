@@ -1,7 +1,7 @@
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Flutter.Collection;
 using DigitalBrain.Files;
-using DigitalBrain.Sdk.Identity;
+using DigitalBrain.Platform.Contracts.Identity;
 using DigitalBrain.Testing.Unit;
 using DigitalBrain.Flutter;
 using Microsoft.Extensions.DependencyInjection;

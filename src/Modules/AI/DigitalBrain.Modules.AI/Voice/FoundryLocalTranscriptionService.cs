@@ -34,7 +34,7 @@ public sealed class FoundryLocalTranscriptionService :
         IConfiguration configuration,
         ILogger<FoundryLocalTranscriptionService> logger,
         IAudioConverter? audioConverter = null)
-        : this(Options.Create(AIOptions.Read(configuration)), logger, audioConverter)
+        : this(Options.Create(AIOptionsRuntime.Read(configuration)), logger, audioConverter)
     {
     }
 

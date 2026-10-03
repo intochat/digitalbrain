@@ -16,6 +16,8 @@
     <PackageReference Include="Microsoft.Orleans.Serialization.SystemTextJson" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/Platform/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
   </ItemGroup>
+  <ItemGroup><ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Kernel.AspNetCore/DigitalBrain.Kernel.AspNetCore.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Client.Orleans/DigitalBrain.Client.Orleans.csproj" /></ItemGroup>
 </Project>

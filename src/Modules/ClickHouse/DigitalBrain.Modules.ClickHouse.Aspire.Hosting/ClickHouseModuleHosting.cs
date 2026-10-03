@@ -1,17 +1,17 @@
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Kernel;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.ClickHouse.Aspire.Hosting;
 
 public sealed class ClickHouseModuleHosting : IDigitalBrainModuleHosting
 {
+    public string Id => "clickhouse";
     public void Configure(DigitalBrainBuilder brain)
     {
-        var options = brain.GetModuleConfiguration<ClickHouseModule>().GetModuleOptions<ClickHouseModuleOptions>(nameof(ClickHouseModule));
+        var options = brain.GetModuleConfiguration("clickhouse").GetModuleOptions<ClickHouseModuleOptions>("clickhouse");
         if (options.Hosting.Enabled)
         {
-            new DigitalBrainModuleBuilder<ClickHouseModule>(brain).WithClickHouse(o =>
+            new DigitalBrainModuleBuilder<DigitalBrain.ClickHouse.Aspire.Hosting.ClickHouseModuleHosting>(brain).WithClickHouse(o =>
             {
                 o.PersistentStorage = options.Hosting.PersistentStorage;
                 o.AlwaysRunInitScripts = options.Hosting.AlwaysRunInitScripts;

@@ -5,7 +5,7 @@
     <RootNamespace>DigitalBrain.Salesforce.Aspire.Hosting</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../DigitalBrain.Modules.Salesforce/DigitalBrain.Modules.Salesforce.csproj" />
+    <ProjectReference Include="../DigitalBrain.Modules.Salesforce.Contracts/DigitalBrain.Modules.Salesforce.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

@@ -1,7 +1,8 @@
 # NuGet Readiness Assessment — Kernel Ring, Client, Sdk, Platform, Aspire
 
-Date: 2026-10-03. Scope: `DigitalBrain`, `DigitalBrain.Modules.Kernel`, `.Contracts`, `.Client`,
-`DigitalBrain.Modules.Sdk`, `DigitalBrain.Platform`, `DigitalBrain.Aspire`, `DigitalBrain.Aspire.Hosting`
+Date: 2026-10-03. Scope: `DigitalBrain`, `DigitalBrain.Contracts`, `DigitalBrain.Kernel`,
+`DigitalBrain.Client`, `DigitalBrain.Client.Orleans`, `DigitalBrain.Sdk`, `DigitalBrain.Platform.Contracts`,
+`DigitalBrain.Platform`, `DigitalBrain.Kernel.AspNetCore`, and the three `DigitalBrain.Aspire.*` integrations
 plus their covering test suites. Every finding carries a severity; the ordered action plan is at the end.
 
 ---
@@ -53,22 +54,22 @@ The findings above describe the original assessment; addressed status and the ac
 | # | Project | Location | Finding | Addressed |
 |---|---------|----------|---------|-----------|
 | C1 | Platform | `PlatformHosting.cs:28` | `TryAddSingleton<IKeyVault, FakeKeyVault>` in default production composition — fake crypto wired in silently; keys persist as `"kv1:"+base64(key)` unless a real wrapper is separately registered. Move fake to Testing; fail fast when no real key vault/master key is configured. | ✅ `9c1f84870` |
-| C2 | Client | `DigitalBrain.Client.csproj:17-27` | Two products in one package; script consumers inherit Orleans/Azure/OTel/ASP.NET. Split script-edge client into a lean package (needs ~`System.Net.Http.Json`). | |
-| C3 | Sdk | whole project | Grab-bag SDK: grains, middleware, SQL compiler, MCP client, identity, secrets APIs in one assembly. Split public module-author surface from unpublished platform contracts. | |
-| C4 | Sdk | `Secrets/ISecrets.cs:17`, `Integrations/IIntegrationRegistration.cs:33`, `Auth/TokenHandoff.cs`, `Identity/Accounts.cs:41` | Plaintext-credential-returning APIs on the public NuGet surface; only runtime `[PlatformOnly]` protects them. Move to a non-published platform-contracts assembly. | |
-| C5 | Aspire | `DigitalBrain.Aspire.csproj` | Misnamed (it's the silo runtime, not an Aspire client integration), product-coupled ("Silo host wiring for IntoChat"), and references `DigitalBrain.Platform` — publishing it publishes the credential ring. Rename and cut the Platform dependency from the public graph. | Partial: renamed to `DigitalBrain.Aspire.Server`; the Platform dependency remains for Phase 2. |
+| C2 | Client | `DigitalBrain.Client.csproj:17-27` | Two products in one package; script consumers inherit Orleans/Azure/OTel/ASP.NET. Split script-edge client into a lean package (needs ~`System.Net.Http.Json`). | ✅ HTTP-only `DigitalBrain.Client`; cluster transport in `DigitalBrain.Client.Orleans`. Host defaults remain in Aspire.Client. |
+| C3 | Sdk | whole project | Grab-bag SDK: grains, middleware, SQL compiler, MCP client, identity, secrets APIs in one assembly. Split public module-author surface from unpublished platform contracts. | ✅ Platform contracts extracted; stored rows/query evaluator moved to Kernel; MCP session moved to Salesforce. SDK retains module-author helpers. |
+| C4 | Sdk | `Secrets/ISecrets.cs:17`, `Integrations/IIntegrationRegistration.cs:33`, `Auth/TokenHandoff.cs`, `Identity/Accounts.cs:41` | Plaintext-credential-returning APIs on the public NuGet surface; only runtime `[PlatformOnly]` protects them. Move to a non-published platform-contracts assembly. | ✅ Approved design adjustment: publish `DigitalBrain.Platform.Contracts` separately. Publication is not an authorization boundary; assembly-level PlatformOnly enforcement remains. Token handoff implementation lives in Platform. |
+| C5 | Aspire | `DigitalBrain.Aspire.csproj` | Misnamed (it's the silo runtime, not an Aspire client integration), product-coupled ("Silo host wiring for IntoChat"), and references `DigitalBrain.Platform` — publishing it publishes the credential ring. Rename and cut the Platform dependency from the public graph. | ✅ Server integration references Kernel, HTTP companion and Orleans client, with no Platform dependency. Applications explicitly install Platform. |
 | C6 | repo | `Directory.Build.props` | `PackageIcon` without a packed icon file → `dotnet pack` fails/ships wrong. Add the icon + pack item or drop the property; add a pack smoke test to CI. | ✅ `1b65d23c7` |
 | C7 | Kernel | `Composition/CompositionOverrideTransport.cs` | Test-only global static in the shipped runtime; `Take` doesn't remove entries (unbounded growth, token reuse). Move to DigitalBrain.Testing; fix the leak regardless. | ✅ `3a724f8a4` (deleted, not moved — see note) |
 
 ## High findings
 
 ### Dependency / layering
-- **H1** Kernel csproj: server runtime references the Client project — invert; the shared records belong in Contracts.
-- **H2** Kernel csproj:8: `FrameworkReference Microsoft.AspNetCore.App` on the core runtime. Split `Enforcement/BrainRoutes|BrainAccessFilter` + `IModule.Configure(IEndpointRouteBuilder)` into a `.AspNetCore`/hosting companion package.
-- **H3** `Aspire.Hosting.csproj:12-13`: AppHost package references the full Kernel implementation; depend on Contracts/composition abstractions only.
-- **H4** Client `Edge/ScriptEdgeProtocol.cs`: wire protocol internal + IVT to a production module. Promote to Contracts; delete the production IVT.
-- **H5** Contracts: relocate `TypeCatalog`/`SchemaExtensions`/`SecretRef` parsing and `IntentContext` (logic) out of Contracts; delete dead `Types/ValueTypes.cs` structs (unused except `Reference`).
-- **H6** Platform csproj: "the ring scripts can never see" is `IsPackable=true`. Decide: private feed or `IsPackable=false`.
+- **H1** Kernel csproj: server runtime references the Client project — invert; the shared records belong in Contracts. — ✅ Kernel no longer references either client package.
+- **H2** Kernel csproj:8: `FrameworkReference Microsoft.AspNetCore.App` on the core runtime. Split `Enforcement/BrainRoutes|BrainAccessFilter` + `IModule.Configure(IEndpointRouteBuilder)` into a `.AspNetCore`/hosting companion package. — ✅ HTTP routes/filter and `IHttpModule` moved into `DigitalBrain.Kernel.AspNetCore`; core Kernel has no ASP.NET framework reference.
+- **H3** `Aspire.Hosting.csproj:12-13`: AppHost package references the full Kernel implementation; depend on Contracts/composition abstractions only. — ✅ AppHost and feature hosting adapters depend on contracts, not runtime implementations.
+- **H4** Client `Edge/ScriptEdgeProtocol.cs`: wire protocol internal + IVT to a production module. Promote to Contracts; delete the production IVT. — ✅ Public v1 wire DTO/constants in Contracts; production protocol IVTs removed. Paths and JSON unchanged.
+- **H5** Contracts: relocate `TypeCatalog`/`SchemaExtensions`/`SecretRef` parsing and `IntentContext` (logic) out of Contracts; delete dead `Types/ValueTypes.cs` structs (unused except `Reference`). — ✅ Type catalog, schema validation and secret-reference parsing moved to SDK; ambient intent state moved to Kernel with synchronized usage snapshots; only the used Reference wrapper remains.
+- **H6** Platform csproj: "the ring scripts can never see" is `IsPackable=true`. Decide: private feed or `IsPackable=false`. — ✅ Approved decision: Platform and Platform.Contracts are packable, explicitly installed server capabilities. Credentials remain inaccessible to untrusted callers through runtime enforcement.
 
 ### Security / correctness
 - **H7** Kernel `Enforcement/BrainAccessFilter.cs:36-38`: unauthenticated header-less requests bypass membership ("open development posture") — insecure-by-default in a public package; make it explicit opt-in, and pin the current behavior with a test. — ✅ Addressed: every request requires a caller stamp and membership check; the explicit Open posture permits the synthetic owner through a composed access policy. Regression tests cover requests with and without Authorization.
@@ -76,17 +77,17 @@ The findings above describe the original assessment; addressed status and the ac
 - **H9** Sdk `Auth/LoginPage.cs:14-16`: unencoded string interpolation into HTML — XSS the moment any consumer passes tainted strings. HtmlEncode. — ✅ Addressed: title and message are HTML-encoded, with regression coverage for both title locations and message markup.
 - **H10** Platform `Identity/Directory/IdentityDirectoryNeuron.cs`: god grain — every account, member, invitation and password hash in one list-shaped global grain state; full scan per auth.
 - **H11** Aspire `DigitalBrainRuntimeHostingExtensions.cs:24-29`: `DigitalBrain:Testing:PrivateConfiguration` reads an arbitrary JSON file into config in the production path; move behind a Testing seam (same family as C7). — ✅ `3a724f8a4`: became the neutral `DigitalBrain:ConfigurationFile` setting loaded via standard `AddJsonFile` (secrets-file pattern, legitimate in production).
-- **H12** Aspire: Azure welded in with no seam (`:31-33,100-126`) — no provider choice, Orleans Dashboard unconditional (`:54`). Accept options; make Azure/Dashboard opt-in.
-- **H13** Aspire.Hosting `Brain/DigitalBrainBuilder.cs`: two classes in one; `Orleans`/`GrainState` are `null!` until `AttachRuntime`; `Materialize()` only runs from `WithReference`, so an unreferenced brain never validates. Split and construct fully.
-- **H14** Aspire reflection contracts: `"FullName, Assembly"` env strings + `Activator.CreateInstance` (`DigitalBrainRuntimeHostingExtensions.cs:77-98`) and `Assembly.Load(name + ".Aspire.Hosting")` + `<Type>Hosting` name convention (`DigitalBrainHostingExtensions.cs:124-142`). Replace with an assembly-level attribute or explicit registration; make `FindModuleHosting` internal.
-- **H15** Client `BrainClientHosting.cs:16`: Azure Tables clustering hardcoded in the public entry point; `BrainOptions` is internal yet registered via public API (unconfigurable). 
-- **H16** Kernel `Composition/ModuleDefinition.cs:24-25`: `CreateModule()` per Configure call — stateful modules silently get two instances. Cache or contract statelessness.
+- **H12** Aspire: Azure welded in with no seam (`:31-33,100-126`) — no provider choice, Orleans Dashboard unconditional (`:54`). Accept options; make Azure/Dashboard opt-in. — ✅ Azure and dashboard are opt-in; AppHost defaults to memory providers. Product and E2E compositions explicitly retain Azure.
+- **H13** Aspire.Hosting `Brain/DigitalBrainBuilder.cs`: two classes in one; `Orleans`/`GrainState` are `null!` until `AttachRuntime`; `Materialize()` only runs from `WithReference`, so an unreferenced brain never validates. Split and construct fully. — ✅ Builder constructor receives its complete runtime state; optional Azure resources are nullable by contract. Module options and adapter selection validate during composition, with no deferred Materialize.
+- **H14** Aspire reflection contracts: `"FullName, Assembly"` env strings + `Activator.CreateInstance` (`DigitalBrainRuntimeHostingExtensions.cs:77-98`) and `Assembly.Load(name + ".Aspire.Hosting")` + `<Type>Hosting` name convention (`DigitalBrainHostingExtensions.cs:124-142`). Replace with an assembly-level attribute or explicit registration; make `FindModuleHosting` internal. — ✅ Stable IDs plus explicit server factories and explicit hosting adapters replace production type-name loading. Docker/publish profiles use Enabled keys. Assembly-qualified test modules remain solely in Testing.E2E.
+- **H15** Client `BrainClientHosting.cs:16`: Azure Tables clustering hardcoded in the public entry point; `BrainOptions` is internal yet registered via public API (unconfigurable). — ✅ Aspire.Client Azure registration is opt-in; public SubscriptionOptions configure client timing/buffers. Kernel owns observer lease options.
+- **H16** Kernel `Composition/ModuleDefinition.cs:24-25`: `CreateModule()` per Configure call — stateful modules silently get two instances. Cache or contract statelessness. — ✅ ModuleDefinition caches one instance with Lazy; the server passes the same instance to silo and HTTP configuration.
 - **H17** Sdk twin `IIntegrationAccounts` interfaces (Sdk.Integrations.Accounts vs Contracts.Integrations) — same name, different neurons; rename one.
-- **H18** Naming unification (systemic defect 5): one convention for package id = assembly = root namespace = folder, done before first publish. Includes `DigitalBrain` meta-package (ns `DigitalBrain.Contracts`) and the two Sdk files in `DigitalBrain.Identity`. — ✅ Addressed: the nine approved projects now use matching folder, csproj, assembly, package ID, and root namespace. The vocabulary is in `DigitalBrain`; SDK identity contracts are in `DigitalBrain.Sdk.Identity`.
+- **H18** Naming unification (systemic defect 5): one convention for package id = assembly = root namespace = folder, done before first publish. Includes `DigitalBrain` meta-package (ns `DigitalBrain.Contracts`) and the two Sdk files in `DigitalBrain.Identity`. — ✅ Addressed: the nine approved projects now use matching folder, csproj, assembly, package ID, and root namespace. The vocabulary is in `DigitalBrain`; Identity contracts now reside in `DigitalBrain.Platform.Contracts.Identity`.
 
 ## Medium findings (abridged — see per-project notes below)
 
-- Contracts `IntentContext.cs`: unsynchronized `List` under concurrent `AddUsage`; `AsyncLocal` stack breaks on out-of-order dispose. (Also move per H5.)
+- Contracts `IntentContext.cs`: ✅ Moved to Kernel; locked usage collection, detached snapshots, nesting checks and explicit scopes across async iterator steps.
 - Contracts `TypeCatalog.cs`: kind list maintained in four places (two switches, BuildCatalog, embedded JSON); derive from one. `ValidateDateTime` drops offsets despite promising ISO 8601.
 - Contracts `SchemaExtensions.cs`: `x-intochat-*` vendor keys hard-code the product name in a platform package.
 - Contracts `Signals/NeuronActivity.cs:8` and `CallRequest.SemanticTypeIds`: `IReadOnlyList<string>` on serialized records violates the repo's own concrete-arrays rule.
@@ -157,22 +158,63 @@ misleading.
 
    Validation: full solution Release build passed with zero warnings/errors; all 24 unit/architecture suites passed (906 passed, 6 skipped, 0 failed). Solution-wide NuGet packing passed; all nine package identities and packed DLL names match the naming rule. Live E2E was not run. The architecture baseline also records previously unrecorded, additive Apps/CSharp contracts after checking that existing field IDs remain unchanged; the Assistant route test now supplies the access policy required by H7.
 
-   Scope: this completes naming and the Aspire client-integration extraction. C2's transport split, C3/C4's SDK split, H1/H3's dependency inversions, and the remaining C5/H6 Platform publication decision are still pending. Aspire.Server still composes Platform; naming does not claim to remove that dependency.
+   Scope at the H18 commit: naming and Aspire client-integration extraction only. The subsequent coordinated refactor below completes the transport split, SDK split, dependency inversions and Platform publication decision.
 
 **Phase 2 — package shape (the big refactor)**
 
-**Next priority: H4 + H1 (step 7).** Move `ScriptEdgeProtocol` from `DigitalBrain.Client` into `DigitalBrain.Contracts`, update client/server consumers, remove the protocol-sharing production `InternalsVisibleTo`, and eliminate the Kernel → Client project reference. Preserve wire compatibility and verify the CSharp script-edge, kernel, and architecture suites. C5 is only partially addressed: the server integration name is fixed, but its Platform dependency remains.
+**Completed: coordinated package/composition refactor (2026-10-03).**
 
-7. H4 + H1: move the script-edge wire protocol into Contracts; delete the Kernel→Client reference and the production IVT.
-8. C2: split Client into lean script-edge package vs cluster-client/host package; drop Azure/OTel/ASP.NET from the script package (H15, service-defaults relocation).
-9. H2: extract Kernel's ASP.NET enforcement into a hosting companion; Kernel loses the framework reference.
-10. H5: purify Contracts (type catalog → own package/Sdk; IntentContext → runtime; delete ValueTypes).
-11. C3 + C4: split the Sdk; move credential-shaped interfaces to an unpublished platform-contracts assembly; relocate `StoredRowsNeuron`, `McpHttpSession`.
-12. C5 + H3 + H6: cut Aspire→Platform from the public graph; Aspire.Hosting depends on Contracts only; decide Platform packability.
+```text
+DigitalBrain.Client          -> Contracts -> DigitalBrain
+DigitalBrain.Client.Orleans  -> Contracts
+DigitalBrain.Kernel          -> Contracts
+DigitalBrain.Kernel.AspNetCore -> Kernel
+DigitalBrain.Sdk             -> Kernel.AspNetCore + Platform.Contracts
+DigitalBrain.Platform       -> Sdk
+DigitalBrain.Aspire.Hosting  -> Contracts
+DigitalBrain.Aspire.Client   -> Client.Orleans
+DigitalBrain.Aspire.Server   -> Kernel.AspNetCore + Client.Orleans
+```
+
+```csharp
+// AppHost: explicit infrastructure and module adapters; no runtime module assemblies.
+var brain = builder.AddDigitalBrain("brain", options: new()
+{
+    UseAzureStorage = true,
+    Dashboard = true,
+}).WithModule<PostgresModuleHosting, PostgresModuleOptions>(db => db.WithPostgres());
+
+// Server: available implementations are registered in code; configuration selects stable IDs.
+builder.AddDigitalBrainServer(server => server
+    .UseAzureStorage().WithDashboard()
+    .AddModule<PostgresModule>("postgres"));
+builder.AddDigitalBrainPlatform();
+app.MapDigitalBrainModules();
+app.MapDigitalBrainPlatform();
+app.MapDigitalBrainDashboard();
+// DigitalBrain__Modules__postgres__Enabled=true
+```
+
+7. H4 + H1 — ✅ Shared v1 protocol; no Kernel→Client reference or protocol IVT.
+8. C2 + H15 — ✅ HTTP script client separated from Orleans; no Generic Host lifecycle in script client. Orleans generator is a private build dependency of contracts.
+9. H2 — ✅ ASP.NET companion extracted.
+10. H5 — ✅ Runtime/catalog/parsing separated from wire DTOs. Intent collection supports concurrency and detached snapshots; async iterator steps explicitly enter the intent scope.
+11. C3 + C4 — ✅ Privileged contracts extracted into **publishable** Platform.Contracts (approved replacement for the original unpublished-package proposal). StoredRowsNeuron/RowQueryEvaluator live in Kernel; Salesforce owns McpHttpSession; Platform owns TokenHandoff.
+12. C5 + H3 + H6 — ✅ Explicit Platform installation, no Aspire.Server→Platform or AppHost→Kernel graph. Assistant and Playwright projects made packable to close existing downstream package dependencies.
+
+Compatibility: all 522 persisted type baselines retain their field IDs; moved types retain Orleans aliases. Legacy collection payloads are unchanged. The local observer path remains through Contracts.Signals.ILocalSignalHub because Orleans forbids creating an observer object reference inside a grain.
+
+Validation (2026-10-03):
+- Release solution build: **0 warnings, 0 errors**.
+- All 24 unit/architecture suites: **919 passed, 6 skipped, 0 failed**. Includes legacy collection deserialization and identity-state fixtures.
+- **73 NuGet packages** produced; every internal dependency exists in the feed.
+- Five isolated consumers restored and built from the produced feed: HTTP script, Kernel, all AppHost adapters, Server + Platform, and all packages. A fresh package cache and source mapping prevented reuse of older DigitalBrain packages.
+- Restored graph assertions: script has no Azure/Aspire/OTel/Generic Host/Orleans client or server; Kernel has no Client/Platform; AppHost adapters have no runtime module dependencies.
+- `git diff --check` passed. Container-backed E2E deployment was not run.
 
 **Phase 3 — API hardening**
-13. H12–H14: options-based Aspire composition, attribute-based module-hosting discovery, builder split.
-14. H10, H16, H17 and the Medium list.
+13. H12–H14, H16 — ✅ Explicit infrastructure options, stable module IDs, explicit hosting adapters/server factories, fully initialized builder and one module instance.
+14. **Next priority: H10** — redesign the global identity-directory grain and its persistence/migration boundaries. Then H17 (distinct names for privileged versus script account interfaces) and the remaining Medium findings.
 
 **Phase 4 — tests**
 15. Split the mono test suite along package lines; delete/fix the listed tests; close the High-priority gaps (BrowserLogins/TokenHandoff, RowQueryEvaluator, IntentContext), then Medium.

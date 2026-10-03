@@ -11,6 +11,5 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
-    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
   </ItemGroup>
 </Project>

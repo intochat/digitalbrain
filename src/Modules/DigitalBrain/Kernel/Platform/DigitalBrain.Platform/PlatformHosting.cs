@@ -1,4 +1,4 @@
-using DigitalBrain.Sdk.Integrations.Accounts;
+using DigitalBrain.Platform.Contracts.Integrations.Accounts;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Platform.Identity;
@@ -8,8 +8,8 @@ using DigitalBrain.Platform.Capacity;
 using DigitalBrain.Platform.Integrations;
 using DigitalBrain.Platform.Integrations.Accounts;
 using DigitalBrain.Platform.Secrets;
-using DigitalBrain.Sdk.Identity;
-using DigitalBrain.Sdk.Integrations;
+using DigitalBrain.Platform.Contracts.Identity;
+using DigitalBrain.Platform.Contracts.Integrations;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -19,12 +19,13 @@ namespace DigitalBrain.Platform;
 
 public static class PlatformHosting
 {
-    internal static void AddPlatform(this ISiloBuilder silo)
+    public static void AddDigitalBrainPlatform(this ISiloBuilder silo)
     {
         var services = silo.Services;
         if (services.Any(service => service.ServiceType == typeof(PlatformRegistration))) { return; }
         services.AddSingleton<PlatformRegistration>();
         services.AddIdentity();
+        services.TryAddSingleton<DigitalBrain.Platform.Contracts.Auth.ITokenHandoff, Auth.TokenHandoff>();
         services.AddMasterKeyWrapper();
         services.TryAddSingleton<IReadOnlyList<IntegrationDefinition>>(provider =>
             IntegrationDiscovery.Collect(provider.GetRequiredService<ModuleInventory>().Types));

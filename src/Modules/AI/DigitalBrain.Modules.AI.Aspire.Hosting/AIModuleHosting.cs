@@ -1,21 +1,21 @@
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Kernel;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.AI.Aspire.Hosting;
 
 public sealed class AIModuleHosting : IDigitalBrainModuleHosting
 {
+    public string Id => "ai";
     public void Configure(DigitalBrainBuilder brain)
         => AIHostingExtensions.ConfigureDeclaration(brain,
-            brain.GetModuleConfiguration<AIModule>().GetModuleOptions<AIOptions>(nameof(AIModule)));
+            brain.GetModuleConfiguration("ai").GetModuleOptions<AIOptions>("ai"));
 }
 
 public static partial class AIHostingExtensions
 {
     internal static void ConfigureDeclaration(DigitalBrainBuilder brain, AIOptions options)
     {
-        var module = new DigitalBrainModuleBuilder<AIModule>(brain);
+        var module = new DigitalBrainModuleBuilder<DigitalBrain.AI.Aspire.Hosting.AIModuleHosting>(brain);
         var state = State(module);
         state.EnableSensitiveData = options.Telemetry.EnableSensitiveData ?? false;
         foreach (var name in options.Hosting.Llms)

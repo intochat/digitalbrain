@@ -15,4 +15,5 @@
     <ProjectReference Include="../../../AI/DigitalBrain.Modules.AI.Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
     <ProjectReference Include="../../Registry/DigitalBrain.Modules.Registry.Contracts/DigitalBrain.Modules.Registry.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup><ProjectReference Include="../../Kernel/DigitalBrain.Kernel.AspNetCore/DigitalBrain.Kernel.AspNetCore.csproj" /></ItemGroup>
 </Project>

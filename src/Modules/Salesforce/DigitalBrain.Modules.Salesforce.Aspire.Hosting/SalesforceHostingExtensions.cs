@@ -8,8 +8,8 @@ public static class SalesforceHostingExtensions
 {
     // Only the kernel receives the OAuth parameters. The public origin defaults to the kernel's own http endpoint;
     // the MCP endpoint is a module option.
-    public static DigitalBrainModuleBuilder<SalesforceModule> WithHostedMcp(
-        this DigitalBrainModuleBuilder<SalesforceModule> module,
+    public static DigitalBrainModuleBuilder<DigitalBrain.Salesforce.Aspire.Hosting.SalesforceModuleHosting> WithHostedMcp(
+        this DigitalBrainModuleBuilder<DigitalBrain.Salesforce.Aspire.Hosting.SalesforceModuleHosting> module,
         Uri? publicOrigin = null)
     {
         ArgumentNullException.ThrowIfNull(module);
@@ -27,7 +27,7 @@ public static class SalesforceHostingExtensions
         DigitalBrainBuilder brain,
         IResourceBuilder<DigitalBrainModuleResource> module) : DigitalBrainModuleProjection
     {
-        private const string OAuthRoot = SalesforceModule.OAuthConfigurationRoot;
+        private const string OAuthRoot = "DigitalBrain:Salesforce:OAuth";
 
         private bool _enabled;
         private Uri? _publicOrigin;

@@ -1,14 +1,16 @@
+using DigitalBrain.Sdk.Types;
+using DigitalBrain.Sdk.Integrations.Accounts;
+using DigitalBrain.Platform.Contracts.Integrations.Accounts;
 using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Contracts.Types;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Enforcement;
-using DigitalBrain.Sdk.Integrations;
+using DigitalBrain.Platform.Contracts.Integrations;
 using DigitalBrain.Platform.Integrations;
-using DigitalBrain.Sdk.Integrations.Accounts;
 using DigitalBrain.Platform.Integrations.Accounts;
-using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Contracts.Secrets;
 using DigitalBrain.Platform.Secrets;
 using DigitalBrain.Testing.Unit;
 using Microsoft.AspNetCore.Builder;
@@ -183,7 +185,7 @@ public sealed class AccountFacts : IDisposable
         var account = await brain.Get<IIntegrationAccounts>("workspace-one")
             .Connect(new ConnectAccount { IntegrationId = "gmail", ConnectionId = "mail", Value = "mine" }, ct);
 
-        Assert.Equal(Owner, account.Credential.Owner);
+        Assert.Equal(Owner, account.Credential.OwnerOf());
         Orleans.Runtime.RequestContext.Clear();
         await Assert.ThrowsAsync<UntrustedCallerException>(() => brain.Get<IIntegrationAccounts>("workspace-one")
             .Connect(new ConnectAccount { IntegrationId = "gmail", ConnectionId = "mail2", Value = "v" }, ct));
@@ -244,7 +246,7 @@ public sealed class AccountFacts : IDisposable
             IntegrationId = "gmail",
             WorkspaceId = workspace,
             Status = AccountStatus.Connected,
-            Credential = SecretRef.For(owner, id, id, true),
+            Credential = SecretReferences.For(owner, id, id, true),
         };
         var result = ScopedAccounts.Visible(scope, [Account("new", "one", "alice"), Account("wrong-workspace", "two", "alice")]);
         Assert.Equal(["new"], result.Select(account => account.Id));

@@ -3,7 +3,7 @@ using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Supabase.Tables;
 using Microsoft.Playwright;
-using DigitalBrain.Sdk.Identity;
+using DigitalBrain.Platform.Contracts.Identity;
 
 namespace DigitalBrain.Modules.Supabase.Tests.E2E;
 

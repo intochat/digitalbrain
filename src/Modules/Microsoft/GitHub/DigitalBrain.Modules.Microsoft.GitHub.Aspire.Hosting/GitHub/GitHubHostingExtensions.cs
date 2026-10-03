@@ -6,8 +6,8 @@ namespace DigitalBrain.Microsoft.GitHub;
 
 public static class GitHubHostingExtensions
 {
-    public static DigitalBrainModuleBuilder<GitHubModule> WithGitHubRepository(
-        this DigitalBrainModuleBuilder<GitHubModule> module, Action<GitHubRepositoryHostingOptions> configure)
+    public static DigitalBrainModuleBuilder<DigitalBrain.Microsoft.GitHub.GitHubModuleHosting> WithGitHubRepository(
+        this DigitalBrainModuleBuilder<DigitalBrain.Microsoft.GitHub.GitHubModuleHosting> module, Action<GitHubRepositoryHostingOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(module);
         ArgumentNullException.ThrowIfNull(configure);
@@ -17,8 +17,8 @@ public static class GitHubHostingExtensions
             options.RepoOwner, options.RepoName, options.EndpointId, options.ApiHost, options.McpEndpoint);
     }
 
-    public static DigitalBrainModuleBuilder<GitHubModule> WithGitHubRepository(
-        this DigitalBrainModuleBuilder<GitHubModule> module,
+    public static DigitalBrainModuleBuilder<DigitalBrain.Microsoft.GitHub.GitHubModuleHosting> WithGitHubRepository(
+        this DigitalBrainModuleBuilder<DigitalBrain.Microsoft.GitHub.GitHubModuleHosting> module,
         string bindingId, long appId, long installationId,
         long repositoryId, string repositoryOwner, string repositoryName,
         string? endpointId = null, Uri? apiHost = null, Uri? mcpEndpoint = null)
@@ -80,7 +80,7 @@ public static class GitHubHostingExtensions
 
         public override void Apply<TResource>(IResourceBuilder<TResource> builder)
         {
-            var microsoft = brain.GetOrAddModuleNode(typeof(GitHubModule));
+            var microsoft = brain.GetOrAddModuleNode("github");
             _privateKey ??= brain.ApplicationBuilder.AddParameter($"github-{id}-app-private-key", secret: true)
                 .WithDescription("PEM private key for the configured GitHub App. Only the kernel receives this secret.")
                 .WithParentRelationship(microsoft);

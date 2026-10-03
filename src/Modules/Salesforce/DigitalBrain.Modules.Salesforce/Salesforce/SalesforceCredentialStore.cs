@@ -1,6 +1,7 @@
+using DigitalBrain.Sdk.Types;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Contracts.Types;
-using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Contracts.Secrets;
 
 namespace DigitalBrain.Salesforce;
 
@@ -47,13 +48,13 @@ internal sealed class SalesforceCredentialStore(
     internal async Task<string> AccessTokenAsync(SalesforceState connection, CancellationToken cancellationToken)
     {
         var secret = connection.AccessToken ?? throw new SalesforceNotConnectedException();
-        return await grains.GetGrain<ISecrets>(secret.Owner).Resolve(Platform(), secret, cancellationToken).ConfigureAwait(false);
+        return await grains.GetGrain<ISecrets>(secret.OwnerOf()).Resolve(Platform(), secret, cancellationToken).ConfigureAwait(false);
     }
 
     internal async Task<string> RefreshTokenAsync(SalesforceState connection, CancellationToken cancellationToken)
     {
         var secret = connection.RefreshToken ?? throw new SalesforceNotConnectedException();
-        return await grains.GetGrain<ISecrets>(secret.Owner).Resolve(Platform(), secret, cancellationToken).ConfigureAwait(false);
+        return await grains.GetGrain<ISecrets>(secret.OwnerOf()).Resolve(Platform(), secret, cancellationToken).ConfigureAwait(false);
     }
 
     private DateTimeOffset Expiry(double? seconds)
@@ -70,7 +71,7 @@ internal sealed class SalesforceCredentialStore(
 
     private static string OwnerOf(SecretRef secret)
     {
-        return secret.Owner;
+        return secret.OwnerOf();
     }
 
     // The outbound call resolves the secret as trusted platform code, never as the user turn.

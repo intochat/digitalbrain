@@ -1,7 +1,6 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Kernel;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Microsoft.CSharp;
@@ -9,13 +8,14 @@ namespace DigitalBrain.Microsoft.CSharp;
 // Declares the sandbox stopped: the brain starts it through IAspire when the first script runs.
 public sealed class CSharpModuleHosting : IDigitalBrainModuleHosting
 {
+    public string Id => "csharp";
     public void Configure(DigitalBrainBuilder brain)
     {
         ArgumentNullException.ThrowIfNull(brain);
-        var options = brain.GetModuleConfiguration<CSharpModule>().GetModuleOptions<CSharpOptions>(nameof(CSharpModule));
+        var options = brain.GetModuleConfiguration("csharp").GetModuleOptions<CSharpOptions>("csharp");
         // The same fallback the silo uses, so composing the module in a repository always declares
         // the sandbox; only a host without any repository (the session-pool path) has none.
-        if (string.IsNullOrWhiteSpace(options.SourceRoot)) { options.SourceRoot = CSharpModule.FindRepositoryRoot(); }
+        if (string.IsNullOrWhiteSpace(options.SourceRoot)) { options.SourceRoot = RepositoryRoot.Find(); }
         if (string.IsNullOrWhiteSpace(options.SourceRoot)) { return; }
         brain.ApplicationBuilder.AddDockerfile(CSharpSandbox.ResourceName, Path.Combine(options.SourceRoot, CSharpSandbox.SourceProject))
             .WithHttpEndpoint(targetPort: CSharpSandbox.Port, name: "http")

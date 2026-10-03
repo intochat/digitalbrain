@@ -1,3 +1,4 @@
+using DigitalBrain.Contracts;
 using System.Text.Json;
 
 namespace DigitalBrain.Kernel;

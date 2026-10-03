@@ -8,6 +8,7 @@ using Orleans.Hosting;
 namespace DigitalBrain.Qdrant;
 
 [ModuleDeployment("DigitalBrain.Qdrant.QdrantDeployment, DigitalBrain.Modules.Qdrant.Deployment")]
+[ModuleId("qdrant")]
 public sealed class QdrantModule : IModule<QdrantModuleOptions>
 {
     public const string ConnectionName = "qdrant";
@@ -24,17 +25,4 @@ public sealed class QdrantModule : IModule<QdrantModuleOptions>
         silo.Services.TryAddSingleton<IVectorStore>(provider => IsConnected(silo.Configuration)
             ? new QdrantStore(provider.GetRequiredService<global::Qdrant.Client.QdrantClient>()) : new InMemoryQdrant());
     }
-}
-
-public sealed class QdrantModuleOptions : IModuleOptions
-{
-    public bool Host { get; set; }
-
-    public QdrantModuleOptions WithHostedQdrant()
-    {
-        Host = true;
-        return this;
-    }
-
-    public void Validate() { }
 }

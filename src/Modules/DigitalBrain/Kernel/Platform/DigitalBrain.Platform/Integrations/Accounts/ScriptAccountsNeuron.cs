@@ -2,7 +2,7 @@ using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Integrations;
 using DigitalBrain.Kernel;
-using DigitalBrain.Sdk.Integrations;
+using DigitalBrain.Platform.Contracts.Integrations;
 using Orleans.Concurrency;
 
 namespace DigitalBrain.Platform.Integrations.Accounts;

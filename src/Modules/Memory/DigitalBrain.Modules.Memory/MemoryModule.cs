@@ -7,6 +7,7 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Memory;
 
+[ModuleId("memory")]
 public sealed class MemoryModule : IModule<MemoryModuleOptions>
 {
     // Canonical memory lives in neurons; a composed vector store supplies the optional projection.
@@ -15,7 +16,7 @@ public sealed class MemoryModule : IModule<MemoryModuleOptions>
         ArgumentNullException.ThrowIfNull(silo);
         var services = silo.Services;
         services.TryAddSingleton(TimeProvider.System);
-        var collectionName = silo.Configuration.GetModuleOptions<MemoryModuleOptions>(nameof(MemoryModule)).CollectionName;
+        var collectionName = silo.Configuration.GetModuleOptions<MemoryModuleOptions>("memory").CollectionName;
         services.TryAddSingleton<IVectorMemoryStore>(provider => provider.GetService<IVectorStore>() is { } vectors
             ? new VectorMemoryStore(vectors, collectionName) : null!);
     }

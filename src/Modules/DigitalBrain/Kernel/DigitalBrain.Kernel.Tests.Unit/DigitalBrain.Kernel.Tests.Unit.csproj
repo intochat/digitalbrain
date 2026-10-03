@@ -10,5 +10,8 @@
     <ProjectReference Include="../Platform/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
     <ProjectReference Include="..\..\..\..\Aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" />
   </ItemGroup>
+  <ItemGroup><ProjectReference Include="../DigitalBrain.Kernel.AspNetCore/DigitalBrain.Kernel.AspNetCore.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../DigitalBrain.Client/DigitalBrain.Client.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../../../Aspire/DigitalBrain.Aspire.Server/DigitalBrain.Aspire.Server.csproj" /></ItemGroup>
 </Project>
 

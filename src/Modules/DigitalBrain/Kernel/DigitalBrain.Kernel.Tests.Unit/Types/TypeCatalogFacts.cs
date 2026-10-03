@@ -1,3 +1,4 @@
+using DigitalBrain.Sdk.Types;
 using System.Text.Json.Nodes;
 using DigitalBrain.Contracts.Types;
 
@@ -75,7 +76,7 @@ public sealed class TypeCatalogFacts
         Assert.DoesNotContain("hunter2", rejected.Message, StringComparison.Ordinal);
         Assert.Null(rejected.RejectedValue);
 
-        var handle = SecretRef.For("owner", "salesforce-api-key", "Salesforce API key", isSet: true);
+        var handle = SecretReferences.For("owner", "salesforce-api-key", "Salesforce API key", isSet: true);
         Assert.Same(handle, TypeCatalog.Validate(handle, FieldKind.Secret));
     }
 
@@ -117,7 +118,7 @@ public sealed class TypeCatalogFacts
     public void EmbeddedJsonCatalogMatchesTheCodeCatalog()
     {
         using var stream = typeof(TypeCatalog).Assembly
-            .GetManifestResourceStream("DigitalBrain.Contracts.Types.TypeCatalog.v0.json");
+            .GetManifestResourceStream("DigitalBrain.Sdk.Types.TypeCatalog.v0.json");
         Assert.NotNull(stream);
 
         var embedded = JsonNode.Parse(stream);

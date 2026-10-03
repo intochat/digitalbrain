@@ -3,7 +3,7 @@ using DigitalBrain.AI.Media;
 using DigitalBrain.AI.WebSearch;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Kernel;
-using DigitalBrain.Sdk.Integrations;
+using DigitalBrain.Platform.Contracts.Integrations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -13,6 +13,7 @@ using Orleans.Hosting;
 namespace DigitalBrain.AI;
 
 [ModuleDeployment("DigitalBrain.AI.AIDeployment, DigitalBrain.Modules.AI.Deployment")]
+[ModuleId("ai")]
 public sealed class AIModule : IModule<AIOptions>
 {
     public const string McpServersKey = "DigitalBrain:AI:McpServers";
@@ -23,8 +24,8 @@ public sealed class AIModule : IModule<AIOptions>
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        AIOptions.Register(builder.Services);
-        var options = AIOptions.Read(builder.Configuration);
+        AIOptionsRuntime.Register(builder.Services);
+        var options = AIOptionsRuntime.Read(builder.Configuration);
         var workspace = builder.Configuration.GetSection(AIWorkspaceOptions.SectionName).Get<AIWorkspaceOptions>() ?? new();
 
         builder.Services.TryAddSingleton(TimeProvider.System);

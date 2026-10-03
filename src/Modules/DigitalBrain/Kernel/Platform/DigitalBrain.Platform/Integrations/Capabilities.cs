@@ -1,4 +1,5 @@
-using DigitalBrain.Sdk.Integrations;
+using DigitalBrain.Kernel.AspNetCore;
+using DigitalBrain.Platform.Contracts.Integrations;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
 using Microsoft.AspNetCore.Builder;

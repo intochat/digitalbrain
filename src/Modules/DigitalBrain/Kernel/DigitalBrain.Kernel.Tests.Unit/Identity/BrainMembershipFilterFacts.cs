@@ -1,6 +1,6 @@
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
-using DigitalBrain.Sdk.Identity;
+using DigitalBrain.Platform.Contracts.Identity;
 using DigitalBrain.Platform.Identity.Grants;
 using Xunit;
 

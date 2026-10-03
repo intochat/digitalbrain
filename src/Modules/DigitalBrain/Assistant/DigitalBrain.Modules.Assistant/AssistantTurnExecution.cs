@@ -149,7 +149,7 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
         {
             // Metering is an observer: one durable batch per completed intent, and a storage
             // fault must never fail or hide the run the user already saw.
-            try { await usage.FlushAsync(intent, CancellationToken.None); }
+            try { await usage.FlushAsync(intent.Snapshot(), CancellationToken.None); }
             catch (Exception error)
             { services.GetRequiredService<ILoggerFactory>().CreateLogger("Assistant").LogWarning(error, "Workspace agent usage flush failed"); }
             if (ownsRun)

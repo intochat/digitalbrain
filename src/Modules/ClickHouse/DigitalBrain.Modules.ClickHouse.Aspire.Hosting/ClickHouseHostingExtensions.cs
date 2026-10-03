@@ -7,8 +7,8 @@ namespace DigitalBrain.ClickHouse.Aspire.Hosting;
 
 public static class ClickHouseHostingExtensions
 {
-    public static DigitalBrainModuleBuilder<ClickHouseModule> WithClickHouse(
-        this DigitalBrainModuleBuilder<ClickHouseModule> module,
+    public static DigitalBrainModuleBuilder<DigitalBrain.ClickHouse.Aspire.Hosting.ClickHouseModuleHosting> WithClickHouse(
+        this DigitalBrainModuleBuilder<DigitalBrain.ClickHouse.Aspire.Hosting.ClickHouseModuleHosting> module,
         Action<ClickHouseHostingOptions>? configure = null)
     {
         ArgumentNullException.ThrowIfNull(module);
@@ -18,7 +18,7 @@ public static class ClickHouseHostingExtensions
         return module;
     }
 
-    private static ClickHouseHostingState State(DigitalBrainModuleBuilder<ClickHouseModule> module)
+    private static ClickHouseHostingState State(DigitalBrainModuleBuilder<DigitalBrain.ClickHouse.Aspire.Hosting.ClickHouseModuleHosting> module)
     {
         var state = module.DigitalBrainBuilder.GetOrAddState(static brain => new ClickHouseHostingState(brain), out var added);
         if (added)
@@ -92,7 +92,7 @@ public static class ClickHouseHostingExtensions
 
             // Waiting on the database resource covers server health and the CREATE DATABASE step.
             builder
-                .WithReference(_database, connectionName: ClickHouseRegistration.DefaultConnectionName)
+                .WithReference(_database, connectionName: "clickhouse")
                 .WithAnnotation(new WaitAnnotation(_database.Resource, WaitType.WaitUntilHealthy, exitCode: 0));
         }
     }

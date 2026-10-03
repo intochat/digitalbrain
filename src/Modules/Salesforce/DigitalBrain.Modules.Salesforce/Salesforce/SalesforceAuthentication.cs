@@ -1,3 +1,4 @@
+using DigitalBrain.Platform.Contracts.Auth;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Sdk;
 using Microsoft.AspNetCore.Authentication.OAuth;
@@ -66,7 +67,7 @@ internal static class SalesforceAuthentication
                             {
                                 throw new InvalidOperationException("Salesforce did not issue a valid HTTPS instance URL.");
                             }
-                            var nonce = context.HttpContext.RequestServices.GetRequiredService<TokenHandoff>()
+                            var nonce = context.HttpContext.RequestServices.GetRequiredService<ITokenHandoff>()
                                 .Deposit(new OAuthTokens(context.AccessToken!, context.RefreshToken));
                             var grains = context.HttpContext.RequestServices.GetRequiredService<IGrainFactory>();
                             var workspace = BrowserLoginWorkspace.FromScope(BrowserLoginCorrelation.Scope(context.Properties));

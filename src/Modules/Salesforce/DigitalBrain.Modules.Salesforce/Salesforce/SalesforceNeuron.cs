@@ -1,3 +1,4 @@
+using DigitalBrain.Platform.Contracts.Auth;
 using System.Text;
 using System.Text.Json;
 using DigitalBrain;
@@ -14,7 +15,7 @@ namespace DigitalBrain.Salesforce;
 internal sealed class SalesforceNeuron(
     ISalesforceProvider provider,
     SalesforceCredentialStore credentials,
-    TokenHandoff handoff,
+    ITokenHandoff handoff,
     SalesforceWriteAccess writeAccess,
     TimeProvider time,
     [PersistentState("salesforce-vault", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SalesforceState> state)

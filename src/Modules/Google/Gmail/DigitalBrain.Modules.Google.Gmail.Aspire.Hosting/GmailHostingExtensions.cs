@@ -6,8 +6,8 @@ namespace DigitalBrain.Google.Gmail;
 
 public static class GmailHostingExtensions
 {
-    public static DigitalBrainModuleBuilder<GmailModule> WithGmail(
-        this DigitalBrainModuleBuilder<GmailModule> module, Action<GmailHostingOptions> configure)
+    public static DigitalBrainModuleBuilder<DigitalBrain.Google.Gmail.GmailModuleHosting> WithGmail(
+        this DigitalBrainModuleBuilder<DigitalBrain.Google.Gmail.GmailModuleHosting> module, Action<GmailHostingOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(module);
         ArgumentNullException.ThrowIfNull(configure);
@@ -18,8 +18,8 @@ public static class GmailHostingExtensions
 
     // Only the kernel receives these values. The public origin defaults to the kernel's own
     // http endpoint; pass one explicitly when a reverse proxy fronts the callback.
-    public static DigitalBrainModuleBuilder<GmailModule> WithGmail(
-        this DigitalBrainModuleBuilder<GmailModule> module,
+    public static DigitalBrainModuleBuilder<DigitalBrain.Google.Gmail.GmailModuleHosting> WithGmail(
+        this DigitalBrainModuleBuilder<DigitalBrain.Google.Gmail.GmailModuleHosting> module,
         Uri? publicOrigin = null)
     {
         ArgumentNullException.ThrowIfNull(module);

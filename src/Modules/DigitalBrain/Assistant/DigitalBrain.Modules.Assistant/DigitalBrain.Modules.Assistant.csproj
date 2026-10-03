@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
+  <PropertyGroup><IsPackable>true</IsPackable>
     <Description>The workspace assistant: chat, voice and agent turns over the AI and Flutter modules.</Description>
     <RootNamespace>DigitalBrain.Assistant</RootNamespace>
   </PropertyGroup>
@@ -19,4 +19,5 @@
   <ItemGroup>
     <EmbeddedResource Include="instructions.md" LogicalName="instructions.md" />
   </ItemGroup>
+  <ItemGroup><ProjectReference Include="../../Kernel/DigitalBrain.Kernel.AspNetCore/DigitalBrain.Kernel.AspNetCore.csproj" /></ItemGroup>
 </Project>

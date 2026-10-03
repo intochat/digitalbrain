@@ -1,3 +1,4 @@
+using DigitalBrain.Contracts.Edge.V1;
 using System.Net.ServerSentEvents;
 using DigitalBrain.Client;
 using Microsoft.AspNetCore.Builder;

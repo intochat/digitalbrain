@@ -3,7 +3,7 @@ using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Enforcement;
-using DigitalBrain.Sdk.Identity;
+using DigitalBrain.Platform.Contracts.Identity;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Platform.Identity.Directory;

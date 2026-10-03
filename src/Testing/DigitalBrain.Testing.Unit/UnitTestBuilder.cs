@@ -1,3 +1,5 @@
+using DigitalBrain.Contracts;
+using DigitalBrain.Client.Orleans;
 using DigitalBrain.Client;
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
@@ -69,14 +71,13 @@ public sealed class UnitTestBuilder
     // Short leases and renewals so subscription expiry and reactivation show up within a test's timeout.
     public UnitTestBuilder WithFastSubscriptions(int bufferCapacity = 256)
     {
-        static void Shorten(BrainOptions options)
+        static void Shorten(SubscriptionOptions options)
         {
-            options.ObserverLease = TimeSpan.FromSeconds(2);
             options.RenewEvery = TimeSpan.FromMilliseconds(200);
             options.OperationTimeout = TimeSpan.FromMilliseconds(500);
         }
-        return ConfigureSilo(silo => silo.Services.Configure<BrainOptions>(Shorten))
-            .ConfigureClient(client => client.Services.Configure<BrainOptions>(options => { Shorten(options); options.BufferCapacity = bufferCapacity; }));
+        return ConfigureSilo(silo => silo.Services.Configure<ObserverOptions>(options => options.Lease = TimeSpan.FromSeconds(2)))
+            .ConfigureClient(client => client.Services.Configure<SubscriptionOptions>(options => { Shorten(options); options.BufferCapacity = bufferCapacity; }));
     }
     public UnitTestBuilder WithReminders()
     {

@@ -1,5 +1,5 @@
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Sdk.Identity;
+using DigitalBrain.Platform.Contracts.Identity;
 using DigitalBrain.Platform.Identity.Grants;
 using DigitalBrain.Testing.Unit;
 using Microsoft.Extensions.DependencyInjection;

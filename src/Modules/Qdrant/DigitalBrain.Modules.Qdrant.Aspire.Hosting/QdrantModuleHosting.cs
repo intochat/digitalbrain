@@ -1,20 +1,20 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Kernel;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Qdrant.Aspire.Hosting;
 
 public sealed class QdrantModuleHosting : IDigitalBrainModuleHosting
 {
+    public string Id => "qdrant";
     public void Configure(DigitalBrainBuilder brain)
     {
         ArgumentNullException.ThrowIfNull(brain);
-        var options = brain.GetModuleConfiguration<QdrantModule>().GetModuleOptions<QdrantModuleOptions>(nameof(QdrantModule));
+        var options = brain.GetModuleConfiguration("qdrant").GetModuleOptions<QdrantModuleOptions>("qdrant");
         if (!options.Host) { return; }
-        var module = new DigitalBrainModuleBuilder<QdrantModule>(brain);
-        var qdrant = brain.ApplicationBuilder.AddQdrant(QdrantModule.ConnectionName + "-server")
+        var module = new DigitalBrainModuleBuilder<DigitalBrain.Qdrant.Aspire.Hosting.QdrantModuleHosting>(brain);
+        var qdrant = brain.ApplicationBuilder.AddQdrant("qdrant" + "-server")
             .WithParentRelationship(module.Resource)
             .WithDataVolume()
             .WithLifetime(ContainerLifetime.Persistent);
@@ -28,7 +28,7 @@ public sealed class QdrantModuleHosting : IDigitalBrainModuleHosting
         {
             ArgumentNullException.ThrowIfNull(builder);
             builder
-                .WithReference(qdrant, connectionName: QdrantModule.ConnectionName)
+                .WithReference(qdrant, connectionName: "qdrant")
                 .WithAnnotation(new WaitAnnotation(qdrant.Resource, WaitType.WaitUntilHealthy, exitCode: 0));
         }
     }

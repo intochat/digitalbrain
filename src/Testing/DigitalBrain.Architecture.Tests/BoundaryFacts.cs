@@ -1,9 +1,9 @@
+using DigitalBrain.Platform.Contracts.Integrations.Accounts;
+using DigitalBrain.Platform.Contracts.Integrations;
 using ArchUnitNET.xUnitV3;
 using DigitalBrain.Kernel;
-using DigitalBrain.Sdk.Identity;
-using DigitalBrain.Sdk.Integrations;
-using DigitalBrain.Sdk.Integrations.Accounts;
-using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Contracts.Identity;
+using DigitalBrain.Platform.Contracts.Secrets;
 using static ArchUnitNET.Fluent.ArchRuleDefinition;
 
 namespace DigitalBrain.Architecture.Tests;
@@ -12,9 +12,19 @@ public sealed class BoundaryFacts
 {
     private static readonly string[] KernelLayers =
     [
-        "DigitalBrain", "DigitalBrain.Contracts", "DigitalBrain.Client",
-        "DigitalBrain.Kernel", "DigitalBrain.Sdk", "DigitalBrain.Platform"
+        "DigitalBrain", "DigitalBrain.Contracts", "DigitalBrain.Platform.Contracts", "DigitalBrain.Client", "DigitalBrain.Client.Orleans",
+        "DigitalBrain.Kernel", "DigitalBrain.Kernel.AspNetCore", "DigitalBrain.Sdk", "DigitalBrain.Platform"
     ];
+
+    [Theory]
+    [InlineData("DigitalBrain.Kernel", "DigitalBrain.Client")]
+    [InlineData("DigitalBrain.Kernel", "DigitalBrain.Client.Orleans")]
+    [InlineData("DigitalBrain.Kernel", "DigitalBrain.Platform.Contracts")]
+    [InlineData("DigitalBrain.Client", "DigitalBrain.Platform.Contracts")]
+    [InlineData("DigitalBrain.Client.Orleans", "DigitalBrain.Platform.Contracts")]
+    public void CoreBoundariesDoNotInvert(string source, string forbidden)
+        => Types().That().ResideInAssembly(ProductionArchitecture.Assemblies.Single(a => a.GetName().Name == source)).Should().NotDependOnAny(Types().That().ResideInAssembly(ProductionArchitecture.Assemblies.Single(a => a.GetName().Name == forbidden)))
+            .Check(ProductionArchitecture.Graph.Value);
 
     [Fact]
     public void KernelDependenciesPointInward()
@@ -67,7 +77,7 @@ public sealed class BoundaryFacts
     }
 
     [Fact]
-    public void CredentialAndIdentityContractsResideInTheSdk()
+    public void CredentialAndIdentityContractsResideInPlatformContracts()
     {
         var contracts = ProductionArchitecture.Types.Where(IsCredentialContract).ToArray();
         Assert.Contains(typeof(IIntegrationRegistration), contracts);
@@ -82,8 +92,8 @@ public sealed class BoundaryFacts
     }
 
     internal static bool IsCredentialContract(Type type) => type.IsInterface && (
-        InNamespace(type, "DigitalBrain.Sdk.Secrets") || InNamespace(type, "DigitalBrain.Sdk.Identity")
-        || InNamespace(type, "DigitalBrain.Sdk.Integrations"));
+        InNamespace(type, "DigitalBrain.Platform.Contracts.Secrets") || InNamespace(type, "DigitalBrain.Platform.Contracts.Identity")
+        || InNamespace(type, "DigitalBrain.Platform.Contracts.Integrations"));
 
     private static bool InNamespace(Type type, string name) =>
         type.Namespace == name || type.Namespace?.StartsWith(name + ".", StringComparison.Ordinal) == true;

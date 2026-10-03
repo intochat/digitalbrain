@@ -1,3 +1,4 @@
+using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
 using Microsoft.AspNetCore.Builder;

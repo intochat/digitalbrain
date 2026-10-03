@@ -11,4 +11,5 @@
     <PackageReference Include="Azure.Extensions.AspNetCore.DataProtection.Blobs" />
     <ProjectReference Include="..\..\Sdk\DigitalBrain.Sdk\DigitalBrain.Sdk.csproj" />
   </ItemGroup>
+  <ItemGroup><ProjectReference Include="../../DigitalBrain.Kernel.AspNetCore/DigitalBrain.Kernel.AspNetCore.csproj" /></ItemGroup>
 </Project>

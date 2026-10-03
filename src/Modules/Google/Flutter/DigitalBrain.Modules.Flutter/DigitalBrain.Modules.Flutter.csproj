@@ -16,4 +16,5 @@
     <ProjectReference Include="../DigitalBrain.Modules.Flutter.Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
     <ProjectReference Include="..\..\..\DigitalBrain\Kernel\Sdk\DigitalBrain.Sdk\DigitalBrain.Sdk.csproj" />
   </ItemGroup>
+  <ItemGroup><ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Kernel.AspNetCore/DigitalBrain.Kernel.AspNetCore.csproj" /></ItemGroup>
 </Project>

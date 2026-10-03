@@ -1,4 +1,4 @@
-using DigitalBrain.Sdk.Identity;
+using DigitalBrain.Platform.Contracts.Identity;
 using DigitalBrain.Platform.Identity;
 using DigitalBrain.Testing.Unit;
 using Xunit;

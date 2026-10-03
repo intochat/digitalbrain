@@ -1,4 +1,4 @@
-using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Contracts.Secrets;
 using DigitalBrain.Kernel.Enforcement;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;

@@ -4,7 +4,7 @@ using System.Text.Json;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Slider;
-using DigitalBrain.Sdk.Identity;
+using DigitalBrain.Platform.Contracts.Identity;
 
 namespace DigitalBrain.Kernel.Tests.E2E.Identity;
 

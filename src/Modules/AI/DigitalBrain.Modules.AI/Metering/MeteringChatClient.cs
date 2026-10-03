@@ -1,3 +1,4 @@
+using DigitalBrain.Kernel;
 using System.Runtime.CompilerServices;
 using DigitalBrain;
 using DigitalBrain.Contracts;

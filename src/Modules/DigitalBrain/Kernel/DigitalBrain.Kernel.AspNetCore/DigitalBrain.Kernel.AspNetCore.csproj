@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>true</IsPackable><RootNamespace>DigitalBrain.Kernel.AspNetCore</RootNamespace></PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
+  </ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="DigitalBrain.Kernel.Tests.Unit" /></ItemGroup>
+</Project>

@@ -12,5 +12,5 @@ public interface IIntentUsageSink
 
     // Persists every entry the intent accumulated in one durable write. A batch is only written when the
     // intent recorded at least one provider call.
-    Task FlushAsync(IntentContext intent, CancellationToken cancellationToken = default);
+    Task FlushAsync(IntentUsageBatch intent, CancellationToken cancellationToken = default);
 }

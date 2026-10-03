@@ -1,3 +1,4 @@
+using DigitalBrain.Client.Orleans;
 using DigitalBrain.Client;
 using DigitalBrain;
 using DigitalBrain.Contracts;
@@ -24,7 +25,7 @@ public sealed class UnitBrain : IDigitalBrain, ITrackedBrain
         _lifetime = lifetime;
         _lifetime.Own("client", _brain);
     }
-    int ITrackedBrain.BufferCapacity => cluster.Client.ServiceProvider.GetRequiredService<IOptions<BrainOptions>>().Value.BufferCapacity;
+    int ITrackedBrain.BufferCapacity => cluster.Client.ServiceProvider.GetRequiredService<IOptions<SubscriptionOptions>>().Value.BufferCapacity;
     TestExecutionOptions ITrackedBrain.Execution => _execution;
 
     public IGrainFactory Grains => cluster.Client;

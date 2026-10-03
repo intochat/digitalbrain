@@ -1,3 +1,4 @@
+using DigitalBrain.Kernel;
 using DigitalBrain.Compute;
 using DigitalBrain;
 using DigitalBrain.Contracts;
@@ -25,7 +26,7 @@ internal sealed class GrainIntentUsageSink(IGrainFactory grains, IMeterSink? met
         await EmitAsync(intentId, null, [entry], cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task FlushAsync(IntentContext intent, CancellationToken cancellationToken = default)
+    public async Task FlushAsync(IntentUsageBatch intent, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(intent);
         var entries = intent.Usage.OfType<TokenUsageEntry>().ToArray();

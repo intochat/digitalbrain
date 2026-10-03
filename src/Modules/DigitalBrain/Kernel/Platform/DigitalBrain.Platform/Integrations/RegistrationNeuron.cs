@@ -1,5 +1,5 @@
-using DigitalBrain.Sdk.Secrets;
-using DigitalBrain.Sdk.Integrations;
+using DigitalBrain.Platform.Contracts.Integrations;
+using DigitalBrain.Platform.Contracts.Secrets;
 using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;

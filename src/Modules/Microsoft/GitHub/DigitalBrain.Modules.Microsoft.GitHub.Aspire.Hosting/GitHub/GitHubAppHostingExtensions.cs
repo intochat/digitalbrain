@@ -6,8 +6,8 @@ namespace DigitalBrain.Microsoft.GitHub;
 
 public static class GitHubAppHostingExtensions
 {
-    public static DigitalBrainModuleBuilder<GitHubModule> WithGitHubApp(
-        this DigitalBrainModuleBuilder<GitHubModule> module, Action<GitHubAppHostingOptions> configure)
+    public static DigitalBrainModuleBuilder<DigitalBrain.Microsoft.GitHub.GitHubModuleHosting> WithGitHubApp(
+        this DigitalBrainModuleBuilder<DigitalBrain.Microsoft.GitHub.GitHubModuleHosting> module, Action<GitHubAppHostingOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(module);
         ArgumentNullException.ThrowIfNull(configure);
@@ -18,8 +18,8 @@ public static class GitHubAppHostingExtensions
         return module.WithGitHubApp(options.AppId, options.Slug, options.ClientId, options.PublicOrigin!, options.PublicWebhookUrl!);
     }
 
-    public static DigitalBrainModuleBuilder<GitHubModule> WithGitHubApp(
-        this DigitalBrainModuleBuilder<GitHubModule> module,
+    public static DigitalBrainModuleBuilder<DigitalBrain.Microsoft.GitHub.GitHubModuleHosting> WithGitHubApp(
+        this DigitalBrainModuleBuilder<DigitalBrain.Microsoft.GitHub.GitHubModuleHosting> module,
         long appId, string slug, string clientId, Uri publicOrigin, Uri publicWebhookUrl)
     {
         ArgumentNullException.ThrowIfNull(module);

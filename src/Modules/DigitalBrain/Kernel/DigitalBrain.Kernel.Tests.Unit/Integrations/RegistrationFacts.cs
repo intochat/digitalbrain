@@ -1,3 +1,5 @@
+using DigitalBrain.Sdk.Types;
+using DigitalBrain.Platform.Contracts.Integrations;
 using System.Security.Claims;
 using System.Text.Json;
 using DigitalBrain;
@@ -5,9 +7,8 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Contracts.Types;
 using DigitalBrain.Kernel;
-using DigitalBrain.Sdk.Integrations;
 using DigitalBrain.Platform.Integrations;
-using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Contracts.Secrets;
 using DigitalBrain.Platform.Secrets;
 using DigitalBrain.Testing;
 using DigitalBrain.Testing.Unit;
@@ -229,7 +230,7 @@ public sealed class RegistrationFacts
         await using var brain = await StartAsync(ct);
         var registration = Registration(brain, "openai");
         await registration.Configure(Values(("ApiKey", Canary)));
-        var vaultReference = SecretRef.For(IntegrationVault.Owner, IntegrationVault.SecretName("openai", "ApiKey"), "ApiKey", true);
+        var vaultReference = SecretReferences.For(IntegrationVault.Owner, IntegrationVault.SecretName("openai", "ApiKey"), "ApiKey", true);
         var platform = Caller(CallerKind.Platform, TrustedEdge.Platform) with { AppId = "test" };
         Assert.Equal(Canary, await brain.Get<ISecrets>(IntegrationVault.Owner).Resolve(platform, vaultReference, ct));
 
@@ -384,28 +385,18 @@ public sealed class RegistrationFacts
         var platform = typeof(IntegrationDiscovery).Assembly;
 
         Assert.True(PlatformAssemblyAttribute.IsPlatform(platform));
-        Assert.False(PlatformAssemblyAttribute.IsPlatform(typeof(IntegrationDefinition).Assembly));
+        Assert.True(PlatformAssemblyAttribute.IsPlatform(typeof(IntegrationDefinition).Assembly));
         Assert.All(platform.GetExportedTypes().Where(type => type.IsInterface && typeof(INeuron).IsAssignableFrom(type)),
             contract => Assert.True(PlatformOnlyAttribute.AppliesTo(contract)));
     }
 
     [Fact]
-    public void EveryExportedNeuronContractInSdkIsEitherPlatformOnlyOrExplicitlyAllowed()
+    public void EveryExportedPlatformContractRequiresPlatformAuthorization()
     {
-        var sdk = typeof(ISecrets).Assembly;
-        var scriptSafeAllowList = new[] { nameof(IIntegrationRegistration) };
-
-        var exported = sdk.GetExportedTypes()
-            .Where(type => type.IsInterface && typeof(INeuron).IsAssignableFrom(type))
-            .ToArray();
-
-        Assert.All(exported, contract =>
-        {
-            var isPlatformOnly = PlatformOnlyAttribute.AppliesTo(contract);
-            var isAllowed = scriptSafeAllowList.Contains(contract.Name);
-            Assert.True(isPlatformOnly || isAllowed,
-                $"{contract.Name} must be either [PlatformOnly] (via PlatformOnlyAttribute.AppliesTo) or in the script-safe allow-list.");
-        });
+        var contracts = typeof(ISecrets).Assembly.GetExportedTypes()
+            .Where(type => type.IsInterface && typeof(INeuron).IsAssignableFrom(type)).ToArray();
+        Assert.NotEmpty(contracts);
+        Assert.All(contracts, contract => Assert.True(PlatformOnlyAttribute.AppliesTo(contract)));
     }
 
     [Fact]

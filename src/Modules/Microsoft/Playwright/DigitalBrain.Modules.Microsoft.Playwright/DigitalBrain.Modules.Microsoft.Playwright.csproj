@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><RootNamespace>DigitalBrain.Microsoft.Playwright</RootNamespace><NoWarn>$(NoWarn);CS1591;ORLEANSEXP005;CA1812</NoWarn></PropertyGroup>
+  <PropertyGroup><IsPackable>true</IsPackable><RootNamespace>DigitalBrain.Microsoft.Playwright</RootNamespace><NoWarn>$(NoWarn);CS1591;ORLEANSEXP005;CA1812</NoWarn></PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Playwright" />

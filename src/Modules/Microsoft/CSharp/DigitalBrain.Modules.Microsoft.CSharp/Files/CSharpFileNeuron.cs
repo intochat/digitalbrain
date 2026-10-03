@@ -1,3 +1,4 @@
+using DigitalBrain.Contracts.Edge.V1;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;

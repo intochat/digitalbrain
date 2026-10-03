@@ -1,3 +1,4 @@
+using DigitalBrain.Client.Orleans;
 using DigitalBrain.Client;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;

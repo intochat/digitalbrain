@@ -4,5 +4,6 @@ namespace DigitalBrain.Microsoft.CSharp;
 
 public sealed class CSharpAuthoringModuleHosting : IDigitalBrainModuleHosting
 {
+    public string Id => "csharp-authoring";
     public void Configure(DigitalBrainBuilder brain) => ArgumentNullException.ThrowIfNull(brain);
 }

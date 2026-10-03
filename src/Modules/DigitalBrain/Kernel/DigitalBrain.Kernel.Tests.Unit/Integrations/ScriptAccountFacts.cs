@@ -1,6 +1,6 @@
 using DigitalBrain.Contracts.Integrations;
 using DigitalBrain.Kernel;
-using DigitalBrain.Sdk.Integrations;
+using DigitalBrain.Platform.Contracts.Integrations;
 using DigitalBrain.Testing.Unit;
 using Orleans.Hosting;
 using Xunit;

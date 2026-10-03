@@ -1,3 +1,4 @@
+using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Kernel;
@@ -28,7 +29,7 @@ public sealed record Posted([property: Id(0)] string From, [property: Id(1)] str
 
 public sealed record TweetWebhook(string Account, string Text);
 
-public sealed class TestTwitterModule : IModule
+public sealed class TestTwitterModule : IModule, IHttpModule
 {
     public void Configure(ISiloBuilder builder) { }
 

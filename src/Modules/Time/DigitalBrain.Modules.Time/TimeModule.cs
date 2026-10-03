@@ -9,6 +9,7 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Time;
 
+[ModuleId("time")]
 public sealed class TimeModule : IModule
 {
     public void Configure(ISiloBuilder silo)

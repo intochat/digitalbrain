@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><IsPackable>true</IsPackable><RootNamespace>DigitalBrain.Platform.Contracts</RootNamespace></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Sdk" PrivateAssets="all" />
+    <ProjectReference Include="../../DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
+  </ItemGroup>
+</Project>

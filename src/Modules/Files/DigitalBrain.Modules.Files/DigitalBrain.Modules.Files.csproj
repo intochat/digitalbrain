@@ -12,4 +12,5 @@
     <ProjectReference Include="..\..\DigitalBrain\Kernel\Sdk\DigitalBrain.Sdk\DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
   </ItemGroup>
+  <ItemGroup><ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Kernel.AspNetCore/DigitalBrain.Kernel.AspNetCore.csproj" /></ItemGroup>
 </Project>

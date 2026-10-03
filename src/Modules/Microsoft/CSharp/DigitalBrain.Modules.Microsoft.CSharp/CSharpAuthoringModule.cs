@@ -1,3 +1,4 @@
+using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Enforcement;
 using Microsoft.AspNetCore.Routing;
@@ -7,7 +8,8 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Microsoft.CSharp;
 
-public sealed class CSharpAuthoringModule : IModule
+[ModuleId("csharp-authoring")]
+public sealed class CSharpAuthoringModule : IModule, IHttpModule
 {
     public void Configure(ISiloBuilder builder)
     {

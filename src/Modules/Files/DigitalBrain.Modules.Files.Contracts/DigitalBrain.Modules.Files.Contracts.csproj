@@ -9,4 +9,5 @@
     <!-- File surfaces expose Flutter UI bindings and image-canvas neuron contracts. -->
     <ProjectReference Include="../../Google/Flutter/DigitalBrain.Modules.Flutter.Contracts/DigitalBrain.Modules.Flutter.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup><PackageReference Include="Microsoft.Orleans.Sdk" PrivateAssets="all" /></ItemGroup>
 </Project>

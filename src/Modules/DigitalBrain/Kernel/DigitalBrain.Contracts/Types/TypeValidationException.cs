@@ -9,10 +9,6 @@ public sealed class TypeValidationException(
     IReadOnlyList<string> allowedValues)
     : ArgumentException(BuildMessage(kind, rejectedValue, allowedValues))
 {
-    public TypeValidationException(FieldKind kind, object? rejectedValue)
-        : this(kind, rejectedValue, TypeCatalog.AllowedFor(kind))
-    {
-    }
 
     [Id(0)] public FieldKind Kind { get; } = kind;
 

@@ -1,3 +1,4 @@
+using DigitalBrain.Contracts;
 using Aspire.Hosting;
 using DigitalBrain.Aspire.Hosting;
 using Orleans.Hosting;
@@ -27,10 +28,10 @@ public sealed class ModuleOptionOverlayFacts
             ],
             DisableDashboard = true,
         });
-        var brain = builder.AddDigitalBrain("modules", persistentStorage: false)
-            .AddModules([ModuleOptionsSerialization.Compile<OverlaidModule, OverlaidOptions>(new() { Endpoint = "declared", Delay = 42 })]);
+        var brain = builder.AddDigitalBrain("modules", persistentStorage: false, options: new() { UseAzureStorage = true })
+            .WithModule("OverlaidModule", settings: ModuleOptionsSerialization.Compile<OverlaidModule, OverlaidOptions>(new() { Endpoint = "declared", Delay = 42 }).Configuration);
 
-        var options = brain.GetModuleConfiguration<OverlaidModule>().GetModuleOptions<OverlaidOptions>(nameof(OverlaidModule));
+        var options = HostingModuleOptions.GetModuleOptions<OverlaidOptions>(brain.GetModuleConfiguration("OverlaidModule"), "OverlaidModule");
         Assert.Equal("from-args", options.Endpoint);
         Assert.Equal(42, options.Delay);
         Assert.Equal("added", options.Bindings["extra"]);

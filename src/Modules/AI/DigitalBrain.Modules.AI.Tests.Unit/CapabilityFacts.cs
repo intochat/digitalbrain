@@ -1,8 +1,8 @@
+using DigitalBrain.Platform.Contracts.Integrations;
 using DigitalBrain.AI;
 using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Sdk.Integrations;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;

@@ -184,7 +184,7 @@ internal static class AIClients
     }
 
     internal static void AddImageGeneration(IServiceCollection services, IConfiguration configuration)
-        => AddImageGeneration(services, AIOptions.Read(configuration));
+        => AddImageGeneration(services, AIOptionsRuntime.Read(configuration));
 
     internal static void AddImageGeneration(IServiceCollection services, AIOptions configuration)
     {

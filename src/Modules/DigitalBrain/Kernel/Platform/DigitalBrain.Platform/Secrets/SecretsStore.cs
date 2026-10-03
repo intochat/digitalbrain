@@ -1,3 +1,4 @@
+using DigitalBrain.Sdk.Types;
 using DigitalBrain.Contracts.Types;
 
 namespace DigitalBrain.Platform.Secrets;
@@ -18,7 +19,7 @@ internal sealed class SecretsStore(IKeyWrapper keys)
             IsSet = true,
             SealedSecret = SecretCipher.Seal(ownerKey, value),
         };
-        return SecretRef.For(state.Owner, name, label, true);
+        return SecretReferences.For(state.Owner, name, label, true);
     }
 
     internal string Resolve(SecretsState state, SecretRef secret)

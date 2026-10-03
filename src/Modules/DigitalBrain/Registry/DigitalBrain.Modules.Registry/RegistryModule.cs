@@ -7,6 +7,7 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Registry;
 
+[ModuleId("registry")]
 public sealed class RegistryModule : IModule
 {
     public const string Key = IRegistry.Key;

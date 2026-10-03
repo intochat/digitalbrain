@@ -11,7 +11,7 @@
     <EmbeddedResource Include="Seeds/*.sql" LogicalName="Seeds/%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../DigitalBrain.Modules.ClickHouse/DigitalBrain.Modules.ClickHouse.csproj" />
+    <ProjectReference Include="../DigitalBrain.Modules.ClickHouse.Contracts/DigitalBrain.Modules.ClickHouse.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

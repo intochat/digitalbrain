@@ -1,3 +1,4 @@
+using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.Kernel;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -6,7 +7,8 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Files;
 
-public sealed class FilesModule : IModule
+[ModuleId("files")]
+public sealed class FilesModule : IModule, IHttpModule
 {
     public void Configure(ISiloBuilder silo)
     {

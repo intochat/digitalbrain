@@ -1,7 +1,7 @@
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Platform.Identity.Grants;
-using DigitalBrain.Sdk.Identity;
+using DigitalBrain.Platform.Contracts.Identity;
 
 namespace DigitalBrain.Platform.Identity;
 

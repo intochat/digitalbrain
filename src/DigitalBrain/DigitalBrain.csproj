@@ -5,6 +5,7 @@
     <RootNamespace>DigitalBrain</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Orleans.Core.Abstractions" />
   </ItemGroup>
 </Project>

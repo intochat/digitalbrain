@@ -72,5 +72,8 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
   </ItemGroup>
+  <ItemGroup><ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Client.Orleans/DigitalBrain.Client.Orleans.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Kernel.AspNetCore/DigitalBrain.Kernel.AspNetCore.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../Modules/Postgres/DigitalBrain.Modules.Postgres/DigitalBrain.Modules.Postgres.csproj" /></ItemGroup>
 </Project>
 

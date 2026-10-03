@@ -6,7 +6,7 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.Metering;
 using DigitalBrain.Testing.E2E.Agent;
 using DigitalBrain.Testing.E2E.Workspace;
-using DigitalBrain.Sdk.Identity;
+using DigitalBrain.Platform.Contracts.Identity;
 
 namespace DigitalBrain.Modules.Assistant.Tests.E2E;
 

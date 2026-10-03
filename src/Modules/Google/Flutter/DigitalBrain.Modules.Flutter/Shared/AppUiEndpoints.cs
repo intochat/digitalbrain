@@ -1,3 +1,5 @@
+using DigitalBrain.Sdk.Types;
+using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.Sdk.Http;
 using DigitalBrain;
 using DigitalBrain.Contracts;
@@ -90,12 +92,12 @@ internal static class AppUiEndpoints
                     }
                     else if (input.Action == "secret")
                     {
-                        if (!SecretRef.IsReference(input.Value))
+                        if (!SecretReferences.IsReference(input.Value))
                         {
                             throw new ArgumentException("A form secret carries the vault reference, never a raw secret value.");
                         }
 
-                        await form.SetSecret(input.Field ?? "", SecretRef.FromReference(input.Value!, input.Field ?? "")).WaitAsync(ct);
+                        await form.SetSecret(input.Field ?? "", SecretReferences.FromReference(input.Value!, input.Field ?? "")).WaitAsync(ct);
                     }
                     else { await form.SetDraft(input.Field ?? "", input.Value ?? "").WaitAsync(ct); }
                     break;

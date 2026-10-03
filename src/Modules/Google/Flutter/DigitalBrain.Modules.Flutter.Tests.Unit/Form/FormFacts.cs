@@ -1,3 +1,4 @@
+using DigitalBrain.Sdk.Types;
 using DigitalBrain.Contracts.Types;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Form;
@@ -75,7 +76,7 @@ public sealed class FormFacts
         await using var brain = await UnitTest.Create().WithModule<FlutterModule>().StartAsync(ct);
         var form = brain.Get<IForm>("owner/a/apps/forms/login");
         await form.Define(new("Login", [new("password", "Password", FieldKind.Secret)]));
-        var secret = SecretRef.For("owner", "login-password", "Password", isSet: true);
+        var secret = SecretReferences.For("owner", "login-password", "Password", isSet: true);
         await form.SetSecret("password", secret);
         var state = await form.Read();
         var field = state.Fields.Single();

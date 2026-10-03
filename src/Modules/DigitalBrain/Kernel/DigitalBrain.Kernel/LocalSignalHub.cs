@@ -1,4 +1,4 @@
-using DigitalBrain.Client;
+using DigitalBrain.Contracts.Signals;
 using System.Collections.Concurrent;
 using DigitalBrain;
 using DigitalBrain.Contracts;

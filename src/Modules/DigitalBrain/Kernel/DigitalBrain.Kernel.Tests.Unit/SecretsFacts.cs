@@ -1,6 +1,7 @@
+using DigitalBrain.Sdk.Types;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
-using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Contracts.Secrets;
 using DigitalBrain.Platform.Secrets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -23,7 +24,7 @@ public sealed class SecretsFacts
         var reference = store.Set(state, "api.key", "API key", Canary);
 
         Assert.DoesNotContain(Canary, state.Fields["api.key"].SealedSecret, StringComparison.Ordinal);
-        Assert.Equal(Owner, reference.Owner);
+        Assert.Equal(Owner, reference.OwnerOf());
         Assert.Equal(Canary, store.Resolve(state, reference));
     }
 
@@ -34,7 +35,7 @@ public sealed class SecretsFacts
         var store = MasterKeyStore("first master key");
         store.Set(state, "api.key", "API key", Canary);
 
-        Assert.Throws<InvalidOperationException>(() => store.Resolve(state, DigitalBrain.Contracts.Types.SecretRef.For("other", "api.key", "API key", true)));
+        Assert.Throws<InvalidOperationException>(() => store.Resolve(state, DigitalBrain.Sdk.Types.SecretReferences.For("other", "api.key", "API key", true)));
     }
 
     [Fact]

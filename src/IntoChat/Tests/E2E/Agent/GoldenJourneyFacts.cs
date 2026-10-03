@@ -9,7 +9,7 @@ using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Supabase.Tables;
 using DigitalBrain.Testing.E2E;
 using Npgsql;
-using DigitalBrain.Sdk.Identity;
+using DigitalBrain.Platform.Contracts.Identity;
 
 namespace IntoChat.Tests.E2E.Agent;
 

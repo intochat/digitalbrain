@@ -1,7 +1,9 @@
+using DigitalBrain.Platform.Contracts.Auth;
+using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Kernel;
 using DigitalBrain.Sdk;
-using DigitalBrain.Sdk.Integrations;
+using DigitalBrain.Platform.Contracts.Integrations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Http;
@@ -13,7 +15,8 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Google.Gmail;
 
-public sealed class GmailModule : IModule<GmailModuleOptions>
+[ModuleId("gmail")]
+public sealed class GmailModule : IModule<GmailModuleOptions>, IHttpModule
 {
     public static IntegrationDefinition Integration { get; } = IntegrationDefinition.For("gmail", "Gmail")
         .RequiresSecret("ClientId")
@@ -25,8 +28,7 @@ public sealed class GmailModule : IModule<GmailModuleOptions>
         ArgumentNullException.ThrowIfNull(silo);
         var services = silo.Services;
         services.TryAddSingleton(TimeProvider.System);
-        services.TryAddSingleton<TokenHandoff>();
-        services.TryAddSingleton(silo.Configuration.GetModuleOptions<GmailModuleOptions>(nameof(GmailModule)));
+        services.TryAddSingleton(silo.Configuration.GetModuleOptions<GmailModuleOptions>("gmail"));
         services.TryAddSingleton<GmailRegistration>();
         services.TryAddSingleton<GmailLogins>();
         services.AddSingleton<BrowserLogins>(s => s.GetRequiredService<GmailLogins>());
@@ -46,7 +48,7 @@ public sealed class GmailModule : IModule<GmailModuleOptions>
             await grains.GetGrain<IGmail>(push.EmailAddress).AcceptWatchPush(push);
             return Results.Accepted();
         });
-        endpoints.MapGet("/google/gmail/oauth/callback", async (string? code, GmailRegistration registration, IGrainFactory grains, DigitalBrain.Sdk.Identity.IIdentity identity) =>
+        endpoints.MapGet("/google/gmail/oauth/callback", async (string? code, GmailRegistration registration, IGrainFactory grains, DigitalBrain.Platform.Contracts.Identity.IIdentity identity) =>
         {
             if (string.IsNullOrWhiteSpace(code))
             {

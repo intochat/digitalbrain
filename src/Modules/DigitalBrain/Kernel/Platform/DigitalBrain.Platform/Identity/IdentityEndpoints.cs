@@ -1,8 +1,9 @@
+using DigitalBrain.Kernel.AspNetCore;
 using System.Security.Claims;
 using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Kernel.Enforcement;
-using DigitalBrain.Sdk.Identity;
+using DigitalBrain.Platform.Contracts.Identity;
 using DigitalBrain.Platform.Identity.Directory;
 using DigitalBrain.Platform.Identity.Grants;
 using Microsoft.AspNetCore.Authentication;

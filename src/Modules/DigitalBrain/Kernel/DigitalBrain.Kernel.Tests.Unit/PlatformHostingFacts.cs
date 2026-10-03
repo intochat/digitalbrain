@@ -1,10 +1,10 @@
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
-using DigitalBrain.Sdk.Identity;
-using DigitalBrain.Platform.Hosting;
+using DigitalBrain.Platform.Contracts.Identity;
+using DigitalBrain.Kernel;
 using DigitalBrain.Sdk.Capacity;
-using DigitalBrain.Sdk.Integrations;
-using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Contracts.Integrations;
+using DigitalBrain.Platform.Contracts.Secrets;
 using DigitalBrain.Platform.Secrets;
 using Microsoft.Extensions.DependencyInjection;
 

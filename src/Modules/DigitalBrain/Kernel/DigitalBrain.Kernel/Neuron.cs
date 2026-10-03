@@ -1,5 +1,4 @@
 using DigitalBrain.Contracts.Signals;
-using DigitalBrain.Client;
 using DigitalBrain;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,10 +16,10 @@ public abstract class Neuron : Grain, INeuron, IGrainBase
     private bool _observedActivation;
     private ObserverManager<INeuronObserver>? _observers;
     private ObserverManager<INeuronObserver> Observers => _observers ??= new(
-        ServiceProvider.GetRequiredService<IOptions<BrainOptions>>().Value.ObserverLease,
+        ServiceProvider.GetRequiredService<IOptions<ObserverOptions>>().Value.Lease,
         ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("Neuron.Observers"));
 
-    protected TimeSpan ObserverRenewal => ServiceProvider.GetRequiredService<IOptions<BrainOptions>>().Value.RenewEvery;
+    protected TimeSpan ObserverRenewal => TimeSpan.FromTicks(ServiceProvider.GetRequiredService<IOptions<ObserverOptions>>().Value.Lease.Ticks / 5);
 
     // Orleans calls IGrainBase; keep derived virtual hooks intact without relying on a base call.
     async Task IGrainBase.OnActivateAsync(CancellationToken cancellationToken)

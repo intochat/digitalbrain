@@ -1,16 +1,16 @@
 using DigitalBrain.Aspire.Hosting;
-using DigitalBrain.Kernel;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Postgres.Aspire.Hosting;
 
 public sealed class PostgresModuleHosting : IDigitalBrainModuleHosting
 {
+    public string Id => "postgres";
     public void Configure(DigitalBrainBuilder brain)
     {
         ArgumentNullException.ThrowIfNull(brain);
-        var options = brain.GetModuleConfiguration<PostgresModule>().GetModuleOptions<PostgresModuleOptions>(nameof(PostgresModule));
-        var module = new DigitalBrainModuleBuilder<PostgresModule>(brain);
+        var options = brain.GetModuleConfiguration("postgres").GetModuleOptions<PostgresModuleOptions>("postgres");
+        var module = new DigitalBrainModuleBuilder<DigitalBrain.Postgres.Aspire.Hosting.PostgresModuleHosting>(brain);
         if (options.Hosting.Enabled)
         {
             module.WithPostgres(hosting =>

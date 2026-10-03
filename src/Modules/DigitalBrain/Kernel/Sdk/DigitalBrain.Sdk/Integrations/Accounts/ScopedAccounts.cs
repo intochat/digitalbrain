@@ -1,5 +1,7 @@
 using DigitalBrain.Kernel.Enforcement;
 
+using DigitalBrain.Platform.Contracts.Integrations.Accounts;
+
 namespace DigitalBrain.Sdk.Integrations.Accounts;
 
 public static class ScopedAccounts

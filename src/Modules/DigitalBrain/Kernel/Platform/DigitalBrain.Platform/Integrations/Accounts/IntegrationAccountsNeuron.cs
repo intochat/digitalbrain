@@ -1,5 +1,6 @@
-using DigitalBrain.Sdk.Secrets;
-using DigitalBrain.Sdk.Integrations.Accounts;
+using DigitalBrain.Sdk.Types;
+using DigitalBrain.Platform.Contracts.Integrations.Accounts;
+using DigitalBrain.Platform.Contracts.Secrets;
 using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
@@ -99,7 +100,7 @@ internal sealed class IntegrationAccountsNeuron : Neuron<IntegrationAccountsStat
     {
         if (!string.IsNullOrWhiteSpace(request.SecretReference))
         {
-            if (!SecretRef.IsReference(request.SecretReference) || !OwnedByCaller(request.SecretReference, caller))
+            if (!SecretReferences.IsReference(request.SecretReference) || !OwnedByCaller(request.SecretReference, caller))
             {
                 throw new ArgumentException("SecretReference must be an existing reference into your own vault.", nameof(request));
             }
@@ -126,7 +127,7 @@ internal sealed class IntegrationAccountsNeuron : Neuron<IntegrationAccountsStat
     // the platform vault included, is never bindable.
     private static bool OwnedByCaller(string reference, CallerContext caller)
     {
-        try { return new SecretRef { Reference = reference }.Owner == caller.PrincipalId; }
+        try { return new SecretRef { Reference = reference }.OwnerOf() == caller.PrincipalId; }
         catch (InvalidOperationException) { return false; }
     }
 
@@ -148,7 +149,7 @@ internal sealed class IntegrationAccountsNeuron : Neuron<IntegrationAccountsStat
         string value;
         try
         {
-            value = await _grains.GetGrain<ISecrets>(credential.Owner).Resolve(Platform(caller), credential, cancellationToken);
+            value = await _grains.GetGrain<ISecrets>(credential.OwnerOf()).Resolve(Platform(caller), credential, cancellationToken);
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {

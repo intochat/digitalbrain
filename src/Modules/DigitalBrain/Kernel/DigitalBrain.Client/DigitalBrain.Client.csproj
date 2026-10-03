@@ -5,17 +5,9 @@
     <RootNamespace>DigitalBrain.Client</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Kernel" />
-    <InternalsVisibleTo Include="DigitalBrain.Platform" />
-    <InternalsVisibleTo Include="DigitalBrain.Testing" />
-    <InternalsVisibleTo Include="DigitalBrain.Testing.Unit" />
-    <InternalsVisibleTo Include="DigitalBrain.Testing.E2E" />
-    <!-- The script edge speaks the same protocol records as the client. -->
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.CSharp" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Hosting" />
-    <PackageReference Include="Microsoft.Orleans.Client" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+<PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" />
+<PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" />
   </ItemGroup>
   <ItemGroup><ProjectReference Include="../DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" /></ItemGroup>
 </Project>

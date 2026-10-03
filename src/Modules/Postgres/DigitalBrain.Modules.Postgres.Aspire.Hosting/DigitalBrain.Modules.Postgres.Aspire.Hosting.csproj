@@ -6,7 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.PostgreSQL" />
-    <ProjectReference Include="../DigitalBrain.Modules.Postgres/DigitalBrain.Modules.Postgres.csproj" />
+    <ProjectReference Include="../DigitalBrain.Modules.Postgres.Contracts/DigitalBrain.Modules.Postgres.Contracts.csproj" />
     <ProjectReference Include="..\..\..\Aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

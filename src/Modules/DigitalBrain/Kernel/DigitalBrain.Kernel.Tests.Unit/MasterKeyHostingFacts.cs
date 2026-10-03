@@ -15,7 +15,7 @@ public sealed class MasterKeyHostingFacts
     {
         var builder = DistributedApplication.CreateBuilder(new DistributedApplicationOptions { Args = [], DisableDashboard = true });
         builder.Configuration[$"Parameters:{DigitalBrainHostingNames.MasterKeyParameter}"] = "hosting test master key";
-        var brain = builder.AddDigitalBrain("modules", persistentStorage: false);
+        var brain = builder.AddDigitalBrain("modules", persistentStorage: false, options: new() { UseAzureStorage = true });
         var first = builder.AddExecutable("first", "unused", ".").WithReference(brain);
         var second = builder.AddExecutable("second", "unused", ".").WithReference(brain);
         var client = builder.AddExecutable("client", "unused", ".").WithReference(brain.AsClient());
@@ -37,7 +37,7 @@ public sealed class MasterKeyHostingFacts
             Args = ["--publisher", "manifest"],
             DisableDashboard = true,
         });
-        builder.AddDigitalBrain("modules", persistentStorage: false);
+        builder.AddDigitalBrain("modules", persistentStorage: false, options: new() { UseAzureStorage = true });
 
         var parameter = builder.Resources.OfType<ParameterResource>().Single(resource => resource.Name == DigitalBrainHostingNames.MasterKeyParameter);
         Assert.True(parameter.Secret);

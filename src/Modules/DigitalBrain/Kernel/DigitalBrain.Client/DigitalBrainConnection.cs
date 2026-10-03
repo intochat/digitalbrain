@@ -1,27 +1,35 @@
+using DigitalBrain.Contracts.Edge.V1;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using DigitalBrain;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using System.Runtime.InteropServices;
 
 namespace DigitalBrain.Client;
 
 public sealed class DigitalBrainConnection : IDigitalBrain
 {
-    private readonly IHost _host;
+    private readonly IConfigurationRoot _configuration;
+    private readonly CancellationTokenSource _stopping = new();
+    private readonly PosixSignalRegistration _termination;
+    private bool _disposed;
     private readonly HttpClient _http;
     private readonly ScriptEdgeClient _edge;
 
-    internal DigitalBrainConnection(IHost host, HttpClient http)
+    internal DigitalBrainConnection(IConfigurationRoot configuration, HttpClient http)
     {
-        _host = host;
+        _configuration = configuration;
+        _termination = PosixSignalRegistration.Create(PosixSignal.SIGTERM, context =>
+        { context.Cancel = true; _stopping.Cancel(); });
+        Console.CancelKeyPress += Cancel;
         _http = http;
         _edge = new ScriptEdgeClient(http);
     }
 
-    public CancellationToken Stopping => _host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping;
+    public CancellationToken Stopping => _stopping.Token;
+
+    private void Cancel(object? sender, ConsoleCancelEventArgs args) { args.Cancel = true; _stopping.Cancel(); }
 
     // Environment variables spell configuration sections with "__", so "Account__twitter" arrives as "Account:twitter".
     public string? Setting(string name) => Configuration["CSharpFile:Settings:" + name.Replace("__", ":", StringComparison.Ordinal)];
@@ -52,13 +60,18 @@ public sealed class DigitalBrainConnection : IDigitalBrain
         }
     }
 
-    private IConfiguration Configuration => _host.Services.GetRequiredService<IConfiguration>();
+    private IConfiguration Configuration => _configuration;
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        using var shutdown = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        await _host.StopAsync(shutdown.Token).ConfigureAwait(false);
-        _host.Dispose();
+        if (_disposed) { return ValueTask.CompletedTask; }
+        _disposed = true;
+        Console.CancelKeyPress -= Cancel;
+        _termination.Dispose();
+        _stopping.Cancel();
         _http.Dispose();
+        (_configuration as IDisposable)?.Dispose();
+        _stopping.Dispose();
+        return ValueTask.CompletedTask;
     }
 }

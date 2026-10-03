@@ -1,3 +1,4 @@
+using DigitalBrain.Client.Orleans;
 using DigitalBrain.Client;
 using DigitalBrain.Contracts;
 using Microsoft.AspNetCore.Builder;
@@ -8,11 +9,11 @@ namespace DigitalBrain.Aspire.Client;
 
 public static class DigitalBrainClientHostingExtensions
 {
-    public static TBuilder AddDigitalBrainClient<TBuilder>(this TBuilder builder)
+    public static TBuilder AddDigitalBrainClient<TBuilder>(this TBuilder builder, bool useAzureClustering = false)
         where TBuilder : IHostApplicationBuilder
     {
         builder.AddDigitalBrainClientDefaults();
-        builder.AddKeyedAzureTableServiceClient(DigitalBrainNames.Clustering);
+        if (useAzureClustering) { builder.AddKeyedAzureTableServiceClient(DigitalBrainNames.Clustering); }
         builder.UseOrleansClient(client => client.AddDigitalBrain());
         return builder;
     }

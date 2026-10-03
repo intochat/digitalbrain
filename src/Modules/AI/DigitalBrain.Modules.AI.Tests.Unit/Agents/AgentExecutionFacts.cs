@@ -67,7 +67,7 @@ public sealed class AgentExecutionFacts
         public int FlushCalls { get; private set; }
         public Task RecordAsync(string intentId, TokenUsageEntry entry, CancellationToken cancellationToken = default)
             => Task.CompletedTask;
-        public Task FlushAsync(IntentContext intent, CancellationToken cancellationToken = default)
+        public Task FlushAsync(IntentUsageBatch intent, CancellationToken cancellationToken = default)
         {
             FlushCalls++;
             throw new IOException("Usage storage unavailable");

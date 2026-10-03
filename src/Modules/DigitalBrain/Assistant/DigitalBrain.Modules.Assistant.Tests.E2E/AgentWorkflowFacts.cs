@@ -10,7 +10,7 @@ using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Testing.E2E.Workspace;
 using Npgsql;
-using DigitalBrain.Sdk.Identity;
+using DigitalBrain.Platform.Contracts.Identity;
 
 namespace DigitalBrain.Modules.Assistant.Tests.E2E;
 

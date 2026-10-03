@@ -1,3 +1,4 @@
+using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.Flutter.Workspace;
 using DigitalBrain.Kernel;
 using Microsoft.AspNetCore.Routing;
@@ -5,7 +6,8 @@ using Orleans.Hosting;
 
 namespace DigitalBrain.Flutter;
 
-public sealed class FlutterModule : IModule<FlutterModuleOptions>
+[ModuleId("flutter")]
+public sealed class FlutterModule : IModule<FlutterModuleOptions>, IHttpModule
 {
     public void Configure(ISiloBuilder silo)
     {

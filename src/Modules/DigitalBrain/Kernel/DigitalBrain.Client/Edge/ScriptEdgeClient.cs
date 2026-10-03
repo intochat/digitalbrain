@@ -1,3 +1,4 @@
+using DigitalBrain.Contracts.Edge.V1;
 using System.Net.Http.Json;
 using System.Text.Json;
 
@@ -16,7 +17,7 @@ internal sealed class ScriptEdgeClient(HttpClient http)
 
     public async Task<HttpResponseMessage> OpenSignalsAsync(string contract, string key, string signal, CancellationToken cancellationToken)
     {
-        var response = await http.GetAsync(ScriptEdgeProtocol.SignalsQuery(contract, key, signal), HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+        var response = await http.GetAsync(ScriptSignalQuery.SignalsQuery(contract, key, signal), HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         try
         {
             await EnsureSuccessAsync(response, "subscribe to " + signal, cancellationToken).ConfigureAwait(false);

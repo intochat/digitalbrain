@@ -1,3 +1,4 @@
+using DigitalBrain.Contracts;
 using DigitalBrain.Kernel;
 using Orleans.Hosting;
 

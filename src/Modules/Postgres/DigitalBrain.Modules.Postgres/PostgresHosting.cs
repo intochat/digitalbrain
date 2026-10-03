@@ -27,7 +27,7 @@ public static class PostgresHosting
         services.TryAddSingleton<IPostgresLegacyTables, PostgresLegacyTables>();
         silo.AddStartupTask<PostgresMigrationStartup>();
         services.AddOptions<PostgresModuleOptions>()
-            .Configure<IConfiguration>((options, configuration) => configuration.PopulateModuleOptions(nameof(PostgresModule), options))
+            .Configure<IConfiguration>((options, configuration) => configuration.PopulateModuleOptions("postgres", options))
             .Validate(options => !string.IsNullOrWhiteSpace(options.ConnectionName), "Postgres requires a connection name.")
             .Validate<IConfiguration>((options, configuration) => IsConnectionValid(configuration.GetConnectionString(options.ConnectionName)),
                 "Postgres requires a valid PostgreSQL URI or Npgsql connection string for its configured connection name.")

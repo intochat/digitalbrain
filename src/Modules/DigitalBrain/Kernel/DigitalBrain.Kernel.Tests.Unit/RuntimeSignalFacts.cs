@@ -2,7 +2,6 @@ using DigitalBrain.Contracts.Signals;
 using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Kernel;
-using DigitalBrain.Platform.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans;

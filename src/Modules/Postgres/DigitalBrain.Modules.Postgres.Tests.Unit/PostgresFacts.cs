@@ -54,7 +54,7 @@ public sealed class PostgresFacts
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["DigitalBrain:Modules:PostgresModule:Options:ConnectionName"] = "analytics",
+                ["DigitalBrain:Modules:postgres:Options:ConnectionName"] = "analytics",
                 ["ConnectionStrings:analytics"] = "Host=localhost;Database=analytics;Username=reader",
                 ["ConnectionStrings:supabase"] = "Host=localhost;Database=supabase;Username=reader",
             }).Build();

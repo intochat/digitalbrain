@@ -7,10 +7,10 @@ namespace IntoChat.Tests.E2E.Composition;
 // compilation and authoring; both product profiles compose the same connector set.
 public sealed class ProfileCompositionFacts
 {
-    private static readonly string[] ToolingModules = ["Aspire", "CSharp", "CSharpAuthoring"];
+    private static readonly string[] ToolingModules = ["aspire", "csharp", "csharp-authoring"];
 
     private static readonly string[] UserPathModules =
-        ["AI", "Memory", "ClickHouse", "Supabase", "Time", "Gmail", "Salesforce", "GitHub", "Flutter"];
+        ["ai", "memory", "clickhouse", "supabase", "time", "gmail", "salesforce", "github", "flutter"];
 
     [Theory]
     [InlineData("developer")]
@@ -30,9 +30,9 @@ public sealed class ProfileCompositionFacts
         await using var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.IntoChat_AppHost>(
             [$"IntoChat:Profile={profile}"], TestContext.Current.CancellationToken);
         var productModules = appHost.Resources.SelectMany(resource => resource.Annotations.OfType<BrainModuleAnnotation>())
-            .Select(module => module.ModuleType.FullName).Order().ToArray();
+            .Select(module => module.ModuleId).Order().ToArray();
         var referenceModules = ReferenceBrain.Create().BuildComposition().Modules
-            .Select(module => module.ModuleType.FullName).Order().ToArray();
+            .Select(module => DigitalBrain.Kernel.ModuleIdentity.Get(module.ModuleType)).Order().ToArray();
         Assert.Equal(productModules, referenceModules);
     }
 }

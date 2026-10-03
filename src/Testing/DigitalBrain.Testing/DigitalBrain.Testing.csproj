@@ -6,4 +6,5 @@
   <ItemGroup>
     <ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
   </ItemGroup>
+  <ItemGroup><ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Client.Orleans/DigitalBrain.Client.Orleans.csproj" /></ItemGroup>
 </Project>

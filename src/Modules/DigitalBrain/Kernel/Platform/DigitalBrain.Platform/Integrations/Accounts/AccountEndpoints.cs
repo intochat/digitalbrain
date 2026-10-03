@@ -1,4 +1,6 @@
 using DigitalBrain.Sdk.Integrations.Accounts;
+using DigitalBrain.Platform.Contracts.Integrations.Accounts;
+using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.Kernel.Enforcement;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;

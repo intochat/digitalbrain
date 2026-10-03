@@ -1,6 +1,6 @@
 using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Sdk.Identity;
+using DigitalBrain.Platform.Contracts.Identity;
 using DigitalBrain.Platform.Identity.Directory;
 using DigitalBrain.Platform.Identity.Grants;
 using Microsoft.Extensions.DependencyInjection;

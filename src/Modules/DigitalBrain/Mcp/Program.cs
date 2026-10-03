@@ -1,9 +1,10 @@
+using DigitalBrain.Client.Orleans;
 using DigitalBrain.Aspire.Client;
 using DigitalBrain.Mcp;
 using ModelContextProtocol.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.AddDigitalBrainClient();
+builder.AddDigitalBrainClient(useAzureClustering: true);
 builder.Services
     .AddMcpServer()
     .WithHttpTransport()

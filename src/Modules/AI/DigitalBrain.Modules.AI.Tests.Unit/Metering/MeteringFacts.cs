@@ -1,3 +1,4 @@
+using DigitalBrain.Kernel;
 using System.Runtime.CompilerServices;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Metering;
@@ -153,7 +154,7 @@ public sealed class MeteringFacts
             await sink.RecordAsync(intent.IntentId, chat with { Meter = MeterKind.Embedding }, ct);
             // Provider calls accumulate in the intent scope; nothing is durable until the flush.
             Assert.Empty((await usage.ReadAsync(ct)).Entries);
-            await sink.FlushAsync(intent, ct);
+            await sink.FlushAsync(intent.Snapshot(), ct);
         }
 
         var recorded = await usage.ReadAsync(ct);
@@ -194,7 +195,7 @@ public sealed class MeteringFacts
             return Task.CompletedTask;
         }
 
-        public Task FlushAsync(IntentContext intent, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task FlushAsync(IntentUsageBatch intent, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 
     private sealed class RecordingBatchMeterSink : IBatchMeterSink

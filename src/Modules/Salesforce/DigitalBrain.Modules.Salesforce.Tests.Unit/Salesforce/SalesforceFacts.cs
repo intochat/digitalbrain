@@ -1,5 +1,7 @@
+using DigitalBrain.Platform.Auth;
+using DigitalBrain.Platform.Contracts.Auth;
 using System.Text.Json;
-using DigitalBrain.Sdk.Secrets;
+using DigitalBrain.Platform.Contracts.Secrets;
 using DigitalBrain.Platform.Secrets;
 using DigitalBrain.Salesforce;
 using DigitalBrain.Salesforce.Signals;
@@ -175,7 +177,7 @@ public sealed class SalesforceFacts
             .ConfigureSilo(silo =>
             {
                 silo.Services.AddSingleton<ISalesforceProvider>(provider);
-                silo.Services.AddSingleton(handoff);
+                silo.Services.AddSingleton<ITokenHandoff>(handoff);
                 if (exchange is not null)
                 {
                     silo.Services.AddSingleton<ISalesforceTokenExchange>(exchange);

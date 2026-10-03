@@ -1,4 +1,4 @@
-using DigitalBrain.Sdk.Integrations;
+using DigitalBrain.Platform.Contracts.Integrations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 

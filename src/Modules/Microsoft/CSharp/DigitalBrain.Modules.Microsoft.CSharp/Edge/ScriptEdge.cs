@@ -1,3 +1,4 @@
+using DigitalBrain.Contracts.Edge.V1;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
