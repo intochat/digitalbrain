@@ -44,26 +44,35 @@ class AppDocument {
         .toList(),
     scenarios: values,
   );
-  AppDocument duplicateScenario(AppScenario original, String newId) =>
-      AppDocument(
-        preamble: preamble,
-        behaviors: behaviors
-            .map(
-              (b) => b.scenarioIds.contains(original.id)
-                  ? b.edit(b.title, b.description, [...b.scenarioIds, newId])
-                  : b,
-            )
-            .toList(),
-        scenarios: [
-          ...scenarios,
-          AppScenario(
-            id: newId,
-            name: '${original.name} copy',
-            body: original.body,
-            isLive: original.isLive,
-          ),
-        ],
-      );
+  AppDocument duplicateScenario(AppScenario original, String newId) {
+    final names = scenarios.map((s) => s.name).toSet();
+    final baseName = '${original.name} copy';
+    var name = baseName;
+    var suffix = 2;
+    while (names.contains(name)) {
+      name = '$baseName ${suffix++}';
+    }
+    return AppDocument(
+      preamble: preamble,
+      behaviors: behaviors
+          .map(
+            (b) => b.scenarioIds.contains(original.id)
+                ? b.edit(b.title, b.description, [...b.scenarioIds, newId])
+                : b,
+          )
+          .toList(),
+      scenarios: [
+        ...scenarios,
+        AppScenario(
+          id: newId,
+          name: name,
+          body: original.body,
+          isLive: original.isLive,
+        ),
+      ],
+    );
+  }
+
   AppDocument moveScenario(AppScenario scenario, int offset) {
     final values = [...scenarios];
     final index = values.indexWhere((s) => s.id == scenario.id);

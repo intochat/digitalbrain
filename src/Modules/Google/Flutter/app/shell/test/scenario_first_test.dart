@@ -6,6 +6,23 @@ import 'package:digitalbrain_flutter_shell/workspace/apps/app_document.dart';
 import 'package:digitalbrain_flutter_shell/workspace/apps/app_spec_view.dart';
 
 void main() {
+  test('repeated scenario duplication chooses the first unused copy name', () {
+    const original = AppScenario(id: 'a', name: 'Open', body: 'Draw UI.');
+    const document = AppDocument(behaviors: [], scenarios: [original]);
+    final first = document.duplicateScenario(original, 'first');
+    final second = first.duplicateScenario(original, 'second');
+    expect(first.scenarios.last.name, 'Open copy');
+    expect(second.scenarios.last.name, 'Open copy 2');
+    final collided = second.withScenarios([
+      ...second.scenarios,
+      const AppScenario(id: 'existing', name: 'Open copy 3', body: ''),
+      const AppScenario(id: 'later', name: 'Open copy 5', body: ''),
+    ]);
+    final next = collided.duplicateScenario(original, 'next');
+    expect(next.scenarios.last.name, 'Open copy 4');
+    expect(next.scenarios.last.id, 'next');
+    expect(next.scenarios.last.body, original.body);
+  });
   test(
     'scenario edits retain IDs and duplication preserves source bindings',
     () {
