@@ -8,7 +8,7 @@ public sealed class E2ETestBuilder
     private readonly BrainCompositionBuilder _composition = new();
     private TestExecutionOptions _execution = new();
     private BrowserOptions _browser = new() { Headless = true };
-    private string? _durableStorageKey;
+    private DurableStorageVolume? _durableStorage;
     private bool _started;
 
     public E2ETestBuilder WithModule<TModule>(Action<ModuleConfiguration<TModule>>? configure = null)
@@ -68,14 +68,11 @@ public sealed class E2ETestBuilder
         return this;
     }
 
-    // Keeps the cluster storage data volume across host restarts within one test, so a host that
-    // is killed and started again reads the persisted grain state. Every host of the same test
-    // passes the same key; the volume is removed when the test process exits.
-    public E2ETestBuilder WithDurableStorage(string key)
+    public E2ETestBuilder WithDurableStorage(DurableStorageVolume volume)
     {
         EnsureMutable();
-        ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        _durableStorageKey = DurableStorageVolume.Acquire(key);
+        ArgumentNullException.ThrowIfNull(volume);
+        _durableStorage = volume;
         return this;
     }
 
@@ -106,12 +103,13 @@ public sealed class E2ETestBuilder
         return composition;
     }
 
-    public Task<E2EBrain> StartAsync(CancellationToken cancellationToken = default)
+    public async Task<E2EBrain> StartAsync(CancellationToken cancellationToken = default)
     {
         EnsureMutable();
         var composition = BuildComposition();
         _started = true;
-        return E2ETest.StartModulesAsync(composition.Modules, _execution, _browser, _durableStorageKey, cancellationToken);
+        if (_durableStorage is not null) { await _durableStorage.WaitUntilReleasedAsync(cancellationToken); }
+        return await E2ETest.StartModulesAsync(composition.Modules, _execution, _browser, _durableStorage?.Name, cancellationToken);
     }
 
     private void EnsureMutable()

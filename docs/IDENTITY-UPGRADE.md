@@ -17,8 +17,10 @@ BrainScope(account, brain) -> BrainAuthority: members, invitations, grants, impo
    prefixed by brain name. Explicitly reuse the existing emulator data volume or point at
    the existing Azure account; changing resource names must not create a fresh data store
    when upgrading an existing deployment.
-4. Start only the new version with migration enabled. List every grant-only legacy brain
-   under its owning account; legacy grant keys cannot identify the account themselves.
+4. Start a dedicated maintenance host without Platform HTTP endpoints. Normal startup
+   only checks compatibility; it never imports legacy state. Stop all other writers first.
+   Provide the backup identifier, its complete legacy grant-store inventory, and ownership
+   mappings for grant-only brains. Legacy grant keys cannot identify the account themselves.
 
 ```json
 {
@@ -26,6 +28,8 @@ BrainScope(account, brain) -> BrainAuthority: members, invitations, grants, impo
     "Identity": {
       "Migration": {
         "Maintenance": true,
+        "SourceSnapshotId": "sha256-of-the-stopped-deployment-backup",
+        "LegacyGrantBrainIds": ["owner", "legacy-grant-only-brain"],
         "LegacyBrainAccounts": {
           "owner": "owner",
           "legacy-grant-only-brain": "its-account-id"
@@ -36,19 +40,34 @@ BrainScope(account, brain) -> BrainAuthority: members, invitations, grants, impo
 }
 ```
 
+Run the explicit operation from the maintenance host:
+
+```csharp
+var directory = grains.GetGrain<IIdentityDirectory>(IdentityGrains.Directory);
+var planId = await directory.InspectMigrationAsync(ct); // read-only, complete source preflight
+await File.WriteAllTextAsync(planPath, planId, ct);       // retain for retries
+await directory.ApplyMigrationAsync(planId, ct);
+```
+
+On retry, read the saved plan ID instead of approving a changed plan. Apply recomputes
+and compares the source/mapping digest before writing. `SourceSnapshotId` and the inventory
+must come from the actual stopped source backup; an operator-provided list is not an
+independent proof that storage contains no other legacy grant stores.
+
 Existing memberships and invitations supply their account/brain pairs automatically.
 If one legacy brain name belongs to multiple accounts, migration refuses to guess.
 Resolve the old records and ownership mapping before retrying. A principal without an
 unambiguous owned default membership also blocks migration.
 
-Each brain import has a durable checkpoint. Repeating it never replaces live membership
-or restores revoked grants. Legacy grant stores become sealed, and the directory writes
-its final checkpoint only after all imports and seals succeed. Failed startup can be
-retried with the same configuration. Normal authorization never falls back to old records.
+The directory persists the plan ID before storage adoption or imports; each brain import
+has a durable checkpoint. Repeating it never replaces live membership or restores revoked grants. Legacy grant stores become sealed, and the directory writes
+its final checkpoint only after all imports and seals succeed. An interrupted apply can be
+retried with the same plan and configuration. Normal authorization never falls back to old records.
 Legacy records, aliases and field IDs remain available for inspection and backup recovery.
 
-5. After successful startup, verify a migrated login, cross-account denial, and the grant
-   list for each mapped scope. Remove the maintenance setting and resume traffic.
+5. After apply completes, stop the maintenance host. Start the normal server and verify a
+   migrated login, cross-account denial, and the grant list for each mapped scope. Keep the
+   maintenance setting disabled on the normal server; resume traffic after verification.
 6. Do not roll back only the binaries after accepting new writes. Restore the coordinated
    state/key backup if a rollback is required; the old version cannot read the new authority
    records. Keep the maintenance window open until migration has been verified.
@@ -118,3 +137,55 @@ dotnet pack DigitalBrain.slnx -c Release --no-build -o $feed
 
 The verifier creates an isolated cache, resolves every DigitalBrain package from the supplied
 feed, builds five consumer profiles, and checks their dependency boundaries.
+
+## Deployment identity and release verification
+
+```csharp
+var brain = builder.AddDigitalBrain("display-name", serviceId: "existing-service-id",
+    dataVolume: "existing-volume", options: new()
+    {
+        UseAzureStorage = true,
+        ClusterId = "current-cluster-id"
+    });
+```
+
+Service ID identifies the logical deployment; cluster ID identifies cluster membership.
+Azure Blob grain names do not include service ID. Platform therefore persists a
+`.digitalbrain-deployment.json` binding in the grain-state container and validates both
+service ID and an encrypted master-key proof before normal startup. This guards reuse of
+an existing store; it does not turn one blob container into separate stores for different
+service IDs. Give different deployments separate backing stores.
+
+A legacy store without a binding requires explicit maintenance adoption. Inspect remains
+read-only; apply creates the binding after preflight. Existing bound stores reject a changed
+service ID or master key in maintenance mode too. The first adoption still requires checking
+the supplied key against the deployment's original encrypted data. Changing
+cluster ID no longer changes service ID. Resource renames require explicitly retaining
+service ID, volume/storage account, and master key. AppHost resource names are scoped;
+Orleans provider service keys and projected connection aliases remain stable.
+
+```powershell
+dotnet build DigitalBrain.slnx -c Release -p:CodeGraphRefresh=false
+dotnet pack DigitalBrain.slnx -c Release --no-build -o artifacts
+./eng/Verify-Release.ps1 -Feed artifacts -Output /path/to/fresh-verification-directory
+# Only when publishing is intended, with NUGET_API_KEY configured:
+./eng/Publish-VerifiedNuGet.ps1 -Feed artifacts `
+    -Manifest /path/to/fresh-verification-directory/verified-packages.json `
+    -Source https://api.nuget.org/v3/index.json
+```
+
+The release verifier builds isolated package consumers, runs packed composition, and
+rehearses an interrupted migration on Azurite using an old writer/reader compiled from
+pinned revision `e39ecb35df23b80ef2f9340ea80a8bd6c8f8e3a5`. It verifies restart/revocation,
+encryption key reuse, and coordinated snapshot rollback. This synthetic deployment is
+repeatable CI evidence; the production maintenance window still requires rehearsal on a
+copy of that deployment's own state and keys.
+
+Docker and the pinned Git history are required. A failed rehearsal retains its owned
+volume for inspection. Successful cleanup never force-removes attached containers.
+The verified manifest records package SHA-256 hashes; publishing checks every hash before
+pushing any package. Do not repack between verification and publishing.
+
+Hosted test consumers declare Aspire orchestration/dashboard packages for their build
+platform explicitly; NuGet does not restore dependencies injected by package build imports.
+See the generated consumer project in `eng/Verify-Release.ps1` for the exact setup.

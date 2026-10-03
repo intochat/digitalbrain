@@ -17,7 +17,7 @@ public static class E2ETest
         var browser = Resolve(browserOptions);
         var identity = NewIdentity();
         var args = ComposeHostArguments(optionOverrides, identity);
-        var session = await AspireTestSession.StartAsync<TAppHost>(args, identity, WithArtifacts(options, identity), cancellationToken).ConfigureAwait(false);
+        var session = await AspireTestSession.StartAsync<TAppHost>(args, WithArtifacts(options, identity), cancellationToken).ConfigureAwait(false);
         return await ReadyAsync(new E2EBrain(session, browser), brain => brain.StartBrowserAsync(cancellationToken)).ConfigureAwait(false);
     }
 

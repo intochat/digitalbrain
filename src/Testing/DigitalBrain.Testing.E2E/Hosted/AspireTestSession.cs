@@ -21,9 +21,10 @@ public sealed class AspireTestSession : IAsyncDisposable
     private readonly TestSessionLifetime _lifetime;
     private readonly TestExecutionOptions _options;
     private IHost? _client;
-    private readonly string _identity;
-    private AspireTestSession(DistributedApplication app, TestSessionLifetime lifetime, TestExecutionOptions options, string identity)
-    { App = app; _lifetime = lifetime; _options = options; _identity = identity; }
+    private readonly DigitalBrainBuilder _brain;
+    private readonly string _serverName;
+    private AspireTestSession(DistributedApplication app, TestSessionLifetime lifetime, TestExecutionOptions options, DigitalBrainBuilder brain, string serverName)
+    { App = app; _lifetime = lifetime; _options = options; _brain = brain; _serverName = serverName; }
 
     public DistributedApplication App { get; }
     public IDigitalBrain Brain => _client!.Services.GetRequiredService<IDigitalBrain>();
@@ -34,17 +35,17 @@ public sealed class AspireTestSession : IAsyncDisposable
     public TestSessionLifetime Lifetime => _lifetime;
 
     public static Task<AspireTestSession> StartAsync<TAppHost>(
-        IReadOnlyList<string> args, string identity, TestExecutionOptions options, CancellationToken cancellationToken)
+        IReadOnlyList<string> args, TestExecutionOptions options, CancellationToken cancellationToken)
         where TAppHost : class
         => StartCoreAsync(ct => DistributedApplicationTestingBuilder.CreateAsync<TAppHost>([.. args], ct),
-            declareTopology: null, identity, options, cancellationToken);
+            declareTopology: null, options, cancellationToken);
 
-    public static Task<AspireTestSession> StartAsync(string identity, TestExecutionOptions options,
+    public static Task<AspireTestSession> StartAsync(TestExecutionOptions options,
         Action<IDistributedApplicationTestingBuilder> declareTopology, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(declareTopology);
         return StartCoreAsync(_ => Task.FromResult(CreateModuleBuilder()),
-            declareTopology, identity, options, cancellationToken);
+            declareTopology, options, cancellationToken);
     }
 
     private static IDistributedApplicationTestingBuilder CreateModuleBuilder()
@@ -59,7 +60,7 @@ public sealed class AspireTestSession : IAsyncDisposable
     private static async Task<AspireTestSession> StartCoreAsync(
         Func<CancellationToken, Task<IDistributedApplicationTestingBuilder>> createBuilder,
         Action<IDistributedApplicationTestingBuilder>? declareTopology,
-        string identity, TestExecutionOptions options, CancellationToken cancellationToken)
+        TestExecutionOptions options, CancellationToken cancellationToken)
     {
         options.Validate();
         cancellationToken.ThrowIfCancellationRequested();
@@ -93,6 +94,8 @@ public sealed class AspireTestSession : IAsyncDisposable
             stage = "topology";
             declareTopology?.Invoke(builder);
             var hosts = SiloHosts.Find(builder.Resources);
+            var selectedHost = SiloHosts.Select(builder.Resources, options.ServerResourceName);
+            var selectedBrain = SiloHosts.BrainOf(selectedHost);
             if (hosts.Count == 0)
             { throw new InvalidOperationException("The AppHost must reference the brain from at least one resource with an http endpoint."); }
             foreach (var resource in builder.Resources.Where(r => r is ProjectResource or ExecutableResource))
@@ -129,9 +132,9 @@ public sealed class AspireTestSession : IAsyncDisposable
             stage = "build";
             var app = await builder.BuildAsync(ct).ConfigureAwait(false);
             lifetime.Own("application", app);
-            var session = new AspireTestSession(app, lifetime, options, identity);
+            var session = new AspireTestSession(app, lifetime, options, selectedBrain, selectedHost.Name);
             stage = "start";
-            await app.StartAsync(ct).ConfigureAwait(false);
+            await app.StartAsync(ct).WaitAsync(ct).ConfigureAwait(false);
             stage = "readiness";
             foreach (var host in hosts)
             { await app.ResourceNotifications.WaitForResourceHealthyAsync(host.Name, ct).ConfigureAwait(false); }
@@ -150,7 +153,7 @@ public sealed class AspireTestSession : IAsyncDisposable
             stage = "client";
             await session.ConnectAsync(ct).ConfigureAwait(false);
             lifetime.Own("client", new AsyncAction(session.ReleaseClientAsync));
-            session.HttpClient = app.CreateHttpClient(hosts[0].Name, SiloHosts.HttpEndpointName);
+            session.HttpClient = app.CreateHttpClient(selectedHost.Name, SiloHosts.HttpEndpointName);
             lifetime.Own("http", new AsyncAction(() => { session.HttpClient.Dispose(); return ValueTask.CompletedTask; }));
             if (session.BrowserEndpoint is not null
                 && options.ResourceEnvironment.ContainsKey("DigitalBrain__Testing__ReferenceComposition"))
@@ -182,16 +185,24 @@ public sealed class AspireTestSession : IAsyncDisposable
 
     private async Task ConnectAsync(CancellationToken ct)
     {
-        var connection = await App.GetConnectionStringAsync(DigitalBrainNames.Clustering, ct).ConfigureAwait(false)
-            ?? throw new InvalidOperationException("Missing brain clustering connection.");
+        var connection = _brain.ClusteringResourceName is { } clustering
+            ? await App.GetConnectionStringAsync(clustering, ct).ConfigureAwait(false)
+                ?? throw new InvalidOperationException("Missing brain clustering connection.")
+            : null;
         var host = Host.CreateDefaultBuilder().ConfigureLogging(log => log.SetMinimumLevel(LogLevel.Warning))
             .UseOrleansClient(client =>
             {
-                client.UseAzureStorageClustering(storage => storage.TableServiceClient = new Azure.Data.Tables.TableServiceClient(connection));
-                client.Configure<ClusterOptions>(cluster => { cluster.ClusterId = _identity; cluster.ServiceId = _identity; });
+                if (connection is not null)
+                { client.UseAzureStorageClustering(storage => storage.TableServiceClient = new Azure.Data.Tables.TableServiceClient(connection)); }
+                else
+                {
+                    var endpoint = App.GetEndpoint(_serverName, "orleans-gateway");
+                    client.UseStaticClustering(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, endpoint.Port));
+                }
+                client.Configure<ClusterOptions>(cluster => { cluster.ClusterId = _brain.ClusterId; cluster.ServiceId = _brain.ServiceId; });
                 client.AddDigitalBrain();
             }).Build();
-        try { await host.StartAsync(ct).ConfigureAwait(false); _client = host; }
+        try { await host.StartAsync(ct).WaitAsync(ct).ConfigureAwait(false); _client = host; }
         catch { host.Dispose(); throw; }
     }
 

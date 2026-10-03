@@ -6,6 +6,11 @@ $ErrorActionPreference = 'Stop'
 $Feed = (Resolve-Path -LiteralPath $Feed).Path
 New-Item -ItemType Directory -Path $Output -Force | Out-Null
 $Output = (Resolve-Path -LiteralPath $Output).Path
+# Consumer projects must not inherit repository or machine-local build customizations.
+foreach ($buildFile in @('Directory.Build.props', 'Directory.Build.targets', 'Directory.Packages.props')) {
+    '<Project />' | Set-Content -LiteralPath (Join-Path $Output $buildFile)
+}
+
 $cache = Join-Path $Output 'packages'
 if (Test-Path -LiteralPath $cache) { throw 'Choose a fresh output directory: the package cache must be empty.' }
 $externalCache = ((dotnet nuget locals global-packages --list) -split ':', 2)[1].Trim()
@@ -16,6 +21,7 @@ Get-ChildItem -LiteralPath $Feed -Filter '*.nupkg' | ForEach-Object {
         $entry = $zip.Entries | Where-Object FullName -Like '*.nuspec' | Select-Object -First 1
         $reader = [IO.StreamReader]::new($entry.Open())
         try { [xml]$spec = $reader.ReadToEnd() } finally { $reader.Dispose() }
+        if ($packages.ContainsKey($spec.package.metadata.id)) { throw "The feed contains multiple versions of $($spec.package.metadata.id). Use one release train per feed." }
         $packages[$spec.package.metadata.id] = $spec.package.metadata.version
     } finally { $zip.Dispose() }
 }

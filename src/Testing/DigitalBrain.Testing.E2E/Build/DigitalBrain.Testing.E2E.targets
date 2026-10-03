@@ -11,7 +11,7 @@
        into buildTransitive so a NuGet consumer gets the identical treatment. -->
   <PropertyGroup>
     <AspireOrchestrationVersion Condition="'$(AspireOrchestrationVersion)' == ''">$(AspireVersion)</AspireOrchestrationVersion>
-    <AspireOrchestrationVersion Condition="'$(AspireOrchestrationVersion)' == ''">13.5.3</AspireOrchestrationVersion>
+    <AspireOrchestrationVersion Condition="'$(AspireOrchestrationVersion)' == ''">13.6.0</AspireOrchestrationVersion>
     <!-- The SDK already knows the host RID, including linux-arm64 and osx-x64. Inferring it from
          the OS alone would hand an x64 dcp to an ARM runner. -->
     <AspireOrchestrationRid Condition="'$(AspireOrchestrationRid)' == ''">$(NETCoreSdkPortableRuntimeIdentifier)</AspireOrchestrationRid>
@@ -22,13 +22,15 @@
     <_AspireDashboardTools>$(_AspirePackageRoot)aspire.dashboard.sdk.$(AspireOrchestrationRid)/$(AspireOrchestrationVersion)/tools/</_AspireDashboardTools>
   </PropertyGroup>
 
+  <!-- Direct repository imports participate in restore. NuGet consumers must declare these
+       host-tool references in their project: NuGet excludes package build imports during restore. -->
   <ItemGroup Condition="'$(ManagePackageVersionsCentrally)' == 'true'">
-    <PackageReference Include="Aspire.Hosting.Orchestration.$(AspireOrchestrationRid)" VersionOverride="$(AspireOrchestrationVersion)" ExcludeAssets="all" PrivateAssets="all" />
-    <PackageReference Include="Aspire.Dashboard.Sdk.$(AspireOrchestrationRid)" VersionOverride="$(AspireOrchestrationVersion)" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="Aspire.Hosting.Orchestration.$(AspireOrchestrationRid)" Condition="'@(PackageReference->WithMetadataValue('Identity', 'Aspire.Hosting.Orchestration.$(AspireOrchestrationRid)'))' == ''" VersionOverride="$(AspireOrchestrationVersion)" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="Aspire.Dashboard.Sdk.$(AspireOrchestrationRid)" Condition="'@(PackageReference->WithMetadataValue('Identity', 'Aspire.Dashboard.Sdk.$(AspireOrchestrationRid)'))' == ''" VersionOverride="$(AspireOrchestrationVersion)" ExcludeAssets="all" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup Condition="'$(ManagePackageVersionsCentrally)' != 'true'">
-    <PackageReference Include="Aspire.Hosting.Orchestration.$(AspireOrchestrationRid)" Version="$(AspireOrchestrationVersion)" ExcludeAssets="all" PrivateAssets="all" />
-    <PackageReference Include="Aspire.Dashboard.Sdk.$(AspireOrchestrationRid)" Version="$(AspireOrchestrationVersion)" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="Aspire.Hosting.Orchestration.$(AspireOrchestrationRid)" Condition="'@(PackageReference->WithMetadataValue('Identity', 'Aspire.Hosting.Orchestration.$(AspireOrchestrationRid)'))' == ''" Version="$(AspireOrchestrationVersion)" ExcludeAssets="all" PrivateAssets="all" />
+    <PackageReference Include="Aspire.Dashboard.Sdk.$(AspireOrchestrationRid)" Condition="'@(PackageReference->WithMetadataValue('Identity', 'Aspire.Dashboard.Sdk.$(AspireOrchestrationRid)'))' == ''" Version="$(AspireOrchestrationVersion)" ExcludeAssets="all" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

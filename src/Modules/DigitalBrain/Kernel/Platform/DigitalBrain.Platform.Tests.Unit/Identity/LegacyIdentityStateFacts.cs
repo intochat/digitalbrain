@@ -14,17 +14,55 @@ namespace DigitalBrain.Platform.Tests.Unit.Identity;
 public sealed class LegacyIdentityStateFacts
 {
     [Fact]
-    public async Task IdentityStateWrittenBeforeTheAssemblyMoveLoadsAndSurvivesReactivation()
+    public async Task IncompleteGrantOnlyMigrationBlocksNormalUseEvenWithoutDirectoryRecords()
     {
         var ct = TestContext.Current.CancellationToken;
         await using var brain = await UnitTest.Create().ConfigureSilo(silo =>
         {
             silo.Services.Configure<IdentityMigrationOptions>(options => options.Maintenance = true);
+            silo.Services.AddKeyedSingleton<IGrainStorage>(DigitalBrainNames.DefaultGrainStorage, (services, _) =>
+                new LegacyStorage(new OrleansGrainStorageSerializer(services.GetRequiredService<Serializer>()), unfinishedGrantOnly: true));
+        }).StartAsync(ct);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => brain.Get<IIdentityDirectory>(IdentityGrains.Directory).PrepareAsync(ct));
+    }
+
+    [Fact]
+    public async Task CompletedCheckpointWithoutPlanIdNeverReimports()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().ConfigureSilo(silo =>
+        {
+            silo.Services.Configure<IdentityMigrationOptions>(options => options.Maintenance = true);
+            silo.Services.AddKeyedSingleton<IGrainStorage>(DigitalBrainNames.DefaultGrainStorage, (services, _) =>
+                new LegacyStorage(new OrleansGrainStorageSerializer(services.GetRequiredService<Serializer>()), alreadyCompleted: true));
+        }).StartAsync(ct);
+        var provider = Assert.IsType<LegacyStorage>(brain.SiloServices.GetRequiredKeyedService<IGrainStorage>(DigitalBrainNames.DefaultGrainStorage));
+        var writes = provider.Writes;
+        await brain.Get<IIdentityDirectory>(IdentityGrains.Directory).ApplyMigrationAsync("new-plan-must-not-reimport", ct);
+        Assert.Equal(writes, provider.Writes);
+    }
+
+    [Fact]
+    public async Task IdentityStateWrittenBeforeTheAssemblyMoveLoadsAndSurvivesReactivation()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await UnitTest.Create().ConfigureSilo(silo =>
+        {
+            silo.Services.Configure<IdentityMigrationOptions>(options => { options.Maintenance = true; options.SourceSnapshotId = "legacy-fixtures"; options.LegacyGrantBrainIds = ["legacy-brain"]; });
             // The persisted Azure Blob provider uses this serializer in AddDigitalBrainRuntime.
             silo.Services.AddKeyedSingleton<IGrainStorage>(DigitalBrainNames.DefaultGrainStorage, (services, _) =>
                 new LegacyStorage(new OrleansGrainStorageSerializer(services.GetRequiredService<Serializer>())));
         }).StartAsync(ct);
         var directory = brain.Get<IIdentityDirectory>(IdentityGrains.Directory);
+        var provider = Assert.IsType<LegacyStorage>(brain.SiloServices.GetRequiredKeyedService<IGrainStorage>(DigitalBrainNames.DefaultGrainStorage));
+        var initialWrites = provider.Writes;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => directory.PrepareAsync(ct));
+        var planId = await directory.InspectMigrationAsync(ct);
+        Assert.Equal(initialWrites, provider.Writes);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => directory.ApplyMigrationAsync("changed-plan", ct));
+        Assert.Equal(initialWrites, provider.Writes);
+        await directory.ApplyMigrationAsync(planId, ct);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => directory.ApplyMigrationAsync("changed-plan", ct));
         var grants = brain.Get<IGrantStore>(IdentityGrains.Grants("legacy-brain"));
         var member = await directory.AuthenticateAsync("alice", "legacy-password", ct);
         Assert.NotNull(member);
@@ -52,10 +90,11 @@ public sealed class LegacyIdentityStateFacts
         Assert.True(storage.Reads >= 4);
     }
 
-    private sealed class LegacyStorage(IGrainStorageSerializer serializer) : IGrainStorage
+    private sealed class LegacyStorage(IGrainStorageSerializer serializer, bool alreadyCompleted = false, bool unfinishedGrantOnly = false) : IGrainStorage
     {
         private readonly Dictionary<(string, GrainId), BinaryData> _written = [];
         public int Reads { get; private set; }
+        public int Writes { get; private set; }
 
         public async Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> state)
         {
@@ -70,12 +109,17 @@ public sealed class LegacyIdentityStateFacts
                     TestContext.Current.CancellationToken));
             }
             state.State = serializer.Deserialize<T>(data);
+            if (alreadyCompleted && state.State is IdentityDirectoryState directory)
+            { state.State = (T)(object)(directory with { MigrationComplete = true }); }
+            if (unfinishedGrantOnly && state.State is IdentityDirectoryState)
+            { state.State = (T)(object)new IdentityDirectoryState { MigrationPlanId = "unfinished-grant-only-plan" }; }
             state.RecordExists = true;
             state.ETag = "legacy";
         }
 
         public Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> state)
         {
+            Writes++;
             _written[(stateName, grainId)] = serializer.Serialize(state.State);
             state.RecordExists = true;
             state.ETag = "updated";

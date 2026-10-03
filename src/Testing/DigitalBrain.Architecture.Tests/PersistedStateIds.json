@@ -2315,7 +2315,8 @@
     "Members": 1,
     "Invitations": 2,
     "PasswordHashes": 3,
-    "MigrationComplete": 4
+    "MigrationComplete": 4,
+    "MigrationPlanId": 5
   },
   "DigitalBrain.Platform.Identity.Grants.GrantStoreState": {
     "Grants": 0,

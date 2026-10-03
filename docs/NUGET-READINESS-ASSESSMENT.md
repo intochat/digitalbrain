@@ -260,11 +260,65 @@ Validation (2026-10-03):
 - All **522 existing serialized type baselines** retain their field IDs. Three new state types and two additive migration fields are reviewed in the baseline (525 types total).
 - `git diff --check` passed. Container-backed E2E and a production-state upgrade rehearsal were not run.
 
-**Next release priority:** rehearse the maintenance upgrade against a backed-up persistent deployment, including key/storage reuse and rollback; then run container-backed E2E before publishing. Unit/model tests do not substitute for that deployment rehearsal.
+**Next release priority:** rehearse the upgrade on a copy of the actual deployment's state and keys, then publish the verified artifacts. The synthetic upgrade and packed-composition gates are now automated; see the lifecycle implementation below.
 
-Remaining release gates, in order:
-1. Persistent upgrade rehearsal: migrate a copy of old state, interrupt and retry migration, verify login and grant revocation, preserve encryption keys and storage, and exercise rollback.
-2. Container-backed E2E: verify server/client/AppHost composition and real provider behavior with the packed packages.
-3. Publish only after those gates pass. The implementation and package smoke checks are complete; deployment verification remains open.
+Release gate status:
+1. **Complete and verified:** automated persistent upgrade rehearsal and packed AppHost/server/client composition in `eng/Verify-Release.ps1`: 73 packages, five isolated consumer builds and 14 lifecycle checks, including interruption, resume, revocation, key checks and rollback with a pinned old reader.
+2. **Next priority — deployment-specific rehearsal:** use an isolated copy of the actual deployment's state, original master key, stable service ID, complete legacy grant-store inventory and ownership mappings. Verify the saved-plan migration, retry, login, revocation, key reuse and snapshot rollback. The synthetic dataset cannot establish production inventory completeness or validate the original production key.
+3. **Pending — broader CI and publication:** require the external-provider/product E2E suite to pass, then publish through `eng/Publish-VerifiedNuGet.ps1` using the verification manifest. Every package hash is checked before the first push; do not repack between verification and publication.
 
 Legacy `.orleans` files are retained compatibility fixtures from the old source revision, moved with the Platform tests. Their purpose and capture provenance are documented in `Identity/LegacyState/README.md` beside the fixtures.
+
+## Unified deployment and release lifecycle — 2026-10-03
+
+The remaining gates shared one problem: independently reconstructed deployment identities,
+resource names, persistence assumptions and process lifetimes. They now use resolved AppHost
+references and an explicit storage binding, with one package-based rehearsal workflow.
+
+- AppHost resolves service ID and cluster ID independently. E2E selects a named server when
+  several exist, then uses that server's actual brain configuration. Scoped infrastructure
+  projects stable connection aliases and Orleans service keys to server/client processes.
+- Local development Orleans endpoints bind localhost without TCP proxy translation, so
+  static clients reach the advertised gateway and can fetch the cluster manifest.
+- Azure Blob grain names do **not** include `ServiceId`. Platform now stores a versioned
+  `.digitalbrain-deployment.json` binding beside grain state and rejects changed service IDs
+  or master keys. Existing unbound storage requires explicit maintenance adoption. This
+  preserves all existing grain blob names; it is not a new namespace migration.
+- Migration has read-only inspection and explicit apply. Preflight validates source scopes,
+  principal defaults and the declared grant inventory before writes. The directory records
+  the source/mapping digest before binding storage or importing actors. Interrupted
+  grant-only migrations block normal use even with an otherwise empty legacy directory.
+- Normal startup never performs migration. Maintenance skips bootstrap and registration
+  seeding, refuses Platform HTTP exposure, and does not provision cookie storage. Existing
+  completed checkpoints remain authoritative and cannot recreate revoked authorization.
+- Durable test volumes have explicit ownership across server sessions. Docker failures and
+  remaining writers fail the operation; unsuccessful rehearsals retain their volumes.
+- Release verification restores package consumers into a fresh isolated cache, compiles an
+  old writer/reader from pinned revision `e39ecb35df23b80ef2f9340ea80a8bd6c8f8e3a5`,
+  and runs real Azurite persistence with packed candidate code. No new binary fixtures were added.
+- CI runs the verifier after packing and retains the exact package files plus their SHA-256
+  manifest. Publishing validates the complete package set before pushing anything.
+
+See [the upgrade procedure](IDENTITY-UPGRADE.md) for commands and maintenance configuration.
+The complete inventory and original key for an actual deployment remain operator-supplied
+inputs; an arbitrary mapping list does not prove that every legacy grant store was inventoried.
+
+Validation:
+- Release solution build: **0 warnings, 0 errors**.
+- Four focused unit/architecture suites: **162 passed, 0 skipped, 0 failed** (Hosting 10,
+  Platform 117, Architecture 23, Testing.Unit 12). Existing serialized field IDs remain intact;
+  the directory adds only the reviewed `MigrationPlanId` field at ID 5.
+- **73 packages** passed all five isolated consumer builds and dependency-boundary checks.
+- **14 lifecycle checks passed:** packed composition, two-brain isolation, resource rename
+  with restart, memory composition, changed-service rejection, read-only preflight, process
+  termination after the plan checkpoint, blocked incomplete startup, termination after an
+  account write, migration resume, revocation across restart/retry, key reuse, wrong-key
+  rejection, and snapshot rollback read by the pinned old version.
+- Inspection was checked against a byte-for-byte snapshot of all blob containers. Rollback
+  restored all original blob containers, including removal of new cookie keys and the
+  storage-binding marker. Successful owned volumes were removed without forced deletion.
+- Publishing preflight rejected a tampered manifest and missing credentials; **nothing was
+  published**. The complete external-provider/product E2E matrix and production-state copy
+  rehearsal were not run locally; CI retains its existing broader E2E suite.
+- `git diff --check` passed. Release commands, prerequisites, and storage-adoption semantics
+  are documented in `docs/IDENTITY-UPGRADE.md`.

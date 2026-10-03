@@ -76,6 +76,9 @@ public sealed class DigitalBrainBuilder
     internal bool Dashboard { get; init; }
 
     public string Name { get; }
+    public string ServiceId { get; internal init; } = null!;
+    public string ClusterId { get; internal init; } = null!;
+    public string? ClusteringResourceName { get; internal init; }
 
     public string ResourceName(string name) => $"{Name}-{name}";
 
@@ -88,6 +91,8 @@ public sealed class DigitalBrainBuilder
     internal IResourceBuilder<AzureStorageResource>? Storage { get; }
 
     internal OrleansService Orleans { get; }
+    internal IResourceBuilder<AzureTableStorageResource>? Clustering { get; init; }
+    internal IResourceBuilder<AzureTableStorageResource>? Reminders { get; init; }
 
     internal IReadOnlyList<DigitalBrainModuleProjection> Projections => _projections;
 

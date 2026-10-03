@@ -26,6 +26,7 @@ public static class PlatformHosting
         services.AddSingleton<PlatformRegistration>();
         services.AddIdentity();
         services.AddOptions<IdentityMigrationOptions>().BindConfiguration(IdentityMigrationOptions.SectionName);
+        services.TryAddSingleton<DeploymentStorageIdentity>();
         silo.AddStartupTask<IdentityMigrationStartup>();
         services.TryAddSingleton<DigitalBrain.Platform.Contracts.Auth.ITokenHandoff, Auth.TokenHandoff>();
         services.TryAddSingleton<DigitalBrain.Platform.Contracts.Auth.IOAuthCredentials, Auth.OAuthCredentials>();

@@ -42,6 +42,8 @@ public interface IIdentityDirectory : IGrainWithStringKey
     Task<Member?> AuthenticateAsync(string principalId, string password, CancellationToken cancellationToken = default);
 
     Task PrepareAsync(CancellationToken cancellationToken = default);
+    Task<string> InspectMigrationAsync(CancellationToken cancellationToken = default);
+    Task ApplyMigrationAsync(string planId, CancellationToken cancellationToken = default);
 
     Task<Member?> FindMemberAsync(string principalId, string accountId, string brainId, CancellationToken cancellationToken = default);
 

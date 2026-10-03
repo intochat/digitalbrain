@@ -15,7 +15,7 @@ public static class DigitalBrainHostingExtensions
     {
         ArgumentNullException.ThrowIfNull(brain);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        return (brain.Storage ?? throw new InvalidOperationException("Blob containers require UseAzureStorage." )).AddBlobContainer(brain.ResourceName(name));
+        return (brain.Storage ?? throw new InvalidOperationException("Blob containers require UseAzureStorage.")).AddBlobContainer(brain.ResourceName(name));
     }
 
     public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name, bool persistentStorage = true, string? dataVolume = null, string? serviceId = null, DigitalBrainHostingOptions? options = null)
@@ -24,7 +24,10 @@ public static class DigitalBrainHostingExtensions
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         options ??= new();
         var persist = persistentStorage && builder.Configuration.GetValue(DigitalBrainHostingNames.PersistentStorageKey, true);
-        var stableServiceId = string.IsNullOrWhiteSpace(serviceId) ? name : serviceId;
+        if (serviceId is not null && options.ServiceId is not null && serviceId != options.ServiceId)
+        { throw new ArgumentException("Specify one consistent service ID.", nameof(serviceId)); }
+        var resolvedServiceId = options.ServiceId ?? serviceId ?? builder.Configuration["Orleans:ServiceId"] ?? name;
+        ArgumentException.ThrowIfNullOrWhiteSpace(resolvedServiceId);
 
         var resource = builder.AddResource(new DigitalBrainResource(name))
             .ExcludeFromManifest()
@@ -35,14 +38,10 @@ public static class DigitalBrainHostingExtensions
                 State = KnownResourceStates.Running,
                 Properties = [new(CustomResourceKnownProperties.Source, "DigitalBrain modules")],
             });
-        // A configured cluster id is one session (tests pass one id and join neither each other nor a previous run).
-        // Development otherwise gets a new cluster so persistent membership does not resurrect dead silos.
-        // The service id stays stable unless that session id was supplied, so grain storage survives the new cluster.
-        var configuredClusterId = builder.Configuration["Orleans:ClusterId"];
-        var clusterId = configuredClusterId
-            ?? (builder.Environment.IsDevelopment() ? $"digitalbrain-{Guid.NewGuid():N}" : stableServiceId);
-        var resolvedServiceId = builder.Configuration["Orleans:ServiceId"]
-            ?? (configuredClusterId is not null ? clusterId : stableServiceId);
+        // Cluster membership may change between runs; persistence identity must not.
+        var clusterId = options.ClusterId ?? builder.Configuration["Orleans:ClusterId"]
+            ?? (builder.Environment.IsDevelopment() ? $"digitalbrain-{Guid.NewGuid():N}" : resolvedServiceId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(clusterId);
         var orleans = builder
             .AddOrleans($"{name}-{DigitalBrainHostingNames.Orleans}")
             .WithClusterId(clusterId)
@@ -50,7 +49,7 @@ public static class DigitalBrainHostingExtensions
         if (!options.UseAzureStorage)
         {
             orleans.WithDevelopmentClustering().WithMemoryGrainStorage(DigitalBrainNames.DefaultGrainStorage).WithMemoryReminders();
-            var memory = new DigitalBrainBuilder(builder, name, resource, orleans, null, null) { Dashboard = options.Dashboard };
+            var memory = new DigitalBrainBuilder(builder, name, resource, orleans, null, null) { Dashboard = options.Dashboard, ServiceId = resolvedServiceId, ClusterId = clusterId };
             memory.AddProjection(MasterKey.Provision(builder, name));
             if (AuthPosture.Provision(builder) is { } memoryPosture) { memory.AddProjection(memoryPosture); }
             return memory;
@@ -70,7 +69,7 @@ public static class DigitalBrainHostingExtensions
         var grainState = storage.AddBlobs($"{name}-{DigitalBrainNames.GrainState}");
         orleans.WithClustering(clustering).WithReminders(reminders)
             .WithGrainStorage(DigitalBrainNames.DefaultGrainStorage, grainState);
-        var brain = new DigitalBrainBuilder(builder, name, resource, orleans, storage, grainState) { Dashboard = options.Dashboard };
+        var brain = new DigitalBrainBuilder(builder, name, resource, orleans, storage, grainState) { Dashboard = options.Dashboard, ServiceId = resolvedServiceId, ClusterId = clusterId, ClusteringResourceName = clustering.Resource.Name, Clustering = clustering, Reminders = reminders };
         brain.AddProjection(MasterKey.Provision(builder, name));
         if (AuthPosture.Provision(builder) is { } posture) { brain.AddProjection(posture); }
         storage.WithParentRelationship(brain.GetOrAddModuleNode(DigitalBrainHostingNames.Kernel));
@@ -87,9 +86,33 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(brain);
 
-        builder.WithAnnotation(new BrainSiloAnnotation(brain.Name));
+        builder.WithAnnotation(new BrainSiloAnnotation(brain));
         builder.WithReference(brain.Orleans);
-        if (brain.GrainState is { } grainState) { builder.WithReference(grainState, DigitalBrainNames.GrainState); }
+        // Development clustering advertises localhost gateways. Local executables must bind
+        // that address too, rather than Orleans selecting a VPN/container adapter address.
+        if (brain.Clustering is null && builder.Resource is ProjectResource or ExecutableResource)
+        {
+            builder.WithEnvironment("Orleans__Endpoints__AdvertisedIPAddress", "127.0.0.1");
+            // Orleans system-target addresses carry the real port; a TCP proxy port cannot
+            // substitute for it when a static client requests the cluster manifest.
+            builder.WithEndpoint("orleans-silo", endpoint => endpoint.IsProxied = false);
+            builder.WithEndpoint("orleans-gateway", endpoint => endpoint.IsProxied = false);
+        }
+        if (brain.Clustering is { } clustering)
+        {
+            builder.WithReference(clustering, DigitalBrainNames.Clustering);
+            builder.WithEnvironment("Orleans__Clustering__ServiceKey", DigitalBrainNames.Clustering);
+        }
+        if (brain.Reminders is { } reminders)
+        {
+            builder.WithReference(reminders, DigitalBrainNames.Reminders);
+            builder.WithEnvironment("Orleans__Reminders__ServiceKey", DigitalBrainNames.Reminders);
+        }
+        if (brain.GrainState is { } grainState)
+        {
+            builder.WithReference(grainState, DigitalBrainNames.GrainState);
+            builder.WithEnvironment($"Orleans__GrainStorage__{DigitalBrainNames.DefaultGrainStorage}__ServiceKey", DigitalBrainNames.GrainState);
+        }
 
         for (var index = 0; index < brain.Modules.Count; index++)
         {
@@ -108,12 +131,15 @@ public static class DigitalBrainHostingExtensions
             projection.Apply(builder);
         }
 
-        if (brain.Dashboard) { builder.WithUrlForEndpoint("http", endpoint => new ResourceUrlAnnotation
+        if (brain.Dashboard)
         {
-            Url = DigitalBrainNames.OrleansDashboardPath,
-            DisplayText = "Orleans Dashboard",
-            Endpoint = endpoint,
-        }); }
+            builder.WithUrlForEndpoint("http", endpoint => new ResourceUrlAnnotation
+            {
+                Url = DigitalBrainNames.OrleansDashboardPath,
+                DisplayText = "Orleans Dashboard",
+                Endpoint = endpoint,
+            });
+        }
 
         return builder;
     }
@@ -125,6 +151,11 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(client);
 
         builder.WithReference(client.Brain.Orleans.AsClient());
+        if (client.Brain.Clustering is { } clustering)
+        {
+            builder.WithReference(clustering, DigitalBrainNames.Clustering);
+            builder.WithEnvironment("Orleans__Clustering__ServiceKey", DigitalBrainNames.Clustering);
+        }
         WaitUntilHealthy(builder, client.Brain.StartupDependencies);
         return builder;
     }

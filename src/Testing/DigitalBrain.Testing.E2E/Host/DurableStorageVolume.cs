@@ -1,86 +1,73 @@
-using System.ComponentModel;
 using System.Diagnostics;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace DigitalBrain.Testing.E2E;
 
-// A named Docker volume that outlives the host process which created it, so a killed-and-restarted
-// host mounts the same cluster storage. Every host of one test passes the same key; the test process
-// removes the volume when it exits.
-internal static class DurableStorageVolume
+// Own this outside the server sessions. Failed rehearsals retain their data by default.
+public sealed class DurableStorageVolume : IAsyncDisposable
 {
-    private static readonly Lock Gate = new();
-    private static readonly HashSet<string> Volumes = new(StringComparer.Ordinal);
-    private static bool _registered;
+    private bool _completed;
+    private bool _disposed;
+    private readonly bool _keepOnFailure;
+    private DurableStorageVolume(string name, bool keepOnFailure)
+    { Name = name; _keepOnFailure = keepOnFailure; }
+    public string Name { get; }
 
-    internal static string Acquire(string key)
+    public static async Task<DurableStorageVolume> CreateAsync(bool keepOnFailure = true, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(key);
-        var sanitized = new string([.. key.Select(character => char.IsAsciiLetterOrDigit(character) || character is '_' or '.' or '-' ? character : '-')]);
-        var name = "brain-e2e-" + sanitized + "-" + Fingerprint(key);
-        lock (Gate)
-        {
-            Volumes.Add(name);
-            if (!_registered)
-            {
-                _registered = true;
-                AppDomain.CurrentDomain.ProcessExit += (_, _) => RemoveAll();
-            }
-        }
-        WaitUntilReleased(name);
-        return name;
+        var volume = new DurableStorageVolume("brain-e2e-" + Guid.NewGuid().ToString("N"), keepOnFailure);
+        await RunAsync(cancellationToken, "volume", "create", volume.Name);
+        return volume;
     }
 
-    // The second host of a test must not start its storage emulator on a volume the previous host's
-    // emulator is still writing. Later acquisition waits for the previous emulator to disappear; the
-    // first acquisition sees no container and returns at once.
-    private static void WaitUntilReleased(string name)
+    public void Complete() { ObjectDisposedException.ThrowIf(_disposed, this); _completed = true; }
+
+    public async Task WaitUntilReleasedAsync(CancellationToken cancellationToken = default)
     {
-        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(60);
-        while (DateTime.UtcNow < deadline)
-        {
-            if (Split(Run("ps", "-q", "--filter", "volume=" + name)).Length == 0) { return; }
-            Thread.Sleep(200);
-        }
-    }
-
-    private static string Fingerprint(string key)
-        => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(key)))[..12];
-
-    private static void RemoveAll()
-    {
-        string[] names;
-        lock (Gate) { names = [.. Volumes]; }
-        foreach (var name in names)
-        {
-            foreach (var container in Split(Run("ps", "-aq", "--filter", "volume=" + name)))
-            { Run("rm", "-f", container); }
-            Run("volume", "rm", "-f", name);
-        }
-    }
-
-    private static string[] Split(string output)
-        => output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-    private static string Run(params string[] arguments)
-    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(60));
         try
         {
-            var startInfo = new ProcessStartInfo("docker") { RedirectStandardOutput = true, UseShellExecute = false, CreateNoWindow = true };
-            foreach (var argument in arguments) { startInfo.ArgumentList.Add(argument); }
-            using var process = Process.Start(startInfo);
-            if (process is null) { return ""; }
-            var output = process.StandardOutput.ReadToEndAsync();
-            if (!process.WaitForExit(5000))
+            while (true)
             {
-                try { process.Kill(entireProcessTree: true); }
-                catch (InvalidOperationException) { /* The process exited between the wait and the kill. */ }
+                var containers = await RunAsync(deadline.Token, "ps", "-q", "--filter", "volume=" + Name);
+                if (string.IsNullOrWhiteSpace(containers)) { return; }
+                await Task.Delay(200, deadline.Token);
             }
-            return output.Wait(5000) ? output.Result : "";
         }
-        catch (Win32Exception) { return ""; }
-        catch (InvalidOperationException) { return ""; }
-        catch (AggregateException) { return ""; }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        { throw new TimeoutException($"Storage volume '{Name}' still has a running writer."); }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) { return; }
+        if (!_completed && _keepOnFailure) { _disposed = true; return; }
+        await WaitUntilReleasedAsync();
+        // Never remove attached containers or force deletion. Ownership is limited to this volume.
+        await RunAsync(CancellationToken.None, "volume", "rm", Name);
+        _disposed = true;
+    }
+
+    private static async Task<string> RunAsync(CancellationToken cancellationToken, params string[] arguments)
+    {
+        var startInfo = new ProcessStartInfo("docker")
+        { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+        foreach (var argument in arguments) { startInfo.ArgumentList.Add(argument); }
+        using var process = Process.Start(startInfo) ?? throw new IOException("Docker did not start.");
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(30));
+        var output = process.StandardOutput.ReadToEndAsync();
+        var error = process.StandardError.ReadToEndAsync();
+        try { await process.WaitForExitAsync(deadline.Token); }
+        catch
+        {
+            try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+            throw;
+        }
+        var stdout = await output;
+        var stderr = await error;
+        if (process.ExitCode != 0) { throw new IOException($"Docker exited with {process.ExitCode}: {stderr}"); }
+        return stdout;
     }
 }

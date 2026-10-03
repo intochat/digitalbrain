@@ -47,6 +47,8 @@ public static class IdentityHosting
 
     public static void UsePlatformHttp(this WebApplication app)
     {
+        if (app.Services.GetRequiredService<IOptions<Directory.IdentityMigrationOptions>>().Value.Maintenance)
+        { throw new InvalidOperationException("Maintenance hosts cannot expose Platform HTTP traffic. Run the migration operation without HTTP endpoints."); }
         app.UseKernelCors();
         app.UseModuleHttpSurfaces();
         app.UseAuthentication();
