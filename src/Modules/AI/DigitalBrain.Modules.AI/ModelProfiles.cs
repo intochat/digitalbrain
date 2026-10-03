@@ -186,7 +186,7 @@ public sealed class ModelProfiles(IServiceProvider services, IOptionsMonitor<AIO
     private static AiProvider ParseProvider(string name)
         => Enum.TryParse<AiProvider>(name, ignoreCase: true, out var provider) && Enum.IsDefined(provider)
             && provider is not AiProvider.FoundryLocal
-            ? provider : throw new ArgumentException($"Unknown runtime chat provider '{name}'. Use OpenAI, Anthropic, Google, XAI or Ollama.", nameof(name));
+            ? provider : throw new ArgumentException($"Unknown runtime chat provider '{name}'. Use OpenAI, Anthropic, Google, XAI, OpenRouter or Ollama.", nameof(name));
 
     private static string? Endpoint(string? endpoint, AiProvider provider)
     {
@@ -196,6 +196,7 @@ public sealed class ModelProfiles(IServiceProvider services, IOptionsMonitor<AIO
             AiProvider.Anthropic => "https://api.anthropic.com",
             AiProvider.Google => "https://generativelanguage.googleapis.com/v1beta/openai/",
             AiProvider.XAI => "https://api.x.ai/v1",
+            AiProvider.OpenRouter => "https://openrouter.ai/api/v1",
             _ => null,
         };
         if (endpoint is null || !Uri.TryCreate(endpoint, UriKind.Absolute, out var uri)

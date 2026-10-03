@@ -11,4 +11,5 @@ public enum AiProvider
     XAI,
     Ollama,
     FoundryLocal,
+    OpenRouter,
 }

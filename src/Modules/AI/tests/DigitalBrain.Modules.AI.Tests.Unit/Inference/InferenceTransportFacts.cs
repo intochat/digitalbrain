@@ -13,6 +13,7 @@ public sealed class InferenceTransportFacts
 {
     [Theory]
     [InlineData("OpenAI")]
+    [InlineData("OpenRouter")]
     [InlineData("Ollama")]
     public async Task OfferedResourceArraysReachTheRealModelAdapterAsJson(string provider)
     {
@@ -20,7 +21,7 @@ public sealed class InferenceTransportFacts
         using var endpoint = new LoopbackServer();
         using var services = new ServiceCollection().AddOptions().Configure<AIOptions>(options =>
             { Configure(options); options.Default.Provider = provider; options.Ollama.Endpoint = endpoint.Url; })
-            .AddSingleton<IAiCredentials>(new FixedAiCredentials().Ready("openai", "test-only", endpoint.Url))
+            .AddSingleton<IAiCredentials>(new FixedAiCredentials().Ready(provider.ToLowerInvariant(), "test-only", endpoint.Url))
             .AddSingleton<ModelProfiles>().AddSingleton<InferenceService>()
             .AddSingleton<IAgentToolFactory>(new ResourceTools()).BuildServiceProvider();
         async Task<CapturedRequest> Serve()
@@ -117,12 +118,14 @@ public sealed class InferenceTransportFacts
         Assert.Equal((await started.NextAsync(ct: ct)).OperationId, (await completed.NextAsync(ct: ct)).OperationId);
     }
 
-    [Fact]
-    public async Task RealStreamingAdapterPreservesTextFinishAndUsage()
+    [Theory]
+    [InlineData("OpenAI")]
+    [InlineData("OpenRouter")]
+    public async Task RealStreamingAdapterPreservesTextFinishAndUsage(string provider)
     {
         var ct = TestContext.Current.CancellationToken;
         using var endpoint = new LoopbackServer();
-        using var services = Services(endpoint.Url);
+        using var services = Services(endpoint.Url, provider);
         var serve = endpoint.ReplyOnce("text/event-stream", """
             data: {"id":"response-2","object":"chat.completion.chunk","created":1,"model":"test-model","choices":[{"index":0,"delta":{"role":"assistant","content":"hello"},"finish_reason":null}]}
 
@@ -141,9 +144,40 @@ public sealed class InferenceTransportFacts
         Assert.Contains(updates, u => u.Usage?.TotalTokens == 3);
     }
 
-    private static ServiceProvider Services(string endpoint)
-        => new ServiceCollection().AddOptions().Configure<AIOptions>(Configure)
-            .AddSingleton<IAiCredentials>(new FixedAiCredentials().Ready("openai", "test-only", endpoint))
+    [Fact]
+    public async Task OpenRouterStreamingToolCallsPreserveIdNameAndArguments()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var endpoint = new LoopbackServer();
+        using var services = Services(endpoint.Url, "OpenRouter");
+        var serve = endpoint.ReplyOnce("text/event-stream", """
+            data: {"id":"r1","object":"chat.completion.chunk","created":1,"model":"test-model","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"index":0,"id":"call-1","type":"function","function":{"name":"lookup","arguments":"{\"id\":"}}]},"finish_reason":null}]}
+
+            data: {"id":"r1","object":"chat.completion.chunk","created":1,"model":"test-model","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"42}"}}]},"finish_reason":null}]}
+
+            data: {"id":"r1","object":"chat.completion.chunk","created":1,"model":"test-model","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}]}
+
+            data: [DONE]
+
+
+            """, ct);
+        var updates = new List<InferenceUpdate>();
+        await foreach (var update in services.GetRequiredService<InferenceService>().GenerateStreaming(
+            new([new("user", [new AiText("lookup")])],
+                Tools: [new("lookup", "Lookup", "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"}}}")]),
+            cancellationToken: ct)) { updates.Add(update); }
+        await serve;
+        var call = Assert.Single(updates.SelectMany(update => update.Content).OfType<AiToolCall>());
+        Assert.Equal("call-1", call.CallId);
+        Assert.Equal("lookup", call.Name);
+        Assert.Contains(updates, update => update.FinishReason == "tool_calls");
+        using var arguments = JsonDocument.Parse(call.ArgumentsJson);
+        Assert.Equal(42, arguments.RootElement.GetProperty("id").GetInt32());
+    }
+
+    private static ServiceProvider Services(string endpoint, string provider)
+        => new ServiceCollection().AddOptions().Configure<AIOptions>(options => { Configure(options); options.Default.Provider = provider; })
+            .AddSingleton<IAiCredentials>(new FixedAiCredentials().Ready(provider.ToLowerInvariant(), "test-only", endpoint))
             .AddSingleton<ModelProfiles>().AddSingleton<InferenceService>().BuildServiceProvider();
 
     private static void Configure(AIOptions options)

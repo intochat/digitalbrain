@@ -29,6 +29,7 @@ internal static class AIClients
             new AnthropicProviderFactory(),
             new GoogleProviderFactory(),
             new XAIProviderFactory(),
+            new OpenRouterProviderFactory(),
             new OllamaProviderFactory(),
         }.ToDictionary(static factory => factory.Provider);
 

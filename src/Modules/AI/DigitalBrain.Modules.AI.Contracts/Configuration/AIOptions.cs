@@ -13,6 +13,7 @@ public sealed class AIOptions : IModuleOptions
     public AIProviderOptions Anthropic { get; set; } = new();
     public AIProviderOptions Google { get; set; } = new();
     public AIProviderOptions XAI { get; set; } = new();
+    public AIProviderOptions OpenRouter { get; set; } = new();
     public OllamaOptions Ollama { get; set; } = new();
     public TavilyOptions Tavily { get; set; } = new();
     public AIHostingOptions Hosting { get; set; } = new();
@@ -25,6 +26,7 @@ public sealed class AIOptions : IModuleOptions
         AiProvider.Anthropic => Anthropic,
         AiProvider.Google => Google,
         AiProvider.XAI => XAI,
+        AiProvider.OpenRouter => OpenRouter,
         AiProvider.Ollama => Ollama,
         _ => throw new NotSupportedException($"{provider} has no hosted provider settings."),
     };
@@ -50,6 +52,7 @@ public sealed class AIOptions : IModuleOptions
         Anthropic = source.Anthropic;
         Google = source.Google;
         XAI = source.XAI;
+        OpenRouter = source.OpenRouter;
         Ollama = source.Ollama;
         Tavily = source.Tavily;
         Hosting = source.Hosting;

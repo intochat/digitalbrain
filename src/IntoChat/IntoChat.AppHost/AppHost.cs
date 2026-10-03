@@ -3,6 +3,7 @@ using DigitalBrain.AI;
 using DigitalBrain.AI.FoundryLocal;
 using DigitalBrain.AI.Ollama;
 using DigitalBrain.AI.OpenAI;
+using DigitalBrain.AI.OpenRouter;
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.ClickHouse;
 using DigitalBrain.Flutter;
@@ -24,7 +25,8 @@ var digitalBrain = builder.AddDigitalBrain(ProductSurfaceResources.Modules, serv
         ai.Telemetry.EnableSensitiveData = true;
 
         ai.WithLlm<IGpt56Luna>()
-            .WithDefaultLlm<IGemma4>()
+            .WithLlm<IGemma4>()
+            .WithDefaultLlm<IDeepSeekV41Flash>()
             .WithDefaultEmbedding<ITextEmbedding3Small>()
             .WithVoiceToText<IWhisperLargeV3Turbo>()
             .WithTavilySearch();

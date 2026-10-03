@@ -11,8 +11,10 @@ namespace DigitalBrain.Modules.AI.Tests.E2E;
 
 public sealed class HostedAgentFacts
 {
-    [Fact]
-    public async Task SeparateHostRunsRealProviderAdapterAndCommitsConversationBeforeSignal()
+    [Theory]
+    [InlineData("OpenAI")]
+    [InlineData("OpenRouter")]
+    public async Task SeparateHostRunsRealProviderAdapterAndCommitsConversationBeforeSignal(string provider)
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         deadline.CancelAfter(TimeSpan.FromMinutes(5));
@@ -23,7 +25,7 @@ public sealed class HostedAgentFacts
                 options.Default.Profile = "fixture";
                 options.ModelProfiles.Add("fixture", new AIModelProfileOptions
                 {
-                    Provider = "OpenAI",
+                    Provider = provider,
                     Model = "fixture-model",
                     Endpoint = endpoint.Url,
                     Capabilities = LlmCapabilities.None,
@@ -33,8 +35,8 @@ public sealed class HostedAgentFacts
             {
                 PrivateConfiguration = new Dictionary<string, string?>
                 {
-                    ["DigitalBrain:Integrations:openai:ApiKey"] = "test-only",
-                    ["DigitalBrain:Integrations:openai:Endpoint"] = endpoint.Url,
+                    [$"DigitalBrain:Integrations:{provider.ToLowerInvariant()}:ApiKey"] = "test-only",
+                    [$"DigitalBrain:Integrations:{provider.ToLowerInvariant()}:Endpoint"] = endpoint.Url,
                 },
             }).StartAsync(ct);
         var agent = brain.Get<IAgent>("hosted-assistant");
