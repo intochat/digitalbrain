@@ -19,8 +19,7 @@ internal sealed class PostgresRegistryResources(PostgresAppResources resources, 
         try
         {
             var result = await resources.List(cancellationToken);
-            resourcesJson = JsonSerializer.Serialize(result.Resources.Select(resource => new
-            { resource = PostgresAppResources.Source(resource), resource.AppId, resource.TableId, resource.Origin, columns = resource.Table.Definition.Columns }));
+            resourcesJson = JsonSerializer.Serialize(result.Resources.Select(PostgresAppResources.Describe));
             errors = [.. result.Errors.Select(error => new RegistryDiscoveryError(Id, "An installed app table could not be described: " + error.TableId))];
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }

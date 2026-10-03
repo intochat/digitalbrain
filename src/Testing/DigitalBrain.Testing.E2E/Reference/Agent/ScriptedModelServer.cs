@@ -110,11 +110,12 @@ public sealed partial class ScriptedModelServer : IAsyncDisposable
         var ownerText = lastUser.Split("\n\n[Conversation agent:", 2, StringSplitOptions.None)[0];
         var wantsCount = ownerText.Contains("how many", StringComparison.OrdinalIgnoreCase);
         var wantsRefine = RefineValue is not null && ownerText.Contains("only", StringComparison.OrdinalIgnoreCase);
-        // Default assistants discover module tools before asking for a schema.
+        // Default assistants rediscover module tools on each turn, including read/refine follow-ups.
         // Explicit custom definitions may already include the tool.
         var toolNames = request.TryGetProperty("tools", out var offeredTools)
             ? offeredTools.EnumerateArray().Select(tool => tool.GetProperty("function").GetProperty("name").GetString()).ToArray() : [];
-        if (!wantsCount && !wantsRefine && !toolNames.Contains("supabase_schema"))
+        var nextTool = wantsCount ? "table_read" : wantsRefine ? "table_refine" : "supabase_schema";
+        if (!toolNames.Contains(nextTool))
         {
             Assert.Contains("discover_capabilities", toolNames);
             return Completion(Call("discovery-call", "discover_capabilities", "{\"query\":\"Supabase tables\"}"), "tool_calls");
@@ -226,7 +227,8 @@ public sealed partial class ScriptedModelServer : IAsyncDisposable
         foreach (var message in messages.Reverse())
         {
             if (message.GetProperty("role").GetString() != "assistant") { continue; }
-            var content = message.GetProperty("content").GetString() ?? "";
+            if (!message.TryGetProperty("content", out var text) || text.ValueKind != JsonValueKind.String) { continue; }
+            var content = text.GetString()!;
             var match = TableIdPattern().Match(content);
             if (match.Success) { return match.Value; }
         }

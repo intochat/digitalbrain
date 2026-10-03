@@ -178,3 +178,17 @@ Execution uses the existing PR branch. Tests establish failures before implement
 - E2E suites: Assistant 8 passed; Apps 4 passed; CSharp 2 passed (including sandbox restart recovery); Supabase 2 passed (table display, filtering, empty and unavailable sources).
 - The running IntoChat service was rebuilt successfully. Computer Use verified the native "Show me my data" flow completed `discover_capabilities` and identified Postgres/Customer Researcher resources without the previous error. The native text-entry helper did not enter custom text, so the exact typo wording was verified through the deterministic integration regression rather than claimed as a manual replay. The browser helper refused localhost navigation; no browser bypass was attempted.
 - Intentional limit: discovery currently ranks and returns the complete provider catalog. Providers are queried serially; large catalogs or slow providers increase latency and response size. There is an overall agent-turn timeout, but no per-provider timeout or paging yet.
+
+### Follow-up: storage resource IDs versus table-window IDs
+
+Computer Use confirmed the reported Customer Researcher failure: discovery exposed the app's storage neuron ID, and the next conversational turn called only `table_read` with that ID. No table-open operation ran. `LiveTableWindows` correctly refused an ID absent from the current workspace, but its error incorrectly suggested the database table did not exist.
+
+- Postgres schema and Registry discovery share one resource descriptor with `storageTableId` and explicit `open.tool` / `open.arguments` (including the pinned resource handle).
+- Assistant defaults expose discovery and presentation tools only. Table read/refine arrive through fresh Registry discovery, alongside source-specific open tools and current resource descriptions.
+- Instructions distinguish storage IDs, resource handles and returned window IDs, including follow-up turns whose earlier tool offers are no longer available.
+- Table read/refine return `table_window_required` with recovery instructions when the workspace has no matching window; they retain workspace membership checks and never reinterpret storage IDs as authorized windows.
+- Regression tests reproduced both the misleading missing-table response and premature default read-tool exposure before the fixes. Real-grain tests then open a window and successfully retry read/refine with the returned ID.
+- Unit validation: Supabase 59 passed; Postgres 74 passed, 3 credential-gated skips; Assistant 61 passed. Supabase E2E: 2 passed. IntoChat rebuilt successfully with zero warnings/errors and is healthy.
+- Native UI inspection confirmed the original tool sequence. A live replay of the exact follow-up remains unverified because the Flutter input element becomes unavailable to the Computer Use helper.
+- The scripted E2E model now rediscovers tools on read/refine follow-up turns and skips assistant tool-call messages without text when recovering prior window IDs. Existing assertions still require refinement and counting in the same window.
+- Final Assistant E2E rerun: 8 passed, including rediscovery followed by refinement/counting in the same existing window. Combined changed-module validation: 194 unit tests and 10 E2E tests passed; 3 credential-gated Postgres tests skipped.

@@ -13,6 +13,20 @@ namespace DigitalBrain.Modules.Postgres.Tests.Unit;
 public sealed class PostgresAppSourceFacts
 {
     [Fact]
+    public void DiscoveredAppStorageHasExplicitOpenArgumentsRatherThanAWindowTableId()
+    {
+        var resource = new PostgresAppTableResource("workspace/packages/intochat/customer-researcher", "workspace/packages/intochat/customer-researcher/table",
+            "db:research", new("db_results", new([new("name", "text")], ["name"]), 1));
+        var descriptor = JsonSerializer.SerializeToElement(PostgresAppResources.Describe(resource));
+        Assert.False(descriptor.TryGetProperty("tableId", out _));
+        Assert.Equal(resource.TableId, descriptor.GetProperty("storageTableId").GetString());
+        var open = descriptor.GetProperty("open");
+        Assert.Equal("show_postgres_query_table", open.GetProperty("tool").GetString());
+        Assert.Equal(PostgresAppResources.Source(resource), open.GetProperty("arguments").GetProperty("resource").GetString());
+        Assert.Contains("returned windowId", descriptor.GetProperty("usage").GetString());
+    }
+
+    [Fact]
     public async Task PendingDefinitionDoesNotHideHealthyTablesInAnotherApp()
     {
         var ct = TestContext.Current.CancellationToken;
