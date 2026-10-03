@@ -1,36 +1,16 @@
 {
   "LegacyModuleTestProjects": [
     "DigitalBrain.Modules.AI.Tests.E2E",
-    "DigitalBrain.Modules.AI.Tests.Unit",
     "DigitalBrain.Modules.Apps.Tests.E2E",
-    "DigitalBrain.Modules.Apps.Tests.Unit",
     "DigitalBrain.Modules.Assistant.Tests.E2E",
-    "DigitalBrain.Modules.Assistant.Tests.Unit",
-    "DigitalBrain.Modules.ClickHouse.Tests.Unit",
-    "DigitalBrain.Modules.Compute.Tests.Unit",
-    "DigitalBrain.Modules.Files.Tests.E2E",
-    "DigitalBrain.Modules.Files.Tests.Unit",
-    "DigitalBrain.Modules.Microsoft.Aspire.Tests.Unit",
     "DigitalBrain.Modules.Microsoft.CSharp.Tests.E2E",
-    "DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit",
-    "DigitalBrain.Modules.Microsoft.GitHub.Tests.Unit",
-    "DigitalBrain.Modules.Microsoft.Playwright.Tests.Unit",
-    "DigitalBrain.Modules.Postgres.Tests.Unit",
-    "DigitalBrain.Modules.Qdrant.Tests.Unit",
-    "DigitalBrain.Modules.Registry.Tests.Unit",
-    "DigitalBrain.Modules.Salesforce.Tests.Unit",
-    "DigitalBrain.Modules.Specs.Tests.Unit",
-    "DigitalBrain.Modules.Supabase.Tests.E2E",
-    "DigitalBrain.Modules.Supabase.Tests.Unit",
-    "DigitalBrain.Modules.Time.Tests.Unit"
+    "DigitalBrain.Modules.Postgres.Tests.Unit"
   ],
   "LegacyEndToEndReferencers": [
     "DigitalBrain.Modules.AI.Tests.E2E",
     "DigitalBrain.Modules.Apps.Tests.E2E",
     "DigitalBrain.Modules.Assistant.Tests.E2E",
-    "DigitalBrain.Modules.Files.Tests.E2E",
-    "DigitalBrain.Modules.Microsoft.CSharp.Tests.E2E",
-    "DigitalBrain.Modules.Supabase.Tests.E2E"
+    "DigitalBrain.Modules.Microsoft.CSharp.Tests.E2E"
   ],
   "LegacyAspireReferencingModuleTests": [
     "DigitalBrain.Modules.AI.Tests.E2E",

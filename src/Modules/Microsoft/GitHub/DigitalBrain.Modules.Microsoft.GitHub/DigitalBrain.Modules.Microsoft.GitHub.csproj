@@ -6,7 +6,7 @@
     <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.GitHub.Tests.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.GitHub.Tests" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Octokit" />
     <PackageReference Include="ModelContextProtocol.Core" />

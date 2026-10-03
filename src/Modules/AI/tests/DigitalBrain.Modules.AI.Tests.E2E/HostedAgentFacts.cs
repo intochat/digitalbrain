@@ -5,7 +5,7 @@ using System.Text.Json;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.AI.Agents.Signals;
-using DigitalBrain.Modules.AI.Tests.Unit;
+using DigitalBrain.Modules.AI.Tests;
 
 namespace DigitalBrain.Modules.AI.Tests.E2E;
 

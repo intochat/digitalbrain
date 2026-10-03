@@ -6,7 +6,7 @@
   <ItemGroup>
     <ProjectReference Include="../../Registry/DigitalBrain.Modules.Registry.Contracts/DigitalBrain.Modules.Registry.Contracts.csproj" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Assistant.Tests.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Assistant.Tests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Modules.Assistant.Contracts/DigitalBrain.Modules.Assistant.Contracts.csproj" />

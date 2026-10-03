@@ -6,8 +6,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Azure.Storage.Blobs" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Files.Tests.Unit" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Files.Tests.E2E" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Files.Tests" />
+    <InternalsVisibleTo Include="DigitalBrain.OS.Tests.E2E" />
     <ProjectReference Include="../DigitalBrain.Modules.Files.Contracts/DigitalBrain.Modules.Files.Contracts.csproj" />
     <ProjectReference Include="../../../DigitalBrain/Sdk/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />

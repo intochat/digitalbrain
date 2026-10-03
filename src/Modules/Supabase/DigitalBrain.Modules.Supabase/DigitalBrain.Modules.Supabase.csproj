@@ -8,7 +8,7 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Npgsql" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Supabase.Tests.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Supabase.Tests" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Modules.Supabase.Contracts/DigitalBrain.Modules.Supabase.Contracts.csproj" />

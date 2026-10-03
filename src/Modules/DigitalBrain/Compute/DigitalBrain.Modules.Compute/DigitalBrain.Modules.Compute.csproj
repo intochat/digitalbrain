@@ -6,7 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="PriceBook/pricebook.v0.json" LogicalName="DigitalBrain.Compute.PriceBook.pricebook.v0.json" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Compute.Tests.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Compute.Tests" />
     <ProjectReference Include="../DigitalBrain.Modules.Compute.Contracts/DigitalBrain.Modules.Compute.Contracts.csproj" />
     <ProjectReference Include="../../../../DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
   </ItemGroup>

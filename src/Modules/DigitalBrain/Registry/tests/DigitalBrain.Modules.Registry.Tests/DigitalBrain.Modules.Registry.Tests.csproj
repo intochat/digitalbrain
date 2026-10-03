@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DigitalBrain.Modules.Registry.Tests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../../../Testing/DigitalBrain.Testing.Module/DigitalBrain.Testing.Module.csproj" />
+    <ProjectReference Include="../../DigitalBrain.Modules.Registry/DigitalBrain.Modules.Registry.csproj" />
+    <ProjectReference Include="../../../../../DigitalBrain/Sdk/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
+    <ProjectReference Include="../../../../../DigitalBrain/Platform/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
+    <ProjectReference Include="../../../../Qdrant/DigitalBrain.Modules.Qdrant/DigitalBrain.Modules.Qdrant.csproj" />
+    <ProjectReference Include="../../../../Time/DigitalBrain.Modules.Time/DigitalBrain.Modules.Time.csproj" />
+  </ItemGroup>
+  <ItemGroup><Using Include="DigitalBrain.Testing.Module" /></ItemGroup>
+</Project>

@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup>
-    <None Update="Table/LegacyState/*.orleans" CopyToOutputDirectory="PreserveNewest" />
-    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Module/DigitalBrain.Testing.Module.csproj" />
-    <ProjectReference Include="../../DigitalBrain.Modules.Supabase/DigitalBrain.Modules.Supabase.csproj" />
-    <ProjectReference Include="../../../Google/Flutter/DigitalBrain.Modules.Flutter/DigitalBrain.Modules.Flutter.csproj" />
-  </ItemGroup>
-</Project>

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <Compile Include="../DigitalBrain.Modules.AI.Tests.Unit/Shared/LoopbackServer.cs" Link="Shared/LoopbackServer.cs" />
+    <Compile Include="../DigitalBrain.Modules.AI.Tests/Shared/LoopbackServer.cs" Link="Shared/LoopbackServer.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />

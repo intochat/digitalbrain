@@ -5,7 +5,7 @@
     <RootNamespace>DigitalBrain.Modules.Specs</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Specs.Tests.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Specs.Tests" />
     <ProjectReference Include="../DigitalBrain.Modules.Specs.Contracts/DigitalBrain.Modules.Specs.Contracts.csproj" />
     <ProjectReference Include="../../../../DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
   </ItemGroup>
