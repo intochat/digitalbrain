@@ -143,7 +143,7 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
                     "Workspace agent run failed for scope {ScopeId}, thread {ThreadId}, run {RunId}", workspace, input.ThreadId, input.RunId);
                 if (ownsRun) { await KeepFailedTurn(error.Message); }
                 if (!ct.IsCancellationRequested)
-                { await Emit(new { type = "RUN_ERROR", message = "The request could not be completed. Check the data connection or try again.", code = "AGENT_FAILED", runId = input.RunId }); }
+                { await Emit(new { type = "RUN_ERROR", message = "The assistant could not complete this request. Try again and use the run ID when reporting the failure.", code = "AGENT_FAILED", runId = input.RunId }); }
             }
         }
         finally
@@ -236,7 +236,7 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
         string? queryError = null;
         var model = modelSelection ?? (configuration.Model is { Length: > 0 } modelName ? new AgentModelSelection(Model: modelName) : null);
         await foreach (var item in runner(new("workspace-assistant", run, scope, state.Turns, message, model,
-            definition.Instructions, AssistantToolPolicy.ForDatabase(definition.Tools, message), ContextProviders: definition.ContextProviders), ct))
+            definition.Instructions, definition.Tools, ContextProviders: definition.ContextProviders), ct))
         {
             switch (item)
             {

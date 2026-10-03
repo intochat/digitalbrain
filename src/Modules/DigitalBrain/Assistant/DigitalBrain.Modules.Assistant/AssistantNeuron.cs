@@ -34,7 +34,7 @@ internal sealed partial class AssistantNeuron(
     private string Workspace => Key.Split("/applications/")[0];
     public async IAsyncEnumerable<string> Run(AssistantRun request, [EnumeratorCancellation] CancellationToken ct = default)
     {
-        await foreach (var item in new AssistantTurnExecution(services, GrainFactory).Run(Workspace, request, summary => DefineTurnForRequest(summary, request.Message), ct))
+        await foreach (var item in new AssistantTurnExecution(services, GrainFactory).Run(Workspace, request, DefineTurn, ct))
         { yield return item; }
     }
 
@@ -54,16 +54,12 @@ internal sealed partial class AssistantNeuron(
         return Task.FromResult(GrainFactory.GetGrain<IAgent>(AssistantConversations.Key(Workspace, threadId)));
     }
 
-    public Task<AgentDefinition> DefineTurn(string? summary) => DefineTurnForRequest(summary, null);
-
-    private async Task<AgentDefinition> DefineTurnForRequest(string? summary, string? message)
+    public Task<AgentDefinition> DefineTurn(string? summary)
     {
-        var appTools = await new AgentToolSelection(GrainFactory).ResolveAsync(Workspace, CancellationToken.None);
         var registered = services.GetServices<IAgentToolFactory>()
             .SelectMany(factory => factory.Create(() => throw new InvalidOperationException("No tool call is active.")))
             .Select(tool => tool.Name).ToHashSet(StringComparer.Ordinal);
-        var authoringTools = registered.Where(AssistantToolPolicy.IsCSharpTool).ToArray();
-        var definition = Snapshot.Definition ?? AssistantDefinition.For(authoringTools, appTools, message, services.GetRequiredService<IOptions<AssistantOptions>>().Value);
+        var definition = Snapshot.Definition ?? AssistantDefinition.For(options: services.GetRequiredService<IOptions<AssistantOptions>>().Value);
         if (Snapshot.Definition is null)
         {
             var native = services.GetService<NativeTools>();
@@ -73,12 +69,12 @@ internal sealed partial class AssistantNeuron(
                 // Optional host modules may be absent. Their default tools must not
                 // make an otherwise standalone Assistant unusable. App-declared
                 // tools can also come from dynamic sources resolved by the runner.
-                Tools = definition.Tools.Where(tool => appTools.Contains(tool) || registered.Contains(tool) || native?.Contains(tool) == true).ToArray(),
+                Tools = definition.Tools.Where(tool => registered.Contains(tool) || native?.Contains(tool) == true).ToArray(),
             };
         }
         if (!string.IsNullOrEmpty(summary))
         { definition = definition with { Instructions = definition.Instructions + "\nEarlier conversation summary: " + summary }; }
-        return definition;
+        return Task.FromResult(definition);
     }
 
     public async Task Configure(AgentDefinition definition)

@@ -9,8 +9,8 @@ that neuron to the kernel-stamped brain and app identity. All subsequent operati
 including reads and repeated definitions, require the same owner. No method accepts
 a scope or physical table name. The physical name hashes the stamped scope and grain
 key; guessing another neuron's key cannot grant access to its rows. Unstamped calls
-are refused. The script edge currently stamps the behavior file as `AppId`, so this
-surface isolates individual behaviors as well as apps; it does not add cross-app sharing.
+are refused. Host-bound behavior files share their installed app's `AppId`; standalone
+scripts retain file-scoped identity. This does not add cross-app sharing.
 
 Definitions contain up to 32 columns, using `text`, `number` (Postgres `numeric`),
 `boolean`, `timestamptz`, or `jsonb`, and one or more primary-key columns. Identifiers
@@ -38,7 +38,12 @@ ordinary tables in `public`. The existing general SQL read surface retains its
 configured database-role visibility; table-neuron ownership does not change that
 surface's read permissions.
 
-The assistant can call `postgres_schema(appTables: true)` to discover tables of currently
+The assistant first calls `discover_capabilities`, backed by Registry's trusted-caller
+discovery and module providers. Postgres contributes explicit tool bindings and app-owned
+resources; a resource enumeration failure reports a partial error without hiding platform
+Postgres tools. Neither installed apps nor exact database-name spelling suppress discovery.
+
+The assistant can then call `postgres_schema(appTables: true)` to discover tables of currently
 installed apps in its brain. It receives a resource handle, installed app identity, declared
 columns, and the pinned capacity origin. `show_postgres_query_table(resource: handle, title: ...)`
 opens that table at its actual origin; use `table_read` and `table_refine` to read, filter,

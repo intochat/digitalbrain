@@ -111,6 +111,7 @@ public sealed class AssistantStreamFacts
         Assert.Equal("AGENT_FAILED", error.GetProperty("code").GetString());
         Assert.Equal("failed", error.GetProperty("runId").GetString());
         Assert.DoesNotContain("scripted failure", error.GetProperty("message").GetString()!, StringComparison.Ordinal);
+        Assert.DoesNotContain("data connection", error.GetProperty("message").GetString()!, StringComparison.OrdinalIgnoreCase);
         Assert.Null((await app.ReadConversation("one", ct)).ActiveRunId);
         Assert.Contains(await Collect(app, new("one", "next", "hello", "owner"), ct), item => Type(item) == "RUN_FINISHED");
     }

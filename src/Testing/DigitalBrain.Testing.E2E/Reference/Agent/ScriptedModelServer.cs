@@ -110,6 +110,16 @@ public sealed partial class ScriptedModelServer : IAsyncDisposable
         var ownerText = lastUser.Split("\n\n[Conversation agent:", 2, StringSplitOptions.None)[0];
         var wantsCount = ownerText.Contains("how many", StringComparison.OrdinalIgnoreCase);
         var wantsRefine = RefineValue is not null && ownerText.Contains("only", StringComparison.OrdinalIgnoreCase);
+        // Default assistants discover module tools before asking for a schema.
+        // Explicit custom definitions may already include the tool.
+        var toolNames = request.TryGetProperty("tools", out var offeredTools)
+            ? offeredTools.EnumerateArray().Select(tool => tool.GetProperty("function").GetProperty("name").GetString()).ToArray() : [];
+        if (!wantsCount && !wantsRefine && !toolNames.Contains("supabase_schema"))
+        {
+            Assert.Contains("discover_capabilities", toolNames);
+            return Completion(Call("discovery-call", "discover_capabilities", "{\"query\":\"Supabase tables\"}"), "tool_calls");
+        }
+        results = results.Where(result => !result.TryGetProperty("tool_call_id", out var callId) || callId.GetString() != "discovery-call").ToArray();
         object message;
         var reason = "tool_calls";
         if (results.Length == 0)
@@ -233,7 +243,10 @@ public sealed partial class ScriptedModelServer : IAsyncDisposable
     {
         Assert.True(Errors.IsEmpty, string.Join("\n", Errors));
         Assert.True(_completed > 0, "The model never received a real query-window tool result.");
-        Assert.Equal(_completed * 3 + RepairCount, Requests.Count);
+        var discoveryRequests = Requests.Count(request => request.TryGetProperty("tools", out var tools)
+            && tools.EnumerateArray().Any(tool => tool.GetProperty("function").GetProperty("name").GetString() == "discover_capabilities")
+            && !tools.EnumerateArray().Any(tool => tool.GetProperty("function").GetProperty("name").GetString() == "supabase_schema"));
+        Assert.Equal(_completed * 3 + RepairCount + discoveryRequests, Requests.Count);
     }
     public void AssertNoProtocolErrors() => Assert.Empty(Errors);
     public ValueTask DisposeAsync() => _app.DisposeAsync();

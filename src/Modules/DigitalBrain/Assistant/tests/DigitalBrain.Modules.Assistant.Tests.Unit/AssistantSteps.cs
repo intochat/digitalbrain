@@ -100,7 +100,13 @@ internal sealed class AssistantSteps : StepLibrary
             var database = context.Services.GetRequiredService<CustomersDatabase>();
             database.Table = args.Text(0);
             database.Rows = [.. Enumerable.Range(1, args.Int(1)).Select(id => new SupabaseTableRow("row-" + id, [id.ToString(CultureInfo.InvariantCulture), $"\"Customer {id}\""]))];
-            return Task.CompletedTask;
+            // This UI feature fixture uses an explicit app definition; scoped Registry
+            // discovery is exercised separately with an authenticated caller.
+            return Assistant(context).Configure(new AgentDefinition
+            {
+                Instructions = "Use the fixture's Supabase tables.",
+                Tools = ["supabase_schema", "show_supabase_query_table", "table_read", "table_refine"]
+            });
         });
         Step("the assistant used {string} and {string}", "The assistant's agent completed calls to both registered tools.", (context, args) =>
         {

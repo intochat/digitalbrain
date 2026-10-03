@@ -15,6 +15,7 @@ public sealed class AssistantModule : IModule, IHttpModule
     {
         ArgumentNullException.ThrowIfNull(silo);
         silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IAgentToolFactory, WorkspaceFormTools>());
+        silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IAgentToolFactory, RegistryDiscoveryTools>());
         silo.Services.AddOptions<AssistantOptions>().BindConfiguration("Assistant");
     }
 
