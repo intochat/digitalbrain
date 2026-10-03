@@ -15,6 +15,7 @@ public sealed class RegistryModule : IModule
     {
         ArgumentNullException.ThrowIfNull(silo);
         silo.Services.TryAddSingleton<NeuronTypes>();
+        silo.Services.TryAddSingleton<RegistryDiscoveryService>();
         silo.Services.TryAddSingleton(provider => new NeuronTypeSearch(provider.GetRequiredService<NeuronTypes>(),
             provider.GetService<IVectorStore>(), Embeddings(provider)));
         silo.Services.AddHostedService<RegistryObserver>();

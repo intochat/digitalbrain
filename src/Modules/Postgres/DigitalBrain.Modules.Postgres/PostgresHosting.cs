@@ -40,6 +40,7 @@ public static class PostgresHosting
         });
         services.TryAddSingleton<IPostgresSourceRegistry, PostgresSourceRegistry>();
         services.TryAddSingleton<PostgresAppResources>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<DigitalBrain.Registry.IRegistryResourceProvider, PostgresRegistryResources>());
         services.AddSingleton<ICapacityConfiguredSource>(provider =>
             new PostgresConfiguredSource(active: provider.GetRequiredService<IConfiguration>()[PostgresCapacityKind.AdminConnectionKey] is null));
         services.AddSingleton<ICapacityProvisioner>(provider =>

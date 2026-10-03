@@ -18,6 +18,7 @@ public sealed class AppsModule : IModule, IHttpModule
         ArgumentNullException.ThrowIfNull(silo);
         silo.Services.TryAddSingleton(TimeProvider.System);
         silo.Services.TryAddSingleton<AppRequirements>();
+        silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<DigitalBrain.Registry.IRegistryResourceProvider, AppsRegistryResources>());
         silo.Services.TryAddSingleton<ITestScriptRunner, CSharpFileTestRunner>();
         silo.Services.TryAddSingleton<MarketplaceService>();
         silo.Services.TryAddSingleton<AppService>();

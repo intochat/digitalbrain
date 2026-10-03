@@ -9,6 +9,7 @@ public interface IRegistry : INeuron
     // The one registry per brain lives under its own module key.
     const string Key = "registry";
 
+    Task<RegistryDiscovery> Discover(string query, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<NeuronType>> Types();
     Task<IReadOnlyList<NeuronTypeHit>> Search(string query, int take = 10, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<NeuronInstance>> Instances(string? typeId = null, bool activeOnly = false, int skip = 0, int take = 100);
