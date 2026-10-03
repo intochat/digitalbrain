@@ -48,8 +48,9 @@ public sealed class PathTruthFacts
         Assert.NotEmpty(docker);
         Assert.Equal(docker.Length, docker.Distinct().Count());
         Assert.Equal(docker, profile);
-        var registered = Regex.Matches(Read("src/IntoChat/IntoChat/Program.cs"), "AddModule<[^>]+>\\(\"([^\"]+)\"")
-            .Select(match => match.Groups[1].Value).Order().ToArray();
+        // The host registers the OS catalog wholesale, so the deployment's enabled set must
+        // name exactly the catalog's modules.
+        var registered = DigitalBrain.OS.OsCatalog.Modules.Select(entry => entry.Id).Order().ToArray();
         Assert.Equal(docker, registered);
     }
 }

@@ -1,5 +1,6 @@
 using DigitalBrain.Aspire.Server;
 using DigitalBrain.Kernel.AspNetCore;
+using DigitalBrain.OS;
 using DigitalBrain.Platform;
 using DigitalBrain.Platform.Identity;
 using DigitalBrain.Testing.E2E;
@@ -22,26 +23,8 @@ builder.AddDigitalBrainServer(server =>
     server.UseAzureStorage();
     if (referenceComposition)
     {
-        server.AddModule<DigitalBrain.AI.AIModule>("ai");
-        server.AddModule<DigitalBrain.ClickHouse.ClickHouseModule>("clickhouse");
-        server.AddModule<DigitalBrain.Apps.AppsModule>("apps");
-        server.AddModule<DigitalBrain.Assistant.AssistantModule>("assistant");
-        server.AddModule<DigitalBrain.Compute.ComputeModule>("compute");
-        server.AddModule<DigitalBrain.Registry.RegistryModule>("registry");
-        server.AddModule<DigitalBrain.Specs.SpecsModule>("specs");
-        server.AddModule<DigitalBrain.Files.FilesModule>("files");
-        server.AddModule<DigitalBrain.Flutter.FlutterModule>("flutter");
-        server.AddModule<DigitalBrain.Google.Gmail.GmailModule>("gmail");
-        server.AddModule<DigitalBrain.Microsoft.Aspire.AspireModule>("aspire");
-        server.AddModule<DigitalBrain.Microsoft.CSharp.CSharpAuthoringModule>("csharp-authoring");
-        server.AddModule<DigitalBrain.Microsoft.CSharp.CSharpModule>("csharp");
-        server.AddModule<DigitalBrain.Microsoft.GitHub.GitHubModule>("github");
-        server.AddModule<DigitalBrain.Microsoft.Playwright.PlaywrightModule>("playwright");
-        server.AddModule<DigitalBrain.Postgres.PostgresModule>("postgres");
-        server.AddModule<DigitalBrain.Qdrant.QdrantModule>("qdrant");
-        server.AddModule<DigitalBrain.Salesforce.SalesforceModule>("salesforce");
-        server.AddModule<DigitalBrain.Supabase.SupabaseModule>("supabase");
-        server.AddModule<DigitalBrain.Time.TimeModule>("time");
+        // The reference composition IS the operating system; the catalog is the one list.
+        server.AddOperatingSystem();
     }
     else
     {

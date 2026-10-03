@@ -40,6 +40,12 @@
   <Folder Name="/DigitalBrain/Mcp/tests/">
     <Project Path="src/DigitalBrain/Mcp/tests/DigitalBrain.Mcp.Tests.Unit/DigitalBrain.Mcp.Tests.Unit.csproj" />
   </Folder>
+  <Folder Name="/DigitalBrain/OS/">
+    <Project Path="src/DigitalBrain/OS/DigitalBrain.OS/DigitalBrain.OS.csproj" />
+  </Folder>
+  <Folder Name="/DigitalBrain/OS/tests/">
+    <Project Path="src/DigitalBrain/OS/tests/DigitalBrain.OS.Tests.Unit/DigitalBrain.OS.Tests.Unit.csproj" />
+  </Folder>
   <Folder Name="/DigitalBrain/Platform/">
     <Project Path="src/DigitalBrain/Platform/DigitalBrain.Platform.Contracts/DigitalBrain.Platform.Contracts.csproj" />
     <Project Path="src/DigitalBrain/Platform/DigitalBrain.Platform/DigitalBrain.Platform.csproj" />
