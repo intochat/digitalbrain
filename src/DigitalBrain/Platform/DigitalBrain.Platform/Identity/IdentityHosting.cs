@@ -1,14 +1,14 @@
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Platform.Identity.Configuration;
+using DigitalBrain.Platform.Identity.Directory;
 using DigitalBrain.Platform.Secrets;
 using DigitalBrain.Sdk;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using DigitalBrain.Kernel.Enforcement;
-using DigitalBrain.Platform.Identity.Directory;
+using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Platform.Identity;
 

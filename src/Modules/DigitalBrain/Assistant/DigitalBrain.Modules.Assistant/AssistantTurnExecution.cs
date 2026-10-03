@@ -205,8 +205,16 @@ public sealed class AssistantTurnExecution(IServiceProvider services, IGrainFact
                         compute = receipt.Compute,
                         computeUsd = ComputeUnits.ToUsd(receipt.Compute),
                         shadow = true,
-                        calls = receipt.Calls.Select(call => new { appId = call.AppId, operation = call.Operation, discovered = call.Discovered, succeeded = call.Succeeded,
-                            callId = call.CallId, errorCode = call.ErrorCode, errorMessage = call.ErrorMessage }),
+                        calls = receipt.Calls.Select(call => new
+                        {
+                            appId = call.AppId,
+                            operation = call.Operation,
+                            discovered = call.Discovered,
+                            succeeded = call.Succeeded,
+                            callId = call.CallId,
+                            errorCode = call.ErrorCode,
+                            errorMessage = call.ErrorMessage
+                        }),
                         touched = receipt.Touched.Select(entry => new { source = entry.Source, semanticTypeId = entry.SemanticTypeId, readOnly = entry.ReadOnly, rowsRead = entry.RowsRead }),
                     });
                 }

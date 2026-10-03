@@ -1,12 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Text.Json;
 using System.Text;
-using Microsoft.Extensions.Options;
+using System.Text.Json;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Platform.Identity;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Mcp.Tests.Unit;
 

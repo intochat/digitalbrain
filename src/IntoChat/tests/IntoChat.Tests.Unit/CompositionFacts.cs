@@ -1,9 +1,7 @@
 extern alias AppHost;
-
-using Aspire.Hosting.Testing;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Testing;
 using DigitalBrain.Aspire.Hosting;
-
 using DigitalBrain.Testing.E2E;
 
 namespace IntoChat.Tests.Unit;

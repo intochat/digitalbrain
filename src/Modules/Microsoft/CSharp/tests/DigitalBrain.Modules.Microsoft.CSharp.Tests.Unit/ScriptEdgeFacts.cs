@@ -75,7 +75,7 @@ public sealed class ScriptEdgeFacts
         foreach (var file in new[] { "behavior-one", "behavior-two" })
         {
             CallerContextStamper.Stamp(Alice);
-        await brain.AuthorizeCallerAsync();
+            await brain.AuthorizeCallerAsync();
             await host.Start(file);
             Orleans.Runtime.RequestContext.Clear();
             var token = sandbox.Requests.Last(FakeSandbox.IsStart).Body!["environment"]!["DigitalBrain__Token"]!.GetValue<string>();

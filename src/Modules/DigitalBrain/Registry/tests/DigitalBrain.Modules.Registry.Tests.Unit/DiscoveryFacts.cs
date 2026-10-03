@@ -9,8 +9,11 @@ public sealed class DiscoveryFacts
 {
     private static void Caller(string brain = "brain") => CallerContextStamper.Stamp(new()
     {
-        PrincipalId = "user", AccountId = "user", BrainId = brain,
-        Kind = CallerKind.Assistant, StampedBy = TrustedEdge.AuthenticatedHttp,
+        PrincipalId = "user",
+        AccountId = "user",
+        BrainId = brain,
+        Kind = CallerKind.Assistant,
+        StampedBy = TrustedEdge.AuthenticatedHttp,
     });
 
     [Fact]

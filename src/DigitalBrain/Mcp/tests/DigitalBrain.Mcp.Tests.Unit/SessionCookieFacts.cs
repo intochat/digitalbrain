@@ -44,8 +44,17 @@ public sealed class SessionCookieFacts
         })
         {
             using var invocation = await client.PostAsJsonAsync(mcp.Urls.Single() + "/mcp",
-                new { jsonrpc = "2.0", id = 3, method = "tools/call", @params = new { name = "neurons_call",
-                    arguments = new { contract, key, method = "Read", arguments = "[]" } } }, ct);
+                new
+                {
+                    jsonrpc = "2.0",
+                    id = 3,
+                    method = "tools/call",
+                    @params = new
+                    {
+                        name = "neurons_call",
+                        arguments = new { contract, key, method = "Read", arguments = "[]" }
+                    }
+                }, ct);
             invocation.EnsureSuccessStatusCode();
             var body = await invocation.Content.ReadAsStringAsync(ct);
             using var result = JsonDocument.Parse(body.Split('\n').Single(line => line.StartsWith("data: ", StringComparison.Ordinal))[6..]);

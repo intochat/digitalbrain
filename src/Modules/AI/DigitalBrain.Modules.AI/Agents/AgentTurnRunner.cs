@@ -193,7 +193,9 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
                     {
                         var failure = new
                         {
-                            isError = true, code = "tool_unavailable", tool = call.Name,
+                            isError = true,
+                            code = "tool_unavailable",
+                            tool = call.Name,
                             message = "This tool is not available in this turn. Use an advertised discovery tool to find registered capabilities before retrying.",
                         };
                         var unavailable = new ChatMessage(ChatRole.Tool, [new FunctionResultContent(call.CallId, failure)]);

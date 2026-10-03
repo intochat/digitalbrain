@@ -11,8 +11,11 @@ public static class BrainIdentityExtensions
         var caller = CallerContextStamper.Require();
         return brain.Grains.GetGrain<IBrainAuthority>(BrainScope.CurrentId()).ProvisionOwner(new Member
         {
-            PrincipalId = caller.PrincipalId, AccountId = caller.AccountId, BrainId = caller.BrainId,
-            Role = MemberRole.Owner, DisplayName = caller.PrincipalId,
+            PrincipalId = caller.PrincipalId,
+            AccountId = caller.AccountId,
+            BrainId = caller.BrainId,
+            Role = MemberRole.Owner,
+            DisplayName = caller.PrincipalId,
         });
     }
 }

@@ -29,8 +29,11 @@ public interface IRegistryResourceProvider
     async Task<RegistryDiscovery> Browse(int offset, int limit, CancellationToken cancellationToken)
     {
         var result = await Discover(cancellationToken);
-        return result with { Capabilities = result.Capabilities.Skip(offset).Take(limit).ToArray(),
-            NextOffset = result.Capabilities.Length > offset + limit ? offset + limit : null };
+        return result with
+        {
+            Capabilities = result.Capabilities.Skip(offset).Take(limit).ToArray(),
+            NextOffset = result.Capabilities.Length > offset + limit ? offset + limit : null
+        };
     }
     async Task<RegistryCapability?> Select(string id, CancellationToken cancellationToken)
         => (await Discover(cancellationToken)).Capabilities.SingleOrDefault(item => item.Id == id);

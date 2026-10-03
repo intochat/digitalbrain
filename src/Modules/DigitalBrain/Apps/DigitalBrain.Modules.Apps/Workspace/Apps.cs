@@ -60,8 +60,12 @@ internal sealed class Apps(
         var tracked = Snapshot.Packages.ToHashSet();
         // Candidates are filtered by InstalledApps outside this grain, avoiding an Install/Track call cycle.
         tracked.UnionWith(candidates);
-        var next = Snapshot with { Packages = tracked.OrderBy(id => id.ToString(), StringComparer.Ordinal).ToArray(),
-            Discovered = complete, DiscoveryOffset = Snapshot.DiscoveryOffset + 1000 };
+        var next = Snapshot with
+        {
+            Packages = tracked.OrderBy(id => id.ToString(), StringComparer.Ordinal).ToArray(),
+            Discovered = complete,
+            DiscoveryOffset = Snapshot.DiscoveryOffset + 1000
+        };
         await Save(next, new AppsChanged(next.Packages));
     }
 

@@ -171,7 +171,8 @@ internal sealed class AgentNeuron(
                     case AgentTurnEvent.Completed result: output = result; break;
                     case AgentTurnEvent.ToolStarted tool: await Record(run.RunId, "tool-started", tool.CallId, tool.Name); break;
                     case AgentTurnEvent.ToolCompleted tool: await Record(run.RunId, "tool-completed", tool.CallId, tool.Name, tool.Result); break;
-                    case AgentTurnEvent.ToolFailed tool: await Record(run.RunId, "tool-failed", tool.CallId, tool.Name,
+                    case AgentTurnEvent.ToolFailed tool:
+                        await Record(run.RunId, "tool-failed", tool.CallId, tool.Name,
                         JsonSerializer.Serialize(new { isError = true, code = tool.Code, message = tool.Message })); break;
                     case AgentTurnEvent.Failed failed:
                         error = failed.Message;
@@ -212,9 +213,12 @@ internal sealed class AgentNeuron(
                         && !terminalCalls.Contains(item.CallId)).ToArray())
                     {
                         await Record(run.RunId, "tool-failed", pending.CallId, pending.Tool,
-                            JsonSerializer.Serialize(new { isError = true,
+                            JsonSerializer.Serialize(new
+                            {
+                                isError = true,
                                 code = cancelled || lifetime.IsCancellationRequested ? "tool_cancelled" : "tool_interrupted",
-                                message = "Execution ended before the tool call completed." }));
+                                message = "Execution ended before the tool call completed."
+                            }));
                     }
                     run = run with
                     {
