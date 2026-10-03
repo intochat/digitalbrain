@@ -167,13 +167,22 @@ dotnet build DigitalBrain.slnx -c Release -p:CodeGraphRefresh=false
 dotnet pack DigitalBrain.slnx -c Release --no-build -o artifacts
 ```
 
-The standalone release verification, package-consumer verification and publishing scripts
-were removed. CI still builds, packs and runs the existing test suites; it no longer runs
-the standalone packed-consumer and persistent-upgrade rehearsal or creates a verified
-package manifest. Publication is not automated by this workflow.
+The standalone release scripts and `eng/` sources have been removed. CI runs these ordinary
+xUnit integration projects through `dotnet test`:
 
-The source files in `eng/ReleaseRehearsal` remain from the previous synthetic rehearsal;
-they currently have no supported entry point. They are not a production upgrade tool.
+- `src/DigitalBrain/Platform/tests/DigitalBrain.Platform.Tests.E2E`: read-only inspection,
+  process interruption/resume, startup rejection, revocation across retry/restart, original-key
+  reuse, wrong-key/service rejection, and snapshot rollback with frozen compatibility fixtures.
+- `src/Aspire/tests/DigitalBrain.Aspire.Hosting.Tests.E2E`: pack actual dependencies, restore an
+  isolated package-only consumer, compose AppHost/server/client, verify two-brain isolation,
+  and rename resources while retaining storage and deployment identity.
+
+Tests own disposable emulator volumes, enforce deadlines, and report diagnostic directories.
+They use synthetic credentials and require no production snapshot. Publication remains manual.
+
+Authenticated users select a shared brain with `POST /identity/session/brain` containing
+`accountId` and `brainId`. The server checks current membership before issuing a cookie for
+that account and brain; sharing never confers owner-only grant permissions.
 
 A rehearsal on a copy of existing deployment state is relevant only when upgrading a
 deployment that already has persisted legacy identity data. A fresh installation has no

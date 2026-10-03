@@ -42,6 +42,9 @@ public sealed class E2EBrain : IDigitalBrain, ITrackedBrain
     public HttpClient HttpClient => _session.HttpClient;
     public DistributedApplication Application => _session.App;
 
+    public ValueTask<string?> GetConnectionStringAsync(string resourceName, CancellationToken cancellationToken = default)
+        => _session.GetConnectionStringAsync(resourceName, cancellationToken);
+
     public IPage Page => _primaryBrowser?.Page
         ?? throw new InvalidOperationException("This test exposes no browser endpoint. Configure a module to run its web app.");
 

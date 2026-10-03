@@ -2,13 +2,13 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>Aspire AppHost integration for the DigitalBrain Qdrant vector store.</Description>
-    <RootNamespace>DigitalBrain.Qdrant.Aspire.Hosting</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Qdrant.Aspire.Hosting</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.Qdrant" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Modules.Qdrant.Contracts/DigitalBrain.Modules.Qdrant.Contracts.csproj" />
-    <ProjectReference Include="..\..\..\Aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../../../Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

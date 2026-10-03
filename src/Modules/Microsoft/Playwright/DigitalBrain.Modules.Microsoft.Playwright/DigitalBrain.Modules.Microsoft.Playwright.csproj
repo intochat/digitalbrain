@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><IsPackable>true</IsPackable><RootNamespace>DigitalBrain.Microsoft.Playwright</RootNamespace><NoWarn>$(NoWarn);CS1591;ORLEANSEXP005;CA1812</NoWarn></PropertyGroup>
+  <PropertyGroup><IsPackable>true</IsPackable><RootNamespace>DigitalBrain.Modules.Microsoft.Playwright</RootNamespace><NoWarn>$(NoWarn);CS1591;ORLEANSEXP005;CA1812</NoWarn></PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Playwright" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.Playwright.Tests.Unit" />
     <ProjectReference Include="../DigitalBrain.Modules.Microsoft.Playwright.Contracts/DigitalBrain.Modules.Microsoft.Playwright.Contracts.csproj" />
-    <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
+    <ProjectReference Include="../../../../DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
   </ItemGroup>
 </Project>

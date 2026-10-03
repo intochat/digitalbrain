@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><IsPackable>true</IsPackable><RootNamespace>DigitalBrain.Microsoft.Playwright</RootNamespace><NoWarn>$(NoWarn);CS1591</NoWarn></PropertyGroup>
+  <PropertyGroup><IsPackable>true</IsPackable><RootNamespace>DigitalBrain.Modules.Microsoft.Playwright.Contracts</RootNamespace><NoWarn>$(NoWarn);CS1591</NoWarn></PropertyGroup>
   <!-- Neuron interfaces and signals use the Kernel wire vocabulary. -->
-  <ItemGroup><ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../../../DigitalBrain/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" /></ItemGroup>
   <ItemGroup><PackageReference Include="Microsoft.Orleans.Sdk" PrivateAssets="all" /></ItemGroup>
 </Project>

@@ -2,15 +2,15 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>Workspace files stored as immutable blobs, host folder import and the image editor.</Description>
-    <RootNamespace>DigitalBrain.Files</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Files</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Azure.Storage.Blobs" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.Files.Tests.Unit" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.Files.Tests.E2E" />
     <ProjectReference Include="../DigitalBrain.Modules.Files.Contracts/DigitalBrain.Modules.Files.Contracts.csproj" />
-    <ProjectReference Include="..\..\DigitalBrain\Kernel\Sdk\DigitalBrain.Sdk\DigitalBrain.Sdk.csproj" />
-    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/Sdk/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
   </ItemGroup>
-  <ItemGroup><ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Kernel.AspNetCore/DigitalBrain.Kernel.AspNetCore.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Kernel.AspNetCore/DigitalBrain.Kernel.AspNetCore.csproj" /></ItemGroup>
 </Project>

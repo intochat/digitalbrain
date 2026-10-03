@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>IntoChat.Tests.Unit</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
+    <ProjectReference Include="../../IntoChat/IntoChat.csproj" />
+    <ProjectReference Include="../../IntoChat.AppHost/IntoChat.AppHost.csproj" IsAspireProjectResource="false" Aliases="AppHost" />
+    <ProjectReference Include="../../../Testing/DigitalBrain.Testing.E2E/DigitalBrain.Testing.E2E.csproj" />
+  </ItemGroup>
+</Project>

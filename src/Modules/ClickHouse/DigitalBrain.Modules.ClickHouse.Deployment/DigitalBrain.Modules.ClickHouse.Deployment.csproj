@@ -2,10 +2,10 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>Azure deployment for the ClickHouse module: the ClickHouse server.</Description>
-    <RootNamespace>DigitalBrain.ClickHouse</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.ClickHouse.Deployment</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../DigitalBrain/Kernel/Deployment/DigitalBrain.Deployment/DigitalBrain.Deployment.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/Deployment/DigitalBrain.Deployment/DigitalBrain.Deployment.csproj" />
     <ProjectReference Include="../DigitalBrain.Modules.ClickHouse/DigitalBrain.Modules.ClickHouse.csproj" />
   </ItemGroup>
 </Project>

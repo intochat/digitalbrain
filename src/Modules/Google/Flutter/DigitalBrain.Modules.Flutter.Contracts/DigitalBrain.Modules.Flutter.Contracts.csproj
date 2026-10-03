@@ -2,12 +2,12 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>Flutter module contracts: inbox and UI kit neurons.</Description>
-    <RootNamespace>DigitalBrain.Flutter</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Flutter.Contracts</RootNamespace>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <!-- Neuron interfaces and signals use the Kernel wire vocabulary. -->
-    <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
+    <ProjectReference Include="../../../../DigitalBrain/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup><PackageReference Include="Microsoft.Orleans.Sdk" PrivateAssets="all" /></ItemGroup>
 </Project>

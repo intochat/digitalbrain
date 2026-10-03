@@ -15,7 +15,8 @@ public static class DigitalBrainHostingExtensions
     {
         ArgumentNullException.ThrowIfNull(brain);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
-        return (brain.Storage ?? throw new InvalidOperationException("Blob containers require UseAzureStorage.")).AddBlobContainer(brain.ResourceName(name));
+        return (brain.Storage ?? throw new InvalidOperationException("Blob containers require UseAzureStorage."))
+            .AddBlobContainer(brain.ResourceName(name), blobContainerName: name);
     }
 
     public static DigitalBrainBuilder AddDigitalBrain(this IDistributedApplicationBuilder builder, string name, bool persistentStorage = true, string? dataVolume = null, string? serviceId = null, DigitalBrainHostingOptions? options = null)

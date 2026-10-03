@@ -1,4 +1,5 @@
 namespace DigitalBrain.Microsoft.CSharp;
+
 internal static class RepositoryRoot
 {
     internal static string? Find()

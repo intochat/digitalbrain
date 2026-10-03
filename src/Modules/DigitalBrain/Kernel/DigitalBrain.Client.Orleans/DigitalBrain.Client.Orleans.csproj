@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><IsPackable>true</IsPackable><RootNamespace>DigitalBrain.Client.Orleans</RootNamespace></PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Client" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" />
-    <ProjectReference Include="../DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
-  </ItemGroup>
-</Project>

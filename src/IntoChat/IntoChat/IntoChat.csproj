@@ -11,11 +11,11 @@
     <InternalsVisibleTo Include="IntoChat.Tests.Unit" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../ServiceDefaults/IntoChat.ServiceDefaults.csproj" />
+    <ProjectReference Include="../IntoChat.ServiceDefaults/IntoChat.ServiceDefaults.csproj" />
     <ProjectReference Include="../../Modules/DigitalBrain/Assistant/DigitalBrain.Modules.Assistant/DigitalBrain.Modules.Assistant.csproj" />
-    <ProjectReference Include="..\..\Aspire\DigitalBrain.Aspire.Server\DigitalBrain.Aspire.Server.csproj" />
-    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
-    <ProjectReference Include="..\..\Modules\DigitalBrain\Kernel\Sdk\DigitalBrain.Sdk\DigitalBrain.Sdk.csproj" />
+    <ProjectReference Include="../../Aspire/DigitalBrain.Aspire.Server/DigitalBrain.Aspire.Server.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
+    <ProjectReference Include="../../DigitalBrain/Sdk/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
     <ProjectReference Include="../../Modules/Time/DigitalBrain.Modules.Time/DigitalBrain.Modules.Time.csproj" />
     <ProjectReference Include="../../Modules/Files/DigitalBrain.Modules.Files/DigitalBrain.Modules.Files.csproj" />
     <ProjectReference Include="../../Modules/Microsoft/Playwright/DigitalBrain.Modules.Microsoft.Playwright/DigitalBrain.Modules.Microsoft.Playwright.csproj" />
@@ -41,5 +41,5 @@
   <ItemGroup>
     <EmbeddedResource Include="../Apps/**/*" LogicalName="IntoChat.ShippedApps/%(RecursiveDir)%(Filename)%(Extension)" Link="ShippedApps/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
-  <ItemGroup><ProjectReference Include="../../Modules/DigitalBrain/Kernel/Platform/DigitalBrain.Platform/DigitalBrain.Platform.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../DigitalBrain/Platform/DigitalBrain.Platform/DigitalBrain.Platform.csproj" /></ItemGroup>
 </Project>

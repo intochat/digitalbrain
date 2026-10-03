@@ -34,10 +34,17 @@ public sealed class AspireTestSession : IAsyncDisposable
     public TestExecutionOptions Options => _options;
     public TestSessionLifetime Lifetime => _lifetime;
 
+    public ValueTask<string?> GetConnectionStringAsync(string resourceName, CancellationToken cancellationToken = default)
+        => App.GetConnectionStringAsync(_brain.ResourceName(resourceName), cancellationToken);
+
     public static Task<AspireTestSession> StartAsync<TAppHost>(
         IReadOnlyList<string> args, TestExecutionOptions options, CancellationToken cancellationToken)
         where TAppHost : class
-        => StartCoreAsync(ct => DistributedApplicationTestingBuilder.CreateAsync<TAppHost>([.. args], ct),
+        => StartCoreAsync(ct => DistributedApplicationTestingBuilder.CreateAsync<TAppHost>([.. args], (_, settings) =>
+            {
+                settings.Configuration ??= new ConfigurationManager();
+                settings.Configuration.AddInMemoryCollection(options.PrivateConfiguration);
+            }, ct),
             declareTopology: null, options, cancellationToken);
 
     public static Task<AspireTestSession> StartAsync(TestExecutionOptions options,

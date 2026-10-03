@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Deploys a DigitalBrain to Azure with Pulumi and DeploymentKit from its Aspire manifest; modules contribute their own resources.</Description>
+    <RootNamespace>DigitalBrain.Deployment</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="DeploymentKit" />
+    <PackageReference Include="Pulumi" />
+    <PackageReference Include="Pulumi.AzureNative" />
+    <PackageReference Include="Pulumi.Random" />
+    <ProjectReference Include="../../Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
+  </ItemGroup>
+</Project>

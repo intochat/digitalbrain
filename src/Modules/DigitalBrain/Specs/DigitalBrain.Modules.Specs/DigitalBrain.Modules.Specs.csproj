@@ -2,11 +2,11 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>Runs .feature specs as scenarios against the brain through host-registered step libraries.</Description>
-    <RootNamespace>DigitalBrain.Specs</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Specs</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Modules.Specs.Tests.Unit" />
     <ProjectReference Include="../DigitalBrain.Modules.Specs.Contracts/DigitalBrain.Modules.Specs.Contracts.csproj" />
-    <ProjectReference Include="../../Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
+    <ProjectReference Include="../../../../DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
   </ItemGroup>
 </Project>

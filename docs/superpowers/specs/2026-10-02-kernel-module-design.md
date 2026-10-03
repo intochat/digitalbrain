@@ -147,7 +147,7 @@ Behaviors reuse `Data/` and `Integrations/` for free: the kernel module's contra
 
 ## Migration order
 
-1. **Extract `DigitalBrain`.** New `src/DigitalBrain` project; move the word-types out of
+1. **Extract `DigitalBrain`.** New `src/DigitalBrain/DigitalBrain` project; move the word-types out of
    `DigitalBrain.Contracts`; `Contracts` references `DigitalBrain`; nothing else changes.
    Every suite stays green — the extraction is observationally invisible.
 2. **Carve the Kernel module.** Rename/move `Contracts` (what remains of it) →

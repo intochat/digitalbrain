@@ -44,7 +44,6 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     IntoChat__Hosted__Enabled=true \
     DigitalBrain__Standalone=true \
     DigitalBrain__Modules__ai__Enabled="true" \
-    DigitalBrain__Modules__memory__Enabled="true" \
     DigitalBrain__Modules__clickhouse__Enabled="true" \
     DigitalBrain__Modules__supabase__Enabled="true" \
     DigitalBrain__Modules__time__Enabled="true" \

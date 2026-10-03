@@ -10,7 +10,7 @@
     <PackageReference Include="Aspire.Hosting.Orleans" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../Modules/DigitalBrain/Kernel/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
+    <ProjectReference Include="../../DigitalBrain/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup><InternalsVisibleTo Include="DigitalBrain.Aspire.Hosting.Tests.Unit" /></ItemGroup>
 </Project>

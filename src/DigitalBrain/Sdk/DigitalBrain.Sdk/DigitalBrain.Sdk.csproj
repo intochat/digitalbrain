@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Reusable auth, secrets, connectors, HTTP surfaces, and webhooks for DigitalBrain modules.</Description>
+    <RootNamespace>DigitalBrain.Sdk</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <ProjectReference Include="../../Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
+  </ItemGroup>
+  <ItemGroup><ProjectReference Include="../../Kernel/DigitalBrain.Kernel.AspNetCore/DigitalBrain.Kernel.AspNetCore.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../Platform/DigitalBrain.Platform.Contracts/DigitalBrain.Platform.Contracts.csproj" /></ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="DigitalBrain.Sdk.Tests.Unit" /></ItemGroup>
+</Project>

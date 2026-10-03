@@ -38,7 +38,7 @@ apphost.out.log
 apphost.err.log
 *.log
 # Locally saved application sources and compiled artifacts.
-src/Applications/IntoChat/IntoChat/applications/
+src/IntoChat/IntoChat/applications/
 .test-results/
 # Scratch source bundles produced by file-application tests.
 .agent-facade-tests/
@@ -47,5 +47,4 @@ src/Applications/IntoChat/IntoChat/applications/
 .script-graph-tests/
 .graph-failure-tests/
 # Local Aspire state created by E2E hosts.
-**/Tests/E2E/.aspire/
 **/*.Tests.E2E/.aspire/

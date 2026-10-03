@@ -87,11 +87,11 @@ public static class ReferenceBrain
                 },
                 PrivateConfiguration = Merge(new Dictionary<string, string?>
                 {
-                    ["Parameters:openai-api-key"] = modelApiKey,
-                    ["Parameters:gmail-client-id"] = "fixture-client",
-                    ["Parameters:gmail-client-secret"] = "fixture-secret",
-                    ["Parameters:salesforce-consumer-key"] = "fixture-client",
-                    ["Parameters:salesforce-consumer-secret"] = "fixture-secret",
+                    ["Parameters:modules-openai-api-key"] = modelApiKey,
+                    ["Parameters:modules-gmail-client-id"] = "fixture-client",
+                    ["Parameters:modules-gmail-client-secret"] = "fixture-secret",
+                    ["Parameters:modules-salesforce-consumer-key"] = "fixture-client",
+                    ["Parameters:modules-salesforce-consumer-secret"] = "fixture-secret",
                 }, privateConfiguration),
             });
     private static Dictionary<string, string?> Merge(Dictionary<string, string?> defaults, Dictionary<string, string?>? extra)

@@ -35,12 +35,12 @@ Paths below use these exact prefixes:
 
 - `AC` = `src/Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps.Contracts`
 - `A` = `src/Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps`
-- `AU` = `src/Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps.Tests.Unit`
-- `AE` = `src/Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps.Tests.E2E`
+- `AU` = `src/Modules/DigitalBrain/Apps/tests/DigitalBrain.Modules.Apps.Tests.Unit`
+- `AE` = `src/Modules/DigitalBrain/Apps/tests/DigitalBrain.Modules.Apps.Tests.E2E`
 - `CC` = `src/Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Contracts`
 - `C` = `src/Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp`
-- `CU` = `src/Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit`
-- `CE` = `src/Modules/Microsoft/CSharp/DigitalBrain.Modules.Microsoft.CSharp.Tests.E2E`
+- `CU` = `src/Modules/Microsoft/CSharp/tests/DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit`
+- `CE` = `src/Modules/Microsoft/CSharp/tests/DigitalBrain.Modules.Microsoft.CSharp.Tests.E2E`
 - `F` = `src/Modules/Google/Flutter/app/shell`
 
 For a named C# fact class, run `dotnet test <prefix>/<project-directory-name>.csproj --filter FullyQualifiedName~<class>` from the checkout root, expanding the prefix above. Full project checks omit the filter. Never test the solution file. Dart commands run from `F`.

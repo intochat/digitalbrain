@@ -21,7 +21,8 @@ public sealed class DigitalBrainBuilder
         { throw new ArgumentException("Module IDs contain only ASCII letters, digits, and hyphens.", nameof(id)); }
         if (_modules.Contains(id, StringComparer.Ordinal)) { throw new InvalidOperationException($"Module '{id}' is already selected."); }
         if (hosting is not null && hosting.Id != id) { throw new ArgumentException("The hosting adapter belongs to another module.", nameof(hosting)); }
-        var values = new Dictionary<string, string?>(settings ?? new Dictionary<string, string?>(), StringComparer.OrdinalIgnoreCase);
+        var replaceOptions = ApplicationBuilder.Configuration.GetValue<bool>($"DigitalBrain:Modules:{id}:ReplaceOptions");
+        var values = new Dictionary<string, string?>(replaceOptions ? [] : settings ?? new Dictionary<string, string?>(), StringComparer.OrdinalIgnoreCase);
         foreach (var pair in ApplicationBuilder.Configuration.GetSection($"DigitalBrain:Modules:{id}:Options").AsEnumerable())
         { if (pair.Value is not null) { values[pair.Key] = pair.Value; } }
         var scopedPrefix = $"DigitalBrain:Brains:{Name}:Modules:{id}:Options";

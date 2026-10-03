@@ -5,8 +5,9 @@ namespace DigitalBrain.Testing.E2E;
 
 public sealed class E2ETestBuilder<TAppHost> where TAppHost : class
 {
-    // Option edits become plain configuration keys passed to the AppHost as arguments; the
-    // AppHost's configuration overrides its code-declared defaults by standard precedence.
+    // A configured module replaces the AppHost's code-declared options with fixture options.
+    // Repeated edits compose on the same options, including empty collections and false values.
+    private readonly Dictionary<Type, object> _moduleOptions = [];
     private readonly Dictionary<string, string?> _optionOverrides = new(StringComparer.OrdinalIgnoreCase);
     private TestExecutionOptions _execution = new();
     private BrowserOptions _browser = new() { Headless = true };
@@ -18,16 +19,18 @@ public sealed class E2ETestBuilder<TAppHost> where TAppHost : class
         EnsureMutable();
         ArgumentNullException.ThrowIfNull(configureOptions);
         using var scope = BrowserConfiguration.Begin(_browser);
-        var edited = new TOptions();
+        var edited = _moduleOptions.TryGetValue(typeof(TModule), out var existing) ? (TOptions)existing : new TOptions();
         configureOptions(edited);
         _browser = scope.Options;
-        // Only the keys the edit changed override the AppHost's own values. An edit that clears
-        // a default collection entry cannot be expressed as configuration and keeps the default.
-        var defaults = ModuleOptionsSerialization.FlattenOptions(new TOptions(), typeof(TModule).Name);
-        foreach (var (key, value) in ModuleOptionsSerialization.FlattenOptions(edited, typeof(TModule).Name))
-        {
-            if (!defaults.TryGetValue(key, out var baseline) || baseline != value) { _optionOverrides[key] = value; }
-        }
+        edited.Validate();
+        _moduleOptions[typeof(TModule)] = edited;
+        var id = ModuleIdentity.Get(typeof(TModule));
+        var prefix = $"DigitalBrain:Modules:{id}:";
+        foreach (var key in _optionOverrides.Keys.Where(key => key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)).ToArray())
+        { _optionOverrides.Remove(key); }
+        _optionOverrides[prefix + "ReplaceOptions"] = "true";
+        foreach (var (key, value) in ModuleOptionsSerialization.FlattenOptions(edited, id))
+        { if (value is not null) { _optionOverrides[key] = value; } }
         return this;
     }
 

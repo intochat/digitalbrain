@@ -2,6 +2,7 @@ using DigitalBrain.Kernel;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 namespace DigitalBrain.AI;
+
 internal static class AIOptionsRuntime
 {
     internal static AIOptions Read(IConfiguration configuration)

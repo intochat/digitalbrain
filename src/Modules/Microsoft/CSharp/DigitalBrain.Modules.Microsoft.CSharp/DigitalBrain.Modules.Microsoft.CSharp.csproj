@@ -2,11 +2,11 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>Single-file C# apps that operate neurons, compiled and run in the C# sandbox.</Description>
-    <RootNamespace>DigitalBrain.Microsoft.CSharp</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Microsoft.CSharp</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../../DigitalBrain/Apps/DigitalBrain.Modules.Apps.Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
-    <ProjectReference Include="..\..\..\DigitalBrain\Kernel\Sdk\DigitalBrain.Sdk\DigitalBrain.Sdk.csproj" />
+    <ProjectReference Include="../../../../DigitalBrain/Sdk/DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
     <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit" />
     <PackageReference Include="Azure.Identity" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
@@ -14,11 +14,11 @@
     <PackageReference Include="Microsoft.Orleans.Reminders" />
     <ProjectReference Include="../DigitalBrain.Modules.Microsoft.CSharp.Contracts/DigitalBrain.Modules.Microsoft.CSharp.Contracts.csproj" />
     <ProjectReference Include="../../../AI/DigitalBrain.Modules.AI.Contracts/DigitalBrain.Modules.AI.Contracts.csproj" />
-    <ProjectReference Include="../../../DigitalBrain/Apps/DigitalBrain.Modules.Apps.Contracts/DigitalBrain.Modules.Apps.Contracts.csproj" />
+
     <ProjectReference Include="../../../DigitalBrain/Registry/DigitalBrain.Modules.Registry.Contracts/DigitalBrain.Modules.Registry.Contracts.csproj" />
     <ProjectReference Include="../../Aspire/DigitalBrain.Modules.Microsoft.Aspire.Contracts/DigitalBrain.Modules.Microsoft.Aspire.Contracts.csproj" />
-    <ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
-    <ProjectReference Include="..\..\..\DigitalBrain\Kernel\DigitalBrain.Client\DigitalBrain.Client.csproj" />
+    <ProjectReference Include="../../../../DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
+    <ProjectReference Include="../../../../DigitalBrain/Client/DigitalBrain.Client/DigitalBrain.Client.csproj" />
   </ItemGroup>
-  <ItemGroup><ProjectReference Include="../../../DigitalBrain/Kernel/DigitalBrain.Kernel.AspNetCore/DigitalBrain.Kernel.AspNetCore.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../../../DigitalBrain/Kernel/DigitalBrain.Kernel.AspNetCore/DigitalBrain.Kernel.AspNetCore.csproj" /></ItemGroup>
 </Project>

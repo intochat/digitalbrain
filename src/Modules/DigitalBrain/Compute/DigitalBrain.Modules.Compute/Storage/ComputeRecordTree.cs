@@ -14,6 +14,10 @@ internal sealed record ComputeStoredRecord(
 // branch at most 16 references. Only publishing the new root changes the view.
 internal sealed class ComputeRecordTree(Func<string, Task<string>> read, Func<string, string, Task> write)
 {
+    // One serialized part per operation avoids reading a just-committed leaf back
+    // over the network. Deserialize on every use so updates cannot mutate old roots.
+    private (string Key, string Text)? _lastPart;
+
     private sealed class Node
     {
         public SortedDictionary<string, ComputeStoredRecord>? Records { get; init; }
@@ -22,8 +26,9 @@ internal sealed class ComputeRecordTree(Func<string, Task<string>> read, Func<st
 
     private async Task<Node> Load(string root)
     {
-        var text = await read(root);
+        var text = _lastPart is { } cached && cached.Key == root ? cached.Text : await read(root);
         if (UsagePaging.Hash(text) != root) { throw new InvalidDataException("Compute record checksum mismatch."); }
+        _lastPart = (root, text);
         return JsonSerializer.Deserialize<Node>(text) ?? throw new InvalidDataException("Missing compute node.");
     }
 
@@ -88,6 +93,7 @@ internal sealed class ComputeRecordTree(Func<string, Task<string>> read, Func<st
         var text = JsonSerializer.Serialize(node);
         var key = UsagePaging.Hash(text);
         await write(key, text);
+        _lastPart = (key, text);
         return key;
     }
 

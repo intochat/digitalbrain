@@ -1,6 +1,7 @@
 using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Kernel;
 namespace DigitalBrain.Testing.E2E;
+
 internal static class ModuleHostingAdapters
 {
     internal static IDigitalBrainModuleHosting? For(Type module) => module switch

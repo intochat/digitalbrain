@@ -2,10 +2,10 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>Aspire hosting for the Aspire connection module.</Description>
-    <RootNamespace>DigitalBrain.Microsoft.Aspire</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Microsoft.Aspire.Aspire.Hosting</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Modules.Microsoft.Aspire.Contracts/DigitalBrain.Modules.Microsoft.Aspire.Contracts.csproj" />
-    <ProjectReference Include="..\..\..\..\Aspire\DigitalBrain.Aspire.Hosting\DigitalBrain.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../../../../Aspire/DigitalBrain.Aspire.Hosting/DigitalBrain.Aspire.Hosting.csproj" />
   </ItemGroup>
 </Project>

@@ -26,11 +26,11 @@
 
 ## Task 1: Remove obsolete guards and replace packaging coverage
 
-**Files:** `src/Applications/IntoChat/Tests/Unit/{PathTruthFacts.cs,IntoChat.Tests.Unit.csproj,ModuleOptionsFacts.cs}`; delete `HygieneFacts.cs`, `Operations/{HostedDeploymentFacts.cs,HostedSdkModuleFacts.cs}`, `Diagnostics/OtlpParserFacts.cs`, `Mcp/NeuronContractFacts.cs`.
+**Files:** `src/IntoChat/tests/IntoChat.Tests.Unit/{PathTruthFacts.cs,IntoChat.Tests.Unit.csproj,ModuleOptionsFacts.cs}`; delete `HygieneFacts.cs`, `Operations/{HostedDeploymentFacts.cs,HostedSdkModuleFacts.cs}`, `Diagnostics/OtlpParserFacts.cs`, `Mcp/NeuronContractFacts.cs`.
 **Interfaces:** Keep `PathTruthFacts.EveryProjectReferenceResolvesToAnExistingFile()`; introduce `ContainerModuleListsAgreeAndResolve()` in that class.
 
 - [x] Replace packaging facts with a test parsing Dockerfile assignments and Container.pubxml environment items. Assert nonempty indexed collections, distinct indices, equal sorted module sets, no developer-profile types, and `Assert.NotNull(Type.GetType(entry))` for every entry. Check parser behavior for actual file formatting; do not silently ignore malformed module entries.
-- [x] Run `dotnet test src/Applications/IntoChat/Tests/Unit/IntoChat.Tests.Unit.csproj --filter FullyQualifiedName~PathTruthFacts`. Confirm the new test catches any real packaging mismatch before repairing it.
+- [x] Run `dotnet test src/IntoChat/tests/IntoChat.Tests.Unit/IntoChat.Tests.Unit.csproj --filter FullyQualifiedName~PathTruthFacts`. Confirm the new test catches any real packaging mismatch before repairing it.
 - [x] Reconcile actual packaging manifests if needed; delete the obsolete facts and linked Otlp parser compile item. Keep ModuleOptions' product assembly reflection sweep and delete the arbitrary count; remove duplicate generic coverage only, preserving the sweep's assertions.
 - [x] Run the full IntoChat Unit project; record failures outside this task separately. The final phase must have zero failures.
 - [x] Stage exact changed files and commit `test: replace IntoChat packaging guards with composition coverage`.
@@ -38,12 +38,12 @@
 ## Task 2: Move module behavior tests
 
 **Files and ownership:**
-- `Unit/Compute/ChaosChargeFacts.cs` → `src/Modules/DigitalBrain/Compute/DigitalBrain.Modules.Compute.Tests.Unit/ChaosChargeFacts.cs`.
-- `Unit/Agent/ComputeUsageFacts.cs` → `src/Modules/DigitalBrain/Assistant/DigitalBrain.Modules.Assistant.Tests.Unit/ComputeUsageFacts.cs`.
+- `Unit/Compute/ChaosChargeFacts.cs` → `src/Modules/DigitalBrain/Compute/tests/DigitalBrain.Modules.Compute.Tests.Unit/ChaosChargeFacts.cs`.
+- `Unit/Agent/ComputeUsageFacts.cs` → `src/Modules/DigitalBrain/Assistant/tests/DigitalBrain.Modules.Assistant.Tests.Unit/ComputeUsageFacts.cs`.
 - `Unit/MasterKeyHostingFacts.cs` → `src/Modules/DigitalBrain/Kernel/DigitalBrain.Core.Tests.Unit/MasterKeyHostingFacts.cs`; add its hosting project reference there.
-- `E2E/LocalApps/LocalAppNeuronFacts.cs` → `src/Modules/Files/DigitalBrain.Modules.Files.Tests.Unit/LocalAppNeuronFacts.cs`; retain image editing/save behavior, replace IntoChat lease/upload infrastructure with that module's test setup.
-- `E2E/Workspace/ShellPersistenceFacts.cs` HTTP fact → `src/Modules/Google/Flutter/DigitalBrain.Modules.Flutter.Tests.E2E/ShellPersistenceHttpFacts.cs`.
-- `E2E/Security/CrossWorkspaceFacts.cs` slider scoping fact → `src/Modules/Google/Flutter/DigitalBrain.Modules.Flutter.Tests.Unit/Slider/SliderFacts.cs`.
+- `E2E/LocalApps/LocalAppNeuronFacts.cs` → `src/Modules/Files/tests/DigitalBrain.Modules.Files.Tests.Unit/LocalAppNeuronFacts.cs`; retain image editing/save behavior, replace IntoChat lease/upload infrastructure with that module's test setup.
+- `E2E/Workspace/ShellPersistenceFacts.cs` HTTP fact → `src/Modules/Google/Flutter/tests/DigitalBrain.Modules.Flutter.Tests.E2E/ShellPersistenceHttpFacts.cs`.
+- `E2E/Security/CrossWorkspaceFacts.cs` slider scoping fact → `src/Modules/Google/Flutter/tests/DigitalBrain.Modules.Flutter.Tests.Unit/Slider/SliderFacts.cs`.
 - Delete `E2E/Compute/ComputeLimitsFacts.cs`.
 **Interfaces:** No production API changes; the source tests' behavior assertions survive with target test-host idioms.
 
@@ -68,7 +68,7 @@
 ## Task 4: Phase 1 acceptance
 
 - [x] Run all test projects touched by this phase individually. Require the single packaging test and full IntoChat Unit suite to pass.
-- [x] Invoke the Aspire orchestration skill and run `aspire run` from `src/Applications/IntoChat/AppHost`; require every resource Healthy, then stop only processes started for this smoke.
+- [x] Invoke the Aspire orchestration skill and run `aspire run` from `src/IntoChat/IntoChat.AppHost`; require every resource Healthy, then stop only processes started for this smoke.
 - [x] Update CLAUDE.md's known-failure note only after recording green results. Review the diff for test ownership, removed direct project references, and preservation of existing master-key work; commit the phase verification note and documentation.
 - [x] Continue with `2026-10-01-marketplace-extraction.md`.
 

@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><RootNamespace>DigitalBrain.Client.Orleans.Tests.Unit</RootNamespace></PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Sdk" />
-    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
-    <ProjectReference Include="../DigitalBrain.Client.Orleans/DigitalBrain.Client.Orleans.csproj" />
-  </ItemGroup>
-</Project>

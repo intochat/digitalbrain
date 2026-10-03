@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using DigitalBrain.Contracts;
 namespace DigitalBrain.Aspire.Hosting;
+
 public static class HostingModuleOptions
 {
     public static T GetModuleOptions<T>(this IConfiguration configuration, string id) where T : class, IModuleOptions, new()

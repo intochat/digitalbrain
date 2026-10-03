@@ -2,12 +2,12 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>Typed timer operations, snapshots and live elapsed facts.</Description>
-    <RootNamespace>DigitalBrain.Time</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Time.Contracts</RootNamespace>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <!-- Neuron interfaces and signals use the Kernel wire vocabulary. -->
-    <ProjectReference Include="../../DigitalBrain/Kernel/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
+    <ProjectReference Include="../../../DigitalBrain/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup><PackageReference Include="Microsoft.Orleans.Sdk" PrivateAssets="all" /></ItemGroup>
 </Project>

@@ -85,7 +85,7 @@ jobs:
         run: flutter build web --release
 
       - name: Install Playwright browser and system dependencies
-        run: pwsh src/IntoChat/Tests/E2E/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
+        run: pwsh src/IntoChat/tests/IntoChat.Tests.E2E/bin/Release/net11.0/playwright.ps1 install --with-deps chromium
 
       # One deterministic build primes the docker layer cache, so the sandbox the E2E hosts
       # start on demand comes up in seconds instead of spending its test budget on the build.

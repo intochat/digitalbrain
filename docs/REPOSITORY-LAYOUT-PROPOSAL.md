@@ -1,8 +1,8 @@
-# Proposed solution layout
+# Repository layout
 
-Discussion draft; folder moves have not been applied. Contains all 116 remaining solution projects, each exactly once. Project extensions omitted.
+Applied repository layout: all 116 original projects remain, plus two discoverable integration-test projects (118 total). Project extensions omitted.
 
-The physical layout mirrors these groups below `src/`; the solution has no `src/` folder. Each project directory matches its project name. Test projects live in the nearest domain-level `tests/` folder. Core libraries move out of `Modules/` into `DigitalBrain/`. Existing project names are preserved in this proposal; namespace alignment needs a separate audit before moves are applied.
+The physical layout mirrors these groups below `src/`; the solution has no `src/` folder. Each project directory matches its project name. Test projects live in the nearest domain-level `tests/` folder. Core libraries move out of `Modules/` into `DigitalBrain/`. Project names are preserved; assembly, package and root namespace metadata use those names. Persisted serialization aliases and field IDs remain unchanged.
 
 ## Required disk and solution alignment
 
@@ -11,7 +11,7 @@ The physical layout mirrors these groups below `src/`; the solution has no `src/
 - Use lowercase `tests/` beside the projects each suite covers, including `src/Aspire/tests/` and the matching `/Aspire/tests/` solution folder.
 - Each project has its own directory named exactly like its `.csproj`; align assembly, package (where packable), and root namespace with that name.
 - Update project references, build imports, CI paths, Dockerfiles, fixtures, tooling and documentation after physical moves. Preserve serialized aliases and field IDs when namespaces change.
-- Verify that all 116 projects occur exactly once, every solution path exists, and build/test discovery succeeds after the move.
+- Verify that all 118 projects occur exactly once, every solution path exists, and build/test discovery succeeds after the move.
 
 For example:
 

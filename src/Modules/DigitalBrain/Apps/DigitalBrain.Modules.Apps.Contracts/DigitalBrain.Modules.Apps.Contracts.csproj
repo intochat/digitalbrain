@@ -2,12 +2,12 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <Description>App manifests, install, versions and Save as app.</Description>
-    <RootNamespace>DigitalBrain.Apps</RootNamespace>
+    <RootNamespace>DigitalBrain.Modules.Apps.Contracts</RootNamespace>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <!-- Neuron interfaces and signals use the Kernel wire vocabulary. -->
-    <ProjectReference Include="../../Kernel/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
+    <ProjectReference Include="../../../../DigitalBrain/DigitalBrain.Contracts/DigitalBrain.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup><PackageReference Include="Microsoft.Orleans.Sdk" PrivateAssets="all" /></ItemGroup>
 </Project>

@@ -1,6 +1,7 @@
 using DigitalBrain.Kernel;
 using Microsoft.Extensions.Configuration;
 namespace DigitalBrain.Aspire.Server;
+
 public sealed class DigitalBrainServerBuilder
 {
     private readonly Dictionary<string, Func<IModule>> _modules = new(StringComparer.Ordinal);
