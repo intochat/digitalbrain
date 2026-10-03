@@ -40,8 +40,15 @@ public sealed class PostgresAppSourceFacts
         Stamp(CallerKind.App);
         await Assert.ThrowsAsync<IOException>(() => brain.Get<IPostgresTable>("pending-discovery").Define(new([new("id", "text")], ["id"])));
         var scope = BrainScope.CurrentId();
-        CallerContextStamper.Stamp(new() { PrincipalId = "alice", AccountId = "alice", BrainId = "brain",
-            Kind = CallerKind.App, AppId = "healthy-install", StampedBy = TrustedEdge.AppProxy });
+        CallerContextStamper.Stamp(new()
+        {
+            PrincipalId = "alice",
+            AccountId = "alice",
+            BrainId = "brain",
+            Kind = CallerKind.App,
+            AppId = "healthy-install",
+            StampedBy = TrustedEdge.AppProxy
+        });
         await brain.Get<IPostgresTable>("healthy-discovery").Define(new([new("id", "text")], ["id"]));
         Stamp(CallerKind.Platform);
         var result = await new PostgresAppResources(brain).CollectInstalled(["install", "healthy-install"], ct);
@@ -109,9 +116,15 @@ public sealed class PostgresAppSourceFacts
     }
 
     private static void Stamp(CallerKind kind, string brain = "brain")
-        => CallerContextStamper.Stamp(new() { PrincipalId = "alice", AccountId = "alice", BrainId = brain,
-            Kind = kind, AppId = kind == CallerKind.App ? "install" : null,
-            StampedBy = kind == CallerKind.App ? TrustedEdge.AppProxy : TrustedEdge.Platform });
+        => CallerContextStamper.Stamp(new()
+        {
+            PrincipalId = "alice",
+            AccountId = "alice",
+            BrainId = brain,
+            Kind = kind,
+            AppId = kind == CallerKind.App ? "install" : null,
+            StampedBy = kind == CallerKind.App ? TrustedEdge.AppProxy : TrustedEdge.Platform
+        });
 
     private sealed class ResearchCapacity : ICapacity
     {

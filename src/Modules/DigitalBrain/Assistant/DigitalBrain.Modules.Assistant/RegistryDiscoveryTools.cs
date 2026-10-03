@@ -21,8 +21,12 @@ internal sealed class RegistryDiscoveryTools(IGrainFactory grains, ModuleInvento
             { throw new UnauthorizedAccessException("Discovery must use the caller's current brain."); }
             if (!modules.ContractAssemblies().Contains(typeof(IRegistry).Assembly))
             {
-                return new([], new { isError = true, code = "discovery_unavailable",
-                    message = "The Registry module is not installed on this host. Capability discovery is unavailable." });
+                return new([], new
+                {
+                    isError = true,
+                    code = "discovery_unavailable",
+                    message = "The Registry module is not installed on this host. Capability discovery is unavailable."
+                });
             }
             var discovery = await grains.GetGrain<IRegistry>(IRegistry.Key).Discover(query, ct);
             return new(discovery.Capabilities.SelectMany(item => item.Tools).Distinct(StringComparer.Ordinal).ToArray(), discovery);

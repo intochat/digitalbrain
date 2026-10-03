@@ -18,8 +18,11 @@ internal sealed class PostgresAppResources(DigitalBrain.IDigitalBrain brain)
 
     public static object Describe(PostgresAppTableResource resource) => new
     {
-        resource = Source(resource), appId = resource.AppId, storageTableId = resource.TableId,
-        origin = resource.Origin, columns = resource.Table.Definition.Columns,
+        resource = Source(resource),
+        appId = resource.AppId,
+        storageTableId = resource.TableId,
+        origin = resource.Origin,
+        columns = resource.Table.Definition.Columns,
         open = new { tool = "show_postgres_query_table", arguments = new { title = "App data", resource = Source(resource) } },
         usage = "Call open.tool with open.arguments to display this data. Use its returned windowId for table_read/table_refine; storageTableId is not a windowId.",
     };

@@ -68,8 +68,11 @@ public sealed class ShareCSharpFacts(ReferenceBrainFixture host)
         // Direct test-client reads carry the same identity as Bob's authenticated requests.
         CallerContextStamper.Stamp(new CallerContext
         {
-            PrincipalId = bobName, AccountId = bob.Account, BrainId = bob.Workspace,
-            Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp,
+            PrincipalId = bobName,
+            AccountId = bob.Account,
+            BrainId = bob.Workspace,
+            Kind = CallerKind.User,
+            StampedBy = TrustedEdge.AuthenticatedHttp,
         });
         try
         {

@@ -112,7 +112,11 @@ public sealed class AppGrantMigrationFacts
 
     private static void Stamp() => CallerContextStamper.Stamp(new()
     {
-        PrincipalId = "alice", AccountId = "account", BrainId = "brain", Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp
+        PrincipalId = "alice",
+        AccountId = "account",
+        BrainId = "brain",
+        Kind = CallerKind.User,
+        StampedBy = TrustedEdge.AuthenticatedHttp
     });
 }
 

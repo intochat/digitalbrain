@@ -20,8 +20,11 @@ public sealed class RegistryDiscoveryFacts
         await using var brain = await UnitTest.Create().StartAsync(ct);
         CallerContextStamper.Stamp(new CallerContext
         {
-            PrincipalId = "alice", AccountId = "alice", BrainId = "personal",
-            Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp,
+            PrincipalId = "alice",
+            AccountId = "alice",
+            BrainId = "personal",
+            Kind = CallerKind.User,
+            StampedBy = TrustedEdge.AuthenticatedHttp,
         });
         try
         {
@@ -43,8 +46,11 @@ public sealed class RegistryDiscoveryFacts
             .ConfigureSilo(silo => silo.Services.AddSingleton<IRegistryResourceProvider>(database)).StartAsync(ct);
         CallerContextStamper.Stamp(new CallerContext
         {
-            PrincipalId = "alice", AccountId = "alice", BrainId = "personal",
-            Kind = CallerKind.User, StampedBy = TrustedEdge.AuthenticatedHttp,
+            PrincipalId = "alice",
+            AccountId = "alice",
+            BrainId = "personal",
+            Kind = CallerKind.User,
+            StampedBy = TrustedEdge.AuthenticatedHttp,
         });
         try
         {

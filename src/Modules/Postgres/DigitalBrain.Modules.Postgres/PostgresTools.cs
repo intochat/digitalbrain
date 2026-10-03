@@ -20,8 +20,13 @@ internal sealed class PostgresTools(IPostgresProvider provider, LiveTableWindows
                 if (appTables)
                 {
                     var discovery = await resources.List(ct);
-                    return new { source = "postgres", partial = discovery.Errors.Length > 0, errors = discovery.Errors,
-                        resources = discovery.Resources.Select(PostgresAppResources.Describe).ToArray() };
+                    return new
+                    {
+                        source = "postgres",
+                        partial = discovery.Errors.Length > 0,
+                        errors = discovery.Errors,
+                        resources = discovery.Resources.Select(PostgresAppResources.Describe).ToArray()
+                    };
                 }
                 return await provider.ReadSchemaAsync(table, ct);
             }
