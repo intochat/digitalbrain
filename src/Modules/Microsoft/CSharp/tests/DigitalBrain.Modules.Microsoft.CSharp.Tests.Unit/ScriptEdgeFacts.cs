@@ -1,13 +1,13 @@
-using Orleans.Runtime;
-using DigitalBrain.Platform.Contracts.Integrations;
 using System.Text.Json;
 using DigitalBrain.Client;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Microsoft.CSharp;
-using Microsoft.Extensions.DependencyInjection;
+using DigitalBrain.Platform.Contracts.Integrations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime;
 using Xunit;
 
 namespace DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit;

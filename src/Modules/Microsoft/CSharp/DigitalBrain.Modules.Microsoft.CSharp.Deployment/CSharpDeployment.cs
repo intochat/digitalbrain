@@ -3,8 +3,8 @@ using Pulumi;
 using Pulumi.AzureNative.App;
 using Pulumi.AzureNative.App.Inputs;
 using Pulumi.AzureNative.Network;
-using NetworkInputs = Pulumi.AzureNative.Network.Inputs;
 using Pulumi.Random;
+using NetworkInputs = Pulumi.AzureNative.Network.Inputs;
 
 namespace DigitalBrain.Microsoft.CSharp;
 

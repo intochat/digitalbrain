@@ -1,8 +1,8 @@
-using DigitalBrain.Platform.Contracts.Integrations.Accounts;
-using DigitalBrain.Platform.Contracts.Integrations;
 using ArchUnitNET.xUnitV3;
 using DigitalBrain.Kernel;
 using DigitalBrain.Platform.Contracts.Identity;
+using DigitalBrain.Platform.Contracts.Integrations;
+using DigitalBrain.Platform.Contracts.Integrations.Accounts;
 using DigitalBrain.Platform.Contracts.Secrets;
 using static ArchUnitNET.Fluent.ArchRuleDefinition;
 

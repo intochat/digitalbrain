@@ -1,5 +1,5 @@
-using DigitalBrain.Client.Orleans;
 using DigitalBrain.Client;
+using DigitalBrain.Client.Orleans;
 using DigitalBrain.Contracts;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;

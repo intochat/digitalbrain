@@ -1,11 +1,11 @@
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using DigitalBrain.Apps;
 using DigitalBrain;
+using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.Apps;
 

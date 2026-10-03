@@ -1,5 +1,5 @@
-using DigitalBrain.Platform.Contracts.Integrations;
 using DigitalBrain.Contracts.Enforcement;
+using DigitalBrain.Platform.Contracts.Integrations;
 using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.AI;

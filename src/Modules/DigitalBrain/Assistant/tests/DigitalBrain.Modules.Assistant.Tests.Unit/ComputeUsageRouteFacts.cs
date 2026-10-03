@@ -1,7 +1,7 @@
+using DigitalBrain;
 using DigitalBrain.Assistant;
 using DigitalBrain.Compute;
 using DigitalBrain.Compute.Usage;
-using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;

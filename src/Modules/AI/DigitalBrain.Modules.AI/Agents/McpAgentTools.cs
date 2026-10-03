@@ -1,8 +1,8 @@
+using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol;
 using ModelContextProtocol.Client;
-using System.Text.Json;
 
 namespace DigitalBrain.AI.Agents;
 

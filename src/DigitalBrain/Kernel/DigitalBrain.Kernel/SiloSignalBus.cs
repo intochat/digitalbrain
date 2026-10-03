@@ -1,5 +1,5 @@
-using DigitalBrain;
 using System.Threading.Channels;
+using DigitalBrain;
 
 namespace DigitalBrain.Kernel;
 

@@ -1,6 +1,6 @@
 using DigitalBrain.Contracts;
-using DigitalBrain.Contracts.Signals;
 using DigitalBrain.Contracts.Enforcement;
+using DigitalBrain.Contracts.Signals;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Postgres;
 

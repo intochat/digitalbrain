@@ -1,9 +1,9 @@
-using DigitalBrain.Platform.Contracts.Integrations;
-using DigitalBrain.Contracts.Signals;
 using System.ComponentModel;
 using DigitalBrain;
 using DigitalBrain.Contracts;
+using DigitalBrain.Contracts.Signals;
 using DigitalBrain.Kernel;
+using DigitalBrain.Platform.Contracts.Integrations;
 using DigitalBrain.Registry;
 using DigitalBrain.Time;
 using Microsoft.Extensions.DependencyInjection;

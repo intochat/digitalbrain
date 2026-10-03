@@ -2,11 +2,11 @@ using DigitalBrain.Contracts;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Platform.Contracts.Identity;
+using DigitalBrain.Platform.Identity.Configuration;
 using DigitalBrain.Platform.Identity.Grants;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Runtime;
-using Microsoft.Extensions.Options;
-using DigitalBrain.Platform.Identity.Configuration;
 
 namespace DigitalBrain.Platform.Identity.Authority;
 

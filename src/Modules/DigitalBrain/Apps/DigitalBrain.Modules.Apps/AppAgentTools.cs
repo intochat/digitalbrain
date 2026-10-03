@@ -2,8 +2,8 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
-using DigitalBrain.AI.Agents;
 using DigitalBrain;
+using DigitalBrain.AI.Agents;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.AI;
 

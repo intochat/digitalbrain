@@ -1,7 +1,7 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
-using DigitalBrain.Aspire.Hosting;
 using DigitalBrain;
+using DigitalBrain.Aspire.Hosting;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;

@@ -1,11 +1,11 @@
 using DigitalBrain.AI;
 using DigitalBrain.AI.Scripted;
-using Microsoft.Extensions.Options;
 using DigitalBrain.Apps;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace DigitalBrain.Modules.Apps.Tests.Unit;

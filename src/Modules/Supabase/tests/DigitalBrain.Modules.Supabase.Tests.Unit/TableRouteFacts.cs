@@ -1,6 +1,6 @@
-using DigitalBrain.Supabase;
 using DigitalBrain;
 using DigitalBrain.Contracts;
+using DigitalBrain.Supabase;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;

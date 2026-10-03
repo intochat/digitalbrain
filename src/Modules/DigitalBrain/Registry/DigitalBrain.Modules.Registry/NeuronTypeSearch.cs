@@ -1,6 +1,6 @@
-using DigitalBrain.Sdk.Vectors;
 using System.Security.Cryptography;
 using System.Text.Json;
+using DigitalBrain.Sdk.Vectors;
 using Microsoft.Extensions.AI;
 
 namespace DigitalBrain.Registry;

@@ -1,9 +1,9 @@
+using DigitalBrain.AI.Agents;
 using DigitalBrain.Apps;
-using DigitalBrain.Registry;
 using DigitalBrain.Assistant;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
-using DigitalBrain.AI.Agents;
+using DigitalBrain.Registry;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 

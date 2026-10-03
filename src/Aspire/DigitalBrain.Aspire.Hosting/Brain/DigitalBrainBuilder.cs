@@ -1,8 +1,8 @@
-using DigitalBrain.Contracts;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Azure;
 using Aspire.Hosting.Orleans;
+using DigitalBrain.Contracts;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Aspire.Hosting;

@@ -1,9 +1,9 @@
-using DigitalBrain.Assistant;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
+using DigitalBrain.Assistant;
 using DigitalBrain.Flutter;
 using DigitalBrain.Flutter.Button;
 using DigitalBrain.Flutter.Chat;

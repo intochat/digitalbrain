@@ -1,7 +1,7 @@
-using DigitalBrain.Kernel;
 using DigitalBrain;
-using DigitalBrain.Contracts;
 using DigitalBrain.Apps.Signals;
+using DigitalBrain.Contracts;
+using DigitalBrain.Kernel;
 using DigitalBrain.Registry;
 using Orleans.Runtime;
 

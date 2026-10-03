@@ -1,12 +1,11 @@
-using DigitalBrain.Platform.Identity.Authority;
-using DigitalBrain.Kernel.AspNetCore;
 using System.Security.Claims;
-using Microsoft.Extensions.Options;
-using DigitalBrain.Platform.Identity.Configuration;
 using DigitalBrain;
 using DigitalBrain.Contracts;
+using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Platform.Contracts.Identity;
+using DigitalBrain.Platform.Identity.Authority;
+using DigitalBrain.Platform.Identity.Configuration;
 using DigitalBrain.Platform.Identity.Directory;
 using DigitalBrain.Platform.Identity.Grants;
 using Microsoft.AspNetCore.Authentication;
@@ -14,6 +13,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Platform.Identity;
 

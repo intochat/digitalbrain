@@ -1,9 +1,9 @@
+using System.Text.Json;
 using DigitalBrain.AI.Agents;
 using DigitalBrain.Apps;
+using DigitalBrain.Kernel.Enforcement;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
-using DigitalBrain.Kernel.Enforcement;
-using System.Text.Json;
 
 namespace DigitalBrain.Modules.Apps.Tests.Unit;
 

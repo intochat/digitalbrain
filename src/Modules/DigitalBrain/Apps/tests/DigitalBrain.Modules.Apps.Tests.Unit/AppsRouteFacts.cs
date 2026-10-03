@@ -1,14 +1,14 @@
-using DigitalBrain.Apps;
+using System.Text.Json;
 using DigitalBrain;
+using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
+using DigitalBrain.Contracts.Enforcement;
+using DigitalBrain.Kernel.Enforcement;
+using DigitalBrain.Testing.Unit;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
-using DigitalBrain.Testing.Unit;
-using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Kernel.Enforcement;
-using System.Text.Json;
 
 namespace DigitalBrain.Modules.Apps.Tests.Unit;
 

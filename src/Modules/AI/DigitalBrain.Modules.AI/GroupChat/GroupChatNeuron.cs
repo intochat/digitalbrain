@@ -1,6 +1,6 @@
 using System.Text;
-using DigitalBrain.AI.GroupChat.Signals;
 using DigitalBrain;
+using DigitalBrain.AI.GroupChat.Signals;
 using DigitalBrain.Contracts;
 using DigitalBrain.Kernel;
 using Orleans.Runtime;

@@ -1,16 +1,16 @@
+using DigitalBrain;
+using DigitalBrain.AI.Agents;
+using DigitalBrain.Apps;
+using DigitalBrain.Aspire.Server;
+using DigitalBrain.Assistant;
+using DigitalBrain.Compute;
+using DigitalBrain.Contracts;
+using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.AspNetCore;
 using DigitalBrain.Platform;
 using DigitalBrain.Platform.Identity;
-using DigitalBrain.Kernel.AspNetCore;
-using DigitalBrain.Kernel;
-using DigitalBrain.AI.Agents;
-using DigitalBrain.Aspire.Server;
-using DigitalBrain.Compute;
-using DigitalBrain;
-using DigitalBrain.Contracts;
 using DigitalBrain.Sdk;
 using IntoChat;
-using DigitalBrain.Apps;
-using DigitalBrain.Assistant;
 using IntoChat.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);

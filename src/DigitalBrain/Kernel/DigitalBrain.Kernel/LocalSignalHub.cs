@@ -1,10 +1,10 @@
-using DigitalBrain.Contracts.Signals;
 using System.Collections.Concurrent;
+using System.Threading.Channels;
 using DigitalBrain;
 using DigitalBrain.Contracts;
-using Orleans.Runtime;
-using System.Threading.Channels;
+using DigitalBrain.Contracts.Signals;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
 
 namespace DigitalBrain.Kernel;
 

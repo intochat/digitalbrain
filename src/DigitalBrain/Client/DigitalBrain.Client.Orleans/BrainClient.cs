@@ -1,6 +1,6 @@
-using DigitalBrain.Contracts.Signals;
 using DigitalBrain;
 using DigitalBrain.Contracts;
+using DigitalBrain.Contracts.Signals;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

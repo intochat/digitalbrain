@@ -1,5 +1,5 @@
-using DigitalBrain.Client.Orleans;
 using DigitalBrain.Aspire.Client;
+using DigitalBrain.Client.Orleans;
 using DigitalBrain.Mcp;
 using ModelContextProtocol.AspNetCore;
 

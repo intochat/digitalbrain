@@ -1,8 +1,8 @@
-using DigitalBrain.Kernel;
+using DigitalBrain;
 using DigitalBrain.AI.Metering;
 using DigitalBrain.Compute;
-using DigitalBrain;
 using DigitalBrain.Contracts;
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Assistant;
 

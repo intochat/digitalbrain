@@ -1,9 +1,9 @@
 using DigitalBrain;
-using DigitalBrain.Contracts;
-using Microsoft.Extensions.DependencyInjection;
 using DigitalBrain.Compute;
+using DigitalBrain.Contracts;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Modules.Compute.Tests.Unit;
 

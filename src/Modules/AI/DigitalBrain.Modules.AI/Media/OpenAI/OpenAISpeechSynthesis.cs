@@ -1,7 +1,7 @@
 using System.ClientModel;
-using Microsoft.Extensions.Options;
 using global::OpenAI;
 using global::OpenAI.Audio;
+using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.AI.Media.OpenAI;
 

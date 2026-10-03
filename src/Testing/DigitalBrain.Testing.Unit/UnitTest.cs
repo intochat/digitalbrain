@@ -1,11 +1,11 @@
-using Microsoft.Extensions.DependencyInjection;
-using DigitalBrain.Client.Orleans;
-using DigitalBrain.Client;
 using DigitalBrain;
+using DigitalBrain.Client;
+using DigitalBrain.Client.Orleans;
 using DigitalBrain.Contracts;
 using DigitalBrain.Kernel;
 using DigitalBrain.Platform;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
 using Orleans.TestingHost;

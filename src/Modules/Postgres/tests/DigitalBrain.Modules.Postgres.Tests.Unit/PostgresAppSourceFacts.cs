@@ -1,12 +1,12 @@
-using DigitalBrain.Postgres;
-using DigitalBrain.Supabase;
-using DigitalBrain.Supabase.Tables;
+using System.Text.Json;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
+using DigitalBrain.Postgres;
 using DigitalBrain.Sdk.Capacity;
-using Microsoft.Extensions.DependencyInjection;
-using System.Text.Json;
+using DigitalBrain.Supabase;
+using DigitalBrain.Supabase.Tables;
 using DigitalBrain.Supabase.Windows;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Modules.Postgres.Tests.Unit;
 

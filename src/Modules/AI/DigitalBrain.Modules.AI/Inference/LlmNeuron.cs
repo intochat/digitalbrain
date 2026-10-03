@@ -1,5 +1,5 @@
-using DigitalBrain.Kernel;
 using System.Runtime.CompilerServices;
+using DigitalBrain.Kernel;
 using Orleans.Runtime;
 
 namespace DigitalBrain.AI;

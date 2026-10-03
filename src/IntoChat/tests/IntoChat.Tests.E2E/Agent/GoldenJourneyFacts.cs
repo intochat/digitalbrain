@@ -1,15 +1,15 @@
-using DigitalBrain.Kernel.Enforcement;
-using DigitalBrain.Assistant;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Aspire.Hosting.Testing;
 using DigitalBrain.AI;
 using DigitalBrain.AI.Agents;
+using DigitalBrain.Assistant;
 using DigitalBrain.Flutter.Workspace;
+using DigitalBrain.Kernel.Enforcement;
+using DigitalBrain.Platform.Contracts.Identity;
 using DigitalBrain.Supabase.Tables;
 using DigitalBrain.Testing.E2E;
 using Npgsql;
-using DigitalBrain.Platform.Contracts.Identity;
 
 namespace IntoChat.Tests.E2E.Agent;
 

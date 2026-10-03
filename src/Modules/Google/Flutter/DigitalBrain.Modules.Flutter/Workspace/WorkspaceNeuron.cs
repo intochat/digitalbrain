@@ -1,8 +1,8 @@
-using Microsoft.Extensions.Options;
 using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Kernel;
 using DigitalBrain.Flutter.Workspace.Signals;
+using DigitalBrain.Kernel;
+using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Flutter.Workspace;

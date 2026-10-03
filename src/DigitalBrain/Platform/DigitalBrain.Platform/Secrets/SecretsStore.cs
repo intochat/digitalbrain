@@ -1,5 +1,5 @@
-using DigitalBrain.Sdk.Types;
 using DigitalBrain.Contracts.Types;
+using DigitalBrain.Sdk.Types;
 
 namespace DigitalBrain.Platform.Secrets;
 

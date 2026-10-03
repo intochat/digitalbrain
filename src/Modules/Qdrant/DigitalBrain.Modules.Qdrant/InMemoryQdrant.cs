@@ -1,5 +1,5 @@
-using DigitalBrain.Sdk.Vectors;
 using System.Collections.Concurrent;
+using DigitalBrain.Sdk.Vectors;
 
 namespace DigitalBrain.Qdrant;
 

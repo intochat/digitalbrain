@@ -1,10 +1,10 @@
 using DigitalBrain.AI;
 using DigitalBrain.AI.Media;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 using IImageGenerator = DigitalBrain.AI.Media.IImageGenerator;
 using ImageGenerationRequest = DigitalBrain.AI.Media.ImageGenerationRequest;
-using Xunit;
 
 namespace DigitalBrain.Modules.AI.Tests.Unit;
 

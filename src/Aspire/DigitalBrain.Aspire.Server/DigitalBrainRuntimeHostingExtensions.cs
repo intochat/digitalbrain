@@ -1,6 +1,6 @@
-using DigitalBrain.Client.Orleans;
 using Azure.Data.Tables;
 using DigitalBrain;
+using DigitalBrain.Client.Orleans;
 using DigitalBrain.Contracts;
 using DigitalBrain.Kernel;
 using Microsoft.AspNetCore.Builder;

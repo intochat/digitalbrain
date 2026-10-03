@@ -1,5 +1,5 @@
-using DigitalBrain.Kernel;
 using DigitalBrain.Google.Gmail;
+using DigitalBrain.Kernel;
 using DigitalBrain.Testing.E2E;
 using Xunit;
 

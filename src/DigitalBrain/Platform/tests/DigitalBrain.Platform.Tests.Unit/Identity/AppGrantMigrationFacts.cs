@@ -2,11 +2,11 @@ using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Platform.Contracts.Identity;
 using DigitalBrain.Platform.Identity.Authority;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Storage;
 using Orleans.Serialization;
-using Microsoft.Extensions.DependencyInjection;
+using Orleans.Storage;
 
 namespace DigitalBrain.Platform.Tests.Unit.Identity;
 

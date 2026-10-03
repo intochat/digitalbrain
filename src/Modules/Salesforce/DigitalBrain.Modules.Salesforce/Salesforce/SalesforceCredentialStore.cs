@@ -1,8 +1,8 @@
-using DigitalBrain.Sdk.Types;
-using DigitalBrain.Platform.Contracts.Auth;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Contracts.Types;
+using DigitalBrain.Platform.Contracts.Auth;
 using DigitalBrain.Platform.Contracts.Secrets;
+using DigitalBrain.Sdk.Types;
 
 namespace DigitalBrain.Salesforce;
 

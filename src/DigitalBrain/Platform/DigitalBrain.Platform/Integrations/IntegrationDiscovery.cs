@@ -1,5 +1,5 @@
-using DigitalBrain.Platform.Contracts.Integrations;
 using System.Reflection;
+using DigitalBrain.Platform.Contracts.Integrations;
 
 namespace DigitalBrain.Platform.Integrations;
 

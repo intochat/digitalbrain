@@ -1,5 +1,5 @@
-using DigitalBrain.Sdk.Vectors;
 using DigitalBrain.Kernel;
+using DigitalBrain.Sdk.Vectors;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;

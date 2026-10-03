@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Hosting;
+using System.Text.Json;
 using Aspire.Hosting;
 using Aspire.Hosting.Azure;
 using DigitalBrain.Aspire.Hosting;
@@ -10,8 +10,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
-using System.Text.Json;
 
 namespace DigitalBrain.Kernel.Tests.Unit;
 

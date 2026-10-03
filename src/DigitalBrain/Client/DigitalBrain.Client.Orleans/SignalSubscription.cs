@@ -1,8 +1,8 @@
-using DigitalBrain.Contracts.Signals;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
 using DigitalBrain;
 using DigitalBrain.Contracts;
+using DigitalBrain.Contracts.Signals;
 using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.Client.Orleans;

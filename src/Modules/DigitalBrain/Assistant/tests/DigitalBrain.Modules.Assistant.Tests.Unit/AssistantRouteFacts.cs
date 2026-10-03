@@ -1,8 +1,8 @@
-using DigitalBrain.Assistant;
 using DigitalBrain;
+using DigitalBrain.Assistant;
+using DigitalBrain.Compute.Usage;
 using DigitalBrain.Contracts;
 using Microsoft.Extensions.DependencyInjection;
-using DigitalBrain.Compute.Usage;
 
 namespace DigitalBrain.Modules.Assistant.Tests.Unit;
 

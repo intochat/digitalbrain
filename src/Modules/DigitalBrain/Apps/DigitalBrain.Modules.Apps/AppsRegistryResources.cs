@@ -1,5 +1,5 @@
-using DigitalBrain.Kernel.Enforcement;
 using System.Text.Json;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Registry;
 
 namespace DigitalBrain.Apps;

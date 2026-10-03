@@ -1,12 +1,12 @@
-using DigitalBrain.Apps;
 using DigitalBrain;
+using DigitalBrain.Apps;
 using DigitalBrain.Contracts;
+using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Postgres;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Storage;
-using DigitalBrain.Contracts.Enforcement;
-using DigitalBrain.Kernel.Enforcement;
 
 namespace DigitalBrain.Modules.Apps.Tests.Unit.Workspace;
 
