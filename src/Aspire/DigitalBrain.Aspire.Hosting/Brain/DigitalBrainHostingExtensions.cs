@@ -152,6 +152,7 @@ public static class DigitalBrainHostingExtensions
         ArgumentNullException.ThrowIfNull(client);
 
         builder.WithReference(client.Brain.Orleans.AsClient());
+        AuthPosture.Provision(client.Brain.ApplicationBuilder)?.Apply(builder);
         if (client.Brain.Clustering is { } clustering)
         {
             builder.WithReference(clustering, DigitalBrainNames.Clustering);

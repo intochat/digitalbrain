@@ -6,12 +6,15 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using DigitalBrain.Kernel.Enforcement;
+using DigitalBrain.Platform.Identity.Directory;
 
 namespace DigitalBrain.Platform.Identity;
 
 public static class IdentityHosting
 {
-    internal static void AddIdentity(this IServiceCollection services)
+    public static void AddIdentity(this IServiceCollection services)
     {
         services.AddOptions<AuthOptions>().BindConfiguration(AuthOptions.SectionName)
             .Validate(options => options.Posture is not null,
@@ -43,6 +46,12 @@ public static class IdentityHosting
                 };
             });
         services.AddKernelCors();
+        services.TryAddSingleton<IBrainAccess>(provider =>
+        {
+            var directory = new DirectoryBrainAccess(provider.GetRequiredService<Orleans.IGrainFactory>());
+            return provider.GetRequiredService<IOptions<AuthOptions>>().Value.Posture == IdentityPosture.Open
+                ? new OpenOwnerBrainAccess(directory) : directory;
+        });
     }
 
     public static void UsePlatformHttp(this WebApplication app)
