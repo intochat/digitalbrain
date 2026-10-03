@@ -1,8 +1,14 @@
 import 'app_document.dart';
 
 class ScenarioVerdict {
-  const ScenarioVerdict(this.name, this.passed, this.message);
+  const ScenarioVerdict(
+    this.name,
+    this.passed,
+    this.message, [
+    this.scenarioId,
+  ]);
   final String name, message;
+  final String? scenarioId;
   final bool passed;
 }
 
@@ -18,13 +24,27 @@ class VerificationRun {
         '${m['name']}',
         m['passed'] == true,
         '${m['message'] ?? ''}',
+        m['scenarioId'] as String?,
       );
     }).toList(),
   );
   ScenarioVerdict? verdict(String name) {
-    final found = scenarios.where((s) => s.name == name).toList();
+    final found = scenarios
+        .where((s) => s.scenarioId == null && s.name == name)
+        .toList();
     return found.length == 1 ? found.single : null;
   }
+
+  ScenarioVerdict? verdictFor(AppScenario scenario) {
+    final matches = scenarios
+        .where((s) => s.scenarioId == scenario.id)
+        .toList();
+    if (matches.isNotEmpty) return matches.length == 1 ? matches.single : null;
+    return verdict(scenario.name);
+  }
+
+  bool hasId(AppScenario scenario) =>
+      scenarios.any((s) => s.scenarioId == scenario.id);
 
   bool get green =>
       exitCode == 0 && scenarios.isNotEmpty && scenarios.every((s) => s.passed);
@@ -37,9 +57,12 @@ String scenarioStatus(
   bool current,
 ) {
   if (s.isLive) return 'Live documentation';
-  if (all.where((x) => x.name == s.name).length != 1) return 'Ambiguous name';
+  if (!(run?.hasId(s) ?? false) &&
+      all.where((x) => x.name == s.name).length != 1) {
+    return 'Ambiguous name';
+  }
   if (!current && run != null) return 'Needs checking';
-  final verdict = run?.verdict(s.name);
+  final verdict = run?.verdictFor(s);
   if (verdict == null) return 'Not run';
   return verdict.passed ? 'Passed' : 'Failed';
 }

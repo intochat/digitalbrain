@@ -108,7 +108,11 @@ void main() {
       find.byKey(const ValueKey('revise-app')),
       'Check the exact answer',
     );
+    await tester.ensureVisible(find.byKey(const ValueKey('revise-button')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('revise-button')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('build-app')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('build-app')));
     await tester.pumpAndSettle();
