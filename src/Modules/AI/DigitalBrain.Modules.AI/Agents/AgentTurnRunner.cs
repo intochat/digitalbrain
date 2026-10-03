@@ -62,7 +62,7 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
             if (request.MaxModelCalls is < 1 or > 128) { throw new ArgumentOutOfRangeException(nameof(request), "MaxModelCalls must be between 1 and 128."); }
             await events.WriteAsync(new AgentTurnEvent.Started(request.RunId), ct).ConfigureAwait(false);
             string? currentCall = null;
-            AgentToolContext Context() => new(request.ScopeId, request.RunId, currentCall ?? throw new InvalidOperationException("No active tool call.")) { DatabaseSource = AgentToolPolicy.DatabaseSource(request.Message) };
+            AgentToolContext Context() => new(request.ScopeId, request.RunId, currentCall ?? throw new InvalidOperationException("No active tool call."));
             var requestedTools = request.ToolNames ?? [];
             if (requestedTools.Distinct(StringComparer.Ordinal).Count() != requestedTools.Count) { throw new ArgumentException("Tool names must be unique."); }
             var provided = await ProvideContext(request, ct).ConfigureAwait(false);
@@ -71,27 +71,29 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
             IReadOnlyList<string> selected = [.. requestedTools, .. provided.SelectMany(static context => context.Tools)
                 .Where(name => !requestedTools.Contains(name) && factoryTools.Any(tool => tool.Name == name))
                 .Distinct(StringComparer.Ordinal)];
-            selected = AgentToolPolicy.ForDatabase(selected, request.Message);
-            var available = selected.Count == 0 ? [] : factoryTools;
-            if (selected.Count > 0 && services.GetService<NativeTools>() is { } native)
-            { available.AddRange(native.Resolve(selected).OfType<AIFunction>()); }
-            if (selected.Count > 0)
+            var tools = new List<AIFunction>();
+            async Task AddTools(IReadOnlyList<string> names)
             {
+                var pending = names.Where(name => tools.All(tool => tool.Name != name)).Distinct(StringComparer.Ordinal).ToArray();
+                if (pending.Length == 0) { return; }
+                var available = factoryTools.Where(tool => pending.Contains(tool.Name)).ToList();
+                if (services.GetService<NativeTools>() is { } native)
+                { available.AddRange(native.Resolve(pending)); }
                 foreach (var source in services.GetServices<IAgentToolSource>())
                 {
-                    // Sources resolve scope-dependent tools before the first call; CallId is
-                    // filled in when the model invokes one of those tools.
-                    var session = await source.OpenAsync(selected, () => new(request.ScopeId, request.RunId, currentCall ?? "")
-                    { DatabaseSource = AgentToolPolicy.DatabaseSource(request.Message) }, ct).ConfigureAwait(false);
+                    // Session tools read the live call identity when invoked, after discovery.
+                    var session = await source.OpenAsync(pending, () => new(request.ScopeId, request.RunId, currentCall ?? ""), ct).ConfigureAwait(false);
                     sessions.Add(session);
-                    available.AddRange(session.Tools);
+                    available.AddRange(session.Tools.Where(tool => pending.Contains(tool.Name)));
                 }
+                var resolved = pending.Select(name =>
+                {
+                    var matches = available.Where(tool => tool.Name == name).ToArray();
+                    return matches.Length == 1 ? matches[0] : throw new InvalidOperationException($"Selected or offered tool '{name}' must have exactly one registration (found {matches.Length}).");
+                }).ToArray();
+                tools.AddRange(resolved);
             }
-            var tools = selected.Select(name =>
-            {
-                var matches = available.Where(f => f.Name == name).ToArray();
-                return matches.Length == 1 ? matches[0] : throw new InvalidOperationException($"Selected tool '{name}' must have exactly one registration.");
-            }).ToList();
+            await AddTools(selected).ConfigureAwait(false);
 
             var configuration = services.GetService<IOptions<AIOptions>>()?.Value;
             var configured = configuration is not null && (configuration.Default.Profile is not null
@@ -180,8 +182,20 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
                 }
                 foreach (var call in requested)
                 {
-                    var tool = tools.SingleOrDefault(t => t.Name == call.Name) ?? throw new InvalidOperationException($"The model requested an unavailable tool '{call.Name}'. Selected: {string.Join(", ", tools.Select(t => t.Name))}.");
                     if (string.IsNullOrWhiteSpace(call.CallId) || !calls.Add(call.CallId)) { throw new InvalidOperationException("The model reused or omitted a tool call identity."); }
+                    var tool = tools.SingleOrDefault(t => t.Name == call.Name);
+                    if (tool is null)
+                    {
+                        var unavailable = new ChatMessage(ChatRole.Tool, [new FunctionResultContent(call.CallId, new
+                        {
+                            error = "tool_unavailable", tool = call.Name,
+                            message = "This tool is not available in this turn. Use an advertised discovery tool to find registered capabilities before retrying.",
+                        })]);
+                        messages.Add(unavailable);
+                        generated.Add(unavailable);
+                        await events.WriteAsync(new AgentTurnEvent.ToolFailed(call.CallId, call.Name), ct).ConfigureAwait(false);
+                        continue;
+                    }
                     currentCall = call.CallId;
                     await WriteObserved(events, new AgentTurnEvent.ToolStarted(call.CallId, call.Name, JsonSerializer.Serialize(call.Arguments)), ct).ConfigureAwait(false);
                     object? result;
@@ -195,9 +209,7 @@ public sealed class AgentTurnRunner(IServiceProvider services) : IAgentTurnRunne
                     ct.ThrowIfCancellationRequested();
                     if (result is AgentToolOffer offer)
                     {
-                        var offered = AgentToolPolicy.ForDatabase(offer.Tools, request.Message);
-                        tools.AddRange(available.Where(function => offered.Contains(function.Name) && tools.All(chosen => chosen.Name != function.Name))
-                            .DistinctBy(static function => function.Name));
+                        await AddTools(offer.Tools).ConfigureAwait(false);
                         options.Tools = tools.Cast<AITool>().ToList();
                         result = offer.Result;
                     }

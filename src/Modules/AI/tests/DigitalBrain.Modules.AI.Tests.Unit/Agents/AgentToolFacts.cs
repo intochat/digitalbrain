@@ -80,13 +80,19 @@ public sealed class AgentToolFacts
             [AIFunctionFactory.Create(async () => { await Task.Yield(); if (fail) { throw new IOException("Tool failed after starting"); } var value = context(); return value.ScopeId + "/" + value.RunId + "/" + value.CallId; }, "lookup")];
     }
     [Fact]
-    public async Task UnknownRequestedToolCannotBecomeSuccess()
+    public async Task RepeatedUnavailableCallsStopAtTheModelCallBudget()
     {
-        using var services = new ServiceCollection().AddSingleton<IChatClient>(ScriptedClient("unknown"))
+        var calls = 0;
+        using var services = new ServiceCollection().AddSingleton<IChatClient>(new StubChatClient((_, _, _) =>
+            Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
+                [new FunctionCallContent("unknown-" + ++calls, "unknown", new Dictionary<string, object?>())])))))
             .AddSingleton<IAgentToolFactory, Tools>().BuildServiceProvider();
         var events = new List<AgentTurnEvent>();
-        await foreach (var item in new AgentTurnRunner(services).RunAsync(new("agent", "run", "scope", [], "ask", null, ToolNames: ["lookup"]), TestContext.Current.CancellationToken)) { events.Add(item); }
-        Assert.Single(events.OfType<AgentTurnEvent.Failed>());
+        await foreach (var item in new AgentTurnRunner(services).RunAsync(new("agent", "run", "scope", [], "ask", null, ToolNames: ["lookup"], MaxModelCalls: 2), TestContext.Current.CancellationToken)) { events.Add(item); }
+        Assert.Contains("budget", Assert.Single(events.OfType<AgentTurnEvent.Failed>()).Message, StringComparison.Ordinal);
+        Assert.Equal(2, calls);
+        Assert.Equal(2, events.OfType<AgentTurnEvent.ToolFailed>().Count());
+        Assert.Empty(events.OfType<AgentTurnEvent.ToolCompleted>());
         Assert.Empty(events.OfType<AgentTurnEvent.Finished>());
     }
 
