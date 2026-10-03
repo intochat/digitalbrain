@@ -4,7 +4,7 @@ using System.Text.Json;
 using DigitalBrain.Apps;
 using DigitalBrain.Microsoft.CSharp;
 
-namespace DigitalBrain.Modules.Apps.Tests.E2E;
+namespace DigitalBrain.OS.Tests.E2E;
 
 // Two signed-in people share a C# app through the product routes: Alice publishes, Bob installs it
 // in one request, customizes it, forks and improves it, and Alice accepts his change back.
@@ -17,20 +17,23 @@ public sealed class PackageSharingHttpFacts(ReferenceBrainFixture host) : BrainF
     {
         var ct = TestContext.Current.CancellationToken;
         var brain = Brain;
-        using var alice = await People.SignedIn(brain.HttpClient, "alice", ct);
-        using var bob = await People.SignedIn(brain.HttpClient, "bob", ct);
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var aliceName = "alice-" + suffix;
+        var bobName = "bob-" + suffix;
+        using var alice = await People.SignedIn(brain.HttpClient, aliceName, ct);
+        using var bob = await People.SignedIn(brain.HttpClient, bobName, ct);
 
-        var original = await People.Send(alice.Client, HttpMethod.Post, "/packages/alice/researcher/revisions",
+        var original = await People.Send(alice.Client, HttpMethod.Post, $"/packages/{aliceName}/researcher/revisions",
             new { content = ResearcherPackage.Content("Research"), message = "Research briefs" }, ct);
-        await People.Send(alice.Client, HttpMethod.Post, "/packages/alice/researcher/publish", new { }, ct);
+        await People.Send(alice.Client, HttpMethod.Post, $"/packages/{aliceName}/researcher/publish", new { }, ct);
         var listings = await People.Send(bob.Client, HttpMethod.Get, "/packages", null, ct);
         Assert.Contains(listings.EnumerateArray(), listing => listing.GetProperty("revision").GetString() == original.GetProperty("id").GetString());
 
-        using (var forged = await bob.Client.PostAsJsonAsync("/packages/alice/researcher/revisions",
+        using (var forged = await bob.Client.PostAsJsonAsync($"/packages/{aliceName}/researcher/revisions",
             new { content = ResearcherPackage.Content("Forged"), message = "Not mine", expectedHead = original.GetProperty("id").GetString() }, Json, ct))
         { Assert.Equal(HttpStatusCode.Forbidden, forged.StatusCode); }
 
-        var app = $"/brains/{bob.Workspace}/packages/alice/researcher";
+        var app = $"/brains/{bob.Workspace}/packages/{aliceName}/researcher";
         await People.Send(bob.Client, HttpMethod.Post, app, new { }, ct);
         Assert.Equal("Research (plain): What is Orleans?", await Ask(bob.Client, app, "What is Orleans?", ct));
         using (var foreign = await alice.Client.GetAsync(app, ct)) { Assert.Equal(HttpStatusCode.Forbidden, foreign.StatusCode); }
@@ -38,15 +41,15 @@ public sealed class PackageSharingHttpFacts(ReferenceBrainFixture host) : BrainF
         await People.Send(bob.Client, HttpMethod.Post, app + "/configure", new { settings = new { style = "bullets" } }, ct);
         Assert.Equal("Research (bullets): What is Orleans?", await Ask(bob.Client, app, "What is Orleans?", ct));
 
-        var fork = await People.Send(bob.Client, HttpMethod.Post, "/packages/alice/researcher/fork", new { }, ct);
-        Assert.Equal("bob", fork.GetProperty("id").GetProperty("owner").GetString());
-        var summaries = await People.Send(bob.Client, HttpMethod.Post, "/packages/bob/researcher/revisions",
+        var fork = await People.Send(bob.Client, HttpMethod.Post, $"/packages/{aliceName}/researcher/fork", new { }, ct);
+        Assert.Equal(bobName, fork.GetProperty("id").GetProperty("owner").GetString());
+        var summaries = await People.Send(bob.Client, HttpMethod.Post, $"/packages/{bobName}/researcher/revisions",
             new { content = ResearcherPackage.Content("Summary"), message = "Summarize instead", expectedHead = fork.GetProperty("head").GetString() }, ct);
 
-        var proposal = await People.Send(bob.Client, HttpMethod.Post, "/packages/alice/researcher/proposals",
-            new { source = new { owner = "bob", name = "researcher" }, title = "Summaries" }, ct);
-        await People.Send(alice.Client, HttpMethod.Post, $"/packages/alice/researcher/proposals/{proposal.GetProperty("number").GetInt32()}/accept", null, ct);
-        var published = await People.Send(alice.Client, HttpMethod.Post, "/packages/alice/researcher/publish", new { }, ct);
+        var proposal = await People.Send(bob.Client, HttpMethod.Post, $"/packages/{aliceName}/researcher/proposals",
+            new { source = new { owner = bobName, name = "researcher" }, title = "Summaries" }, ct);
+        await People.Send(alice.Client, HttpMethod.Post, $"/packages/{aliceName}/researcher/proposals/{proposal.GetProperty("number").GetInt32()}/accept", null, ct);
+        var published = await People.Send(alice.Client, HttpMethod.Post, $"/packages/{aliceName}/researcher/publish", new { }, ct);
         Assert.Equal(summaries.GetProperty("id").GetString(), published.GetProperty("published").GetString());
 
         await People.Send(bob.Client, HttpMethod.Post, app + "/upgrade", new { }, ct);

@@ -94,7 +94,6 @@
     <Project Path="src/Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps/DigitalBrain.Modules.Apps.csproj" />
   </Folder>
   <Folder Name="/Modules/DigitalBrain/Apps/tests/">
-    <Project Path="src/Modules/DigitalBrain/Apps/tests/DigitalBrain.Modules.Apps.Tests.E2E/DigitalBrain.Modules.Apps.Tests.E2E.csproj" />
     <Project Path="src/Modules/DigitalBrain/Apps/tests/DigitalBrain.Modules.Apps.Tests/DigitalBrain.Modules.Apps.Tests.csproj" />
   </Folder>
   <Folder Name="/Modules/DigitalBrain/Assistant/">

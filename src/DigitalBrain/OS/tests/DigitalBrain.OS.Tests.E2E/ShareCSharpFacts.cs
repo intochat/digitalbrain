@@ -5,7 +5,7 @@ using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Microsoft.CSharp;
 
-namespace DigitalBrain.Modules.Apps.Tests.E2E;
+namespace DigitalBrain.OS.Tests.E2E;
 
 // Alice writes a C# app and shares it with one request; the package carries its code and account
 // slots, never Alice's settings, and Bob's install runs it with his own account.

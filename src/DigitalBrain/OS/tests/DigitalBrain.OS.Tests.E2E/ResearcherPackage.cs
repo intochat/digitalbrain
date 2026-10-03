@@ -1,6 +1,6 @@
 using DigitalBrain.Apps;
 
-namespace DigitalBrain.Modules.Apps.Tests.E2E;
+namespace DigitalBrain.OS.Tests.E2E;
 
 // A real package: the script answers each invocation of its app, drains invocations it missed while
 // building, and reads its style from the installer's settings.

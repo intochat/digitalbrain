@@ -1,7 +1,7 @@
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
 
-namespace DigitalBrain.Modules.Apps.Tests.E2E;
+namespace DigitalBrain.OS.Tests.E2E;
 
 // Stamps the signed-in principal the way the authenticated HTTP edge does; it travels with every grain call.
 internal static class Caller

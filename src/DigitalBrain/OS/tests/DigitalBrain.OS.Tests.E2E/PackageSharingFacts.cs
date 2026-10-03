@@ -2,39 +2,41 @@ using DigitalBrain.Apps;
 using DigitalBrain.Microsoft.Aspire;
 using DigitalBrain.Microsoft.CSharp;
 
-namespace DigitalBrain.Modules.Apps.Tests.E2E;
+namespace DigitalBrain.OS.Tests.E2E;
 
 // Alice shares a C# app, Bob installs and customizes it, forks and changes its code, and his change
-// flows back upstream. Every installed app runs as a real script in the C# sandbox container.
-public sealed class PackageSharingFacts
+// flows back upstream. Every installed app runs as a real script in the C# sandbox container of
+// the shared OS host; ids carry a per-run suffix so the leased host stays clean between facts.
+public sealed class PackageSharingFacts(ReferenceBrainFixture host)
 {
-    private static readonly PackageId Upstream = PackageId.Parse("alice/researcher");
-    private static readonly PackageId Fork = PackageId.Parse("bob/researcher");
     private static readonly TimeSpan BuildAndAnswer = TimeSpan.FromMinutes(3);
 
-    [Fact]
+    [Fact(Timeout = 900_000)]
     public async Task ASharedCSharpAppIsInstalledCustomizedForkedAndContributedBack()
     {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         deadline.CancelAfter(TimeSpan.FromMinutes(15));
         var ct = deadline.Token;
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var alice = "alice-" + suffix;
+        var bob = "bob-" + suffix;
+        var upstreamId = PackageId.Parse(alice + "/researcher");
+        var forkId = PackageId.Parse(bob + "/researcher");
         IApp? bobsApp = null;
         IApp? bobsFork = null;
         try
         {
-            await using var brain = await E2ETest.Create()
-                .WithModule<AspireModule>().WithModule<CSharpModule, CSharpOptions>(csharp => csharp.WithSandbox(RepositoryRoot())).WithModule<AppsModule>()
-                .StartAsync(ct);
+            await using var brain = await host.LeaseAsync(ct);
 
-            Caller.As("alice");
-            var upstream = brain.Get<IPackage>(Upstream.ToString());
+            Caller.As(alice);
+            var upstream = brain.Get<IPackage>(upstreamId.ToString());
             var original = await upstream.Commit(new(Guid.NewGuid(), null, ResearcherPackage.Content("Research"), "Research briefs"));
             await upstream.Publish(new(Guid.NewGuid(), original.Id));
-            var listing = Assert.Single(await brain.Get<IPackageDirectory>(PackageDirectory.Key).List());
+            var listing = Assert.Single(await brain.Get<IPackageDirectory>(PackageDirectory.Key).List(), item => item.Package == upstreamId);
             Assert.Equal(original.Id, listing.Revision);
 
             // One step from a marketplace listing to a running script in Bob's workspace.
-            bobsApp = brain.Get<IApp>("workspace-bob/apps/alice/researcher");
+            bobsApp = brain.Get<IApp>($"workspace-{bob}/apps/{upstreamId}");
             var installed = await bobsApp.Install(new(Guid.NewGuid(), new(listing.Package, listing.Revision), new Dictionary<string, string>()));
             Assert.Equal("Research (plain): What is Orleans?", await Ask(brain, bobsApp, installed, "What is Orleans?", ct));
 
@@ -44,24 +46,24 @@ public sealed class PackageSharingFacts
             Assert.Equal("Research (bullets): What is Orleans?", await Ask(brain, bobsApp, configured, "What is Orleans?", ct));
 
             // Changing the code needs a fork.
-            Caller.As("bob");
-            var fork = brain.Get<IPackage>(Fork.ToString());
+            Caller.As(bob);
+            var fork = brain.Get<IPackage>(forkId.ToString());
             await fork.Fork(new(Guid.NewGuid(), new(listing.Package, listing.Revision)));
             var summaries = await fork.Commit(new(Guid.NewGuid(), original.Id, ResearcherPackage.Content("Summary"), "Summarize instead"));
-            bobsFork = brain.Get<IApp>("workspace-bob/apps/bob/researcher");
-            var forkInstalled = await bobsFork.Install(new(Guid.NewGuid(), new(Fork, summaries.Id), new Dictionary<string, string>()));
+            bobsFork = brain.Get<IApp>($"workspace-{bob}/apps/{forkId}");
+            var forkInstalled = await bobsFork.Install(new(Guid.NewGuid(), new(forkId, summaries.Id), new Dictionary<string, string>()));
             Assert.Equal("Summary (plain): What is Orleans?", await Ask(brain, bobsFork, forkInstalled, "What is Orleans?", ct));
 
             // Bob proposes the change back; Alice accepts and publishes it.
-            var proposal = await upstream.Propose(new(Guid.NewGuid(), new(Fork, summaries.Id), "Summaries"));
-            Caller.As("alice");
+            var proposal = await upstream.Propose(new(Guid.NewGuid(), new(forkId, summaries.Id), "Summaries"));
+            Caller.As(alice);
             var accepted = await upstream.Accept(new(Guid.NewGuid(), proposal.Number));
             Assert.Equal(summaries.Id, accepted.Head);
             await upstream.Publish(new(Guid.NewGuid(), summaries.Id));
-            Assert.Equal(summaries.Id, Assert.Single(await brain.Get<IPackageDirectory>(PackageDirectory.Key).List(), item => item.Package == Upstream).Revision);
+            Assert.Equal(summaries.Id, Assert.Single(await brain.Get<IPackageDirectory>(PackageDirectory.Key).List(), item => item.Package == upstreamId).Revision);
 
             // Bob's original install upgrades to the contributed revision and keeps his setting.
-            var upgraded = await bobsApp.Upgrade(new(Guid.NewGuid(), new(Upstream, summaries.Id)));
+            var upgraded = await bobsApp.Upgrade(new(Guid.NewGuid(), new(upstreamId, summaries.Id)));
             Assert.Equal("Summary (bullets): What is Orleans?", await Ask(brain, bobsApp, upgraded, "What is Orleans?", ct));
         }
         finally
@@ -70,15 +72,6 @@ public sealed class PackageSharingFacts
             if (bobsApp is not null) { await Uninstall(bobsApp); }
             if (bobsFork is not null) { await Uninstall(bobsFork); }
         }
-    }
-
-    private static string RepositoryRoot()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            if (File.Exists(Path.Combine(directory.FullName, "DigitalBrain.slnx"))) { return directory.FullName; }
-        }
-        throw new InvalidOperationException("The sandbox mounts the repository; run the test from inside it.");
     }
 
     // The first answer waits for the container to build the script, so a failure reports its logs.

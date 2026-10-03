@@ -18,8 +18,8 @@ public sealed class BrainRouteIsolationFacts(ReferenceBrainFixture host)
         await using var brain = await host.LeaseAsync(ct);
         var suffix = Guid.NewGuid().ToString("N")[..8];
 
-        using var alicePerson = await DigitalBrain.Testing.E2E.Packages.People.SignedIn(brain.HttpClient, "alice-" + suffix, ct);
-        using var bobPerson = await DigitalBrain.Testing.E2E.Packages.People.SignedIn(brain.HttpClient, "bob-" + suffix, ct);
+        using var alicePerson = await People.SignedIn(brain.HttpClient, "alice-" + suffix, ct);
+        using var bobPerson = await People.SignedIn(brain.HttpClient, "bob-" + suffix, ct);
         var alice = alicePerson.Client;
         var bob = bobPerson.Client;
         var aliceWorkspace = alicePerson.Workspace;
