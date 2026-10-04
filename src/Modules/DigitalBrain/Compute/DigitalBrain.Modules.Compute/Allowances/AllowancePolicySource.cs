@@ -14,6 +14,10 @@ internal sealed class GrainAllowancePolicySource(IGrainFactory grains) : IAllowa
 {
     public ValueTask<AllowanceDecision> AuthorizeAsync(CallRequest request, CancellationToken cancellationToken)
     {
+        // Allowances govern app spend: every rule matches on the caller's AppId. A caller
+        // without one has nothing to meter, and consulting the ledger for every user UI call
+        // multiplies each intent's trace by a guaranteed-allow round trip.
+        if (request.Caller.AppId is not { Length: > 0 }) { return new(AllowanceDecision.Allow()); }
         var ledger = grains.GetGrain<IAllowanceLedger>(request.Caller.AccountId);
         // The ledger cannot meter calls to itself: consulting it from its own authorization
         // turn would be a self-call on a non-reentrant grain. Reading the ledger costs nothing.

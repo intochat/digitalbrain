@@ -28,7 +28,10 @@ return failures == 0 ? 0 : 1;
 
 async Task Scenario(string name, Func<IApp, string, Task> run)
 {
-    var scope = $"specs/{package}@{revision}/{Guid.NewGuid():N}";
+    // Scratch installs live inside the host-supplied brain scope, so the scenario's neurons
+    // are brain-owned for target authorization instead of failing closed as unclassified.
+    var brainScope = brain.Setting("BrainScope");
+    var scope = (brainScope is null ? "" : brainScope + "/") + $"specs/{package}@{revision}/{Guid.NewGuid():N}";
     var app = brain.Get<IApp>(scope + "/app");
     try
     {

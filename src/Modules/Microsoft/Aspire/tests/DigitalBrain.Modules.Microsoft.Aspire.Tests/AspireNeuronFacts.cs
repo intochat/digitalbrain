@@ -65,6 +65,8 @@ public sealed class AspireNeuronFacts
         {
             await foreach (var command in bridge.ReadCommandsAsync(cancellationToken))
             {
+                // Heartbeats keep the proxied stream alive and carry no command.
+                if (command.Id == Guid.Empty) { continue; }
                 served.Add(command.Command + " " + command.Resource);
                 bridge.Complete(command.Id, execute(command));
             }

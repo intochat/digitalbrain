@@ -7,4 +7,5 @@ namespace DigitalBrain.Microsoft.Aspire;
 internal interface IAspireResourceReporter : IGrainWithStringKey
 {
     Task Report(AspireResource resource);
+    Task ReportMany(AspireResource[] resources);
 }

@@ -29,4 +29,12 @@ internal sealed class AspireNeuron(
         var resources = new Dictionary<string, AspireResource>(Snapshot.Resources, StringComparer.Ordinal) { [resource.Name] = resource };
         await Save(Snapshot with { Resources = resources }, new ResourceStateChanged(resource.Name, resource.State, resource.Health, previous?.State));
     }
+
+    // The AppHost syncs every resource after (re)connecting; one call keeps that burst to a
+    // single span instead of one per resource during an otherwise idle minute.
+    public async Task ReportMany(AspireResource[] resources)
+    {
+        ArgumentNullException.ThrowIfNull(resources);
+        foreach (var resource in resources) { await Report(resource); }
+    }
 }
