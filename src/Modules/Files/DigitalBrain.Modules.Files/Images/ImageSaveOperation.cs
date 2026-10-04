@@ -25,6 +25,11 @@ public sealed record ImageSaveOperationState
 [GrainType("intochat.image-save-operation")]
 internal sealed class ImageSaveOperationNeuron([PersistentState("save-operation", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<ImageSaveOperationState> store) : Neuron, IImageSaveOperation
 {
+    // Keyed by the save ticket's hash, never by a brain: the image document that issued the
+    // ticket is the authorization, so any trusted caller holding the key may drive it.
+    public override DigitalBrain.Kernel.Enforcement.NeuronAccess Access(string operation)
+        => DigitalBrain.Kernel.Enforcement.NeuronAccess.PublicOperation;
+
     public Task<ImageSaveOperationState> Read() => Task.FromResult(store.State);
     public async Task<ImageSaveOperationState> Prepare(SavedFile result)
     {

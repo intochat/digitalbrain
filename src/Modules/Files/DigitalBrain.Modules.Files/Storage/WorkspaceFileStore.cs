@@ -79,7 +79,10 @@ internal sealed class WorkspaceFileStore(IAssetBlobStore blobs, IGrainFactory gr
     internal static void ValidateAssetId(string scope, string id)
     {
         if (id.Length != 129 || !id.StartsWith(ScopeKey(scope) + "-", StringComparison.Ordinal) || id.Where((_, i) => i != 64).Any(c => !char.IsAsciiHexDigit(c)))
-        { throw new UnauthorizedAccessException("The image does not belong to this workspace."); }
+        {
+            throw new UnauthorizedAccessException(
+                $"The image does not belong to this workspace (caller scope key {ScopeKey(scope)[..8]}…, asset {id[..Math.Min(8, id.Length)]}…).");
+        }
     }
     private static void VerifyBytes(string id, byte[] bytes)
     {

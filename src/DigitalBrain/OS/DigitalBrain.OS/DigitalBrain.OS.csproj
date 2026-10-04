@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <IsPackable>true</IsPackable>
     <Description>The operating system: the named module composition and the boot behavior that starts the OS apps when a brain activates.</Description>
   </PropertyGroup>
   <ItemGroup>

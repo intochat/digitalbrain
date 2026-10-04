@@ -79,11 +79,14 @@ public sealed class LocalAppsJourneyFacts(ReferenceBrainFixture host) : BrainFac
             var response = await page.RunAndWaitForResponseAsync(
                 () => editor.GetByRole(AriaRole.Button, new() { Name = "Save copy", Exact = true }).ClickAsync(),
                 response => response.Request.Method == "POST" && response.Url.Contains("/save/", StringComparison.Ordinal));
-            using var receipt = System.Text.Json.JsonDocument.Parse(await response.TextAsync());
-            var outputName = receipt.RootElement.GetProperty("file").GetProperty("name").GetString()!;
+            var receiptBody = await response.TextAsync();
+            using var receipt = System.Text.Json.JsonDocument.Parse(receiptBody);
+            if (!receipt.RootElement.TryGetProperty("file", out var savedFile))
+            { Assert.Fail($"Save answered {response.Status}: {receiptBody}"); }
+            var outputName = savedFile.GetProperty("name").GetString()!;
             // Flutter mirrors the SnackBar text into an aria-live announcement; assert the visible node.
             await Assertions.Expect(page.Locator("flt-semantics").GetByText("Saved " + outputName, new() { Exact = true })).ToBeVisibleAsync();
-            var assetChecksum = receipt.RootElement.GetProperty("file").GetProperty("checksum").GetString()!;
+            var assetChecksum = savedFile.GetProperty("checksum").GetString()!;
             var assetId = DigitalBrain.Files.WorkspaceFileStore.AssetId(DigitalBrain.Kernel.Enforcement.BrainScope.Create("owner", workspaceId).Id, assetChecksum);
             var outputResponse = await brain.HttpClient.GetAsync($"/brains/{Uri.EscapeDataString(workspaceId)}/apps/assets/{assetId}", ct);
             outputResponse.EnsureSuccessStatusCode();

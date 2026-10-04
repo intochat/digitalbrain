@@ -1,13 +1,14 @@
 using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Microsoft.Aspire;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Microsoft.CSharp;
 
 // Development: every owner shares the csharp-sandbox resource. It starts on demand through IAspire
 // and its URL comes from the resource state the AppHost reports, so nothing is wired until needed.
-internal sealed class AspireSandboxRunner(HttpClient http, IGrainFactory grains, IDigitalBrain brain, IOptions<CSharpOptions> options) : ICSharpRunner
+internal sealed class AspireSandboxRunner(HttpClient http, IGrainFactory grains, IDigitalBrain brain, IOptions<CSharpOptions> options, IConfiguration configuration) : ICSharpRunner
 {
     internal static readonly TimeSpan SandboxStartTimeout = TimeSpan.FromMinutes(4);
     internal static readonly TimeSpan InspectProbeTimeout = TimeSpan.FromSeconds(10);
@@ -59,20 +60,76 @@ internal sealed class AspireSandboxRunner(HttpClient http, IGrainFactory grains,
         {
             await Aspire.StartResource(CSharpSandbox.ResourceName, deadline.Token).ConfigureAwait(false);
         }
-        await foreach (var change in changes.ReadAllAsync(deadline.Token).ConfigureAwait(false))
+        // The state feed has one reader and the AppHost's resource watch can die mid-start
+        // (DCP's Kubernetes watch times out), taking every further signal with it. One
+        // enumerator reads events while a five-second tick polls the report and probes the
+        // sandbox's own health endpoint - the truth that survives a dead watch.
+        var events = changes.ReadAllAsync(deadline.Token).GetAsyncEnumerator(deadline.Token);
+        Task<bool>? pending = null;
+        var feedEnded = false;
+        try
         {
-            if (change.Resource != CSharpSandbox.ResourceName) { continue; }
-            if (change.State == "FailedToStart") { throw new InvalidOperationException("The C# sandbox failed to start. Check the csharp-sandbox resource in the Aspire dashboard."); }
-            if (IsReady(change.State, change.Health) && SandboxUrl(await Aspire.ListResources(deadline.Token).ConfigureAwait(false)) is { } ready)
+        while (true)
+        {
+            if (!feedEnded)
             {
-                return ready;
+                pending ??= events.MoveNextAsync().AsTask();
+                var tick = await Task.WhenAny(pending, Task.Delay(TimeSpan.FromSeconds(5), deadline.Token)).ConfigureAwait(false);
+                if (tick == pending)
+                {
+                    if (await pending.ConfigureAwait(false))
+                    {
+                        var change = events.Current;
+                        pending = null;
+                        if (change.Resource != CSharpSandbox.ResourceName) { continue; }
+                        if (change.State == "FailedToStart") { throw new InvalidOperationException("The C# sandbox failed to start. Check the csharp-sandbox resource in the Aspire dashboard."); }
+                        if (IsReady(change.State, change.Health) && SandboxUrl(await Aspire.ListResources(deadline.Token).ConfigureAwait(false)) is { } ready)
+                        {
+                            return ready;
+                        }
+                        continue;
+                    }
+                    pending = null;
+                    feedEnded = true;
+                }
             }
+            else
+            {
+                await Task.Delay(TimeSpan.FromSeconds(5), deadline.Token).ConfigureAwait(false);
+            }
+            if (await FindSandboxAsync(deadline.Token).ConfigureAwait(false) is { } found) { return found; }
         }
-        throw new InvalidOperationException("The sandbox state subscription ended before the sandbox was ready.");
+        }
+        finally
+        {
+            // The subscription's iterator does not implement disposal; the subscription itself
+            // owns the channel and closes with the enclosing await using.
+            try { await events.DisposeAsync().ConfigureAwait(false); }
+            catch (NotSupportedException) { }
+        }
     }
 
     private async Task<Uri?> FindSandboxAsync(CancellationToken cancellationToken)
-        => SandboxUrl(await Aspire.ListResources(cancellationToken).ConfigureAwait(false));
+    {
+        var resources = await Aspire.ListResources(cancellationToken).ConfigureAwait(false);
+        if (SandboxUrl(resources) is { } reported) { return reported; }
+        // The report goes stale when the AppHost's resource watch dies; the allocated endpoint
+        // from deployment configuration plus a live health probe stays truthful.
+        var address = resources.FirstOrDefault(resource => resource.Name == CSharpSandbox.ResourceName)
+                ?.Urls.FirstOrDefault(url => url.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+            ?? configuration["DigitalBrain:CSharp:SandboxProbeUrl"];
+        if (address is not { Length: > 0 }) { return null; }
+        var probed = new Uri(address.TrimEnd('/') + "/");
+        using var probe = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        probe.CancelAfter(TimeSpan.FromSeconds(3));
+        try
+        {
+            using var health = await http.GetAsync(new Uri(probed, "health"), probe.Token).ConfigureAwait(false);
+            return health.IsSuccessStatusCode ? probed : null;
+        }
+        catch (HttpRequestException) { return null; }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { return null; }
+    }
 
     private static Uri? SandboxUrl(IReadOnlyList<AspireResource> resources)
         => resources.FirstOrDefault(resource => resource.Name == CSharpSandbox.ResourceName) is { } sandbox

@@ -16,6 +16,12 @@ internal sealed class SupabaseTableNeuron(
     [PersistentState("state", DigitalBrainNames.DefaultGrainStorage)] IPersistentState<SupabaseTableState> state)
     : Neuron, ISupabaseTable
 {
+    // Tables are addressed by name, not by brain scope; the HTTP route gates reads behind
+    // brain membership and the owning window, and app callers pass the grant stages. The
+    // neuron itself stays reachable for every trusted caller, as PackageNeuron does.
+    public override DigitalBrain.Kernel.Enforcement.NeuronAccess Access(string operation)
+        => DigitalBrain.Kernel.Enforcement.NeuronAccess.PublicOperation;
+
     private ILiveTableSource ResolveSource(string source) => source == "supabase"
         ? ServiceProvider.GetRequiredService<ILiveTableSource>()
         : ServiceProvider.GetKeyedService<ILiveTableSource>(source)

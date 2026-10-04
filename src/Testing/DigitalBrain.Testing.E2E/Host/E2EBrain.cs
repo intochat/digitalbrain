@@ -102,6 +102,20 @@ public sealed class E2EBrain : IDigitalBrain, ITrackedBrain
             await context.Tracing.StartAsync(new() { Screenshots = true, Snapshots = true }).ConfigureAwait(false);
             var page = await context.NewPageAsync().ConfigureAwait(false);
             session.Page = page;
+            // The shell fails silently from the test's point of view without this: a browser
+            // assertion that times out needs the page's own errors in the failure output.
+            page.Console += (_, message) =>
+            {
+                if (message.Type is "error" or "warning")
+                { Console.WriteLine($"[shell-console] {message.Type}: {message.Text}"); }
+            };
+            page.PageError += (_, error) => Console.WriteLine($"[shell-pageerror] {error}");
+            page.RequestFailed += (_, request) => Console.WriteLine($"[shell-requestfailed] {request.Method} {request.Url}: {request.Failure}");
+            page.Response += (_, response) =>
+            {
+                if (response.Status >= 400)
+                { Console.WriteLine($"[shell-response] {response.Status} {response.Request.Method} {response.Url}"); }
+            };
             page.SetDefaultTimeout((float)_options.AssertionTimeout.TotalMilliseconds);
             // Playwright's Expect() has its own 5s default, separate from the page timeout.
             Assertions.SetDefaultExpectTimeout((float)_options.AssertionTimeout.TotalMilliseconds);

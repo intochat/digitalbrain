@@ -45,7 +45,6 @@ public sealed class CSharpFileContainerFacts
             .WithModule<CSharpModule, CSharpOptions>(csharp => csharp.WithSandbox(RepositoryRoot()))
             .StartAsync(ct);
         var aspire = brain.Get<IAspire>(new AspireOptions().ApplicationName);
-        await using var sandboxStates = await brain.Observe<ResourceStateChanged>(aspire, ct);
         var timerId = "csharp-e2e-" + Guid.NewGuid().ToString("N")[..8];
         var listener = brain.Get<ICSharpFile>("e2e/" + timerId);
         var broken = brain.Get<ICSharpFile>("e2e/broken-" + timerId);
@@ -55,8 +54,10 @@ public sealed class CSharpFileContainerFacts
         {
             await listener.Write(Source, ct);
             await listener.Configure(new Dictionary<string, string> { ["TimerId"] = timerId }, ct);
+            // Start answers Running only once the sandbox accepted the run; the state-change
+            // feed is not asserted because the AppHost's resource watch can die mid-session,
+            // and "script ready" below is the durable proof the sandbox executes.
             Assert.Equal(CSharpFileStatus.Running, (await listener.Start(ct)).Status);
-            await sandboxStates.NextAsync(change => change.Resource == CSharpSandbox.ResourceName && change.State == "Running", ct: ct);
 
             await broken.Write("Console.WriteLine(undefinedName);", ct);
             await broken.Start(ct);

@@ -27,7 +27,11 @@ internal sealed partial class CSharpFileNeuron(
         : Snapshot.OwnerContext is { } owner ? new(BrainScope.Create(owner.AccountId, owner.BrainId).Id)
         : base.Access(operation) is { Scope: not null } scoped ? scoped
         : operation == nameof(Write) && Snapshot.Source.Length == 0
-            ? new(BrainScope.CurrentId()) : NeuronAccess.Unclassified;
+            ? new(BrainScope.CurrentId())
+        // A file without source (never written, or deleted) has nothing to protect, and the
+        // uninstall view legitimately reads the emptied files it just deleted.
+        : Snapshot.Source.Length == 0 ? NeuronAccess.PublicOperation
+        : NeuronAccess.Unclassified;
 
     internal const int MaximumSourceBytes = 128 * 1024;
     internal const int MaximumFailures = 5;
