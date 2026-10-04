@@ -32,7 +32,13 @@ internal sealed class NeuronCallFilter(ICallFilter filter) : IIncomingGrainCallF
             TargetScope = access.Scope,
             PublicOperation = access.Public,
         });
-        if (!decision.Allowed) { throw new UnauthorizedAccessException(decision.Explanation); }
+        // The target's type and operation (never its key) turn a denial from a riddle into a
+        // pointer at the neuron whose classification needs a decision.
+        if (!decision.Allowed)
+        {
+            throw new UnauthorizedAccessException(
+                $"{decision.Explanation} (target {neuron.GetGrainId().Type}, operation {context.InterfaceMethod.Name})");
+        }
         Orleans.Runtime.RequestContext.Set(ModuleCall, true);
         await context.Invoke();
     }

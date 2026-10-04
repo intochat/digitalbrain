@@ -3,7 +3,7 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.Playwright" />
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.Playwright.Tests.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.Playwright.Tests" />
     <ProjectReference Include="../DigitalBrain.Modules.Microsoft.Playwright.Contracts/DigitalBrain.Modules.Microsoft.Playwright.Contracts.csproj" />
     <ProjectReference Include="../../../../DigitalBrain/Kernel/DigitalBrain.Kernel/DigitalBrain.Kernel.csproj" />
   </ItemGroup>

@@ -8,6 +8,9 @@ namespace DigitalBrain.Compute.Ledger;
 [GrainType("compute-wallet")]
 internal sealed class WalletNeuron : Neuron, IWallet
 {
+    public override DigitalBrain.Kernel.Enforcement.NeuronAccess Access(string operation)
+        => AccountAccess.For(this.GetPrimaryKeyString());
+
     private ILedgerStore? store;
 
     private ILedgerStore Store => store ??= ServiceProvider.GetRequiredService<ILedgerStore>();

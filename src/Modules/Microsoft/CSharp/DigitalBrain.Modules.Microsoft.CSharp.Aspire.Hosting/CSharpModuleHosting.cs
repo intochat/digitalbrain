@@ -17,7 +17,7 @@ public sealed class CSharpModuleHosting : IDigitalBrainModuleHosting
         // the sandbox; only a host without any repository (the session-pool path) has none.
         if (string.IsNullOrWhiteSpace(options.SourceRoot)) { options.SourceRoot = RepositoryRoot.Find(); }
         if (string.IsNullOrWhiteSpace(options.SourceRoot)) { return; }
-        brain.ApplicationBuilder.AddDockerfile(CSharpSandbox.ResourceName, Path.Combine(options.SourceRoot, CSharpSandbox.SourceProject))
+        var sandbox = brain.ApplicationBuilder.AddDockerfile(CSharpSandbox.ResourceName, Path.Combine(options.SourceRoot, CSharpSandbox.SourceProject))
             .WithHttpEndpoint(targetPort: CSharpSandbox.Port, name: "http")
             .WithHttpHealthCheck("/health")
             .WithBindMount(options.SourceRoot, CSharpSandbox.SourceMount, isReadOnly: true)
@@ -26,5 +26,15 @@ public sealed class CSharpModuleHosting : IDigitalBrainModuleHosting
             .WithContainerRuntimeArgs("--add-host", "host.docker.internal:host-gateway")
             .WithParentRelationship(brain.Resource)
             .WithExplicitStart();
+        // The endpoint proxy listens from allocation, long before the container's first start,
+        // so the silo can always probe the sandbox directly - the resource-state bridge is an
+        // optimization, not the only truth (its watch can die mid-session).
+        brain.AddProjection(new SandboxProbeProjection(sandbox.GetEndpoint("http")));
+    }
+
+    private sealed class SandboxProbeProjection(EndpointReference endpoint) : DigitalBrainModuleProjection
+    {
+        public override void Apply<TResource>(IResourceBuilder<TResource> builder)
+            => builder.WithEnvironment("DigitalBrain__CSharp__SandboxProbeUrl", endpoint);
     }
 }

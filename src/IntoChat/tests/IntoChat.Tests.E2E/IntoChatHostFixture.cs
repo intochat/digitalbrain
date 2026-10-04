@@ -13,7 +13,7 @@ public sealed class IntoChatHostFixture : ReferenceBrainFixture
             .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, Model.Endpoint))
             .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp())
             .WithBrowser(new() { PrimarySession = false, AssertionTimeout = TimeSpan.FromMinutes(2) })
-            .WithStartupTimeout(TimeSpan.FromMinutes(20))
+            .WithStartupTimeout(TimeSpan.FromMinutes(8))
             .WithResourceEnvironment(new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["OTEL_EXPORTER_OTLP_ENDPOINT"] = Collector.Endpoint.AbsoluteUri,

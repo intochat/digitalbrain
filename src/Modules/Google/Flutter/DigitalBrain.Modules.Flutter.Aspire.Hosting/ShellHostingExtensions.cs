@@ -63,6 +63,7 @@ public static class ShellHostingExtensions
         private IResourceBuilder<ExecutableResource>? _flutterHost;
         private IResourceBuilder<ContainerResource>? _shellContainer;
         private string? _servedConfigPath;
+        private string? _flutterWebDirectory;
         private FlutterHostKind _flutterKind;
         private bool _uiBaseBound;
 
@@ -137,6 +138,7 @@ public static class ShellHostingExtensions
                     .WithHttpHealthCheck("/")
                     .AsBrainBrowser(path: "/?semantics=true", readySelector: "flt-semantics");
                 host.WithArgs(ReferenceExpression.Create($"--web-port={host.GetEndpoint(ShellNames.HttpEndpointName).Property(EndpointProperty.TargetPort)}"));
+                _flutterWebDirectory = launch.WorkingDirectory;
             }
 
             // Hot reload rides the Dart VM service, which the headless web-server target no
@@ -305,10 +307,16 @@ public static class ShellHostingExtensions
                 builder.WithEnvironment(
                     EnvironmentKeys.For("DigitalBrain:Cors", "AllowedOrigin"),
                     _flutterHost.GetEndpoint(ShellNames.HttpEndpointName));
-                _flutterHost.WithArgs(
-                    ReferenceExpression.Create($"--dart-define={ShellNames.UIBaseEnvironmentVariable}={uiEndpoint}"),
-                    $"--dart-define={ShellNames.ShellEnvironmentVariable}={_pendingShell}",
-                    $"--dart-define={ShellNames.ChatEnvironmentVariable}={_pendingChat}");
+                // The kernel endpoint must not be compiled into the bundle: a baked define
+                // differs every session and forces a full release recompile per boot. The dev
+                // web server serves web/config.json the same way the deployed container serves
+                // its config.json, so the bundle stays byte-identical across sessions and
+                // flutter reuses its build cache.
+                var configPath = Path.Combine(_flutterWebDirectory!, "web", "config.json");
+                var shellName = _pendingShell;
+                var chatName = _pendingChat;
+                _flutterHost.OnBeforeResourceStarted((_, _, ct) => File.WriteAllTextAsync(
+                    configPath, ShellServedConfig.Payload(uiEndpoint.Url, shellName, chatName), ct));
             }
 
             _uiBaseBound = true;

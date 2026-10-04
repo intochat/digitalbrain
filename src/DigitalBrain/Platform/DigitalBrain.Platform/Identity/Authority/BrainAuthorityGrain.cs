@@ -107,6 +107,21 @@ internal sealed class BrainAuthorityGrain(
     public async Task<CallDecision?> Authorize(CallRequest request)
     {
         var caller = request.Caller;
+        // The grain-side mirror of OpenOwnerBrainAccess at the HTTP edge: with the declared
+        // Open posture, an untouched brain belongs to the first trusted caller acting in their
+        // own scope. Secured deployments and provisioned brains are untouched.
+        if (State.AccountId is null && auth.Value.Posture == IdentityPosture.Open
+            && BrainScope.Create(caller.AccountId, caller.BrainId).Id == this.GetPrimaryKeyString())
+        {
+            await ProvisionOwner(new Member
+            {
+                PrincipalId = caller.PrincipalId,
+                AccountId = caller.AccountId,
+                BrainId = caller.BrainId,
+                Role = MemberRole.Owner,
+                DisplayName = caller.PrincipalId,
+            });
+        }
         if (State.AccountId != caller.AccountId || State.BrainId != caller.BrainId)
         { return CallDecision.Deny(CallDenial.OutsideWorkspace, "The target scope does not match this brain."); }
         var decision = GrantRules.Evaluate(request, State.Members.GetValueOrDefault(caller.PrincipalId), State.Grants);

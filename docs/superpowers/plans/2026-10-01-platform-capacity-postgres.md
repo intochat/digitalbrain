@@ -6,7 +6,7 @@
 
 **Architecture:** `DigitalBrain.Sdk/Capacity` declares `ICapacity` (resolution), `ICapacityConfiguredSource` and `ICapacityProvisioner` (per-kind registrations) and `CapacityUnavailableException`. `DigitalBrain.Platform/Capacity` implements the resolver (account slot → configured source → provisioner → refusal) behind an idempotent `AddCapacity()` registration. The Postgres module registers EITHER a configured source for kind `"postgres"` (external connection = production) OR a Docker provisioner (admin connection present = local hosted run), rewires `PostgresTableProvider` to resolve an `NpgsqlDataSource` per origin string, and pins each table's origin in grain state at first `Define`. Aspire hosting splits: run mode keeps the container and passes the server's admin connection; publish mode emits the `postgres-connection` secret parameter, which the kernel deployment auto-resolves from stack config into Key Vault.
 
-**Tech Stack:** .NET / Orleans grains, Npgsql, Aspire hosting, xunit v3 (`UnitTest.Create()`, `TestContext.Current.CancellationToken`).
+**Tech Stack:** .NET / Orleans grains, Npgsql, Aspire hosting, xunit v3 (`ModuleTest.Create()`, `TestContext.Current.CancellationToken`).
 
 **Spec:** `docs/superpowers/specs/2026-10-01-postgres-capacity-and-provisioning-design.md` (amended by `docs/superpowers/specs/2026-10-01-kernel-sdk-platform-ring-law-design.md`: Capacity is a Platform facet, not a module).
 
@@ -266,7 +266,7 @@ public sealed class PostgresCapacityFacts
     public async Task AComposedPostgresModuleResolvesThePlatformOriginForTables()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<PostgresModule>()
+        await using var brain = await ModuleTest.Create().WithModule<PostgresModule>()
             .ConfigureSilo(silo => silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=sample;Username=reader")
             .StartAsync(ct);
         var capacity = brain.Services.GetRequiredService<ICapacity>();
@@ -278,7 +278,7 @@ public sealed class PostgresCapacityFacts
     public async Task ProvisioningIsRefusedWhenOnlyThePlatformConnectionExists()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<PostgresModule>()
+        await using var brain = await ModuleTest.Create().WithModule<PostgresModule>()
             .ConfigureSilo(silo => silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=sample;Username=reader")
             .StartAsync(ct);
         var capacity = brain.Services.GetRequiredService<ICapacity>();
@@ -297,7 +297,7 @@ public sealed class PostgresCapacityFacts
 }
 ```
 
-(If `brain.Services` is not how `UnitTest` exposes the silo's provider, use the equivalent accessor the fixture offers — check `src/Testing/DigitalBrain.Testing.Unit` for the established way other facts reach a silo service, e.g. how `PostgresTableFacts` reaches keyed services, and follow it.)
+(If `brain.Services` is not how `ModuleTest` exposes the silo's provider, use the equivalent accessor the fixture offers — check `src/Testing/DigitalBrain.Testing.Module` for the established way other facts reach a silo service, e.g. how `PostgresTableFacts` reaches keyed services, and follow it.)
 
 - [ ] **Step 2: Run to verify it fails**
 
@@ -458,7 +458,7 @@ public void DatabaseNamesAreStableHashedAndDistinctPerBrain()
 public async Task AnAdminConnectionActivatesTheProvisionerAndDeactivatesThePlatformSource()
 {
     var ct = TestContext.Current.CancellationToken;
-    await using var brain = await UnitTest.Create().WithModule<PostgresModule>()
+    await using var brain = await ModuleTest.Create().WithModule<PostgresModule>()
         .ConfigureSilo(silo =>
         {
             silo.Configuration["ConnectionStrings:postgres"] = "Host=localhost;Database=sample;Username=reader";
@@ -692,4 +692,4 @@ Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
 ## Self-review notes
 
 - Spec coverage: Sdk/Platform facet (Task 1), Postgres as reference consumer with pinning (Task 2), local provisioning + refusal (Task 3), run/publish split (Task 4), host cleanup + production path + smoke (Task 5). The spec's "integration account" resolution step is an explicit future slot (comment in `CapacityResolver`), per spec. The spec's deployment-project paragraph is corrected by Task 5's spec edit, justified by `ManifestValues`/`DigitalBrainDeployment` behavior read during planning.
-- Known judgment calls an implementer may hit: the exact `UnitTest` accessor for silo services (follow `PostgresTableFacts`), the `WithEnvironment` overload for `ReferenceExpression` (fallback given), and duplicate provisioner registration in the Task 3 fact (fallback given). These are adaptation points, not placeholders — the target behavior and assertions are fixed.
+- Known judgment calls an implementer may hit: the exact `ModuleTest` accessor for silo services (follow `PostgresTableFacts`), the `WithEnvironment` overload for `ReferenceExpression` (fallback given), and duplicate provisioner registration in the Task 3 fact (fallback given). These are adaptation points, not placeholders — the target behavior and assertions are fixed.

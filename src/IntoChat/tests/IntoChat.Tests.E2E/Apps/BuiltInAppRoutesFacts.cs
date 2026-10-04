@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text.Json;
-using DigitalBrain.Testing.E2E.Packages;
 
 namespace IntoChat.Tests.E2E.Apps;
 

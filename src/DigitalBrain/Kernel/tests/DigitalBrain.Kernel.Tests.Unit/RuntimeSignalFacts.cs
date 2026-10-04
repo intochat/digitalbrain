@@ -16,7 +16,7 @@ public sealed class RuntimeSignalFacts
     public async Task SiloSubscriptionsReceiveOrdinaryNeuronSignalsAndFilterByType()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         using var signals = brain.SiloServices.GetRequiredService<LocalSignalHub>().Subscribe<Number>();
         await brain.Get<ITestEmitter>("one").EmitText("ignored");
         await brain.Get<ITestEmitter>("one").Emit(1);
@@ -44,7 +44,7 @@ public sealed class RuntimeSignalFacts
     public async Task LifecycleSignalsDoNotDependOnDerivedHooksCallingBase()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         using var signals = brain.SiloServices.GetRequiredService<LocalSignalHub>().Subscribe<NeuronActivity>();
         var neuron = brain.Get<IRuntimeProbe>("runtime-probe");
         await neuron.Ping();
@@ -67,7 +67,7 @@ public sealed class RuntimeSignalFacts
     public async Task FailedActivationIsNotReportedAsActive()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         using var signals = brain.SiloServices.GetRequiredService<LocalSignalHub>().Subscribe<NeuronActivity>();
         await Assert.ThrowsAsync<InvalidOperationException>(() => brain.Get<IRuntimeProbe>("fail").Ping());
         await brain.Get<IRuntimeProbe>("healthy").Ping();

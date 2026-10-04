@@ -38,9 +38,14 @@ internal sealed class AspireBridgeClient(
         try
         {
             var host = await WaitForAnyRunningAsync(hosts, stoppingToken).ConfigureAwait(false);
+            // The endpoint proxy does not hold a streaming response open, which would turn the
+            // command stream into a two-second reconnect loop; the AppHost dials the silo's own
+            // port directly and only falls back to the proxied URL when there is none.
+            var endpoint = host.GetEndpoint(SiloHosts.HttpEndpointName);
+            var targetPort = await new HostUrlExpression(endpoint).ResolveAsync(stoppingToken).ConfigureAwait(false);
             using var brain = new HttpClient
             {
-                BaseAddress = new Uri(host.GetEndpoint(SiloHosts.HttpEndpointName).Url),
+                BaseAddress = new Uri(targetPort ?? endpoint.Url),
                 Timeout = Timeout.InfiniteTimeSpan,
             };
             brain.DefaultRequestHeaders.Add(AspireBridgeRoutes.KeyHeader, bridgeKey);
@@ -50,6 +55,23 @@ internal sealed class AspireBridgeClient(
                 ServeCommandsAsync(brain, stoppingToken)).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
+    }
+
+    private sealed class HostUrlExpression(EndpointReference endpoint)
+    {
+        public async Task<string?> ResolveAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                var port = await ReferenceExpression.Create($"{endpoint.Property(EndpointProperty.TargetPort)}")
+                    .GetValueAsync(cancellationToken).ConfigureAwait(false);
+                return string.IsNullOrWhiteSpace(port) ? null : $"http://localhost:{port}";
+            }
+            catch (InvalidOperationException)
+            {
+                return null;
+            }
+        }
     }
 
     private async Task<IResourceWithEndpoints> WaitForAnyRunningAsync(IReadOnlyList<IResourceWithEndpoints> hosts, CancellationToken stoppingToken)
@@ -76,8 +98,16 @@ internal sealed class AspireBridgeClient(
                 snapshot.HealthStatus?.ToString(), [.. snapshot.Urls.Select(url => url.Url)]);
             lock (_gate)
             {
-                if (_latest.TryGetValue(resource.Name, out var known) && known.State == resource.State && known.Health == resource.Health
-                    && known.Urls.SequenceEqual(resource.Urls, StringComparer.Ordinal)) { continue; }
+                if (_latest.TryGetValue(resource.Name, out var known))
+                {
+                    // A null health is "being evaluated", not a transition: health checks flap
+                    // Healthy->null on every probe, and reposting each flap floods the brain
+                    // with Report calls (the idle trace budget measured 87 spans a minute).
+                    if (resource.Health is null && known.Health is not null && known.State == resource.State
+                        && known.Urls.SequenceEqual(resource.Urls, StringComparer.Ordinal)) { continue; }
+                    if (known.State == resource.State && known.Health == resource.Health
+                        && known.Urls.SequenceEqual(resource.Urls, StringComparer.Ordinal)) { continue; }
+                }
                 _latest[resource.Name] = resource;
             }
             await _outbox.Writer.WriteAsync(resource, stoppingToken).ConfigureAwait(false);
@@ -113,11 +143,13 @@ internal sealed class AspireBridgeClient(
             {
                 using var response = await brain.GetAsync(AspireBridgeRoutes.Commands, HttpCompletionOption.ResponseHeadersRead, stoppingToken).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
-                await ResendLatestAsync(stoppingToken).ConfigureAwait(false);
+                await SyncLatestAsync(brain, stoppingToken).ConfigureAwait(false);
                 await using var stream = await response.Content.ReadAsStreamAsync(stoppingToken).ConfigureAwait(false);
                 var parser = SseParser.Create(stream, static (_, data) => JsonSerializer.Deserialize<AspireBridgeCommand>(data, JsonSerializerOptions.Web)!);
                 await foreach (var item in parser.EnumerateAsync(stoppingToken).ConfigureAwait(false))
                 {
+                    // Heartbeats keep the proxied stream alive and carry no command.
+                    if (item.Data.Id == Guid.Empty) { continue; }
                     _ = ExecuteCommandAsync(brain, item.Data, stoppingToken);
                 }
             }
@@ -129,11 +161,27 @@ internal sealed class AspireBridgeClient(
         }
     }
 
-    private async Task ResendLatestAsync(CancellationToken stoppingToken)
+    // One request carries the whole post-connect state sync, so an idle minute is not spent
+    // on a span per resource.
+    private async Task SyncLatestAsync(HttpClient brain, CancellationToken stoppingToken)
     {
-        AspireResource[] known;
-        lock (_gate) { known = [.. _latest.Values]; }
-        foreach (var resource in known) { await _outbox.Writer.WriteAsync(resource, stoppingToken).ConfigureAwait(false); }
+        AspireResource[] sync;
+        lock (_gate) { sync = [.. _latest.Values]; }
+        if (sync.Length == 0) { return; }
+        while (true)
+        {
+            try
+            {
+                using var response = await brain.PostAsJsonAsync(AspireBridgeRoutes.ResourceSync, sync, stoppingToken).ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
+                return;
+            }
+            catch (Exception error) when (error is HttpRequestException or TaskCanceledException && !stoppingToken.IsCancellationRequested)
+            {
+                logger.LogDebug(error, "Brain is not accepting the resource sync yet; retrying.");
+                await Task.Delay(ReconnectDelay, stoppingToken).ConfigureAwait(false);
+            }
+        }
     }
 
     private async Task ExecuteCommandAsync(HttpClient brain, AspireBridgeCommand command, CancellationToken stoppingToken)

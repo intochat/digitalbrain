@@ -2,7 +2,7 @@ using System.Text;
 using DigitalBrain.Contracts.Enforcement;
 using DigitalBrain.Kernel.Enforcement;
 using DigitalBrain.Platform.Secrets;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
@@ -17,7 +17,7 @@ public sealed class SecretOwnershipFacts
     public async Task AnotherOwnersSecretIsForbiddenWhateverThePathSays()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var builder = WebApplication.CreateBuilder();
         builder.Services.AddSingleton(brain.Grains);
         builder.Services.AddSingleton<DigitalBrain.IDigitalBrain>(brain);

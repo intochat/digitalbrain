@@ -107,6 +107,6 @@ renderable palette v1 / UiPart; run-token tightening.
 - Code style: no boilerplate `/// <summary>`; names carry the meaning; small inline comments only
   for what the code cannot say (and keep them true — stale comments are bugs). Tests are facts
   with sentence-shaped names, `TestContext.Current.CancellationToken`, real grains over mocks
-  (`UnitTest.Create().WithModule<...>()`, `FakeSandbox`, `RecordingCSharpFile`, scripted LLMs).
+  (`ModuleTest.Create().WithModule<...>()`, `FakeSandbox`, `RecordingCSharpFile`, scripted LLMs).
 - Grain hazards: no self-calls on non-reentrant grains (deadlock); one-way self-references
   (`AsReference<T>()`) for signal-triggered work; `ObserverManager` watches need lease renewal.

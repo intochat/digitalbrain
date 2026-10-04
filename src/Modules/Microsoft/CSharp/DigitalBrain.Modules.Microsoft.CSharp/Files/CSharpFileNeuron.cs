@@ -23,11 +23,20 @@ internal sealed partial class CSharpFileNeuron(
     IReminderRegistry reminders)
     : Neuron<CSharpFileState>(store), ICSharpFile, ICSharpAppBinding, ICSharpFileTrigger, ICSharpFileEdge, IRemindable, INeuronObserver
 {
-    public override NeuronAccess Access(string operation) => Snapshot.AppBrain is { } appScope ? new(appScope)
+    public override NeuronAccess Access(string operation) =>
+        // The script edge's inbound operations authenticate with the run token the edge has
+        // already verified; the neuron re-checks the run id itself. Same rule as a webhook.
+        operation is nameof(ICSharpFileEdge.Authorize) or nameof(ICSharpFileEdge.Subscribed) or nameof(ICSharpFileEdge.DrainPending)
+            ? NeuronAccess.PublicOperation
+        : Snapshot.AppBrain is { } appScope ? new(appScope)
         : Snapshot.OwnerContext is { } owner ? new(BrainScope.Create(owner.AccountId, owner.BrainId).Id)
         : base.Access(operation) is { Scope: not null } scoped ? scoped
         : operation == nameof(Write) && Snapshot.Source.Length == 0
-            ? new(BrainScope.CurrentId()) : NeuronAccess.Unclassified;
+            ? new(BrainScope.CurrentId())
+        // A file without source (never written, or deleted) has nothing to protect, and the
+        // uninstall view legitimately reads the emptied files it just deleted.
+        : Snapshot.Source.Length == 0 ? NeuronAccess.PublicOperation
+        : NeuronAccess.Unclassified;
 
     internal const int MaximumSourceBytes = 128 * 1024;
     internal const int MaximumFailures = 5;

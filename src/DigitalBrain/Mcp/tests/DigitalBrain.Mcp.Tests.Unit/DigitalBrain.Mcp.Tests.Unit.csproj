@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="../../DigitalBrain.Mcp/DigitalBrain.Mcp.csproj" />
-    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
+    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Module/DigitalBrain.Testing.Module.csproj" />
     <ProjectReference Include="../../../../Modules/DigitalBrain/Apps/DigitalBrain.Modules.Apps/DigitalBrain.Modules.Apps.csproj" />
   </ItemGroup>
 </Project>

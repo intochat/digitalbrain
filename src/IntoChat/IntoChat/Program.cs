@@ -7,6 +7,7 @@ using DigitalBrain.Compute;
 using DigitalBrain.Contracts;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.AspNetCore;
+using DigitalBrain.OS;
 using DigitalBrain.Platform;
 using DigitalBrain.Platform.Identity;
 using DigitalBrain.Sdk;
@@ -16,30 +17,10 @@ using IntoChat.ServiceDefaults;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
-builder.AddDigitalBrainServer(server =>
-{
-    server.UseAzureStorage().WithDashboard();
-    server.AddModule<DigitalBrain.AI.AIModule>("ai");
-    server.AddModule<DigitalBrain.ClickHouse.ClickHouseModule>("clickhouse");
-    server.AddModule<DigitalBrain.Apps.AppsModule>("apps");
-    server.AddModule<DigitalBrain.Assistant.AssistantModule>("assistant");
-    server.AddModule<DigitalBrain.Compute.ComputeModule>("compute");
-    server.AddModule<DigitalBrain.Registry.RegistryModule>("registry");
-    server.AddModule<DigitalBrain.Specs.SpecsModule>("specs");
-    server.AddModule<DigitalBrain.Files.FilesModule>("files");
-    server.AddModule<DigitalBrain.Flutter.FlutterModule>("flutter");
-    server.AddModule<DigitalBrain.Google.Gmail.GmailModule>("gmail");
-    server.AddModule<DigitalBrain.Microsoft.Aspire.AspireModule>("aspire");
-    server.AddModule<DigitalBrain.Microsoft.CSharp.CSharpAuthoringModule>("csharp-authoring");
-    server.AddModule<DigitalBrain.Microsoft.CSharp.CSharpModule>("csharp");
-    server.AddModule<DigitalBrain.Microsoft.GitHub.GitHubModule>("github");
-    server.AddModule<DigitalBrain.Microsoft.Playwright.PlaywrightModule>("playwright");
-    server.AddModule<DigitalBrain.Postgres.PostgresModule>("postgres");
-    server.AddModule<DigitalBrain.Qdrant.QdrantModule>("qdrant");
-    server.AddModule<DigitalBrain.Salesforce.SalesforceModule>("salesforce");
-    server.AddModule<DigitalBrain.Supabase.SupabaseModule>("supabase");
-    server.AddModule<DigitalBrain.Time.TimeModule>("time");
-});
+// IntoChat is a distribution of the operating system: the composition is the OS's, and what
+// is IntoChat's own is branding, shipped apps and configuration.
+builder.AddDigitalBrainServer(server => server.UseAzureStorage().WithDashboard().AddOperatingSystem());
+builder.Services.AddOperatingSystemBoot(os => os.Apps.Add("intochat/settings"));
 builder.AddDigitalBrainPlatform();
 builder.Services.Configure<AssistantOptions>(options =>
 {

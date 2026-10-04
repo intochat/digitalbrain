@@ -76,6 +76,17 @@ public sealed class AspireTestSession : IAsyncDisposable
         var ct = deadline.Token;
         var lifetime = new TestSessionLifetime(options);
         var stage = "builder";
+        // A slow boot must name its stage: the timings print into the test output, so a
+        // 15-minute fixture says whether the containers, the shell compile or the bundle
+        // re-target ate the time.
+        var bootWatch = System.Diagnostics.Stopwatch.StartNew();
+        var stageWatch = System.Diagnostics.Stopwatch.StartNew();
+        void Advance(string next)
+        {
+            Console.WriteLine($"[aspire-boot] {stage}: {stageWatch.Elapsed.TotalSeconds:F1}s");
+            stage = next;
+            stageWatch.Restart();
+        }
         try
         {
             // Module hosts explicitly use the consuming test assembly's Aspire metadata.
@@ -98,7 +109,7 @@ public sealed class AspireTestSession : IAsyncDisposable
                 [$"Logging:LogLevel:{builder.Environment.ApplicationName}.Resources"] = "Warning",
             });
             builder.Services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
-            stage = "topology";
+            Advance("topology");
             declareTopology?.Invoke(builder);
             var hosts = SiloHosts.Find(builder.Resources);
             var selectedHost = SiloHosts.Select(builder.Resources, options.ServerResourceName);
@@ -136,13 +147,13 @@ public sealed class AspireTestSession : IAsyncDisposable
                     http.TargetPort = null;
                 }
             }
-            stage = "build";
+            Advance("build");
             var app = await builder.BuildAsync(ct).ConfigureAwait(false);
             lifetime.Own("application", app);
             var session = new AspireTestSession(app, lifetime, options, selectedBrain, selectedHost.Name);
-            stage = "start";
+            Advance("start");
             await app.StartAsync(ct).WaitAsync(ct).ConfigureAwait(false);
-            stage = "readiness";
+            Advance("readiness");
             foreach (var host in hosts)
             { await app.ResourceNotifications.WaitForResourceHealthyAsync(host.Name, ct).ConfigureAwait(false); }
             var browser = builder.Resources.SelectMany(r => r.Annotations.OfType<BrainBrowserAnnotation>()
@@ -157,7 +168,7 @@ public sealed class AspireTestSession : IAsyncDisposable
                 session.BrowserEndpoint = new Uri(app.GetEndpoint(browser[0].Name, browser[0].Endpoint), browser[0].Path);
                 session.BrowserReadySelector = browser[0].ReadySelector;
             }
-            stage = "client";
+            Advance("client");
             await session.ConnectAsync(ct).ConfigureAwait(false);
             lifetime.Own("client", new AsyncAction(session.ReleaseClientAsync));
             session.HttpClient = app.CreateHttpClient(selectedHost.Name, SiloHosts.HttpEndpointName);
@@ -165,24 +176,27 @@ public sealed class AspireTestSession : IAsyncDisposable
             if (session.BrowserEndpoint is not null
                 && options.ResourceEnvironment.ContainsKey("DigitalBrain__Testing__ReferenceComposition"))
             {
-                stage = "reference-browser-bundle";
-                // Sequential suites reuse Flutter's build directory. A cached bundle can answer
-                // health probes while still targeting the previous suite's now-stopped runtime.
+                Advance("reference-browser-bundle");
+                // Sequential suites reuse Flutter's build directory, and the bundle itself is
+                // endpoint-agnostic: the dev server serves config.json for this runtime the way
+                // the deployed container does. Wait until the served config names this session.
                 using var probe = new HttpClient();
                 var runtimeEndpoint = session.HttpClient.BaseAddress!.GetLeftPart(UriPartial.Authority);
                 while (true)
                 {
-                    using var response = await probe.GetAsync(new Uri(session.BrowserEndpoint, "/main.dart.js"), ct).ConfigureAwait(false);
+                    using var response = await probe.GetAsync(new Uri(session.BrowserEndpoint, "/config.json"), ct).ConfigureAwait(false);
                     if (response.IsSuccessStatusCode
                         && (await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false)).Contains(runtimeEndpoint, StringComparison.Ordinal))
                     { break; }
                     await Task.Delay(TimeSpan.FromSeconds(1), ct).ConfigureAwait(false);
                 }
             }
+            Console.WriteLine($"[aspire-boot] {stage}: {stageWatch.Elapsed.TotalSeconds:F1}s; total {bootWatch.Elapsed.TotalSeconds:F1}s");
             return session;
         }
         catch (Exception error)
         {
+            Console.WriteLine($"[aspire-boot] failed in {stage} after {stageWatch.Elapsed.TotalSeconds:F1}s; total {bootWatch.Elapsed.TotalSeconds:F1}s");
             try { options.Diagnostics?.Invoke(new(stage, "Startup failed; releasing owned resources.")); } catch { }
             try { await lifetime.DisposeAsync().ConfigureAwait(false); }
             catch (Exception cleanup) { throw new AggregateException($"Startup failed at '{stage}' and rollback failed.", error, cleanup); }

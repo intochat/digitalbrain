@@ -31,9 +31,10 @@ public class ReferenceBrainFixture : SharedBrainFixture, IAsyncLifetime
             .ConfigureModule<AIModule, AIOptions>(ai => ai.WithModelEndpoint(AiProvider.OpenAI, Model.Endpoint))
             .ConfigureModule<FlutterModule, FlutterModuleOptions>(flutter => flutter.RunWebApp())
             .WithBrowser(new() { PrimarySession = false, AssertionTimeout = TimeSpan.FromMinutes(2) })
-            // The one shared boot compiles the web shell; a cold CI runner needs well over the
-            // default three minutes.
-            .WithStartupTimeout(TimeSpan.FromMinutes(20))
+            // The bundle no longer bakes the runtime endpoint, so a warm boot serves the cached
+            // shell; eight minutes covers a cold runner's one-time compile and container pulls.
+            // A boot that needs longer is starved or broken - fail it fast and say so.
+            .WithStartupTimeout(TimeSpan.FromMinutes(8))
             .WithResourceEnvironment(new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 ["OTEL_EXPORTER_OTLP_ENDPOINT"] = Collector.Endpoint.AbsoluteUri,

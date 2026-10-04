@@ -1,0 +1,22 @@
+using DigitalBrain.Flutter;
+using DigitalBrain.Flutter.Toggle;
+using DigitalBrain.Testing.Module;
+using Xunit;
+
+namespace DigitalBrain.Modules.Flutter.Tests.Toggle;
+
+public sealed class ToggleFacts
+{
+    [Fact]
+    public async Task SetAndFlipUpdateOn()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var brain = await ModuleTest.Create().WithModule<FlutterModule>()
+            .StartAsync(ct);
+        var toggle = brain.Get<IToggle>("dark");
+        await toggle.Set("Dark", true);
+        Assert.True((await toggle.Read()).On);
+        await toggle.Flip();
+        Assert.False((await toggle.Read()).On);
+    }
+}

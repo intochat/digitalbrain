@@ -2,7 +2,7 @@
   <PropertyGroup><RootNamespace>DigitalBrain.Sdk.Tests.Unit</RootNamespace></PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.Sdk" />
-    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Unit/DigitalBrain.Testing.Unit.csproj" />
+    <ProjectReference Include="../../../../Testing/DigitalBrain.Testing.Module/DigitalBrain.Testing.Module.csproj" />
     <ProjectReference Include="../../DigitalBrain.Sdk/DigitalBrain.Sdk.csproj" />
     <None Update="Identity/LegacyState/*.orleans" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

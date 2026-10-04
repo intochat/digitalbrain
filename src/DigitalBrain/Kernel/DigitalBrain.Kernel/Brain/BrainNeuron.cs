@@ -16,6 +16,15 @@ internal sealed class BrainNeuron : Neuron<BrainState>, IBrain
 
     public Task<BrainSnapshot> Read() => Task.FromResult(ToSnapshot());
 
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        await base.OnActivateAsync(cancellationToken);
+        if (Snapshot.EstablishedAt != default)
+        {
+            await PublishAsync(new Activated(this.GetPrimaryKeyString(), Snapshot.OwnerAccountId, Snapshot.Name));
+        }
+    }
+
     public async Task<BrainSnapshot> Establish(EstablishBrain request)
     {
         if (Snapshot.EstablishedAt == default)
@@ -24,6 +33,7 @@ internal sealed class BrainNeuron : Neuron<BrainState>, IBrain
             Snapshot.OwnerAccountId = request.OwnerAccountId;
             Snapshot.EstablishedAt = DateTimeOffset.UtcNow;
             await _store.WriteStateAsync();
+            await PublishAsync(new Activated(this.GetPrimaryKeyString(), Snapshot.OwnerAccountId, Snapshot.Name));
         }
         return ToSnapshot();
     }

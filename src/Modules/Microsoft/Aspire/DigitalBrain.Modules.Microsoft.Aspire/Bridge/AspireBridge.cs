@@ -43,10 +43,24 @@ internal sealed class AspireBridge
         }
         try
         {
-            await foreach (var command in _commands.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+            while (!cancellationToken.IsCancellationRequested)
             {
-                // A caller that already timed out or gave up must not have its command run later.
-                if (_pending.ContainsKey(command.Id)) { yield return command; }
+                // The endpoint proxy in front of the brain closes streams it considers idle,
+                // and every reconnect makes the AppHost re-push all resource state. A heartbeat
+                // keeps the stream visibly alive; the AppHost ignores the empty command.
+                var wait = _commands.Reader.WaitToReadAsync(cancellationToken).AsTask();
+                var tick = await Task.WhenAny(wait, Task.Delay(TimeSpan.FromSeconds(10), cancellationToken)).ConfigureAwait(false);
+                if (tick != wait)
+                {
+                    yield return new AspireBridgeCommand(Guid.Empty, "", "");
+                    continue;
+                }
+                if (!await wait.ConfigureAwait(false)) { yield break; }
+                while (_commands.Reader.TryRead(out var command))
+                {
+                    // A caller that already timed out or gave up must not have its command run later.
+                    if (_pending.ContainsKey(command.Id)) { yield return command; }
+                }
             }
         }
         finally

@@ -53,7 +53,7 @@
     <Using Include="DigitalBrain.Testing" />
   </ItemGroup>
   <ItemGroup Condition="$(MSBuildProjectName.EndsWith('.Tests.Unit'))">
-    <Using Include="DigitalBrain.Testing.Unit" />
+    <Using Include="DigitalBrain.Testing.Module" />
   </ItemGroup>
   <ItemGroup Condition="$(MSBuildProjectName.EndsWith('.Tests.E2E'))">
     <Using Include="DigitalBrain.Testing.E2E" />

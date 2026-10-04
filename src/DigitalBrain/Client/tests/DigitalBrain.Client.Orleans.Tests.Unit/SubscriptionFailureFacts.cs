@@ -1,6 +1,6 @@
 using DigitalBrain;
 using DigitalBrain.Contracts;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Orleans;
 using Xunit;
 

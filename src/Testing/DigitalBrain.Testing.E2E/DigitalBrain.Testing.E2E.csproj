@@ -29,6 +29,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../Modules/AI/DigitalBrain.Modules.AI.Aspire.Hosting/DigitalBrain.Modules.AI.Aspire.Hosting.csproj" />
+    <ProjectReference Include="../../DigitalBrain/OS/DigitalBrain.OS/DigitalBrain.OS.csproj" />
     <ProjectReference Include="../../Modules/AI/DigitalBrain.Modules.AI/DigitalBrain.Modules.AI.csproj" />
     <ProjectReference Include="../../Modules/ClickHouse/DigitalBrain.Modules.ClickHouse.Aspire.Hosting/DigitalBrain.Modules.ClickHouse.Aspire.Hosting.csproj" />
     <ProjectReference Include="../../Modules/ClickHouse/DigitalBrain.Modules.ClickHouse/DigitalBrain.Modules.ClickHouse.csproj" />

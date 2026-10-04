@@ -1,7 +1,7 @@
 using DigitalBrain.Contracts.Integrations;
 using DigitalBrain.Kernel;
 using DigitalBrain.Platform.Contracts.Integrations;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Orleans.Hosting;
 using Xunit;
 
@@ -13,7 +13,7 @@ public sealed class ScriptAccountFacts
     public async Task RequestingAKnownKindReturnsAnOpaqueRefAndAnUnknownKindIsRejected()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().WithModule<PostgresKindModule>().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().WithModule<PostgresKindModule>().StartAsync(ct);
         var accounts = brain.Get<IConnectionRequests>("brain-1");
 
         var kind = Assert.Single(await accounts.ListKinds());

@@ -11,6 +11,6 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
-    <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.CSharp.Tests.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Modules.Microsoft.CSharp.Tests" />
   </ItemGroup>
 </Project>

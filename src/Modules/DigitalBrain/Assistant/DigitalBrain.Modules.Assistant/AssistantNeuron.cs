@@ -28,7 +28,12 @@ internal sealed partial class AssistantNeuron(
     : Neuron<AssistantState>(store), IAssistant
 {
     private string Key => this.GetPrimaryKeyString();
-    public override DigitalBrain.Kernel.Enforcement.NeuronAccess Access(string operation) => new(Workspace);
+    // The model catalog is deployment-wide and already secret-free; the HTTP posture is its
+    // gate. Everything else belongs to the assistant's own workspace.
+    public override DigitalBrain.Kernel.Enforcement.NeuronAccess Access(string operation)
+        => operation is nameof(Models)
+            ? DigitalBrain.Kernel.Enforcement.NeuronAccess.PublicOperation
+            : new(Workspace);
     private ITextField Draft => GrainFactory.GetGrain<ITextField>(UiParts.NameOf(Key, AssistantSurface.DraftPart));
     public Task<AssistantState> Read() => Task.FromResult(Snapshot);
     // An assistant started for a workspace is keyed "{workspace}/applications/assistant".

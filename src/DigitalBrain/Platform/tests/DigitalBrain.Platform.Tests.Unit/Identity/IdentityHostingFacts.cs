@@ -22,7 +22,7 @@ public sealed class IdentityHostingFacts
     public async Task SharedBrainSessionRequiresMembershipAndUsesTheOwningAccount()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var directory = brain.Get<DigitalBrain.Platform.Contracts.Identity.IIdentityDirectory>(DigitalBrain.Platform.Contracts.Identity.IdentityGrains.Directory);
         var alice = await directory.RegisterAsync("alice", "correct-password", "Alice", ct);
         await directory.RegisterAsync("bob", "correct-password", "Bob", ct);
@@ -108,7 +108,7 @@ public sealed class IdentityHostingFacts
     public async Task LoginUsesTheHostCookieAndTheAccountGateKeepsCorsOnUnauthorizedResponses()
     {
         var ct = TestContext.Current.CancellationToken;
-        await using var brain = await UnitTest.Create().StartAsync(ct);
+        await using var brain = await ModuleTest.Create().StartAsync(ct);
         var builder = WebApplication.CreateBuilder();
         builder.Configuration[AuthOptions.PostureKey] = "Secured";
         builder.Configuration["DigitalBrain:Auth:Username"] = "bootstrap";

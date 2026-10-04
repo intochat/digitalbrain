@@ -1,7 +1,7 @@
 using DigitalBrain;
 using DigitalBrain.Contracts;
 using DigitalBrain.Kernel;
-using DigitalBrain.Testing.Unit;
+using DigitalBrain.Testing.Module;
 using Orleans;
 using Orleans.Concurrency;
 using Xunit;
