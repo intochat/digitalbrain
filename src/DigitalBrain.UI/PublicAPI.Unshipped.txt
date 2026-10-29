@@ -1,125 +1,110 @@
 #nullable enable
-DigitalBrain.UI.Collection
-DigitalBrain.UI.Collection.Collection(System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Entry!>! Entries) -> void
-DigitalBrain.UI.Collection.Deconstruct(out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Entry!>! Entries) -> void
-DigitalBrain.UI.Collection.Entries.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Entry!>!
-DigitalBrain.UI.Collection.Entries.init -> void
-DigitalBrain.UI.Collection.Equals(DigitalBrain.UI.Collection? other) -> bool
-DigitalBrain.UI.Column
-DigitalBrain.UI.Column.Children.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>!
-DigitalBrain.UI.Column.Children.init -> void
-DigitalBrain.UI.Column.Column(System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>! Children) -> void
-DigitalBrain.UI.Column.Deconstruct(out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>! Children) -> void
-DigitalBrain.UI.Column.Equals(DigitalBrain.UI.Column? other) -> bool
-DigitalBrain.UI.Entry
-DigitalBrain.UI.Entry.<Clone>$() -> DigitalBrain.UI.Entry!
-DigitalBrain.UI.Entry.Deconstruct(out string! Id, out string! Title, out string? Subtitle) -> void
-DigitalBrain.UI.Entry.Entry(string! Id, string! Title, string? Subtitle) -> void
-DigitalBrain.UI.Entry.Equals(DigitalBrain.UI.Entry? other) -> bool
-DigitalBrain.UI.Entry.Id.get -> string!
-DigitalBrain.UI.Entry.Id.init -> void
-DigitalBrain.UI.Entry.Subtitle.get -> string?
-DigitalBrain.UI.Entry.Subtitle.init -> void
-DigitalBrain.UI.Entry.Title.get -> string!
-DigitalBrain.UI.Entry.Title.init -> void
-DigitalBrain.UI.Entry.Trailing.get -> string?
-DigitalBrain.UI.Entry.Trailing.init -> void
-DigitalBrain.UI.IPresenter
-DigitalBrain.UI.IPresenter.Present(DigitalBrain.UI.View? side, DigitalBrain.UI.View? main) -> void
-DigitalBrain.UI.IPresenter.Toast(DigitalBrain.UI.Toast! toast) -> void
-DigitalBrain.UI.Node
-DigitalBrain.UI.Node.Node() -> void
-DigitalBrain.UI.Node.Node(DigitalBrain.UI.Node! original) -> void
-DigitalBrain.UI.Text
-DigitalBrain.UI.Text.Deconstruct(out string! Value) -> void
-DigitalBrain.UI.Text.Equals(DigitalBrain.UI.Text? other) -> bool
-DigitalBrain.UI.Text.Text(string! Value) -> void
-DigitalBrain.UI.Text.Value.get -> string!
-DigitalBrain.UI.Text.Value.init -> void
-DigitalBrain.UI.TextField
-DigitalBrain.UI.TextField.Deconstruct(out string! Name, out string? Value, out string? Placeholder) -> void
-DigitalBrain.UI.TextField.Equals(DigitalBrain.UI.TextField? other) -> bool
-DigitalBrain.UI.TextField.Name.get -> string!
-DigitalBrain.UI.TextField.Name.init -> void
-DigitalBrain.UI.TextField.Placeholder.get -> string?
-DigitalBrain.UI.TextField.Placeholder.init -> void
-DigitalBrain.UI.TextField.TextField(string! Name, string? Value, string? Placeholder) -> void
-DigitalBrain.UI.TextField.Value.get -> string?
-DigitalBrain.UI.TextField.Value.init -> void
-DigitalBrain.UI.Toast
-DigitalBrain.UI.Toast.Deconstruct(out string! Message) -> void
-DigitalBrain.UI.Toast.Equals(DigitalBrain.UI.Toast? other) -> bool
-DigitalBrain.UI.Toast.Message.get -> string!
-DigitalBrain.UI.Toast.Message.init -> void
-DigitalBrain.UI.Toast.Toast(string! Message) -> void
-DigitalBrain.UI.View
-DigitalBrain.UI.View.<Clone>$() -> DigitalBrain.UI.View!
-DigitalBrain.UI.View.Deconstruct(out string! Title, out DigitalBrain.UI.Node! Root) -> void
-DigitalBrain.UI.View.Equals(DigitalBrain.UI.View? other) -> bool
-DigitalBrain.UI.View.Root.get -> DigitalBrain.UI.Node!
-DigitalBrain.UI.View.Root.init -> void
-DigitalBrain.UI.View.Title.get -> string!
-DigitalBrain.UI.View.Title.init -> void
-DigitalBrain.UI.View.View(string! Title, DigitalBrain.UI.Node! Root) -> void
 abstract DigitalBrain.UI.Node.<Clone>$() -> DigitalBrain.UI.Node!
-override DigitalBrain.UI.Collection.<Clone>$() -> DigitalBrain.UI.Collection!
-override DigitalBrain.UI.Collection.Equals(object? obj) -> bool
-override DigitalBrain.UI.Collection.GetHashCode() -> int
-override DigitalBrain.UI.Collection.ToString() -> string!
-override DigitalBrain.UI.Column.<Clone>$() -> DigitalBrain.UI.Column!
-override DigitalBrain.UI.Column.Equals(object? obj) -> bool
-override DigitalBrain.UI.Column.GetHashCode() -> int
-override DigitalBrain.UI.Column.ToString() -> string!
-override DigitalBrain.UI.Entry.Equals(object? obj) -> bool
-override DigitalBrain.UI.Entry.GetHashCode() -> int
-override DigitalBrain.UI.Entry.ToString() -> string!
-override DigitalBrain.UI.Node.Equals(object? obj) -> bool
-override DigitalBrain.UI.Node.GetHashCode() -> int
-override DigitalBrain.UI.Node.ToString() -> string!
-override DigitalBrain.UI.Text.<Clone>$() -> DigitalBrain.UI.Text!
-override DigitalBrain.UI.Text.Equals(object? obj) -> bool
-override DigitalBrain.UI.Text.GetHashCode() -> int
-override DigitalBrain.UI.Text.ToString() -> string!
-override DigitalBrain.UI.TextField.<Clone>$() -> DigitalBrain.UI.TextField!
-override DigitalBrain.UI.TextField.Equals(object? obj) -> bool
-override DigitalBrain.UI.TextField.GetHashCode() -> int
-override DigitalBrain.UI.TextField.ToString() -> string!
-override DigitalBrain.UI.Toast.<Clone>$() -> DigitalBrain.UI.Toast!
-override DigitalBrain.UI.Toast.Equals(object? obj) -> bool
-override DigitalBrain.UI.Toast.GetHashCode() -> int
-override DigitalBrain.UI.Toast.ToString() -> string!
-override DigitalBrain.UI.View.Equals(object? obj) -> bool
-override DigitalBrain.UI.View.GetHashCode() -> int
-override DigitalBrain.UI.View.ToString() -> string!
-override sealed DigitalBrain.UI.Collection.Equals(DigitalBrain.UI.Node? other) -> bool
-override sealed DigitalBrain.UI.Column.Equals(DigitalBrain.UI.Node? other) -> bool
-override sealed DigitalBrain.UI.Text.Equals(DigitalBrain.UI.Node? other) -> bool
-override sealed DigitalBrain.UI.TextField.Equals(DigitalBrain.UI.Node? other) -> bool
-override sealed DigitalBrain.UI.Toast.Equals(DigitalBrain.UI.Node? other) -> bool
-static DigitalBrain.UI.Collection.operator !=(DigitalBrain.UI.Collection? left, DigitalBrain.UI.Collection? right) -> bool
-static DigitalBrain.UI.Collection.operator ==(DigitalBrain.UI.Collection? left, DigitalBrain.UI.Collection? right) -> bool
-static DigitalBrain.UI.Column.operator !=(DigitalBrain.UI.Column? left, DigitalBrain.UI.Column? right) -> bool
-static DigitalBrain.UI.Column.operator ==(DigitalBrain.UI.Column? left, DigitalBrain.UI.Column? right) -> bool
-static DigitalBrain.UI.Entry.operator !=(DigitalBrain.UI.Entry? left, DigitalBrain.UI.Entry? right) -> bool
-static DigitalBrain.UI.Entry.operator ==(DigitalBrain.UI.Entry? left, DigitalBrain.UI.Entry? right) -> bool
-static DigitalBrain.UI.Node.operator !=(DigitalBrain.UI.Node? left, DigitalBrain.UI.Node? right) -> bool
-static DigitalBrain.UI.Node.operator ==(DigitalBrain.UI.Node? left, DigitalBrain.UI.Node? right) -> bool
-static DigitalBrain.UI.Text.operator !=(DigitalBrain.UI.Text? left, DigitalBrain.UI.Text? right) -> bool
-static DigitalBrain.UI.Text.operator ==(DigitalBrain.UI.Text? left, DigitalBrain.UI.Text? right) -> bool
-static DigitalBrain.UI.TextField.operator !=(DigitalBrain.UI.TextField? left, DigitalBrain.UI.TextField? right) -> bool
-static DigitalBrain.UI.TextField.operator ==(DigitalBrain.UI.TextField? left, DigitalBrain.UI.TextField? right) -> bool
-static DigitalBrain.UI.Toast.operator !=(DigitalBrain.UI.Toast? left, DigitalBrain.UI.Toast? right) -> bool
-static DigitalBrain.UI.Toast.operator ==(DigitalBrain.UI.Toast? left, DigitalBrain.UI.Toast? right) -> bool
-static DigitalBrain.UI.View.operator !=(DigitalBrain.UI.View? left, DigitalBrain.UI.View? right) -> bool
-static DigitalBrain.UI.View.operator ==(DigitalBrain.UI.View? left, DigitalBrain.UI.View? right) -> bool
-virtual DigitalBrain.UI.Node.EqualityContract.get -> System.Type!
-virtual DigitalBrain.UI.Node.Equals(DigitalBrain.UI.Node? other) -> bool
-virtual DigitalBrain.UI.Node.PrintMembers(System.Text.StringBuilder! builder) -> bool
 const DigitalBrain.UI.ButtonTone.Accent = "accent" -> string!
 const DigitalBrain.UI.ButtonTone.Neutral = "neutral" -> string!
 const DigitalBrain.UI.Confirmation.ConfirmView.ConfirmationsNeuronKey = "confirmations" -> string!
 const DigitalBrain.UI.Confirmation.ConfirmView.ResolveOperation = "Resolve" -> string!
 const DigitalBrain.UI.Confirmation.ConfirmView.WaitingText = "Waiting for you to approve." -> string!
+const DigitalBrain.UI.SurfaceKind.Acrylic = "acrylic" -> string!
+const DigitalBrain.UI.SurfaceKind.Elevated = "elevated" -> string!
+const DigitalBrain.UI.SurfaceKind.Recessed = "recessed" -> string!
+DigitalBrain.UI.ApprovalCardNode
+DigitalBrain.UI.ApprovalCardNode.ApprovalCardNode(string! Id, string! Title, string! Summary, System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.ApprovalRowNode!>! Rows, string! ValueLabel = "Value", string! SystemName = "DigitalBrain", string! Status = "pending", DigitalBrain.UI.ButtonAction? OnApprove = null, DigitalBrain.UI.ButtonAction? OnReject = null, string? SourceNeuronUri = null) -> void
+DigitalBrain.UI.ApprovalCardNode.Deconstruct(out string! Id, out string! Title, out string! Summary, out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.ApprovalRowNode!>! Rows, out string! ValueLabel, out string! SystemName, out string! Status, out DigitalBrain.UI.ButtonAction? OnApprove, out DigitalBrain.UI.ButtonAction? OnReject, out string? SourceNeuronUri) -> void
+DigitalBrain.UI.ApprovalCardNode.Equals(DigitalBrain.UI.ApprovalCardNode? other) -> bool
+DigitalBrain.UI.ApprovalCardNode.Id.get -> string!
+DigitalBrain.UI.ApprovalCardNode.Id.init -> void
+DigitalBrain.UI.ApprovalCardNode.OnApprove.get -> DigitalBrain.UI.ButtonAction?
+DigitalBrain.UI.ApprovalCardNode.OnApprove.init -> void
+DigitalBrain.UI.ApprovalCardNode.OnReject.get -> DigitalBrain.UI.ButtonAction?
+DigitalBrain.UI.ApprovalCardNode.OnReject.init -> void
+DigitalBrain.UI.ApprovalCardNode.Rows.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.ApprovalRowNode!>!
+DigitalBrain.UI.ApprovalCardNode.Rows.init -> void
+DigitalBrain.UI.ApprovalCardNode.SourceNeuronUri.get -> string?
+DigitalBrain.UI.ApprovalCardNode.SourceNeuronUri.init -> void
+DigitalBrain.UI.ApprovalCardNode.Status.get -> string!
+DigitalBrain.UI.ApprovalCardNode.Status.init -> void
+DigitalBrain.UI.ApprovalCardNode.Summary.get -> string!
+DigitalBrain.UI.ApprovalCardNode.Summary.init -> void
+DigitalBrain.UI.ApprovalCardNode.SystemName.get -> string!
+DigitalBrain.UI.ApprovalCardNode.SystemName.init -> void
+DigitalBrain.UI.ApprovalCardNode.Title.get -> string!
+DigitalBrain.UI.ApprovalCardNode.Title.init -> void
+DigitalBrain.UI.ApprovalCardNode.ValueLabel.get -> string!
+DigitalBrain.UI.ApprovalCardNode.ValueLabel.init -> void
+DigitalBrain.UI.ApprovalRowNode
+DigitalBrain.UI.ApprovalRowNode.<Clone>$() -> DigitalBrain.UI.ApprovalRowNode!
+DigitalBrain.UI.ApprovalRowNode.Amount.get -> string?
+DigitalBrain.UI.ApprovalRowNode.Amount.init -> void
+DigitalBrain.UI.ApprovalRowNode.ApprovalRowNode(string! Label, string! OldValue, string! NewValue, string? Amount = null, bool Warn = false) -> void
+DigitalBrain.UI.ApprovalRowNode.Deconstruct(out string! Label, out string! OldValue, out string! NewValue, out string? Amount, out bool Warn) -> void
+DigitalBrain.UI.ApprovalRowNode.Equals(DigitalBrain.UI.ApprovalRowNode? other) -> bool
+DigitalBrain.UI.ApprovalRowNode.Label.get -> string!
+DigitalBrain.UI.ApprovalRowNode.Label.init -> void
+DigitalBrain.UI.ApprovalRowNode.NewValue.get -> string!
+DigitalBrain.UI.ApprovalRowNode.NewValue.init -> void
+DigitalBrain.UI.ApprovalRowNode.OldValue.get -> string!
+DigitalBrain.UI.ApprovalRowNode.OldValue.init -> void
+DigitalBrain.UI.ApprovalRowNode.Warn.get -> bool
+DigitalBrain.UI.ApprovalRowNode.Warn.init -> void
+DigitalBrain.UI.Badge
+DigitalBrain.UI.Badge.Badge(string! Label, string! Tone = "neutral", string? Icon = null) -> void
+DigitalBrain.UI.Badge.Deconstruct(out string! Label, out string! Tone, out string? Icon) -> void
+DigitalBrain.UI.Badge.Equals(DigitalBrain.UI.Badge? other) -> bool
+DigitalBrain.UI.Badge.Icon.get -> string?
+DigitalBrain.UI.Badge.Icon.init -> void
+DigitalBrain.UI.Badge.Label.get -> string!
+DigitalBrain.UI.Badge.Label.init -> void
+DigitalBrain.UI.Badge.Tone.get -> string!
+DigitalBrain.UI.Badge.Tone.init -> void
+DigitalBrain.UI.BrainGraphNode
+DigitalBrain.UI.BrainGraphNode.<Clone>$() -> DigitalBrain.UI.BrainGraphNode!
+DigitalBrain.UI.BrainGraphNode.BrainGraphNode(string! Id, string! Label, string! Uri, string! Kind, double X, double Y, double Z, string! Status = "idle", string? Subtitle = null, DigitalBrain.UI.ButtonAction? OnSelect = null) -> void
+DigitalBrain.UI.BrainGraphNode.Deconstruct(out string! Id, out string! Label, out string! Uri, out string! Kind, out double X, out double Y, out double Z, out string! Status, out string? Subtitle, out DigitalBrain.UI.ButtonAction? OnSelect) -> void
+DigitalBrain.UI.BrainGraphNode.Equals(DigitalBrain.UI.BrainGraphNode? other) -> bool
+DigitalBrain.UI.BrainGraphNode.Id.get -> string!
+DigitalBrain.UI.BrainGraphNode.Id.init -> void
+DigitalBrain.UI.BrainGraphNode.Kind.get -> string!
+DigitalBrain.UI.BrainGraphNode.Kind.init -> void
+DigitalBrain.UI.BrainGraphNode.Label.get -> string!
+DigitalBrain.UI.BrainGraphNode.Label.init -> void
+DigitalBrain.UI.BrainGraphNode.OnSelect.get -> DigitalBrain.UI.ButtonAction?
+DigitalBrain.UI.BrainGraphNode.OnSelect.init -> void
+DigitalBrain.UI.BrainGraphNode.Status.get -> string!
+DigitalBrain.UI.BrainGraphNode.Status.init -> void
+DigitalBrain.UI.BrainGraphNode.Subtitle.get -> string?
+DigitalBrain.UI.BrainGraphNode.Subtitle.init -> void
+DigitalBrain.UI.BrainGraphNode.Uri.get -> string!
+DigitalBrain.UI.BrainGraphNode.Uri.init -> void
+DigitalBrain.UI.BrainGraphNode.X.get -> double
+DigitalBrain.UI.BrainGraphNode.X.init -> void
+DigitalBrain.UI.BrainGraphNode.Y.get -> double
+DigitalBrain.UI.BrainGraphNode.Y.init -> void
+DigitalBrain.UI.BrainGraphNode.Z.get -> double
+DigitalBrain.UI.BrainGraphNode.Z.init -> void
+DigitalBrain.UI.BrainGraphSynapse
+DigitalBrain.UI.BrainGraphSynapse.<Clone>$() -> DigitalBrain.UI.BrainGraphSynapse!
+DigitalBrain.UI.BrainGraphSynapse.Active.get -> bool
+DigitalBrain.UI.BrainGraphSynapse.Active.init -> void
+DigitalBrain.UI.BrainGraphSynapse.BrainGraphSynapse(string! FromId, string! ToId, string? SignalLabel = null, bool Active = false) -> void
+DigitalBrain.UI.BrainGraphSynapse.Deconstruct(out string! FromId, out string! ToId, out string? SignalLabel, out bool Active) -> void
+DigitalBrain.UI.BrainGraphSynapse.Equals(DigitalBrain.UI.BrainGraphSynapse? other) -> bool
+DigitalBrain.UI.BrainGraphSynapse.FromId.get -> string!
+DigitalBrain.UI.BrainGraphSynapse.FromId.init -> void
+DigitalBrain.UI.BrainGraphSynapse.SignalLabel.get -> string?
+DigitalBrain.UI.BrainGraphSynapse.SignalLabel.init -> void
+DigitalBrain.UI.BrainGraphSynapse.ToId.get -> string!
+DigitalBrain.UI.BrainGraphSynapse.ToId.init -> void
+DigitalBrain.UI.BrainSceneNode
+DigitalBrain.UI.BrainSceneNode.BrainSceneNode(System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.BrainGraphNode!>! Nodes, System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.BrainGraphSynapse!>! Synapses, string? SelectedId = null) -> void
+DigitalBrain.UI.BrainSceneNode.Deconstruct(out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.BrainGraphNode!>! Nodes, out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.BrainGraphSynapse!>! Synapses, out string? SelectedId) -> void
+DigitalBrain.UI.BrainSceneNode.Equals(DigitalBrain.UI.BrainSceneNode? other) -> bool
+DigitalBrain.UI.BrainSceneNode.Nodes.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.BrainGraphNode!>!
+DigitalBrain.UI.BrainSceneNode.Nodes.init -> void
+DigitalBrain.UI.BrainSceneNode.SelectedId.get -> string?
+DigitalBrain.UI.BrainSceneNode.SelectedId.init -> void
+DigitalBrain.UI.BrainSceneNode.Synapses.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.BrainGraphSynapse!>!
+DigitalBrain.UI.BrainSceneNode.Synapses.init -> void
 DigitalBrain.UI.Button
 DigitalBrain.UI.Button.Action.get -> DigitalBrain.UI.ButtonAction!
 DigitalBrain.UI.Button.Action.init -> void
@@ -128,8 +113,14 @@ DigitalBrain.UI.Button.Deconstruct(out string! Label, out DigitalBrain.UI.Button
 DigitalBrain.UI.Button.Enabled.get -> bool
 DigitalBrain.UI.Button.Enabled.init -> void
 DigitalBrain.UI.Button.Equals(DigitalBrain.UI.Button? other) -> bool
+DigitalBrain.UI.Button.Icon.get -> string?
+DigitalBrain.UI.Button.Icon.init -> void
 DigitalBrain.UI.Button.Label.get -> string!
 DigitalBrain.UI.Button.Label.init -> void
+DigitalBrain.UI.Button.Small.get -> bool
+DigitalBrain.UI.Button.Small.init -> void
+DigitalBrain.UI.Button.Style.get -> string!
+DigitalBrain.UI.Button.Style.init -> void
 DigitalBrain.UI.Button.Tone.get -> string!
 DigitalBrain.UI.Button.Tone.init -> void
 DigitalBrain.UI.ButtonAction
@@ -154,7 +145,433 @@ DigitalBrain.UI.Card.Deconstruct(out string! Title, out string! Body, out System
 DigitalBrain.UI.Card.Equals(DigitalBrain.UI.Card? other) -> bool
 DigitalBrain.UI.Card.Title.get -> string!
 DigitalBrain.UI.Card.Title.init -> void
+DigitalBrain.UI.Chart
+DigitalBrain.UI.Chart.Chart(string! Kind, string! Title, System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.ChartPointNode!>! Points, System.Collections.Generic.IReadOnlyList<double>? ComparePoints = null, string! SeriesName = "", string! CompareName = "", string? SourceNeuronUri = null, string! From = "DigitalBrain", string! Prefix = "") -> void
+DigitalBrain.UI.Chart.CompareName.get -> string!
+DigitalBrain.UI.Chart.CompareName.init -> void
+DigitalBrain.UI.Chart.ComparePoints.get -> System.Collections.Generic.IReadOnlyList<double>?
+DigitalBrain.UI.Chart.ComparePoints.init -> void
+DigitalBrain.UI.Chart.Deconstruct(out string! Kind, out string! Title, out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.ChartPointNode!>! Points, out System.Collections.Generic.IReadOnlyList<double>? ComparePoints, out string! SeriesName, out string! CompareName, out string? SourceNeuronUri, out string! From, out string! Prefix) -> void
+DigitalBrain.UI.Chart.Equals(DigitalBrain.UI.Chart? other) -> bool
+DigitalBrain.UI.Chart.From.get -> string!
+DigitalBrain.UI.Chart.From.init -> void
+DigitalBrain.UI.Chart.Kind.get -> string!
+DigitalBrain.UI.Chart.Kind.init -> void
+DigitalBrain.UI.Chart.Points.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.ChartPointNode!>!
+DigitalBrain.UI.Chart.Points.init -> void
+DigitalBrain.UI.Chart.Prefix.get -> string!
+DigitalBrain.UI.Chart.Prefix.init -> void
+DigitalBrain.UI.Chart.SeriesName.get -> string!
+DigitalBrain.UI.Chart.SeriesName.init -> void
+DigitalBrain.UI.Chart.SourceNeuronUri.get -> string?
+DigitalBrain.UI.Chart.SourceNeuronUri.init -> void
+DigitalBrain.UI.Chart.Title.get -> string!
+DigitalBrain.UI.Chart.Title.init -> void
+DigitalBrain.UI.ChartPointNode
+DigitalBrain.UI.ChartPointNode.<Clone>$() -> DigitalBrain.UI.ChartPointNode!
+DigitalBrain.UI.ChartPointNode.ChartPointNode(string! Label, double Value) -> void
+DigitalBrain.UI.ChartPointNode.Deconstruct(out string! Label, out double Value) -> void
+DigitalBrain.UI.ChartPointNode.Equals(DigitalBrain.UI.ChartPointNode? other) -> bool
+DigitalBrain.UI.ChartPointNode.Label.get -> string!
+DigitalBrain.UI.ChartPointNode.Label.init -> void
+DigitalBrain.UI.ChartPointNode.Value.get -> double
+DigitalBrain.UI.ChartPointNode.Value.init -> void
+DigitalBrain.UI.ChoiceCardNode
+DigitalBrain.UI.ChoiceCardNode.ChoiceCardNode(string! Id, string! Question, System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.ChoiceOptionNode!>! Options, int? PickedIndex = null) -> void
+DigitalBrain.UI.ChoiceCardNode.Deconstruct(out string! Id, out string! Question, out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.ChoiceOptionNode!>! Options, out int? PickedIndex) -> void
+DigitalBrain.UI.ChoiceCardNode.Equals(DigitalBrain.UI.ChoiceCardNode? other) -> bool
+DigitalBrain.UI.ChoiceCardNode.Id.get -> string!
+DigitalBrain.UI.ChoiceCardNode.Id.init -> void
+DigitalBrain.UI.ChoiceCardNode.Options.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.ChoiceOptionNode!>!
+DigitalBrain.UI.ChoiceCardNode.Options.init -> void
+DigitalBrain.UI.ChoiceCardNode.PickedIndex.get -> int?
+DigitalBrain.UI.ChoiceCardNode.PickedIndex.init -> void
+DigitalBrain.UI.ChoiceCardNode.Question.get -> string!
+DigitalBrain.UI.ChoiceCardNode.Question.init -> void
+DigitalBrain.UI.ChoiceOptionNode
+DigitalBrain.UI.ChoiceOptionNode.<Clone>$() -> DigitalBrain.UI.ChoiceOptionNode!
+DigitalBrain.UI.ChoiceOptionNode.Action.get -> DigitalBrain.UI.ButtonAction?
+DigitalBrain.UI.ChoiceOptionNode.Action.init -> void
+DigitalBrain.UI.ChoiceOptionNode.ChoiceOptionNode(string! Title, string? Detail = null, DigitalBrain.UI.ButtonAction? Action = null, string? Icon = null) -> void
+DigitalBrain.UI.ChoiceOptionNode.Deconstruct(out string! Title, out string? Detail, out DigitalBrain.UI.ButtonAction? Action, out string? Icon) -> void
+DigitalBrain.UI.ChoiceOptionNode.Detail.get -> string?
+DigitalBrain.UI.ChoiceOptionNode.Detail.init -> void
+DigitalBrain.UI.ChoiceOptionNode.Equals(DigitalBrain.UI.ChoiceOptionNode? other) -> bool
+DigitalBrain.UI.ChoiceOptionNode.Icon.get -> string?
+DigitalBrain.UI.ChoiceOptionNode.Icon.init -> void
+DigitalBrain.UI.ChoiceOptionNode.Title.get -> string!
+DigitalBrain.UI.ChoiceOptionNode.Title.init -> void
+DigitalBrain.UI.Collection
+DigitalBrain.UI.Collection.Collection(System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Entry!>! Entries) -> void
+DigitalBrain.UI.Collection.Deconstruct(out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Entry!>! Entries) -> void
+DigitalBrain.UI.Collection.Entries.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Entry!>!
+DigitalBrain.UI.Collection.Entries.init -> void
+DigitalBrain.UI.Collection.Equals(DigitalBrain.UI.Collection? other) -> bool
+DigitalBrain.UI.Column
+DigitalBrain.UI.Column.Children.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>!
+DigitalBrain.UI.Column.Children.init -> void
+DigitalBrain.UI.Column.Column(System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>! Children) -> void
+DigitalBrain.UI.Column.Deconstruct(out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>! Children) -> void
+DigitalBrain.UI.Column.Equals(DigitalBrain.UI.Column? other) -> bool
+DigitalBrain.UI.Column.Extents.get -> System.Collections.Generic.IReadOnlyList<double>?
+DigitalBrain.UI.Column.Extents.init -> void
+DigitalBrain.UI.Column.Gap.get -> double
+DigitalBrain.UI.Column.Gap.init -> void
+DigitalBrain.UI.Column.Padding.get -> double
+DigitalBrain.UI.Column.Padding.init -> void
 DigitalBrain.UI.Confirmation.ConfirmView
+DigitalBrain.UI.DataTable
+DigitalBrain.UI.DataTable.Columns.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.UI.DataTable.Columns.init -> void
+DigitalBrain.UI.DataTable.DataTable(string! Title, System.Collections.Generic.IReadOnlyList<string!>! Columns, System.Collections.Generic.IReadOnlyList<System.Collections.Generic.IReadOnlyList<string!>!>! Rows, string? SourceNeuronUri = null, string! From = "DigitalBrain") -> void
+DigitalBrain.UI.DataTable.Deconstruct(out string! Title, out System.Collections.Generic.IReadOnlyList<string!>! Columns, out System.Collections.Generic.IReadOnlyList<System.Collections.Generic.IReadOnlyList<string!>!>! Rows, out string? SourceNeuronUri, out string! From) -> void
+DigitalBrain.UI.DataTable.Equals(DigitalBrain.UI.DataTable? other) -> bool
+DigitalBrain.UI.DataTable.From.get -> string!
+DigitalBrain.UI.DataTable.From.init -> void
+DigitalBrain.UI.DataTable.Rows.get -> System.Collections.Generic.IReadOnlyList<System.Collections.Generic.IReadOnlyList<string!>!>!
+DigitalBrain.UI.DataTable.Rows.init -> void
+DigitalBrain.UI.DataTable.SourceNeuronUri.get -> string?
+DigitalBrain.UI.DataTable.SourceNeuronUri.init -> void
+DigitalBrain.UI.DataTable.Title.get -> string!
+DigitalBrain.UI.DataTable.Title.init -> void
+DigitalBrain.UI.Divider
+DigitalBrain.UI.Divider.Deconstruct(out string? Label) -> void
+DigitalBrain.UI.Divider.Divider(string? Label = null) -> void
+DigitalBrain.UI.Divider.Equals(DigitalBrain.UI.Divider? other) -> bool
+DigitalBrain.UI.Divider.Label.get -> string?
+DigitalBrain.UI.Divider.Label.init -> void
+DigitalBrain.UI.DraftCardNode
+DigitalBrain.UI.DraftCardNode.Body.get -> string!
+DigitalBrain.UI.DraftCardNode.Body.init -> void
+DigitalBrain.UI.DraftCardNode.Channel.get -> string!
+DigitalBrain.UI.DraftCardNode.Channel.init -> void
+DigitalBrain.UI.DraftCardNode.Deconstruct(out string! Id, out string! Channel, out string! To, out string! Body, out string! From, out string? Subject, out string! Status, out DigitalBrain.UI.ButtonAction? OnSend, out DigitalBrain.UI.ButtonAction? OnDiscard) -> void
+DigitalBrain.UI.DraftCardNode.DraftCardNode(string! Id, string! Channel, string! To, string! Body, string! From, string? Subject = null, string! Status = "pending", DigitalBrain.UI.ButtonAction? OnSend = null, DigitalBrain.UI.ButtonAction? OnDiscard = null) -> void
+DigitalBrain.UI.DraftCardNode.Equals(DigitalBrain.UI.DraftCardNode? other) -> bool
+DigitalBrain.UI.DraftCardNode.From.get -> string!
+DigitalBrain.UI.DraftCardNode.From.init -> void
+DigitalBrain.UI.DraftCardNode.Id.get -> string!
+DigitalBrain.UI.DraftCardNode.Id.init -> void
+DigitalBrain.UI.DraftCardNode.OnDiscard.get -> DigitalBrain.UI.ButtonAction?
+DigitalBrain.UI.DraftCardNode.OnDiscard.init -> void
+DigitalBrain.UI.DraftCardNode.OnSend.get -> DigitalBrain.UI.ButtonAction?
+DigitalBrain.UI.DraftCardNode.OnSend.init -> void
+DigitalBrain.UI.DraftCardNode.Status.get -> string!
+DigitalBrain.UI.DraftCardNode.Status.init -> void
+DigitalBrain.UI.DraftCardNode.Subject.get -> string?
+DigitalBrain.UI.DraftCardNode.Subject.init -> void
+DigitalBrain.UI.DraftCardNode.To.get -> string!
+DigitalBrain.UI.DraftCardNode.To.init -> void
+DigitalBrain.UI.Entry
+DigitalBrain.UI.Entry.<Clone>$() -> DigitalBrain.UI.Entry!
+DigitalBrain.UI.Entry.Deconstruct(out string! Id, out string! Title, out string? Subtitle) -> void
+DigitalBrain.UI.Entry.Entry(string! Id, string! Title, string? Subtitle) -> void
+DigitalBrain.UI.Entry.Equals(DigitalBrain.UI.Entry? other) -> bool
+DigitalBrain.UI.Entry.Id.get -> string!
+DigitalBrain.UI.Entry.Id.init -> void
+DigitalBrain.UI.Entry.Subtitle.get -> string?
+DigitalBrain.UI.Entry.Subtitle.init -> void
+DigitalBrain.UI.Entry.Title.get -> string!
+DigitalBrain.UI.Entry.Title.init -> void
+DigitalBrain.UI.Entry.Trailing.get -> string?
+DigitalBrain.UI.Entry.Trailing.init -> void
+DigitalBrain.UI.Grid
+DigitalBrain.UI.Grid.Children.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>!
+DigitalBrain.UI.Grid.Children.init -> void
+DigitalBrain.UI.Grid.Columns.get -> int
+DigitalBrain.UI.Grid.Columns.init -> void
+DigitalBrain.UI.Grid.Deconstruct(out int Columns, out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>! Children, out double Gap) -> void
+DigitalBrain.UI.Grid.Equals(DigitalBrain.UI.Grid? other) -> bool
+DigitalBrain.UI.Grid.Gap.get -> double
+DigitalBrain.UI.Grid.Gap.init -> void
+DigitalBrain.UI.Grid.Grid(int Columns, System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>! Children, double Gap = 12) -> void
+DigitalBrain.UI.Heading
+DigitalBrain.UI.Heading.Deconstruct(out string! Value, out int Level, out string? Subtitle) -> void
+DigitalBrain.UI.Heading.Equals(DigitalBrain.UI.Heading? other) -> bool
+DigitalBrain.UI.Heading.Heading(string! Value, int Level = 2, string? Subtitle = null) -> void
+DigitalBrain.UI.Heading.Level.get -> int
+DigitalBrain.UI.Heading.Level.init -> void
+DigitalBrain.UI.Heading.Subtitle.get -> string?
+DigitalBrain.UI.Heading.Subtitle.init -> void
+DigitalBrain.UI.Heading.Value.get -> string!
+DigitalBrain.UI.Heading.Value.init -> void
+DigitalBrain.UI.InfoBar
+DigitalBrain.UI.InfoBar.Action.get -> DigitalBrain.UI.Button?
+DigitalBrain.UI.InfoBar.Action.init -> void
+DigitalBrain.UI.InfoBar.Deconstruct(out string! Title, out string! Message, out string! Tone, out DigitalBrain.UI.Button? Action) -> void
+DigitalBrain.UI.InfoBar.Equals(DigitalBrain.UI.InfoBar? other) -> bool
+DigitalBrain.UI.InfoBar.InfoBar(string! Title, string! Message, string! Tone = "neutral", DigitalBrain.UI.Button? Action = null) -> void
+DigitalBrain.UI.InfoBar.Message.get -> string!
+DigitalBrain.UI.InfoBar.Message.init -> void
+DigitalBrain.UI.InfoBar.Title.get -> string!
+DigitalBrain.UI.InfoBar.Title.init -> void
+DigitalBrain.UI.InfoBar.Tone.get -> string!
+DigitalBrain.UI.InfoBar.Tone.init -> void
+DigitalBrain.UI.IPresenter
+DigitalBrain.UI.IPresenter.Present(DigitalBrain.UI.View? side, DigitalBrain.UI.View? main) -> void
+DigitalBrain.UI.IPresenter.Toast(DigitalBrain.UI.Toast! toast) -> void
+DigitalBrain.UI.JobCardNode
+DigitalBrain.UI.JobCardNode.Deconstruct(out string! Title, out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.JobStepNode!>! Steps, out double Progress, out string! Status, out string? ResultText, out DigitalBrain.UI.ButtonAction? OnCancel) -> void
+DigitalBrain.UI.JobCardNode.Equals(DigitalBrain.UI.JobCardNode? other) -> bool
+DigitalBrain.UI.JobCardNode.JobCardNode(string! Title, System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.JobStepNode!>! Steps, double Progress = 0, string! Status = "running", string? ResultText = null, DigitalBrain.UI.ButtonAction? OnCancel = null) -> void
+DigitalBrain.UI.JobCardNode.OnCancel.get -> DigitalBrain.UI.ButtonAction?
+DigitalBrain.UI.JobCardNode.OnCancel.init -> void
+DigitalBrain.UI.JobCardNode.Progress.get -> double
+DigitalBrain.UI.JobCardNode.Progress.init -> void
+DigitalBrain.UI.JobCardNode.ResultText.get -> string?
+DigitalBrain.UI.JobCardNode.ResultText.init -> void
+DigitalBrain.UI.JobCardNode.Status.get -> string!
+DigitalBrain.UI.JobCardNode.Status.init -> void
+DigitalBrain.UI.JobCardNode.Steps.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.JobStepNode!>!
+DigitalBrain.UI.JobCardNode.Steps.init -> void
+DigitalBrain.UI.JobCardNode.Title.get -> string!
+DigitalBrain.UI.JobCardNode.Title.init -> void
+DigitalBrain.UI.JobStepNode
+DigitalBrain.UI.JobStepNode.<Clone>$() -> DigitalBrain.UI.JobStepNode!
+DigitalBrain.UI.JobStepNode.Deconstruct(out string! Label, out string! Status, out string? Detail) -> void
+DigitalBrain.UI.JobStepNode.Detail.get -> string?
+DigitalBrain.UI.JobStepNode.Detail.init -> void
+DigitalBrain.UI.JobStepNode.Equals(DigitalBrain.UI.JobStepNode? other) -> bool
+DigitalBrain.UI.JobStepNode.JobStepNode(string! Label, string! Status = "waiting", string? Detail = null) -> void
+DigitalBrain.UI.JobStepNode.Label.get -> string!
+DigitalBrain.UI.JobStepNode.Label.init -> void
+DigitalBrain.UI.JobStepNode.Status.get -> string!
+DigitalBrain.UI.JobStepNode.Status.init -> void
+DigitalBrain.UI.NeuronRef
+DigitalBrain.UI.NeuronRef.Deconstruct(out string! Kind, out string! NeuronUri) -> void
+DigitalBrain.UI.NeuronRef.Equals(DigitalBrain.UI.NeuronRef? other) -> bool
+DigitalBrain.UI.NeuronRef.Kind.get -> string!
+DigitalBrain.UI.NeuronRef.Kind.init -> void
+DigitalBrain.UI.NeuronRef.NeuronRef(string! Kind, string! NeuronUri) -> void
+DigitalBrain.UI.NeuronRef.NeuronUri.get -> string!
+DigitalBrain.UI.NeuronRef.NeuronUri.init -> void
+DigitalBrain.UI.Node
+DigitalBrain.UI.Node.Node() -> void
+DigitalBrain.UI.Node.Node(DigitalBrain.UI.Node! original) -> void
+DigitalBrain.UI.Progress
+DigitalBrain.UI.Progress.Deconstruct(out string! Label, out double Value, out string? Detail) -> void
+DigitalBrain.UI.Progress.Detail.get -> string?
+DigitalBrain.UI.Progress.Detail.init -> void
+DigitalBrain.UI.Progress.Equals(DigitalBrain.UI.Progress? other) -> bool
+DigitalBrain.UI.Progress.Label.get -> string!
+DigitalBrain.UI.Progress.Label.init -> void
+DigitalBrain.UI.Progress.Progress(string! Label, double Value, string? Detail = null) -> void
+DigitalBrain.UI.Progress.Value.get -> double
+DigitalBrain.UI.Progress.Value.init -> void
+DigitalBrain.UI.RecordCardNode
+DigitalBrain.UI.RecordCardNode.Deconstruct(out string! ObjectLabel, out string! Name, out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.RecordFieldNode!>! Fields, out string? Subtitle, out string! LinkLabel, out DigitalBrain.UI.ButtonAction? OnOpen) -> void
+DigitalBrain.UI.RecordCardNode.Equals(DigitalBrain.UI.RecordCardNode? other) -> bool
+DigitalBrain.UI.RecordCardNode.Fields.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.RecordFieldNode!>!
+DigitalBrain.UI.RecordCardNode.Fields.init -> void
+DigitalBrain.UI.RecordCardNode.LinkLabel.get -> string!
+DigitalBrain.UI.RecordCardNode.LinkLabel.init -> void
+DigitalBrain.UI.RecordCardNode.Name.get -> string!
+DigitalBrain.UI.RecordCardNode.Name.init -> void
+DigitalBrain.UI.RecordCardNode.ObjectLabel.get -> string!
+DigitalBrain.UI.RecordCardNode.ObjectLabel.init -> void
+DigitalBrain.UI.RecordCardNode.OnOpen.get -> DigitalBrain.UI.ButtonAction?
+DigitalBrain.UI.RecordCardNode.OnOpen.init -> void
+DigitalBrain.UI.RecordCardNode.RecordCardNode(string! ObjectLabel, string! Name, System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.RecordFieldNode!>! Fields, string? Subtitle = null, string! LinkLabel = "Open Neuron", DigitalBrain.UI.ButtonAction? OnOpen = null) -> void
+DigitalBrain.UI.RecordCardNode.Subtitle.get -> string?
+DigitalBrain.UI.RecordCardNode.Subtitle.init -> void
+DigitalBrain.UI.RecordFieldNode
+DigitalBrain.UI.RecordFieldNode.<Clone>$() -> DigitalBrain.UI.RecordFieldNode!
+DigitalBrain.UI.RecordFieldNode.Deconstruct(out string! Label, out string! Value, out bool Warn) -> void
+DigitalBrain.UI.RecordFieldNode.Equals(DigitalBrain.UI.RecordFieldNode? other) -> bool
+DigitalBrain.UI.RecordFieldNode.Label.get -> string!
+DigitalBrain.UI.RecordFieldNode.Label.init -> void
+DigitalBrain.UI.RecordFieldNode.RecordFieldNode(string! Label, string! Value, bool Warn = false) -> void
+DigitalBrain.UI.RecordFieldNode.Value.get -> string!
+DigitalBrain.UI.RecordFieldNode.Value.init -> void
+DigitalBrain.UI.RecordFieldNode.Warn.get -> bool
+DigitalBrain.UI.RecordFieldNode.Warn.init -> void
+DigitalBrain.UI.Row
+DigitalBrain.UI.Row.Children.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>!
+DigitalBrain.UI.Row.Children.init -> void
+DigitalBrain.UI.Row.Deconstruct(out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>! Children) -> void
+DigitalBrain.UI.Row.Equals(DigitalBrain.UI.Row? other) -> bool
+DigitalBrain.UI.Row.Extents.get -> System.Collections.Generic.IReadOnlyList<double>?
+DigitalBrain.UI.Row.Extents.init -> void
+DigitalBrain.UI.Row.Gap.get -> double
+DigitalBrain.UI.Row.Gap.init -> void
+DigitalBrain.UI.Row.Padding.get -> double
+DigitalBrain.UI.Row.Padding.init -> void
+DigitalBrain.UI.Row.Row(System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>! Children) -> void
+DigitalBrain.UI.SecretCardNode
+DigitalBrain.UI.SecretCardNode.Deconstruct(out string! Name, out string! Why, out string! SavedIn, out string! Status, out DigitalBrain.UI.ButtonAction? OnEnter, out DigitalBrain.UI.ButtonAction? OnSkip) -> void
+DigitalBrain.UI.SecretCardNode.Equals(DigitalBrain.UI.SecretCardNode? other) -> bool
+DigitalBrain.UI.SecretCardNode.Name.get -> string!
+DigitalBrain.UI.SecretCardNode.Name.init -> void
+DigitalBrain.UI.SecretCardNode.OnEnter.get -> DigitalBrain.UI.ButtonAction?
+DigitalBrain.UI.SecretCardNode.OnEnter.init -> void
+DigitalBrain.UI.SecretCardNode.OnSkip.get -> DigitalBrain.UI.ButtonAction?
+DigitalBrain.UI.SecretCardNode.OnSkip.init -> void
+DigitalBrain.UI.SecretCardNode.SavedIn.get -> string!
+DigitalBrain.UI.SecretCardNode.SavedIn.init -> void
+DigitalBrain.UI.SecretCardNode.SecretCardNode(string! Name, string! Why, string! SavedIn = "Variables and secrets", string! Status = "pending", DigitalBrain.UI.ButtonAction? OnEnter = null, DigitalBrain.UI.ButtonAction? OnSkip = null) -> void
+DigitalBrain.UI.SecretCardNode.Status.get -> string!
+DigitalBrain.UI.SecretCardNode.Status.init -> void
+DigitalBrain.UI.SecretCardNode.Why.get -> string!
+DigitalBrain.UI.SecretCardNode.Why.init -> void
+DigitalBrain.UI.Select
+DigitalBrain.UI.Select.Deconstruct(out string! Label, out string! Selected, out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.SelectOption!>! Options) -> void
+DigitalBrain.UI.Select.Equals(DigitalBrain.UI.Select? other) -> bool
+DigitalBrain.UI.Select.Label.get -> string!
+DigitalBrain.UI.Select.Label.init -> void
+DigitalBrain.UI.Select.Options.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.SelectOption!>!
+DigitalBrain.UI.Select.Options.init -> void
+DigitalBrain.UI.Select.Select(string! Label, string! Selected, System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.SelectOption!>! Options) -> void
+DigitalBrain.UI.Select.Selected.get -> string!
+DigitalBrain.UI.Select.Selected.init -> void
+DigitalBrain.UI.SelectOption
+DigitalBrain.UI.SelectOption.<Clone>$() -> DigitalBrain.UI.SelectOption!
+DigitalBrain.UI.SelectOption.Action.get -> DigitalBrain.UI.ButtonAction?
+DigitalBrain.UI.SelectOption.Action.init -> void
+DigitalBrain.UI.SelectOption.Deconstruct(out string! Id, out string! Label, out DigitalBrain.UI.ButtonAction? Action) -> void
+DigitalBrain.UI.SelectOption.Equals(DigitalBrain.UI.SelectOption? other) -> bool
+DigitalBrain.UI.SelectOption.Id.get -> string!
+DigitalBrain.UI.SelectOption.Id.init -> void
+DigitalBrain.UI.SelectOption.Label.get -> string!
+DigitalBrain.UI.SelectOption.Label.init -> void
+DigitalBrain.UI.SelectOption.SelectOption(string! Id, string! Label, DigitalBrain.UI.ButtonAction? Action = null) -> void
+DigitalBrain.UI.Spacer
+DigitalBrain.UI.Spacer.Deconstruct(out double Size) -> void
+DigitalBrain.UI.Spacer.Equals(DigitalBrain.UI.Spacer? other) -> bool
+DigitalBrain.UI.Spacer.Size.get -> double
+DigitalBrain.UI.Spacer.Size.init -> void
+DigitalBrain.UI.Spacer.Spacer(double Size = 12) -> void
+DigitalBrain.UI.SplitPane
+DigitalBrain.UI.SplitPane.Deconstruct(out DigitalBrain.UI.Node! Leading, out DigitalBrain.UI.Node! Trailing, out double LeadingExtent, out double Gap) -> void
+DigitalBrain.UI.SplitPane.Equals(DigitalBrain.UI.SplitPane? other) -> bool
+DigitalBrain.UI.SplitPane.Gap.get -> double
+DigitalBrain.UI.SplitPane.Gap.init -> void
+DigitalBrain.UI.SplitPane.Leading.get -> DigitalBrain.UI.Node!
+DigitalBrain.UI.SplitPane.Leading.init -> void
+DigitalBrain.UI.SplitPane.LeadingExtent.get -> double
+DigitalBrain.UI.SplitPane.LeadingExtent.init -> void
+DigitalBrain.UI.SplitPane.SplitPane(DigitalBrain.UI.Node! Leading, DigitalBrain.UI.Node! Trailing, double LeadingExtent = 280, double Gap = 16) -> void
+DigitalBrain.UI.SplitPane.Trailing.get -> DigitalBrain.UI.Node!
+DigitalBrain.UI.SplitPane.Trailing.init -> void
+DigitalBrain.UI.Surface
+DigitalBrain.UI.Surface.Children.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>!
+DigitalBrain.UI.Surface.Children.init -> void
+DigitalBrain.UI.Surface.Deconstruct(out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>! Children, out string! Kind, out string? Title, out string? Subtitle, out double Padding) -> void
+DigitalBrain.UI.Surface.Equals(DigitalBrain.UI.Surface? other) -> bool
+DigitalBrain.UI.Surface.Kind.get -> string!
+DigitalBrain.UI.Surface.Kind.init -> void
+DigitalBrain.UI.Surface.Padding.get -> double
+DigitalBrain.UI.Surface.Padding.init -> void
+DigitalBrain.UI.Surface.Subtitle.get -> string?
+DigitalBrain.UI.Surface.Subtitle.init -> void
+DigitalBrain.UI.Surface.Surface(System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>! Children, string! Kind = "acrylic", string? Title = null, string? Subtitle = null, double Padding = 18) -> void
+DigitalBrain.UI.Surface.Title.get -> string?
+DigitalBrain.UI.Surface.Title.init -> void
+DigitalBrain.UI.SurfaceKind
+DigitalBrain.UI.Switch
+DigitalBrain.UI.Switch.Action.get -> DigitalBrain.UI.ButtonAction?
+DigitalBrain.UI.Switch.Action.init -> void
+DigitalBrain.UI.Switch.Deconstruct(out string! Label, out bool IsOn, out DigitalBrain.UI.ButtonAction? Action, out bool Locked) -> void
+DigitalBrain.UI.Switch.Equals(DigitalBrain.UI.Switch? other) -> bool
+DigitalBrain.UI.Switch.IsOn.get -> bool
+DigitalBrain.UI.Switch.IsOn.init -> void
+DigitalBrain.UI.Switch.Label.get -> string!
+DigitalBrain.UI.Switch.Label.init -> void
+DigitalBrain.UI.Switch.Locked.get -> bool
+DigitalBrain.UI.Switch.Locked.init -> void
+DigitalBrain.UI.Switch.Switch(string! Label, bool IsOn, DigitalBrain.UI.ButtonAction? Action = null, bool Locked = false) -> void
+DigitalBrain.UI.TabItem
+DigitalBrain.UI.TabItem.<Clone>$() -> DigitalBrain.UI.TabItem!
+DigitalBrain.UI.TabItem.Action.get -> DigitalBrain.UI.ButtonAction!
+DigitalBrain.UI.TabItem.Action.init -> void
+DigitalBrain.UI.TabItem.Deconstruct(out string! Id, out string! Label, out DigitalBrain.UI.ButtonAction! Action, out string? Icon) -> void
+DigitalBrain.UI.TabItem.Equals(DigitalBrain.UI.TabItem? other) -> bool
+DigitalBrain.UI.TabItem.Icon.get -> string?
+DigitalBrain.UI.TabItem.Icon.init -> void
+DigitalBrain.UI.TabItem.Id.get -> string!
+DigitalBrain.UI.TabItem.Id.init -> void
+DigitalBrain.UI.TabItem.Label.get -> string!
+DigitalBrain.UI.TabItem.Label.init -> void
+DigitalBrain.UI.TabItem.TabItem(string! Id, string! Label, DigitalBrain.UI.ButtonAction! Action, string? Icon = null) -> void
+DigitalBrain.UI.Tabs
+DigitalBrain.UI.Tabs.Deconstruct(out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.TabItem!>! Items, out string! SelectedId) -> void
+DigitalBrain.UI.Tabs.Equals(DigitalBrain.UI.Tabs? other) -> bool
+DigitalBrain.UI.Tabs.Items.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.TabItem!>!
+DigitalBrain.UI.Tabs.Items.init -> void
+DigitalBrain.UI.Tabs.SelectedId.get -> string!
+DigitalBrain.UI.Tabs.SelectedId.init -> void
+DigitalBrain.UI.Tabs.Tabs(System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.TabItem!>! Items, string! SelectedId) -> void
+DigitalBrain.UI.TagPill
+DigitalBrain.UI.TagPill.Deconstruct(out string! Label, out string! Tone, out string? Icon) -> void
+DigitalBrain.UI.TagPill.Equals(DigitalBrain.UI.TagPill? other) -> bool
+DigitalBrain.UI.TagPill.Icon.get -> string?
+DigitalBrain.UI.TagPill.Icon.init -> void
+DigitalBrain.UI.TagPill.Label.get -> string!
+DigitalBrain.UI.TagPill.Label.init -> void
+DigitalBrain.UI.TagPill.TagPill(string! Label, string! Tone = "neutral", string? Icon = null) -> void
+DigitalBrain.UI.TagPill.Tone.get -> string!
+DigitalBrain.UI.TagPill.Tone.init -> void
+DigitalBrain.UI.Text
+DigitalBrain.UI.Text.Deconstruct(out string! Value) -> void
+DigitalBrain.UI.Text.Equals(DigitalBrain.UI.Text? other) -> bool
+DigitalBrain.UI.Text.Mono.get -> bool
+DigitalBrain.UI.Text.Mono.init -> void
+DigitalBrain.UI.Text.Size.get -> double?
+DigitalBrain.UI.Text.Size.init -> void
+DigitalBrain.UI.Text.Tabular.get -> bool
+DigitalBrain.UI.Text.Tabular.init -> void
+DigitalBrain.UI.Text.Text(string! Value) -> void
+DigitalBrain.UI.Text.Tone.get -> string!
+DigitalBrain.UI.Text.Tone.init -> void
+DigitalBrain.UI.Text.Value.get -> string!
+DigitalBrain.UI.Text.Value.init -> void
+DigitalBrain.UI.TextField
+DigitalBrain.UI.TextField.Deconstruct(out string! Name, out string? Value, out string? Placeholder) -> void
+DigitalBrain.UI.TextField.Equals(DigitalBrain.UI.TextField? other) -> bool
+DigitalBrain.UI.TextField.Name.get -> string!
+DigitalBrain.UI.TextField.Name.init -> void
+DigitalBrain.UI.TextField.OnSubmit.get -> DigitalBrain.UI.ButtonAction?
+DigitalBrain.UI.TextField.OnSubmit.init -> void
+DigitalBrain.UI.TextField.Placeholder.get -> string?
+DigitalBrain.UI.TextField.Placeholder.init -> void
+DigitalBrain.UI.TextField.TextField(string! Name, string? Value, string? Placeholder) -> void
+DigitalBrain.UI.TextField.Value.get -> string?
+DigitalBrain.UI.TextField.Value.init -> void
+DigitalBrain.UI.Toast
+DigitalBrain.UI.Toast.Deconstruct(out string! Message) -> void
+DigitalBrain.UI.Toast.Equals(DigitalBrain.UI.Toast? other) -> bool
+DigitalBrain.UI.Toast.Message.get -> string!
+DigitalBrain.UI.Toast.Message.init -> void
+DigitalBrain.UI.Toast.Toast(string! Message) -> void
+DigitalBrain.UI.View
+DigitalBrain.UI.View.<Clone>$() -> DigitalBrain.UI.View!
+DigitalBrain.UI.View.Deconstruct(out string! Title, out DigitalBrain.UI.Node! Root) -> void
+DigitalBrain.UI.View.Equals(DigitalBrain.UI.View? other) -> bool
+DigitalBrain.UI.View.Root.get -> DigitalBrain.UI.Node!
+DigitalBrain.UI.View.Root.init -> void
+DigitalBrain.UI.View.Title.get -> string!
+DigitalBrain.UI.View.Title.init -> void
+DigitalBrain.UI.View.View(string! Title, DigitalBrain.UI.Node! Root) -> void
+override DigitalBrain.UI.ApprovalCardNode.<Clone>$() -> DigitalBrain.UI.ApprovalCardNode!
+override DigitalBrain.UI.ApprovalCardNode.Equals(object? obj) -> bool
+override DigitalBrain.UI.ApprovalCardNode.GetHashCode() -> int
+override DigitalBrain.UI.ApprovalCardNode.ToString() -> string!
+override DigitalBrain.UI.ApprovalRowNode.Equals(object? obj) -> bool
+override DigitalBrain.UI.ApprovalRowNode.GetHashCode() -> int
+override DigitalBrain.UI.ApprovalRowNode.ToString() -> string!
+override DigitalBrain.UI.Badge.<Clone>$() -> DigitalBrain.UI.Badge!
+override DigitalBrain.UI.Badge.Equals(object? obj) -> bool
+override DigitalBrain.UI.Badge.GetHashCode() -> int
+override DigitalBrain.UI.Badge.ToString() -> string!
+override DigitalBrain.UI.BrainGraphNode.Equals(object? obj) -> bool
+override DigitalBrain.UI.BrainGraphNode.GetHashCode() -> int
+override DigitalBrain.UI.BrainGraphNode.ToString() -> string!
+override DigitalBrain.UI.BrainGraphSynapse.Equals(object? obj) -> bool
+override DigitalBrain.UI.BrainGraphSynapse.GetHashCode() -> int
+override DigitalBrain.UI.BrainGraphSynapse.ToString() -> string!
+override DigitalBrain.UI.BrainSceneNode.<Clone>$() -> DigitalBrain.UI.BrainSceneNode!
+override DigitalBrain.UI.BrainSceneNode.Equals(object? obj) -> bool
+override DigitalBrain.UI.BrainSceneNode.GetHashCode() -> int
+override DigitalBrain.UI.BrainSceneNode.ToString() -> string!
 override DigitalBrain.UI.Button.<Clone>$() -> DigitalBrain.UI.Button!
 override DigitalBrain.UI.Button.Equals(object? obj) -> bool
 override DigitalBrain.UI.Button.GetHashCode() -> int
@@ -166,13 +583,258 @@ override DigitalBrain.UI.Card.<Clone>$() -> DigitalBrain.UI.Card!
 override DigitalBrain.UI.Card.Equals(object? obj) -> bool
 override DigitalBrain.UI.Card.GetHashCode() -> int
 override DigitalBrain.UI.Card.ToString() -> string!
+override DigitalBrain.UI.Chart.<Clone>$() -> DigitalBrain.UI.Chart!
+override DigitalBrain.UI.Chart.Equals(object? obj) -> bool
+override DigitalBrain.UI.Chart.GetHashCode() -> int
+override DigitalBrain.UI.Chart.ToString() -> string!
+override DigitalBrain.UI.ChartPointNode.Equals(object? obj) -> bool
+override DigitalBrain.UI.ChartPointNode.GetHashCode() -> int
+override DigitalBrain.UI.ChartPointNode.ToString() -> string!
+override DigitalBrain.UI.ChoiceCardNode.<Clone>$() -> DigitalBrain.UI.ChoiceCardNode!
+override DigitalBrain.UI.ChoiceCardNode.Equals(object? obj) -> bool
+override DigitalBrain.UI.ChoiceCardNode.GetHashCode() -> int
+override DigitalBrain.UI.ChoiceCardNode.ToString() -> string!
+override DigitalBrain.UI.ChoiceOptionNode.Equals(object? obj) -> bool
+override DigitalBrain.UI.ChoiceOptionNode.GetHashCode() -> int
+override DigitalBrain.UI.ChoiceOptionNode.ToString() -> string!
+override DigitalBrain.UI.Collection.<Clone>$() -> DigitalBrain.UI.Collection!
+override DigitalBrain.UI.Collection.Equals(object? obj) -> bool
+override DigitalBrain.UI.Collection.GetHashCode() -> int
+override DigitalBrain.UI.Collection.ToString() -> string!
+override DigitalBrain.UI.Column.<Clone>$() -> DigitalBrain.UI.Column!
+override DigitalBrain.UI.Column.Equals(object? obj) -> bool
+override DigitalBrain.UI.Column.GetHashCode() -> int
+override DigitalBrain.UI.Column.ToString() -> string!
+override DigitalBrain.UI.DataTable.<Clone>$() -> DigitalBrain.UI.DataTable!
+override DigitalBrain.UI.DataTable.Equals(object? obj) -> bool
+override DigitalBrain.UI.DataTable.GetHashCode() -> int
+override DigitalBrain.UI.DataTable.ToString() -> string!
+override DigitalBrain.UI.Divider.<Clone>$() -> DigitalBrain.UI.Divider!
+override DigitalBrain.UI.Divider.Equals(object? obj) -> bool
+override DigitalBrain.UI.Divider.GetHashCode() -> int
+override DigitalBrain.UI.Divider.ToString() -> string!
+override DigitalBrain.UI.DraftCardNode.<Clone>$() -> DigitalBrain.UI.DraftCardNode!
+override DigitalBrain.UI.DraftCardNode.Equals(object? obj) -> bool
+override DigitalBrain.UI.DraftCardNode.GetHashCode() -> int
+override DigitalBrain.UI.DraftCardNode.ToString() -> string!
+override DigitalBrain.UI.Entry.Equals(object? obj) -> bool
+override DigitalBrain.UI.Entry.GetHashCode() -> int
+override DigitalBrain.UI.Entry.ToString() -> string!
+override DigitalBrain.UI.Grid.<Clone>$() -> DigitalBrain.UI.Grid!
+override DigitalBrain.UI.Grid.Equals(object? obj) -> bool
+override DigitalBrain.UI.Grid.GetHashCode() -> int
+override DigitalBrain.UI.Grid.ToString() -> string!
+override DigitalBrain.UI.Heading.<Clone>$() -> DigitalBrain.UI.Heading!
+override DigitalBrain.UI.Heading.Equals(object? obj) -> bool
+override DigitalBrain.UI.Heading.GetHashCode() -> int
+override DigitalBrain.UI.Heading.ToString() -> string!
+override DigitalBrain.UI.InfoBar.<Clone>$() -> DigitalBrain.UI.InfoBar!
+override DigitalBrain.UI.InfoBar.Equals(object? obj) -> bool
+override DigitalBrain.UI.InfoBar.GetHashCode() -> int
+override DigitalBrain.UI.InfoBar.ToString() -> string!
+override DigitalBrain.UI.JobCardNode.<Clone>$() -> DigitalBrain.UI.JobCardNode!
+override DigitalBrain.UI.JobCardNode.Equals(object? obj) -> bool
+override DigitalBrain.UI.JobCardNode.GetHashCode() -> int
+override DigitalBrain.UI.JobCardNode.ToString() -> string!
+override DigitalBrain.UI.JobStepNode.Equals(object? obj) -> bool
+override DigitalBrain.UI.JobStepNode.GetHashCode() -> int
+override DigitalBrain.UI.JobStepNode.ToString() -> string!
+override DigitalBrain.UI.NeuronRef.<Clone>$() -> DigitalBrain.UI.NeuronRef!
+override DigitalBrain.UI.NeuronRef.Equals(object? obj) -> bool
+override DigitalBrain.UI.NeuronRef.GetHashCode() -> int
+override DigitalBrain.UI.NeuronRef.ToString() -> string!
+override DigitalBrain.UI.Node.Equals(object? obj) -> bool
+override DigitalBrain.UI.Node.GetHashCode() -> int
+override DigitalBrain.UI.Node.ToString() -> string!
+override DigitalBrain.UI.Progress.<Clone>$() -> DigitalBrain.UI.Progress!
+override DigitalBrain.UI.Progress.Equals(object? obj) -> bool
+override DigitalBrain.UI.Progress.GetHashCode() -> int
+override DigitalBrain.UI.Progress.ToString() -> string!
+override DigitalBrain.UI.RecordCardNode.<Clone>$() -> DigitalBrain.UI.RecordCardNode!
+override DigitalBrain.UI.RecordCardNode.Equals(object? obj) -> bool
+override DigitalBrain.UI.RecordCardNode.GetHashCode() -> int
+override DigitalBrain.UI.RecordCardNode.ToString() -> string!
+override DigitalBrain.UI.RecordFieldNode.Equals(object? obj) -> bool
+override DigitalBrain.UI.RecordFieldNode.GetHashCode() -> int
+override DigitalBrain.UI.RecordFieldNode.ToString() -> string!
+override DigitalBrain.UI.Row.<Clone>$() -> DigitalBrain.UI.Row!
+override DigitalBrain.UI.Row.Equals(object? obj) -> bool
+override DigitalBrain.UI.Row.GetHashCode() -> int
+override DigitalBrain.UI.Row.ToString() -> string!
+override DigitalBrain.UI.SecretCardNode.<Clone>$() -> DigitalBrain.UI.SecretCardNode!
+override DigitalBrain.UI.SecretCardNode.Equals(object? obj) -> bool
+override DigitalBrain.UI.SecretCardNode.GetHashCode() -> int
+override DigitalBrain.UI.SecretCardNode.ToString() -> string!
+override DigitalBrain.UI.Select.<Clone>$() -> DigitalBrain.UI.Select!
+override DigitalBrain.UI.Select.Equals(object? obj) -> bool
+override DigitalBrain.UI.Select.GetHashCode() -> int
+override DigitalBrain.UI.Select.ToString() -> string!
+override DigitalBrain.UI.SelectOption.Equals(object? obj) -> bool
+override DigitalBrain.UI.SelectOption.GetHashCode() -> int
+override DigitalBrain.UI.SelectOption.ToString() -> string!
+override DigitalBrain.UI.Spacer.<Clone>$() -> DigitalBrain.UI.Spacer!
+override DigitalBrain.UI.Spacer.Equals(object? obj) -> bool
+override DigitalBrain.UI.Spacer.GetHashCode() -> int
+override DigitalBrain.UI.Spacer.ToString() -> string!
+override DigitalBrain.UI.SplitPane.<Clone>$() -> DigitalBrain.UI.SplitPane!
+override DigitalBrain.UI.SplitPane.Equals(object? obj) -> bool
+override DigitalBrain.UI.SplitPane.GetHashCode() -> int
+override DigitalBrain.UI.SplitPane.ToString() -> string!
+override DigitalBrain.UI.Surface.<Clone>$() -> DigitalBrain.UI.Surface!
+override DigitalBrain.UI.Surface.Equals(object? obj) -> bool
+override DigitalBrain.UI.Surface.GetHashCode() -> int
+override DigitalBrain.UI.Surface.ToString() -> string!
+override DigitalBrain.UI.Switch.<Clone>$() -> DigitalBrain.UI.Switch!
+override DigitalBrain.UI.Switch.Equals(object? obj) -> bool
+override DigitalBrain.UI.Switch.GetHashCode() -> int
+override DigitalBrain.UI.Switch.ToString() -> string!
+override DigitalBrain.UI.TabItem.Equals(object? obj) -> bool
+override DigitalBrain.UI.TabItem.GetHashCode() -> int
+override DigitalBrain.UI.TabItem.ToString() -> string!
+override DigitalBrain.UI.Tabs.<Clone>$() -> DigitalBrain.UI.Tabs!
+override DigitalBrain.UI.Tabs.Equals(object? obj) -> bool
+override DigitalBrain.UI.Tabs.GetHashCode() -> int
+override DigitalBrain.UI.Tabs.ToString() -> string!
+override DigitalBrain.UI.TagPill.<Clone>$() -> DigitalBrain.UI.TagPill!
+override DigitalBrain.UI.TagPill.Equals(object? obj) -> bool
+override DigitalBrain.UI.TagPill.GetHashCode() -> int
+override DigitalBrain.UI.TagPill.ToString() -> string!
+override DigitalBrain.UI.Text.<Clone>$() -> DigitalBrain.UI.Text!
+override DigitalBrain.UI.Text.Equals(object? obj) -> bool
+override DigitalBrain.UI.Text.GetHashCode() -> int
+override DigitalBrain.UI.Text.ToString() -> string!
+override DigitalBrain.UI.TextField.<Clone>$() -> DigitalBrain.UI.TextField!
+override DigitalBrain.UI.TextField.Equals(object? obj) -> bool
+override DigitalBrain.UI.TextField.GetHashCode() -> int
+override DigitalBrain.UI.TextField.ToString() -> string!
+override DigitalBrain.UI.Toast.<Clone>$() -> DigitalBrain.UI.Toast!
+override DigitalBrain.UI.Toast.Equals(object? obj) -> bool
+override DigitalBrain.UI.Toast.GetHashCode() -> int
+override DigitalBrain.UI.Toast.ToString() -> string!
+override DigitalBrain.UI.View.Equals(object? obj) -> bool
+override DigitalBrain.UI.View.GetHashCode() -> int
+override DigitalBrain.UI.View.ToString() -> string!
+override sealed DigitalBrain.UI.ApprovalCardNode.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.Badge.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.BrainSceneNode.Equals(DigitalBrain.UI.Node? other) -> bool
 override sealed DigitalBrain.UI.Button.Equals(DigitalBrain.UI.Node? other) -> bool
 override sealed DigitalBrain.UI.Card.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.Chart.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.ChoiceCardNode.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.Collection.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.Column.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.DataTable.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.Divider.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.DraftCardNode.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.Grid.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.Heading.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.InfoBar.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.JobCardNode.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.NeuronRef.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.Progress.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.RecordCardNode.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.Row.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.SecretCardNode.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.Select.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.Spacer.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.SplitPane.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.Surface.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.Switch.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.Tabs.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.TagPill.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.Text.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.TextField.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.Toast.Equals(DigitalBrain.UI.Node? other) -> bool
+static DigitalBrain.UI.ApprovalCardNode.operator !=(DigitalBrain.UI.ApprovalCardNode? left, DigitalBrain.UI.ApprovalCardNode? right) -> bool
+static DigitalBrain.UI.ApprovalCardNode.operator ==(DigitalBrain.UI.ApprovalCardNode? left, DigitalBrain.UI.ApprovalCardNode? right) -> bool
+static DigitalBrain.UI.ApprovalRowNode.operator !=(DigitalBrain.UI.ApprovalRowNode? left, DigitalBrain.UI.ApprovalRowNode? right) -> bool
+static DigitalBrain.UI.ApprovalRowNode.operator ==(DigitalBrain.UI.ApprovalRowNode? left, DigitalBrain.UI.ApprovalRowNode? right) -> bool
+static DigitalBrain.UI.Badge.operator !=(DigitalBrain.UI.Badge? left, DigitalBrain.UI.Badge? right) -> bool
+static DigitalBrain.UI.Badge.operator ==(DigitalBrain.UI.Badge? left, DigitalBrain.UI.Badge? right) -> bool
+static DigitalBrain.UI.BrainGraphNode.operator !=(DigitalBrain.UI.BrainGraphNode? left, DigitalBrain.UI.BrainGraphNode? right) -> bool
+static DigitalBrain.UI.BrainGraphNode.operator ==(DigitalBrain.UI.BrainGraphNode? left, DigitalBrain.UI.BrainGraphNode? right) -> bool
+static DigitalBrain.UI.BrainGraphSynapse.operator !=(DigitalBrain.UI.BrainGraphSynapse? left, DigitalBrain.UI.BrainGraphSynapse? right) -> bool
+static DigitalBrain.UI.BrainGraphSynapse.operator ==(DigitalBrain.UI.BrainGraphSynapse? left, DigitalBrain.UI.BrainGraphSynapse? right) -> bool
+static DigitalBrain.UI.BrainSceneNode.operator !=(DigitalBrain.UI.BrainSceneNode? left, DigitalBrain.UI.BrainSceneNode? right) -> bool
+static DigitalBrain.UI.BrainSceneNode.operator ==(DigitalBrain.UI.BrainSceneNode? left, DigitalBrain.UI.BrainSceneNode? right) -> bool
 static DigitalBrain.UI.Button.operator !=(DigitalBrain.UI.Button? left, DigitalBrain.UI.Button? right) -> bool
 static DigitalBrain.UI.Button.operator ==(DigitalBrain.UI.Button? left, DigitalBrain.UI.Button? right) -> bool
 static DigitalBrain.UI.ButtonAction.operator !=(DigitalBrain.UI.ButtonAction? left, DigitalBrain.UI.ButtonAction? right) -> bool
 static DigitalBrain.UI.ButtonAction.operator ==(DigitalBrain.UI.ButtonAction? left, DigitalBrain.UI.ButtonAction? right) -> bool
 static DigitalBrain.UI.Card.operator !=(DigitalBrain.UI.Card? left, DigitalBrain.UI.Card? right) -> bool
 static DigitalBrain.UI.Card.operator ==(DigitalBrain.UI.Card? left, DigitalBrain.UI.Card? right) -> bool
+static DigitalBrain.UI.Chart.operator !=(DigitalBrain.UI.Chart? left, DigitalBrain.UI.Chart? right) -> bool
+static DigitalBrain.UI.Chart.operator ==(DigitalBrain.UI.Chart? left, DigitalBrain.UI.Chart? right) -> bool
+static DigitalBrain.UI.ChartPointNode.operator !=(DigitalBrain.UI.ChartPointNode? left, DigitalBrain.UI.ChartPointNode? right) -> bool
+static DigitalBrain.UI.ChartPointNode.operator ==(DigitalBrain.UI.ChartPointNode? left, DigitalBrain.UI.ChartPointNode? right) -> bool
+static DigitalBrain.UI.ChoiceCardNode.operator !=(DigitalBrain.UI.ChoiceCardNode? left, DigitalBrain.UI.ChoiceCardNode? right) -> bool
+static DigitalBrain.UI.ChoiceCardNode.operator ==(DigitalBrain.UI.ChoiceCardNode? left, DigitalBrain.UI.ChoiceCardNode? right) -> bool
+static DigitalBrain.UI.ChoiceOptionNode.operator !=(DigitalBrain.UI.ChoiceOptionNode? left, DigitalBrain.UI.ChoiceOptionNode? right) -> bool
+static DigitalBrain.UI.ChoiceOptionNode.operator ==(DigitalBrain.UI.ChoiceOptionNode? left, DigitalBrain.UI.ChoiceOptionNode? right) -> bool
+static DigitalBrain.UI.Collection.operator !=(DigitalBrain.UI.Collection? left, DigitalBrain.UI.Collection? right) -> bool
+static DigitalBrain.UI.Collection.operator ==(DigitalBrain.UI.Collection? left, DigitalBrain.UI.Collection? right) -> bool
+static DigitalBrain.UI.Column.operator !=(DigitalBrain.UI.Column? left, DigitalBrain.UI.Column? right) -> bool
+static DigitalBrain.UI.Column.operator ==(DigitalBrain.UI.Column? left, DigitalBrain.UI.Column? right) -> bool
 static DigitalBrain.UI.Confirmation.ConfirmView.For(string! planId, string! title, string! body, string! approveLabel, string! denyLabel, System.TimeSpan expiry, bool viewerIsHuman) -> DigitalBrain.UI.Card!
 static DigitalBrain.UI.Confirmation.ConfirmView.Resolve(string! planId, bool approve) -> DigitalBrain.UI.ButtonAction!
+static DigitalBrain.UI.DataTable.operator !=(DigitalBrain.UI.DataTable? left, DigitalBrain.UI.DataTable? right) -> bool
+static DigitalBrain.UI.DataTable.operator ==(DigitalBrain.UI.DataTable? left, DigitalBrain.UI.DataTable? right) -> bool
+static DigitalBrain.UI.Divider.operator !=(DigitalBrain.UI.Divider? left, DigitalBrain.UI.Divider? right) -> bool
+static DigitalBrain.UI.Divider.operator ==(DigitalBrain.UI.Divider? left, DigitalBrain.UI.Divider? right) -> bool
+static DigitalBrain.UI.DraftCardNode.operator !=(DigitalBrain.UI.DraftCardNode? left, DigitalBrain.UI.DraftCardNode? right) -> bool
+static DigitalBrain.UI.DraftCardNode.operator ==(DigitalBrain.UI.DraftCardNode? left, DigitalBrain.UI.DraftCardNode? right) -> bool
+static DigitalBrain.UI.Entry.operator !=(DigitalBrain.UI.Entry? left, DigitalBrain.UI.Entry? right) -> bool
+static DigitalBrain.UI.Entry.operator ==(DigitalBrain.UI.Entry? left, DigitalBrain.UI.Entry? right) -> bool
+static DigitalBrain.UI.Grid.operator !=(DigitalBrain.UI.Grid? left, DigitalBrain.UI.Grid? right) -> bool
+static DigitalBrain.UI.Grid.operator ==(DigitalBrain.UI.Grid? left, DigitalBrain.UI.Grid? right) -> bool
+static DigitalBrain.UI.Heading.operator !=(DigitalBrain.UI.Heading? left, DigitalBrain.UI.Heading? right) -> bool
+static DigitalBrain.UI.Heading.operator ==(DigitalBrain.UI.Heading? left, DigitalBrain.UI.Heading? right) -> bool
+static DigitalBrain.UI.InfoBar.operator !=(DigitalBrain.UI.InfoBar? left, DigitalBrain.UI.InfoBar? right) -> bool
+static DigitalBrain.UI.InfoBar.operator ==(DigitalBrain.UI.InfoBar? left, DigitalBrain.UI.InfoBar? right) -> bool
+static DigitalBrain.UI.JobCardNode.operator !=(DigitalBrain.UI.JobCardNode? left, DigitalBrain.UI.JobCardNode? right) -> bool
+static DigitalBrain.UI.JobCardNode.operator ==(DigitalBrain.UI.JobCardNode? left, DigitalBrain.UI.JobCardNode? right) -> bool
+static DigitalBrain.UI.JobStepNode.operator !=(DigitalBrain.UI.JobStepNode? left, DigitalBrain.UI.JobStepNode? right) -> bool
+static DigitalBrain.UI.JobStepNode.operator ==(DigitalBrain.UI.JobStepNode? left, DigitalBrain.UI.JobStepNode? right) -> bool
+static DigitalBrain.UI.NeuronRef.operator !=(DigitalBrain.UI.NeuronRef? left, DigitalBrain.UI.NeuronRef? right) -> bool
+static DigitalBrain.UI.NeuronRef.operator ==(DigitalBrain.UI.NeuronRef? left, DigitalBrain.UI.NeuronRef? right) -> bool
+static DigitalBrain.UI.Node.operator !=(DigitalBrain.UI.Node? left, DigitalBrain.UI.Node? right) -> bool
+static DigitalBrain.UI.Node.operator ==(DigitalBrain.UI.Node? left, DigitalBrain.UI.Node? right) -> bool
+static DigitalBrain.UI.Progress.operator !=(DigitalBrain.UI.Progress? left, DigitalBrain.UI.Progress? right) -> bool
+static DigitalBrain.UI.Progress.operator ==(DigitalBrain.UI.Progress? left, DigitalBrain.UI.Progress? right) -> bool
+static DigitalBrain.UI.RecordCardNode.operator !=(DigitalBrain.UI.RecordCardNode? left, DigitalBrain.UI.RecordCardNode? right) -> bool
+static DigitalBrain.UI.RecordCardNode.operator ==(DigitalBrain.UI.RecordCardNode? left, DigitalBrain.UI.RecordCardNode? right) -> bool
+static DigitalBrain.UI.RecordFieldNode.operator !=(DigitalBrain.UI.RecordFieldNode? left, DigitalBrain.UI.RecordFieldNode? right) -> bool
+static DigitalBrain.UI.RecordFieldNode.operator ==(DigitalBrain.UI.RecordFieldNode? left, DigitalBrain.UI.RecordFieldNode? right) -> bool
+static DigitalBrain.UI.Row.operator !=(DigitalBrain.UI.Row? left, DigitalBrain.UI.Row? right) -> bool
+static DigitalBrain.UI.Row.operator ==(DigitalBrain.UI.Row? left, DigitalBrain.UI.Row? right) -> bool
+static DigitalBrain.UI.SecretCardNode.operator !=(DigitalBrain.UI.SecretCardNode? left, DigitalBrain.UI.SecretCardNode? right) -> bool
+static DigitalBrain.UI.SecretCardNode.operator ==(DigitalBrain.UI.SecretCardNode? left, DigitalBrain.UI.SecretCardNode? right) -> bool
+static DigitalBrain.UI.Select.operator !=(DigitalBrain.UI.Select? left, DigitalBrain.UI.Select? right) -> bool
+static DigitalBrain.UI.Select.operator ==(DigitalBrain.UI.Select? left, DigitalBrain.UI.Select? right) -> bool
+static DigitalBrain.UI.SelectOption.operator !=(DigitalBrain.UI.SelectOption? left, DigitalBrain.UI.SelectOption? right) -> bool
+static DigitalBrain.UI.SelectOption.operator ==(DigitalBrain.UI.SelectOption? left, DigitalBrain.UI.SelectOption? right) -> bool
+static DigitalBrain.UI.Spacer.operator !=(DigitalBrain.UI.Spacer? left, DigitalBrain.UI.Spacer? right) -> bool
+static DigitalBrain.UI.Spacer.operator ==(DigitalBrain.UI.Spacer? left, DigitalBrain.UI.Spacer? right) -> bool
+static DigitalBrain.UI.SplitPane.operator !=(DigitalBrain.UI.SplitPane? left, DigitalBrain.UI.SplitPane? right) -> bool
+static DigitalBrain.UI.SplitPane.operator ==(DigitalBrain.UI.SplitPane? left, DigitalBrain.UI.SplitPane? right) -> bool
+static DigitalBrain.UI.Surface.operator !=(DigitalBrain.UI.Surface? left, DigitalBrain.UI.Surface? right) -> bool
+static DigitalBrain.UI.Surface.operator ==(DigitalBrain.UI.Surface? left, DigitalBrain.UI.Surface? right) -> bool
+static DigitalBrain.UI.Switch.operator !=(DigitalBrain.UI.Switch? left, DigitalBrain.UI.Switch? right) -> bool
+static DigitalBrain.UI.Switch.operator ==(DigitalBrain.UI.Switch? left, DigitalBrain.UI.Switch? right) -> bool
+static DigitalBrain.UI.TabItem.operator !=(DigitalBrain.UI.TabItem? left, DigitalBrain.UI.TabItem? right) -> bool
+static DigitalBrain.UI.TabItem.operator ==(DigitalBrain.UI.TabItem? left, DigitalBrain.UI.TabItem? right) -> bool
+static DigitalBrain.UI.Tabs.operator !=(DigitalBrain.UI.Tabs? left, DigitalBrain.UI.Tabs? right) -> bool
+static DigitalBrain.UI.Tabs.operator ==(DigitalBrain.UI.Tabs? left, DigitalBrain.UI.Tabs? right) -> bool
+static DigitalBrain.UI.TagPill.operator !=(DigitalBrain.UI.TagPill? left, DigitalBrain.UI.TagPill? right) -> bool
+static DigitalBrain.UI.TagPill.operator ==(DigitalBrain.UI.TagPill? left, DigitalBrain.UI.TagPill? right) -> bool
+static DigitalBrain.UI.Text.operator !=(DigitalBrain.UI.Text? left, DigitalBrain.UI.Text? right) -> bool
+static DigitalBrain.UI.Text.operator ==(DigitalBrain.UI.Text? left, DigitalBrain.UI.Text? right) -> bool
+static DigitalBrain.UI.TextField.operator !=(DigitalBrain.UI.TextField? left, DigitalBrain.UI.TextField? right) -> bool
+static DigitalBrain.UI.TextField.operator ==(DigitalBrain.UI.TextField? left, DigitalBrain.UI.TextField? right) -> bool
+static DigitalBrain.UI.Toast.operator !=(DigitalBrain.UI.Toast? left, DigitalBrain.UI.Toast? right) -> bool
+static DigitalBrain.UI.Toast.operator ==(DigitalBrain.UI.Toast? left, DigitalBrain.UI.Toast? right) -> bool
+static DigitalBrain.UI.View.operator !=(DigitalBrain.UI.View? left, DigitalBrain.UI.View? right) -> bool
+static DigitalBrain.UI.View.operator ==(DigitalBrain.UI.View? left, DigitalBrain.UI.View? right) -> bool
+virtual DigitalBrain.UI.Node.EqualityContract.get -> System.Type!
+virtual DigitalBrain.UI.Node.Equals(DigitalBrain.UI.Node? other) -> bool
+virtual DigitalBrain.UI.Node.PrintMembers(System.Text.StringBuilder! builder) -> bool

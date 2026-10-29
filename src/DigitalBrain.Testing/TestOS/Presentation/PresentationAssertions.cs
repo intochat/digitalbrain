@@ -45,7 +45,23 @@ public sealed class PresentedView
     public IReadOnlyList<Entry> Entries => [.. Nodes.OfType<Collection>().SelectMany(collection => collection.Entries)];
 
     /// <summary>The text values of the view, in order.</summary>
-    public IReadOnlyList<string> Texts => [.. Nodes.OfType<Text>().Select(text => text.Value)];
+    public IReadOnlyList<string> Texts =>
+    [
+        .. Nodes.SelectMany(node => node switch
+        {
+            Text text => [text.Value],
+            Heading { Subtitle: { Length: > 0 } sub } heading => new[] { heading.Value, sub },
+            Heading heading => [heading.Value],
+            InfoBar info => new[] { info.Title, info.Message },
+            ApprovalCardNode approval => new[] { approval.Title, approval.Summary, approval.Status, approval.SourceNeuronUri ?? string.Empty }.Where(s => s.Length > 0).ToArray(),
+            DataTable table => new[] { table.Title, table.SourceNeuronUri ?? string.Empty }.Where(s => s.Length > 0).ToArray(),
+            Chart chart => new[] { chart.Title, chart.SourceNeuronUri ?? string.Empty }.Where(s => s.Length > 0).ToArray(),
+            RecordCardNode record => new[] { record.ObjectLabel, record.Name, record.Subtitle ?? string.Empty }.Where(s => s.Length > 0).ToArray(),
+            BrainSceneNode scene => new[] { $"3D BrainScene ({scene.Nodes.Count} nodes, {scene.Synapses.Count} synapses)" }.Concat(scene.Nodes.Select(n => $"{n.Label} ({n.Uri})")).ToArray(),
+            NeuronRef nref => [nref.NeuronUri],
+            _ => Array.Empty<string>(),
+        }),
+    ];
 
     /// <summary>The text fields of the view, in order.</summary>
     public IReadOnlyList<TextField> Fields => [.. Nodes.OfType<TextField>()];
@@ -72,10 +88,17 @@ public sealed class PresentedView
     private static IEnumerable<Node> Walk(Node node)
     {
         yield return node;
-        if (node is Column column)
+        var children = node switch
         {
-            foreach (var child in column.Children.SelectMany(Walk)) { yield return child; }
-        }
+            Column column => column.Children,
+            Row row => row.Children,
+            Grid grid => grid.Children,
+            SplitPane split => [split.Leading, split.Trailing],
+            Surface surface => surface.Children,
+            Card card => card.Children,
+            _ => [],
+        };
+        foreach (var child in children.SelectMany(Walk)) { yield return child; }
     }
 }
 
