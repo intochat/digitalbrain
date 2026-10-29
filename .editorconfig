@@ -1,0 +1,19 @@
+root = true
+
+[*]
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{csproj,props,targets,slnx,xml,json,yml,yaml,mts,mjs,md,config}]
+indent_size = 2
+
+[*.{cs,vb}]
+dotnet_analyzer_diagnostic.category-Style.severity = none
+dotnet_diagnostic.IDE0005.severity = none
+dotnet_diagnostic.IDE0008.severity = none
+dotnet_diagnostic.IDE0130.severity = none
+dotnet_diagnostic.IDE0160.severity = none
+dotnet_diagnostic.CA1716.severity = none
