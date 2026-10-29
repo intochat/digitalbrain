@@ -17,7 +17,7 @@ public sealed class APP_CLASSFacts
     [Fact]
     public async Task Opening_shows_the_start_view()
     {
-        var report = await BddRunner.VerifyAsync<APP_CLASS>();
+        var report = await BddRunner.VerifyAsync<APP_CLASS>(cancellationToken: TestContext.Current.CancellationToken);
         Assert.True(report.Passed);
 
         await using var os = TestOS.Local();

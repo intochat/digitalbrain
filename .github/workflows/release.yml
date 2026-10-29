@@ -25,6 +25,7 @@ jobs:
     environment: nuget-release
     permissions:
       contents: read
+      packages: write
       id-token: write
     steps:
       - uses: actions/checkout@v7
@@ -45,7 +46,12 @@ jobs:
         run: |
           dotnet pack DigitalBrain.slnx -c Release -o artifacts
           dotnet pack templates/DigitalBrain.Templates/DigitalBrain.Templates.csproj -c Release -o artifacts
-          [ "$(find artifacts -maxdepth 1 -name "*.nupkg" | wc -l)" -eq 10 ] || { echo "::error::expected 10 packages"; ls artifacts; exit 1; }
+          [ "$(find artifacts -maxdepth 1 -name "*.nupkg" | wc -l)" -eq 13 ] || { echo "::error::expected 13 packages"; ls artifacts; exit 1; }
+
+      - name: Push to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: dotnet nuget push "artifacts/*.nupkg" --source https://nuget.pkg.github.com/intochat/index.json --api-key "${GITHUB_TOKEN}" --skip-duplicate
 
       - name: NuGet login (Trusted Publishing)
         id: login
