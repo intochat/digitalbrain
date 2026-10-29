@@ -1,4 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>DigitalBrain.Apps.Packaging</PackageId>
+    <Description>DigitalBrain app bundle packaging and validation.</Description>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
   </ItemGroup>

@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>DigitalBrain.Testing.Silo</PackageId>
     <RootNamespace>DigitalBrain.Testing</RootNamespace>
     <Description>Runs one fact body on TestOS and on the in-process silo (SiloHost.Local).</Description>
   </PropertyGroup>

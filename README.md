@@ -63,8 +63,8 @@ public sealed class CalculatorApp : App<CalculatorState>
 | `DigitalBrain.Testing.Silo` | Dual-tier harness running the same fact on `TestOS.Local()` and `SiloHost.Local()`. |
 | `DigitalBrain.Analyzers` | Compile-time analyzers enforcing reaction shapes, spec comments, and module invariants. |
 | `DigitalBrain.Templates` | `dotnet new intochat-app` and `dotnet new intochat-module`. |
-| `DigitalBrain.Runtime.Orleans` | Distributed Orleans runtime for `local` and `local+cloud` topologies. |
-| `DigitalBrain.Runtime.Orleans.Azure` | Cloud topology provider on Azure Storage and Key Vault. |
+| `DigitalBrain.Runtime.Orleans` | Distributed Orleans runtime for `LocalProfile` and `LocalCloudProfile`. |
+| `DigitalBrain.Runtime.Orleans.Azure` | `CloudProfile` on Azure Storage and Key Vault. |
 | `DigitalBrain.Runtime.Http` | ASP.NET Core edge seam for module routes, webhooks, and session cookies. |
 
 ## Documentation & Ecosystem

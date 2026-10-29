@@ -26,5 +26,8 @@
     <InternalsVisibleTo Include="DigitalBrain.Runtime.Orleans.Tests.Integration" />
     <!-- 04-15: the framework e2e reaches RuntimeTestHooks; the hooks stay internal so no production host can call them. -->
     <InternalsVisibleTo Include="DigitalBrain.Framework.Tests.E2E" />
+    <InternalsVisibleTo Include="IntoChat.OS.Kernel.Composition" />
+    <InternalsVisibleTo Include="IntoChat.OS.Kernel.Tests.Integration" />
+    <InternalsVisibleTo Include="IntoChat.OS.Kernel.Composition.Tests.Integration" />
   </ItemGroup>
 </Project>
