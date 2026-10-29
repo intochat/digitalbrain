@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DigitalBrain.Testing</RootNamespace>
+    <Description>Runs one fact body on TestOS and on the in-process silo (SiloHost.Local).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="../DigitalBrain.Runtime.Orleans/DigitalBrain.Runtime.Orleans.csproj" />
+    <PackageReference Include="xunit.v3.extensibility.core" />
+    <PackageReference Include="xunit.v3.assert" />
+  </ItemGroup>
+</Project>

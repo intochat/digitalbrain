@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>MODULE_NAMESPACE</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="DigitalBrain" />
+    <InternalsVisibleTo Include="MODULE_NAME.Tests.Unit" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,81 @@
+#nullable enable
+DigitalBrain.Capabilities.Secrets.ISecrets
+DigitalBrain.Capabilities.Secrets.ISecrets.Remove(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Secrets.ISecrets.Resolve(DigitalBrain.Capabilities.Secrets.SecretRef! secret, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+DigitalBrain.Capabilities.Secrets.ISecrets.Set(string! name, string! label, string! value, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Secrets.SecretRef!>!
+DigitalBrain.Capabilities.Secrets.SecretDenied
+DigitalBrain.Capabilities.Secrets.SecretDenied.SecretDenied(string! name, System.Exception? innerException = null) -> void
+DigitalBrain.Capabilities.Secrets.SecretException
+DigitalBrain.Capabilities.Secrets.SecretException.Code.get -> string!
+DigitalBrain.Capabilities.Secrets.SecretException.Name.get -> string!
+DigitalBrain.Capabilities.Secrets.SecretException.SecretException(string! code, string! name, System.Exception? innerException) -> void
+DigitalBrain.Capabilities.Secrets.SecretNotFound
+DigitalBrain.Capabilities.Secrets.SecretNotFound.SecretNotFound(string! name, System.Exception? innerException = null) -> void
+DigitalBrain.Capabilities.Secrets.SecretRef
+DigitalBrain.Capabilities.Secrets.SecretRef.<Clone>$() -> DigitalBrain.Capabilities.Secrets.SecretRef!
+DigitalBrain.Capabilities.Secrets.SecretRef.Equals(DigitalBrain.Capabilities.Secrets.SecretRef? other) -> bool
+DigitalBrain.Capabilities.Secrets.SecretRef.IsSet.get -> bool
+DigitalBrain.Capabilities.Secrets.SecretRef.Label.get -> string!
+DigitalBrain.Capabilities.Secrets.SecretRef.Label.init -> void
+DigitalBrain.Capabilities.Secrets.SecretRef.Reference.get -> string!
+DigitalBrain.Capabilities.Secrets.SecretRef.Reference.init -> void
+DigitalBrain.Capabilities.Secrets.SecretRef.SecretRef() -> void
+DigitalBrain.Capabilities.Secrets.SecretRef.Status.get -> DigitalBrain.Capabilities.Secrets.SecretStatus
+DigitalBrain.Capabilities.Secrets.SecretRef.Status.init -> void
+DigitalBrain.Capabilities.Secrets.SecretStatus
+DigitalBrain.Capabilities.Secrets.SecretStatus.Set = 1 -> DigitalBrain.Capabilities.Secrets.SecretStatus
+DigitalBrain.Capabilities.Secrets.SecretStatus.Unset = 0 -> DigitalBrain.Capabilities.Secrets.SecretStatus
+override DigitalBrain.Capabilities.Secrets.SecretRef.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Secrets.SecretRef.GetHashCode() -> int
+override DigitalBrain.Capabilities.Secrets.SecretRef.ToString() -> string!
+static DigitalBrain.Capabilities.Secrets.SecretRef.operator !=(DigitalBrain.Capabilities.Secrets.SecretRef? left, DigitalBrain.Capabilities.Secrets.SecretRef? right) -> bool
+static DigitalBrain.Capabilities.Secrets.SecretRef.operator ==(DigitalBrain.Capabilities.Secrets.SecretRef? left, DigitalBrain.Capabilities.Secrets.SecretRef? right) -> bool
+static DigitalBrain.Capabilities.Secrets.SecretRef.Unset(string! reference, string! label) -> DigitalBrain.Capabilities.Secrets.SecretRef!
+DigitalBrain.Capabilities.Secrets.ISecretVaultPort
+DigitalBrain.Capabilities.Secrets.ISecretVaultPort.Remove(DigitalBrain.Capabilities.CapabilityCaller! caller, string! name, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Secrets.SecretVaultStatus>!
+DigitalBrain.Capabilities.Secrets.ISecretVaultPort.Resolve(DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.Capabilities.Secrets.SecretRef! secret, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Secrets.SecretVaultResult!>!
+DigitalBrain.Capabilities.Secrets.ISecretVaultPort.Set(DigitalBrain.Capabilities.CapabilityCaller! caller, string! name, string! label, string! value, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Secrets.SecretVaultResult!>!
+DigitalBrain.Capabilities.Secrets.SecretVaultResult
+DigitalBrain.Capabilities.Secrets.SecretVaultResult.<Clone>$() -> DigitalBrain.Capabilities.Secrets.SecretVaultResult!
+DigitalBrain.Capabilities.Secrets.SecretVaultResult.Equals(DigitalBrain.Capabilities.Secrets.SecretVaultResult? other) -> bool
+DigitalBrain.Capabilities.Secrets.SecretVaultResult.Secret.get -> DigitalBrain.Capabilities.Secrets.SecretRef?
+DigitalBrain.Capabilities.Secrets.SecretVaultResult.Secret.init -> void
+DigitalBrain.Capabilities.Secrets.SecretVaultResult.SecretVaultResult() -> void
+DigitalBrain.Capabilities.Secrets.SecretVaultResult.Status.get -> DigitalBrain.Capabilities.Secrets.SecretVaultStatus
+DigitalBrain.Capabilities.Secrets.SecretVaultResult.Status.init -> void
+DigitalBrain.Capabilities.Secrets.SecretVaultResult.Value.get -> string?
+DigitalBrain.Capabilities.Secrets.SecretVaultResult.Value.init -> void
+DigitalBrain.Capabilities.Secrets.SecretVaultStatus
+DigitalBrain.Capabilities.Secrets.SecretVaultStatus.Denied = 2 -> DigitalBrain.Capabilities.Secrets.SecretVaultStatus
+DigitalBrain.Capabilities.Secrets.SecretVaultStatus.NotFound = 1 -> DigitalBrain.Capabilities.Secrets.SecretVaultStatus
+DigitalBrain.Capabilities.Secrets.SecretVaultStatus.Ok = 0 -> DigitalBrain.Capabilities.Secrets.SecretVaultStatus
+override DigitalBrain.Capabilities.Secrets.SecretVaultResult.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Secrets.SecretVaultResult.GetHashCode() -> int
+override DigitalBrain.Capabilities.Secrets.SecretVaultResult.ToString() -> string!
+static DigitalBrain.Capabilities.Secrets.SecretVaultResult.Denied.get -> DigitalBrain.Capabilities.Secrets.SecretVaultResult!
+static DigitalBrain.Capabilities.Secrets.SecretVaultResult.NotFound.get -> DigitalBrain.Capabilities.Secrets.SecretVaultResult!
+static DigitalBrain.Capabilities.Secrets.SecretVaultResult.Resolved(string! value) -> DigitalBrain.Capabilities.Secrets.SecretVaultResult!
+static DigitalBrain.Capabilities.Secrets.SecretVaultResult.Stored(DigitalBrain.Capabilities.Secrets.SecretRef! secret) -> DigitalBrain.Capabilities.Secrets.SecretVaultResult!
+static DigitalBrain.Capabilities.Secrets.SecretVaultResult.operator !=(DigitalBrain.Capabilities.Secrets.SecretVaultResult? left, DigitalBrain.Capabilities.Secrets.SecretVaultResult? right) -> bool
+static DigitalBrain.Capabilities.Secrets.SecretVaultResult.operator ==(DigitalBrain.Capabilities.Secrets.SecretVaultResult? left, DigitalBrain.Capabilities.Secrets.SecretVaultResult? right) -> bool
+DigitalBrain.Capabilities.Secrets.ISecretVaultPort.Named(DigitalBrain.Capabilities.CapabilityCaller! caller, string! name, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Secrets.SecretVaultResult!>!
+DigitalBrain.Capabilities.Secrets.ISecretVaultPort.Open(DigitalBrain.Capabilities.CapabilityCaller! caller, string! context, DigitalBrain.Capabilities.Secrets.SealedSecret! sealedSecret, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<byte[]?>!
+DigitalBrain.Capabilities.Secrets.ISecretVaultPort.Seal(DigitalBrain.Capabilities.CapabilityCaller! caller, string! context, System.ReadOnlyMemory<byte> plaintext, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Secrets.SealedSecret?>!
+DigitalBrain.Capabilities.Secrets.ISecrets.Named(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Secrets.SecretRef!>!
+DigitalBrain.Capabilities.Secrets.ISecrets.Open(string! context, DigitalBrain.Capabilities.Secrets.SealedSecret! sealedSecret, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<byte[]!>!
+DigitalBrain.Capabilities.Secrets.ISecrets.Seal(string! context, System.ReadOnlyMemory<byte> plaintext, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Secrets.SealedSecret!>!
+DigitalBrain.Capabilities.Secrets.SealedSecret
+DigitalBrain.Capabilities.Secrets.SealedSecret.<Clone>$() -> DigitalBrain.Capabilities.Secrets.SealedSecret!
+DigitalBrain.Capabilities.Secrets.SealedSecret.Cipher.get -> string!
+DigitalBrain.Capabilities.Secrets.SealedSecret.Cipher.init -> void
+DigitalBrain.Capabilities.Secrets.SealedSecret.Equals(DigitalBrain.Capabilities.Secrets.SealedSecret? other) -> bool
+DigitalBrain.Capabilities.Secrets.SealedSecret.KeyId.get -> string!
+DigitalBrain.Capabilities.Secrets.SealedSecret.KeyId.init -> void
+DigitalBrain.Capabilities.Secrets.SealedSecret.SealedSecret() -> void
+DigitalBrain.Capabilities.Secrets.SecretRef.IsNamed.get -> bool
+const DigitalBrain.Capabilities.Secrets.SecretRef.NamedPrefix = "named:" -> string!
+override DigitalBrain.Capabilities.Secrets.SealedSecret.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Secrets.SealedSecret.GetHashCode() -> int
+override DigitalBrain.Capabilities.Secrets.SealedSecret.ToString() -> string!
+static DigitalBrain.Capabilities.Secrets.SealedSecret.operator !=(DigitalBrain.Capabilities.Secrets.SealedSecret? left, DigitalBrain.Capabilities.Secrets.SealedSecret? right) -> bool
+static DigitalBrain.Capabilities.Secrets.SealedSecret.operator ==(DigitalBrain.Capabilities.Secrets.SealedSecret? left, DigitalBrain.Capabilities.Secrets.SealedSecret? right) -> bool

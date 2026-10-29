@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>APP_NAMESPACE</RootNamespace>
+    <DigitalBrainCompiledApp>true</DigitalBrainCompiledApp>
+    <!-- The app convention rules (DigitalBrain.Analyzers, bundled in the DigitalBrain package) fail the build. -->
+    <WarningsAsErrors>$(WarningsAsErrors);DB0002;DB0013;DB0014;DB0020;DB0021;DB0022;DB0023;DB0024;DB0025;DB0026;DB0027;DB0028</WarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="DigitalBrain" />
+    <PackageReference Include="DigitalBrain.UI" />
+    <!-- The spec comment: the analyzers read it to check the operations (DB0024, DB0027). -->
+    <AdditionalFiles Include="*.spec.md" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>APP_NAMESPACE.Tests.Unit</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../AppName/AppName.csproj" />
+  </ItemGroup>
+</Project>

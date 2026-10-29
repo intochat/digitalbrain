@@ -1,0 +1,18 @@
+#nullable enable
+DigitalBrain.Runtime.Http.BrainRouteGroups
+DigitalBrain.Runtime.Http.IModuleHttpSurface
+DigitalBrain.Runtime.Http.IModuleHttpSurface.Map(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! brainGroup) -> void
+DigitalBrain.Runtime.Http.ISessionIssuer
+DigitalBrain.Runtime.Http.ISessionIssuer.EndAsync(Microsoft.AspNetCore.Http.HttpContext! http, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Http.ISessionIssuer.IssueAsync(Microsoft.AspNetCore.Http.HttpContext! http, DigitalBrain.Capabilities.Identity.SessionRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.SessionIssued!>!
+DigitalBrain.Runtime.Http.ModuleHttpSurfaces
+DigitalBrain.Runtime.Http.SessionPrincipal
+const DigitalBrain.Runtime.Http.SessionPrincipal.SessionIdClaim = "sid" -> string!
+static DigitalBrain.Runtime.Http.BrainRouteGroups.Brain(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! suffix = "") -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!
+static DigitalBrain.Runtime.Http.BrainRouteGroups.MemberOf(Microsoft.AspNetCore.Http.HttpContext! http) -> DigitalBrain.Capabilities.Identity.Member?
+static DigitalBrain.Runtime.Http.BrainRouteGroups.Session(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! suffix = "") -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!
+static DigitalBrain.Runtime.Http.ModuleHttpSurfaces.AddModuleHttpSurface<T>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static DigitalBrain.Runtime.Http.ModuleHttpSurfaces.MapModuleHttpSurfaces(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!
+static DigitalBrain.Runtime.Http.SessionPrincipal.Create(DigitalBrain.Capabilities.Identity.SessionRequest! request, DigitalBrain.Capabilities.Identity.SessionIssued! issued, string! authenticationType) -> System.Security.Claims.ClaimsPrincipal!
+static DigitalBrain.Runtime.Http.SessionPrincipal.PrincipalId(System.Security.Claims.ClaimsPrincipal? user) -> string?
+static DigitalBrain.Runtime.Http.SessionPrincipal.SessionId(System.Security.Claims.ClaimsPrincipal? user) -> string?

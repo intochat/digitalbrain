@@ -1,0 +1,53 @@
+{
+  "streams": {
+    "binding": "signals",
+    "namespacePrefix": "brain.signals.",
+    "granularity": "one stream per (brain, signal namespace); key = brain key; namespace = alias up to its last dot",
+    "item": "synapse.ref"
+  },
+  "runtime": {
+    "grainTypes": [
+      "neuron.host",
+      "neuron.host.reentrant",
+      "neuron.host.stateless",
+      "runtime.storage-write-grants"
+    ],
+    "aliases": [
+      "admit",
+      "brain.affine-placement",
+      "brain.synapse-cursors",
+      "brain.synapse-index",
+      "catch-up",
+      "db.json-element",
+      "db.runtime-invocation",
+      "invoke",
+      "invoke-interleaved",
+      "is-interleaved",
+      "kernel.compiled-type-table",
+      "kernel.instance",
+      "kernel.instance-directory",
+      "kernel.instance-types",
+      "kernel.type-entry",
+      "kernel.type-kind",
+      "neuron.host",
+      "neuron.synapse-host",
+      "post",
+      "post-interleaved",
+      "storage.brain-entry",
+      "storage.brain-record",
+      "storage.brain-snapshot",
+      "storage.journaled-signal",
+      "storage.publisher-mark",
+      "stream",
+      "synapse.ref"
+    ],
+    "neurons": [
+      "runtime.listener",
+      "runtime.operation",
+      "runtime.session"
+    ],
+    "signals": [
+      "synapse.gap"
+    ]
+  }
+}

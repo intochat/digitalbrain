@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../src/DigitalBrain.Apps.Packaging/DigitalBrain.Apps.Packaging.csproj" />
+  </ItemGroup>
+</Project>

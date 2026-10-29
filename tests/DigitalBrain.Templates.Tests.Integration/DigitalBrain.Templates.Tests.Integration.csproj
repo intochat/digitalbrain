@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Instantiates the template outside the repository using framework packages alone.
+       OS CLI packaging is covered separately by IntoChat.OS.Cli.Tests.Integration. -->
+</Project>

@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../src/DigitalBrain.Capabilities.Storage/DigitalBrain.Capabilities.Storage.csproj" />
+  </ItemGroup>
+</Project>

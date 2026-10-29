@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Roslyn 4.14 floor (D-07 as revised by R4-01): dependency-free netstandard2.0, packed to analyzers/dotnet/cs. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IsPackable>true</IsPackable>
+    <PackageId>DigitalBrain.Analyzers</PackageId>
+    <RootNamespace>DigitalBrain.Analyzers</RootNamespace>
+    <Description>Build-time rules for DigitalBrain modules, apps and neurons (DB0001-DB0003, DB0013-DB0014, DB0020-DB0028).</Description>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <IncludeSymbols>false</IncludeSymbols>
+    <Deterministic>true</Deterministic>
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <!-- SpecComment.cs is shared with DigitalBrain (public there, internal here) so os can reference both. -->
+    <DefineConstants>$(DefineConstants);DIGITALBRAIN_ANALYZERS</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+    <InternalsVisibleTo Include="DigitalBrain.Analyzers.Tests.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Analyzers.CodeFixes" />
+    <Compile Include="..\DigitalBrain\Apps\SpecComment.cs" Link="Apps\SpecComment.cs" />
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md;AnalyzerReleases.Unshipped.md" />
+    <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
+  <!-- 08-03: the code fixes (Workspaces-dependent, RS1038) ship next to the analyzer dll. -->
+  <Target Name="DigitalBrainPackCodeFixes" BeforeTargets="_GetPackageFiles">
+    <MSBuild Projects="../DigitalBrain.Analyzers.CodeFixes/DigitalBrain.Analyzers.CodeFixes.csproj" Targets="Build" Properties="Configuration=$(Configuration)" Condition="'$(NoBuild)' != 'true'" />
+    <MSBuild Projects="../DigitalBrain.Analyzers.CodeFixes/DigitalBrain.Analyzers.CodeFixes.csproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_DigitalBrainCodeFixesDll" />
+    </MSBuild>
+    <ItemGroup>
+      <None Include="@(_DigitalBrainCodeFixesDll)" Pack="true" PackagePath="analyzers/dotnet/cs" />
+    </ItemGroup>
+  </Target>
+</Project>

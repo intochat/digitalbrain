@@ -1,0 +1,353 @@
+#nullable enable
+DigitalBrain.Capabilities.Storage.IStorageWriteAuthorizer
+DigitalBrain.Capabilities.Storage.IStorageWriteAuthorizer.BeginApproved(DigitalBrain.BrainId brain, string! requester) -> System.IDisposable!
+DigitalBrain.Capabilities.Storage.IStorageWriteAuthorizer.Consume(DigitalBrain.NeuronId storageNeuron, DigitalBrain.Capabilities.Storage.WritePlan! primitive, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Capabilities.Storage.IStorageWriteAuthorizer.Invoke<T>(string! connection, DigitalBrain.Capabilities.Storage.WritePlan! primitive, System.Func<System.Threading.Tasks.Task<T>!>! send, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<T>!
+DigitalBrain.Capabilities.Storage.IStorageWriteIdentity
+DigitalBrain.Capabilities.Storage.IStorageWriteIdentity.Current(DigitalBrain.BrainId brain) -> string?
+static DigitalBrain.Capabilities.Storage.StorageConfirmationGate.Check(DigitalBrain.Spi.INeuronContext! context, DigitalBrain.Capabilities.Storage.IStorage! storage, DigitalBrain.Capabilities.Storage.WritePlan! plan, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<string?>!
+static DigitalBrain.Capabilities.Storage.StorageConfirmationGate.Check(DigitalBrain.Capabilities.Storage.IStorage! storage, DigitalBrain.Confirmation.IConfirmations! confirmations, DigitalBrain.Capabilities.Storage.WritePlan! plan, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<string?>!
+DigitalBrain.Capabilities.Storage.ByteRange
+DigitalBrain.Capabilities.Storage.ByteRange.ByteRange() -> void
+DigitalBrain.Capabilities.Storage.ByteRange.ByteRange(long Offset, long? Length) -> void
+DigitalBrain.Capabilities.Storage.ByteRange.Equals(DigitalBrain.Capabilities.Storage.ByteRange other) -> bool
+DigitalBrain.Capabilities.Storage.ByteRange.Length.get -> long?
+DigitalBrain.Capabilities.Storage.ByteRange.Offset.get -> long
+DigitalBrain.Capabilities.Storage.Conflict
+DigitalBrain.Capabilities.Storage.Conflict.Conflict(DigitalBrain.Capabilities.Storage.ItemId? item, System.Exception? innerException = null) -> void
+DigitalBrain.Capabilities.Storage.ConflictPolicy
+DigitalBrain.Capabilities.Storage.ConflictPolicy.Fail = 0 -> DigitalBrain.Capabilities.Storage.ConflictPolicy
+DigitalBrain.Capabilities.Storage.ConflictPolicy.Overwrite = 2 -> DigitalBrain.Capabilities.Storage.ConflictPolicy
+DigitalBrain.Capabilities.Storage.ConflictPolicy.Rename = 1 -> DigitalBrain.Capabilities.Storage.ConflictPolicy
+DigitalBrain.Capabilities.Storage.Content
+DigitalBrain.Capabilities.Storage.Content.<Clone>$() -> DigitalBrain.Capabilities.Storage.Content!
+DigitalBrain.Capabilities.Storage.Content.Bytes.get -> System.ReadOnlyMemory<byte>
+DigitalBrain.Capabilities.Storage.Content.Bytes.init -> void
+DigitalBrain.Capabilities.Storage.Content.Content(System.ReadOnlyMemory<byte> Bytes, string! MediaType, long? TotalLength) -> void
+DigitalBrain.Capabilities.Storage.Content.Deconstruct(out System.ReadOnlyMemory<byte> Bytes, out string! MediaType, out long? TotalLength) -> void
+DigitalBrain.Capabilities.Storage.Content.Equals(DigitalBrain.Capabilities.Storage.Content? other) -> bool
+DigitalBrain.Capabilities.Storage.Content.MediaType.get -> string!
+DigitalBrain.Capabilities.Storage.Content.MediaType.init -> void
+DigitalBrain.Capabilities.Storage.Content.TotalLength.get -> long?
+DigitalBrain.Capabilities.Storage.Content.TotalLength.init -> void
+DigitalBrain.Capabilities.Storage.Denied
+DigitalBrain.Capabilities.Storage.Denied.Denied(DigitalBrain.Capabilities.Storage.ItemId? item, System.Exception? innerException = null) -> void
+DigitalBrain.Capabilities.Storage.IStorage
+DigitalBrain.Capabilities.Storage.IStorage.Ancestors(DigitalBrain.Capabilities.Storage.ItemId id, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Storage.Item!>!>!
+DigitalBrain.Capabilities.Storage.IStorage.Describe(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.StorageDescriptor!>!
+DigitalBrain.Capabilities.Storage.IStorage.List(DigitalBrain.Capabilities.Storage.ItemId folder, DigitalBrain.Capabilities.Storage.ListQuery! query, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.Page<DigitalBrain.Capabilities.Storage.Item!>!>!
+DigitalBrain.Capabilities.Storage.IStorage.OpenRead(DigitalBrain.Capabilities.Storage.ItemId item, DigitalBrain.Capabilities.Storage.ByteRange? range, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.StorageReadStream!>!
+DigitalBrain.Capabilities.Storage.IStorage.OpenWrite(DigitalBrain.Capabilities.Storage.WritePlan! plan, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.StorageWriteStream!>!
+DigitalBrain.Capabilities.Storage.IStorage.Read(DigitalBrain.Capabilities.Storage.ItemId id, DigitalBrain.Capabilities.Storage.ByteRange? range, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.Content!>!
+DigitalBrain.Capabilities.Storage.IStorage.Roots(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Storage.Item!>!>!
+DigitalBrain.Capabilities.Storage.IStorage.Search(DigitalBrain.Capabilities.Storage.SearchQuery! query, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.Page<DigitalBrain.Capabilities.Storage.Item!>!>!
+DigitalBrain.Capabilities.Storage.IStorage.Stat(DigitalBrain.Capabilities.Storage.ItemId id, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.Item!>!
+DigitalBrain.Capabilities.Storage.IStorage.Write(DigitalBrain.Capabilities.Storage.WritePlan! plan, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Operations.OperationId>!
+DigitalBrain.Capabilities.Storage.Item
+DigitalBrain.Capabilities.Storage.Item.<Clone>$() -> DigitalBrain.Capabilities.Storage.Item!
+DigitalBrain.Capabilities.Storage.Item.Deconstruct(out DigitalBrain.Capabilities.Storage.ItemId Id, out string! Name, out DigitalBrain.Capabilities.Storage.ItemKind Kind, out long? Size, out System.DateTimeOffset? Modified, out DigitalBrain.Capabilities.Storage.ItemFlags Flags, out string? Hash, out DigitalBrain.Capabilities.Storage.ItemId? Target) -> void
+DigitalBrain.Capabilities.Storage.Item.Equals(DigitalBrain.Capabilities.Storage.Item? other) -> bool
+DigitalBrain.Capabilities.Storage.Item.Flags.get -> DigitalBrain.Capabilities.Storage.ItemFlags
+DigitalBrain.Capabilities.Storage.Item.Flags.init -> void
+DigitalBrain.Capabilities.Storage.Item.Hash.get -> string?
+DigitalBrain.Capabilities.Storage.Item.Hash.init -> void
+DigitalBrain.Capabilities.Storage.Item.Id.get -> DigitalBrain.Capabilities.Storage.ItemId
+DigitalBrain.Capabilities.Storage.Item.Id.init -> void
+DigitalBrain.Capabilities.Storage.Item.Item(DigitalBrain.Capabilities.Storage.ItemId Id, string! Name, DigitalBrain.Capabilities.Storage.ItemKind Kind, long? Size, System.DateTimeOffset? Modified, DigitalBrain.Capabilities.Storage.ItemFlags Flags, string? Hash = null, DigitalBrain.Capabilities.Storage.ItemId? Target = null) -> void
+DigitalBrain.Capabilities.Storage.Item.Kind.get -> DigitalBrain.Capabilities.Storage.ItemKind
+DigitalBrain.Capabilities.Storage.Item.Kind.init -> void
+DigitalBrain.Capabilities.Storage.Item.Modified.get -> System.DateTimeOffset?
+DigitalBrain.Capabilities.Storage.Item.Modified.init -> void
+DigitalBrain.Capabilities.Storage.Item.Name.get -> string!
+DigitalBrain.Capabilities.Storage.Item.Name.init -> void
+DigitalBrain.Capabilities.Storage.Item.Size.get -> long?
+DigitalBrain.Capabilities.Storage.Item.Size.init -> void
+DigitalBrain.Capabilities.Storage.Item.Target.get -> DigitalBrain.Capabilities.Storage.ItemId?
+DigitalBrain.Capabilities.Storage.Item.Target.init -> void
+DigitalBrain.Capabilities.Storage.ItemFlags
+DigitalBrain.Capabilities.Storage.ItemFlags.CloudOnly = 1024 -> DigitalBrain.Capabilities.Storage.ItemFlags
+DigitalBrain.Capabilities.Storage.ItemFlags.Copy = 32 -> DigitalBrain.Capabilities.Storage.ItemFlags
+DigitalBrain.Capabilities.Storage.ItemFlags.CreateFolder = 256 -> DigitalBrain.Capabilities.Storage.ItemFlags
+DigitalBrain.Capabilities.Storage.ItemFlags.Delete = 8 -> DigitalBrain.Capabilities.Storage.ItemFlags
+DigitalBrain.Capabilities.Storage.ItemFlags.Move = 16 -> DigitalBrain.Capabilities.Storage.ItemFlags
+DigitalBrain.Capabilities.Storage.ItemFlags.None = 0 -> DigitalBrain.Capabilities.Storage.ItemFlags
+DigitalBrain.Capabilities.Storage.ItemFlags.Read = 1 -> DigitalBrain.Capabilities.Storage.ItemFlags
+DigitalBrain.Capabilities.Storage.ItemFlags.Rename = 64 -> DigitalBrain.Capabilities.Storage.ItemFlags
+DigitalBrain.Capabilities.Storage.ItemFlags.Search = 128 -> DigitalBrain.Capabilities.Storage.ItemFlags
+DigitalBrain.Capabilities.Storage.ItemFlags.Shared = 512 -> DigitalBrain.Capabilities.Storage.ItemFlags
+DigitalBrain.Capabilities.Storage.ItemFlags.Trash = 4 -> DigitalBrain.Capabilities.Storage.ItemFlags
+DigitalBrain.Capabilities.Storage.ItemFlags.Write = 2 -> DigitalBrain.Capabilities.Storage.ItemFlags
+DigitalBrain.Capabilities.Storage.ItemId
+DigitalBrain.Capabilities.Storage.ItemId.Deconstruct(out string! Value) -> void
+DigitalBrain.Capabilities.Storage.ItemId.Equals(DigitalBrain.Capabilities.Storage.ItemId other) -> bool
+DigitalBrain.Capabilities.Storage.ItemId.ItemId() -> void
+DigitalBrain.Capabilities.Storage.ItemId.ItemId(string! Value) -> void
+DigitalBrain.Capabilities.Storage.ItemId.Value.get -> string!
+DigitalBrain.Capabilities.Storage.ItemId.Value.init -> void
+DigitalBrain.Capabilities.Storage.ItemKind
+DigitalBrain.Capabilities.Storage.ItemKind.File = 0 -> DigitalBrain.Capabilities.Storage.ItemKind
+DigitalBrain.Capabilities.Storage.ItemKind.Folder = 1 -> DigitalBrain.Capabilities.Storage.ItemKind
+DigitalBrain.Capabilities.Storage.ItemKind.Link = 2 -> DigitalBrain.Capabilities.Storage.ItemKind
+DigitalBrain.Capabilities.Storage.ListQuery
+DigitalBrain.Capabilities.Storage.ListQuery.<Clone>$() -> DigitalBrain.Capabilities.Storage.ListQuery!
+DigitalBrain.Capabilities.Storage.ListQuery.Cursor.get -> string?
+DigitalBrain.Capabilities.Storage.ListQuery.Cursor.init -> void
+DigitalBrain.Capabilities.Storage.ListQuery.Deconstruct(out string? Cursor, out int PageSize, out DigitalBrain.Capabilities.Storage.SortKey Sort, out bool Descending) -> void
+DigitalBrain.Capabilities.Storage.ListQuery.Descending.get -> bool
+DigitalBrain.Capabilities.Storage.ListQuery.Descending.init -> void
+DigitalBrain.Capabilities.Storage.ListQuery.Equals(DigitalBrain.Capabilities.Storage.ListQuery? other) -> bool
+DigitalBrain.Capabilities.Storage.ListQuery.ListQuery(string? Cursor = null, int PageSize = 100, DigitalBrain.Capabilities.Storage.SortKey Sort = DigitalBrain.Capabilities.Storage.SortKey.FolderThenName, bool Descending = false) -> void
+DigitalBrain.Capabilities.Storage.ListQuery.PageSize.get -> int
+DigitalBrain.Capabilities.Storage.ListQuery.PageSize.init -> void
+DigitalBrain.Capabilities.Storage.ListQuery.Sort.get -> DigitalBrain.Capabilities.Storage.SortKey
+DigitalBrain.Capabilities.Storage.ListQuery.Sort.init -> void
+DigitalBrain.Capabilities.Storage.NeedsAuth
+DigitalBrain.Capabilities.Storage.NeedsAuth.NeedsAuth(DigitalBrain.Capabilities.Storage.ItemId? item, System.Exception? innerException = null) -> void
+DigitalBrain.Capabilities.Storage.NotFound
+DigitalBrain.Capabilities.Storage.NotFound.NotFound(DigitalBrain.Capabilities.Storage.ItemId? item, System.Exception? innerException = null) -> void
+DigitalBrain.Capabilities.Storage.OperationDone
+DigitalBrain.Capabilities.Storage.OperationDone.Deconstruct(out DigitalBrain.Operations.OperationId Operation, out DigitalBrain.Operations.OperationResult! Result) -> void
+DigitalBrain.Capabilities.Storage.OperationDone.Equals(DigitalBrain.Capabilities.Storage.OperationDone? other) -> bool
+DigitalBrain.Capabilities.Storage.OperationDone.Operation.get -> DigitalBrain.Operations.OperationId
+DigitalBrain.Capabilities.Storage.OperationDone.Operation.init -> void
+DigitalBrain.Capabilities.Storage.OperationDone.OperationDone(DigitalBrain.Operations.OperationId Operation, DigitalBrain.Operations.OperationResult! Result) -> void
+DigitalBrain.Capabilities.Storage.OperationDone.Result.get -> DigitalBrain.Operations.OperationResult!
+DigitalBrain.Capabilities.Storage.OperationDone.Result.init -> void
+DigitalBrain.Capabilities.Storage.OperationProgress
+DigitalBrain.Capabilities.Storage.OperationProgress.Deconstruct(out DigitalBrain.Operations.OperationId Operation, out double Fraction) -> void
+DigitalBrain.Capabilities.Storage.OperationProgress.Equals(DigitalBrain.Capabilities.Storage.OperationProgress? other) -> bool
+DigitalBrain.Capabilities.Storage.OperationProgress.Fraction.get -> double
+DigitalBrain.Capabilities.Storage.OperationProgress.Fraction.init -> void
+DigitalBrain.Capabilities.Storage.OperationProgress.Operation.get -> DigitalBrain.Operations.OperationId
+DigitalBrain.Capabilities.Storage.OperationProgress.Operation.init -> void
+DigitalBrain.Capabilities.Storage.OperationProgress.OperationProgress(DigitalBrain.Operations.OperationId Operation, double Fraction) -> void
+DigitalBrain.Capabilities.Storage.OperationStarted
+DigitalBrain.Capabilities.Storage.OperationStarted.Deconstruct(out DigitalBrain.Operations.OperationId Operation, out DigitalBrain.Capabilities.Storage.WritePlan! Plan) -> void
+DigitalBrain.Capabilities.Storage.OperationStarted.Equals(DigitalBrain.Capabilities.Storage.OperationStarted? other) -> bool
+DigitalBrain.Capabilities.Storage.OperationStarted.Operation.get -> DigitalBrain.Operations.OperationId
+DigitalBrain.Capabilities.Storage.OperationStarted.Operation.init -> void
+DigitalBrain.Capabilities.Storage.OperationStarted.OperationStarted(DigitalBrain.Operations.OperationId Operation, DigitalBrain.Capabilities.Storage.WritePlan! Plan) -> void
+DigitalBrain.Capabilities.Storage.OperationStarted.Plan.get -> DigitalBrain.Capabilities.Storage.WritePlan!
+DigitalBrain.Capabilities.Storage.OperationStarted.Plan.init -> void
+DigitalBrain.Capabilities.Storage.Page<T>
+DigitalBrain.Capabilities.Storage.Page<T>.<Clone>$() -> DigitalBrain.Capabilities.Storage.Page<T>!
+DigitalBrain.Capabilities.Storage.Page<T>.Deconstruct(out System.Collections.Generic.IReadOnlyList<T>! Items, out string? NextCursor) -> void
+DigitalBrain.Capabilities.Storage.Page<T>.Equals(DigitalBrain.Capabilities.Storage.Page<T>? other) -> bool
+DigitalBrain.Capabilities.Storage.Page<T>.Items.get -> System.Collections.Generic.IReadOnlyList<T>!
+DigitalBrain.Capabilities.Storage.Page<T>.Items.init -> void
+DigitalBrain.Capabilities.Storage.Page<T>.NextCursor.get -> string?
+DigitalBrain.Capabilities.Storage.Page<T>.NextCursor.init -> void
+DigitalBrain.Capabilities.Storage.Page<T>.Page(System.Collections.Generic.IReadOnlyList<T>! Items, string? NextCursor) -> void
+DigitalBrain.Capabilities.Storage.Quota
+DigitalBrain.Capabilities.Storage.Quota.<Clone>$() -> DigitalBrain.Capabilities.Storage.Quota!
+DigitalBrain.Capabilities.Storage.Quota.Equals(DigitalBrain.Capabilities.Storage.Quota? other) -> bool
+DigitalBrain.Capabilities.Storage.Quota.Pooled.get -> bool
+DigitalBrain.Capabilities.Storage.Quota.Quota(DigitalBrain.Capabilities.Storage.QuotaState State, long? Used, long? Total, bool Pooled = false) -> void
+DigitalBrain.Capabilities.Storage.Quota.State.get -> DigitalBrain.Capabilities.Storage.QuotaState
+DigitalBrain.Capabilities.Storage.Quota.Total.get -> long?
+DigitalBrain.Capabilities.Storage.Quota.Used.get -> long?
+DigitalBrain.Capabilities.Storage.QuotaExceeded
+DigitalBrain.Capabilities.Storage.QuotaExceeded.QuotaExceeded(DigitalBrain.Capabilities.Storage.ItemId? item, System.Exception? innerException = null) -> void
+DigitalBrain.Capabilities.Storage.QuotaState
+DigitalBrain.Capabilities.Storage.QuotaState.Known = 0 -> DigitalBrain.Capabilities.Storage.QuotaState
+DigitalBrain.Capabilities.Storage.QuotaState.Unknown = 2 -> DigitalBrain.Capabilities.Storage.QuotaState
+DigitalBrain.Capabilities.Storage.QuotaState.Unlimited = 1 -> DigitalBrain.Capabilities.Storage.QuotaState
+DigitalBrain.Capabilities.Storage.SearchMode
+DigitalBrain.Capabilities.Storage.SearchMode.Name = 0 -> DigitalBrain.Capabilities.Storage.SearchMode
+DigitalBrain.Capabilities.Storage.SearchQuery
+DigitalBrain.Capabilities.Storage.SearchQuery.<Clone>$() -> DigitalBrain.Capabilities.Storage.SearchQuery!
+DigitalBrain.Capabilities.Storage.SearchQuery.Cursor.get -> string?
+DigitalBrain.Capabilities.Storage.SearchQuery.Cursor.init -> void
+DigitalBrain.Capabilities.Storage.SearchQuery.Deconstruct(out string! Text, out DigitalBrain.Capabilities.Storage.SearchMode Mode, out DigitalBrain.Capabilities.Storage.ItemId? Within, out string? Cursor, out int PageSize) -> void
+DigitalBrain.Capabilities.Storage.SearchQuery.Equals(DigitalBrain.Capabilities.Storage.SearchQuery? other) -> bool
+DigitalBrain.Capabilities.Storage.SearchQuery.Mode.get -> DigitalBrain.Capabilities.Storage.SearchMode
+DigitalBrain.Capabilities.Storage.SearchQuery.Mode.init -> void
+DigitalBrain.Capabilities.Storage.SearchQuery.PageSize.get -> int
+DigitalBrain.Capabilities.Storage.SearchQuery.PageSize.init -> void
+DigitalBrain.Capabilities.Storage.SearchQuery.SearchQuery(string! Text, DigitalBrain.Capabilities.Storage.SearchMode Mode = DigitalBrain.Capabilities.Storage.SearchMode.Name, DigitalBrain.Capabilities.Storage.ItemId? Within = null, string? Cursor = null, int PageSize = 100) -> void
+DigitalBrain.Capabilities.Storage.SearchQuery.Text.get -> string!
+DigitalBrain.Capabilities.Storage.SearchQuery.Text.init -> void
+DigitalBrain.Capabilities.Storage.SearchQuery.Within.get -> DigitalBrain.Capabilities.Storage.ItemId?
+DigitalBrain.Capabilities.Storage.SearchQuery.Within.init -> void
+DigitalBrain.Capabilities.Storage.SortKey
+DigitalBrain.Capabilities.Storage.SortKey.FolderThenName = 0 -> DigitalBrain.Capabilities.Storage.SortKey
+DigitalBrain.Capabilities.Storage.SortKey.Modified = 2 -> DigitalBrain.Capabilities.Storage.SortKey
+DigitalBrain.Capabilities.Storage.SortKey.Name = 1 -> DigitalBrain.Capabilities.Storage.SortKey
+DigitalBrain.Capabilities.Storage.SortKey.Size = 3 -> DigitalBrain.Capabilities.Storage.SortKey
+DigitalBrain.Capabilities.Storage.StorageDescriptor
+DigitalBrain.Capabilities.Storage.StorageDescriptor.<Clone>$() -> DigitalBrain.Capabilities.Storage.StorageDescriptor!
+DigitalBrain.Capabilities.Storage.StorageDescriptor.Deconstruct(out string! Label, out string! Kind, out DigitalBrain.Capabilities.Storage.Quota! Quota, out DigitalBrain.Capabilities.Storage.ItemFlags Flags) -> void
+DigitalBrain.Capabilities.Storage.StorageDescriptor.Equals(DigitalBrain.Capabilities.Storage.StorageDescriptor? other) -> bool
+DigitalBrain.Capabilities.Storage.StorageDescriptor.Flags.get -> DigitalBrain.Capabilities.Storage.ItemFlags
+DigitalBrain.Capabilities.Storage.StorageDescriptor.Flags.init -> void
+DigitalBrain.Capabilities.Storage.StorageDescriptor.Kind.get -> string!
+DigitalBrain.Capabilities.Storage.StorageDescriptor.Kind.init -> void
+DigitalBrain.Capabilities.Storage.StorageDescriptor.Label.get -> string!
+DigitalBrain.Capabilities.Storage.StorageDescriptor.Label.init -> void
+DigitalBrain.Capabilities.Storage.StorageDescriptor.Quota.get -> DigitalBrain.Capabilities.Storage.Quota!
+DigitalBrain.Capabilities.Storage.StorageDescriptor.Quota.init -> void
+DigitalBrain.Capabilities.Storage.StorageDescriptor.StorageDescriptor(string! Label, string! Kind, DigitalBrain.Capabilities.Storage.Quota! Quota, DigitalBrain.Capabilities.Storage.ItemFlags Flags) -> void
+DigitalBrain.Capabilities.Storage.StorageException
+DigitalBrain.Capabilities.Storage.StorageException.Code.get -> string!
+DigitalBrain.Capabilities.Storage.StorageException.Item.get -> DigitalBrain.Capabilities.Storage.ItemId?
+DigitalBrain.Capabilities.Storage.StorageException.StorageException(string! code, DigitalBrain.Capabilities.Storage.ItemId? item, System.Exception? innerException) -> void
+DigitalBrain.Capabilities.Storage.StorageExtensions
+DigitalBrain.Capabilities.Storage.StorageReadStream
+DigitalBrain.Capabilities.Storage.StorageReadStream.CanSeek.get -> bool
+DigitalBrain.Capabilities.Storage.StorageReadStream.Content.get -> System.IO.Stream!
+DigitalBrain.Capabilities.Storage.StorageReadStream.ContentType.get -> string!
+DigitalBrain.Capabilities.Storage.StorageReadStream.DisposeAsync() -> System.Threading.Tasks.ValueTask
+DigitalBrain.Capabilities.Storage.StorageReadStream.ETag.get -> string?
+DigitalBrain.Capabilities.Storage.StorageReadStream.Length.get -> long?
+DigitalBrain.Capabilities.Storage.StorageReadStream.Modified.get -> System.DateTimeOffset?
+DigitalBrain.Capabilities.Storage.StorageReadStream.StorageReadStream(System.IO.Stream! content, long? length, string! contentType, string? eTag, bool canSeek, System.DateTimeOffset? modified) -> void
+DigitalBrain.Capabilities.Storage.StorageWriteStream
+DigitalBrain.Capabilities.Storage.StorageWriteStream.Abort(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Storage.StorageWriteStream.Commit(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.ItemId>!
+DigitalBrain.Capabilities.Storage.StorageWriteStream.Content.get -> System.IO.Stream!
+DigitalBrain.Capabilities.Storage.StorageWriteStream.DisposeAsync() -> System.Threading.Tasks.ValueTask
+DigitalBrain.Capabilities.Storage.StorageWriteStream.StorageWriteStream(System.IO.Stream! content) -> void
+DigitalBrain.Capabilities.Storage.Unavailable
+DigitalBrain.Capabilities.Storage.Unavailable.Unavailable(DigitalBrain.Capabilities.Storage.ItemId? item, System.Exception? innerException = null) -> void
+DigitalBrain.Capabilities.Storage.Unsupported
+DigitalBrain.Capabilities.Storage.Unsupported.Unsupported(DigitalBrain.Capabilities.Storage.ItemId? item, System.Exception? innerException = null) -> void
+DigitalBrain.Capabilities.Storage.WriteKind
+DigitalBrain.Capabilities.Storage.WriteKind.Copy = 3 -> DigitalBrain.Capabilities.Storage.WriteKind
+DigitalBrain.Capabilities.Storage.WriteKind.CreateFolder = 0 -> DigitalBrain.Capabilities.Storage.WriteKind
+DigitalBrain.Capabilities.Storage.WriteKind.Delete = 5 -> DigitalBrain.Capabilities.Storage.WriteKind
+DigitalBrain.Capabilities.Storage.WriteKind.Move = 2 -> DigitalBrain.Capabilities.Storage.WriteKind
+DigitalBrain.Capabilities.Storage.WriteKind.Rename = 4 -> DigitalBrain.Capabilities.Storage.WriteKind
+DigitalBrain.Capabilities.Storage.WriteKind.WriteFile = 1 -> DigitalBrain.Capabilities.Storage.WriteKind
+DigitalBrain.Capabilities.Storage.WritePlan
+DigitalBrain.Capabilities.Storage.WritePlan.Conflict.get -> DigitalBrain.Capabilities.Storage.ConflictPolicy
+DigitalBrain.Capabilities.Storage.WritePlan.Conflict.init -> void
+DigitalBrain.Capabilities.Storage.WritePlan.Deconstruct(out DigitalBrain.Capabilities.Storage.WriteKind Kind, out DigitalBrain.Capabilities.Storage.ItemId? Source, out DigitalBrain.Capabilities.Storage.ItemId? TargetFolder, out string? Name, out DigitalBrain.Capabilities.Storage.ConflictPolicy Conflict, out bool Permanent, out System.ReadOnlyMemory<byte>? Inline, out bool DryRun) -> void
+DigitalBrain.Capabilities.Storage.WritePlan.Equals(DigitalBrain.Capabilities.Storage.WritePlan? other) -> bool
+DigitalBrain.Capabilities.Storage.WritePlan.Inline.get -> System.ReadOnlyMemory<byte>?
+DigitalBrain.Capabilities.Storage.WritePlan.Inline.init -> void
+DigitalBrain.Capabilities.Storage.WritePlan.Kind.get -> DigitalBrain.Capabilities.Storage.WriteKind
+DigitalBrain.Capabilities.Storage.WritePlan.Kind.init -> void
+DigitalBrain.Capabilities.Storage.WritePlan.Name.get -> string?
+DigitalBrain.Capabilities.Storage.WritePlan.Name.init -> void
+DigitalBrain.Capabilities.Storage.WritePlan.Permanent.get -> bool
+DigitalBrain.Capabilities.Storage.WritePlan.Permanent.init -> void
+DigitalBrain.Capabilities.Storage.WritePlan.Source.get -> DigitalBrain.Capabilities.Storage.ItemId?
+DigitalBrain.Capabilities.Storage.WritePlan.Source.init -> void
+DigitalBrain.Capabilities.Storage.WritePlan.TargetFolder.get -> DigitalBrain.Capabilities.Storage.ItemId?
+DigitalBrain.Capabilities.Storage.WritePlan.TargetFolder.init -> void
+DigitalBrain.Capabilities.Storage.WritePlan.WritePlan(DigitalBrain.Capabilities.Storage.WriteKind Kind, DigitalBrain.Capabilities.Storage.ItemId? Source, DigitalBrain.Capabilities.Storage.ItemId? TargetFolder, string? Name, DigitalBrain.Capabilities.Storage.ConflictPolicy Conflict = DigitalBrain.Capabilities.Storage.ConflictPolicy.Fail, bool Permanent = false, System.ReadOnlyMemory<byte>? Inline = null, bool DryRun = false) -> void
+abstract DigitalBrain.Capabilities.Storage.StorageWriteStream.AbortCore(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+abstract DigitalBrain.Capabilities.Storage.StorageWriteStream.CommitCore(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.ItemId>!
+const DigitalBrain.Capabilities.Storage.ListQuery.MaxPageSize = 1000 -> int
+override DigitalBrain.Capabilities.Storage.ByteRange.GetHashCode() -> int
+override DigitalBrain.Capabilities.Storage.Content.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Storage.Content.GetHashCode() -> int
+override DigitalBrain.Capabilities.Storage.Content.ToString() -> string!
+override DigitalBrain.Capabilities.Storage.Item.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Storage.Item.GetHashCode() -> int
+override DigitalBrain.Capabilities.Storage.Item.ToString() -> string!
+override DigitalBrain.Capabilities.Storage.ItemId.GetHashCode() -> int
+override DigitalBrain.Capabilities.Storage.ItemId.ToString() -> string!
+override DigitalBrain.Capabilities.Storage.ListQuery.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Storage.ListQuery.GetHashCode() -> int
+override DigitalBrain.Capabilities.Storage.ListQuery.ToString() -> string!
+override DigitalBrain.Capabilities.Storage.OperationDone.<Clone>$() -> DigitalBrain.Capabilities.Storage.OperationDone!
+override DigitalBrain.Capabilities.Storage.OperationDone.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Storage.OperationDone.GetHashCode() -> int
+override DigitalBrain.Capabilities.Storage.OperationDone.ToString() -> string!
+override DigitalBrain.Capabilities.Storage.OperationProgress.<Clone>$() -> DigitalBrain.Capabilities.Storage.OperationProgress!
+override DigitalBrain.Capabilities.Storage.OperationProgress.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Storage.OperationProgress.GetHashCode() -> int
+override DigitalBrain.Capabilities.Storage.OperationProgress.ToString() -> string!
+override DigitalBrain.Capabilities.Storage.OperationStarted.<Clone>$() -> DigitalBrain.Capabilities.Storage.OperationStarted!
+override DigitalBrain.Capabilities.Storage.OperationStarted.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Storage.OperationStarted.GetHashCode() -> int
+override DigitalBrain.Capabilities.Storage.OperationStarted.ToString() -> string!
+override DigitalBrain.Capabilities.Storage.Page<T>.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Storage.Page<T>.GetHashCode() -> int
+override DigitalBrain.Capabilities.Storage.Page<T>.ToString() -> string!
+override DigitalBrain.Capabilities.Storage.Quota.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Storage.Quota.GetHashCode() -> int
+override DigitalBrain.Capabilities.Storage.Quota.ToString() -> string!
+override DigitalBrain.Capabilities.Storage.SearchQuery.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Storage.SearchQuery.GetHashCode() -> int
+override DigitalBrain.Capabilities.Storage.SearchQuery.ToString() -> string!
+override DigitalBrain.Capabilities.Storage.StorageDescriptor.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Storage.StorageDescriptor.GetHashCode() -> int
+override DigitalBrain.Capabilities.Storage.StorageDescriptor.ToString() -> string!
+override DigitalBrain.Capabilities.Storage.WritePlan.<Clone>$() -> DigitalBrain.Capabilities.Storage.WritePlan!
+override DigitalBrain.Capabilities.Storage.WritePlan.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Storage.WritePlan.GetHashCode() -> int
+override DigitalBrain.Capabilities.Storage.WritePlan.ToString() -> string!
+override sealed DigitalBrain.Capabilities.Storage.OperationDone.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Capabilities.Storage.OperationProgress.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Capabilities.Storage.OperationStarted.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Capabilities.Storage.WritePlan.Equals(DigitalBrain.Operations.OperationPlan? other) -> bool
+static DigitalBrain.Capabilities.Storage.ByteRange.operator !=(DigitalBrain.Capabilities.Storage.ByteRange left, DigitalBrain.Capabilities.Storage.ByteRange right) -> bool
+static DigitalBrain.Capabilities.Storage.ByteRange.operator ==(DigitalBrain.Capabilities.Storage.ByteRange left, DigitalBrain.Capabilities.Storage.ByteRange right) -> bool
+static DigitalBrain.Capabilities.Storage.Content.operator !=(DigitalBrain.Capabilities.Storage.Content? left, DigitalBrain.Capabilities.Storage.Content? right) -> bool
+static DigitalBrain.Capabilities.Storage.Content.operator ==(DigitalBrain.Capabilities.Storage.Content? left, DigitalBrain.Capabilities.Storage.Content? right) -> bool
+static DigitalBrain.Capabilities.Storage.Item.operator !=(DigitalBrain.Capabilities.Storage.Item? left, DigitalBrain.Capabilities.Storage.Item? right) -> bool
+static DigitalBrain.Capabilities.Storage.Item.operator ==(DigitalBrain.Capabilities.Storage.Item? left, DigitalBrain.Capabilities.Storage.Item? right) -> bool
+static DigitalBrain.Capabilities.Storage.ItemId.operator !=(DigitalBrain.Capabilities.Storage.ItemId left, DigitalBrain.Capabilities.Storage.ItemId right) -> bool
+static DigitalBrain.Capabilities.Storage.ItemId.operator ==(DigitalBrain.Capabilities.Storage.ItemId left, DigitalBrain.Capabilities.Storage.ItemId right) -> bool
+static DigitalBrain.Capabilities.Storage.ListQuery.operator !=(DigitalBrain.Capabilities.Storage.ListQuery? left, DigitalBrain.Capabilities.Storage.ListQuery? right) -> bool
+static DigitalBrain.Capabilities.Storage.ListQuery.operator ==(DigitalBrain.Capabilities.Storage.ListQuery? left, DigitalBrain.Capabilities.Storage.ListQuery? right) -> bool
+static DigitalBrain.Capabilities.Storage.OperationDone.operator !=(DigitalBrain.Capabilities.Storage.OperationDone? left, DigitalBrain.Capabilities.Storage.OperationDone? right) -> bool
+static DigitalBrain.Capabilities.Storage.OperationDone.operator ==(DigitalBrain.Capabilities.Storage.OperationDone? left, DigitalBrain.Capabilities.Storage.OperationDone? right) -> bool
+static DigitalBrain.Capabilities.Storage.OperationProgress.operator !=(DigitalBrain.Capabilities.Storage.OperationProgress? left, DigitalBrain.Capabilities.Storage.OperationProgress? right) -> bool
+static DigitalBrain.Capabilities.Storage.OperationProgress.operator ==(DigitalBrain.Capabilities.Storage.OperationProgress? left, DigitalBrain.Capabilities.Storage.OperationProgress? right) -> bool
+static DigitalBrain.Capabilities.Storage.OperationStarted.operator !=(DigitalBrain.Capabilities.Storage.OperationStarted? left, DigitalBrain.Capabilities.Storage.OperationStarted? right) -> bool
+static DigitalBrain.Capabilities.Storage.OperationStarted.operator ==(DigitalBrain.Capabilities.Storage.OperationStarted? left, DigitalBrain.Capabilities.Storage.OperationStarted? right) -> bool
+static DigitalBrain.Capabilities.Storage.Page<T>.operator !=(DigitalBrain.Capabilities.Storage.Page<T>? left, DigitalBrain.Capabilities.Storage.Page<T>? right) -> bool
+static DigitalBrain.Capabilities.Storage.Page<T>.operator ==(DigitalBrain.Capabilities.Storage.Page<T>? left, DigitalBrain.Capabilities.Storage.Page<T>? right) -> bool
+static DigitalBrain.Capabilities.Storage.Quota.Known(long used, long total, bool pooled = false) -> DigitalBrain.Capabilities.Storage.Quota!
+static DigitalBrain.Capabilities.Storage.Quota.Unknown.get -> DigitalBrain.Capabilities.Storage.Quota!
+static DigitalBrain.Capabilities.Storage.Quota.Unlimited(long? used) -> DigitalBrain.Capabilities.Storage.Quota!
+static DigitalBrain.Capabilities.Storage.Quota.operator !=(DigitalBrain.Capabilities.Storage.Quota? left, DigitalBrain.Capabilities.Storage.Quota? right) -> bool
+static DigitalBrain.Capabilities.Storage.Quota.operator ==(DigitalBrain.Capabilities.Storage.Quota? left, DigitalBrain.Capabilities.Storage.Quota? right) -> bool
+static DigitalBrain.Capabilities.Storage.SearchQuery.operator !=(DigitalBrain.Capabilities.Storage.SearchQuery? left, DigitalBrain.Capabilities.Storage.SearchQuery? right) -> bool
+static DigitalBrain.Capabilities.Storage.SearchQuery.operator ==(DigitalBrain.Capabilities.Storage.SearchQuery? left, DigitalBrain.Capabilities.Storage.SearchQuery? right) -> bool
+static DigitalBrain.Capabilities.Storage.StorageDescriptor.operator !=(DigitalBrain.Capabilities.Storage.StorageDescriptor? left, DigitalBrain.Capabilities.Storage.StorageDescriptor? right) -> bool
+static DigitalBrain.Capabilities.Storage.StorageDescriptor.operator ==(DigitalBrain.Capabilities.Storage.StorageDescriptor? left, DigitalBrain.Capabilities.Storage.StorageDescriptor? right) -> bool
+static DigitalBrain.Capabilities.Storage.StorageExtensions.ReadText(this DigitalBrain.Capabilities.Storage.IStorage! storage, DigitalBrain.Capabilities.Storage.ItemId id, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+static DigitalBrain.Capabilities.Storage.WritePlan.Copy(DigitalBrain.Capabilities.Storage.ItemId source, DigitalBrain.Capabilities.Storage.ItemId folder, DigitalBrain.Capabilities.Storage.ConflictPolicy conflict = DigitalBrain.Capabilities.Storage.ConflictPolicy.Fail) -> DigitalBrain.Capabilities.Storage.WritePlan!
+static DigitalBrain.Capabilities.Storage.WritePlan.CreateFolder(DigitalBrain.Capabilities.Storage.ItemId parent, string! name, DigitalBrain.Capabilities.Storage.ConflictPolicy conflict = DigitalBrain.Capabilities.Storage.ConflictPolicy.Fail) -> DigitalBrain.Capabilities.Storage.WritePlan!
+static DigitalBrain.Capabilities.Storage.WritePlan.Delete(DigitalBrain.Capabilities.Storage.ItemId source, bool permanent = false) -> DigitalBrain.Capabilities.Storage.WritePlan!
+static DigitalBrain.Capabilities.Storage.WritePlan.Move(DigitalBrain.Capabilities.Storage.ItemId source, DigitalBrain.Capabilities.Storage.ItemId folder, DigitalBrain.Capabilities.Storage.ConflictPolicy conflict = DigitalBrain.Capabilities.Storage.ConflictPolicy.Fail) -> DigitalBrain.Capabilities.Storage.WritePlan!
+static DigitalBrain.Capabilities.Storage.WritePlan.Rename(DigitalBrain.Capabilities.Storage.ItemId source, string! name, DigitalBrain.Capabilities.Storage.ConflictPolicy conflict = DigitalBrain.Capabilities.Storage.ConflictPolicy.Fail) -> DigitalBrain.Capabilities.Storage.WritePlan!
+static DigitalBrain.Capabilities.Storage.WritePlan.WriteFile(DigitalBrain.Capabilities.Storage.ItemId folder, string! name, System.ReadOnlyMemory<byte>? content = null, DigitalBrain.Capabilities.Storage.ConflictPolicy conflict = DigitalBrain.Capabilities.Storage.ConflictPolicy.Fail) -> DigitalBrain.Capabilities.Storage.WritePlan!
+static DigitalBrain.Capabilities.Storage.WritePlan.operator !=(DigitalBrain.Capabilities.Storage.WritePlan? left, DigitalBrain.Capabilities.Storage.WritePlan? right) -> bool
+static DigitalBrain.Capabilities.Storage.WritePlan.operator ==(DigitalBrain.Capabilities.Storage.WritePlan? left, DigitalBrain.Capabilities.Storage.WritePlan? right) -> bool
+~override DigitalBrain.Capabilities.Storage.ByteRange.Equals(object obj) -> bool
+~override DigitalBrain.Capabilities.Storage.ByteRange.ToString() -> string
+~override DigitalBrain.Capabilities.Storage.ItemId.Equals(object obj) -> bool
+DigitalBrain.Capabilities.Storage.StorageOwner
+DigitalBrain.Capabilities.Storage.StorageWriteResult
+DigitalBrain.Capabilities.Storage.StorageWriteRunner
+DigitalBrain.Capabilities.Storage.StorageWriteRunner.Run(DigitalBrain.Capabilities.Storage.WritePlan! plan, DigitalBrain.Spi.IOperation! operation) -> System.Threading.Tasks.Task<DigitalBrain.Operations.OperationResult!>!
+DigitalBrain.Capabilities.Storage.StorageWriteRunner.StorageWriteRunner(DigitalBrain.Capabilities.Storage.StorageOwner! owner, DigitalBrain.Capabilities.Storage.StorageWriteResult! result) -> void
+static DigitalBrain.Capabilities.Storage.StorageWriteRunner.FreeName(string! name, System.Collections.Generic.IEnumerable<string!>! taken) -> string!
+virtual DigitalBrain.Capabilities.Storage.StorageOwner.Invoke(DigitalBrain.Capabilities.Storage.ItemId item, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.CapabilityConnection<DigitalBrain.Capabilities.Storage.IStorage!>!>!
+virtual DigitalBrain.Capabilities.Storage.StorageWriteResult.Invoke(DigitalBrain.Capabilities.Storage.IStorage! storage, DigitalBrain.Operations.OperationId operation, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Operations.OperationResult!>!
+DigitalBrain.Capabilities.Storage.StorageConfirmation
+DigitalBrain.Capabilities.Storage.StorageConfirmationGate
+DigitalBrain.Capabilities.Storage.StorageWriteRunner.Confirmation(DigitalBrain.Capabilities.Storage.WritePlan! plan, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Confirmation.ConfirmationPlan!>!
+static DigitalBrain.Capabilities.Storage.StorageConfirmation.For(string! planId, DigitalBrain.Capabilities.Storage.WritePlan! plan, bool crossConnection, string! name, string! storage, string! sourceStorage, string! folder) -> DigitalBrain.Confirmation.ConfirmationPlan!
+static DigitalBrain.Capabilities.Storage.StorageConfirmation.IsDestructive(DigitalBrain.Capabilities.Storage.WritePlan! plan, bool crossConnection) -> bool
+static DigitalBrain.Capabilities.Storage.StorageConfirmationGate.Check(DigitalBrain.Capabilities.Storage.StorageWriteRunner! runner, DigitalBrain.Confirmation.IConfirmations! confirmations, DigitalBrain.Capabilities.Storage.WritePlan! plan, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<string?>!
+DigitalBrain.Capabilities.Storage.IStorageUpload
+DigitalBrain.Capabilities.Storage.IStorageUpload.AbortUpload(string! upload, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Storage.IStorageUpload.AppendUpload(string! upload, long offset, byte[]! bytes, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Storage.IStorageUpload.BeginUpload(DigitalBrain.Capabilities.Storage.WritePlan! plan, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+DigitalBrain.Capabilities.Storage.IStorageUpload.CommitUpload(string! upload, long length, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.ItemId>!
+DigitalBrain.Capabilities.Storage.StorageUploadSessions
+DigitalBrain.Capabilities.Storage.StorageUploadSessions.AbortUpload(string! upload, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Storage.StorageUploadSessions.AppendUpload(string! upload, long offset, byte[]! bytes, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Storage.StorageUploadSessions.BeginUpload(DigitalBrain.Capabilities.Storage.WritePlan! plan, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+DigitalBrain.Capabilities.Storage.StorageUploadSessions.CommitUpload(string! upload, long length, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.ItemId>!
+DigitalBrain.Capabilities.Storage.StorageUploadSessions.DisposeAsync() -> System.Threading.Tasks.ValueTask
+DigitalBrain.Capabilities.Storage.StorageUploadSessions.StorageUploadSessions(System.Func<DigitalBrain.Capabilities.Storage.IStorage!>! storage, System.Func<string!>! caller, System.TimeProvider? time) -> void
+const DigitalBrain.Capabilities.Storage.StorageUploadSessions.ChunkSize = 262144 -> int
+DigitalBrain.Capabilities.Storage.StorageUploadSessions.StorageUploadSessions(System.Func<DigitalBrain.Capabilities.Storage.WritePlan!, System.Threading.CancellationToken, System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.StorageWriteStream!>!>! openWrite, System.Func<string!>! caller, System.TimeProvider? time) -> void
+DigitalBrain.Capabilities.Storage.StorageUploadSessions.StorageUploadSessions(System.Func<DigitalBrain.Capabilities.Storage.IStorage!>! storage, System.Func<string!>! caller) -> void

@@ -1,0 +1,60 @@
+name: release
+
+# Agents: do not run this workflow, and do not push the tag yourself.
+# The owner creates a GitHub release whose tag is v<VERSION> (the VERSION file); publishing it starts this workflow.
+# It packs the eleven DigitalBrain packages without a suffix and pushes them to nuget.org via Trusted Publishing.
+# No tests: ci.yml owns them.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  CI: 'true'
+
+jobs:
+  release:
+    name: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: nuget-release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # Must stay first: nothing is logged in, packed or pushed for a mismatched tag.
+      - name: Guard tag matches VERSION
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          [ "v${version}" = "${TAG}" ] || { echo "::error::tag ${TAG} does not match VERSION ${version}"; exit 1; }
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Pack release packages
+        run: |
+          dotnet pack DigitalBrain.slnx -c Release -o artifacts
+          dotnet pack templates/DigitalBrain.Templates/DigitalBrain.Templates.csproj -c Release -o artifacts
+          [ "$(find artifacts -maxdepth 1 -name "*.nupkg" | wc -l)" -eq 10 ] || { echo "::error::expected 10 packages"; ls artifacts; exit 1; }
+
+      - name: NuGet login (Trusted Publishing)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      # Strict: a version that already exists fails the release.
+      - name: Push to nuget.org
+        env:
+          NUGET_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: dotnet nuget push "artifacts/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "${NUGET_KEY}"

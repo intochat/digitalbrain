@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../src/DigitalBrain.Runtime.Orleans.Azure/DigitalBrain.Runtime.Orleans.Azure.csproj" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+  </ItemGroup>
+</Project>

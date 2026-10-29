@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>DigitalBrain.Examples.Calculator</RootNamespace>
+    <WarningsAsErrors>$(WarningsAsErrors);DB0002;DB0013;DB0014;DB0020;DB0021;DB0022;DB0023;DB0024;DB0025;DB0026;DB0027;DB0028</WarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../../src/DigitalBrain.UI/DigitalBrain.UI.csproj" />
+    <ProjectReference Include="../../src/DigitalBrain.Analyzers/DigitalBrain.Analyzers.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
+  </ItemGroup>
+</Project>

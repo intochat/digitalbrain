@@ -1,0 +1,8 @@
+# Default gitleaks rules plus one allowlisted value: the Azurite development account key, which Microsoft
+# publishes for the storage emulator (it grants nothing outside a local Azurite).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Azurite well-known development storage key"
+regexes = ['''Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==''']

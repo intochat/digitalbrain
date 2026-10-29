@@ -1,0 +1,36 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.14.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Analyzer.Testing" Version="1.1.4" />
+    <!-- Transitive pin (NU1902/NU1903 via Analyzer.Testing); same version as os. -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.TemplateEngine.Authoring.Tasks" Version="11.0.100-rc.1.26425.128" />
+    <PackageVersion Include="xunit.v3.mtp-v2" Version="4.0.2" />
+    <!-- 05-04: the conformance kits in DigitalBrain.Testing are xunit fact classes; same xunit family and version as the runner. -->
+    <PackageVersion Include="xunit.v3.extensibility.core" Version="4.0.2" />
+    <PackageVersion Include="xunit.v3.assert" Version="4.0.2" />
+    <!-- Runtime (03-05): Orleans versions approved in 03-01; Microsoft.Extensions at the os pin. -->
+    <PackageVersion Include="Microsoft.Orleans.Server" Version="10.4.0" />
+    <PackageVersion Include="Microsoft.Orleans.Sdk" Version="10.4.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="11.0.0-rc.2.26504.105" />
+    <!-- Local topology (03-07): versions approved in 03-01. -->
+    <PackageVersion Include="Microsoft.Orleans.Streaming" Version="10.4.0" />
+    <PackageVersion Include="Microsoft.Orleans.Reminders" Version="10.4.0" />
+    <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.13" />
+    <!-- Cloud topology (03-08): versions approved in 03-01; only DigitalBrain.Runtime.Orleans.Azure references them. -->
+    <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.4.0" />
+    <PackageVersion Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.4.0" />
+    <PackageVersion Include="Microsoft.Orleans.Reminders.AzureStorage" Version="10.4.0" />
+    <PackageVersion Include="Microsoft.Orleans.Streaming.AzureStorage" Version="10.4.0" />
+    <PackageVersion Include="Azure.Extensions.AspNetCore.Configuration.Secrets" Version="1.5.2" />
+    <PackageVersion Include="Azure.Identity" Version="1.21.0" />
+    <PackageVersion Include="Azure.Storage.Blobs" Version="12.30.1" />
+    <PackageVersion Include="Azure.Storage.Queues" Version="12.28.1" />
+  </ItemGroup>
+</Project>

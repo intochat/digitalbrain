@@ -1,0 +1,37 @@
+#nullable enable
+DigitalBrain.Runtime.Orleans.Azure.BlobLeaseBrainLogOwnership
+DigitalBrain.Runtime.Orleans.Azure.BlobLeaseBrainLogOwnership.BlobLeaseBrainLogOwnership(Azure.Storage.Blobs.BlobContainerClient! container, System.TimeProvider! time, Microsoft.Extensions.Logging.ILoggerFactory! loggers, System.TimeSpan claimTimeout, System.TimeSpan writeTimeout) -> void
+DigitalBrain.Runtime.Orleans.Azure.BlobLeaseBrainLogOwnership.ClaimAsync(string! directory, string! brainId, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Runtime.Orleans.IBrainLogLease!>!
+DigitalBrain.Runtime.Orleans.Azure.BlobLeaseBrainLogOwnership.Snapshot() -> DigitalBrain.Runtime.Orleans.BrainOwnershipCounts!
+DigitalBrain.Runtime.Orleans.Azure.CloudProfile
+DigitalBrain.Runtime.Orleans.Azure.CloudProfile.Bindings.get -> DigitalBrain.Runtime.Orleans.Bindings!
+DigitalBrain.Runtime.Orleans.Azure.CloudProfile.CloudProfile() -> void
+DigitalBrain.Runtime.Orleans.Azure.CloudProfile.CloudProfile(System.Action<Microsoft.Extensions.Configuration.IConfigurationBuilder!, System.Uri!>? keyVaultSource) -> void
+DigitalBrain.Runtime.Orleans.Azure.CloudProfile.ConfigureConfiguration(Microsoft.Extensions.Configuration.IConfigurationBuilder! builder, DigitalBrain.Runtime.Orleans.TopologyContext! context) -> void
+DigitalBrain.Runtime.Orleans.Azure.CloudProfile.ConfigureServices(Microsoft.Extensions.DependencyInjection.IServiceCollection! services, DigitalBrain.Runtime.Orleans.TopologyContext! context) -> void
+DigitalBrain.Runtime.Orleans.Azure.CloudProfile.ConfigureSilo(Orleans.Hosting.ISiloBuilder! silo, DigitalBrain.Runtime.Orleans.TopologyContext! context) -> void
+DigitalBrain.Runtime.Orleans.Azure.CloudProfile.Defaults.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string?>!
+DigitalBrain.Runtime.Orleans.Azure.CloudProfile.Services.get -> DigitalBrain.Runtime.Orleans.Services!
+DigitalBrain.Runtime.Orleans.Azure.CloudProfile.Topology.get -> DigitalBrain.Runtime.Orleans.Topology
+DigitalBrain.Runtime.Orleans.Azure.CloudProfile.Validate(Microsoft.Extensions.Configuration.IConfiguration! configuration, System.Collections.Generic.IReadOnlyList<DigitalBrain.ModuleManifest!>! modules) -> System.Collections.Generic.IEnumerable<DigitalBrain.Runtime.Orleans.TopologyIssue!>!
+DigitalBrain.Runtime.Orleans.Azure.CloudStorageAccount
+DigitalBrain.Runtime.Orleans.Azure.CloudStorageAccount.Blobs() -> Azure.Storage.Blobs.BlobServiceClient!
+DigitalBrain.Runtime.Orleans.Azure.CloudStorageAccount.Queues() -> Azure.Storage.Queues.QueueServiceClient!
+DigitalBrain.Runtime.Orleans.Azure.CloudStorageAccount.Tables() -> Azure.Data.Tables.TableServiceClient!
+DigitalBrain.Runtime.Orleans.Azure.CloudStorageAccount.UsesIdentity.get -> bool
+DigitalBrain.Runtime.Orleans.Azure.CloudTopologyExtensions
+const DigitalBrain.Runtime.Orleans.Azure.CloudProfile.LeaseContainer = "brain-leases" -> string!
+override DigitalBrain.Runtime.Orleans.Azure.CloudStorageAccount.ToString() -> string!
+static DigitalBrain.Runtime.Orleans.Azure.CloudProfile.AzureResourceKinds.get -> System.Collections.Generic.IReadOnlyList<string!>!
+static DigitalBrain.Runtime.Orleans.Azure.CloudProfile.CloudBindings.get -> DigitalBrain.Runtime.Orleans.Bindings!
+static DigitalBrain.Runtime.Orleans.Azure.CloudProfile.CloudServices.get -> DigitalBrain.Runtime.Orleans.Services!
+static DigitalBrain.Runtime.Orleans.Azure.CloudProfile.KeyVault(string? value, out DigitalBrain.Runtime.Orleans.TopologyIssue? issue) -> System.Uri?
+static DigitalBrain.Runtime.Orleans.Azure.CloudProfile.SignalQueues.get -> System.Collections.Generic.IReadOnlyList<string!>!
+static DigitalBrain.Runtime.Orleans.Azure.CloudStorageAccount.Parse(string? value) -> DigitalBrain.Runtime.Orleans.Azure.CloudStorageAccount!
+static DigitalBrain.Runtime.Orleans.Azure.CloudStorageAccount.TryParse(string? value, out DigitalBrain.Runtime.Orleans.TopologyIssue? issue) -> DigitalBrain.Runtime.Orleans.Azure.CloudStorageAccount?
+static DigitalBrain.Runtime.Orleans.Azure.CloudTopologyExtensions.AddCloudTopology() -> DigitalBrain.Runtime.Orleans.ITopologyProfile!
+static readonly DigitalBrain.Runtime.Orleans.Azure.BlobLeaseBrainLogOwnership.DefaultClaimTimeout -> System.TimeSpan
+static readonly DigitalBrain.Runtime.Orleans.Azure.BlobLeaseBrainLogOwnership.DefaultWriteTimeout -> System.TimeSpan
+static readonly DigitalBrain.Runtime.Orleans.Azure.BlobLeaseBrainLogOwnership.Fence -> System.TimeSpan
+static readonly DigitalBrain.Runtime.Orleans.Azure.BlobLeaseBrainLogOwnership.LeaseDuration -> System.TimeSpan
+static readonly DigitalBrain.Runtime.Orleans.Azure.BlobLeaseBrainLogOwnership.RenewalInterval -> System.TimeSpan

@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Digital Brain Tech",
+  "classifications": [
+    "DigitalBrain",
+    "Module"
+  ],
+  "identity": "DigitalBrain.Module.CSharp",
+  "name": "DigitalBrain module",
+  "description": "A DigitalBrain module with a manifest, a contract, one internal neuron and a unit test.",
+  "shortName": "intochat-module",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "MODULE_NAME",
+  "preferNameDirectory": true,
+  "symbols": {
+    "ModuleId": {
+      "type": "parameter",
+      "datatype": "string",
+      "isRequired": true,
+      "description": "Module id: vendor.name, lowercase letters, digits and hyphens (for example acme.weather). The generated test checks it.",
+      "replaces": "MODULE_ID"
+    },
+    "ClassName": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "safe_name",
+      "replaces": "MODULE_CLASS",
+      "fileRename": "MODULE_CLASS"
+    },
+    "Namespace": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "safe_namespace",
+      "replaces": "MODULE_NAMESPACE"
+    },
+    "DigitalBrainVersion": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "__DIGITALBRAIN_VERSION__",
+      "description": "DigitalBrain and DigitalBrain.Testing package version.",
+      "replaces": "DIGITALBRAIN_VERSION_VALUE"
+    }
+  }
+}

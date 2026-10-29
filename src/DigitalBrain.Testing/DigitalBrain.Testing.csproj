@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <RootNamespace>DigitalBrain.Testing</RootNamespace>
+    <PackageId>DigitalBrain.Testing</PackageId>
+    <Description>Fakes, assertion helpers and the in-process host entry point for testing DigitalBrain neurons and modules.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <WarningsAsErrors>$(WarningsAsErrors);RS0016;RS0017</WarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../DigitalBrain.UI/DigitalBrain.UI.csproj" />
+    <ProjectReference Include="../DigitalBrain.Capabilities.Storage/DigitalBrain.Capabilities.Storage.csproj" />
+    <ProjectReference Include="../DigitalBrain.Capabilities.Secrets/DigitalBrain.Capabilities.Secrets.csproj" />
+    <ProjectReference Include="../DigitalBrain.Capabilities.Identity/DigitalBrain.Capabilities.Identity.csproj" />
+    <PackageReference Include="xunit.v3.extensibility.core" />
+    <PackageReference Include="xunit.v3.assert" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+    <None Include="README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+</Project>

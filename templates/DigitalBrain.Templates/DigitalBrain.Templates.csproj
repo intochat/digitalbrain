@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Outside DigitalBrain.slnx on purpose: the pack project ships template sources, it compiles nothing. -->
+  <PropertyGroup>
+    <PackageId>DigitalBrain.Templates</PackageId>
+    <IsPackable>true</IsPackable>
+    <PackageType>Template</PackageType>
+    <Description>dotnet new templates for DigitalBrain: intochat-app scaffolds an app with a neuron, intochat-module scaffolds a module; both with tests.</Description>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+    <NoWarn>$(NoWarn);NU5128;NU5039</NoWarn>
+    <LocalizeTemplates>false</LocalizeTemplates>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <IncludeSymbols>false</IncludeSymbols>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <StampedContent>$(MSBuildProjectDirectory)/obj/stamped/</StampedContent>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="**/*" />
+    <PackageReference Include="Microsoft.TemplateEngine.Authoring.Tasks" PrivateAssets="all" />
+  </ItemGroup>
+  <!-- Copy source bytes unchanged; stamp only the version-bearing template configuration. WriteLinesToFile treats
+       backslashes in its Lines items as path separators on Unix, so C# sources must never pass through it. -->
+  <Target Name="DigitalBrainStampTemplate" BeforeTargets="_GetPackageFiles;GenerateTemplateManifest;Build;Pack">
+    <ItemGroup>
+      <_TemplateSource Include="content/**/*" Exclude="content/**/bin/**;content/**/obj/**" />
+    </ItemGroup>
+    <RemoveDir Directories="$(StampedContent)" />
+    <Copy SourceFiles="@(_TemplateSource)" DestinationFiles="@(_TemplateSource->'$(StampedContent)%(RecursiveDir)%(Filename)%(Extension)')" />
+    <ItemGroup>
+      <_StampedFile Include="$(StampedContent)**/.template.config/template.json" />
+    </ItemGroup>
+    <WriteLinesToFile File="%(_StampedFile.FullPath)"
+                      Lines="$([System.IO.File]::ReadAllText('%(_StampedFile.FullPath)').Replace('__DIGITALBRAIN_VERSION__', '$(PackageVersion)'))"
+                      Overwrite="true" Encoding="UTF-8" />
+    <ItemGroup>
+      <Content Include="$(StampedContent)**/*" PackagePath="content/%(RecursiveDir)%(Filename)%(Extension)" />
+    </ItemGroup>
+  </Target>
+</Project>

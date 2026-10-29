@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <RootNamespace>DigitalBrain</RootNamespace>
+    <PackageId>DigitalBrain</PackageId>
+    <Description>Neurons, signals, synapses, brains, apps and modules.</Description>
+    <PackageReadmeFile Condition="Exists('README.md')">README.md</PackageReadmeFile>
+    <WarningsAsErrors>$(WarningsAsErrors);RS0016;RS0017</WarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+    <None Include="README.md" Pack="true" PackagePath="/" Condition="Exists('README.md')" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="DigitalBrain.Tests.Unit" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Analyzer-only (03-04): no assembly reference. NuGet drops ReferenceOutputAssembly=false references from the
+         dependency list (pack-and-consume probe), so the analyzer dll is bundled under analyzers/dotnet/cs below;
+         DigitalBrain.Analyzers still ships as its own package. -->
+    <ProjectReference Include="../DigitalBrain.Analyzers/DigitalBrain.Analyzers.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
+  </ItemGroup>
+  <Target Name="DigitalBrainBundleAnalyzers" BeforeTargets="_GetPackageFiles">
+    <MSBuild Projects="../DigitalBrain.Analyzers/DigitalBrain.Analyzers.csproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_DigitalBrainAnalyzerDll" />
+    </MSBuild>
+    <MSBuild Projects="../DigitalBrain.Analyzers.CodeFixes/DigitalBrain.Analyzers.CodeFixes.csproj" Targets="Build" Properties="Configuration=$(Configuration)" Condition="'$(NoBuild)' != 'true'" />
+    <MSBuild Projects="../DigitalBrain.Analyzers.CodeFixes/DigitalBrain.Analyzers.CodeFixes.csproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_DigitalBrainAnalyzerDll" />
+    </MSBuild>
+    <ItemGroup>
+      <None Include="@(_DigitalBrainAnalyzerDll)" Pack="true" PackagePath="analyzers/dotnet/cs" />
+    </ItemGroup>
+  </Target>
+</Project>

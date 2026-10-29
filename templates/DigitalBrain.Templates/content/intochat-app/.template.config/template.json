@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Digital Brain Tech",
+  "classifications": [
+    "DigitalBrain",
+    "App"
+  ],
+  "identity": "DigitalBrain.App.CSharp",
+  "name": "DigitalBrain app",
+  "description": "An IntoChat app that follows the app convention: X.cs, X.spec.md and XFacts.cs with the generated baseline test.",
+  "shortName": "intochat-app",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "AppName",
+  "preferNameDirectory": true,
+  "symbols": {
+    "AppId": {
+      "type": "parameter",
+      "datatype": "string",
+      "isRequired": false,
+      "description": "App id: lowercase letters, digits and hyphens, dot-separated (for example acme.notes). Defaults to the lower-case name. The generated test checks it.",
+      "defaultValue": ""
+    },
+    "AppIdFromName": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "lowerCase"
+    },
+    "AppIdValue": {
+      "type": "generated",
+      "generator": "coalesce",
+      "parameters": {
+        "sourceVariableName": "AppId",
+        "fallbackVariableName": "AppIdFromName"
+      },
+      "replaces": "APP_ID"
+    },
+    "ClassName": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "safe_name",
+      "replaces": "APP_CLASS"
+    },
+    "Namespace": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "safe_namespace",
+      "replaces": "APP_NAMESPACE"
+    },
+    "DigitalBrainVersion": {
+      "type": "parameter",
+      "datatype": "string",
+      "defaultValue": "__DIGITALBRAIN_VERSION__",
+      "description": "DigitalBrain, DigitalBrain.UI and DigitalBrain.Testing package version.",
+      "replaces": "DIGITALBRAIN_VERSION_VALUE"
+    }
+  }
+}

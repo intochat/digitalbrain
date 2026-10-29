@@ -1,0 +1,346 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+  CI: 'true'
+
+# Gate jobs: format, build, test, azure, e2e, no-orleans, template. The aggregate `ci` job needs all of them.
+# On a push to main, publish ships 0.6.0-preview.<run> of the eleven DigitalBrain packages to nuget.org via
+# Trusted Publishing; template-feed and the report-only downstream job run after it and never gate.
+jobs:
+  format:
+    name: format
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore DigitalBrain.slnx -v quiet
+
+      - name: Format
+        run: dotnet format DigitalBrain.slnx --verify-no-changes --no-restore --verbosity minimal
+
+  build:
+    name: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Build
+        run: dotnet build DigitalBrain.slnx -c Release
+
+      - name: Pack
+        run: |
+          dotnet pack DigitalBrain.slnx -c Release --no-build -o artifacts/packages
+          dotnet pack templates/DigitalBrain.Templates/DigitalBrain.Templates.csproj -c Release -o artifacts/packages
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: packages
+          path: artifacts/packages
+          retention-days: 7
+
+  # Unit, architecture, analyzer, testing and runtime (unit and integration) facts.
+  test:
+    name: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Test
+        run: |
+          for project in \
+            tests/DigitalBrain.Tests.Unit \
+            tests/DigitalBrain.Architecture.Tests.Unit \
+            tests/DigitalBrain.Analyzers.Tests.Unit \
+            tests/DigitalBrain.Testing.Tests.Unit \
+            tests/DigitalBrain.Runtime.Orleans.Tests.Unit \
+            tests/DigitalBrain.Runtime.Http.Tests.Unit \
+            tests/DigitalBrain.Runtime.Orleans.Tests.Integration; do
+            name=$(basename "$project")
+            dotnet test --project "$project/$name.csproj" -c Release
+          done
+
+  # CloudProfile facts against Azurite. CI=true makes a missing Azurite a failure, never a skip.
+  azure:
+    name: azure
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite
+        ports:
+          - 10000:10000
+          - 10001:10001
+          - 10002:10002
+    env:
+      AZURITE_CONNECTION_STRING: DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Azure integration facts
+        run: dotnet test --project tests/DigitalBrain.Runtime.Orleans.Azure.Tests.Integration/DigitalBrain.Runtime.Orleans.Azure.Tests.Integration.csproj -c Release
+
+  # Framework e2e (R4-03, 04-15): one fact set on TestOS, the local and the Azurite targets. The skip guard (04-16) fails the job
+  # when any result is skipped or no report was written, so the Azurite target can never pass silently.
+  e2e:
+    name: e2e
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite
+        ports:
+          - 10000:10000
+          - 10001:10001
+          - 10002:10002
+    env:
+      AZURITE_CONNECTION_STRING: DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Framework e2e facts
+        run: dotnet test --project tests/DigitalBrain.Framework.Tests.E2E/DigitalBrain.Framework.Tests.E2E.csproj -c Release --report-xunit-trx --results-directory artifacts/e2e
+
+      - name: No skipped e2e facts
+        run: bash scripts/ci/fail-on-skipped.sh artifacts/e2e
+
+  # The Orleans-free packages must stay Orleans-free, transitively.
+  no-orleans:
+    name: no-orleans
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: No Orleans in the core packages
+        run: |
+          status=0
+          for name in DigitalBrain DigitalBrain.UI DigitalBrain.Testing DigitalBrain.Analyzers; do
+            project="src/$name/$name.csproj"
+            dotnet restore "$project" -v quiet
+            if dotnet list "$project" package --include-transitive | grep -i orleans; then
+              echo "::error::$name references Orleans"
+              status=1
+            fi
+          done
+          exit $status
+
+  # dotnet new intochat-app / intochat-module outside the repository, from this run's packages.
+  template:
+    name: template
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: packages
+          path: artifacts/packages
+
+      - name: Template smoke (local)
+        run: bash scripts/ci/template-smoke.sh local "$RUNNER_TEMP/t" "$GITHUB_WORKSPACE/artifacts/packages"
+
+      # 08-05: dotnet new intochat-app (Notes, Foo.Bar) into a custom hive, build -warnaserror, generated baseline green, DB0024 probe.
+      - name: intochat-app template facts
+        env:
+          DIGITALBRAIN_TEMPLATE_PACKAGES: ${{ github.workspace }}/artifacts/packages
+        run: dotnet test --project tests/DigitalBrain.Templates.Tests.Integration/DigitalBrain.Templates.Tests.Integration.csproj -c Release
+
+  ci:
+    name: ci
+    needs: [format, build, test, azure, e2e, no-orleans, template]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Gate
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS"
+          exit 1
+
+  # Prerelease packages to nuget.org via Trusted Publishing, only after the gate on a push to main.
+  publish:
+    name: publish
+    needs: [ci]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: nuget-preview
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: publish-main
+      cancel-in-progress: false
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Version
+        id: version
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: echo "version=$(tr -d '[:space:]' < VERSION)-preview.${RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Pack prerelease packages
+        env:
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          dotnet pack DigitalBrain.slnx -c Release -o artifacts "-p:VersionSuffix=preview.${RUN_NUMBER}"
+          dotnet pack templates/DigitalBrain.Templates/DigitalBrain.Templates.csproj -c Release -o artifacts "-p:VersionSuffix=preview.${RUN_NUMBER}"
+
+      # DIST-04: only the eleven DigitalBrain ids leave this repository.
+      - name: Package allowlist
+        run: |
+          allowed=" DigitalBrain DigitalBrain.UI DigitalBrain.Testing DigitalBrain.Analyzers DigitalBrain.Templates DigitalBrain.Runtime.Orleans DigitalBrain.Runtime.Orleans.Azure DigitalBrain.Capabilities.Storage DigitalBrain.Capabilities.Secrets DigitalBrain.Capabilities.Identity DigitalBrain.Runtime.Http "
+          version='${{ steps.version.outputs.version }}'
+          count=0
+          for pkg in artifacts/*.nupkg; do
+            id=$(basename "$pkg" ".${version}.nupkg")
+            case "$allowed" in *" $id "*) count=$((count + 1)) ;; *) echo "::error::unexpected package $pkg"; exit 1 ;; esac
+          done
+          [ "$count" -eq 11 ] || { echo "::error::expected 11 packages, got $count"; exit 1; }
+
+      - name: NuGet login (Trusted Publishing)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      # Separate from pack so --skip-duplicate cannot mask a pack failure.
+      - name: Push to nuget.org
+        env:
+          NUGET_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: dotnet nuget push "artifacts/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "${NUGET_KEY}" --skip-duplicate
+
+  # The external-author path: the template from nuget.org with the just-published preview.
+  template-feed:
+    name: template-feed
+    needs: [publish]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Template smoke (feed)
+        env:
+          VERSION: ${{ needs.publish.outputs.version }}
+        run: bash scripts/ci/template-smoke.sh feed "$RUNNER_TEMP/t" "$VERSION"
+
+  # Report-only; replaces the os platform downstream job (R4-03). Not in the ci gate.
+  # Builds intochat/os (branch os-0-7-0) against the just-published preview.
+  downstream:
+    name: downstream
+    needs: [publish]
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ needs.publish.outputs.version }}
+      HAS_OS_TOKEN: ${{ secrets.OS_DOWNSTREAM_TOKEN != '' }}
+    steps:
+      - name: Wait for nuget.org to index the preview
+        run: |
+          url="https://api.nuget.org/v3-flatcontainer/digitalbrain.runtime.orleans/index.json"
+          deadline=$(( $(date +%s) + 1200 ))
+          until curl -sf "$url" | grep -q "\"${VERSION}\""; do
+            [ "$(date +%s)" -lt "$deadline" ] || { echo "::error::${VERSION} not indexed after 20 minutes"; exit 1; }
+            sleep 30
+          done
+
+      - name: Check out intochat/os (private, with token)
+        if: env.HAS_OS_TOKEN == 'true'
+        uses: actions/checkout@v7
+        with:
+          repository: intochat/os
+          ref: os-0-7-0
+          path: os
+          token: ${{ secrets.OS_DOWNSTREAM_TOKEN }}
+          persist-credentials: false
+
+      - name: Check out intochat/os (public)
+        if: env.HAS_OS_TOKEN != 'true'
+        uses: actions/checkout@v7
+        with:
+          repository: intochat/os
+          ref: os-0-7-0
+          path: os
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: os/global.json
+
+      - name: Pin os to the fresh preview
+        working-directory: os
+        run: |
+          sed -i -E "s#(<PackageVersion Include=\"DigitalBrain[^\"]*\" Version=\")0\.6\.0-preview\.[^\"]*(\")#\1${VERSION}\2#g" Directory.Packages.props
+          grep -n 'DigitalBrain' Directory.Packages.props || echo "os does not reference DigitalBrain yet"
+
+      - name: Build os kernel and run os architecture facts
+        working-directory: os
+        run: |
+          dotnet build src/IntoChat.OS.Kernel/IntoChat.OS.Kernel/IntoChat.OS.Kernel.csproj -c Release
+          dotnet test --project src/Testing/IntoChat.OS.Architecture.Tests.Unit/IntoChat.OS.Architecture.Tests.Unit.csproj -c Release

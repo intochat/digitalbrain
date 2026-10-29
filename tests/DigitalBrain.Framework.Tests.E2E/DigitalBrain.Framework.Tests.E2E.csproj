@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Framework e2e harness (R4-03): one fact set over every FrameworkTarget. Phase 4 adds the TestOS target. -->
+  <ItemGroup>
+    <ProjectReference Include="../../src/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="../../src/DigitalBrain.Runtime.Orleans/DigitalBrain.Runtime.Orleans.csproj" />
+    <ProjectReference Include="../../src/DigitalBrain.Runtime.Orleans.Azure/DigitalBrain.Runtime.Orleans.Azure.csproj" />
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The 03-08 Azurite fixture, shared as source: CI sets AZURITE_CONNECTION_STRING; locally Docker starts the image. -->
+    <Compile Include="../DigitalBrain.Runtime.Orleans.Azure.Tests.Integration/AzuriteFixture.cs" Link="AzuriteFixture.cs" />
+  </ItemGroup>
+</Project>
