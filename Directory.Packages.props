@@ -18,7 +18,7 @@
     <!-- Runtime (03-05): Orleans versions approved in 03-01; Microsoft.Extensions at the os pin. -->
     <PackageVersion Include="Microsoft.Orleans.Server" Version="10.4.0" />
     <PackageVersion Include="Microsoft.Orleans.Sdk" Version="10.4.0" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="11.0.0-rc.2.26504.105" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="11.0.0-rc.3.26522.148" />
     <!-- Local topology (03-07): versions approved in 03-01. -->
     <PackageVersion Include="Microsoft.Orleans.Streaming" Version="10.4.0" />
     <PackageVersion Include="Microsoft.Orleans.Reminders" Version="10.4.0" />
