@@ -1142,3 +1142,11 @@ override DigitalBrain.AppSignalSubscription.GetHashCode() -> int
 override DigitalBrain.AppSignalSubscription.ToString() -> string!
 static DigitalBrain.AppSignalSubscription.operator !=(DigitalBrain.AppSignalSubscription? left, DigitalBrain.AppSignalSubscription? right) -> bool
 static DigitalBrain.AppSignalSubscription.operator ==(DigitalBrain.AppSignalSubscription? left, DigitalBrain.AppSignalSubscription? right) -> bool
+DigitalBrain.AppAttribute.Accent.get -> string?
+DigitalBrain.AppAttribute.Accent.init -> void
+DigitalBrain.AppAttribute.Category.get -> string?
+DigitalBrain.AppAttribute.Category.init -> void
+DigitalBrain.AppManifest.Accent.get -> string?
+DigitalBrain.AppManifest.Accent.init -> void
+DigitalBrain.AppManifest.Category.get -> string?
+DigitalBrain.AppManifest.Category.init -> void

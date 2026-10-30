@@ -38,6 +38,9 @@ public sealed record View(string Title, Node Root);
 [JsonDerivedType(typeof(JobCardNode), "jobCard")]
 [JsonDerivedType(typeof(BrainSceneNode), "brainScene")]
 [JsonDerivedType(typeof(NeuronRef), "neuronRef")]
+[JsonDerivedType(typeof(AppShellNode), "appShell")]
+[JsonDerivedType(typeof(NavItemNode), "navItem")]
+[JsonDerivedType(typeof(StatCardNode), "statCard")]
 public abstract record Node;
 
 /// <summary>Children laid out top to bottom.</summary>
@@ -494,6 +497,84 @@ public sealed record BrainSceneNode(
 
 /// <summary>Reference to a live neuron control in the same brain.</summary>
 public sealed record NeuronRef([property: JsonPropertyName("refKind")] string Kind, string NeuronUri) : Node;
+
+/// <summary>Semantic tone for status badges and stat cards.</summary>
+public enum BadgeTone
+{
+    /// <summary>Default neutral metadata tone.</summary>
+    Neutral = 0,
+
+    /// <summary>Primary brand/accent tone.</summary>
+    Accent = 1,
+
+    /// <summary>Completed / healthy green tone.</summary>
+    Done = 2,
+
+    /// <summary>In-progress / warning amber tone.</summary>
+    Working = 3,
+
+    /// <summary>Destructive / failure red tone.</summary>
+    Error = 4,
+}
+
+/// <summary>Studio-grade desktop application shell with optional Acrylic sidebar, top toolbar, main body, and right-hand inspector.</summary>
+public sealed record AppShellNode(
+    string Key,
+    Node? Sidebar,
+    Node Body,
+    Node? Toolbar = null,
+    Node? Inspector = null) : Node;
+
+/// <summary>Navigation rail / sidebar item with icon, active indicator, and optional count/status badge.</summary>
+public sealed record NavItemNode(
+    string Key,
+    string Label,
+    string Icon,
+    string Action,
+    bool Selected = false,
+    string? Badge = null) : Node;
+
+/// <summary>Compact KPI / telemetry card with tabular-numeral (<c>tnum</c>) metric value and optional delta pill.</summary>
+public sealed record StatCardNode(
+    string Key,
+    string Label,
+    string Value,
+    string? Delta = null,
+    BadgeTone Tone = BadgeTone.Neutral,
+    string? Icon = null) : Node;
+
+/// <summary>Ergonomic high-level builders for authoring <c>App&lt;TState&gt;</c> desktop views in ~30 lines of C#.</summary>
+public static class Ui
+{
+    /// <summary>Creates a studio-grade desktop app shell layout with optional sidebar, toolbar, and right inspector pane.</summary>
+    public static AppShellNode AppShell(
+        string key,
+        Node? sidebar,
+        Node body,
+        Node? toolbar = null,
+        Node? inspector = null) =>
+        new(key, sidebar, body, toolbar, inspector);
+
+    /// <summary>Creates a sidebar navigation item with a Lucide icon key, operation name, selection state, and optional badge.</summary>
+    public static NavItemNode NavItem(
+        string key,
+        string label,
+        string icon,
+        string action,
+        bool selected = false,
+        string? badge = null) =>
+        new(key, label, icon, action, selected, badge);
+
+    /// <summary>Creates a tabular-numeral (<c>tnum</c>) KPI stat card with optional delta pill and semantic tone.</summary>
+    public static StatCardNode StatCard(
+        string key,
+        string label,
+        string value,
+        string? delta = null,
+        BadgeTone tone = BadgeTone.Neutral,
+        string? icon = null) =>
+        new(key, label, value, delta, tone, icon);
+}
 
 /// <summary>Where an app publishes what it shows: its side and main views and transient toasts. The host renders the latest of each.</summary>
 public interface IPresenter

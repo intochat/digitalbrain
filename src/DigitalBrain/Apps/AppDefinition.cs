@@ -45,8 +45,15 @@ public sealed partial class AppDefinition
         }
         Operations = new ReadOnlyDictionary<string, MethodInfo>(operations);
         SignalSubscriptions = subscriptions.AsReadOnly();
-        Manifest = appType.GetProperty("Manifest", BindingFlags.Public | BindingFlags.Static)?.GetValue(null) is AppManifest declared
+        var rawManifest = appType.GetProperty("Manifest", BindingFlags.Public | BindingFlags.Static)?.GetValue(null) is AppManifest declared
             ? declared : DeriveManifest(appType, attribute);
+        Manifest = (rawManifest.Accent is null && attribute.Accent is not null) || (rawManifest.Category is null && attribute.Category is not null)
+            ? rawManifest with
+            {
+                Accent = rawManifest.Accent ?? attribute.Accent,
+                Category = rawManifest.Category ?? attribute.Category,
+            }
+            : rawManifest;
         if (!string.Equals(Manifest.Id, attribute.Id, StringComparison.Ordinal))
         {
             throw new InvalidOperationException($"App manifest id '{Manifest.Id}' does not match [App] id '{attribute.Id}'.");
@@ -77,7 +84,11 @@ public sealed partial class AppDefinition
             .Select(t => t.GetCustomAttribute<CapabilityAttribute>(false)!.Id).Distinct().ToList();
         var neurons = appType.Assembly.GetTypes().Where(t => t is { IsAbstract: false, IsClass: true }
             && t.Namespace == appType.Namespace && typeof(Neuron).IsAssignableFrom(t) && t.IsDefined(typeof(NeuronAttribute), false)).ToList();
-        return new AppManifest(attribute.Id, appType.Name, appType.Assembly.GetName().Version?.ToString() ?? "0.0.0", neurons, new AppRequirements(requires));
+        return new AppManifest(attribute.Id, appType.Name, appType.Assembly.GetName().Version?.ToString() ?? "0.0.0", neurons, new AppRequirements(requires))
+        {
+            Accent = attribute.Accent,
+            Category = attribute.Category,
+        };
     }
 
     private static Type? Contract(Type type)
