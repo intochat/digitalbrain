@@ -25,7 +25,7 @@
     <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.13" />
     <!-- Cloud topology (03-08): versions approved in 03-01; only DigitalBrain.Runtime.Orleans.Azure references them. -->
     <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.4.0" />
-    <PackageVersion Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.4.0" />
+    <PackageVersion Include="Microsoft.Orleans.Persistence.AzureStorage" Version="10.4.1" />
     <PackageVersion Include="Microsoft.Orleans.Reminders.AzureStorage" Version="10.4.0" />
     <PackageVersion Include="Microsoft.Orleans.Streaming.AzureStorage" Version="10.4.0" />
     <PackageVersion Include="Azure.Extensions.AspNetCore.Configuration.Secrets" Version="1.5.2" />
