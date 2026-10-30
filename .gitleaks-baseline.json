@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "RuleID": "generic-api-key",
+    "File": "src/DigitalBrain.Analyzers.CodeFixes/Fixes.cs",
+    "StartLine": 24,
+    "Commit": "76357d8698cc0bbf01ca3f0208246d8e5b86950d",
+    "Fingerprint": "76357d8698cc0bbf01ca3f0208246d8e5b86950d:src/DigitalBrain.Analyzers.CodeFixes/Fixes.cs:generic-api-key:24"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "File": "src/DigitalBrain.Analyzers.CodeFixes/Fixes.cs",
+    "StartLine": 79,
+    "Commit": "76357d8698cc0bbf01ca3f0208246d8e5b86950d",
+    "Fingerprint": "76357d8698cc0bbf01ca3f0208246d8e5b86950d:src/DigitalBrain.Analyzers.CodeFixes/Fixes.cs:generic-api-key:79"
+  }
+]

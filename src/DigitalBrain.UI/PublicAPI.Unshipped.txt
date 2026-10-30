@@ -915,3 +915,32 @@ static DigitalBrain.UI.StatCardNode.operator ==(DigitalBrain.UI.StatCardNode? le
 static DigitalBrain.UI.Ui.AppShell(string! key, DigitalBrain.UI.Node? sidebar, DigitalBrain.UI.Node! body, DigitalBrain.UI.Node? toolbar = null, DigitalBrain.UI.Node? inspector = null) -> DigitalBrain.UI.AppShellNode!
 static DigitalBrain.UI.Ui.NavItem(string! key, string! label, string! icon, string! action, bool selected = false, string? badge = null) -> DigitalBrain.UI.NavItemNode!
 static DigitalBrain.UI.Ui.StatCard(string! key, string! label, string! value, string? delta = null, DigitalBrain.UI.BadgeTone tone = DigitalBrain.UI.BadgeTone.Neutral, string? icon = null) -> DigitalBrain.UI.StatCardNode!
+
+DigitalBrain.UI.BrainSceneNode.PauseRotation.get -> bool
+DigitalBrain.UI.BrainSceneNode.PauseRotation.init -> void
+DigitalBrain.UI.BrainSceneNode.TargetZoom.get -> double
+DigitalBrain.UI.BrainSceneNode.TargetZoom.init -> void
+DigitalBrain.UI.BrainSceneNode.ZoomTargetId.get -> string?
+DigitalBrain.UI.BrainSceneNode.ZoomTargetId.init -> void
+DigitalBrain.UI.WebBrowser
+DigitalBrain.UI.WebBrowser.Deconstruct(out string! Key, out string! Url, out string? Title, out double Height, out string! ExecutionMode) -> void
+DigitalBrain.UI.WebBrowser.Equals(DigitalBrain.UI.WebBrowser? other) -> bool
+DigitalBrain.UI.WebBrowser.ExecutionMode.get -> string!
+DigitalBrain.UI.WebBrowser.ExecutionMode.init -> void
+DigitalBrain.UI.WebBrowser.Height.get -> double
+DigitalBrain.UI.WebBrowser.Height.init -> void
+DigitalBrain.UI.WebBrowser.Key.get -> string!
+DigitalBrain.UI.WebBrowser.Key.init -> void
+DigitalBrain.UI.WebBrowser.Title.get -> string?
+DigitalBrain.UI.WebBrowser.Title.init -> void
+DigitalBrain.UI.WebBrowser.Url.get -> string!
+DigitalBrain.UI.WebBrowser.Url.init -> void
+DigitalBrain.UI.WebBrowser.WebBrowser(string! Key, string! Url, string? Title = null, double Height = 520, string! ExecutionMode = "wasm-ui") -> void
+override DigitalBrain.UI.WebBrowser.<Clone>$() -> DigitalBrain.UI.WebBrowser!
+override DigitalBrain.UI.WebBrowser.Equals(object? obj) -> bool
+override DigitalBrain.UI.WebBrowser.GetHashCode() -> int
+override DigitalBrain.UI.WebBrowser.ToString() -> string!
+override sealed DigitalBrain.UI.WebBrowser.Equals(DigitalBrain.UI.Node? other) -> bool
+static DigitalBrain.UI.Ui.WebBrowser(string! url, string? title = null, string! key = "web-browser", double height = 520, string! executionMode = "wasm-ui") -> DigitalBrain.UI.WebBrowser!
+static DigitalBrain.UI.WebBrowser.operator !=(DigitalBrain.UI.WebBrowser? left, DigitalBrain.UI.WebBrowser? right) -> bool
+static DigitalBrain.UI.WebBrowser.operator ==(DigitalBrain.UI.WebBrowser? left, DigitalBrain.UI.WebBrowser? right) -> bool

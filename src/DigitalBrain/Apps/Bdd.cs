@@ -16,14 +16,38 @@ public sealed class ScenarioAttribute : Attribute
 
     /// <summary>The scenario title from the spec comment.</summary>
     public string Title { get; }
+
+    /// <summary>Optional plain-language step descriptions for non-technical users.</summary>
+    public string[] Steps { get; init; } = [];
+
+    /// <summary>BCP-47 language code for the scenario description (default <c>en</c>).</summary>
+    public string Language { get; init; } = "en";
 }
+
+/// <summary>Outcome of a single plain-language step inside a <see cref="ScenarioVerdict"/>.</summary>
+/// <param name="Step">Plain-language description of what the step verifies.</param>
+/// <param name="Passed">True when the step passed.</param>
+/// <param name="Error">Step failure explanation when <paramref name="Passed"/> is false, or null.</param>
+/// <param name="Elapsed">Step execution duration.</param>
+public sealed record ScenarioStepVerdict(string Step, bool Passed, string? Error = null, TimeSpan Elapsed = default);
 
 /// <summary>The outcome of running a single <see cref="ScenarioAttribute"/> scenario.</summary>
 /// <param name="Title">The scenario title.</param>
 /// <param name="Passed">True when the scenario completed without throwing or recording an app error.</param>
 /// <param name="Error">The failure message when <paramref name="Passed"/> is false, or null.</param>
 /// <param name="Elapsed">How long the scenario took.</param>
-public sealed record ScenarioVerdict(string Title, bool Passed, string? Error, TimeSpan Elapsed);
+public sealed record ScenarioVerdict(
+    string Title,
+    bool Passed,
+    string? Error,
+    TimeSpan Elapsed)
+{
+    /// <summary>Optional step-by-step plain-language verdicts.</summary>
+    public IReadOnlyList<ScenarioStepVerdict>? Steps { get; init; }
+
+    /// <summary>BCP-47 language code of the scenario specification.</summary>
+    public string Language { get; init; } = "en";
+}
 
 /// <summary>The aggregate BDD verification report for an app, combining its operation baseline and all <see cref="ScenarioAttribute"/> scenarios.</summary>
 /// <param name="AppId">The verified app id.</param>

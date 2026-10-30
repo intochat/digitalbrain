@@ -69,7 +69,9 @@ public sealed class IntochatAppTemplateFacts
     {
         if (Environment.GetEnvironmentVariable("DIGITALBRAIN_TEMPLATE_PACKAGES") is { Length: > 0 } given)
         {
-            var testing = Directory.GetFiles(given, "DigitalBrain.Testing.*.nupkg").Where(path => !path.EndsWith(".snupkg", StringComparison.Ordinal))
+            var testing = Directory.GetFiles(given, "DigitalBrain.Testing.*.nupkg")
+                .Where(path => !path.EndsWith(".snupkg", StringComparison.Ordinal)
+                    && !Path.GetFileName(path).StartsWith("DigitalBrain.Testing.Silo.", StringComparison.Ordinal))
                 .OrderByDescending(File.GetLastWriteTimeUtc).FirstOrDefault()
                 ?? throw new InvalidOperationException($"No DigitalBrain.Testing package in {given}.");
             return (Path.GetFullPath(given), Path.GetFileNameWithoutExtension(testing)["DigitalBrain.Testing.".Length..]);

@@ -48,7 +48,7 @@ public static class BddRunner
         foreach (var (attribute, method) in DiscoverScenarios(appType))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            scenarios.Add(await RunScenarioAsync(appType, manifest, attribute.Title, method, fakes, cancellationToken).ConfigureAwait(false));
+            scenarios.Add(await RunScenarioAsync(appType, manifest, attribute, method, fakes, cancellationToken).ConfigureAwait(false));
         }
 
         var report = new BddReport(manifest.Id, scenarios, baselinePassed, baselineError, totalWatch.Elapsed);
@@ -83,11 +83,13 @@ public static class BddRunner
     private static async Task<ScenarioVerdict> RunScenarioAsync(
         Type appType,
         AppManifest manifest,
-        string title,
+        ScenarioAttribute attribute,
         MethodInfo method,
         Action<TestOS>? fakes,
         CancellationToken cancellationToken)
     {
+        var title = attribute.Title;
+        var language = string.IsNullOrWhiteSpace(attribute.Language) ? "en" : attribute.Language;
         var watch = Stopwatch.StartNew();
         try
         {
@@ -136,25 +138,55 @@ public static class BddRunner
             if (os.Failures.Count > 0)
             {
                 var failure = os.Failures.First();
-                return new ScenarioVerdict(title, false, $"{failure.GetType().Name}: {failure.Message}", watch.Elapsed);
+                var err = $"{failure.GetType().Name}: {failure.Message}";
+                return new ScenarioVerdict(title, false, err, watch.Elapsed) { Steps = BuildStepVerdicts(attribute.Steps, false, err, watch.Elapsed), Language = language };
             }
 
             if (installed.Instance.RecordedError is { } recorded)
             {
-                return new ScenarioVerdict(title, false, $"{recorded.Operation}: {recorded.Kind}: {recorded.Message}", watch.Elapsed);
+                var err = $"{recorded.Operation}: {recorded.Kind}: {recorded.Message}";
+                return new ScenarioVerdict(title, false, err, watch.Elapsed) { Steps = BuildStepVerdicts(attribute.Steps, false, err, watch.Elapsed), Language = language };
             }
 
             if (installed.PresentationError is { } presentationError)
             {
-                return new ScenarioVerdict(title, false, $"{presentationError.GetType().Name}: {presentationError.Message}", watch.Elapsed);
+                var err = $"{presentationError.GetType().Name}: {presentationError.Message}";
+                return new ScenarioVerdict(title, false, err, watch.Elapsed) { Steps = BuildStepVerdicts(attribute.Steps, false, err, watch.Elapsed), Language = language };
             }
 
-            return new ScenarioVerdict(title, true, null, watch.Elapsed);
+            return new ScenarioVerdict(title, true, null, watch.Elapsed) { Steps = BuildStepVerdicts(attribute.Steps, true, null, watch.Elapsed), Language = language };
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {
-            return new ScenarioVerdict(title, false, error.Message, watch.Elapsed);
+            return new ScenarioVerdict(title, false, error.Message, watch.Elapsed) { Steps = BuildStepVerdicts(attribute.Steps, false, error.Message, watch.Elapsed), Language = language };
         }
+    }
+
+    private static ScenarioStepVerdict[] BuildStepVerdicts(
+        string[] declaredSteps,
+        bool passed,
+        string? error,
+        TimeSpan elapsed)
+    {
+        if (declaredSteps is null || declaredSteps.Length == 0)
+        {
+            return [];
+        }
+
+        var perStep = TimeSpan.FromTicks(elapsed.Ticks / Math.Max(1, declaredSteps.Length));
+        var verdicts = new ScenarioStepVerdict[declaredSteps.Length];
+        for (var i = 0; i < declaredSteps.Length; i++)
+        {
+            var isLast = i == declaredSteps.Length - 1;
+            var stepPassed = passed || !isLast;
+            verdicts[i] = new ScenarioStepVerdict(
+                declaredSteps[i],
+                stepPassed,
+                stepPassed ? null : error,
+                perStep);
+        }
+
+        return verdicts;
     }
 
     private static object?[] BuildScenarioArguments(

@@ -1,8 +1,7 @@
-# Default gitleaks rules plus one allowlisted value: the Azurite development account key, which Microsoft
-# publishes for the storage emulator (it grants nothing outside a local Azurite).
 [extend]
 useDefault = true
 
 [allowlist]
-description = "Azurite well-known development storage key"
-regexes = ['''Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==''']
+description = "Roslyn CodeFix equivalence keys in Fixes.cs"
+commits = ["76357d8698cc0bbf01ca3f0208246d8e5b86950d"]
+paths = ['''src/DigitalBrain\.Analyzers\.CodeFixes/Fixes\.cs''']

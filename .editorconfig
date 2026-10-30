@@ -10,10 +10,50 @@ indent_size = 4
 [*.{csproj,props,targets,slnx,xml,json,yml,yaml,mts,mjs,md,config}]
 indent_size = 2
 
-[*.{cs,vb}]
+[*.cs]
 dotnet_analyzer_diagnostic.category-Style.severity = none
 dotnet_diagnostic.IDE0005.severity = none
 dotnet_diagnostic.IDE0008.severity = none
+dotnet_diagnostic.IDE0010.severity = none
+dotnet_diagnostic.IDE0019.severity = none
+dotnet_diagnostic.IDE0021.severity = none
+dotnet_diagnostic.IDE0022.severity = none
+dotnet_diagnostic.IDE0023.severity = none
+dotnet_diagnostic.IDE0024.severity = none
+dotnet_diagnostic.IDE0028.severity = none
+dotnet_diagnostic.IDE0032.severity = none
+dotnet_diagnostic.IDE0040.severity = none
+dotnet_diagnostic.IDE0042.severity = none
+dotnet_diagnostic.IDE0045.severity = none
+dotnet_diagnostic.IDE0046.severity = none
+dotnet_diagnostic.IDE0047.severity = none
+dotnet_diagnostic.IDE0048.severity = none
+dotnet_diagnostic.IDE0051.severity = none
+dotnet_diagnostic.IDE0055.severity = none
+dotnet_diagnostic.IDE0057.severity = none
+dotnet_diagnostic.IDE0058.severity = none
+dotnet_diagnostic.IDE0059.severity = none
+dotnet_diagnostic.IDE0060.severity = none
+dotnet_diagnostic.IDE0061.severity = none
+dotnet_diagnostic.IDE0062.severity = none
+dotnet_diagnostic.IDE0063.severity = none
+dotnet_diagnostic.IDE0072.severity = none
+dotnet_diagnostic.IDE0078.severity = none
+dotnet_diagnostic.IDE0090.severity = none
 dotnet_diagnostic.IDE0130.severity = none
 dotnet_diagnostic.IDE0160.severity = none
+dotnet_diagnostic.IDE0200.severity = none
+dotnet_diagnostic.IDE0270.severity = none
+dotnet_diagnostic.IDE0290.severity = none
+dotnet_diagnostic.IDE0300.severity = none
+dotnet_diagnostic.IDE0301.severity = none
+dotnet_diagnostic.IDE0303.severity = none
+dotnet_diagnostic.IDE0305.severity = none
+dotnet_diagnostic.IDE0330.severity = none
+dotnet_diagnostic.IDE0340.severity = none
+dotnet_diagnostic.IDE0370.severity = none
+dotnet_diagnostic.IDE0390.severity = none
 dotnet_diagnostic.CA1716.severity = none
+
+[*.{cs,vb}]
+dotnet_analyzer_diagnostic.category-Style.severity = none

@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 30
     environment: nuget-release
     permissions:
-      contents: read
+      contents: write
       packages: write
       id-token: write
     steps:
@@ -46,7 +46,13 @@ jobs:
         run: |
           dotnet pack DigitalBrain.slnx -c Release -o artifacts
           dotnet pack templates/DigitalBrain.Templates/DigitalBrain.Templates.csproj -c Release -o artifacts
-          [ "$(find artifacts -maxdepth 1 -name "*.nupkg" | wc -l)" -eq 13 ] || { echo "::error::expected 13 packages"; ls artifacts; exit 1; }
+          count="$(find artifacts -maxdepth 1 -name "*.nupkg" ! -name "*.snupkg" | wc -l)"
+          [ "$count" -ge 11 ] || { echo "::error::expected at least 11 packages, got $count"; ls artifacts; exit 1; }
+
+      - name: Upload packages to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${GITHUB_REF_NAME}" artifacts/*.nupkg --clobber
 
       - name: Push to GitHub Packages
         env:

@@ -1150,3 +1150,30 @@ DigitalBrain.AppManifest.Accent.get -> string?
 DigitalBrain.AppManifest.Accent.init -> void
 DigitalBrain.AppManifest.Category.get -> string?
 DigitalBrain.AppManifest.Category.init -> void
+
+DigitalBrain.ScenarioAttribute.Language.get -> string!
+DigitalBrain.ScenarioAttribute.Language.init -> void
+DigitalBrain.ScenarioAttribute.Steps.get -> string![]!
+DigitalBrain.ScenarioAttribute.Steps.init -> void
+DigitalBrain.ScenarioStepVerdict
+DigitalBrain.ScenarioStepVerdict.<Clone>$() -> DigitalBrain.ScenarioStepVerdict!
+DigitalBrain.ScenarioStepVerdict.Deconstruct(out string! Step, out bool Passed, out string? Error, out System.TimeSpan Elapsed) -> void
+DigitalBrain.ScenarioStepVerdict.Elapsed.get -> System.TimeSpan
+DigitalBrain.ScenarioStepVerdict.Elapsed.init -> void
+DigitalBrain.ScenarioStepVerdict.Equals(DigitalBrain.ScenarioStepVerdict? other) -> bool
+DigitalBrain.ScenarioStepVerdict.Error.get -> string?
+DigitalBrain.ScenarioStepVerdict.Error.init -> void
+DigitalBrain.ScenarioStepVerdict.Passed.get -> bool
+DigitalBrain.ScenarioStepVerdict.Passed.init -> void
+DigitalBrain.ScenarioStepVerdict.ScenarioStepVerdict(string! Step, bool Passed, string? Error = null, System.TimeSpan Elapsed = default(System.TimeSpan)) -> void
+DigitalBrain.ScenarioStepVerdict.Step.get -> string!
+DigitalBrain.ScenarioStepVerdict.Step.init -> void
+DigitalBrain.ScenarioVerdict.Language.get -> string!
+DigitalBrain.ScenarioVerdict.Language.init -> void
+DigitalBrain.ScenarioVerdict.Steps.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.ScenarioStepVerdict!>?
+DigitalBrain.ScenarioVerdict.Steps.init -> void
+override DigitalBrain.ScenarioStepVerdict.Equals(object? obj) -> bool
+override DigitalBrain.ScenarioStepVerdict.GetHashCode() -> int
+override DigitalBrain.ScenarioStepVerdict.ToString() -> string!
+static DigitalBrain.ScenarioStepVerdict.operator !=(DigitalBrain.ScenarioStepVerdict? left, DigitalBrain.ScenarioStepVerdict? right) -> bool
+static DigitalBrain.ScenarioStepVerdict.operator ==(DigitalBrain.ScenarioStepVerdict? left, DigitalBrain.ScenarioStepVerdict? right) -> bool

@@ -41,6 +41,7 @@ public sealed record View(string Title, Node Root);
 [JsonDerivedType(typeof(AppShellNode), "appShell")]
 [JsonDerivedType(typeof(NavItemNode), "navItem")]
 [JsonDerivedType(typeof(StatCardNode), "statCard")]
+[JsonDerivedType(typeof(WebBrowser), "webBrowser")]
 public abstract record Node;
 
 /// <summary>Children laid out top to bottom.</summary>
@@ -484,16 +485,37 @@ public sealed record BrainSceneNode(
     IReadOnlyList<BrainGraphSynapse> Synapses,
     string? SelectedId = null) : Node
 {
+    /// <summary>True to pause orbital auto-rotation when inspecting or creating a target app node.</summary>
+    public bool PauseRotation { get; init; }
+
+    /// <summary>Target 3D node ID to smoothly center and zoom the camera into.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ZoomTargetId { get; init; }
+
+    /// <summary>Target camera zoom factor (default <c>1.0</c>).</summary>
+    public double TargetZoom { get; init; } = 1.0;
+
     /// <inheritdoc />
     public bool Equals(BrainSceneNode? other) =>
         other is not null &&
         SelectedId == other.SelectedId &&
+        PauseRotation == other.PauseRotation &&
+        ZoomTargetId == other.ZoomTargetId &&
+        TargetZoom.Equals(other.TargetZoom) &&
         Nodes.SequenceEqual(other.Nodes) &&
         Synapses.SequenceEqual(other.Synapses);
 
     /// <inheritdoc />
-    public override int GetHashCode() => HashCode.Combine(SelectedId, Nodes.Count, Synapses.Count);
+    public override int GetHashCode() => HashCode.Combine(SelectedId, PauseRotation, ZoomTargetId, Nodes.Count, Synapses.Count);
 }
+
+/// <summary>Declarative WASM / web studio viewport embedded inside an app view.</summary>
+public sealed record WebBrowser(
+    string Key,
+    string Url,
+    string? Title = null,
+    double Height = 520,
+    string ExecutionMode = "wasm-ui") : Node;
 
 /// <summary>Reference to a live neuron control in the same brain.</summary>
 public sealed record NeuronRef([property: JsonPropertyName("refKind")] string Kind, string NeuronUri) : Node;
@@ -574,6 +596,15 @@ public static class Ui
         BadgeTone tone = BadgeTone.Neutral,
         string? icon = null) =>
         new(key, label, value, delta, tone, icon);
+
+    /// <summary>Creates a declarative WASM / Web studio browser surface for <paramref name="url"/>.</summary>
+    public static WebBrowser WebBrowser(
+        string url,
+        string? title = null,
+        string key = "web-browser",
+        double height = 520,
+        string executionMode = "wasm-ui") =>
+        new(key, url, title, height, executionMode);
 }
 
 /// <summary>Where an app publishes what it shows: its side and main views and transient toasts. The host renders the latest of each.</summary>
