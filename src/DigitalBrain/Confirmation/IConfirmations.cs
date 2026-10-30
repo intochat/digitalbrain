@@ -9,10 +9,10 @@ namespace DigitalBrain.Confirmation;
 public interface IConfirmations
 {
     /// <summary>The key of the runtime confirmations neuron that approve and deny buttons call (07 D-19).</summary>
-    public const string ConfirmationsNeuronKey = "confirmations";
+    const string ConfirmationsNeuronKey = "confirmations";
 
     /// <summary>The operation the approve and deny buttons call on <see cref="ConfirmationsNeuronKey"/>.</summary>
-    public const string ResolveOperation = "Resolve";
+    const string ResolveOperation = "Resolve";
 
     /// <summary>The policy of the brain this instance serves.</summary>
     ConfirmationPolicy Policy { get; }

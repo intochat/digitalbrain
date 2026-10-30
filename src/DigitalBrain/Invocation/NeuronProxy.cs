@@ -173,7 +173,10 @@ public class NeuronProxy : DispatchProxy
     }
 
     private object? StreamItems<TItem>(RuntimeInvocation call, CallShape shape, CancellationToken cancellationToken)
-        => Items<TItem>(call, cancellationToken);
+    {
+        _ = shape;
+        return Items<TItem>(call, cancellationToken);
+    }
 
     private async IAsyncEnumerable<TItem> Items<TItem>(RuntimeInvocation call, [EnumeratorCancellation] CancellationToken cancellationToken)
     {

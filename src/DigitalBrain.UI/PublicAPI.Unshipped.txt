@@ -838,3 +838,109 @@ static DigitalBrain.UI.View.operator ==(DigitalBrain.UI.View? left, DigitalBrain
 virtual DigitalBrain.UI.Node.EqualityContract.get -> System.Type!
 virtual DigitalBrain.UI.Node.Equals(DigitalBrain.UI.Node? other) -> bool
 virtual DigitalBrain.UI.Node.PrintMembers(System.Text.StringBuilder! builder) -> bool
+DigitalBrain.UI.AppShellNode
+DigitalBrain.UI.AppShellNode.AppShellNode(string! Key, DigitalBrain.UI.Node? Sidebar, DigitalBrain.UI.Node! Body, DigitalBrain.UI.Node? Toolbar = null, DigitalBrain.UI.Node? Inspector = null) -> void
+DigitalBrain.UI.AppShellNode.Body.get -> DigitalBrain.UI.Node!
+DigitalBrain.UI.AppShellNode.Body.init -> void
+DigitalBrain.UI.AppShellNode.Deconstruct(out string! Key, out DigitalBrain.UI.Node? Sidebar, out DigitalBrain.UI.Node! Body, out DigitalBrain.UI.Node? Toolbar, out DigitalBrain.UI.Node? Inspector) -> void
+DigitalBrain.UI.AppShellNode.Equals(DigitalBrain.UI.AppShellNode? other) -> bool
+DigitalBrain.UI.AppShellNode.Inspector.get -> DigitalBrain.UI.Node?
+DigitalBrain.UI.AppShellNode.Inspector.init -> void
+DigitalBrain.UI.AppShellNode.Key.get -> string!
+DigitalBrain.UI.AppShellNode.Key.init -> void
+DigitalBrain.UI.AppShellNode.Sidebar.get -> DigitalBrain.UI.Node?
+DigitalBrain.UI.AppShellNode.Sidebar.init -> void
+DigitalBrain.UI.AppShellNode.Toolbar.get -> DigitalBrain.UI.Node?
+DigitalBrain.UI.AppShellNode.Toolbar.init -> void
+DigitalBrain.UI.BadgeTone
+DigitalBrain.UI.BadgeTone.Accent = 1 -> DigitalBrain.UI.BadgeTone
+DigitalBrain.UI.BadgeTone.Done = 2 -> DigitalBrain.UI.BadgeTone
+DigitalBrain.UI.BadgeTone.Error = 4 -> DigitalBrain.UI.BadgeTone
+DigitalBrain.UI.BadgeTone.Neutral = 0 -> DigitalBrain.UI.BadgeTone
+DigitalBrain.UI.BadgeTone.Working = 3 -> DigitalBrain.UI.BadgeTone
+DigitalBrain.UI.NavItemNode
+DigitalBrain.UI.NavItemNode.Action.get -> string!
+DigitalBrain.UI.NavItemNode.Action.init -> void
+DigitalBrain.UI.NavItemNode.Badge.get -> string?
+DigitalBrain.UI.NavItemNode.Badge.init -> void
+DigitalBrain.UI.NavItemNode.Deconstruct(out string! Key, out string! Label, out string! Icon, out string! Action, out bool Selected, out string? Badge) -> void
+DigitalBrain.UI.NavItemNode.Equals(DigitalBrain.UI.NavItemNode? other) -> bool
+DigitalBrain.UI.NavItemNode.Icon.get -> string!
+DigitalBrain.UI.NavItemNode.Icon.init -> void
+DigitalBrain.UI.NavItemNode.Key.get -> string!
+DigitalBrain.UI.NavItemNode.Key.init -> void
+DigitalBrain.UI.NavItemNode.Label.get -> string!
+DigitalBrain.UI.NavItemNode.Label.init -> void
+DigitalBrain.UI.NavItemNode.NavItemNode(string! Key, string! Label, string! Icon, string! Action, bool Selected = false, string? Badge = null) -> void
+DigitalBrain.UI.NavItemNode.Selected.get -> bool
+DigitalBrain.UI.NavItemNode.Selected.init -> void
+DigitalBrain.UI.StatCardNode
+DigitalBrain.UI.StatCardNode.Deconstruct(out string! Key, out string! Label, out string! Value, out string? Delta, out DigitalBrain.UI.BadgeTone Tone, out string? Icon) -> void
+DigitalBrain.UI.StatCardNode.Delta.get -> string?
+DigitalBrain.UI.StatCardNode.Delta.init -> void
+DigitalBrain.UI.StatCardNode.Equals(DigitalBrain.UI.StatCardNode? other) -> bool
+DigitalBrain.UI.StatCardNode.Icon.get -> string?
+DigitalBrain.UI.StatCardNode.Icon.init -> void
+DigitalBrain.UI.StatCardNode.Key.get -> string!
+DigitalBrain.UI.StatCardNode.Key.init -> void
+DigitalBrain.UI.StatCardNode.Label.get -> string!
+DigitalBrain.UI.StatCardNode.Label.init -> void
+DigitalBrain.UI.StatCardNode.StatCardNode(string! Key, string! Label, string! Value, string? Delta = null, DigitalBrain.UI.BadgeTone Tone = DigitalBrain.UI.BadgeTone.Neutral, string? Icon = null) -> void
+DigitalBrain.UI.StatCardNode.Tone.get -> DigitalBrain.UI.BadgeTone
+DigitalBrain.UI.StatCardNode.Tone.init -> void
+DigitalBrain.UI.StatCardNode.Value.get -> string!
+DigitalBrain.UI.StatCardNode.Value.init -> void
+DigitalBrain.UI.Ui
+override DigitalBrain.UI.AppShellNode.<Clone>$() -> DigitalBrain.UI.AppShellNode!
+override DigitalBrain.UI.AppShellNode.Equals(object? obj) -> bool
+override DigitalBrain.UI.AppShellNode.GetHashCode() -> int
+override DigitalBrain.UI.AppShellNode.ToString() -> string!
+override DigitalBrain.UI.NavItemNode.<Clone>$() -> DigitalBrain.UI.NavItemNode!
+override DigitalBrain.UI.NavItemNode.Equals(object? obj) -> bool
+override DigitalBrain.UI.NavItemNode.GetHashCode() -> int
+override DigitalBrain.UI.NavItemNode.ToString() -> string!
+override DigitalBrain.UI.StatCardNode.<Clone>$() -> DigitalBrain.UI.StatCardNode!
+override DigitalBrain.UI.StatCardNode.Equals(object? obj) -> bool
+override DigitalBrain.UI.StatCardNode.GetHashCode() -> int
+override DigitalBrain.UI.StatCardNode.ToString() -> string!
+override sealed DigitalBrain.UI.AppShellNode.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.NavItemNode.Equals(DigitalBrain.UI.Node? other) -> bool
+override sealed DigitalBrain.UI.StatCardNode.Equals(DigitalBrain.UI.Node? other) -> bool
+static DigitalBrain.UI.AppShellNode.operator !=(DigitalBrain.UI.AppShellNode? left, DigitalBrain.UI.AppShellNode? right) -> bool
+static DigitalBrain.UI.AppShellNode.operator ==(DigitalBrain.UI.AppShellNode? left, DigitalBrain.UI.AppShellNode? right) -> bool
+static DigitalBrain.UI.NavItemNode.operator !=(DigitalBrain.UI.NavItemNode? left, DigitalBrain.UI.NavItemNode? right) -> bool
+static DigitalBrain.UI.NavItemNode.operator ==(DigitalBrain.UI.NavItemNode? left, DigitalBrain.UI.NavItemNode? right) -> bool
+static DigitalBrain.UI.StatCardNode.operator !=(DigitalBrain.UI.StatCardNode? left, DigitalBrain.UI.StatCardNode? right) -> bool
+static DigitalBrain.UI.StatCardNode.operator ==(DigitalBrain.UI.StatCardNode? left, DigitalBrain.UI.StatCardNode? right) -> bool
+static DigitalBrain.UI.Ui.AppShell(string! key, DigitalBrain.UI.Node? sidebar, DigitalBrain.UI.Node! body, DigitalBrain.UI.Node? toolbar = null, DigitalBrain.UI.Node? inspector = null) -> DigitalBrain.UI.AppShellNode!
+static DigitalBrain.UI.Ui.NavItem(string! key, string! label, string! icon, string! action, bool selected = false, string? badge = null) -> DigitalBrain.UI.NavItemNode!
+static DigitalBrain.UI.Ui.StatCard(string! key, string! label, string! value, string? delta = null, DigitalBrain.UI.BadgeTone tone = DigitalBrain.UI.BadgeTone.Neutral, string? icon = null) -> DigitalBrain.UI.StatCardNode!
+
+DigitalBrain.UI.BrainSceneNode.PauseRotation.get -> bool
+DigitalBrain.UI.BrainSceneNode.PauseRotation.init -> void
+DigitalBrain.UI.BrainSceneNode.TargetZoom.get -> double
+DigitalBrain.UI.BrainSceneNode.TargetZoom.init -> void
+DigitalBrain.UI.BrainSceneNode.ZoomTargetId.get -> string?
+DigitalBrain.UI.BrainSceneNode.ZoomTargetId.init -> void
+DigitalBrain.UI.WebBrowser
+DigitalBrain.UI.WebBrowser.Deconstruct(out string! Key, out string! Url, out string? Title, out double Height, out string! ExecutionMode) -> void
+DigitalBrain.UI.WebBrowser.Equals(DigitalBrain.UI.WebBrowser? other) -> bool
+DigitalBrain.UI.WebBrowser.ExecutionMode.get -> string!
+DigitalBrain.UI.WebBrowser.ExecutionMode.init -> void
+DigitalBrain.UI.WebBrowser.Height.get -> double
+DigitalBrain.UI.WebBrowser.Height.init -> void
+DigitalBrain.UI.WebBrowser.Key.get -> string!
+DigitalBrain.UI.WebBrowser.Key.init -> void
+DigitalBrain.UI.WebBrowser.Title.get -> string?
+DigitalBrain.UI.WebBrowser.Title.init -> void
+DigitalBrain.UI.WebBrowser.Url.get -> string!
+DigitalBrain.UI.WebBrowser.Url.init -> void
+DigitalBrain.UI.WebBrowser.WebBrowser(string! Key, string! Url, string? Title = null, double Height = 520, string! ExecutionMode = "wasm-ui") -> void
+override DigitalBrain.UI.WebBrowser.<Clone>$() -> DigitalBrain.UI.WebBrowser!
+override DigitalBrain.UI.WebBrowser.Equals(object? obj) -> bool
+override DigitalBrain.UI.WebBrowser.GetHashCode() -> int
+override DigitalBrain.UI.WebBrowser.ToString() -> string!
+override sealed DigitalBrain.UI.WebBrowser.Equals(DigitalBrain.UI.Node? other) -> bool
+static DigitalBrain.UI.Ui.WebBrowser(string! url, string? title = null, string! key = "web-browser", double height = 520, string! executionMode = "wasm-ui") -> DigitalBrain.UI.WebBrowser!
+static DigitalBrain.UI.WebBrowser.operator !=(DigitalBrain.UI.WebBrowser? left, DigitalBrain.UI.WebBrowser? right) -> bool
+static DigitalBrain.UI.WebBrowser.operator ==(DigitalBrain.UI.WebBrowser? left, DigitalBrain.UI.WebBrowser? right) -> bool

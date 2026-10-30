@@ -42,6 +42,12 @@ public sealed class AppAttribute(string id) : Attribute
 {
     /// <summary>The frozen app id.</summary>
     public string Id { get; } = id;
+
+    /// <summary>Optional hex accent color (<c>#RRGGBB</c>) for the app's squircle icon badge.</summary>
+    public string? Accent { get; init; }
+
+    /// <summary>Optional app category label (e.g., <c>Intelligence</c>, <c>Workspace</c>, <c>Studio</c>).</summary>
+    public string? Category { get; init; }
 }
 
 /// <summary>Marks a versioned capability contract, written <c>name@version</c>.</summary>

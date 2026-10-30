@@ -76,7 +76,10 @@ public readonly record struct AppKey
             : new NeuronId(Brain, type, Path);
 
     /// <summary>The key path, for APIs that take a key as text.</summary>
-    public static implicit operator string(AppKey key) => key.ToString();
+    public static implicit operator string(AppKey key)
+    {
+        return key.ToString();
+    }
 
     /// <summary>The key path.</summary>
     public override string ToString() => Path ?? string.Empty;

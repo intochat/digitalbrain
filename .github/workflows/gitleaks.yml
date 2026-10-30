@@ -2,9 +2,9 @@ name: gitleaks
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
 
 permissions:
   contents: read
@@ -32,4 +32,4 @@ jobs:
           mkdir "$RUNNER_TEMP/gitleaks-bin"
           tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP/gitleaks-bin" gitleaks
       - name: Scan history
-        run: '"$RUNNER_TEMP/gitleaks-bin/gitleaks" git . --redact --verbose --baseline-path .gitleaks-baseline.json'
+        run: '"$RUNNER_TEMP/gitleaks-bin/gitleaks" git . --redact --verbose --config .gitleaks.toml --baseline-path .gitleaks-baseline.json'
