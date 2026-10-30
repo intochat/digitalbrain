@@ -17,11 +17,11 @@
     <PackageVersion Include="xunit.v3.assert" Version="4.0.2" />
     <!-- Runtime (03-05): Orleans versions approved in 03-01; Microsoft.Extensions at the os pin. -->
     <PackageVersion Include="Microsoft.Orleans.Server" Version="10.4.0" />
-    <PackageVersion Include="Microsoft.Orleans.Sdk" Version="10.4.0" />
+    <PackageVersion Include="Microsoft.Orleans.Sdk" Version="10.4.1" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="11.0.0-rc.2.26504.105" />
     <!-- Local topology (03-07): versions approved in 03-01. -->
     <PackageVersion Include="Microsoft.Orleans.Streaming" Version="10.4.0" />
-    <PackageVersion Include="Microsoft.Orleans.Reminders" Version="10.4.0" />
+    <PackageVersion Include="Microsoft.Orleans.Reminders" Version="10.4.1" />
     <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="10.0.13" />
     <!-- Cloud topology (03-08): versions approved in 03-01; only DigitalBrain.Runtime.Orleans.Azure references them. -->
     <PackageVersion Include="Microsoft.Orleans.Clustering.AzureStorage" Version="10.4.0" />
