@@ -5,7 +5,7 @@ namespace DigitalBrain.Capabilities.Storage;
 /// <summary>One mount point in the virtual file system.</summary>
 /// <param name="MountPoint">The top-level root segment (e.g. "drive", "local", "windows").</param>
 /// <param name="Label">Display label for the mount.</param>
-/// <param name="Storage">The underlying storage provider.</param>
+/// <param name="Storage">The underlying storage.</param>
 public sealed record VfsMount(string MountPoint, string Label, IStorage Storage);
 
 /// <summary>A file or folder in the virtual file system.</summary>

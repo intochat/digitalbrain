@@ -20,6 +20,7 @@
       "catch-up",
       "db.json-element",
       "db.runtime-invocation",
+      "inspect-state",
       "invoke",
       "invoke-interleaved",
       "is-interleaved",
