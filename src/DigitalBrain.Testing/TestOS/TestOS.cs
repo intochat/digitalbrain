@@ -189,6 +189,17 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     /// <summary>Deliveries from now on, across every brain of this TestOS.</summary>
     public IAsyncEnumerable<SignalDelivery> Deliveries(CancellationToken cancellationToken = default) => _deliveries.Listen(cancellationToken);
 
+    /// <summary>Inspects the live state of an in-process neuron.</summary>
+    Task<System.Text.Json.JsonElement?> IBrainObserver.State(NeuronId id, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_hosts.TryGetValue(id, out var host) && host.CurrentNeuron is IStateInspectable inspectable)
+        {
+            return inspectable.InspectState(cancellationToken);
+        }
+        return Task.FromResult<System.Text.Json.JsonElement?>(null);
+    }
+
     private readonly DeliveryFanout _deliveries = new();
 
     internal void NoteDelivery(SignalDelivery delivery) => _deliveries.Publish(delivery);

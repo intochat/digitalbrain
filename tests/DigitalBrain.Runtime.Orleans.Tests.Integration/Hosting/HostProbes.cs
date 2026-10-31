@@ -251,6 +251,9 @@ public sealed record Counted(int Value) : Signal;
 [Signal("probe.noted.deep")]
 public sealed record Noted(string Text) : Signal;
 
+[Signal("probe.ephemeral"), EphemeralSignal]
+public sealed record EphemeralPing(string Message) : Signal;
+
 public interface ICounter
 {
     Task<int> Add(int by);
@@ -258,6 +261,8 @@ public interface ICounter
     Task<int> Value();
 
     Task Note(string text);
+
+    Task PingEphemeral(string message);
 
     Task Tick(string name, int dueMs);
 
@@ -291,6 +296,8 @@ public sealed class CounterNeuron : Neuron<CounterState>, ICounter
     public Task<int> Value() => Task.FromResult(State.Value);
 
     public Task Note(string text) => Publish(new Noted(text));
+
+    public Task PingEphemeral(string message) => Publish(new EphemeralPing(message));
 
     public Task Tick(string name, int dueMs)
     {

@@ -35,4 +35,8 @@ public interface INeuronHost : IGrainWithStringKey
     /// <summary>Runs a streaming call and yields its items as JSON.</summary>
     [Alias("stream")]
     IAsyncEnumerable<JsonElement> Stream(RuntimeInvocation call, CancellationToken cancellationToken = default);
+
+    /// <summary>Inspects the live state of the hosted neuron.</summary>
+    [AlwaysInterleave, Alias("inspect-state")]
+    Task<JsonElement?> InspectState(CancellationToken cancellationToken = default);
 }

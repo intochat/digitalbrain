@@ -37,6 +37,13 @@ public abstract class Neuron
         return Context.Publish(signal);
     }
 
+    /// <summary>Publishes an ephemeral signal without persisting to the journal.</summary>
+    protected Task PublishEphemeral(Signal signal)
+    {
+        ArgumentNullException.ThrowIfNull(signal);
+        return Context.PublishEphemeral(signal);
+    }
+
     /// <summary>A typed interface to another neuron of the same brain.</summary>
     /// <exception cref="ArgumentException"><paramref name="id"/> belongs to another brain.</exception>
     protected T Get<T>(NeuronId id) where T : class

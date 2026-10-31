@@ -6,10 +6,18 @@ namespace DigitalBrain;
 /// There is no save without a signal; <c>Publish</c> alone is for stateless reactions.
 /// </summary>
 /// <typeparam name="TState">An immutable state record with a parameterless constructor for the empty state.</typeparam>
-public abstract class Neuron<TState> : Neuron where TState : class, new()
+public abstract class Neuron<TState> : Neuron, Spi.IStateInspectable where TState : class, new()
 {
+    private static readonly System.Text.Json.JsonSerializerOptions InspectOptions = new(System.Text.Json.JsonSerializerDefaults.Web);
+
     /// <summary>The current state; loaded by the runtime before <c>OnActivate</c>.</summary>
     protected TState State { get; private set; } = new();
+
+    Task<System.Text.Json.JsonElement?> Spi.IStateInspectable.InspectState(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult<System.Text.Json.JsonElement?>(System.Text.Json.JsonSerializer.SerializeToElement(State, InspectOptions));
+    }
 
     internal override async Task Load()
         => State = await Context.State.Load<TState>().ConfigureAwait(true) ?? new TState();

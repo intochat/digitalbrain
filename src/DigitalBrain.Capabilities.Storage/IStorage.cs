@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text;
+using DigitalBrain.Contracts;
 using DigitalBrain.Operations;
 
 namespace DigitalBrain.Capabilities.Storage;
@@ -9,7 +10,7 @@ namespace DigitalBrain.Capabilities.Storage;
 /// a shared folder). Items are addressed by an opaque <see cref="ItemId"/> that only the module providing the
 /// connection can interpret. Failures surface as <see cref="StorageException"/> subtypes.
 /// </summary>
-[Capability("storage", 1)]
+[Capability("storage", 1), NeuronAlias("storage")]
 public interface IStorage
 {
     /// <summary>Describes this storage connection: its label, kind, quota and what it allows.</summary>
@@ -69,5 +70,78 @@ public static class StorageExtensions
         ArgumentNullException.ThrowIfNull(storage);
         var content = await storage.Read(id, null, ct).ConfigureAwait(false);
         return Encoding.UTF8.GetString(content.Bytes.Span);
+    }
+
+    /// <summary>Resolves an item by traversing path segments relative to storage roots.</summary>
+    public static async Task<Item?> ResolvePath(this IStorage storage, string relativePath, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(storage);
+        ArgumentNullException.ThrowIfNull(relativePath);
+
+        var segments = relativePath.Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries);
+        var roots = await storage.Roots(ct).ConfigureAwait(false);
+        if (segments.Length == 0)
+        {
+            return roots.Count > 0 ? roots[0] : null;
+        }
+
+        Item? current = roots.FirstOrDefault(r => string.Equals(r.Name, segments[0], StringComparison.OrdinalIgnoreCase));
+        var startIndex = 1;
+        if (current is null && roots.Count == 1)
+        {
+            current = roots[0];
+            startIndex = 0;
+        }
+
+        if (current is null)
+        {
+            return null;
+        }
+
+        for (var i = startIndex; i < segments.Length; i++)
+        {
+            var segment = segments[i];
+            if (current.Kind != ItemKind.Folder)
+            {
+                return null;
+            }
+
+            var page = await storage.List(current.Id, new ListQuery(PageSize: 100), ct).ConfigureAwait(false);
+            var next = page.Items.FirstOrDefault(item => string.Equals(item.Name, segment, StringComparison.OrdinalIgnoreCase));
+            var cursor = page.NextCursor;
+            while (next is null && !string.IsNullOrEmpty(cursor))
+            {
+                page = await storage.List(current.Id, new ListQuery(Cursor: cursor, PageSize: 100), ct).ConfigureAwait(false);
+                next = page.Items.FirstOrDefault(item => string.Equals(item.Name, segment, StringComparison.OrdinalIgnoreCase));
+                cursor = page.NextCursor;
+            }
+
+            if (next is null)
+            {
+                return null;
+            }
+
+            current = next;
+        }
+
+        return current;
+    }
+
+    /// <summary>Reads a file's content resolved by its relative path.</summary>
+    public static async Task<Content> ReadByPath(this IStorage storage, string relativePath, ByteRange? range = null, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(storage);
+        var item = await storage.ResolvePath(relativePath, ct).ConfigureAwait(false)
+            ?? throw new System.IO.FileNotFoundException($"File '{relativePath}' was not found in storage.");
+        return await storage.Read(item.Id, range, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Reads a whole file and decodes it as UTF-8 text resolved by its relative path.</summary>
+    public static async Task<string> ReadTextByPath(this IStorage storage, string relativePath, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(storage);
+        var item = await storage.ResolvePath(relativePath, ct).ConfigureAwait(false)
+            ?? throw new System.IO.FileNotFoundException($"File '{relativePath}' was not found in storage.");
+        return await storage.ReadText(item.Id, ct).ConfigureAwait(false);
     }
 }

@@ -82,6 +82,15 @@ public static class StorageConfirmation
 /// </summary>
 public static class StorageConfirmationGate
 {
+    /// <summary>Checks a storage boundary, consuming an exact host-issued permit or independently asking for confirmation. Throws <see cref="UnauthorizedAccessException"/> if denied.</summary>
+    public static async Task Require(DigitalBrain.Spi.INeuronContext context, IStorage storage, WritePlan plan, CancellationToken ct)
+    {
+        if (await Check(context, storage, plan, ct).ConfigureAwait(false) is { } reason)
+        {
+            throw new UnauthorizedAccessException(reason);
+        }
+    }
+
     /// <summary>Checks a storage boundary, consuming an exact host-issued permit or independently asking for confirmation.</summary>
     public static async Task<string?> Check(DigitalBrain.Spi.INeuronContext context, IStorage storage, WritePlan plan, CancellationToken ct)
     {

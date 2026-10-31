@@ -17,6 +17,7 @@ public abstract class App
     private readonly Lock _gate = new();
     private readonly List<AppError> _swallowed = [];
     private Func<Type, string, object>? _neuronResolver;
+    private Func<Type, object>? _capabilityResolver;
     private string? _id;
     private AppError? _error;
 
@@ -30,6 +31,25 @@ public abstract class App
     {
         ArgumentNullException.ThrowIfNull(resolver);
         _neuronResolver = resolver;
+    }
+
+    /// <summary>Attaches a capability resolver to this app instance.</summary>
+    public void AttachCapabilityResolver(Func<Type, object> resolver)
+    {
+        ArgumentNullException.ThrowIfNull(resolver);
+        _capabilityResolver = resolver;
+    }
+
+    /// <summary>Resolves a scoped capability required by this app (e.g. IStorage).</summary>
+    protected T GetCapability<T>() where T : class
+    {
+        if (_capabilityResolver is not null)
+        {
+            return (T)_capabilityResolver(typeof(T));
+        }
+        var alias = typeof(T).GetCustomAttribute<DigitalBrain.Contracts.NeuronAliasAttribute>(inherit: false)?.Alias
+            ?? typeof(T).Name.ToLowerInvariant();
+        return Get<T>(alias);
     }
 
     /// <summary>A typed interface to a neuron of the current brain by its default neuron type and <paramref name="key"/>.</summary>

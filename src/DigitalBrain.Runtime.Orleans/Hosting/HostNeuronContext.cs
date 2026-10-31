@@ -92,6 +92,8 @@ internal sealed class HostNeuronContext : INeuronContext, IHostNeuronContext
 
     public Task Publish(Signal signal) => _state.Publish(signal);
 
+    public Task PublishEphemeral(Signal signal) => _state.PublishEphemeral(signal);
+
     public T Get<T>(NeuronId target) where T : class
     {
         if (target.Brain != Id.Brain) { throw new ArgumentException($"Neuron {target} belongs to another brain than {Id}.", nameof(target)); }

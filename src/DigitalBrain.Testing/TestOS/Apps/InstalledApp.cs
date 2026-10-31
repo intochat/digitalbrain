@@ -85,6 +85,22 @@ public sealed partial class InstalledApp<TApp> : IInstalledApp where TApp : App
                     throw;
                 }
             });
+            _app.AttachCapabilityResolver(capabilityType =>
+            {
+                var alias = capabilityType.GetCustomAttribute<DigitalBrain.Contracts.NeuronAliasAttribute>(false)?.Alias
+                    ?? capabilityType.GetCustomAttribute<DigitalBrain.Contracts.DefaultNeuronTypeAttribute>(false)?.Type
+                    ?? capabilityType.Name.ToLowerInvariant();
+                var id = new NeuronId(new BrainId("local"), alias, alias);
+                try
+                {
+                    return typeof(TestOS).GetMethod(nameof(TestOS.Get))!.MakeGenericMethod(capabilityType).Invoke(_os, [id])!;
+                }
+                catch (TargetInvocationException error) when (error.InnerException is not null)
+                {
+                    System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(error.InnerException).Throw();
+                    throw;
+                }
+            });
             foreach (var sub in _definition.SignalSubscriptions)
             {
                 var register = typeof(InstalledApp<TApp>)

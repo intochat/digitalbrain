@@ -44,6 +44,16 @@ internal sealed class TestClusterListeners(TestOS os) : IClusterListeners
         }
     }
 
+    internal void Offered(NeuronId publisher, IReadOnlyList<Signal> signals)
+    {
+        if (_handlers.IsEmpty || signals.Count == 0) { return; }
+        lock (_gate)
+        {
+            var previous = _tail;
+            _tail = os.Track(Run(previous, publisher, [.. signals]));
+        }
+    }
+
     private async Task Run(Task previous, NeuronId publisher, Signal[] signals)
     {
         try { await previous.ConfigureAwait(false); }

@@ -47,7 +47,7 @@ public sealed class CapabilityRegistry
         }
     }
 
-    /// <summary>Lets a host accept <paramref name="binding"/> as an implementation of <paramref name="capability"/> (os: ILegacyStorage).</summary>
+    /// <summary>Lets a host accept <paramref name="binding"/> as an implementation of <paramref name="capability"/> (e.g.: IStorage).</summary>
     /// <exception cref="InvalidOperationException">The capability is unknown.</exception>
     public void AcceptBinding(CapabilityId capability, Type binding)
     {

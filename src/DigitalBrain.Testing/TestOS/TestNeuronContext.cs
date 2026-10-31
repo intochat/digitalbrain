@@ -45,9 +45,20 @@ internal sealed class TestNeuronContext : INeuronContext
     public Task Publish(Signal signal)
     {
         ArgumentNullException.ThrowIfNull(signal);
+        if (signal.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false))
+        {
+            return PublishEphemeral(signal);
+        }
         var written = _host.OS.Journal(Id.Brain).Append(Id, [signal]);
         _host.OS.Synapses.Committed(Id);
         _host.OS.Synapses.Appended(Id, written);
+        return Task.CompletedTask;
+    }
+
+    public Task PublishEphemeral(Signal signal)
+    {
+        ArgumentNullException.ThrowIfNull(signal);
+        _host.OS.Listeners.Offered(Id, [signal]);
         return Task.CompletedTask;
     }
 

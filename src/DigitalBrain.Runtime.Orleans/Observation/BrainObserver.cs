@@ -59,6 +59,12 @@ internal sealed class ClusterBrainObserver(IGrainFactory grains, IServiceProvide
             ? SynapseObservation.List(logs, Caller().BrainId, cancellationToken)
             : Task.FromResult<ObservedSynapse[]>([]);
 
+    public async Task<System.Text.Json.JsonElement?> State(NeuronId id, CancellationToken cancellationToken = default)
+    {
+        var host = grains.GetGrain<Hosting.INeuronHost>(id.ToString());
+        return await host.InspectState(cancellationToken).ConfigureAwait(false);
+    }
+
     public IAsyncEnumerable<SignalDelivery> Deliveries(CancellationToken cancellationToken = default)
         => services.GetService<DeliveryHub>() is { } hub
             ? hub.Listen(Caller().BrainId, cancellationToken)

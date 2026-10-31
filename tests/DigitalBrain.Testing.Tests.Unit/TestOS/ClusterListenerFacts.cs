@@ -77,4 +77,42 @@ public sealed class ClusterListenerFacts
         await os.Idle();
         Assert.Equal(["cl-t:4"], heard);
     }
+
+    [Fact]
+    public async Task An_ephemeral_signal_is_delivered_to_cluster_listeners_without_writing_to_journal()
+    {
+        await using var os = OS.Local().Register<EphemeralSource>();
+        var heard = new ConcurrentQueue<int>();
+        await using var reg = await os.ClusterListeners.Listen<EphemeralTick>("ephemeral-test", (_, signal, _) =>
+        {
+            heard.Enqueue(signal.Value);
+            return Task.CompletedTask;
+        });
+
+        var id = NeuronId.Parse("cl-eph/rx.ephemeral-source/s");
+        var source = os.Get<IEphemeralSource>(id);
+        await source.EmitEphemeral(42);
+        await os.Idle();
+
+        Assert.Equal([42], heard);
+        // Verify journal has zero entries for this neuron
+        Assert.Empty(os.Journal(id.Brain).Signals(id));
+        Assert.Equal(0, os.Journal(id.Brain).Last(id));
+    }
+}
+
+public interface IEphemeralSource
+{
+    Task EmitEphemeral(int value);
+    Task EmitDirectEphemeral(int value);
+}
+
+[Signal("rx.ephemeral"), EphemeralSignal]
+public sealed record EphemeralTick(int Value) : Signal;
+
+[Neuron("rx.ephemeral-source")]
+public sealed class EphemeralSource : Neuron, IEphemeralSource
+{
+    public Task EmitEphemeral(int value) => Publish(new EphemeralTick(value));
+    public Task EmitDirectEphemeral(int value) => PublishEphemeral(new Number(value));
 }

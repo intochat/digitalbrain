@@ -816,3 +816,4 @@ DigitalBrain.Runtime.Orleans.TypeTableKey
 static DigitalBrain.Runtime.Orleans.InstanceDirectoryKey.Of(string! brain, string! type) -> string!
 static DigitalBrain.Runtime.Orleans.SynapseObservation.Deliveries(System.IServiceProvider? services, string! brain, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<DigitalBrain.SignalDelivery!>!
 static DigitalBrain.Runtime.Orleans.SynapseObservation.List(System.IServiceProvider? services, string! brain, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.ObservedSynapse![]!>!
+DigitalBrain.Runtime.Orleans.Hosting.INeuronHost.InspectState(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Text.Json.JsonElement?>!

@@ -128,6 +128,16 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
         await foreach (var item in Binder.StreamAsync(neuron, bound, call.Arguments, cancellationToken).ConfigureAwait(true)) { yield return item; }
     }
 
+    /// <inheritdoc />
+    public Task<JsonElement?> InspectState(CancellationToken cancellationToken = default)
+    {
+        if (_neuron is IStateInspectable inspectable)
+        {
+            return inspectable.InspectState(cancellationToken);
+        }
+        return Task.FromResult<JsonElement?>(null);
+    }
+
     private void RequireInterleaving(RuntimeInvocation call)
     {
         var (neuron, bound) = Prepare(call);

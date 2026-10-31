@@ -40,6 +40,8 @@ internal sealed class TestNeuronHost : IDisposable
 
     public bool IsActive => _neuron is not null;
 
+    internal Neuron? CurrentNeuron => _neuron;
+
     public TestOS OS => _os;
 
     public Task<JsonElement?> Invoke(RuntimeInvocation call, CancellationToken cancellationToken)

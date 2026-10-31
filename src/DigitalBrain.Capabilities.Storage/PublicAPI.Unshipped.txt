@@ -351,3 +351,62 @@ DigitalBrain.Capabilities.Storage.StorageUploadSessions.StorageUploadSessions(Sy
 const DigitalBrain.Capabilities.Storage.StorageUploadSessions.ChunkSize = 262144 -> int
 DigitalBrain.Capabilities.Storage.StorageUploadSessions.StorageUploadSessions(System.Func<DigitalBrain.Capabilities.Storage.WritePlan!, System.Threading.CancellationToken, System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.StorageWriteStream!>!>! openWrite, System.Func<string!>! caller, System.TimeProvider? time) -> void
 DigitalBrain.Capabilities.Storage.StorageUploadSessions.StorageUploadSessions(System.Func<DigitalBrain.Capabilities.Storage.IStorage!>! storage, System.Func<string!>! caller) -> void
+static DigitalBrain.Capabilities.Storage.StorageExtensions.ReadByPath(this DigitalBrain.Capabilities.Storage.IStorage! storage, string! relativePath, DigitalBrain.Capabilities.Storage.ByteRange? range = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.Content!>!
+static DigitalBrain.Capabilities.Storage.StorageExtensions.ReadTextByPath(this DigitalBrain.Capabilities.Storage.IStorage! storage, string! relativePath, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+static DigitalBrain.Capabilities.Storage.StorageExtensions.ResolvePath(this DigitalBrain.Capabilities.Storage.IStorage! storage, string! relativePath, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.Item?>!
+DigitalBrain.Capabilities.Storage.IStorageVfs
+DigitalBrain.Capabilities.Storage.VfsMount
+override DigitalBrain.Capabilities.Storage.VfsMount.ToString() -> string!
+static DigitalBrain.Capabilities.Storage.VfsMount.operator !=(DigitalBrain.Capabilities.Storage.VfsMount? left, DigitalBrain.Capabilities.Storage.VfsMount? right) -> bool
+static DigitalBrain.Capabilities.Storage.VfsMount.operator ==(DigitalBrain.Capabilities.Storage.VfsMount? left, DigitalBrain.Capabilities.Storage.VfsMount? right) -> bool
+override DigitalBrain.Capabilities.Storage.VfsMount.GetHashCode() -> int
+override DigitalBrain.Capabilities.Storage.VfsMount.Equals(object? obj) -> bool
+DigitalBrain.Capabilities.Storage.VfsMount.Equals(DigitalBrain.Capabilities.Storage.VfsMount? other) -> bool
+DigitalBrain.Capabilities.Storage.VfsMount.<Clone>$() -> DigitalBrain.Capabilities.Storage.VfsMount!
+DigitalBrain.Capabilities.Storage.VfsMount.Deconstruct(out string! MountPoint, out string! Label, out DigitalBrain.Capabilities.Storage.IStorage! Storage) -> void
+DigitalBrain.Capabilities.Storage.VfsMount.MountPoint.get -> string!
+DigitalBrain.Capabilities.Storage.VfsMount.MountPoint.init -> void
+DigitalBrain.Capabilities.Storage.VfsMount.Label.get -> string!
+DigitalBrain.Capabilities.Storage.VfsMount.Label.init -> void
+DigitalBrain.Capabilities.Storage.VfsItem
+override DigitalBrain.Capabilities.Storage.VfsItem.ToString() -> string!
+static DigitalBrain.Capabilities.Storage.VfsItem.operator !=(DigitalBrain.Capabilities.Storage.VfsItem? left, DigitalBrain.Capabilities.Storage.VfsItem? right) -> bool
+static DigitalBrain.Capabilities.Storage.VfsItem.operator ==(DigitalBrain.Capabilities.Storage.VfsItem? left, DigitalBrain.Capabilities.Storage.VfsItem? right) -> bool
+override DigitalBrain.Capabilities.Storage.VfsItem.GetHashCode() -> int
+override DigitalBrain.Capabilities.Storage.VfsItem.Equals(object? obj) -> bool
+DigitalBrain.Capabilities.Storage.VfsItem.Equals(DigitalBrain.Capabilities.Storage.VfsItem? other) -> bool
+DigitalBrain.Capabilities.Storage.VfsItem.<Clone>$() -> DigitalBrain.Capabilities.Storage.VfsItem!
+DigitalBrain.Capabilities.Storage.VfsItem.Deconstruct(out string! Path, out string! Name, out DigitalBrain.Capabilities.Storage.ItemKind Kind, out long? Size, out System.DateTimeOffset? Modified, out DigitalBrain.Capabilities.Storage.ItemFlags Flags) -> void
+DigitalBrain.Capabilities.Storage.VfsMount.Storage.get -> DigitalBrain.Capabilities.Storage.IStorage!
+DigitalBrain.Capabilities.Storage.VfsMount.Storage.init -> void
+DigitalBrain.Capabilities.Storage.VfsItem.Path.get -> string!
+DigitalBrain.Capabilities.Storage.VfsItem.Path.init -> void
+DigitalBrain.Capabilities.Storage.VfsItem.Name.get -> string!
+DigitalBrain.Capabilities.Storage.VfsItem.Kind.get -> DigitalBrain.Capabilities.Storage.ItemKind
+DigitalBrain.Capabilities.Storage.VfsItem.Size.get -> long?
+DigitalBrain.Capabilities.Storage.VfsItem.Name.init -> void
+DigitalBrain.Capabilities.Storage.VfsItem.Flags.get -> DigitalBrain.Capabilities.Storage.ItemFlags
+DigitalBrain.Capabilities.Storage.VfsItem.Modified.get -> System.DateTimeOffset?
+DigitalBrain.Capabilities.Storage.VfsItem.Kind.init -> void
+DigitalBrain.Capabilities.Storage.VfsItem.Flags.init -> void
+DigitalBrain.Capabilities.Storage.VfsItem.Size.init -> void
+DigitalBrain.Capabilities.Storage.VfsItem.Modified.init -> void
+DigitalBrain.Capabilities.Storage.StorageVfs
+DigitalBrain.Capabilities.Storage.IStorageVfs.List(string! folderPath, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Storage.VfsItem!>!>!
+DigitalBrain.Capabilities.Storage.IStorageVfs.Stat(string! path, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.VfsItem?>!
+DigitalBrain.Capabilities.Storage.IStorageVfs.GetMounts(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Storage.VfsMount!>!>!
+DigitalBrain.Capabilities.Storage.IStorageVfs.Read(string! filePath, DigitalBrain.Capabilities.Storage.ByteRange? range = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.Content!>!
+DigitalBrain.Capabilities.Storage.IStorageVfs.ReadText(string! filePath, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+DigitalBrain.Capabilities.Storage.IStorageVfs.OpenRead(string! filePath, DigitalBrain.Capabilities.Storage.ByteRange? range = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.StorageReadStream!>!
+DigitalBrain.Capabilities.Storage.IStorageVfs.Write(string! filePath, byte[]! content, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Operations.OperationId>!
+DigitalBrain.Capabilities.Storage.VfsMount.VfsMount(string! MountPoint, string! Label, DigitalBrain.Capabilities.Storage.IStorage! Storage) -> void
+DigitalBrain.Capabilities.Storage.VfsItem.VfsItem(string! Path, string! Name, DigitalBrain.Capabilities.Storage.ItemKind Kind, long? Size, System.DateTimeOffset? Modified, DigitalBrain.Capabilities.Storage.ItemFlags Flags = DigitalBrain.Capabilities.Storage.ItemFlags.None) -> void
+DigitalBrain.Capabilities.Storage.StorageVfs.StorageVfs(System.Collections.Generic.IEnumerable<DigitalBrain.Capabilities.Storage.VfsMount!>! mounts) -> void
+static DigitalBrain.Capabilities.Storage.StorageConfirmationGate.Require(DigitalBrain.Spi.INeuronContext! context, DigitalBrain.Capabilities.Storage.IStorage! storage, DigitalBrain.Capabilities.Storage.WritePlan! plan, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Storage.StorageVfs.GetMounts(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Storage.VfsMount!>!>!
+DigitalBrain.Capabilities.Storage.StorageVfs.Stat(string! path, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.VfsItem?>!
+DigitalBrain.Capabilities.Storage.StorageVfs.List(string! folderPath, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Storage.VfsItem!>!>!
+DigitalBrain.Capabilities.Storage.StorageVfs.Read(string! filePath, DigitalBrain.Capabilities.Storage.ByteRange? range = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.Content!>!
+DigitalBrain.Capabilities.Storage.StorageVfs.ReadText(string! filePath, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+DigitalBrain.Capabilities.Storage.StorageVfs.OpenRead(string! filePath, DigitalBrain.Capabilities.Storage.ByteRange? range = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.StorageReadStream!>!
+DigitalBrain.Capabilities.Storage.StorageVfs.Write(string! filePath, byte[]! content, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Operations.OperationId>!

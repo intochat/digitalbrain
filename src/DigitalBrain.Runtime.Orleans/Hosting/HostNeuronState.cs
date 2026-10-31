@@ -55,15 +55,45 @@ internal sealed class HostNeuronState(NeuronId id, GrainId grainId, NeuronRegist
         _etag = null;
     }
 
+    private static long _ephemeralSequence;
+
+    private static bool IsEphemeral(Signal signal) =>
+        signal.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false);
+
+    /// <summary>Publishes an ephemeral signal directly without persisting to the journal.</summary>
+    public Task PublishEphemeral(Signal signal)
+    {
+        ArgumentNullException.ThrowIfNull(signal);
+        return AnnounceEphemeral(signal);
+    }
+
     /// <summary>Appends <paramref name="signal"/> as a signal-only entry, then publishes it.</summary>
     /// <exception cref="InvalidOperationException">The <c>cluster</c> store is not BrainLog.</exception>
     public async Task Publish(Signal signal)
     {
         ArgumentNullException.ThrowIfNull(signal);
+        if (IsEphemeral(signal))
+        {
+            await AnnounceEphemeral(signal).ConfigureAwait(true);
+            return;
+        }
         if (Store is not BrainGrainStorage journal) { throw new InvalidOperationException($"{id} publishes, which needs BrainLog as the cluster store (BrainStorageRegistration)."); }
         IReadOnlyList<Signal> signals = [signal];
         var last = await journal.AppendSignalsAsync(registration.StateName, grainId, id.ToString(), signals, ReactionCursor.For(grainId)).ConfigureAwait(true);
         await Announce(last, signals).ConfigureAwait(true);
+    }
+
+    private async Task AnnounceEphemeral(Signal signal)
+    {
+        IReadOnlyList<Signal> signals = [signal];
+        services.GetService<Signalling.ClusterListeners>()?.Offer(id, signals);
+        if (services.GetService<JournalPayloads>() is { } payloads
+            && payloads.Types.TryAliasOf(signal.GetType(), out var alias)
+            && services.GetService<SignalPublisher>() is { } publisher)
+        {
+            var seq = Interlocked.Increment(ref _ephemeralSequence);
+            await publisher.Publish(new AppendedSignals(id, [(seq, alias)])).ConfigureAwait(true);
+        }
     }
 
     /// <summary>Re-announces this publisher's last sequence on every namespace it holds signals in, when it has any.</summary>

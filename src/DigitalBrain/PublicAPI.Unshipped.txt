@@ -92,6 +92,8 @@ DigitalBrain.DeactivationCause.Failed = 3 -> DigitalBrain.DeactivationCause
 DigitalBrain.DeactivationCause.Idle = 1 -> DigitalBrain.DeactivationCause
 DigitalBrain.DeactivationCause.Requested = 0 -> DigitalBrain.DeactivationCause
 DigitalBrain.DeactivationCause.Shutdown = 2 -> DigitalBrain.DeactivationCause
+DigitalBrain.EphemeralSignalAttribute
+DigitalBrain.EphemeralSignalAttribute.EphemeralSignalAttribute() -> void
 DigitalBrain.Gap
 DigitalBrain.Gap.Deconstruct(out DigitalBrain.NeuronId Source, out long From, out long To) -> void
 DigitalBrain.Gap.Equals(DigitalBrain.Gap? other) -> bool
@@ -219,6 +221,7 @@ DigitalBrain.Neuron.Get<T>(DigitalBrain.NeuronId id) -> T!
 DigitalBrain.Neuron.Id.get -> DigitalBrain.NeuronId
 DigitalBrain.Neuron.Neuron() -> void
 DigitalBrain.Neuron.Publish(DigitalBrain.Signal! signal) -> System.Threading.Tasks.Task!
+DigitalBrain.Neuron.PublishEphemeral(DigitalBrain.Signal! signal) -> System.Threading.Tasks.Task!
 DigitalBrain.Neuron<TState>
 DigitalBrain.Neuron<TState>.Neuron() -> void
 DigitalBrain.Neuron<TState>.Save(TState! next, DigitalBrain.Signal! changed, DigitalBrain.Signal? acted = null) -> System.Threading.Tasks.Task!
@@ -334,6 +337,7 @@ DigitalBrain.Spi.INeuronContext.History.get -> DigitalBrain.Spi.ISignalHistory!
 DigitalBrain.Spi.INeuronContext.Id.get -> DigitalBrain.NeuronId
 DigitalBrain.Spi.INeuronContext.Operations.get -> DigitalBrain.Spi.IOperations!
 DigitalBrain.Spi.INeuronContext.Publish(DigitalBrain.Signal! signal) -> System.Threading.Tasks.Task!
+DigitalBrain.Spi.INeuronContext.PublishEphemeral(DigitalBrain.Signal! signal) -> System.Threading.Tasks.Task!
 DigitalBrain.Spi.INeuronContext.Reminders.get -> DigitalBrain.Spi.IReminders!
 DigitalBrain.Spi.INeuronContext.Services.get -> System.IServiceProvider!
 DigitalBrain.Spi.INeuronContext.State.get -> DigitalBrain.Spi.INeuronState!
@@ -805,6 +809,8 @@ static DigitalBrain.Apps.SpecComment.NormalizeOperation(string! name) -> string!
 static DigitalBrain.Apps.SpecComment.Parse(string! text) -> DigitalBrain.Apps.SpecComment!
 DigitalBrain.App.AppId.get -> string!
 DigitalBrain.App.AttachNeuronResolver(System.Func<System.Type!, string!, object!>! resolver) -> void
+DigitalBrain.App.AttachCapabilityResolver(System.Func<System.Type!, object!>! resolver) -> void
+DigitalBrain.App.GetCapability<T>() -> T!
 DigitalBrain.App.Get<T>(string! key) -> T!
 DigitalBrain.App.ClearError() -> void
 DigitalBrain.App.Key(DigitalBrain.BrainId brain) -> DigitalBrain.AppKey
@@ -1177,3 +1183,6 @@ override DigitalBrain.ScenarioStepVerdict.GetHashCode() -> int
 override DigitalBrain.ScenarioStepVerdict.ToString() -> string!
 static DigitalBrain.ScenarioStepVerdict.operator !=(DigitalBrain.ScenarioStepVerdict? left, DigitalBrain.ScenarioStepVerdict? right) -> bool
 static DigitalBrain.ScenarioStepVerdict.operator ==(DigitalBrain.ScenarioStepVerdict? left, DigitalBrain.ScenarioStepVerdict? right) -> bool
+DigitalBrain.Spi.IStateInspectable
+DigitalBrain.Spi.IStateInspectable.InspectState(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Text.Json.JsonElement?>!
+DigitalBrain.Spi.IBrainObserver.State(DigitalBrain.NeuronId id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Text.Json.JsonElement?>!

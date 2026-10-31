@@ -35,6 +35,9 @@ public interface INeuronContext
     /// <summary>Publishes a signal from this neuron.</summary>
     Task Publish(Signal signal);
 
+    /// <summary>Publishes an ephemeral signal from this neuron without persisting to the journal.</summary>
+    Task PublishEphemeral(Signal signal) => Publish(signal);
+
     /// <summary>A typed interface to another neuron of the same brain.</summary>
     T Get<T>(NeuronId id) where T : class;
 

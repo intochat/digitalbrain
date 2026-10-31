@@ -106,6 +106,30 @@ public sealed class HostStateFacts(StatefulSilo silo) : IClassFixture<StatefulSi
     }
 
     [Fact]
+    public async Task Publish_ephemeral_delivers_to_listeners_without_journal_append()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var clusterListeners = silo.Services.GetRequiredService<DigitalBrain.Spi.IClusterListeners>();
+        var heard = new ConcurrentQueue<string>();
+        await using var reg = await clusterListeners.Listen<EphemeralPing>("test-ephemeral", (_, signal, _) =>
+        {
+            heard.Enqueue(signal.Message);
+            return Task.CompletedTask;
+        });
+
+        var counter = silo.Get<ICounter>("b1/probe.counter/ephemeral");
+        await counter.PingEphemeral("ping-fast");
+
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (heard.IsEmpty && DateTime.UtcNow < deadline) { await Task.Delay(50, ct); }
+
+        Assert.Equal(["ping-fast"], heard);
+        var page = await silo.History("b1").Read(NeuronId.Parse("b1/probe.counter/ephemeral"), 0, 10, ct);
+        Assert.Empty(page.Signals);
+        Assert.Equal(0, page.Last);
+    }
+
+    [Fact]
     public async Task On_activation_a_publisher_with_journal_entries_reannounces_its_last()
     {
         var ct = TestContext.Current.CancellationToken;

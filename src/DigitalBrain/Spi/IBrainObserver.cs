@@ -24,4 +24,7 @@ public interface IBrainObserver
 
     /// <summary>Signal deliveries in the caller's brain from now on. Nothing already delivered is replayed.</summary>
     IAsyncEnumerable<SignalDelivery> Deliveries(CancellationToken cancellationToken = default);
+
+    /// <summary>Inspects the live state of a neuron in the caller's brain, or null if stateless or not inspectable.</summary>
+    Task<System.Text.Json.JsonElement?> State(NeuronId id, CancellationToken cancellationToken = default);
 }

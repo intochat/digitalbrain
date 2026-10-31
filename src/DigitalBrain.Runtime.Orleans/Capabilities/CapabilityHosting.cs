@@ -11,7 +11,7 @@ namespace DigitalBrain.Runtime.Orleans.Capabilities;
 public static class CapabilityHosting
 {
     /// <summary>
-    /// Configures the one <see cref="CapabilityRegistry"/> of this host (for example <c>AcceptBinding(storage@1, typeof(ILegacyStorage))</c>).
+    /// Configures the one <see cref="CapabilityRegistry"/> of this host (for example <c>AcceptBinding(storage@1, typeof(IStorage))</c>).
     /// Call before the silo is configured; module validation runs there.
     /// </summary>
     public static IHostApplicationBuilder ConfigureCapabilities(this IHostApplicationBuilder builder, Action<CapabilityRegistry> configure)

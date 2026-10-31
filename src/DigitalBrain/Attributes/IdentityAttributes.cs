@@ -19,6 +19,10 @@ public sealed class SignalAttribute(string alias) : Attribute
     public string Alias { get; } = alias;
 }
 
+/// <summary>Marks a signal as ephemeral (fast-path in-memory broadcast without durable journal append).</summary>
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
+public sealed class EphemeralSignalAttribute : Attribute;
+
 /// <summary>Marks a reaction: a method that runs when a signal arrives through a synapse. Signals arrive deduped and ordered per source.</summary>
 [AttributeUsage(AttributeTargets.Method, Inherited = false)]
 public sealed class OnAttribute : Attribute
