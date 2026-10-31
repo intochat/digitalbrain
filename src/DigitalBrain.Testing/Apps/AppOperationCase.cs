@@ -14,8 +14,8 @@ public sealed class AppOperationCase : IXunitSerializable
     private static readonly ConcurrentDictionary<string, AppOperationCase> Known = new(StringComparer.Ordinal);
     private string _token = string.Empty;
 
-    /// <summary>For the xunit serializer only.</summary>
-    [Obsolete("For the xunit serializer only; use AppBaseline.Cases.")]
+    /// <summary>For the xunit serializer only; use AppBaseline.Cases.</summary>
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     public AppOperationCase()
     {
         Manifest = new AppManifest("unknown", "unknown", "0.0.0", [], new AppRequirements([]));
