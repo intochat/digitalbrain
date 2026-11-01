@@ -1186,3 +1186,30 @@ static DigitalBrain.ScenarioStepVerdict.operator ==(DigitalBrain.ScenarioStepVer
 DigitalBrain.Spi.IStateInspectable
 DigitalBrain.Spi.IStateInspectable.InspectState(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Text.Json.JsonElement?>!
 DigitalBrain.Spi.IBrainObserver.State(DigitalBrain.NeuronId id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Text.Json.JsonElement?>!
+DigitalBrain.Capabilities.AppPrincipal
+const DigitalBrain.Capabilities.AppPrincipal.Prefix = "app:" -> string!
+static DigitalBrain.Capabilities.AppPrincipal.AppKeyOf(string? principalId) -> string?
+static DigitalBrain.Capabilities.AppPrincipal.Id(string! appKey) -> string!
+static DigitalBrain.Capabilities.AppPrincipal.IsApp(string? principalId) -> bool
+DigitalBrain.Capabilities.CallerKind
+DigitalBrain.Capabilities.CallerKind.App = 2 -> DigitalBrain.Capabilities.CallerKind
+DigitalBrain.Capabilities.CallerKind.Assistant = 1 -> DigitalBrain.Capabilities.CallerKind
+DigitalBrain.Capabilities.CallerKind.Platform = 4 -> DigitalBrain.Capabilities.CallerKind
+DigitalBrain.Capabilities.CallerKind.Scheduler = 3 -> DigitalBrain.Capabilities.CallerKind
+DigitalBrain.Capabilities.CallerKind.User = 0 -> DigitalBrain.Capabilities.CallerKind
+DigitalBrain.Capabilities.CapabilityCaller.Kind.get -> DigitalBrain.Capabilities.CallerKind
+DigitalBrain.Capabilities.CapabilityCaller.OnBehalfOf.get -> string?
+DigitalBrain.Capabilities.CapabilityCaller.OnBehalfOf.init -> void
+DigitalBrain.Capabilities.CapabilityCaller.PersonId.get -> string!
+DigitalBrain.Capabilities.CapabilityCaller.StampedBy.get -> DigitalBrain.Capabilities.TrustedEdge
+DigitalBrain.Capabilities.CapabilityCallers
+const DigitalBrain.Capabilities.CapabilityCallers.AssistantApp = "assistant" -> string!
+const DigitalBrain.Capabilities.CapabilityCallers.PlatformApp = "platform" -> string!
+const DigitalBrain.Capabilities.CapabilityCallers.SchedulerApp = "scheduler" -> string!
+static DigitalBrain.Capabilities.CapabilityCallers.Of(string! principalId, string! accountId, string! brainId, DigitalBrain.Capabilities.CallerKind kind = DigitalBrain.Capabilities.CallerKind.User, string? appId = null, string? conversationId = null) -> DigitalBrain.Capabilities.CapabilityCaller!
+static DigitalBrain.Capabilities.CapabilityCallers.Platform(string! principalId, string! accountId, string! brainId, string? conversationId = null) -> DigitalBrain.Capabilities.CapabilityCaller!
+DigitalBrain.Capabilities.TrustedEdge
+DigitalBrain.Capabilities.TrustedEdge.AppProxy = 1 -> DigitalBrain.Capabilities.TrustedEdge
+DigitalBrain.Capabilities.TrustedEdge.AuthenticatedHttp = 0 -> DigitalBrain.Capabilities.TrustedEdge
+DigitalBrain.Capabilities.TrustedEdge.Platform = 3 -> DigitalBrain.Capabilities.TrustedEdge
+DigitalBrain.Capabilities.TrustedEdge.Scheduler = 2 -> DigitalBrain.Capabilities.TrustedEdge
