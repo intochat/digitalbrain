@@ -21,3 +21,4 @@ DB0030 | DigitalBrain.Apps | Error | Single [App] class in application assembly
 DB0031 | DigitalBrain | Error | Cross-brain contract interface requires [Shareable]
 DB0032 | DigitalBrain | Error | Neuron reentrancy requires explicit justification comment
 DB0033 | DigitalBrain | Error | Synchronous contract call cycle detected
+DB0040 | DigitalBrain | Disabled | Bare exception for an invariant inside a neuron or app

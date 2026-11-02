@@ -29,6 +29,12 @@ internal static class Rules
         "'{0}' loops over a {1} stream; use an [On] reaction and Context.Synapses.Ensure",
         Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
+    // The first rule off by default: consumers opt in with `dotnet_diagnostic.DB0040.severity = warning` in .editorconfig.
+    public static readonly DiagnosticDescriptor BareInvariant = new(
+        "DB0040", "Bare exception for an invariant inside a neuron or app",
+        "'{0}' throws {1} with a message; express the invariant as a Rule and call Check",
+        Category, DiagnosticSeverity.Warning, isEnabledByDefault: false);
+
     public static readonly DiagnosticDescriptor ShareableContract = new(
         "DB0031", "Cross-brain contract interface requires [Shareable]",
         "Contract interface or member '{0}' violates [Shareable] contract rules",

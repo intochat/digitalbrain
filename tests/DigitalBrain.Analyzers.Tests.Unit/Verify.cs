@@ -30,6 +30,7 @@ internal static class Verify<TAnalyzer> where TAnalyzer : DiagnosticAnalyzer, ne
                 protected T Get<T>(string key) where T : class => default!;
                 protected void RecordError(System.Exception error, string operation = "") { }
                 protected void Swallow(System.Exception error, string reason, string operation = "") { }
+                protected void Check(string operation, params DigitalBrain.Rules.Rule[] rules) { }
             }
             public readonly record struct BrainId(string Value);
             public readonly record struct AppKey
@@ -40,10 +41,14 @@ internal static class Verify<TAnalyzer> where TAnalyzer : DiagnosticAnalyzer, ne
                 public static implicit operator string(AppKey key) => "";
             }
             public sealed class RequestLedger { public bool Handled(System.Guid id) => false; public bool Record(System.Guid id) => true; }
-            public abstract class Neuron { }
+            public abstract class Neuron { protected System.Threading.Tasks.Task Check(string operation, params DigitalBrain.Rules.Rule[] rules) => System.Threading.Tasks.Task.CompletedTask; }
             public sealed class ModuleManifest { }
             public abstract record Signal;
             [System.AttributeUsage(System.AttributeTargets.Method)] public sealed class OnAttribute : System.Attribute;
+        }
+        namespace DigitalBrain.Rules
+        {
+            public abstract record Rule(string Name) { public abstract bool Broken { get; } public abstract string Message { get; } }
         }
         namespace DigitalBrain.Access
         {
