@@ -16,6 +16,7 @@ internal sealed class BrainLogs : IAsyncDisposable
     private readonly Lock gate = new();
     private readonly IBrainLogFiles? files;
     private readonly IBrainLogOwnership ownership;
+    private readonly BrainStoreOptions storeOptions;
     private bool disposed;
 
     public BrainLogs(BrainStorageKeys keys, Serializer serializer, JournalPayloads payloads, TimeProvider time, IRetentionPolicy retention,
@@ -29,6 +30,7 @@ internal sealed class BrainLogs : IAsyncDisposable
         this.payloads = payloads;
         this.time = time;
         this.retention = retention;
+        this.storeOptions = options.Value;
         Directory.CreateDirectory(options.Value.Directory);
     }
 
@@ -66,7 +68,7 @@ internal sealed class BrainLogs : IAsyncDisposable
         {
             var directory = keys.DirectoryOf(brainId);
             var lease = await ownership.ClaimAsync(directory, brainId, CancellationToken.None);
-            try { return new(directory, brainId, await keys.GetOrCreate(brainId, CancellationToken.None), serializer, payloads, time, retention, lease, files); }
+            try { return new(directory, brainId, await keys.GetOrCreate(brainId, CancellationToken.None), serializer, payloads, time, retention, lease, files, storeOptions); }
             catch { await lease.DisposeAsync(); throw; }
         }
         catch

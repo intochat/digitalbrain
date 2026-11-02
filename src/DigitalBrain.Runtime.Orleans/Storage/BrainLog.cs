@@ -26,8 +26,12 @@ internal sealed class BrainLog : IAsyncDisposable
     private readonly IRetentionPolicy retention;
     private readonly IBrainLogLease ownership;
     private readonly IBrainLogFiles files;
-    // Held across each durable write and read of the journal state; async so no thread blocks behind a writer.
+    private readonly BrainStoreOptions options;
+    // Held across each durable write and checkpoint to guarantee contiguous sequence and file updates.
     private readonly SemaphoreSlim gate = new(1, 1);
+    private readonly SemaphoreSlim checkpointGate = new(1, 1);
+    // Protects in-memory projections (records, signals, marks, sequence, position) from concurrent access without blocking on disk flushes.
+    private readonly Lock stateLock = new();
     private Dictionary<string, Dictionary<string, BrainRecord>> records = new(StringComparer.Ordinal);
     // Signal-only entries still held (above each publisher's floor), in position order.
     private readonly List<BrainEntry> signals = [];
@@ -35,15 +39,18 @@ internal sealed class BrainLog : IAsyncDisposable
     private string generation = "initial";
     private long sequence;
     private long position;
+    private long uncompactedBytes;
+    private int uncompactedEntries;
     // Read without the gate; written only under it.
     private volatile Exception? failure;
     private volatile bool disposed;
 
     internal BrainLog(string directory, string brainId, byte[] key, Serializer serializer, JournalPayloads payloads, TimeProvider time,
-        IRetentionPolicy retention, IBrainLogLease ownership, IBrainLogFiles? files = null)
+        IRetentionPolicy retention, IBrainLogLease ownership, IBrainLogFiles? files = null, BrainStoreOptions? options = null)
     {
         this.ownership = ownership;
         this.files = files ?? FileBrainLogFiles.Instance;
+        this.options = options ?? new BrainStoreOptions();
         this.directory = directory;
         this.brainId = brainId;
         this.key = key;
@@ -51,7 +58,11 @@ internal sealed class BrainLog : IAsyncDisposable
         this.payloads = payloads;
         this.time = time;
         this.retention = retention;
-        try { Recover(); }
+        try
+        {
+            Recover();
+            TryTriggerAutoCheckpoint();
+        }
         catch { ReleaseUnopened(ownership); throw; }
     }
 
@@ -206,11 +217,17 @@ internal sealed class BrainLog : IAsyncDisposable
                 FlushToDisk(stream);
                 // Deserialize the durable bytes so callers cannot mutate the stored projection.
                 Apply(serializer.Deserialize<BrainEntry>(plain)!);
+                uncompactedBytes += frame.Length;
+                uncompactedEntries++;
             }
             catch (Exception error) { failure = error; throw; }
             return (sequence, encoded.Length > 0 ? marks[publisher].Last : marks.GetValueOrDefault(publisher).Last);
         }
-        finally { gate.Release(); }
+        finally
+        {
+            gate.Release();
+            TryTriggerAutoCheckpoint();
+        }
     }
 
     /// <summary>Held signals of <paramref name="publisher"/> after <paramref name="since"/> (publisher sequences), with its floor and last.</summary>
@@ -256,43 +273,50 @@ internal sealed class BrainLog : IAsyncDisposable
     /// </summary>
     public async Task Checkpoint(CancellationToken ct)
     {
-        var floors = await Floors(ct);
-        await gate.WaitAsync(ct);
+        await checkpointGate.WaitAsync(ct);
         try
         {
-            RequireOpen();
-            ct.ThrowIfCancellationRequested();
-            foreach (var (publisher, floor) in floors) { Trim(publisher, floor); }
-            var started = ownership.BeginWrite();
-            var previous = generation;
-            var next = Guid.NewGuid().ToString("N");
-            var snapshot = new BrainSnapshot(sequence, position, records, [.. signals],
-                [.. marks.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => new PublisherMark(pair.Key, pair.Value.Floor, pair.Value.Last))]);
-            var body = serializer.SerializeToArray(snapshot);
-            var plain = new byte[SegmentHeaderBytes + body.Length];
-            WriteHeader(plain);
-            body.CopyTo(plain.AsSpan(SegmentHeaderBytes));
-            WriteFlushed(Path.Combine(directory, next + ".snapshot"), SegmentSeal.Close(key, Context("snapshot", next), plain));
-            WriteFlushed(Path.Combine(directory, next + ".log"), []);
-            // A writer-unique staging name, so a stale owner cannot swap its manifest in under the current owner's move.
-            var staged = Path.Combine(directory, "current." + next + ".tmp");
-            WriteFlushed(staged, System.Text.Encoding.UTF8.GetBytes(next));
-            try { ownership.EndWrite(started); File.Move(staged, Path.Combine(directory, "current"), overwrite: true); }
-            catch (Exception error)
+            var floors = await Floors(ct);
+            await gate.WaitAsync(ct);
+            try
             {
-                failure = error;
-                TryDelete(staged); // Never read: only "current" names a generation.
-                throw;
+                RequireOpen();
+                ct.ThrowIfCancellationRequested();
+                foreach (var (publisher, floor) in floors) { Trim(publisher, floor); }
+                var started = ownership.BeginWrite();
+                var previous = generation;
+                var next = Guid.NewGuid().ToString("N");
+                var snapshot = new BrainSnapshot(sequence, position, records, [.. signals],
+                    [.. marks.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => new PublisherMark(pair.Key, pair.Value.Floor, pair.Value.Last))]);
+                var body = serializer.SerializeToArray(snapshot);
+                var plain = new byte[SegmentHeaderBytes + body.Length];
+                WriteHeader(plain);
+                body.CopyTo(plain.AsSpan(SegmentHeaderBytes));
+                WriteFlushed(Path.Combine(directory, next + ".snapshot"), SegmentSeal.Close(key, Context("snapshot", next), plain));
+                WriteFlushed(Path.Combine(directory, next + ".log"), []);
+                // A writer-unique staging name, so a stale owner cannot swap its manifest in under the current owner's move.
+                var staged = Path.Combine(directory, "current." + next + ".tmp");
+                WriteFlushed(staged, System.Text.Encoding.UTF8.GetBytes(next));
+                try { ownership.EndWrite(started); File.Move(staged, Path.Combine(directory, "current"), overwrite: true); }
+                catch (Exception error)
+                {
+                    failure = error;
+                    TryDelete(staged); // Never read: only "current" names a generation.
+                    throw;
+                }
+                generation = next;
+                uncompactedBytes = 0;
+                uncompactedEntries = 0;
+                // Old complete generation remains until the manifest points to the new one.
+                foreach (var suffix in new[] { ".snapshot", ".log" })
+                {
+                    // Unreachable generations may be removed on a later maintenance run.
+                    TryDelete(Path.Combine(directory, previous + suffix));
+                }
             }
-            generation = next;
-            // Old complete generation remains until the manifest points to the new one.
-            foreach (var suffix in new[] { ".snapshot", ".log" })
-            {
-                // Unreachable generations may be removed on a later maintenance run.
-                TryDelete(Path.Combine(directory, previous + suffix));
-            }
+            finally { gate.Release(); }
         }
-        finally { gate.Release(); }
+        finally { checkpointGate.Release(); }
     }
 
     private async Task<List<(string Publisher, long Floor)>> Floors(CancellationToken ct)
@@ -381,8 +405,10 @@ internal sealed class BrainLog : IAsyncDisposable
             { throw new InvalidDataException("The local brain log is not contiguous."); }
             Apply(entry);
             valid = stream.Position;
+            uncompactedEntries++;
         }
         if (valid != stream.Length) { stream.SetLength(valid); FlushToDisk(stream); }
+        uncompactedBytes = valid;
     }
 
     // Held signals of each publisher run contiguously from Floor + 1 to Last; positions rise strictly.
@@ -495,15 +521,43 @@ internal sealed class BrainLog : IAsyncDisposable
         if (failure is not null) { throw new IOException("The brain store must be reopened after a failed append or checkpoint.", failure); }
     }
 
+    private void TryTriggerAutoCheckpoint()
+    {
+        if (disposed || failure is not null || !ownership.IsHeld) { return; }
+        if (uncompactedBytes < options.CheckpointBytesThreshold && uncompactedEntries < options.CheckpointEntriesThreshold) { return; }
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (disposed || failure is not null || !ownership.IsHeld) { return; }
+                await Checkpoint(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                // In auto-checkpoint background runs, failures to checkpoint do not corrupt the journal;
+                // if ownership was lost or I/O failed, record failure if critical.
+                if (ex is BrainNotOwnedException or IOException)
+                {
+                    failure = ex;
+                }
+            }
+        });
+    }
+
     public async ValueTask DisposeAsync()
     {
-        await gate.WaitAsync();
+        await checkpointGate.WaitAsync();
         try
         {
-            if (disposed) { return; }
-            disposed = true;
+            await gate.WaitAsync();
+            try
+            {
+                if (disposed) { return; }
+                disposed = true;
+            }
+            finally { gate.Release(); }
         }
-        finally { gate.Release(); }
+        finally { checkpointGate.Release(); }
         await ownership.DisposeAsync();
     }
 

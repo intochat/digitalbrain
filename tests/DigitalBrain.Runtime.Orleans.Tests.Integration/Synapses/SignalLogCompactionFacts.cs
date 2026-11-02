@@ -180,4 +180,73 @@ public sealed class SignalLogCompactionFacts
         // Compaction floor is now unblocked and advances to fast subscriber's cursor (450)
         Assert.Equal(450, unblockedFloor);
     }
+
+    [Fact]
+    public async Task Compaction_AutoTriggers_WhenUncompactedEntriesExceedThreshold()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var home = new TempHome();
+        await using var store = new BrainStore(home.Path, services =>
+        {
+            services.Configure<BrainStoreOptions>(opts =>
+            {
+                opts.CheckpointEntriesThreshold = 5;
+            });
+        });
+
+        var logDir = store.DirectoryOf("b1");
+        var grain = GrainId.Create("neuron.host", "b1/autocheckpoint/1");
+
+        for (var i = 1; i <= 6; i++)
+        {
+            await store.Storage.AppendSignalsAsync("state", grain, grain.Key.ToString()!, [new Count(i)]);
+        }
+
+        var currentFile = Path.Combine(logDir, "current");
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!File.Exists(currentFile) && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(50, ct);
+        }
+
+        Assert.True(File.Exists(currentFile), "Snapshot manifest 'current' should exist after auto-checkpoint.");
+        var gen = File.ReadAllText(currentFile).Trim();
+        Assert.True(File.Exists(Path.Combine(logDir, gen + ".snapshot")), "Snapshot file should exist.");
+        Assert.True(File.Exists(Path.Combine(logDir, gen + ".log")), "Generation log file should exist.");
+    }
+
+    [Fact]
+    public async Task Compaction_AutoTriggers_WhenUncompactedBytesExceedThreshold()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var home = new TempHome();
+        await using var store = new BrainStore(home.Path, services =>
+        {
+            services.Configure<BrainStoreOptions>(opts =>
+            {
+                opts.CheckpointBytesThreshold = 1024; // 1 KiB
+                opts.CheckpointEntriesThreshold = 10000;
+            });
+        });
+
+        var logDir = store.DirectoryOf("b1");
+        var grain = GrainId.Create("neuron.host", "b1/autocheckpoint/bytes");
+
+        // Write entries totaling > 1 KiB
+        for (var i = 1; i <= 10; i++)
+        {
+            await store.Storage.AppendSignalsAsync("state", grain, grain.Key.ToString()!, [new Note(new string('x', 200))]);
+        }
+
+        var currentFile = Path.Combine(logDir, "current");
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!File.Exists(currentFile) && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(50, ct);
+        }
+
+        Assert.True(File.Exists(currentFile), "Snapshot manifest 'current' should exist after auto-checkpoint on byte threshold.");
+        var gen = File.ReadAllText(currentFile).Trim();
+        Assert.True(File.Exists(Path.Combine(logDir, gen + ".snapshot")), "Snapshot file should exist.");
+    }
 }

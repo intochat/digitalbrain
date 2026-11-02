@@ -66,6 +66,10 @@ DigitalBrain.Runtime.Orleans.BrainStorageRegistration.BrainStorageRegistration(p
 DigitalBrain.Runtime.Orleans.BrainStorageRegistration.Register(Orleans.Hosting.ISiloBuilder! silo) -> void
 DigitalBrain.Runtime.Orleans.BrainStoreOptions
 DigitalBrain.Runtime.Orleans.BrainStoreOptions.BrainStoreOptions() -> void
+DigitalBrain.Runtime.Orleans.BrainStoreOptions.CheckpointBytesThreshold.get -> long
+DigitalBrain.Runtime.Orleans.BrainStoreOptions.CheckpointBytesThreshold.set -> void
+DigitalBrain.Runtime.Orleans.BrainStoreOptions.CheckpointEntriesThreshold.get -> int
+DigitalBrain.Runtime.Orleans.BrainStoreOptions.CheckpointEntriesThreshold.set -> void
 DigitalBrain.Runtime.Orleans.BrainStoreOptions.Directory.get -> string!
 DigitalBrain.Runtime.Orleans.BrainStoreOptions.Directory.set -> void
 DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection

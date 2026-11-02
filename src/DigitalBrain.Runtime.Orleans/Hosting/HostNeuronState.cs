@@ -96,19 +96,6 @@ internal sealed class HostNeuronState(NeuronId id, GrainId grainId, NeuronRegist
         }
     }
 
-    /// <summary>Re-announces this publisher's last sequence on every namespace it holds signals in, when it has any.</summary>
-    public async Task Reannounce()
-    {
-        if (services.GetKeyedService<IGrainStorage>(IntoChatOSNames.ClusterGrainStorage) is not BrainGrainStorage journal || services.GetService<SignalPublisher>() is not { } publisher) { return; }
-        var log = await journal.LogOf(grainId).ConfigureAwait(true);
-        var publisherId = id.ToString();
-        var last = (await log.PublisherSignals(publisherId, 0, 1, CancellationToken.None).ConfigureAwait(true)).Last;
-        if (last <= 0) { return; }
-        var held = await log.PublisherSignals(publisherId, Math.Max(0, last - SignalPage.MaxLimit), SignalPage.MaxLimit, CancellationToken.None).ConfigureAwait(true);
-        var namespaces = held.Held.Select(item => StreamNames.SignalNamespace(item.Payload.Type)).ToArray();
-        if (namespaces.Length > 0) { await publisher.Announce(id, last, namespaces).ConfigureAwait(true); }
-    }
-
     // Runs only after the append returned: AppendedSignals are never built for an entry that is not durable.
     private Task Announce(long last, IReadOnlyList<Signal> signals)
     {
