@@ -221,6 +221,56 @@ public sealed class BareInvariantAnalyzerFacts
     }
 
     [Fact]
+    public async Task FixIsNotOfferedWhenACaptureHasAPrivateNestedType()
+    {
+        Assert.Empty(await Offered("""
+            using System;
+            using System.Threading.Tasks;
+            using DigitalBrain;
+            public sealed class Cart : Neuron
+            {
+                private enum Mode { Open, Closed }
+                private Mode mode = Mode.Open;
+                public async Task Add() { if (this.mode == Mode.Closed) throw new InvalidOperationException("Cart is closed"); await Task.Yield(); }
+            }
+            """));
+        Assert.Empty(await Offered("""
+            using System;
+            using System.Threading.Tasks;
+            using DigitalBrain;
+            public sealed class Cart : Neuron
+            {
+                private enum Mode { Open, Closed }
+                public async Task Add() { var m = Mode.Open; if (m != Mode.Open) throw new InvalidOperationException("Cart is closed"); await Task.Yield(); }
+            }
+            """));
+    }
+
+    [Fact]
+    public async Task FixCopiesUsingsFromABlockNamespace()
+    {
+        var (_, rule) = await ApplyFix("""
+            namespace Shop
+            {
+                using System;
+                using System.Threading.Tasks;
+                using DigitalBrain;
+                using Text = System.String;
+
+                public sealed class Cart : Neuron
+                {
+                    public async Task Add(Text name)
+                    {
+                        if (name == Text.Empty) throw new InvalidOperationException("Cart cannot hold more than nothing");
+                        await Task.Yield();
+                    }
+                }
+            }
+            """);
+        Assert.Contains("using Text = System.String;", rule, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task NoFixWhenTheMethodIsNotAsyncOrTheConditionCalls()
     {
         Assert.Empty(await Offered("""

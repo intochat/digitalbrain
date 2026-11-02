@@ -106,7 +106,9 @@ public sealed class ExtractToRuleFix : CodeFixProvider
         var newline = guard.SyntaxTree.GetText(cancellation).ToString().Contains("\r\n") ? "\r\n" : "\n";
         // The new file sees the original's usings, so type names in the condition resolve the same way.
         var text = new StringBuilder();
-        var usings = guard.SyntaxTree.GetCompilationUnitRoot(cancellation).Usings.Select(u => u.WithoutTrivia().ToString())
+        var usings = guard.SyntaxTree.GetCompilationUnitRoot(cancellation).Usings
+            .Concat(guard.Ancestors().OfType<BaseNamespaceDeclarationSyntax>().SelectMany(n => n.Usings))
+            .Select(u => u.WithoutTrivia().ToString())
             .Where(u => u != "using DigitalBrain.Rules;").Prepend("using DigitalBrain.Rules;").Distinct().OrderBy(u => u.TrimEnd(';'), System.StringComparer.Ordinal);
         foreach (var directive in usings) { text.Append(directive).Append(newline); }
         text.Append(newline);
@@ -146,7 +148,7 @@ public sealed class ExtractToRuleFix : CodeFixProvider
             if (captured)
             {
                 var type = model.GetTypeInfo(expression, cancellation).Type;
-                if (type is null || type.TypeKind == TypeKind.Error) { return false; }
+                if (type is null || type.TypeKind == TypeKind.Error || !Visible(type, model.Compilation)) { return false; }
                 captures.Add((expression, symbol!.Name, type.ToDisplayString()));
                 return true;
             }
@@ -155,6 +157,16 @@ public sealed class ExtractToRuleFix : CodeFixProvider
         }
         return node.ChildNodes().All(child => Capture(model, child, captures, cancellation));
     }
+
+    // A parameter type the new file can name: accessible in the assembly, and so are its element and type arguments.
+    private static bool Visible(ITypeSymbol type, Compilation compilation) => type switch
+    {
+        IArrayTypeSymbol array => Visible(array.ElementType, compilation),
+        ITypeParameterSymbol => false,
+        INamedTypeSymbol named => compilation.IsSymbolAccessibleWithin(named, compilation.Assembly)
+            && named.TypeArguments.All(argument => Visible(argument, compilation)),
+        _ => compilation.IsSymbolAccessibleWithin(type, compilation.Assembly),
+    };
 
     // The first five words of the message, letters only.
     private static IEnumerable<string> Words(ExpressionSyntax message)
