@@ -180,4 +180,79 @@ public sealed class SignalLogCompactionFacts
         // Compaction floor is now unblocked and advances to fast subscriber's cursor (450)
         Assert.Equal(450, unblockedFloor);
     }
+
+    [Fact]
+    public async Task Compaction_AutoTriggers_WhenEntryThresholdExceeded()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var home = new TempHome();
+
+        // Configure with a low entry threshold of 10
+        await using var store = new BrainStore(home.Path, services =>
+        {
+            services.Configure<BrainStoreOptions>(opt =>
+            {
+                opt.CheckpointEntryThreshold = 10;
+                opt.CheckpointBytesThreshold = 10 * 1024 * 1024;
+            });
+        });
+
+        var log = await store.Log("b1");
+        var logDir = store.DirectoryOf("b1");
+        var currentFile = Path.Combine(logDir, "current");
+        var initialLog = Path.Combine(logDir, "initial.log");
+
+        // Publish 9 entries in batches of 1 (9 append operations)
+        await store.Publish(BrainStore.P, 9, batch: 1);
+        Assert.False(File.Exists(currentFile), "Checkpoint should not have triggered before reaching entry threshold");
+        Assert.True(File.Exists(initialLog), "initial.log must hold entries before threshold is exceeded");
+
+        // 10th entry triggers auto-compaction
+        await store.Publish(BrainStore.P, 1, batch: 1);
+
+        Assert.True(File.Exists(currentFile), "Manifest 'current' file must exist after auto-compaction");
+        var gen = File.ReadAllText(currentFile).Trim();
+        var snapshotFile = Path.Combine(logDir, gen + ".snapshot");
+        var logFile = Path.Combine(logDir, gen + ".log");
+
+        Assert.True(File.Exists(snapshotFile), "Generation .snapshot file must exist");
+        Assert.True(File.Exists(logFile), "Generation .log file must exist");
+        Assert.False(File.Exists(initialLog), "initial.log must be truncated after auto-compaction");
+
+        // Verify all 10 signals are readable through replay
+        var slice = await log.BrainSignals(0, 50, ct);
+        Assert.Equal(10, slice.Held.Length);
+        Assert.Equal(10L, slice.Last);
+    }
+
+    [Fact]
+    public async Task Compaction_AutoTriggers_WhenBytesThresholdExceeded()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var home = new TempHome();
+
+        // Configure a small byte threshold (e.g. 500 bytes) and high entry threshold
+        await using var store = new BrainStore(home.Path, services =>
+        {
+            services.Configure<BrainStoreOptions>(opt =>
+            {
+                opt.CheckpointEntryThreshold = 1000;
+                opt.CheckpointBytesThreshold = 500;
+            });
+        });
+
+        var log = await store.Log("b1");
+        var logDir = store.DirectoryOf("b1");
+        var currentFile = Path.Combine(logDir, "current");
+
+        Assert.False(File.Exists(currentFile), "Manifest 'current' file must not exist before writes");
+
+        // Write entries until the byte threshold is breached
+        await store.Publish(BrainStore.P, 10, batch: 1);
+
+        Assert.True(File.Exists(currentFile), "Manifest 'current' file must exist after byte threshold exceeded");
+        var gen = File.ReadAllText(currentFile).Trim();
+        Assert.True(File.Exists(Path.Combine(logDir, gen + ".snapshot")), "Snapshot file must exist");
+        Assert.True(File.Exists(Path.Combine(logDir, gen + ".log")), "Generation log file must exist");
+    }
 }

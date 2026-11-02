@@ -68,6 +68,7 @@ public sealed record JournalSignalPage(long Floor, long Last, IReadOnlyList<Jour
 /// is only ever written by one log. Entries use the same Json format as every other entry; signals whose type is a registered
 /// <c>[Signal]</c> alias reach plain <c>[On]</c> subscribers, others are skipped by them with a logged reason.
 /// </summary>
+[Obsolete("IBrainJournalWriter is an obsolete legacy bypass for non-neuron writers. Use standard Neuron.Save or signal dispatch instead.")]
 public interface IBrainJournalWriter
 {
     /// <summary>Claims and opens the brain's log (its exclusive <c>writer.lock</c>); later calls reuse the same log.</summary>
