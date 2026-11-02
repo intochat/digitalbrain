@@ -38,13 +38,13 @@ public static class TopologyHosting
         var configuration = builder.Configuration;
         var options = RuntimeOptions.From(builder.Services);
         builder.Services.TryAddSingleton(options);
-        foreach (var profile in additional.OfType<IRuntimeOptionsProfile>())
+        foreach (var holder in additional.OfType<IRuntimeOptionsHolder>())
         {
-            if (profile.Options != options)
+            if (holder.Options != options)
             {
                 throw new InvalidOperationException(
-                    $"{profile.GetType().Name} was built with RuntimeOptions keyed {profile.Options.TopologyKey} (home {profile.Options.DefaultHomeDirectoryName}), "
-                    + $"but the host registered RuntimeOptions keyed {options.TopologyKey} (home {options.DefaultHomeDirectoryName}); build the profile with the host's options.");
+                    $"{holder.GetType().Name} was built with RuntimeOptions keyed {holder.Options.TopologyKey} (home {holder.Options.DefaultHomeDirectoryName}), "
+                    + $"but the host registered RuntimeOptions keyed {options.TopologyKey} (home {options.DefaultHomeDirectoryName}); build the topology with the host's options.");
             }
         }
 

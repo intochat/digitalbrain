@@ -15,7 +15,7 @@ public interface IBrainKeyCustody
     byte[] Unwrap(string accountId, string context, byte[] wrapped);
 }
 
-/// <summary>Where the brain journals live: <c>&lt;Home&gt;/state</c>, set from <c>IntoChatOS:Home</c> by <c>AddBrainStorage</c>.</summary>
+/// <summary>Where the brain journals live: <c>&lt;Home&gt;/state</c>, set from the configured home key by <c>AddBrainStorage</c>.</summary>
 public sealed class BrainStoreOptions
 {
     /// <summary>The brain store directory.</summary>

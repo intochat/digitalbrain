@@ -12,7 +12,7 @@ namespace DigitalBrain.Runtime.Orleans;
 /// reminder table, memory streams for <c>signals</c> over the file <c>PubSubStore</c>, and the machine-key master key.
 /// The <c>cluster</c> store is host-bound (BrainLog); until the host registers it, it is <see cref="UnregisteredClusterStorage"/>.
 /// </summary>
-public sealed class LocalProfile : ITopologyProfile, IRuntimeOptionsProfile
+public sealed class LocalProfile : ITopologyProfile, IRuntimeOptionsHolder
 {
     /// <summary>The os HTTP port (os Kernel launch settings).</summary>
     public const int HttpPort = 5310;

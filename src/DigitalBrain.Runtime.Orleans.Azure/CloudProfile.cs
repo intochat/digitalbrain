@@ -15,7 +15,7 @@ namespace DigitalBrain.Runtime.Orleans.Azure;
 /// configuration, and blob-lease brain ownership. One account (<see cref="RuntimeOptions.CloudStorageKey"/>) carries tables, blobs and queues.
 /// The <c>cluster</c> store is host-bound (BrainLog); until the host registers it, it is <see cref="UnregisteredClusterStorage"/>.
 /// </summary>
-public sealed class CloudProfile : ITopologyProfile, IRuntimeOptionsProfile
+public sealed class CloudProfile : ITopologyProfile, IRuntimeOptionsHolder
 {
     /// <summary>The blob container holding one lease blob per brain; provisioned with the environment.</summary>
     public const string LeaseContainer = "brain-leases";

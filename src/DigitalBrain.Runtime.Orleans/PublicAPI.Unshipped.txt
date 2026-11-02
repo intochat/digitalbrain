@@ -1,7 +1,7 @@
 #nullable enable
 DigitalBrain.Runtime.Orleans.Bindings.Binds(DigitalBrain.Need! need, bool clusterStoreRegistered, DigitalBrain.Runtime.Orleans.RuntimeOptions? options = null) -> bool
-DigitalBrain.Runtime.Orleans.IRuntimeOptionsProfile
-DigitalBrain.Runtime.Orleans.IRuntimeOptionsProfile.Options.get -> DigitalBrain.Runtime.Orleans.RuntimeOptions!
+DigitalBrain.Runtime.Orleans.IRuntimeOptionsHolder
+DigitalBrain.Runtime.Orleans.IRuntimeOptionsHolder.Options.get -> DigitalBrain.Runtime.Orleans.RuntimeOptions!
 DigitalBrain.Runtime.Orleans.LocalCloudProfile.LocalCloudProfile(DigitalBrain.Runtime.Orleans.RuntimeOptions? options = null) -> void
 DigitalBrain.Runtime.Orleans.LocalCloudProfile.Options.get -> DigitalBrain.Runtime.Orleans.RuntimeOptions!
 DigitalBrain.Runtime.Orleans.LocalProfile.LocalProfile(DigitalBrain.Runtime.Orleans.RuntimeOptions? options = null) -> void

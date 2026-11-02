@@ -17,9 +17,14 @@ public sealed record CapabilityCaller(string PrincipalId, string AccountId, stri
         null or "" => CallerKind.User,
         CapabilityCallers.PlatformApp => CallerKind.Platform,
         CapabilityCallers.SchedulerApp => CallerKind.Scheduler,
-        CapabilityCallers.AssistantApp => CallerKind.Assistant,
+#pragma warning disable CS0618
+        CapabilityCallers.AssistantApp => CallerKind.Agent,
+#pragma warning restore CS0618
         _ => CallerKind.App,
     };
+
+    /// <summary>The key of the calling app, or null when the caller is a user, the platform or the scheduler.</summary>
+    public string? AppKey => Kind == CallerKind.App ? AppId : null;
 
     /// <summary>The trusted runtime edge that stamped this caller.</summary>
     public TrustedEdge StampedBy => Kind switch
@@ -35,6 +40,19 @@ public sealed record CapabilityCaller(string PrincipalId, string AccountId, stri
 
     /// <summary>Optional delegated principal when acting on behalf of another principal.</summary>
     public string? OnBehalfOf { get; init; }
+
+    /// <summary>The stamp shape of an app: the app's own principal and key, with no account or brain until the runtime stamps them.</summary>
+    public static CapabilityCaller App(string appKey)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(appKey);
+#pragma warning disable CS0618
+        if (appKey is CapabilityCallers.PlatformApp or CapabilityCallers.SchedulerApp or CapabilityCallers.AssistantApp)
+#pragma warning restore CS0618
+        {
+            throw new ArgumentException($"'{appKey}' is a reserved caller id, not an app key.", nameof(appKey));
+        }
+        return new CapabilityCaller(AppPrincipal.Id(appKey), string.Empty, string.Empty, appKey);
+    }
 }
 
 /// <summary>The logical kind of caller represented by a <see cref="CapabilityCaller"/>.</summary>
@@ -42,14 +60,17 @@ public enum CallerKind
 {
     /// <summary>A human user calling directly from an authenticated edge.</summary>
     User = 0,
-    /// <summary>The brain's assistant runtime.</summary>
-    Assistant = 1,
-    /// <summary>An installed or sandboxed app.</summary>
+    /// <summary>The brain's own agent runtime, acting with the user's authority.</summary>
+    Agent = 1,
+    /// <summary>An installed or sandboxed app, named by its key.</summary>
     App = 2,
     /// <summary>The runtime scheduler.</summary>
     Scheduler = 3,
     /// <summary>The platform authority or integration release path.</summary>
     Platform = 4,
+    /// <summary>The former name of <see cref="Agent"/>.</summary>
+    [Obsolete("The agent kind; removed in 0.13.")]
+    Assistant = Agent,
 }
 
 /// <summary>The trusted edge that stamped a <see cref="CapabilityCaller"/>.</summary>
@@ -72,7 +93,8 @@ public static class CapabilityCallers
     public const string PlatformApp = "platform";
     /// <summary>Reserved app identifier for scheduler-stamped calls.</summary>
     public const string SchedulerApp = "scheduler";
-    /// <summary>Reserved app identifier for assistant-stamped calls.</summary>
+    /// <summary>The app identifier the former assistant caller carried; still read as an agent.</summary>
+    [Obsolete("In 0.12 it is still the default app id of an Agent caller; removed in 0.13.")]
     public const string AssistantApp = "assistant";
 
     /// <summary>Creates a <see cref="CapabilityCaller"/> for the specified principal, account, brain, and caller kind.</summary>
@@ -91,7 +113,9 @@ public static class CapabilityCallers
         {
             CallerKind.Platform => PlatformApp,
             CallerKind.Scheduler => SchedulerApp,
-            CallerKind.Assistant => AssistantApp,
+#pragma warning disable CS0618
+            CallerKind.Agent => AssistantApp,
+#pragma warning restore CS0618
             CallerKind.App => string.IsNullOrEmpty(appId) ? "app" : appId,
             _ => null,
         };

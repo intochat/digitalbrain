@@ -205,6 +205,7 @@ DigitalBrain.CallsAttribute.To.get -> string!
 DigitalBrain.Capabilities.AppPrincipal
 DigitalBrain.Capabilities.CallerKind
 DigitalBrain.Capabilities.CallerKind.App = 2 -> DigitalBrain.Capabilities.CallerKind
+DigitalBrain.Capabilities.CallerKind.Agent = 1 -> DigitalBrain.Capabilities.CallerKind
 DigitalBrain.Capabilities.CallerKind.Assistant = 1 -> DigitalBrain.Capabilities.CallerKind
 DigitalBrain.Capabilities.CallerKind.Platform = 4 -> DigitalBrain.Capabilities.CallerKind
 DigitalBrain.Capabilities.CallerKind.Scheduler = 3 -> DigitalBrain.Capabilities.CallerKind
@@ -222,6 +223,7 @@ DigitalBrain.Capabilities.CapabilityCaller.AppId.init -> void
 DigitalBrain.Capabilities.CapabilityCaller.BrainId.get -> string!
 DigitalBrain.Capabilities.CapabilityCaller.BrainId.init -> void
 DigitalBrain.Capabilities.CapabilityCaller.CapabilityCaller(string! PrincipalId, string! AccountId, string! BrainId, string? AppId = null, string? ConversationId = null) -> void
+DigitalBrain.Capabilities.CapabilityCaller.AppKey.get -> string?
 DigitalBrain.Capabilities.CapabilityCaller.ConversationId.get -> string?
 DigitalBrain.Capabilities.CapabilityCaller.ConversationId.init -> void
 DigitalBrain.Capabilities.CapabilityCaller.Deconstruct(out string! PrincipalId, out string! AccountId, out string! BrainId, out string? AppId, out string? ConversationId) -> void
@@ -1108,6 +1110,7 @@ static DigitalBrain.Capabilities.Capability.Secrets.V1.get -> DigitalBrain.Capab
 static DigitalBrain.Capabilities.Capability.Storage.V1.get -> DigitalBrain.Capabilities.CapabilityId
 static DigitalBrain.Capabilities.CapabilityCaller.operator !=(DigitalBrain.Capabilities.CapabilityCaller? left, DigitalBrain.Capabilities.CapabilityCaller? right) -> bool
 static DigitalBrain.Capabilities.CapabilityCaller.operator ==(DigitalBrain.Capabilities.CapabilityCaller? left, DigitalBrain.Capabilities.CapabilityCaller? right) -> bool
+static DigitalBrain.Capabilities.CapabilityCaller.App(string! appKey) -> DigitalBrain.Capabilities.CapabilityCaller!
 static DigitalBrain.Capabilities.CapabilityCallers.Of(string! principalId, string! accountId, string! brainId, DigitalBrain.Capabilities.CallerKind kind = DigitalBrain.Capabilities.CallerKind.User, string? appId = null, string? conversationId = null) -> DigitalBrain.Capabilities.CapabilityCaller!
 static DigitalBrain.Capabilities.CapabilityCallers.Platform(string! principalId, string! accountId, string! brainId, string? conversationId = null) -> DigitalBrain.Capabilities.CapabilityCaller!
 static DigitalBrain.Capabilities.CapabilityId.Parse(string! text) -> DigitalBrain.Capabilities.CapabilityId

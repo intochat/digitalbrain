@@ -84,7 +84,7 @@ public sealed record RuntimeOptions
     /// <summary>Keys named after DigitalBrain, home <c>~/.digitalbrain</c>.</summary>
     public static RuntimeOptions Default { get; } = new();
 
-    /// <summary>The <c>IntoChatOS:</c> key spellings and home <c>~/.intochat</c> that IntoChat hosts have always used.</summary>
+    /// <summary>The key spellings and home <c>~/.intochat</c> that the original product's hosts have always used.</summary>
     public static RuntimeOptions IntoChatCompatible { get; } = new()
     {
         TopologyKey = IntoChatTopologyKey,
@@ -103,7 +103,7 @@ public sealed record RuntimeOptions
         SandboxImage = IntoChatSandboxImage,
     };
 
-    // The options the host registered, or the IntoChat spellings that callers without options have always got.
+    // The options the host registered, or the compatible spellings that callers without options have always got.
     internal static RuntimeOptions From(IServiceProvider services)
         => services.GetService<RuntimeOptions>() ?? IntoChatCompatible;
 

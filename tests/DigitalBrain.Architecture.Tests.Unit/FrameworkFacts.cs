@@ -212,3 +212,39 @@ public sealed partial class VocabularyWordFacts
         Assert.True(hits.Count == 0, string.Join(Environment.NewLine, hits));
     }
 }
+
+// The framework names no product: IntoChat appears in src only in the compatibility options, the obsolete shim and the obsolete caller aliases.
+public sealed class FrameworkSourceNamesNoProductFacts
+{
+    private const string Options = "RuntimeOptions.cs";
+    private const string Shim = "IntoChatOSNames.cs";
+
+    [Fact]
+    public void FrameworkSourceNamesNoProduct()
+    {
+        var source = Path.Combine(Repository.Root, "src");
+        var files = Repository.SourceFiles(source, "*.cs").ToList();
+        var options = files.Single(path => Path.GetFileName(path) == Options);
+        var declared = Regex.Matches(File.ReadAllText(options), @"\bIntoChat[A-Za-z]+\b").Select(match => match.Value).ToHashSet(StringComparer.Ordinal);
+        Assert.Contains("IntoChatCompatible", declared);
+
+        var offenders = new List<string>();
+        foreach (var path in files.Where(path => Path.GetFileName(path) != Shim))
+        {
+            var lines = File.ReadAllLines(path);
+            for (var index = 0; index < lines.Length; index++)
+            {
+                var line = lines[index];
+                if (path == options && line.Contains("const string IntoChat", StringComparison.Ordinal)) { continue; }
+                if (Path.GetFileName(path) == "CapabilityCaller.cs" && (line.Contains("Obsolete", StringComparison.Ordinal) || line.Contains("Assistant", StringComparison.Ordinal))) { continue; }
+                var remaining = Regex.Replace(line, @"\bIntoChat[A-Za-z]+\b", match => declared.Contains(match.Value) ? string.Empty : match.Value);
+                if (remaining.Contains("IntoChat", StringComparison.Ordinal))
+                {
+                    offenders.Add($"{Path.GetRelativePath(Repository.Root, path)}:{index + 1}");
+                }
+            }
+        }
+
+        Assert.True(offenders.Count == 0, "Product names in framework source:" + Environment.NewLine + string.Join(Environment.NewLine, offenders));
+    }
+}
