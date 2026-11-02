@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using DigitalBrain.Rules;
 
 namespace DigitalBrain;
 
@@ -145,6 +146,16 @@ public abstract class App
     {
         ArgumentNullException.ThrowIfNull(error);
         lock (_gate) { _error = error; }
+    }
+
+    /// <summary>Records the rejection as the app's error state and throws RuleViolationException when any rule is broken.</summary>
+    /// <exception cref="RuleViolationException">A rule is broken.</exception>
+    protected void Check(string operation, params Rule[] rules)
+    {
+        if (DigitalBrain.Rules.Rules.Judge(operation, rules) is not { } rejected) { return; }
+        var error = new RuleViolationException(rejected);
+        RecordError(new AppError(operation, nameof(Rejected), error.Message));
+        throw error;
     }
 
     /// <summary>Clears the recorded error state after the app answered normally again.</summary>

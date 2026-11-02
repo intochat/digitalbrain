@@ -22,6 +22,7 @@ DigitalBrain.App.Get<T>(string! key) -> T!
 DigitalBrain.App.GetCapability<T>() -> T!
 DigitalBrain.App.Key(DigitalBrain.BrainId brain) -> DigitalBrain.AppKey
 DigitalBrain.App.Present<TView>(System.Action<TView?, TView?>! publish, System.Func<TView?>! side, System.Func<TView?>! main, string! operation = "") -> bool
+DigitalBrain.App.Check(string! operation, params DigitalBrain.Rules.Rule![]! rules) -> void
 DigitalBrain.App.RecordError(DigitalBrain.AppError! error) -> void
 DigitalBrain.App.RecordError(System.Exception! error, string! operation = "") -> void
 DigitalBrain.App.RecordedError.get -> DigitalBrain.AppError?
@@ -581,6 +582,7 @@ DigitalBrain.Neuron.Id.get -> DigitalBrain.NeuronId
 DigitalBrain.Neuron.Neuron() -> void
 DigitalBrain.Neuron.Publish(DigitalBrain.Signal! signal) -> System.Threading.Tasks.Task!
 DigitalBrain.Neuron.PublishEphemeral(DigitalBrain.Signal! signal) -> System.Threading.Tasks.Task!
+DigitalBrain.Neuron.Check(string! operation, params DigitalBrain.Rules.Rule![]! rules) -> System.Threading.Tasks.Task!
 DigitalBrain.Neuron<TState>
 DigitalBrain.Neuron<TState>.Neuron() -> void
 DigitalBrain.Neuron<TState>.Save(TState! next, DigitalBrain.Signal! changed, DigitalBrain.Signal? acted = null) -> System.Threading.Tasks.Task!

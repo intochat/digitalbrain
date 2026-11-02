@@ -1,3 +1,4 @@
+using DigitalBrain.Rules;
 using DigitalBrain.Spi;
 
 namespace DigitalBrain;
@@ -42,6 +43,15 @@ public abstract class Neuron
     {
         ArgumentNullException.ThrowIfNull(signal);
         return Context.PublishEphemeral(signal);
+    }
+
+    /// <summary>Publishes Rejected as an ephemeral signal and throws RuleViolationException when any rule is broken.</summary>
+    /// <exception cref="RuleViolationException">A rule is broken.</exception>
+    protected async Task Check(string operation, params Rule[] rules)
+    {
+        if (DigitalBrain.Rules.Rules.Judge(operation, rules) is not { } rejected) { return; }
+        await PublishEphemeral(rejected).ConfigureAwait(true);
+        throw new RuleViolationException(rejected);
     }
 
     /// <summary>A typed interface to another neuron of the same brain.</summary>
