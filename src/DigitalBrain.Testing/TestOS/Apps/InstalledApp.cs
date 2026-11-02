@@ -21,14 +21,14 @@ public sealed partial class InstalledApp<TApp> : IInstalledApp where TApp : App
     {
         _os = os;
         _definition = definition;
-        Manifest = definition.Manifest;
+        Definition = definition;
     }
 
-    /// <summary>The manifest the app was installed with.</summary>
-    public AppManifest Manifest { get; }
+    /// <summary>The definition the app was installed with.</summary>
+    public AppDefinition Definition { get; }
 
     /// <summary>The app instance.</summary>
-    public TApp App => _app ?? throw new InvalidOperationException($"App '{Manifest.Id}' is not started.");
+    public TApp App => _app ?? throw new InvalidOperationException($"App '{Definition.Id}' is not started.");
 
     /// <summary>The operations the app offers: the names of its <c>[On]</c> methods, as requested by <see cref="Request(string, object?)"/>.</summary>
     public IReadOnlyList<string> Operations => [.. _definition.Operations.Values.Select(method => method.Name).Order(StringComparer.Ordinal)];
@@ -44,7 +44,7 @@ public sealed partial class InstalledApp<TApp> : IInstalledApp where TApp : App
         if (_definition.FindOperation(operation) is not { } method)
         {
             throw new ArgumentException(
-                $"App '{Manifest.Id}' has no operation '{operation}'. Operations: {string.Join(", ", Operations)}.", nameof(operation));
+                $"App '{Definition.Id}' has no operation '{operation}'. Operations: {string.Join(", ", Operations)}.", nameof(operation));
         }
         return _os.Track(Turn(method, argument));
     }
@@ -124,7 +124,7 @@ public sealed partial class InstalledApp<TApp> : IInstalledApp where TApp : App
 
     private Task<IAsyncDisposable> RegisterSignalSubscription<TSignal>(AppSignalSubscription sub) where TSignal : Signal
         => _os.ClusterListeners.Listen<TSignal>(
-            $"app:{Manifest.Id}:{sub.OperationName}",
+            $"app:{Definition.Id}:{sub.OperationName}",
             (publisher, signal, _) => string.Equals(publisher.Key, sub.SourceKey, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(publisher.Type, sub.SourceKey, StringComparison.OrdinalIgnoreCase)
                 ? Turn(sub.Method, signal)

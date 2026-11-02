@@ -26,7 +26,7 @@ public static class BddRunner
         }
 
         var totalWatch = Stopwatch.StartNew();
-        var manifest = TestOS.ManifestOf(appType);
+        var definition = TestOS.DefinitionOf(appType);
         var baselinePassed = true;
         string? baselineError = null;
 
@@ -48,14 +48,14 @@ public static class BddRunner
         foreach (var (attribute, method) in DiscoverScenarios(appType))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            scenarios.Add(await RunScenarioAsync(appType, manifest, attribute, method, fakes, cancellationToken).ConfigureAwait(false));
+            scenarios.Add(await RunScenarioAsync(appType, definition, attribute, method, fakes, cancellationToken).ConfigureAwait(false));
         }
 
-        var report = new BddReport(manifest.Id, scenarios, baselinePassed, baselineError, totalWatch.Elapsed);
+        var report = new BddReport(definition.Id, scenarios, baselinePassed, baselineError, totalWatch.Elapsed);
         if (targetOs is not null)
         {
             targetOs.Register<BddNeuron>();
-            var bddId = new NeuronId(new BrainId("test"), "bdd", manifest.Id);
+            var bddId = new NeuronId(new BrainId("test"), "bdd", definition.Id);
             await targetOs.Get<IBdd>(bddId).Record(report, cancellationToken).ConfigureAwait(false);
             await targetOs.Idle().ConfigureAwait(false);
         }
@@ -82,7 +82,7 @@ public static class BddRunner
 
     private static async Task<ScenarioVerdict> RunScenarioAsync(
         Type appType,
-        AppManifest manifest,
+        AppDefinition definition,
         ScenarioAttribute attribute,
         MethodInfo method,
         Action<TestOS>? fakes,
@@ -95,7 +95,7 @@ public static class BddRunner
         {
             await using var os = TestOS.Local();
             fakes?.Invoke(os);
-            foreach (var capability in manifest.Requires.Capabilities)
+            foreach (var capability in definition.Requires.Capabilities)
             {
                 if (os.Capabilities.IsBound(capability)) { continue; }
                 if (AppBaseline.DefaultFakes.TryGetValue(capability, out var bind))

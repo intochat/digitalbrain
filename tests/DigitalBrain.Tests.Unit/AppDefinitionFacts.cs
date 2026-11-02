@@ -9,9 +9,9 @@ public sealed class AppDefinitionFacts
     public void Discovery_resolves_alias_and_parameters_without_constructing_app()
     {
         var definition = new AppDefinition(typeof(TemplateApp));
-        Assert.Equal("definition-template", definition.Manifest.Id);
-        Assert.Equal("TemplateApp", definition.Manifest.Name);
-        Assert.Equal([new CapabilityId("definition-capability", 1)], definition.Manifest.Requires.Capabilities);
+        Assert.Equal("definition-template", definition.Id);
+        Assert.Equal("TemplateApp", definition.Name);
+        Assert.Equal([new CapabilityId("definition-capability", 1)], definition.Requires.Capabilities);
         Assert.Equal(typeof(TemplateApp), definition.AppType);
         var method = definition.FindOperation("o-P-e-N");
         Assert.NotNull(method);
@@ -22,10 +22,10 @@ public sealed class AppDefinitionFacts
     }
 
     [Fact]
-    public void Declared_manifest_is_used_and_legacy_return_shapes_are_discovered()
+    public void Declared_operations_and_legacy_return_shapes_are_discovered()
     {
         var definition = new AppDefinition(typeof(DeclaredApp));
-        Assert.Same(DeclaredApp.Manifest, definition.Manifest);
+        Assert.Equal("definition-declared", definition.Id);
         Assert.Equal(4, definition.Operations.Count);
         Assert.NotNull(definition.FindOperation("Sync"));
         Assert.NotNull(definition.FindOperation("WithResult"));
@@ -38,7 +38,6 @@ public sealed class AppDefinitionFacts
     [InlineData(typeof(App))]
     [InlineData(typeof(UnmarkedApp))]
     [InlineData(typeof(GenericApp<>))]
-    [InlineData(typeof(MismatchedApp))]
     [InlineData(typeof(DuplicateApp))]
     [InlineData(typeof(StaticHandlerApp))]
     [InlineData(typeof(GenericHandlerApp))]
@@ -71,7 +70,6 @@ public sealed class AppDefinitionFacts
     [App("definition-declared")]
     private sealed class DeclaredApp : App
     {
-        public static AppManifest Manifest { get; } = new("definition-declared", "Declared", "2.3", [], new AppRequirements([]));
         [On] public void Sync() { }
         [On] public Task<int> WithResult() => Task.FromResult(1);
         [On] public ValueTask Value() => ValueTask.CompletedTask;
@@ -80,11 +78,6 @@ public sealed class AppDefinitionFacts
 
     private sealed class UnmarkedApp : App;
     [App("generic")] private sealed class GenericApp<T> : App;
-    [App("mismatch")]
-    private sealed class MismatchedApp : App
-    {
-        public static AppManifest Manifest { get; } = new("other", "Other", "1", [], new AppRequirements([]));
-    }
     [App("duplicate")]
     private sealed class DuplicateApp : App
     {

@@ -10,17 +10,20 @@ namespace DigitalBrain.Apps.Packaging;
 /// <summary>Local build seam. Only call with trusted developer types, never while inspecting a received archive.</summary>
 public static class TrustedBuildMetadata
 {
-    public static CompiledAppDescriptor Extract(Type entryType, AppManifest? manifest = null, CompiledAppDescriptor? hostMetadata = null)
+    public static CompiledAppDescriptor Extract(Type entryType, CompiledAppDescriptor? hostMetadata = null)
+        => Extract(entryType, new AppDefinition(entryType), hostMetadata);
+
+    public static CompiledAppDescriptor Extract(Type entryType, AppDefinition definition, CompiledAppDescriptor? hostMetadata = null)
     {
         ArgumentNullException.ThrowIfNull(entryType);
-        manifest ??= new AppDefinition(entryType).Manifest;
-        if (!typeof(App).IsAssignableFrom(entryType) || entryType.GetCustomAttribute<AppAttribute>()?.Id != manifest.Id)
+        ArgumentNullException.ThrowIfNull(definition);
+        if (!typeof(App).IsAssignableFrom(entryType) || entryType.GetCustomAttribute<AppAttribute>()?.Id != definition.Id)
         { throw new InvalidDataException("Typed manifest and entry app identity disagree."); }
-        if (hostMetadata is not null && (hostMetadata.Id != manifest.Id || (hostMetadata.Capabilities.Length != 0 && !hostMetadata.Capabilities.Order(StringComparer.Ordinal).SequenceEqual(manifest.Requires.Capabilities.Select(c => c.ToString()).Order(StringComparer.Ordinal), StringComparer.Ordinal))))
+        if (hostMetadata is not null && (hostMetadata.Id != definition.Id || (hostMetadata.Capabilities.Length != 0 && !hostMetadata.Capabilities.Order(StringComparer.Ordinal).SequenceEqual(definition.Requires.Capabilities.Select(c => c.ToString()).Order(StringComparer.Ordinal), StringComparer.Ordinal))))
         { throw new InvalidDataException("Host metadata cannot change framework identity or capabilities."); }
         var descriptors = new List<CompiledNeuronDescriptor>();
         var contracts = new Dictionary<Type, CompiledContractDescriptor>();
-        foreach (var neuron in manifest.Neurons)
+        foreach (var neuron in definition.Neurons)
         {
             var attribute = neuron.GetCustomAttribute<NeuronAttribute>() ?? throw new InvalidDataException("Owned neuron lacks frozen identity.");
             var stateType = StateType(neuron);
@@ -37,20 +40,20 @@ public static class TrustedBuildMetadata
         { contracts.TryAdd(type, Contract(type)); }
         var descriptor = hostMetadata ?? new CompiledAppDescriptor
         {
-            Id = manifest.Id,
-            Name = manifest.Name,
-            Version = manifest.Version,
+            Id = definition.Id,
+            Name = definition.Name,
+            Version = definition.Version,
             EntryAssembly = entryType.Assembly.GetName().Name + ".dll",
             EntryType = PortableName(entryType)
         };
         return PackageFormat.Canonical(descriptor with
         {
-            Id = manifest.Id,
-            Name = manifest.Name,
-            Version = manifest.Version,
+            Id = definition.Id,
+            Name = definition.Name,
+            Version = definition.Version,
             EntryAssembly = entryType.Assembly.GetName().Name + ".dll",
             EntryType = PortableName(entryType),
-            Capabilities = [.. manifest.Requires.Capabilities.Select(c => c.ToString())],
+            Capabilities = [.. definition.Requires.Capabilities.Select(c => c.ToString())],
             Neurons = [.. descriptors],
             Contracts = [.. contracts.Where(c => !typeof(Signal).IsAssignableFrom(c.Key)).Select(c => c.Value)],
             Signals = [.. contracts.Where(c => typeof(Signal).IsAssignableFrom(c.Key)).Select(c => c.Value)],

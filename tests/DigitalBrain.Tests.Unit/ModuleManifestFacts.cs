@@ -97,10 +97,10 @@ public sealed class ModuleManifestFacts
     }
 
     [Fact]
-    public void App_manifest_lists_required_capabilities()
+    public void App_requirements_lists_required_capabilities()
     {
-        var app = new AppManifest("notes", "Notes", "1.0.0", [typeof(SampleModule)], new AppRequirements([CapabilityId.Parse("storage@1")]));
-        Assert.Equal("storage@1", Assert.Single(app.Requires.Capabilities).ToString());
+        var req = new AppRequirements([CapabilityId.Parse("storage@1")]);
+        Assert.Equal("storage@1", Assert.Single(req.Capabilities).ToString());
     }
 
     [Theory]

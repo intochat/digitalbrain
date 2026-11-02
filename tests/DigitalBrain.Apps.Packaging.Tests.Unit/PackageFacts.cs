@@ -5,7 +5,8 @@ using DigitalBrain.Apps.Packaging;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Contracts;
 
-namespace DigitalBrain.Apps.Packaging.Tests.Unit;
+namespace DigitalBrain.Apps.Packaging.Tests.Unit
+{
 
 public sealed class PackageFacts : IDisposable
 {
@@ -16,12 +17,11 @@ public sealed class PackageFacts : IDisposable
     [Fact]
     public void TrustedBuildMetadataFreezesTypedManifestAndSchemas()
     {
-        var manifest = new AppManifest("example.app", "Example", "2.0.0", [typeof(OwnedNeuron)], new([new CapabilityId("storage", 1)]));
-        var metadata = TrustedBuildMetadata.Extract(typeof(ExampleApp), manifest, Descriptor() with
+        var metadata = TrustedBuildMetadata.Extract(typeof(StatefulSample.StatefulApp), Descriptor() with
         {
             HostMetadata = System.Collections.Immutable.ImmutableSortedDictionary<string, string>.Empty.Add("intochat.os.v1", "{\"operations\":[\"open\"]}")
         });
-        Assert.Equal("2.0.0", metadata.Version);
+        Assert.Equal(typeof(PackageFacts).Assembly.GetName().Version?.ToString(), metadata.Version);
         Assert.Equal(["storage@1"], metadata.Capabilities);
         Assert.Equal("{\"operations\":[\"open\"]}", metadata.HostMetadata["intochat.os.v1"]);
         var neuron = Assert.Single(metadata.Neurons);
@@ -38,17 +38,14 @@ public sealed class PackageFacts : IDisposable
     [Fact]
     public void TrustedBuildMetadataRefusesIdentityAndCapabilityWidening()
     {
-        var manifest = new AppManifest("different", "Example", "1", [], new([]));
-        Assert.Throws<InvalidDataException>(() => TrustedBuildMetadata.Extract(typeof(ExampleApp), manifest));
-        manifest = manifest with { Id = "example.app" };
-        Assert.Throws<InvalidDataException>(() => TrustedBuildMetadata.Extract(typeof(ExampleApp), manifest, Descriptor() with { Capabilities = ["storage@1"] }));
+        Assert.Throws<InvalidDataException>(() => TrustedBuildMetadata.Extract(typeof(ExampleApp), Descriptor() with { Id = "different" }));
+        Assert.Throws<InvalidDataException>(() => TrustedBuildMetadata.Extract(typeof(ExampleApp), Descriptor() with { Capabilities = ["storage@1"] }));
     }
 
     [Fact]
     public void TrustedBuildMetadataSupportsStatelessNeuronsWithoutInventedState()
     {
-        var manifest = new AppManifest("example.app", "Example", "1", [typeof(StatelessOwnedNeuron)], new([]));
-        var neuron = Assert.Single(TrustedBuildMetadata.Extract(typeof(ExampleApp), manifest).Neurons);
+        var neuron = Assert.Single(TrustedBuildMetadata.Extract(typeof(StatelessSample.StatelessApp)).Neurons);
         Assert.Equal("stateless", neuron.HostPolicy);
         Assert.Equal("state", neuron.StateName);
         Assert.Null(neuron.State);
@@ -349,16 +346,32 @@ public sealed class PackageFacts : IDisposable
 
     [App("example.app")]
     private sealed class ExampleApp : App;
+}
+}
+
+namespace DigitalBrain.Apps.Packaging.Tests.Unit.StatefulSample
+{
+    [Capability("storage", 1)]
+    public interface IStorageCapability;
+
+    [App("example.app")]
+    public sealed class StatefulApp(IStorageCapability storage) : App { public IStorageCapability Storage { get; } = storage; }
 
     [Neuron("example-items", State = "old-state")]
-    private sealed class OwnedNeuron : Neuron<OwnedState>;
-
-    [Neuron("stateless-items"), StatelessNeuron]
-    private sealed class StatelessOwnedNeuron : Neuron;
+    public sealed class OwnedNeuron : Neuron<OwnedState>;
 
     [NeuronContract, NeuronAlias("state-v1")]
-    private sealed record OwnedState
+    public sealed record OwnedState
     {
         [Field(3)] public int Count { get; init; }
     }
+}
+
+namespace DigitalBrain.Apps.Packaging.Tests.Unit.StatelessSample
+{
+    [App("example.app")]
+    public sealed class StatelessApp : App;
+
+    [Neuron("stateless-items"), StatelessNeuron]
+    public sealed class StatelessOwnedNeuron : Neuron;
 }

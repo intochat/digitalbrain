@@ -16,21 +16,6 @@ DigitalBrain.App.App() -> void
 DigitalBrain.AppAttribute
 DigitalBrain.AppAttribute.AppAttribute(string! id) -> void
 DigitalBrain.AppAttribute.Id.get -> string!
-DigitalBrain.AppManifest
-DigitalBrain.AppManifest.<Clone>$() -> DigitalBrain.AppManifest!
-DigitalBrain.AppManifest.AppManifest(string! Id, string! Name, string! Version, System.Collections.Generic.IReadOnlyList<System.Type!>! Neurons, DigitalBrain.AppRequirements! Requires) -> void
-DigitalBrain.AppManifest.Deconstruct(out string! Id, out string! Name, out string! Version, out System.Collections.Generic.IReadOnlyList<System.Type!>! Neurons, out DigitalBrain.AppRequirements! Requires) -> void
-DigitalBrain.AppManifest.Equals(DigitalBrain.AppManifest? other) -> bool
-DigitalBrain.AppManifest.Id.get -> string!
-DigitalBrain.AppManifest.Id.init -> void
-DigitalBrain.AppManifest.Name.get -> string!
-DigitalBrain.AppManifest.Name.init -> void
-DigitalBrain.AppManifest.Neurons.get -> System.Collections.Generic.IReadOnlyList<System.Type!>!
-DigitalBrain.AppManifest.Neurons.init -> void
-DigitalBrain.AppManifest.Requires.get -> DigitalBrain.AppRequirements!
-DigitalBrain.AppManifest.Requires.init -> void
-DigitalBrain.AppManifest.Version.get -> string!
-DigitalBrain.AppManifest.Version.init -> void
 DigitalBrain.AppRequirements
 DigitalBrain.AppRequirements.<Clone>$() -> DigitalBrain.AppRequirements!
 DigitalBrain.AppRequirements.AppRequirements(System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.CapabilityId>! Capabilities) -> void
@@ -421,9 +406,6 @@ const DigitalBrain.Capabilities.Capability.Secrets.V1Id = "secrets@1" -> string!
 const DigitalBrain.Capabilities.Capability.Storage.V1Id = "storage@1" -> string!
 const DigitalBrain.Invocation.NeuronBinder.DefaultMaximumArgumentBytes = 1048576 -> int
 const DigitalBrain.SignalPage.MaxLimit = 1000 -> int
-override DigitalBrain.AppManifest.Equals(object? obj) -> bool
-override DigitalBrain.AppManifest.GetHashCode() -> int
-override DigitalBrain.AppManifest.ToString() -> string!
 override DigitalBrain.AppRequirements.Equals(object? obj) -> bool
 override DigitalBrain.AppRequirements.GetHashCode() -> int
 override DigitalBrain.AppRequirements.ToString() -> string!
@@ -508,8 +490,6 @@ override sealed DigitalBrain.Operations.OperationResult.Cancelled.Equals(Digital
 override sealed DigitalBrain.Operations.OperationResult.Failed.Equals(DigitalBrain.Operations.OperationResult? other) -> bool
 override sealed DigitalBrain.Operations.OperationResult.Planned.Equals(DigitalBrain.Operations.OperationResult? other) -> bool
 override sealed DigitalBrain.Operations.OperationResult.Succeeded.Equals(DigitalBrain.Operations.OperationResult? other) -> bool
-static DigitalBrain.AppManifest.operator !=(DigitalBrain.AppManifest? left, DigitalBrain.AppManifest? right) -> bool
-static DigitalBrain.AppManifest.operator ==(DigitalBrain.AppManifest? left, DigitalBrain.AppManifest? right) -> bool
 static DigitalBrain.AppRequirements.operator !=(DigitalBrain.AppRequirements? left, DigitalBrain.AppRequirements? right) -> bool
 static DigitalBrain.AppRequirements.operator ==(DigitalBrain.AppRequirements? left, DigitalBrain.AppRequirements? right) -> bool
 static DigitalBrain.BrainId.IsValid(string? value) -> bool
@@ -964,7 +944,13 @@ static DigitalBrain.SynapseRequest.operator ==(DigitalBrain.SynapseRequest? left
 DigitalBrain.AppDefinition
 DigitalBrain.AppDefinition.AppDefinition(System.Type! appType) -> void
 DigitalBrain.AppDefinition.AppType.get -> System.Type!
-DigitalBrain.AppDefinition.Manifest.get -> DigitalBrain.AppManifest!
+DigitalBrain.AppDefinition.Accent.get -> string?
+DigitalBrain.AppDefinition.Category.get -> string?
+DigitalBrain.AppDefinition.Id.get -> string!
+DigitalBrain.AppDefinition.Name.get -> string!
+DigitalBrain.AppDefinition.Neurons.get -> System.Collections.Generic.IReadOnlyList<System.Type!>!
+DigitalBrain.AppDefinition.Requires.get -> DigitalBrain.AppRequirements!
+DigitalBrain.AppDefinition.Version.get -> string!
 DigitalBrain.AppDefinition.Operations.get -> System.Collections.Generic.IReadOnlyDictionary<string!, System.Reflection.MethodInfo!>!
 DigitalBrain.AppDefinition.FindOperation(string! operation) -> System.Reflection.MethodInfo?
 DigitalBrain.AppDefinition.Create(System.Func<System.Type!, object?>! services) -> DigitalBrain.App!
@@ -1154,10 +1140,6 @@ DigitalBrain.AppAttribute.Accent.get -> string?
 DigitalBrain.AppAttribute.Accent.init -> void
 DigitalBrain.AppAttribute.Category.get -> string?
 DigitalBrain.AppAttribute.Category.init -> void
-DigitalBrain.AppManifest.Accent.get -> string?
-DigitalBrain.AppManifest.Accent.init -> void
-DigitalBrain.AppManifest.Category.get -> string?
-DigitalBrain.AppManifest.Category.init -> void
 
 DigitalBrain.ScenarioAttribute.Language.get -> string!
 DigitalBrain.ScenarioAttribute.Language.init -> void

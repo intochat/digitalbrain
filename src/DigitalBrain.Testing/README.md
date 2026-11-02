@@ -45,7 +45,7 @@ Assert.Contains(files.Side.Entries, e => e.Id == "c" && e.Trailing == "10 GB of 
 
 ### Installing an app
 
-- `os.Install<TApp>()` reads the app's manifest: its static `AppManifest Manifest` property, or else the `[App]` id, the capability
+- `os.Install<TApp>()` reads the app's definition: the `[App]` id, the capability
   contracts its constructor takes and the `[Neuron]` classes in its namespace. A required capability with no bound fake fails the
   install with the capability named, before anything is registered ([TestOSAppExtensions.cs](TestOS/Apps/TestOSAppExtensions.cs)).
 - `app.Request(operation, argument)` runs the `[On]` method of that name (case-insensitive) as a turn. A null argument is the empty

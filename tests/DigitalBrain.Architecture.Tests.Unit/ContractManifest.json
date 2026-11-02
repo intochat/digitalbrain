@@ -15,7 +15,6 @@
     "aliases": [
       "admit",
       "brain.affine-placement",
-      "brain.synapse-cursors",
       "catch-up",
       "db.json-element",
       "db.runtime-invocation",

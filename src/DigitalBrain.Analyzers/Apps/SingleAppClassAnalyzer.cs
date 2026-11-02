@@ -31,8 +31,21 @@ public sealed class SingleAppClassAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        if (context.Options != null &&
+            context.Options.AnalyzerConfigOptionsProvider.GlobalOptions.TryGetValue("build_property.DigitalBrainApp", out var isApp) &&
+            bool.TryParse(isApp.Trim(), out var b) && !b)
+        {
+            return;
+        }
+
         var appClasses = new List<INamedTypeSymbol>();
-        CollectAppClasses(context.Compilation.GlobalNamespace, appClasses);
+        var hasModule = false;
+        CollectTypes(context.Compilation.GlobalNamespace, appClasses, ref hasModule);
+
+        if (hasModule)
+        {
+            return;
+        }
 
         if (appClasses.Count > 1)
         {
@@ -54,21 +67,25 @@ public sealed class SingleAppClassAnalyzer : DiagnosticAnalyzer
         }
     }
 
-    private static void CollectAppClasses(INamespaceOrTypeSymbol container, List<INamedTypeSymbol> appClasses)
+    private static void CollectTypes(INamespaceOrTypeSymbol container, List<INamedTypeSymbol> appClasses, ref bool hasModule)
     {
         foreach (var member in container.GetMembers())
         {
             if (member is INamespaceSymbol childNs)
             {
-                CollectAppClasses(childNs, appClasses);
+                CollectTypes(childNs, appClasses, ref hasModule);
             }
             else if (member is INamedTypeSymbol type)
             {
+                if (Rules.Has(type, Rules.ModuleAttribute) || Rules.DerivesFrom(type, Rules.ModuleType))
+                {
+                    hasModule = true;
+                }
                 if (Rules.Has(type, Rules.AppAttribute))
                 {
                     appClasses.Add(type);
                 }
-                CollectAppClasses(type, appClasses);
+                CollectTypes(type, appClasses, ref hasModule);
             }
         }
     }

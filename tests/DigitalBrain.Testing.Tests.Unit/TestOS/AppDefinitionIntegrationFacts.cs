@@ -15,8 +15,8 @@ public sealed class AppDefinitionIntegrationFacts
         await app.Request("SetValue");
         Assert.Equal(0, app.App.Value);
         Assert.Equal(["SetValue"], app.Operations);
-        Assert.Same(DefinitionIntegrationApp.Manifest, app.Manifest);
-        Assert.Same(DefinitionIntegrationApp.Manifest, OS.ManifestOf(typeof(DefinitionIntegrationApp)));
+        Assert.Equal("definition-integration", app.Definition.Id);
+        Assert.Equal("definition-integration", OS.DefinitionOf(typeof(DefinitionIntegrationApp)).Id);
     }
 
     [Fact]
@@ -45,7 +45,6 @@ public sealed class AppDefinitionIntegrationFacts
     [App("definition-integration")]
     public sealed class DefinitionIntegrationApp : App
     {
-        public static AppManifest Manifest { get; } = new("definition-integration", "Definition", "1", [], new AppRequirements([]));
         public int Value { get; private set; }
         [On] public void SetValue(Input input) => Value = input.Value;
     }

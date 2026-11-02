@@ -13,7 +13,7 @@ public static class SynapseRetentionHosting
         ArgumentNullException.ThrowIfNull(silo);
         AddRetentionOptions(silo.Services);
         silo.Services.TryAddSingleton(TimeProvider.System);
-        silo.Services.AddSingleton<ISynapseCursorLookup, GrainSynapseCursorLookup>();
+        silo.Services.AddSingleton<ISynapseCursorLookup, NullSynapseCursorLookup>();
         silo.Services.AddSingleton<IRetentionPolicy, RetentionPolicy>();
         return silo;
     }
@@ -23,4 +23,10 @@ public static class SynapseRetentionHosting
         services.AddOptions<RetentionOptions>().BindConfiguration(IntoChatOSNames.Signalling.Retention);
         return services;
     }
+}
+
+internal sealed class NullSynapseCursorLookup : ISynapseCursorLookup
+{
+    public ValueTask<long?> LowestLive(string brainKey, NeuronId publisher)
+        => ValueTask.FromResult<long?>(null);
 }

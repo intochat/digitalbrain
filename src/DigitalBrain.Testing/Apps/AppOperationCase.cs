@@ -18,30 +18,30 @@ public sealed class AppOperationCase : IXunitSerializable
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     public AppOperationCase()
     {
-        Manifest = new AppManifest("unknown", "unknown", "0.0.0", [], new AppRequirements([]));
+        Definition = null!;
         Operation = string.Empty;
         Install = static _ => throw new InvalidOperationException("This case was not built by AppBaseline.Cases.");
     }
 
-    internal AppOperationCase(AppManifest manifest, string operation, Func<TestOS, Task<IInstalledApp>> install, Action<TestOS>? fakes, bool opens)
+    internal AppOperationCase(AppDefinition definition, string operation, Func<TestOS, Task<IInstalledApp>> install, Action<TestOS>? fakes, bool opens)
     {
-        Manifest = manifest;
+        Definition = definition;
         Operation = operation;
         Install = install;
         Fakes = fakes;
         OpensFirst = opens;
-        _token = $"{manifest.Id}/{operation}/{Guid.NewGuid():N}";
+        _token = $"{definition.Id}/{operation}/{Guid.NewGuid():N}";
         Known[_token] = this;
     }
 
-    /// <summary>The manifest of the app under test.</summary>
-    public AppManifest Manifest { get; private set; }
+    /// <summary>The definition of the app under test.</summary>
+    public AppDefinition Definition { get; private set; }
 
     /// <summary>The operation this row requests, normalised (<c>open</c>).</summary>
     public string Operation { get; private set; }
 
     /// <summary><c>app/operation</c>.</summary>
-    public string DisplayName => $"{Manifest.Id}/{Operation}";
+    public string DisplayName => $"{Definition.Id}/{Operation}";
 
     internal Func<TestOS, Task<IInstalledApp>> Install { get; private set; }
 
@@ -61,7 +61,7 @@ public sealed class AppOperationCase : IXunitSerializable
         {
             throw new InvalidOperationException($"Baseline case '{_token}' is unknown in this process; build the theory data with AppBaseline.Cases.");
         }
-        Manifest = known.Manifest;
+        Definition = known.Definition;
         Operation = known.Operation;
         Install = known.Install;
         Fakes = known.Fakes;

@@ -18,9 +18,9 @@ public sealed class InstallAppFacts
         _ = app.Request("rename", "notes");
         await os.Idle();
 
-        Assert.Equal("sample-app", app.Manifest.Id);
-        Assert.Equal([CapabilityId.Parse("storage-like@1")], app.Manifest.Requires.Capabilities);
-        Assert.Contains(typeof(SampleCounter), app.Manifest.Neurons);
+        Assert.Equal("sample-app", app.Definition.Id);
+        Assert.Equal([CapabilityId.Parse("storage-like@1")], app.Definition.Requires.Capabilities);
+        Assert.Contains(typeof(SampleCounter), app.Definition.Neurons);
         Assert.Equal(["Open", "Rename"], app.Operations);
         Assert.Equal(1, c.Calls);
         Assert.Equal(["open:C::10:True", "rename:notes"], app.App.Log);

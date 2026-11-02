@@ -14,7 +14,7 @@ public sealed partial class RuntimeTypeFacts
     // The names this phase added (04-16 must-haves); the namespace prefix is pinned under "streams".
     private static readonly string[] PhaseNames =
     [
-        "neuron.host", "neuron.host.reentrant", "neuron.host.stateless", "brain.synapse-cursors", "signal.subscriber",
+        "neuron.host", "neuron.host.reentrant", "neuron.host.stateless", "signal.subscriber",
         "runtime.listener", "synapse.ref", "synapse.gap",
     ];
 

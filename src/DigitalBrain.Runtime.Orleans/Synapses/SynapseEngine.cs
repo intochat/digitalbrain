@@ -163,7 +163,6 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
         {
             await Subscribe(StreamNames.ForNamespace(_id.Brain.Value, alias)).ConfigureAwait(true);
         }
-        await Report(entry).ConfigureAwait(true);
         if (created) { await Pull(entry, null).ConfigureAwait(true); }
     }
 
@@ -186,9 +185,6 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
         {
             await Unsubscribe(StreamNames.ForNamespace(_id.Brain.Value, ns)).ConfigureAwait(true);
         }
-        var registry = _grains.GetGrain<ISynapseCursorRegistry>(_id.Brain.Value);
-        await registry.Forget(_id.ToString()).ConfigureAwait(true);
-        foreach (var other in _state.Sources) { await Report(other).ConfigureAwait(true); }
     }
 
     /// <summary>Catches up every source from its cursor: on activation and when reconcile asks.</summary>
@@ -284,13 +280,11 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
                     }
                 }
                 if (skipped) { await Persist().ConfigureAwait(true); }
-                await Report(entry).ConfigureAwait(true);
             }
         }
         finally
         {
             gate.Release();
-            if (entry.Cursor != start) { await Report(entry).ConfigureAwait(true); }
         }
     }
 
@@ -359,9 +353,6 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
         var alias = item.Signal.GetType().GetCustomAttribute<SignalAttribute>(inherit: false)?.Alias ?? item.Signal.GetType().Name;
         _services.GetService<DeliveryHub>()?.Publish(brain, new SignalDelivery(entry.Source, _id.ToString(), alias, item.Sequence));
     }
-
-    private Task Report(SynapseSource entry)
-        => entry.Source == BrainWide || !_state.Sources.Contains(entry) ? Task.CompletedTask : _grains.GetGrain<ISynapseCursorRegistry>(_id.Brain.Value).ReportCursor(_id.ToString(), NeuronId.Parse(entry.Source), entry.Cursor);
 
     private static IStreamSubscriptionManager Manager(IServiceProvider services)
         => services.GetRequiredService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);

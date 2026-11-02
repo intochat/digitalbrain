@@ -196,13 +196,14 @@ public sealed class AppBaselineFacts
     }
 
     [Fact]
-    public async Task The_manifest_overload_drives_an_app_installed_by_a_delegate()
+    public async Task The_definition_overload_drives_an_app_installed_by_a_delegate()
     {
-        var manifest = TestOS.ManifestOf(typeof(BaselineSample));
-        var rows = AppBaseline.Cases(manifest, ["Open", "add"], async os => await os.Install<BaselineSample>(), fakes: null).ToList();
+        var definition = TestOS.DefinitionOf(typeof(BaselineSample));
+        var rows = AppBaseline.Cases(definition, ["Open", "add"], async os => await os.Install<BaselineSample>(), fakes: null).ToList();
         Assert.Equal(["sample/add", "sample/open"], rows.Select(row => row.TestDisplayName));
         foreach (var row in rows) { await AppBaseline.RunAsync(row.Data!); }
-        Assert.Throws<InvalidOperationException>(() => AppBaseline.Cases(manifest, [], async os => await os.Install<BaselineSample>(), fakes: null));
+        Action act = () => AppBaseline.Cases(definition, [], async os => await os.Install<BaselineSample>(), fakes: null);
+        Assert.Throws<InvalidOperationException>(act);
     }
 
     private static AppOperationCase Single(Type app) => Assert.Single(AppBaseline.Cases(app)).Data!;

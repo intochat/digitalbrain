@@ -44,6 +44,6 @@ public sealed class APP_CLASSFacts
     [Fact]
     public void App_id_is_lowercase_and_dotted()
     {
-        Assert.Matches(new Regex("^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*$"), TestOS.ManifestOf(typeof(APP_CLASS)).Id);
+        Assert.Matches(new Regex("^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*$"), TestOS.DefinitionOf(typeof(APP_CLASS)).Id);
     }
 }

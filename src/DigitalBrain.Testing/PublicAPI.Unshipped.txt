@@ -281,7 +281,7 @@ DigitalBrain.Testing.InstalledApp<TApp>
 DigitalBrain.Testing.InstalledApp<TApp>.App.get -> TApp!
 DigitalBrain.Testing.InstalledApp<TApp>.Find(string! id) -> object!
 DigitalBrain.Testing.InstalledApp<TApp>.Main.get -> DigitalBrain.Testing.PresentedView!
-DigitalBrain.Testing.InstalledApp<TApp>.Manifest.get -> DigitalBrain.AppManifest!
+DigitalBrain.Testing.InstalledApp<TApp>.Definition.get -> DigitalBrain.AppDefinition!
 DigitalBrain.Testing.InstalledApp<TApp>.Operations.get -> System.Collections.Generic.IReadOnlyList<string!>!
 DigitalBrain.Testing.InstalledApp<TApp>.Presentation.get -> DigitalBrain.Testing.AppPresentation!
 DigitalBrain.Testing.InstalledApp<TApp>.PresentationError.get -> System.Exception?
@@ -462,7 +462,7 @@ static DigitalBrain.Testing.Conformance.Storage.StorageSubject.operator ==(Digit
 static DigitalBrain.Testing.NeuronHarness.Create<TNeuron>(DigitalBrain.NeuronId id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Testing.NeuronHarness<TNeuron!>!>!
 static DigitalBrain.Testing.SiloHost.Local(System.Action<DigitalBrain.InProcessHostOptions!>? configure = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Spi.IInProcessHost!>!
 static DigitalBrain.Testing.TestOS.Local(System.Action<DigitalBrain.Testing.TestOSOptions!>? configure = null) -> DigitalBrain.Testing.TestOS!
-static DigitalBrain.Testing.TestOS.ManifestOf(System.Type! appType) -> DigitalBrain.AppManifest!
+static DigitalBrain.Testing.TestOS.DefinitionOf(System.Type! appType) -> DigitalBrain.AppDefinition!
 static DigitalBrain.Testing.TestOSSecretsIdentityExtensions.WithIdentity(this DigitalBrain.Testing.TestOS! os, string! name) -> DigitalBrain.Testing.TestOS!
 static DigitalBrain.Testing.TestOSSecretsIdentityExtensions.WithIdentity(this DigitalBrain.Testing.TestOS! os, string! name, DigitalBrain.Capabilities.Identity.IIdentity! identity, DigitalBrain.Capabilities.Identity.IGrants! grants) -> DigitalBrain.Testing.TestOS!
 static DigitalBrain.Testing.TestOSSecretsIdentityExtensions.WithIdentity(this DigitalBrain.Testing.TestOS! os, string! name, System.Action<DigitalBrain.Testing.FakeIdentity!>! configure) -> DigitalBrain.Testing.TestOS!
@@ -539,17 +539,17 @@ DigitalBrain.Testing.AppBaselineException.AppBaselineException(string! message, 
 DigitalBrain.Testing.AppOperationCase
 DigitalBrain.Testing.AppOperationCase.AppOperationCase() -> void
 DigitalBrain.Testing.AppOperationCase.DisplayName.get -> string!
-DigitalBrain.Testing.AppOperationCase.Manifest.get -> DigitalBrain.AppManifest!
+DigitalBrain.Testing.AppOperationCase.Definition.get -> DigitalBrain.AppDefinition!
 DigitalBrain.Testing.AppOperationCase.Operation.get -> string!
 DigitalBrain.Testing.IInstalledApp
 DigitalBrain.Testing.IInstalledApp.Instance.get -> DigitalBrain.App!
-DigitalBrain.Testing.IInstalledApp.Manifest.get -> DigitalBrain.AppManifest!
+DigitalBrain.Testing.IInstalledApp.Definition.get -> DigitalBrain.AppDefinition!
 DigitalBrain.Testing.IInstalledApp.Operations.get -> System.Collections.Generic.IReadOnlyList<string!>!
 DigitalBrain.Testing.IInstalledApp.Presentation.get -> DigitalBrain.Testing.AppPresentation!
 DigitalBrain.Testing.IInstalledApp.PresentationError.get -> System.Exception?
 DigitalBrain.Testing.IInstalledApp.Request(string! operation, object? argument = null) -> System.Threading.Tasks.Task!
 override DigitalBrain.Testing.AppOperationCase.ToString() -> string!
-static DigitalBrain.Testing.AppBaseline.Cases(DigitalBrain.AppManifest! manifest, System.Collections.Generic.IEnumerable<string!>! operations, System.Func<DigitalBrain.Testing.TestOS!, System.Threading.Tasks.Task<DigitalBrain.Testing.IInstalledApp!>!>! install, System.Action<DigitalBrain.Testing.TestOS!>? fakes) -> System.Collections.Generic.IEnumerable<Xunit.TheoryDataRow<DigitalBrain.Testing.AppOperationCase!>!>!
+static DigitalBrain.Testing.AppBaseline.Cases(DigitalBrain.AppDefinition! definition, System.Collections.Generic.IEnumerable<string!>! operations, System.Func<DigitalBrain.Testing.TestOS!, System.Threading.Tasks.Task<DigitalBrain.Testing.IInstalledApp!>!>! install, System.Action<DigitalBrain.Testing.TestOS!>? fakes) -> System.Collections.Generic.IEnumerable<Xunit.TheoryDataRow<DigitalBrain.Testing.AppOperationCase!>!>!
 static DigitalBrain.Testing.AppBaseline.Cases(System.Type! appType) -> System.Collections.Generic.IEnumerable<Xunit.TheoryDataRow<DigitalBrain.Testing.AppOperationCase!>!>!
 static DigitalBrain.Testing.AppBaseline.Cases(System.Type! appType, System.Action<DigitalBrain.Testing.TestOS!>? fakes) -> System.Collections.Generic.IEnumerable<Xunit.TheoryDataRow<DigitalBrain.Testing.AppOperationCase!>!>!
 static DigitalBrain.Testing.AppBaseline.DefaultFakes.get -> System.Collections.Generic.IReadOnlyDictionary<DigitalBrain.Capabilities.CapabilityId, System.Action<DigitalBrain.Testing.TestOS!>!>!

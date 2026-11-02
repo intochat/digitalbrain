@@ -148,7 +148,7 @@ public sealed partial class InstalledApp<TApp>
         return side.Ids.Contains(id)
             ? side.Find(id)
             : throw new PresentationAssertionException(
-                $"App '{Manifest.Id}' presents no entry or field '{id}'. Main ids: {List(main.Ids)}. Side ids: {List(side.Ids)}.");
+                $"App '{Definition.Id}' presents no entry or field '{id}'. Main ids: {List(main.Ids)}. Side ids: {List(side.Ids)}.");
     }
 
     private object? Service(Type type) => type == typeof(IPresenter) ? new Presenter(this) : _os.Services.GetService(type);

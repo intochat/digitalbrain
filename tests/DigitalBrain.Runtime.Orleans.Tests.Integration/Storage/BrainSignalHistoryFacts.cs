@@ -3,6 +3,7 @@ using DigitalBrain.Runtime.Orleans.Testing;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
+using Orleans.Runtime;
 using Orleans.Storage;
 
 using OrleansSdk = Orleans;
@@ -97,12 +98,17 @@ public sealed class BrainSignalHistoryFacts
         {
             Assert.IsType<BrainGrainStorage>(host.Services.GetRequiredKeyedService<IGrainStorage>(IntoChatOSNames.ClusterGrainStorage));
             Assert.NotNull(host.Services.GetRequiredService<BrainSignalHistories>());
-            await host.Services.GetRequiredService<IGrainFactory>().GetGrain<ISynapseCursorRegistry>("b1").ReportCursor("s", BrainStore.P, 5);
+            var cluster = host.Services.GetRequiredKeyedService<IGrainStorage>(IntoChatOSNames.ClusterGrainStorage);
+            var grainState = new TestGrainState<SynapseState> { State = new SynapseState { Sources = [new SynapseSource { Source = BrainStore.P.ToString(), Cursor = 5 }] } };
+            await cluster.WriteStateAsync(SynapseState.Name, GrainId.Create("neuron.host", "b1/probe/s"), grainState);
         }
         await using (var host = await new LocalSiloHostFactory(registration).Start(new InProcessHostOptions { Home = home.Path }, ct))
         {
-            // The registry state was written into the b1 journal (JSON) and reads back after a restart.
-            Assert.Equal(5, await host.Services.GetRequiredService<IGrainFactory>().GetGrain<ISynapseCursorRegistry>("b1").LowestLive(BrainStore.P));
+            // The state was written into the b1 journal (JSON) and reads back after a restart.
+            var cluster = host.Services.GetRequiredKeyedService<IGrainStorage>(IntoChatOSNames.ClusterGrainStorage);
+            var grainState = new TestGrainState<SynapseState>();
+            await cluster.ReadStateAsync(SynapseState.Name, GrainId.Create("neuron.host", "b1/probe/s"), grainState);
+            Assert.Equal(5, grainState.State.Sources[0].Cursor);
             // The policy runs outside the log gate, so a checkpoint that asks the registry (stored in this same log) does not deadlock.
             var log = await host.Services.GetRequiredService<BrainLogs>().For("b1");
             await log.AppendEntry("x", "", null, BrainRecordChange.None, [], BrainStore.P.ToString(), [new Count(1)], ct);

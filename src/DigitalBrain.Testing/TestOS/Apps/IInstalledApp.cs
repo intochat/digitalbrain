@@ -6,8 +6,8 @@ namespace DigitalBrain.Testing;
 /// </summary>
 public interface IInstalledApp
 {
-    /// <summary>The manifest the app was installed with.</summary>
-    AppManifest Manifest { get; }
+    /// <summary>The definition the app was installed with.</summary>
+    AppDefinition Definition { get; }
 
     /// <summary>The operations the app offers.</summary>
     IReadOnlyList<string> Operations { get; }

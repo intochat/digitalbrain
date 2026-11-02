@@ -20,7 +20,7 @@ public sealed partial class AppDefinition
         }
         var arguments = constructor.GetParameters().Select(parameter => services(parameter.ParameterType)
             ?? (parameter.HasDefaultValue ? parameter.DefaultValue
-                : throw new InvalidOperationException($"App '{Manifest.Id}' needs a {parameter.ParameterType.Name} that the services do not provide."))).ToArray();
+                : throw new InvalidOperationException($"App '{Id}' needs a {parameter.ParameterType.Name} that the services do not provide."))).ToArray();
         try { return (App)constructor.Invoke(arguments); }
         catch (System.Reflection.TargetInvocationException error) when (error.InnerException is not null)
         {
@@ -35,7 +35,7 @@ public sealed partial class AppDefinition
         ArgumentNullException.ThrowIfNull(instance);
         if (!AppType.IsInstanceOfType(instance)) { throw new ArgumentException($"Instance must be a {AppType.FullName}.", nameof(instance)); }
         var method = FindOperation(operation) ?? throw new ArgumentException(
-            $"App '{Manifest.Id}' has no operation '{operation}'. Operations: {string.Join(", ", Operations.Values.Select(m => m.Name).Order(StringComparer.Ordinal))}.", nameof(operation));
+            $"App '{Id}' has no operation '{operation}'. Operations: {string.Join(", ", Operations.Values.Select(m => m.Name).Order(StringComparer.Ordinal))}.", nameof(operation));
         var arguments = method.GetParameters().Select(parameter => parameter.ParameterType == typeof(CancellationToken)
             ? (object)ct : ConvertInput(argument, parameter.ParameterType, json ?? _json)).ToArray();
         object? result;

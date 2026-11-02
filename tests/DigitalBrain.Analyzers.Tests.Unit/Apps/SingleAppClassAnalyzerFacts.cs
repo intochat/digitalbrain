@@ -51,4 +51,32 @@ public sealed class SingleAppClassAnalyzerFacts
         test.TestState.AnalyzerConfigFiles.Add(("/.editorconfig", "is_global = true\nbuild_property.IsTestProject = true\n"));
         return test.RunAsync(TestContext.Current.CancellationToken);
     }
+
+    [Fact]
+    public Task Multiple_app_classes_in_module_assembly_are_excluded() => Verify<SingleAppClassAnalyzer>.Diagnostics("""
+        using DigitalBrain;
+        [Module("test")]
+        public sealed class TestModule : Module { public static ModuleManifest Manifest { get; } }
+
+        [App("app1")]
+        public sealed class App1 : App { }
+
+        [App("app2")]
+        public sealed class App2 : App { }
+        """);
+
+    [Fact]
+    public Task Multiple_app_classes_with_digitalbrain_app_false_are_excluded()
+    {
+        var test = Verify<SingleAppClassAnalyzer>.Create("""
+            using DigitalBrain;
+            [App("app1")]
+            public sealed class App1 : App { }
+
+            [App("app2")]
+            public sealed class App2 : App { }
+            """);
+        test.TestState.AnalyzerConfigFiles.Add(("/.editorconfig", "is_global = true\nbuild_property.DigitalBrainApp = false\n"));
+        return test.RunAsync(TestContext.Current.CancellationToken);
+    }
 }

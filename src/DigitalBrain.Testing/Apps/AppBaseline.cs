@@ -55,13 +55,13 @@ public static class AppBaseline
         {
             throw new ArgumentException($"{appType.FullName} is not a concrete App class.", nameof(appType));
         }
-        var manifest = TestOS.ManifestOf(appType);
+        var definition = TestOS.DefinitionOf(appType);
         var operations = appType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
             .Where(method => method.GetCustomAttribute<OnAttribute>(inherit: false) is { Source: null or "" })
             .Select(method => method.Name)
             .ToList();
         var install = typeof(TestOS).GetMethod(nameof(TestOS.Install))!.MakeGenericMethod(appType);
-        return Cases(manifest, operations, async os =>
+        return Cases(definition, operations, async os =>
         {
             var task = (Task)install.Invoke(os, null)!;
             await task.ConfigureAwait(false);
@@ -75,20 +75,20 @@ public static class AppBaseline
     /// </summary>
     /// <exception cref="InvalidOperationException"><paramref name="operations"/> is empty.</exception>
     public static IEnumerable<TheoryDataRow<AppOperationCase>> Cases(
-        AppManifest manifest, IEnumerable<string> operations, Func<TestOS, Task<IInstalledApp>> install, Action<TestOS>? fakes)
+        AppDefinition definition, IEnumerable<string> operations, Func<TestOS, Task<IInstalledApp>> install, Action<TestOS>? fakes)
     {
-        ArgumentNullException.ThrowIfNull(manifest);
+        ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(operations);
         ArgumentNullException.ThrowIfNull(install);
         var names = operations.Select(SpecComment.NormalizeOperation).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
         if (names.Count == 0)
         {
-            throw new InvalidOperationException($"App '{manifest.Id}' has no operation: an app has at least one [On] method.");
+            throw new InvalidOperationException($"App '{definition.Id}' has no operation: an app has at least one [On] method.");
         }
         var opens = names.Contains("open", StringComparer.Ordinal);
         return [.. names.Select(name =>
         {
-            var row = new AppOperationCase(manifest, name, install, fakes, opens && name != "open");
+            var row = new AppOperationCase(definition, name, install, fakes, opens && name != "open");
             return new TheoryDataRow<AppOperationCase>(row) { TestDisplayName = row.DisplayName };
         })];
     }
@@ -105,7 +105,7 @@ public static class AppBaseline
         var name = operation.DisplayName;
         await using var os = TestOS.Local();
         operation.Fakes?.Invoke(os);
-        foreach (var capability in operation.Manifest.Requires.Capabilities)
+        foreach (var capability in operation.Definition.Requires.Capabilities)
         {
             if (os.Capabilities.IsBound(capability)) { continue; }
             if (!DefaultFakes.TryGetValue(capability, out var bind))

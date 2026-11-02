@@ -94,12 +94,11 @@ public sealed class SampleApp(IStorageLike storage, ICapabilityBroker broker) : 
     }
 }
 
-// Declares its manifest: requires a capability the facts never bind.
+// Requires a capability the facts never bind.
 [App("needs-clock")]
-public sealed class NeedsClockApp : App
+public sealed class NeedsClockApp(IClockLike clock) : App
 {
-    public static AppManifest Manifest { get; } = new("needs-clock", "Needs clock", "1.0.0", [], new AppRequirements([CapabilityId.Parse("clock-like@1")]));
-
+    public IClockLike Clock { get; } = clock;
     public int Opened { get; private set; }
 
     [On]

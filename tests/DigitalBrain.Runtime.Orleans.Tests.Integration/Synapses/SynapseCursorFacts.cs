@@ -55,7 +55,7 @@ public sealed class SynapseCursorFacts(SynapseSilo silo) : IClassFixture<Synapse
     }
 
     [Fact]
-    public async Task The_cursor_is_persisted_in_the_subscriber_state_and_reported_to_the_cursor_registry()
+    public async Task The_cursor_is_persisted_in_the_subscriber_state()
     {
         var ct = TestContext.Current.CancellationToken;
         const string Listener = "b1/probe.listener/persist", Source = "b1/probe.counter/persist";
@@ -72,10 +72,6 @@ public sealed class SynapseCursorFacts(SynapseSilo silo) : IClassFixture<Synapse
         Assert.Equal(Source, entry.Source);
         Assert.Equal(["probe.counted"], entry.Aliases);
         Assert.Equal(2, entry.Cursor);
-
-        var registry = silo.Services.GetRequiredService<IGrainFactory>().GetGrain<ISynapseCursorRegistry>("b1");
-        Assert.DoesNotContain(Listener, await registry.Behind(NeuronId.Parse(Source), 2));
-        Assert.Contains(Listener, await registry.Behind(NeuronId.Parse(Source), 3));
     }
 
     [Fact]

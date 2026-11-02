@@ -12,34 +12,32 @@ public sealed partial class TestOS
     /// neurons, builds the app from <see cref="Services"/> and returns a handle to request its operations and read its presentation.
     /// </summary>
     /// <remarks>
-    /// The manifest is the app's public static <see cref="AppManifest"/> <c>Manifest</c> property when it has one. Otherwise it is read from the class:
-    /// the id from <c>[App]</c>, the requirements from the <c>[Capability]</c> contracts its constructor takes, and the neurons from the
-    /// <c>[Neuron]</c> classes in the app's namespace.
+    /// The definition is read from the class: the id from <c>[App]</c>, the requirements from the <c>[Capability]</c> contracts its constructor takes,
+    /// and the neurons from the <c>[Neuron]</c> classes in the app's namespace.
     /// </remarks>
     /// <exception cref="CapabilityNotBoundException">A required capability has no bound fake; nothing was registered or built.</exception>
     /// <exception cref="InvalidOperationException">The class has no <c>[App]</c> attribute, or it is already installed.</exception>
     public async Task<InstalledApp<TApp>> Install<TApp>() where TApp : App
     {
         var definition = new AppDefinition(typeof(TApp));
-        var manifest = definition.Manifest;
-        foreach (var capability in manifest.Requires.Capabilities)
+        foreach (var capability in definition.Requires.Capabilities)
         {
             if (!Capabilities.IsBound(capability))
             {
-                throw new CapabilityNotBoundException(capability, null, $"App '{manifest.Id}'");
+                throw new CapabilityNotBoundException(capability, null, $"App '{definition.Id}'");
             }
         }
-        if (!_apps.TryAdd(manifest.Id, typeof(TApp)))
+        if (!_apps.TryAdd(definition.Id, typeof(TApp)))
         {
-            throw new InvalidOperationException($"App '{manifest.Id}' is already installed in this TestOS.");
+            throw new InvalidOperationException($"App '{definition.Id}' is already installed in this TestOS.");
         }
-        foreach (var neuron in manifest.Neurons) { Register(neuron); }
+        foreach (var neuron in definition.Neurons) { Register(neuron); }
         var app = new InstalledApp<TApp>(this, definition);
         await app.Start().ConfigureAwait(false);
         return app;
     }
 
-    /// <summary>The manifest <see cref="Install{TApp}"/> uses for <paramref name="appType"/>.</summary>
+    /// <summary>The definition <see cref="Install{TApp}"/> uses for <paramref name="appType"/>.</summary>
     /// <exception cref="InvalidOperationException">The class has no <c>[App]</c> attribute.</exception>
-    public static AppManifest ManifestOf(Type appType) => new AppDefinition(appType).Manifest;
+    public static AppDefinition DefinitionOf(Type appType) => new(appType);
 }
