@@ -8,7 +8,7 @@ public class SessionSilo : SynapseSilo
 {
     protected override IReadOnlyDictionary<string, string?> Configuration { get; } = new Dictionary<string, string?>
     {
-        [IntoChatOSNames.Signalling.Section + ":SessionSweepEvery"] = "00:00:00.200",
+        [RuntimeOptions.IntoChatCompatible.SignallingSection + ":SessionSweepEvery"] = "00:00:00.200",
     };
 }
 

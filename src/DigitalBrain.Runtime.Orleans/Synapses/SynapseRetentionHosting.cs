@@ -11,16 +11,16 @@ public static class SynapseRetentionHosting
     public static ISiloBuilder AddSynapseRetention(this ISiloBuilder silo)
     {
         ArgumentNullException.ThrowIfNull(silo);
-        AddRetentionOptions(silo.Services);
+        AddRetentionOptions(silo.Services, RuntimeOptions.From(silo.Services));
         silo.Services.TryAddSingleton(TimeProvider.System);
         silo.Services.AddSingleton<ISynapseCursorLookup, NullSynapseCursorLookup>();
         silo.Services.AddSingleton<IRetentionPolicy, RetentionPolicy>();
         return silo;
     }
 
-    internal static IServiceCollection AddRetentionOptions(IServiceCollection services)
+    internal static IServiceCollection AddRetentionOptions(IServiceCollection services, RuntimeOptions options)
     {
-        services.AddOptions<RetentionOptions>().BindConfiguration(IntoChatOSNames.Signalling.Retention);
+        services.AddOptions<RetentionOptions>().BindConfiguration(options.RetentionSection);
         return services;
     }
 }

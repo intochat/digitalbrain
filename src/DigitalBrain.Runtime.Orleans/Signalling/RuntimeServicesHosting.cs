@@ -14,7 +14,7 @@ internal static class RuntimeServicesHosting
     internal static ISiloBuilder AddRuntimeServices(this ISiloBuilder silo)
     {
         silo.AddNeuronHosting(typeof(RuntimeServicesHosting).Assembly);
-        silo.Services.AddOptions<SessionSynapseOptions>().BindConfiguration(IntoChatOSNames.Signalling.Section);
+        silo.Services.AddOptions<SessionSynapseOptions>().BindConfiguration(RuntimeOptions.From(silo.Services).SignallingSection);
         silo.Services.TryAddSingleton(TimeProvider.System);
         silo.Services.AddSingleton<RuntimeClock>();
         silo.Services.AddSingleton<BrainListeners>();

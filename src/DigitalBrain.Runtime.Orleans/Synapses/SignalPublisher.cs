@@ -33,7 +33,7 @@ internal sealed partial class SignalPublisher(IServiceProvider services, Publish
 {
     private readonly ILogger _log = logger ?? (ILogger)NullLogger.Instance;
 
-    private IStreamProvider Streams => services.GetRequiredKeyedService<IStreamProvider>(IntoChatOSNames.SignalStreams);
+    private IStreamProvider Streams => services.GetRequiredKeyedService<IStreamProvider>(RuntimeOptions.From(services).SignalStreams);
 
     /// <summary>
     /// Announces a completed append. The append is already durable, so a failed send (a stopping silo, an unreachable queue) does

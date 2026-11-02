@@ -1,6 +1,6 @@
 namespace DigitalBrain.Runtime.Orleans.Synapses;
 
-/// <summary>Retention of signal history, bound from <c>IntoChatOS:Signalling:Retention</c> (04 D-11).</summary>
+/// <summary>Retention of signal history, bound from <see cref="RuntimeOptions.RetentionSection"/> (04 D-11).</summary>
 public sealed class RetentionOptions
 {
     /// <summary>History younger than this is kept. Default 7 days.</summary>

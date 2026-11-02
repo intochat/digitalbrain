@@ -7,7 +7,7 @@ using Azure.Storage.Queues;
 namespace DigitalBrain.Runtime.Orleans.Azure;
 
 /// <summary>
-/// The one storage account behind <c>IntoChatOS:Cloud:Storage</c> (P2-D-22): an https account endpoint (managed identity
+/// The one storage account behind <see cref="RuntimeOptions.CloudStorageKey"/> (P2-D-22): an https account endpoint (managed identity
 /// through <see cref="DefaultAzureCredential"/>, honouring <c>AZURE_CLIENT_ID</c>) or a connection string (Azurite, CI).
 /// Tables, blobs and queues are all derived from it. The value is never formatted into messages.
 /// </summary>
@@ -31,13 +31,17 @@ public sealed class CloudStorageAccount
     /// <summary>True when the account authenticates with the deployment identity (an account URI).</summary>
     public bool UsesIdentity => _connectionString is null;
 
-    /// <summary>Parses the configured value; null with an issue naming <c>IntoChatOS:Cloud:Storage</c> otherwise.</summary>
-    public static CloudStorageAccount? TryParse(string? value, out TopologyIssue? issue)
+    /// <summary>Parses the configured value; null with an issue naming the cloud storage key otherwise.</summary>
+    /// <param name="value">The configured value.</param>
+    /// <param name="issue">The issue when the value is invalid.</param>
+    /// <param name="options">Names the cloud storage key; null means <see cref="RuntimeOptions.IntoChatCompatible"/>.</param>
+    public static CloudStorageAccount? TryParse(string? value, out TopologyIssue? issue, RuntimeOptions? options = null)
     {
+        var key = (options ?? RuntimeOptions.IntoChatCompatible).CloudStorageKey;
         issue = null;
         if (string.IsNullOrWhiteSpace(value))
         {
-            issue = new TopologyIssue(IntoChatOSNames.CloudStorageKey, "is required on Topology=cloud (a storage account URI or connection string).");
+            issue = new TopologyIssue(key, "is required on Topology=cloud (a storage account URI or connection string).");
             return null;
         }
         var trimmed = value.Trim();
@@ -49,7 +53,7 @@ public sealed class CloudStorageAccount
             {
                 return new CloudStorageAccount(parts[0], parts[2]);
             }
-            issue = new TopologyIssue(IntoChatOSNames.CloudStorageKey, "must be an https storage account endpoint (https://<account>.blob.<suffix>) or a connection string.");
+            issue = new TopologyIssue(key, "must be an https storage account endpoint (https://<account>.blob.<suffix>) or a connection string.");
             return null;
         }
         try
@@ -62,15 +66,15 @@ public sealed class CloudStorageAccount
         }
         catch (Exception error) when (error is FormatException or ArgumentException or InvalidOperationException)
         {
-            issue = new TopologyIssue(IntoChatOSNames.CloudStorageKey, "is neither a storage account URI nor a valid connection string.");
+            issue = new TopologyIssue(key, "is neither a storage account URI nor a valid connection string.");
             return null;
         }
     }
 
     /// <summary>Parses the configured value.</summary>
     /// <exception cref="InvalidOperationException">The value is missing or invalid; names the key only.</exception>
-    public static CloudStorageAccount Parse(string? value)
-        => TryParse(value, out var issue) ?? throw new InvalidOperationException($"{issue!.Key}: {issue.Message}");
+    public static CloudStorageAccount Parse(string? value, RuntimeOptions? options = null)
+        => TryParse(value, out var issue, options) ?? throw new InvalidOperationException($"{issue!.Key}: {issue.Message}");
 
     /// <summary>The blob endpoint.</summary>
     public BlobServiceClient Blobs() => _connectionString is { } cs ? new BlobServiceClient(cs) : new BlobServiceClient(Endpoint("blob"), _credential!.Value);

@@ -21,7 +21,7 @@ public sealed class ProbeState
     public int Value { get; set; }
 }
 
-public sealed class ProbeGrain([PersistentState("probe", IntoChatOSNames.PlatformGrainStorage)] IPersistentState<ProbeState> state) : Grain, IProbeGrain
+public sealed class ProbeGrain([PersistentState("probe", "platform")] IPersistentState<ProbeState> state) : Grain, IProbeGrain
 {
     public async Task Set(int value)
     {
@@ -52,7 +52,7 @@ public sealed class FakeClusterStore : IClusterStoreRegistration, IGrainStorage
     public void Register(ISiloBuilder silo)
     {
         Registered++;
-        silo.Services.AddKeyedSingleton<IGrainStorage>(IntoChatOSNames.ClusterGrainStorage, this);
+        silo.Services.AddKeyedSingleton<IGrainStorage>(RuntimeOptions.IntoChatCompatible.ClusterGrainStorage, this);
     }
 
     public Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState) => Task.CompletedTask;

@@ -166,14 +166,14 @@ public sealed record Bindings(
     /// True when <paramref name="need"/> is bound. A <c>State("cluster")</c> need is bound only when
     /// <see cref="ClusterStore"/> is <see cref="ClusterStoreBinding.HostBound"/> and the host registered the store.
     /// </summary>
-    public bool Binds(Need need, bool clusterStoreRegistered)
+    public bool Binds(Need need, bool clusterStoreRegistered, RuntimeOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(need);
-        return IsClusterStore(need)
+        return IsClusterStore(need, options ?? RuntimeOptions.IntoChatCompatible)
             ? ClusterStore == ClusterStoreBinding.HostBound && clusterStoreRegistered
             : Binds(need.Kind);
     }
 
-    internal static bool IsClusterStore(Need need)
-        => need.Kind == NeedKind.State && need.Name == IntoChatOSNames.ClusterGrainStorage;
+    internal static bool IsClusterStore(Need need, RuntimeOptions options)
+        => need.Kind == NeedKind.State && need.Name == options.ClusterGrainStorage;
 }

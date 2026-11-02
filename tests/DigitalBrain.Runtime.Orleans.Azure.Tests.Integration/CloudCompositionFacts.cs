@@ -64,9 +64,9 @@ public sealed class CloudCompositionFacts(AzuriteFixture azurite)
         using (var host = CloudHosts.Build(storage, home.Path, fake, clusterId, typeof(DriveModule)))
         {
             var services = host.Services;
-            Assert.Same(fake, services.GetRequiredKeyedService<IGrainStorage>(IntoChatOSNames.ClusterGrainStorage));
-            Assert.IsType<AzureBlobGrainStorage>(services.GetRequiredKeyedService<IGrainStorage>(IntoChatOSNames.PlatformGrainStorage));
-            Assert.Equal(CloudHosts.MasterKey, services.GetRequiredService<IConfiguration>()[IntoChatOSNames.MasterKeyKey]);
+            Assert.Same(fake, services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.IntoChatCompatible.ClusterGrainStorage));
+            Assert.IsType<AzureBlobGrainStorage>(services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.IntoChatCompatible.PlatformGrainStorage));
+            Assert.Equal(CloudHosts.MasterKey, services.GetRequiredService<IConfiguration>()[RuntimeOptions.IntoChatCompatible.MasterKeyKey]);
 
             await host.StartAsync(ct);
             await services.GetRequiredService<IGrainFactory>().GetGrain<ICloudProbeGrain>("p1").Set(42);
@@ -81,15 +81,15 @@ public sealed class CloudCompositionFacts(AzuriteFixture azurite)
             Assert.Contains(rows, row => row.GetString("Status") == "Active");
 
             // Queue streams: the signals provider writes to signals-0.
-            var stream = services.GetRequiredKeyedService<IStreamProvider>(IntoChatOSNames.SignalStreams)
-                .GetStream<int>(StreamId.Create(IntoChatOSNames.SignalStreams, "probe"));
+            var stream = services.GetRequiredKeyedService<IStreamProvider>(RuntimeOptions.IntoChatCompatible.SignalStreams)
+                .GetStream<int>(StreamId.Create(RuntimeOptions.IntoChatCompatible.SignalStreams, "probe"));
             await stream.OnNextAsync(1);
             Assert.True((await new QueueServiceClient(storage).GetQueueClient("signals-0").ExistsAsync(ct)).Value);
 
             await host.StopAsync(ct);
         }
 
-        var blobs = new BlobServiceClient(storage).GetBlobContainerClient(IntoChatOSNames.GrainStateContainer);
+        var blobs = new BlobServiceClient(storage).GetBlobContainerClient(RuntimeOptions.IntoChatCompatible.GrainStateContainer);
         Assert.True((await blobs.ExistsAsync(ct)).Value);
 
         using (var host = CloudHosts.Build(storage, home.Path, fake, clusterId, typeof(DriveModule)))

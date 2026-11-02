@@ -4,6 +4,7 @@ using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Signalling;
 using DigitalBrain.Runtime.Orleans.Synapses;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -18,10 +19,19 @@ public static class RuntimeSiloBuilderExtensions
 {
     /// <summary>
     /// Hosts the plain <c>[Neuron]</c> classes of <paramref name="modules"/> on the host grains, with their JSON journal payloads,
-    /// signal publishing and synapse retention. Relies on the topology's <see cref="IntoChatOSNames.SignalStreams"/> binding.
+    /// signal publishing and synapse retention. Relies on the topology's <see cref="RuntimeOptions.SignalStreams"/> binding.
     /// </summary>
     /// <exception cref="InvalidOperationException">The runtime was already added to this silo.</exception>
     public static ISiloBuilder AddDigitalBrainRuntime(this ISiloBuilder silo, params Assembly[] modules)
+        => silo.AddDigitalBrainRuntime(null, modules);
+
+    /// <summary>
+    /// <see cref="AddDigitalBrainRuntime(ISiloBuilder, Assembly[])"/> with the key and store names the host chose. A null
+    /// <paramref name="options"/> keeps the options the host registered with <see cref="TopologyHosting.UseRuntimeOptions"/>, or
+    /// <see cref="RuntimeOptions.IntoChatCompatible"/> when it registered none.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The runtime was already added to this silo.</exception>
+    public static ISiloBuilder AddDigitalBrainRuntime(this ISiloBuilder silo, RuntimeOptions? options, params Assembly[] modules)
     {
         ArgumentNullException.ThrowIfNull(silo);
         ArgumentNullException.ThrowIfNull(modules);
@@ -30,6 +40,12 @@ public static class RuntimeSiloBuilderExtensions
             throw new InvalidOperationException("AddDigitalBrainRuntime was already called on this silo; ConfigureTopologySilo calls it once.");
         }
         silo.Services.AddSingleton(new RuntimeAdded());
+        if (options is not null)
+        {
+            silo.Services.RemoveAll<RuntimeOptions>();
+            silo.Services.AddSingleton(options);
+        }
+        else { silo.Services.TryAddSingleton(RuntimeOptions.IntoChatCompatible); }
         silo.AddNeuronHosting(modules);
         silo.Services.AddJournalPayloads(modules);
         silo.Services.AddSignalPublisher();

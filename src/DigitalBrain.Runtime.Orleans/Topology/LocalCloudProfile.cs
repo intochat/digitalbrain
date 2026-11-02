@@ -6,7 +6,7 @@ using Orleans.Hosting;
 namespace DigitalBrain.Runtime.Orleans;
 
 /// <summary>
-/// Local plus a connection to a cloud server: the local bindings, an absolute https <c>IntoChatOS:Cloud:ServerAddress</c>,
+/// Local plus a connection to a cloud server: the local bindings, an absolute https cloud server address (<see cref="RuntimeOptions.CloudServerAddressKey"/>),
 /// and a loaded module that provides <c>circle@1</c> (the circle module itself arrives in Phase 10).
 /// </summary>
 public sealed class LocalCloudProfile : ITopologyProfile
@@ -14,7 +14,16 @@ public sealed class LocalCloudProfile : ITopologyProfile
     /// <summary>The capability a local+cloud host needs a module to provide.</summary>
     public static CapabilityId Circle { get; } = new("circle", 1);
 
-    private readonly LocalProfile _local = new();
+    private readonly RuntimeOptions _options;
+    private readonly LocalProfile _local;
+
+    /// <summary>Creates the local+cloud topology.</summary>
+    /// <param name="options">The runtime's key and store names; null means <see cref="RuntimeOptions.IntoChatCompatible"/>.</param>
+    public LocalCloudProfile(RuntimeOptions? options = null)
+    {
+        _options = options ?? RuntimeOptions.IntoChatCompatible;
+        _local = new LocalProfile(_options);
+    }
 
     /// <inheritdoc />
     public Topology Topology => Topology.LocalCloud;
@@ -35,10 +44,10 @@ public sealed class LocalCloudProfile : ITopologyProfile
         ArgumentNullException.ThrowIfNull(modules);
         foreach (var issue in _local.Validate(configuration, modules)) { yield return issue; }
 
-        var address = configuration[IntoChatOSNames.CloudServerAddressKey];
+        var address = configuration[_options.CloudServerAddressKey];
         if (!Uri.TryCreate(address, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
         {
-            yield return new TopologyIssue(IntoChatOSNames.CloudServerAddressKey, "Topology=local+cloud requires an absolute https server address.");
+            yield return new TopologyIssue(_options.CloudServerAddressKey, "Topology=local+cloud requires an absolute https server address.");
         }
         if (!modules.Any(module => module.Provides.Contains(Circle)))
         {

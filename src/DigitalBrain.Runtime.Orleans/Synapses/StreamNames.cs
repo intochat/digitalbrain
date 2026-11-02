@@ -5,7 +5,7 @@ namespace DigitalBrain.Runtime.Orleans.Synapses;
 
 /// <summary>
 /// Stream identity (04 D-06, D-12; RT-06): one stream per (brain, signal namespace) on the
-/// <see cref="IntoChatOSNames.SignalStreams"/> binding. Namespace <c>brain.signals.&lt;signal namespace&gt;</c>, key = brain key.
+/// <see cref="RuntimeOptions.SignalStreams"/> binding. Namespace <c>brain.signals.&lt;signal namespace&gt;</c>, key = brain key.
 /// Stream ids are persisted (PubSubStore, queues); they are pinned in ContractManifest.json.
 /// </summary>
 internal static class StreamNames

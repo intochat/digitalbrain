@@ -66,7 +66,7 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
     /// <summary>The sources and cursors this subscriber holds.</summary>
     internal IReadOnlyList<SynapseSource> Sources => _state.Sources;
 
-    private IGrainStorage? Store => _services.GetKeyedService<IGrainStorage>(IntoChatOSNames.ClusterGrainStorage) is { } store and not UnregisteredClusterStorage ? store : null;
+    private IGrainStorage? Store => _services.GetKeyedService<IGrainStorage>(RuntimeOptions.From(_services).ClusterGrainStorage) is { } store and not UnregisteredClusterStorage ? store : null;
 
     private bool Stateless => _registration.Policy == HostPolicy.Stateless;
 
@@ -369,18 +369,18 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
     private async Task Subscribe(StreamId stream)
     {
         var manager = Manager(_services);
-        var existing = await manager.GetSubscriptions(IntoChatOSNames.SignalStreams, stream).ConfigureAwait(true);
+        var existing = await manager.GetSubscriptions(RuntimeOptions.From(_services).SignalStreams, stream).ConfigureAwait(true);
         if (existing.Any(subscription => subscription.GrainId == _grainId)) { return; }
         var self = (GrainReference)(object)_grains.GetGrain<ISynapseHost>(_grainId);
-        _ = await manager.AddSubscription(IntoChatOSNames.SignalStreams, stream, self).ConfigureAwait(true);
+        _ = await manager.AddSubscription(RuntimeOptions.From(_services).SignalStreams, stream, self).ConfigureAwait(true);
     }
 
     private async Task Unsubscribe(StreamId stream)
     {
         var manager = Manager(_services);
-        foreach (var subscription in (await manager.GetSubscriptions(IntoChatOSNames.SignalStreams, stream).ConfigureAwait(true)).Where(s => s.GrainId == _grainId))
+        foreach (var subscription in (await manager.GetSubscriptions(RuntimeOptions.From(_services).SignalStreams, stream).ConfigureAwait(true)).Where(s => s.GrainId == _grainId))
         {
-            await manager.RemoveSubscription(IntoChatOSNames.SignalStreams, stream, subscription.SubscriptionId).ConfigureAwait(true);
+            await manager.RemoveSubscription(RuntimeOptions.From(_services).SignalStreams, stream, subscription.SubscriptionId).ConfigureAwait(true);
         }
     }
 

@@ -43,10 +43,10 @@ public sealed class CloudStorageAccountFacts
         Assert.Null(CloudStorageAccount.TryParse(value, out var issue));
 
         Assert.NotNull(issue);
-        Assert.Equal(IntoChatOSNames.CloudStorageKey, issue.Key);
+        Assert.Equal(RuntimeOptions.IntoChatCompatible.CloudStorageKey, issue.Key);
         Assert.DoesNotContain("c2VjcmV0", issue.Message, StringComparison.Ordinal);
         var error = Assert.Throws<InvalidOperationException>(() => CloudStorageAccount.Parse(value));
-        Assert.Contains(IntoChatOSNames.CloudStorageKey, error.Message, StringComparison.Ordinal);
+        Assert.Contains(RuntimeOptions.IntoChatCompatible.CloudStorageKey, error.Message, StringComparison.Ordinal);
         Assert.DoesNotContain("c2VjcmV0", error.Message, StringComparison.Ordinal);
     }
 

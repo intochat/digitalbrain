@@ -16,6 +16,7 @@ public sealed class LocalSiloHostFactory : IInProcessHostFactory
 {
     private readonly IClusterStoreRegistration _clusterStore;
     private readonly Action<IServiceCollection>? _configureServices;
+    private readonly RuntimeOptions _options;
 
     /// <summary>A factory whose hosts leave the <c>cluster</c> store unregistered.</summary>
     public LocalSiloHostFactory() : this(null) { }
@@ -28,9 +29,17 @@ public sealed class LocalSiloHostFactory : IInProcessHostFactory
     /// services after every topology and runtime registration, so a fact can replace services such as <see cref="TimeProvider"/>.
     /// </summary>
     public LocalSiloHostFactory(IClusterStoreRegistration? clusterStore, Action<IServiceCollection>? configureServices)
+        : this(clusterStore, configureServices, null) { }
+
+    /// <summary>
+    /// <see cref="LocalSiloHostFactory(IClusterStoreRegistration?, Action{IServiceCollection}?)"/> with the key and store names of
+    /// <paramref name="options"/>; null means <see cref="RuntimeOptions.IntoChatCompatible"/>.
+    /// </summary>
+    public LocalSiloHostFactory(IClusterStoreRegistration? clusterStore, Action<IServiceCollection>? configureServices, RuntimeOptions? options)
     {
         _clusterStore = clusterStore ?? new Unregistered();
         _configureServices = configureServices;
+        _options = options ?? RuntimeOptions.IntoChatCompatible;
     }
 
     /// <inheritdoc />
@@ -54,13 +63,14 @@ public sealed class LocalSiloHostFactory : IInProcessHostFactory
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
         var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
         {
-            [IntoChatOSNames.TopologyKey] = Topology.Local.ToConfigValue(),
-            [IntoChatOSNames.HomeKey] = home,
+            [_options.TopologyKey] = Topology.Local.ToConfigValue(),
+            [_options.HomeKey] = home,
             [TopologyContext.SiloPortKey] = FreePort().ToString(System.Globalization.CultureInfo.InvariantCulture),
             [TopologyContext.GatewayPortKey] = FreePort().ToString(System.Globalization.CultureInfo.InvariantCulture),
         };
         foreach (var (key, value) in options.Configuration) { values[key] = value; }
         builder.Configuration.AddInMemoryCollection(values);
+        builder.UseRuntimeOptions(_options);
         builder.UseClusterStore(_clusterStore);
         builder.UseModuleTopology(options.Modules, []);
         builder.UseOrleans(silo =>

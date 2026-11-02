@@ -1,6 +1,6 @@
 namespace DigitalBrain.Runtime.Orleans.Signalling;
 
-/// <summary>Session and listener lifetimes and caps, bound from <c>IntoChatOS:Signalling</c> (04 D-13, R4-03).</summary>
+/// <summary>Session and listener lifetimes and caps, bound from <see cref="RuntimeOptions.SignallingSection"/> (04 D-13, R4-03).</summary>
 public sealed class SessionSynapseOptions
 {
     /// <summary>A session with no ack for this long removes its synapses and cursors and ends; a listener neuron with no handler for this long does the same. Default 10 minutes.</summary>

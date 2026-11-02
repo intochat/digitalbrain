@@ -12,7 +12,7 @@ namespace DigitalBrain.Runtime.Orleans.Azure;
 /// <summary>
 /// Hosted in the cloud (P2-D-12 revised, P2-D-22): Azure Table clustering and reminders, Azure Blob grain storage for
 /// <c>platform</c>, <c>PubSubStore</c> and every module grain store, Azure Queue streams for <c>signals</c>, Key Vault secrets as
-/// configuration, and blob-lease brain ownership. One account (<c>IntoChatOS:Cloud:Storage</c>) carries tables, blobs and queues.
+/// configuration, and blob-lease brain ownership. One account (<see cref="RuntimeOptions.CloudStorageKey"/>) carries tables, blobs and queues.
 /// The <c>cluster</c> store is host-bound (BrainLog); until the host registers it, it is <see cref="UnregisteredClusterStorage"/>.
 /// </summary>
 public sealed class CloudProfile : ITopologyProfile
@@ -20,22 +20,29 @@ public sealed class CloudProfile : ITopologyProfile
     /// <summary>The blob container holding one lease blob per brain; provisioned with the environment.</summary>
     public const string LeaseContainer = "brain-leases";
 
-    private static readonly HashSet<string> Reserved = new(StringComparer.OrdinalIgnoreCase)
-    {
-        IntoChatOSNames.PlatformGrainStorage,
-        IntoChatOSNames.PubSubStore,
-    };
-
+    private readonly HashSet<string> _reserved;
+    private readonly RuntimeOptions _options;
     private readonly Action<IConfigurationBuilder, Uri>? _keyVaultSource;
 
-    /// <summary>The production topology: Key Vault through <c>DefaultAzureCredential</c>.</summary>
-    public CloudProfile() : this(null) { }
+    /// <summary>The production topology: Key Vault through <c>DefaultAzureCredential</c>, <see cref="RuntimeOptions.IntoChatCompatible"/> names.</summary>
+    public CloudProfile() : this(RuntimeOptions.IntoChatCompatible, null) { }
 
     /// <summary>
     /// A cloud topology whose Key Vault source is replaced (tests on Azurite only; production code never passes one).
     /// Null keeps the production source.
     /// </summary>
-    public CloudProfile(Action<IConfigurationBuilder, Uri>? keyVaultSource) => _keyVaultSource = keyVaultSource;
+    public CloudProfile(Action<IConfigurationBuilder, Uri>? keyVaultSource) : this(RuntimeOptions.IntoChatCompatible, keyVaultSource) { }
+
+    /// <summary>A cloud topology with the key and store names the host chose.</summary>
+    /// <param name="options">The runtime's key and store names.</param>
+    /// <param name="keyVaultSource">Replaces the production Key Vault source (tests on Azurite only); null keeps it.</param>
+    public CloudProfile(RuntimeOptions options, Action<IConfigurationBuilder, Uri>? keyVaultSource)
+    {
+        _options = options ?? throw new ArgumentNullException(nameof(options));
+        _keyVaultSource = keyVaultSource;
+        _reserved = new(StringComparer.OrdinalIgnoreCase) { _options.PlatformGrainStorage, _options.PubSubStore };
+        Services = ServicesFor(_options);
+    }
 
     /// <summary>The signal queues (one partition).</summary>
     public static IReadOnlyList<string> SignalQueues { get; } = ["signals-0"];
@@ -63,18 +70,25 @@ public sealed class CloudProfile : ITopologyProfile
     /// <inheritdoc />
     public Bindings Bindings => CloudBindings;
 
-    /// <summary>The cloud process shape.</summary>
-    public static Services CloudServices { get; } = new(
-        [
-            new ServiceProcess("os", LocalProfile.Image, [TopologyContext.DefaultSiloPort, TopologyContext.DefaultGatewayPort, LocalProfile.HttpPort], [],
-                [EnvironmentName(IntoChatOSNames.TopologyKey), EnvironmentName(IntoChatOSNames.CloudStorageKey),
-                 EnvironmentName(IntoChatOSNames.CloudKeyVaultKey), "AZURE_CLIENT_ID"]),
-            new ServiceProcess("os-sandbox", LocalProfile.SandboxImage, [], [], []),
-        ],
-        AzureResourceKinds);
+    /// <summary>The cloud process shape with the <see cref="RuntimeOptions.IntoChatCompatible"/> environment names.</summary>
+    public static Services CloudServices { get; } = ServicesFor(RuntimeOptions.IntoChatCompatible);
+
+    /// <summary>The cloud process shape for <paramref name="options"/>.</summary>
+    public static Services ServicesFor(RuntimeOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return new(
+            [
+                new ServiceProcess("os", LocalProfile.Image, [TopologyContext.DefaultSiloPort, TopologyContext.DefaultGatewayPort, LocalProfile.HttpPort], [],
+                    [EnvironmentName(options.TopologyKey), EnvironmentName(options.CloudStorageKey),
+                     EnvironmentName(options.CloudKeyVaultKey), "AZURE_CLIENT_ID"]),
+                new ServiceProcess("os-sandbox", LocalProfile.SandboxImage, [], [], []),
+            ],
+            AzureResourceKinds);
+    }
 
     /// <inheritdoc />
-    public Services Services => CloudServices;
+    public Services Services { get; }
 
     /// <inheritdoc />
     public IReadOnlyDictionary<string, string?> Defaults { get; } = new Dictionary<string, string?>();
@@ -85,12 +99,12 @@ public sealed class CloudProfile : ITopologyProfile
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(modules);
         var issues = new List<TopologyIssue>();
-        if (CloudStorageAccount.TryParse(configuration[IntoChatOSNames.CloudStorageKey], out var storage) is null) { issues.Add(storage!); }
-        var vaultValue = configuration[IntoChatOSNames.CloudKeyVaultKey];
-        if (!string.IsNullOrWhiteSpace(vaultValue) && KeyVault(vaultValue, out var vault) is null) { issues.Add(vault!); }
+        if (CloudStorageAccount.TryParse(configuration[_options.CloudStorageKey], out var storage, _options) is null) { issues.Add(storage!); }
+        var vaultValue = configuration[_options.CloudKeyVaultKey];
+        if (!string.IsNullOrWhiteSpace(vaultValue) && KeyVault(vaultValue, out var vault, _options) is null) { issues.Add(vault!); }
         foreach (var module in modules)
         {
-            foreach (var need in module.Needs.Where(n => n.Kind == NeedKind.State && n.Name is not null && Reserved.Contains(n.Name)))
+            foreach (var need in module.Needs.Where(n => n.Kind == NeedKind.State && n.Name is not null && _reserved.Contains(n.Name)))
             {
                 issues.Add(new TopologyIssue($"module {module.Id ?? "(unnamed)"}",
                     $"grain store {need.Name} is reserved by the runtime; choose another name."));
@@ -99,36 +113,40 @@ public sealed class CloudProfile : ITopologyProfile
         return issues;
     }
 
-    /// <summary>The key vault URI, or null with an issue naming <c>IntoChatOS:Cloud:KeyVault</c>.</summary>
-    public static Uri? KeyVault(string? value, out TopologyIssue? issue)
+    /// <summary>The key vault URI, or null with an issue naming the cloud key vault key.</summary>
+    /// <param name="value">The configured value.</param>
+    /// <param name="issue">The issue when the value is missing or invalid.</param>
+    /// <param name="options">Names the key vault key; null means <see cref="RuntimeOptions.IntoChatCompatible"/>.</param>
+    public static Uri? KeyVault(string? value, out TopologyIssue? issue, RuntimeOptions? options = null)
     {
+        var key = (options ?? RuntimeOptions.IntoChatCompatible).CloudKeyVaultKey;
         issue = null;
         if (string.IsNullOrWhiteSpace(value))
         {
-            issue = new TopologyIssue(IntoChatOSNames.CloudKeyVaultKey, "is required on Topology=cloud (https://<vault>.vault.azure.net/).");
+            issue = new TopologyIssue(key, "is required on Topology=cloud (https://<vault>.vault.azure.net/).");
             return null;
         }
         if (Uri.TryCreate(value.Trim(), UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps) { return uri; }
-        issue = new TopologyIssue(IntoChatOSNames.CloudKeyVaultKey, "must be an absolute https URI.");
+        issue = new TopologyIssue(key, "must be an absolute https URI.");
         return null;
     }
 
     /// <inheritdoc />
     /// <remarks>
-    /// Secret <c>IntoChatOS--MasterKey</c> maps to <c>IntoChatOS:MasterKey</c>; secrets load once (no reload interval).
-    /// Without <c>IntoChatOS:Cloud:KeyVault</c> (contributor runs on Azurite, 04-CONTEXT R4-08) secrets come from the machine key,
+    /// A Key Vault secret named like the master key with <c>--</c> for <c>:</c> maps to <see cref="RuntimeOptions.MasterKeyKey"/>; secrets load once (no reload interval).
+    /// Without <see cref="RuntimeOptions.CloudKeyVaultKey"/> (contributor runs on Azurite, 04-CONTEXT R4-08) secrets come from the machine key,
     /// as on local; the topology settings carry the warning.
     /// </remarks>
     public void ConfigureConfiguration(IConfigurationBuilder builder, TopologyContext context)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(context);
-        if (string.IsNullOrWhiteSpace(context.Configuration[IntoChatOSNames.CloudKeyVaultKey]))
+        if (string.IsNullOrWhiteSpace(context.Configuration[_options.CloudKeyVaultKey]))
         {
-            builder.Add(new MachineKeyConfigurationSource(context.Home, context.Configuration));
+            builder.Add(new MachineKeyConfigurationSource(context.Home, context.Configuration, options: _options));
             return;
         }
-        var vault = KeyVault(context.Configuration[IntoChatOSNames.CloudKeyVaultKey], out var issue)
+        var vault = KeyVault(context.Configuration[_options.CloudKeyVaultKey], out var issue, _options)
             ?? throw new InvalidOperationException($"{issue!.Key}: {issue.Message}");
         if (_keyVaultSource is { } replace) { replace(builder, vault); }
         else { builder.AddAzureKeyVault(vault, CloudStorageAccount.Credential()); }
@@ -139,7 +157,7 @@ public sealed class CloudProfile : ITopologyProfile
     {
         ArgumentNullException.ThrowIfNull(silo);
         ArgumentNullException.ThrowIfNull(context);
-        var account = CloudStorageAccount.Parse(context.Configuration[IntoChatOSNames.CloudStorageKey]);
+        var account = CloudStorageAccount.Parse(context.Configuration[_options.CloudStorageKey], _options);
         silo.Services.TryAddSingleton(account);
         silo.Configure<EndpointOptions>(options =>
         {
@@ -150,22 +168,22 @@ public sealed class CloudProfile : ITopologyProfile
         silo.UseAzureStorageClustering(options => options.Configure(o => o.TableServiceClient = account.Tables()));
         silo.UseAzureTableReminderService(options => options.Configure(o => o.TableServiceClient = account.Tables()));
 
-        var stores = new List<string> { IntoChatOSNames.PlatformGrainStorage, IntoChatOSNames.PubSubStore };
+        var stores = new List<string> { _options.PlatformGrainStorage, _options.PubSubStore };
         stores.AddRange(context.Modules.SelectMany(m => m.Needs)
-            .Where(n => n.Kind == NeedKind.State && n.Name is not null && n.Name != IntoChatOSNames.ClusterGrainStorage && !Reserved.Contains(n.Name))
+            .Where(n => n.Kind == NeedKind.State && n.Name is not null && n.Name != _options.ClusterGrainStorage && !_reserved.Contains(n.Name))
             .Select(n => n.Name!));
         foreach (var name in stores.Distinct(StringComparer.Ordinal))
         {
             silo.AddAzureBlobGrainStorage(name, options => options.Configure(o =>
             {
                 o.BlobServiceClient = account.Blobs();
-                o.ContainerName = IntoChatOSNames.GrainStateContainer;
+                o.ContainerName = _options.GrainStateContainer;
             }));
         }
         // Replaced by the host-bound registration, which ConfigureTopologySilo runs after this.
-        silo.Services.AddKeyedSingleton<IGrainStorage>(IntoChatOSNames.ClusterGrainStorage, new UnregisteredClusterStorage());
+        silo.Services.AddKeyedSingleton<IGrainStorage>(_options.ClusterGrainStorage, new UnregisteredClusterStorage());
 
-        silo.AddAzureQueueStreams(IntoChatOSNames.SignalStreams, configurator => configurator.ConfigureAzureQueue(options => options.Configure(o =>
+        silo.AddAzureQueueStreams(_options.SignalStreams, configurator => configurator.ConfigureAzureQueue(options => options.Configure(o =>
         {
             o.QueueServiceClient = account.Queues();
             o.QueueNames = [.. SignalQueues];
@@ -177,7 +195,7 @@ public sealed class CloudProfile : ITopologyProfile
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(context);
-        var account = CloudStorageAccount.Parse(context.Configuration[IntoChatOSNames.CloudStorageKey]);
+        var account = CloudStorageAccount.Parse(context.Configuration[_options.CloudStorageKey], _options);
         services.TryAddSingleton(account);
         services.TryAddSingleton(TimeProvider.System);
         services.RemoveAll<IBrainLogOwnership>();

@@ -28,7 +28,7 @@ internal sealed class OrleansRun(IInProcessHost host, FrameworkHostOptions optio
     public static Dictionary<string, string?> Configuration(FrameworkHostOptions options)
     {
         var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        const string Retention = IntoChatOSNames.Signalling.Retention;
+        var Retention = RuntimeOptions.IntoChatCompatible.RetentionSection;
         if (options.HistoryWindowSignals is { } signals) { values[Retention + ":HistoryWindowSignals"] = signals.ToString(System.Globalization.CultureInfo.InvariantCulture); }
         if (options.HistoryWindowAge is { } age) { values[Retention + ":HistoryWindowAge"] = age.ToString("c"); }
         if (options.StaleCursorAfter is { } stale) { values[Retention + ":StaleCursorAfter"] = stale.ToString("c"); }
@@ -72,7 +72,7 @@ internal sealed class OrleansRun(IInProcessHost host, FrameworkHostOptions optio
     public override async Task<int> SubscriptionCount(NeuronId subscriber, NeuronId source, Type signal)
     {
         var manager = Services.GetRequiredService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
-        var all = await manager.GetSubscriptions(IntoChatOSNames.SignalStreams, StreamNames.For(source.Brain.Value, signal));
+        var all = await manager.GetSubscriptions(RuntimeOptions.IntoChatCompatible.SignalStreams, StreamNames.For(source.Brain.Value, signal));
         return all.Count(s => s.GrainId.Key.ToString() == subscriber.ToString());
     }
 

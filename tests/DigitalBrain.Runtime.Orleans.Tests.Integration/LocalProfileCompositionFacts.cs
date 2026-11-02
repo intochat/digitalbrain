@@ -20,16 +20,16 @@ public sealed class LocalProfileCompositionFacts
         var fake = new FakeClusterStore();
         using var host = new LocalSiloHostFactory(fake).Build(Options(home.Path, typeof(DriveModule)), home.Path);
 
-        Assert.Same(fake, host.Services.GetRequiredKeyedService<IGrainStorage>(IntoChatOSNames.ClusterGrainStorage));
+        Assert.Same(fake, host.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.IntoChatCompatible.ClusterGrainStorage));
         Assert.Equal(1, fake.Registered);
-        foreach (var name in new[] { IntoChatOSNames.PlatformGrainStorage, IntoChatOSNames.PubSubStore, "drive" })
+        foreach (var name in new[] { RuntimeOptions.IntoChatCompatible.PlatformGrainStorage, RuntimeOptions.IntoChatCompatible.PubSubStore, "drive" })
         {
             var store = host.Services.GetRequiredKeyedService<IGrainStorage>(name);
             Assert.NotNull(store);
         }
         Assert.NotNull(host.Services.GetRequiredService<IReminderTable>());
-        Assert.NotNull(host.Services.GetRequiredKeyedService<OrleansSdk.Streams.IStreamProvider>(IntoChatOSNames.SignalStreams));
-        Assert.False(string.IsNullOrEmpty(host.Services.GetRequiredService<IConfiguration>()[IntoChatOSNames.MasterKeyKey]));
+        Assert.NotNull(host.Services.GetRequiredKeyedService<OrleansSdk.Streams.IStreamProvider>(RuntimeOptions.IntoChatCompatible.SignalStreams));
+        Assert.False(string.IsNullOrEmpty(host.Services.GetRequiredService<IConfiguration>()[RuntimeOptions.IntoChatCompatible.MasterKeyKey]));
     }
 
     [Fact]
@@ -37,12 +37,12 @@ public sealed class LocalProfileCompositionFacts
     {
         using var home = new TempHome();
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
-        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { [IntoChatOSNames.HomeKey] = home.Path });
-        var context = TopologyContext.Create(Topology.Local, StateHome.Resolve(builder.Configuration), builder.Configuration, []);
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { [RuntimeOptions.IntoChatCompatible.HomeKey] = home.Path });
+        var context = TopologyContext.Create(Topology.Local, StateHome.Resolve(builder.Configuration, RuntimeOptions.IntoChatCompatible), builder.Configuration, []);
         builder.UseOrleans(silo => new LocalProfile().ConfigureSilo(silo, context));
         using var host = builder.Build();
 
-        var cluster = host.Services.GetRequiredKeyedService<IGrainStorage>(IntoChatOSNames.ClusterGrainStorage);
+        var cluster = host.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.IntoChatCompatible.ClusterGrainStorage);
 
         Assert.IsType<UnregisteredClusterStorage>(cluster);
         var error = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -90,8 +90,8 @@ public sealed class LocalProfileCompositionFacts
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            [IntoChatOSNames.TopologyKey] = "local",
-            [IntoChatOSNames.HomeKey] = home.Path,
+            [RuntimeOptions.IntoChatCompatible.TopologyKey] = "local",
+            [RuntimeOptions.IntoChatCompatible.HomeKey] = home.Path,
         });
         builder.UseClusterStore(new FakeClusterStore());
         Assert.IsType<LocalProfile>(builder.UseTopology([], []));

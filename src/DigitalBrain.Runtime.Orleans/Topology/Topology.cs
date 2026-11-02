@@ -16,7 +16,7 @@ public enum Topology
 /// <summary>Configuration spelling of <see cref="Topology"/>.</summary>
 public static class TopologyExtensions
 {
-    /// <summary>The value written to <c>IntoChatOS:Topology</c>: <c>local</c>, <c>local+cloud</c> or <c>cloud</c>.</summary>
+    /// <summary>The value written to <see cref="RuntimeOptions.TopologyKey"/>: <c>local</c>, <c>local+cloud</c> or <c>cloud</c>.</summary>
     public static string ToConfigValue(this Topology topology) => topology switch
     {
         Topology.Local => "local",

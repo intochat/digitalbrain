@@ -16,8 +16,8 @@ internal sealed class HostNeuronState(NeuronId id, GrainId grainId, NeuronRegist
 {
     private string? _etag;
 
-    private IGrainStorage Store => services.GetKeyedService<IGrainStorage>(IntoChatOSNames.ClusterGrainStorage)
-        ?? throw new InvalidOperationException($"{id} has state, but the silo has no '{IntoChatOSNames.ClusterGrainStorage}' grain store.");
+    private IGrainStorage Store => services.GetKeyedService<IGrainStorage>(RuntimeOptions.From(services).ClusterGrainStorage)
+        ?? throw new InvalidOperationException($"{id} has state, but the silo has no '{RuntimeOptions.From(services).ClusterGrainStorage}' grain store.");
 
     public async Task<T?> Load<T>()
     {

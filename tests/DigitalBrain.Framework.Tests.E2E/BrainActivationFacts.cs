@@ -23,7 +23,7 @@ public sealed class BrainProbeState
 }
 
 /// <summary>A probe neuron keyed by a BrainId; its state lives in the platform store.</summary>
-public sealed class BrainProbeGrain([PersistentState("probe", IntoChatOSNames.PlatformGrainStorage)] IPersistentState<BrainProbeState> state)
+public sealed class BrainProbeGrain([PersistentState("probe", "platform")] IPersistentState<BrainProbeState> state)
     : Grain, IBrainProbeGrain
 {
     public Task<string> Ping() => Task.FromResult(this.GetPrimaryKeyString());

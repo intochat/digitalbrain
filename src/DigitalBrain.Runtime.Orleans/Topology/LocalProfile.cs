@@ -23,11 +23,19 @@ public sealed class LocalProfile : ITopologyProfile
     /// <summary>The sandbox container image.</summary>
     public const string SandboxImage = "ghcr.io/intochat/os-sandbox";
 
-    private static readonly HashSet<string> Reserved = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<RuntimeOptions, Services> ServicesByOptions = new();
+
+    private readonly RuntimeOptions _options;
+    private readonly HashSet<string> _reserved;
+
+    /// <summary>Creates the local topology.</summary>
+    /// <param name="options">The runtime's key and store names; null means <see cref="RuntimeOptions.IntoChatCompatible"/>.</param>
+    public LocalProfile(RuntimeOptions? options = null)
     {
-        IntoChatOSNames.PlatformGrainStorage,
-        IntoChatOSNames.PubSubStore,
-    };
+        _options = options ?? RuntimeOptions.IntoChatCompatible;
+        _reserved = new(StringComparer.OrdinalIgnoreCase) { _options.PlatformGrainStorage, _options.PubSubStore };
+        Services = ServicesFor(_options);
+    }
 
     /// <inheritdoc />
     public Topology Topology => Topology.Local;
@@ -48,17 +56,27 @@ public sealed class LocalProfile : ITopologyProfile
     /// <inheritdoc />
     public Bindings Bindings => LocalBindings;
 
-    /// <summary>The local process shape, shared by local+cloud.</summary>
-    public static Services LocalServices { get; } = new(
-        [
-            new ServiceProcess("os", Image, [TopologyContext.DefaultSiloPort, TopologyContext.DefaultGatewayPort, HttpPort], ["<Home>"],
-                [EnvironmentName(IntoChatOSNames.TopologyKey), EnvironmentName(IntoChatOSNames.HomeKey)]),
-            new ServiceProcess("os-sandbox", SandboxImage, [], [], []),
-        ],
-        []);
+    /// <summary>The local process shape with the <see cref="RuntimeOptions.IntoChatCompatible"/> environment names.</summary>
+    public static Services LocalServices { get; } = ServicesFor(RuntimeOptions.IntoChatCompatible);
+
+    /// <summary>The local process shape for <paramref name="options"/>, shared by local+cloud. Equal options give the same instance.</summary>
+    public static Services ServicesFor(RuntimeOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return ServicesByOptions.GetOrAdd(options, static o => Build(o));
+    }
+
+    private static Services Build(RuntimeOptions options)
+        => new(
+            [
+                new ServiceProcess("os", Image, [TopologyContext.DefaultSiloPort, TopologyContext.DefaultGatewayPort, HttpPort], ["<Home>"],
+                    [EnvironmentName(options.TopologyKey), EnvironmentName(options.HomeKey)]),
+                new ServiceProcess("os-sandbox", SandboxImage, [], [], []),
+            ],
+            []);
 
     /// <inheritdoc />
-    public Services Services => LocalServices;
+    public Services Services { get; }
 
     /// <summary>
     /// Below <c>&lt;Home&gt;/settings.json</c>. A local run defaults auth posture to Open, as the AppHost does.
@@ -83,7 +101,7 @@ public sealed class LocalProfile : ITopologyProfile
         ArgumentNullException.ThrowIfNull(modules);
         foreach (var module in modules)
         {
-            foreach (var need in module.Needs.Where(n => n.Kind == NeedKind.State && n.Name is not null && Reserved.Contains(n.Name)))
+            foreach (var need in module.Needs.Where(n => n.Kind == NeedKind.State && n.Name is not null && _reserved.Contains(n.Name)))
             {
                 yield return new TopologyIssue($"module {module.Id ?? "(unnamed)"}",
                     $"grain store {need.Name} is reserved by the runtime; choose another name.");
@@ -96,7 +114,7 @@ public sealed class LocalProfile : ITopologyProfile
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(context);
-        builder.Add(new MachineKeyConfigurationSource(context.Home, context.Configuration));
+        builder.Add(new MachineKeyConfigurationSource(context.Home, context.Configuration, options: _options));
     }
 
     /// <inheritdoc />
@@ -104,23 +122,23 @@ public sealed class LocalProfile : ITopologyProfile
     {
         ArgumentNullException.ThrowIfNull(silo);
         ArgumentNullException.ThrowIfNull(context);
-        // Loopback only; IntoChatOS:Bind widens the HTTP listener (os BindPolicy), never the silo.
+        // Loopback only; the bind key widens the HTTP listener (os BindPolicy), never the silo.
         silo.UseLocalhostClustering(context.SiloPort, context.GatewayPort);
 
-        var stores = new List<string> { IntoChatOSNames.PlatformGrainStorage, IntoChatOSNames.PubSubStore };
+        var stores = new List<string> { _options.PlatformGrainStorage, _options.PubSubStore };
         stores.AddRange(context.Modules.SelectMany(m => m.Needs)
-            .Where(n => n.Kind == NeedKind.State && n.Name is not null && n.Name != IntoChatOSNames.ClusterGrainStorage && !Reserved.Contains(n.Name))
+            .Where(n => n.Kind == NeedKind.State && n.Name is not null && n.Name != _options.ClusterGrainStorage && !_reserved.Contains(n.Name))
             .Select(n => n.Name!));
         foreach (var name in stores.Distinct(StringComparer.Ordinal))
         {
             silo.Services.AddKeyedSingleton<IGrainStorage>(name, (_, _) => new LocalMemoryGrainStorage(context.Home.State, name));
         }
         // Replaced by the host-bound registration, which ConfigureTopologySilo runs after this.
-        silo.Services.AddKeyedSingleton<IGrainStorage>(IntoChatOSNames.ClusterGrainStorage, new UnregisteredClusterStorage());
+        silo.Services.AddKeyedSingleton<IGrainStorage>(_options.ClusterGrainStorage, new UnregisteredClusterStorage());
 
         silo.AddReminders();
         silo.Services.AddSingleton<IReminderTable>(_ => MemoryReminderTable.For(context.Home.State));
-        silo.AddMemoryStreams(IntoChatOSNames.SignalStreams);
+        silo.AddMemoryStreams(_options.SignalStreams);
     }
 
     /// <inheritdoc />

@@ -4,7 +4,7 @@ namespace DigitalBrain.Runtime.Orleans;
 
 /// <summary>The parsed topology settings: one value selects one implementation (P2-D-09).</summary>
 /// <param name="Topology">The selected topology; <c>local</c> when absent and nothing else asks for more.</param>
-/// <param name="Home">Where local state lives; null when <c>IntoChatOS:Home</c> is invalid.</param>
+/// <param name="Home">Where local state lives; null when the home key is invalid.</param>
 /// <param name="Issues">Every reason the host must not start.</param>
 /// <param name="Warnings">Non-fatal notes, such as the deprecated <c>local-cloud</c> spelling.</param>
 public sealed record TopologySettings(Topology Topology, StateHome? Home, IReadOnlyList<TopologyIssue> Issues, IReadOnlyList<string> Warnings)
@@ -13,18 +13,19 @@ public sealed record TopologySettings(Topology Topology, StateHome? Home, IReadO
     public bool IsValid => Issues.Count == 0;
 
     /// <summary>Parses configuration without throwing; problems are returned as issues.</summary>
-    public static TopologySettings Parse(IConfiguration configuration, IReadOnlyList<RetiredSetting> retired)
+    public static TopologySettings Parse(IConfiguration configuration, IReadOnlyList<RetiredSetting> retired, RuntimeOptions? options = null)
     {
-        var (topology, issues, warnings) = TopologyValidator.Evaluate(configuration, retired);
+        options ??= RuntimeOptions.IntoChatCompatible;
+        var (topology, issues, warnings) = TopologyValidator.Evaluate(configuration, retired, options);
         var all = issues.ToList();
         StateHome? home = null;
         try
         {
-            home = StateHome.Resolve(configuration);
+            home = StateHome.Resolve(configuration, options);
         }
         catch (InvalidOperationException exception)
         {
-            all.Add(new TopologyIssue(IntoChatOSNames.HomeKey, exception.Message));
+            all.Add(new TopologyIssue(options.HomeKey, exception.Message));
         }
         return new TopologySettings(topology ?? Topology.Local, home, all, warnings);
     }

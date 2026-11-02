@@ -15,11 +15,11 @@ public sealed class TopologyPubSubStoreFacts
     private static ServiceProvider With(IGrainStorage? pubSub)
     {
         var services = new ServiceCollection();
-        if (pubSub is not null) { services.AddKeyedSingleton(IntoChatOSNames.PubSubStore, pubSub); }
+        if (pubSub is not null) { services.AddKeyedSingleton(RuntimeOptions.IntoChatCompatible.PubSubStore, pubSub); }
         return services.BuildServiceProvider();
     }
 
-    private static MemoryGrainStorage Memory() => new(IntoChatOSNames.PubSubStore, new OrleansSdk.Configuration.MemoryGrainStorageOptions(),
+    private static MemoryGrainStorage Memory() => new(RuntimeOptions.IntoChatCompatible.PubSubStore, new OrleansSdk.Configuration.MemoryGrainStorageOptions(),
         Microsoft.Extensions.Logging.Abstractions.NullLogger<MemoryGrainStorage>.Instance,
         null!, null!, null!);
 
@@ -31,7 +31,7 @@ public sealed class TopologyPubSubStoreFacts
     {
         using var services = With(null);
         var issue = Assert.Single(TopologyValidator.ValidatePubSubStore(topology, services));
-        Assert.Contains(IntoChatOSNames.PubSubStore, issue.Key, StringComparison.Ordinal);
+        Assert.Contains(RuntimeOptions.IntoChatCompatible.PubSubStore, issue.Key, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -40,7 +40,7 @@ public sealed class TopologyPubSubStoreFacts
     {
         using var services = With(Memory());
         var issue = Assert.Single(TopologyValidator.ValidatePubSubStore(topology, services));
-        Assert.Contains(IntoChatOSNames.PubSubStore, issue.Key, StringComparison.Ordinal);
+        Assert.Contains(RuntimeOptions.IntoChatCompatible.PubSubStore, issue.Key, StringComparison.Ordinal);
         Assert.Contains("Topology=" + value, issue.Message, StringComparison.Ordinal);
     }
 
@@ -50,7 +50,7 @@ public sealed class TopologyPubSubStoreFacts
         using var services = With(Memory());
         var check = new PubSubStoreCheck(Topology.Cloud, services);
         var error = Assert.Throws<InvalidOperationException>(check.Run);
-        Assert.Contains(IntoChatOSNames.PubSubStore, error.Message, StringComparison.Ordinal);
+        Assert.Contains(RuntimeOptions.IntoChatCompatible.PubSubStore, error.Message, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -60,16 +60,16 @@ public sealed class TopologyPubSubStoreFacts
     {
         using var home = new TempDirectory();
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
-        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { [IntoChatOSNames.HomeKey] = home.Path });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?> { [RuntimeOptions.IntoChatCompatible.HomeKey] = home.Path });
         var topology = localCloud ? Topology.LocalCloud : Topology.Local;
-        var context = TopologyContext.Create(topology, StateHome.Resolve(builder.Configuration), builder.Configuration, []);
+        var context = TopologyContext.Create(topology, StateHome.Resolve(builder.Configuration, RuntimeOptions.IntoChatCompatible), builder.Configuration, []);
         ITopologyProfile profile = localCloud ? new LocalCloudProfile() : new LocalProfile();
         builder.UseOrleans(silo => profile.ConfigureSilo(silo, context));
         using var host = builder.Build();
 
-        Assert.IsType<MemoryGrainStorage>(host.Services.GetRequiredKeyedService<IGrainStorage>(IntoChatOSNames.PubSubStore));
-        Assert.IsType<PersistentStreamProvider>(host.Services.GetRequiredKeyedService<IStreamProvider>(IntoChatOSNames.SignalStreams));
-        Assert.Contains("Memory", host.Services.GetRequiredKeyedService<IQueueAdapterFactory>(IntoChatOSNames.SignalStreams).GetType().Name, StringComparison.Ordinal);
+        Assert.IsType<MemoryGrainStorage>(host.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.IntoChatCompatible.PubSubStore));
+        Assert.IsType<PersistentStreamProvider>(host.Services.GetRequiredKeyedService<IStreamProvider>(RuntimeOptions.IntoChatCompatible.SignalStreams));
+        Assert.Contains("Memory", host.Services.GetRequiredKeyedService<IQueueAdapterFactory>(RuntimeOptions.IntoChatCompatible.SignalStreams).GetType().Name, StringComparison.Ordinal);
         Assert.Empty(TopologyValidator.ValidatePubSubStore(topology, host.Services));
     }
 

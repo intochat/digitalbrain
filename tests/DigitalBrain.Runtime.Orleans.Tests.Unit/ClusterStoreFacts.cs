@@ -13,7 +13,7 @@ public sealed class ClusterStoreFacts : IDisposable
     private HostApplicationBuilder Builder()
     {
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
-        builder.Configuration.AddInMemoryCollection([new(IntoChatOSNames.HomeKey, _home), new(IntoChatOSNames.TopologyKey, "local")]);
+        builder.Configuration.AddInMemoryCollection([new(RuntimeOptions.IntoChatCompatible.HomeKey, _home), new(RuntimeOptions.IntoChatCompatible.TopologyKey, "local")]);
         return builder;
     }
 

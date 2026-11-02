@@ -39,8 +39,8 @@ public static class TopologyValidator
     }
 
     /// <summary>Validates topology, cloud and retired keys. Reads configuration only.</summary>
-    public static IReadOnlyList<TopologyIssue> Validate(IConfiguration configuration, IReadOnlyList<RetiredSetting> retired)
-        => Evaluate(configuration, retired).Issues;
+    public static IReadOnlyList<TopologyIssue> Validate(IConfiguration configuration, IReadOnlyList<RetiredSetting> retired, RuntimeOptions? options = null)
+        => Evaluate(configuration, retired, options ?? RuntimeOptions.IntoChatCompatible).Issues;
 
     /// <summary>Every module need the bindings leave unbound, by module id and need kind (R4-02).</summary>
     public static IReadOnlyList<TopologyIssue> ValidateNeeds(Topology topology, Bindings bindings, IReadOnlyList<ModuleManifest> modules)
@@ -50,22 +50,24 @@ public static class TopologyValidator
     /// Every module need the bindings leave unbound. A host-bound <c>cluster</c> store without a host registration is one issue
     /// naming <see cref="ClusterStoreHosting.HookName"/>, whether or not a module needs it.
     /// </summary>
-    public static IReadOnlyList<TopologyIssue> ValidateNeeds(Topology topology, Bindings bindings, IReadOnlyList<ModuleManifest> modules, bool clusterStoreRegistered)
+    public static IReadOnlyList<TopologyIssue> ValidateNeeds(
+        Topology topology, Bindings bindings, IReadOnlyList<ModuleManifest> modules, bool clusterStoreRegistered, RuntimeOptions? options = null)
     {
+        options ??= RuntimeOptions.IntoChatCompatible;
         ArgumentNullException.ThrowIfNull(bindings);
         ArgumentNullException.ThrowIfNull(modules);
         var hostBound = bindings.ClusterStore == ClusterStoreBinding.HostBound;
         var issues = new List<TopologyIssue>();
         if (hostBound && !clusterStoreRegistered)
         {
-            issues.Add(new TopologyIssue($"grain store {IntoChatOSNames.ClusterGrainStorage}",
+            issues.Add(new TopologyIssue($"grain store {options.ClusterGrainStorage}",
                 $"is host-bound under Topology={topology.ToConfigValue()} but the host registered none; call {ClusterStoreHosting.HookName} before UseTopology."));
         }
 
         issues.AddRange(modules
             .SelectMany(module => module.Needs.Select(need => (Module: module, Need: need)))
-            .Where(entry => !bindings.Binds(entry.Need, clusterStoreRegistered))
-            .Where(entry => !(hostBound && Bindings.IsClusterStore(entry.Need))) // reported once above
+            .Where(entry => !bindings.Binds(entry.Need, clusterStoreRegistered, options))
+            .Where(entry => !(hostBound && Bindings.IsClusterStore(entry.Need, options))) // reported once above
             .Select(entry => new TopologyIssue(
                 $"module {entry.Module.Id ?? "(unnamed)"}",
                 $"needs {entry.Need.Kind}{(entry.Need.Name is null ? string.Empty : $"({entry.Need.Name})")}, which Topology={topology.ToConfigValue()} does not bind.")));
@@ -79,8 +81,9 @@ public static class TopologyValidator
     public static IReadOnlyList<TopologyIssue> ValidatePubSubStore(Topology topology, IServiceProvider services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        var key = $"grain store {IntoChatOSNames.PubSubStore}";
-        var store = services.GetKeyedService<IGrainStorage>(IntoChatOSNames.PubSubStore);
+        var options = RuntimeOptions.From(services);
+        var key = $"grain store {options.PubSubStore}";
+        var store = services.GetKeyedService<IGrainStorage>(options.PubSubStore);
         if (store is null)
         {
             return [new TopologyIssue(key, $"is not registered under Topology={topology.ToConfigValue()}; stream subscriptions need it.")];
@@ -93,7 +96,7 @@ public static class TopologyValidator
     }
 
     internal static (Topology? Topology, IReadOnlyList<TopologyIssue> Issues, IReadOnlyList<string> Warnings) Evaluate(
-        IConfiguration configuration, IReadOnlyList<RetiredSetting> retired)
+        IConfiguration configuration, IReadOnlyList<RetiredSetting> retired, RuntimeOptions options)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(retired);
@@ -105,16 +108,16 @@ public static class TopologyValidator
             new TopologyIssue(setting.Key, $"is retired and not read; use {setting.Replacement}.")));
 
         var hasCloudKeys = configuration.AsEnumerable()
-            .Any(pair => pair.Value is not null && pair.Key.StartsWith(IntoChatOSNames.CloudSectionPrefix, StringComparison.OrdinalIgnoreCase));
+            .Any(pair => pair.Value is not null && pair.Key.StartsWith(options.CloudSectionPrefix, StringComparison.OrdinalIgnoreCase));
 
         Topology topology;
-        var raw = configuration[IntoChatOSNames.TopologyKey];
+        var raw = configuration[options.TopologyKey];
         if (string.IsNullOrWhiteSpace(raw))
         {
             if (hasCloudKeys || retiredPresent.Count > 0)
             {
-                issues.Add(new TopologyIssue(IntoChatOSNames.TopologyKey,
-                    $"set {IntoChatOSNames.TopologyKey} to {Allowed}; cloud or retired settings are present."));
+                issues.Add(new TopologyIssue(options.TopologyKey,
+                    $"set {options.TopologyKey} to {Allowed}; cloud or retired settings are present."));
                 return (null, issues, warnings);
             }
             topology = Topology.Local;
@@ -124,23 +127,23 @@ public static class TopologyValidator
             topology = parsed;
             if (isAlias)
             {
-                warnings.Add($"{IntoChatOSNames.TopologyKey} uses the deprecated spelling {LocalCloudAlias}; write local+cloud.");
+                warnings.Add($"{options.TopologyKey} uses the deprecated spelling {LocalCloudAlias}; write local+cloud.");
             }
         }
         else
         {
-            issues.Add(new TopologyIssue(IntoChatOSNames.TopologyKey, $"must be one of {Allowed}."));
+            issues.Add(new TopologyIssue(options.TopologyKey, $"must be one of {Allowed}."));
             return (null, issues, warnings);
         }
 
-        foreach (var key in new[] { IntoChatOSNames.CloudStorageKey, IntoChatOSNames.CloudKeyVaultKey })
+        foreach (var key in new[] { options.CloudStorageKey, options.CloudKeyVaultKey })
         {
             var set = configuration[key] is not null;
             if (set && topology != Topology.Cloud)
             {
                 issues.Add(new TopologyIssue(key, "requires Topology=cloud."));
             }
-            else if (!set && topology == Topology.Cloud && key == IntoChatOSNames.CloudStorageKey)
+            else if (!set && topology == Topology.Cloud && key == options.CloudStorageKey)
             {
                 issues.Add(new TopologyIssue(key, "is required when Topology=cloud."));
             }
@@ -151,14 +154,14 @@ public static class TopologyValidator
             }
         }
 
-        var hasServer = configuration[IntoChatOSNames.CloudServerAddressKey] is not null;
+        var hasServer = configuration[options.CloudServerAddressKey] is not null;
         if (hasServer && topology != Topology.LocalCloud)
         {
-            issues.Add(new TopologyIssue(IntoChatOSNames.CloudServerAddressKey, "requires Topology=local+cloud."));
+            issues.Add(new TopologyIssue(options.CloudServerAddressKey, "requires Topology=local+cloud."));
         }
         else if (!hasServer && topology == Topology.LocalCloud)
         {
-            issues.Add(new TopologyIssue(IntoChatOSNames.CloudServerAddressKey, "is required when Topology=local+cloud."));
+            issues.Add(new TopologyIssue(options.CloudServerAddressKey, "is required when Topology=local+cloud."));
         }
 
         return (topology, issues, warnings);

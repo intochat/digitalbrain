@@ -4,11 +4,11 @@ using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Runtime.Orleans;
 
-/// <summary>Where local state lives: <c>IntoChatOS:Home</c>, or <c>~/.intochat</c> when unset (P2-D-13).</summary>
+/// <summary>Where local state lives: the <see cref="RuntimeOptions.HomeKey"/> value, or <c>~/&lt;DefaultHomeDirectoryName&gt;</c> when unset (P2-D-13).</summary>
 public sealed record StateHome
 {
-    /// <summary>The default folder name under the user folder.</summary>
-    public const string DefaultDirectoryName = ".intochat";
+    /// <summary>The default folder name under the user folder of <see cref="RuntimeOptions.IntoChatCompatible"/>.</summary>
+    public const string DefaultDirectoryName = RuntimeOptions.IntoChatDefaultHomeDirectoryName;
 
     private StateHome(string path) => Path = path;
 
@@ -30,12 +30,20 @@ public sealed record StateHome
     /// <summary><c>&lt;Home&gt;/settings.json</c>.</summary>
     public string SettingsFile => System.IO.Path.Combine(Path, "settings.json");
 
-    /// <summary>Resolves Home; a leading <c>~</c> expands to the user folder.</summary>
+    /// <summary>Resolves Home with the <see cref="RuntimeOptions.IntoChatCompatible"/> spellings; a leading <c>~</c> expands to the user folder.</summary>
     /// <exception cref="InvalidOperationException">The value is relative or names an existing file. Names the key only.</exception>
-    public static StateHome Resolve(IConfiguration? configuration)
+    [Obsolete("Pass RuntimeOptions; removed in 0.13.")]
+    public static StateHome Resolve(IConfiguration? configuration) => Resolve(configuration, RuntimeOptions.IntoChatCompatible);
+
+    /// <summary>Resolves Home; a leading <c>~</c> expands to the user folder.</summary>
+    /// <param name="configuration">The configuration holding the home key.</param>
+    /// <param name="options">Names the home key and the default folder; null means <see cref="RuntimeOptions.IntoChatCompatible"/>.</param>
+    /// <exception cref="InvalidOperationException">The value is relative or names an existing file. Names the key only.</exception>
+    public static StateHome Resolve(IConfiguration? configuration, RuntimeOptions? options = null)
     {
-        var configured = configuration?[IntoChatOSNames.HomeKey];
-        if (string.IsNullOrWhiteSpace(configured)) { return Default(); }
+        options ??= RuntimeOptions.IntoChatCompatible;
+        var configured = configuration?[options.HomeKey];
+        if (string.IsNullOrWhiteSpace(configured)) { return Default(options); }
         configured = configured.Trim();
         if (configured == "~" || configured.StartsWith("~/", StringComparison.Ordinal) || configured.StartsWith("~\\", StringComparison.Ordinal))
         {
@@ -43,18 +51,25 @@ public sealed record StateHome
         }
         if (!System.IO.Path.IsPathFullyQualified(configured))
         {
-            throw new InvalidOperationException($"{IntoChatOSNames.HomeKey} must be an absolute path.");
+            throw new InvalidOperationException($"{options.HomeKey} must be an absolute path.");
         }
         var full = System.IO.Path.TrimEndingDirectorySeparator(System.IO.Path.GetFullPath(configured));
         if (File.Exists(full))
         {
-            throw new InvalidOperationException($"{IntoChatOSNames.HomeKey} names a file; it must be a folder.");
+            throw new InvalidOperationException($"{options.HomeKey} names a file; it must be a folder.");
         }
         return new StateHome(full);
     }
 
-    /// <summary><c>~/.intochat</c>.</summary>
-    public static StateHome Default() => new(System.IO.Path.Combine(UserFolder(), DefaultDirectoryName));
+    /// <summary><c>~/.intochat</c>, the default of <see cref="RuntimeOptions.IntoChatCompatible"/>.</summary>
+    public static StateHome Default() => Default(RuntimeOptions.IntoChatCompatible);
+
+    /// <summary>The user folder plus <see cref="RuntimeOptions.DefaultHomeDirectoryName"/>.</summary>
+    public static StateHome Default(RuntimeOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        return new(System.IO.Path.Combine(UserFolder(), options.DefaultHomeDirectoryName));
+    }
 
     /// <summary>Creates state, secrets, apps and logs; secrets is readable only by the current user.</summary>
     public StateHome EnsureCreated()

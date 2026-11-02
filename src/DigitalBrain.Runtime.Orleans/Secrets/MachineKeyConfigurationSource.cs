@@ -4,7 +4,7 @@ using Microsoft.Extensions.Configuration;
 namespace DigitalBrain.Runtime.Orleans;
 
 /// <summary>
-/// Supplies <c>IntoChatOS:MasterKey</c> from <c>&lt;Home&gt;/secrets/master.key</c> when no explicit value exists. Mints a
+/// Supplies the master key (<see cref="RuntimeOptions.MasterKeyKey"/>) from <c>&lt;Home&gt;/secrets/master.key</c> when no explicit value exists. Mints a
 /// 32-byte key (base64, a format os accepts) on first start, and refuses to mint while <c>&lt;Home&gt;/state</c> holds data.
 /// </summary>
 public sealed class MachineKeyConfigurationSource : IConfigurationSource
@@ -16,12 +16,17 @@ public sealed class MachineKeyConfigurationSource : IConfigurationSource
     /// <param name="home">Where the key and state live.</param>
     /// <param name="existing">The configuration built so far; an explicit master key there wins.</param>
     /// <param name="protector">null uses <see cref="MachineKeyProtectors.ForCurrentPlatform"/>.</param>
-    public MachineKeyConfigurationSource(StateHome home, IConfiguration? existing, IMachineKeyProtector? protector = null)
+    /// <param name="options">Names the master key; null means <see cref="RuntimeOptions.IntoChatCompatible"/>.</param>
+    public MachineKeyConfigurationSource(StateHome home, IConfiguration? existing, IMachineKeyProtector? protector = null, RuntimeOptions? options = null)
     {
+        Options = options ?? RuntimeOptions.IntoChatCompatible;
         Home = home ?? throw new ArgumentNullException(nameof(home));
         Existing = existing;
         Protector = protector ?? MachineKeyProtectors.ForCurrentPlatform();
     }
+
+    /// <summary>The key names.</summary>
+    public RuntimeOptions Options { get; }
 
     /// <summary>The Home.</summary>
     public StateHome Home { get; }
@@ -42,7 +47,7 @@ public sealed class MachineKeyConfigurationSource : IConfigurationSource
     /// <exception cref="InvalidOperationException">The key file is missing while state holds data.</exception>
     public string? ResolveKey()
     {
-        if (!string.IsNullOrWhiteSpace(Existing?[IntoChatOSNames.MasterKeyKey])) { return null; }
+        if (!string.IsNullOrWhiteSpace(Existing?[Options.MasterKeyKey])) { return null; }
         if (File.Exists(KeyFile))
         {
             return Convert.ToBase64String(Protector.Unprotect(File.ReadAllBytes(KeyFile)));
@@ -50,7 +55,7 @@ public sealed class MachineKeyConfigurationSource : IConfigurationSource
         if (Directory.Exists(Home.State) && Directory.EnumerateFiles(Home.State, "*", SearchOption.AllDirectories).Any())
         {
             throw new InvalidOperationException(
-                $"{IntoChatOSNames.MasterKeyKey}: {FileName} is missing under {Home.Secrets} but {Home.State} holds data. "
+                $"{Options.MasterKeyKey}: {FileName} is missing under {Home.Secrets} but {Home.State} holds data. "
                 + "Restore the key file or set the master key explicitly; a new key would not open existing state.");
         }
         Home.EnsureCreated();
@@ -85,7 +90,7 @@ public sealed class MachineKeyConfigurationSource : IConfigurationSource
         {
             var key = source.ResolveKey();
             var data = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-            if (key is not null) { data[IntoChatOSNames.MasterKeyKey] = key; }
+            if (key is not null) { data[source.Options.MasterKeyKey] = key; }
             Data = data;
         }
     }

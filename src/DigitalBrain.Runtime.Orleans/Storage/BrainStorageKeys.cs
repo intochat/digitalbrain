@@ -28,8 +28,8 @@ public sealed class BrainStoreOptions
     public int CheckpointEntriesThreshold { get; set; } = 500;
 }
 
-// Default custody: an HKDF-derived master per account from IntoChatOS:MasterKey (the os configured custody's derivation).
-internal sealed class ConfiguredBrainKeyCustody(IConfiguration configuration) : IBrainKeyCustody
+// Default custody: an HKDF-derived master per account from the configured master key (the os configured custody's derivation).
+internal sealed class ConfiguredBrainKeyCustody(IConfiguration configuration, IServiceProvider services) : IBrainKeyCustody
 {
     public byte[] Wrap(string accountId, string context, byte[] secret) => SegmentSeal.Close(Master(accountId), context, secret);
 
@@ -38,8 +38,9 @@ internal sealed class ConfiguredBrainKeyCustody(IConfiguration configuration) : 
     private byte[] Master(string accountId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(accountId);
-        var root = configuration[IntoChatOSNames.MasterKeyKey];
-        if (string.IsNullOrWhiteSpace(root)) { throw new InvalidOperationException($"{IntoChatOSNames.MasterKeyKey} is not set; the brain store cannot open a key."); }
+        var masterKeyKey = RuntimeOptions.From(services).MasterKeyKey;
+        var root = configuration[masterKeyKey];
+        if (string.IsNullOrWhiteSpace(root)) { throw new InvalidOperationException($"{masterKeyKey} is not set; the brain store cannot open a key."); }
         return HKDF.DeriveKey(HashAlgorithmName.SHA256, Encoding.UTF8.GetBytes(root), 32, info: Encoding.UTF8.GetBytes($"master|{accountId}"));
     }
 }

@@ -1,31 +1,32 @@
 namespace DigitalBrain.Runtime.Orleans;
 
-/// <summary>Configuration keys and store names shared by the runtime and os (same strings as os, P2-D-21, P2-D-22).</summary>
+/// <summary>The <c>IntoChatOS:</c> spellings, kept for hosts that have not moved to <see cref="RuntimeOptions"/>; the strings are those of <see cref="RuntimeOptions.IntoChatCompatible"/>.</summary>
+[Obsolete("Use RuntimeOptions.IntoChatCompatible; removed in 0.13.")]
 public static class IntoChatOSNames
 {
     /// <summary>Selects the topology: local, local+cloud or cloud.</summary>
-    public const string TopologyKey = "IntoChatOS:Topology";
+    public const string TopologyKey = RuntimeOptions.IntoChatTopologyKey;
 
     /// <summary>Where local state lives; unset means ~/.intochat.</summary>
-    public const string HomeKey = "IntoChatOS:Home";
+    public const string HomeKey = RuntimeOptions.IntoChatHomeKey;
 
     /// <summary>Widens binding beyond loopback on local and local+cloud.</summary>
-    public const string BindKey = "IntoChatOS:Bind";
+    public const string BindKey = RuntimeOptions.IntoChatBindKey;
 
     /// <summary>The cloud storage account (cloud only).</summary>
-    public const string CloudStorageKey = "IntoChatOS:Cloud:Storage";
+    public const string CloudStorageKey = RuntimeOptions.IntoChatCloudStorageKey;
 
     /// <summary>The cloud key vault (cloud only).</summary>
-    public const string CloudKeyVaultKey = "IntoChatOS:Cloud:KeyVault";
+    public const string CloudKeyVaultKey = RuntimeOptions.IntoChatCloudKeyVaultKey;
 
     /// <summary>The server a local+cloud host connects to.</summary>
-    public const string CloudServerAddressKey = "IntoChatOS:Cloud:ServerAddress";
+    public const string CloudServerAddressKey = RuntimeOptions.IntoChatCloudServerAddressKey;
 
     /// <summary>The master key.</summary>
-    public const string MasterKeyKey = "IntoChatOS:MasterKey";
+    public const string MasterKeyKey = RuntimeOptions.IntoChatMasterKeyKey;
 
     /// <summary>The prefix of every cloud key.</summary>
-    public const string CloudSectionPrefix = "IntoChatOS:Cloud:";
+    public const string CloudSectionPrefix = RuntimeOptions.IntoChatCloudSectionPrefix;
 
     /// <summary>The stream pub-sub grain store.</summary>
     public const string PubSubStore = "PubSubStore";
@@ -46,9 +47,9 @@ public static class IntoChatOSNames
     public static class Signalling
     {
         /// <summary>The signalling section: session lifetime and caps (04-13).</summary>
-        public const string Section = "IntoChatOS:Signalling";
+        public const string Section = RuntimeOptions.IntoChatSignallingSection;
 
         /// <summary>The retention section (04 D-11).</summary>
-        public const string Retention = "IntoChatOS:Signalling:Retention";
+        public const string Retention = RuntimeOptions.IntoChatRetentionSection;
     }
 }

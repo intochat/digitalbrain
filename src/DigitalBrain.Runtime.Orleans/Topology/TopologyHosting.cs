@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.Configuration.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Hosting;
@@ -16,7 +17,7 @@ public static class TopologyHosting
     public const string CloudPackage = "DigitalBrain.Runtime.Orleans.Azure";
 
     // The single composition entry: local and local+cloud are built in; cloud arrives through the Azure package.
-    private static readonly ITopologyProfile[] BuiltIn = [new LocalProfile(), new LocalCloudProfile()];
+    private static ITopologyProfile[] BuiltIn(RuntimeOptions options) => [new LocalProfile(options), new LocalCloudProfile(options)];
 
     /// <summary>
     /// Parses the topology, selects its implementation, validates settings, the implementation and every module need, and
@@ -35,9 +36,11 @@ public static class TopologyHosting
         ArgumentNullException.ThrowIfNull(retired);
         ArgumentNullException.ThrowIfNull(additional);
         var configuration = builder.Configuration;
+        var options = RuntimeOptions.From(builder.Services);
+        builder.Services.TryAddSingleton(options);
 
         // Home comes from the command line, environment or code, never from settings.json itself.
-        var home = TryResolveHome(configuration);
+        var home = TryResolveHome(configuration, options);
         if (home is not null)
         {
             var json = new JsonConfigurationSource { Path = home.SettingsFile, Optional = true, ReloadOnChange = false };
@@ -45,16 +48,16 @@ public static class TopologyHosting
             configuration.Sources.Insert(0, json);
         }
 
-        var settings = TopologySettings.Parse(configuration, retired);
+        var settings = TopologySettings.Parse(configuration, retired, options);
         var issues = settings.Issues.ToList();
         ITopologyProfile? selected = null;
         // Select whenever the topology itself parsed, so settings and implementation issues are reported together.
-        if (!settings.Issues.Any(issue => issue.Key == IntoChatOSNames.TopologyKey))
+        if (!settings.Issues.Any(issue => issue.Key == options.TopologyKey))
         {
-            selected = additional.Concat(BuiltIn).FirstOrDefault(candidate => candidate.Topology == settings.Topology);
+            selected = additional.Concat(BuiltIn(options)).FirstOrDefault(candidate => candidate.Topology == settings.Topology);
             if (selected is null)
             {
-                issues.Add(new TopologyIssue(IntoChatOSNames.TopologyKey, settings.Topology == Topology.Cloud
+                issues.Add(new TopologyIssue(options.TopologyKey, settings.Topology == Topology.Cloud
                     ? $"Topology=cloud requires {CloudPackage}; reference it and pass its implementation."
                     : $"Topology={settings.Topology.ToConfigValue()} has no registered implementation."));
             }
@@ -64,7 +67,7 @@ public static class TopologyHosting
         {
             configuration.Sources.Insert(0, new MemoryConfigurationSource { InitialData = selected.Defaults });
             issues.AddRange(selected.Validate(configuration, modules));
-            issues.AddRange(ValidateNeeds(selected, modules, ClusterStoreHosting.HasClusterStore(builder.Services)));
+            issues.AddRange(TopologyValidator.ValidateNeeds(selected.Topology, selected.Bindings, modules, ClusterStoreHosting.HasClusterStore(builder.Services), options));
         }
 
         TopologyValidator.ThrowIfInvalid(issues);
@@ -112,6 +115,19 @@ public static class TopologyHosting
         return TopologyValidator.ValidateNeeds(topology.Topology, topology.Bindings, modules, clusterStoreRegistered);
     }
 
+    /// <summary>
+    /// Names the configuration keys, stores and default home the runtime uses on this host. Call it before <see cref="UseTopology"/>;
+    /// without it the host gets <see cref="RuntimeOptions.IntoChatCompatible"/>.
+    /// </summary>
+    public static IHostApplicationBuilder UseRuntimeOptions(this IHostApplicationBuilder builder, RuntimeOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(options);
+        builder.Services.RemoveAll<RuntimeOptions>();
+        builder.Services.AddSingleton(options);
+        return builder;
+    }
+
     /// <summary>Applies the topology chosen by <see cref="UseTopology"/> to the silo.</summary>
     /// <exception cref="InvalidOperationException"><see cref="UseTopology"/> was not called on this host.</exception>
     public static ISiloBuilder ConfigureTopologySilo(this ISiloBuilder silo)
@@ -143,9 +159,9 @@ public static class TopologyHosting
 
     private sealed record ModuleAssemblies(System.Reflection.Assembly[] Assemblies, Type[] Modules);
 
-    private static StateHome? TryResolveHome(IConfiguration configuration)
+    private static StateHome? TryResolveHome(IConfiguration configuration, RuntimeOptions options)
     {
-        try { return StateHome.Resolve(configuration); }
+        try { return StateHome.Resolve(configuration, options); }
         catch (InvalidOperationException) { return null; } // reported by TopologySettings.Parse
     }
 }

@@ -142,7 +142,7 @@ public class SynapseSilo : IAsyncLifetime
     {
         var manager = Services.GetRequiredService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
         var id = NeuronId.Parse(listener);
-        var all = await manager.GetSubscriptions(IntoChatOSNames.SignalStreams, StreamNames.For(id.Brain.Value, alias));
+        var all = await manager.GetSubscriptions(RuntimeOptions.IntoChatCompatible.SignalStreams, StreamNames.For(id.Brain.Value, alias));
         return all.Count(s => s.GrainId.Key.ToString() == listener);
     }
 
@@ -150,7 +150,7 @@ public class SynapseSilo : IAsyncLifetime
     internal Task Nudge(string publisher, long sequence, string alias)
     {
         var id = NeuronId.Parse(publisher);
-        var provider = Services.GetRequiredKeyedService<IStreamProvider>(IntoChatOSNames.SignalStreams);
+        var provider = Services.GetRequiredKeyedService<IStreamProvider>(RuntimeOptions.IntoChatCompatible.SignalStreams);
         return provider.GetStream<SignalReference>(StreamNames.For(id.Brain.Value, alias)).OnNextAsync(new SignalReference(id, sequence));
     }
 
@@ -179,8 +179,8 @@ public sealed class ShortRetentionSilo : SynapseSilo
 {
     protected override IReadOnlyDictionary<string, string?> Configuration { get; } = new Dictionary<string, string?>
     {
-        [IntoChatOSNames.Signalling.Retention + ":HistoryWindowSignals"] = "2",
-        [IntoChatOSNames.Signalling.Retention + ":HistoryWindowAge"] = "00:00:00",
-        [IntoChatOSNames.Signalling.Retention + ":StaleCursorAfter"] = "00:00:00",
+        [RuntimeOptions.IntoChatCompatible.RetentionSection + ":HistoryWindowSignals"] = "2",
+        [RuntimeOptions.IntoChatCompatible.RetentionSection + ":HistoryWindowAge"] = "00:00:00",
+        [RuntimeOptions.IntoChatCompatible.RetentionSection + ":StaleCursorAfter"] = "00:00:00",
     };
 }

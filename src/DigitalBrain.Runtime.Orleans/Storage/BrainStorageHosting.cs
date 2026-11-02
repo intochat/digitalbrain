@@ -46,11 +46,12 @@ public static class BrainStorageHosting
 
     internal static IServiceCollection AddBrainStorageServices(IServiceCollection services, Assembly[] signalAssemblies)
     {
+        var runtime = RuntimeOptions.From(services);
         services.AddOptions<BrainStoreOptions>()
-            .PostConfigure<IConfiguration>((options, configuration) => options.Directory = StateHome.Resolve(configuration).State)
+            .PostConfigure<IConfiguration>((options, configuration) => options.Directory = StateHome.Resolve(configuration, runtime).State)
             .Validate(options => !string.IsNullOrWhiteSpace(options.Directory), "Brain storage needs a directory.");
         services.AddJournalPayloads(signalAssemblies);
-        SynapseRetentionHosting.AddRetentionOptions(services);
+        SynapseRetentionHosting.AddRetentionOptions(services, runtime);
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<IRetentionPolicy, DefaultRetentionPolicy>();
         services.TryAddSingleton<IBrainKeyCustody, ConfiguredBrainKeyCustody>();
@@ -70,9 +71,9 @@ public static class BrainStorageHosting
                 sp.GetService<OrleansSdk.IGrainFactory>(),
                 sp.GetService<TimeProvider>(),
                 sp.GetService<IOptions<RetentionOptions>>()));
-        foreach (var descriptor in services.Where(d => d.ServiceType == typeof(IGrainStorage) && Equals(d.ServiceKey, IntoChatOSNames.ClusterGrainStorage)).ToArray())
+        foreach (var descriptor in services.Where(d => d.ServiceType == typeof(IGrainStorage) && Equals(d.ServiceKey, runtime.ClusterGrainStorage)).ToArray())
         { services.Remove(descriptor); }
-        services.AddKeyedSingleton<IGrainStorage>(IntoChatOSNames.ClusterGrainStorage, (sp, _) => new BrainGrainStorage(sp.GetRequiredService<BrainLogs>()));
+        services.AddKeyedSingleton<IGrainStorage>(runtime.ClusterGrainStorage, (sp, _) => new BrainGrainStorage(sp.GetRequiredService<BrainLogs>()));
         return services;
     }
 }
