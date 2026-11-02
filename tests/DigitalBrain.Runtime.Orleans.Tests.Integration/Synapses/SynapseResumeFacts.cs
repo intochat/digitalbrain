@@ -27,36 +27,6 @@ public sealed partial class SynapseResumeFacts(SynapseSilo silo) : IClassFixture
     }
 
     [Fact]
-    public async Task A_signal_appended_without_a_reference_is_caught_up_when_the_subscriber_activates()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        const string Listener = "b1/probe.listener/activate", Source = "b1/probe.counter/activate";
-        await silo.Get<IListener>(Listener).Follow(Source);
-        await silo.DeactivateAll();
-        await KillBetweenAppendAndPublish(Source);
-
-        Assert.Equal(1, await silo.Get<IListener>(Listener).Ping());
-        Assert.Equal(["counted:1"], Heard.Of(Listener)); // caught up inside activation, before the call returned
-    }
-
-    [Fact]
-    public async Task Reconcile_bounds_its_catch_ups_and_two_runs_at_once_deliver_each_signal_once()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        const string Listener = "b1/probe.listener/reconcile", Source = "b1/probe.counter/reconcile";
-        await silo.Get<IListener>(Listener).Follow(Source);
-        await KillBetweenAppendAndPublish(Source);
-        Assert.Empty(Heard.Of(Listener));
-
-        var reconcile = silo.Services.GetRequiredService<SynapseReconcile>();
-        await Task.WhenAll(reconcile.Run(ct), reconcile.Run(ct));
-        await Heard.Until(Listener, 1, ct);
-        await Task.Delay(500, ct);
-        Assert.Equal(["counted:1"], Heard.Of(Listener));
-        Assert.Equal(64, SynapseReconcile.MaxConcurrentCatchUps);
-    }
-
-    [Fact]
     public void No_observer_or_lease_code_exists_in_the_digitalbrain_sources()
     {
         var root = AppContext.BaseDirectory;
@@ -68,41 +38,6 @@ public sealed partial class SynapseResumeFacts(SynapseSilo silo) : IClassFixture
         Assert.Empty(hits);
     }
 
-    private async Task KillBetweenAppendAndPublish(string source)
-    {
-        silo.Faults.FailAfterAppend = true;
-        try { await Assert.ThrowsAnyAsync<Exception>(() => silo.Get<ICounter>(source).Add(1)); }
-        finally { silo.Faults.FailAfterAppend = false; }
-    }
-
     [GeneratedRegex(@"\b(WatchRenewing|ObserverManager|INeuronObserver)\b")]
     private static partial Regex Forbidden();
-}
-
-// A silo restart: subscriptions persist in the file PubSubStore and reconcile wakes subscribers that are behind.
-public sealed class SynapseRestartFacts(SynapseSilo silo) : IClassFixture<SynapseSilo>
-{
-    [Fact]
-    public async Task A_signal_appended_before_a_restart_without_a_reference_reaches_the_subscriber_once_after_restart_through_reconcile()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        const string Listener = "b1/probe.listener/restart", Source = "b1/probe.counter/restart";
-        await silo.Get<IListener>(Listener).Follow(Source);
-        silo.Faults.FailAfterAppend = true;
-        try { await Assert.ThrowsAnyAsync<Exception>(() => silo.Get<ICounter>(Source).Add(1)); }
-        finally { silo.Faults.FailAfterAppend = false; }
-        Assert.Empty(Heard.Of(Listener));
-
-        await silo.Restart(ct);
-        await Heard.Until(Listener, 1, ct, seconds: 30);
-        Assert.Equal(["counted:1"], Heard.Of(Listener));
-        Assert.Equal(1, await silo.Subscriptions(Listener, "probe.counted"));
-
-        // A live signal after the restart arrives through the resumed subscription, once.
-        await silo.Get<ICounter>(Source).Add(1);
-        await Heard.Until(Listener, 2, ct);
-        await Task.Delay(300, ct);
-        Assert.Equal(2, Heard.Of(Listener).Length);
-        Assert.Equal(1, await silo.Subscriptions(Listener, "probe.counted"));
-    }
 }

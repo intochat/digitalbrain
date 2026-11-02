@@ -29,10 +29,21 @@ internal static class Rules
         "'{0}' loops over a {1} stream; use an [On] reaction and Context.Synapses.Ensure",
         Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
-    public static readonly DiagnosticDescriptor ReactionShape = new(
-        "DB0014", "Malformed [On] reaction",
-        "[On] method '{0}' must take exactly one Signal-derived parameter (plus an optional trailing CancellationToken) and return Task or ValueTask",
+    public static readonly DiagnosticDescriptor ShareableContract = new(
+        "DB0031", "Cross-brain contract interface requires [Shareable]",
+        "Contract interface or member '{0}' violates [Shareable] contract rules",
         Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor ReentrancyJustification = new(
+        "DB0032", "Neuron reentrancy requires explicit justification comment",
+        "Neuron class '{0}' is marked [Reentrant] without an explicit design justification comment explaining why concurrent turn interleaving is safe",
+        Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor CallCycle = new(
+        "DB0033", "Synchronous contract call cycle detected",
+        "Synchronous contract invocation cycle detected: {0}. Blocking calls across turns will cause actor deadlocks; use asynchronous signals or [OneWayCall].",
+        Category, DiagnosticSeverity.Error, isEnabledByDefault: true,
+        customTags: [WellKnownDiagnosticTags.CompilationEnd]);
 
     public const string SignalType = "DigitalBrain.Signal";
     public const string NeuronType = "DigitalBrain.Neuron";

@@ -114,7 +114,7 @@ public sealed class AppRuleTimingFacts
         Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken).Where(d => d.Severity == DiagnosticSeverity.Error));
 
         var analyzers = AnalyzerSet.All;
-        Assert.Equal(14, analyzers.Length);
+        Assert.Equal(16, analyzers.Length);
         var watch = Stopwatch.StartNew();
         var diagnostics = await compilation.WithAnalyzers(analyzers).GetAnalyzerDiagnosticsAsync(TestContext.Current.CancellationToken);
         watch.Stop();

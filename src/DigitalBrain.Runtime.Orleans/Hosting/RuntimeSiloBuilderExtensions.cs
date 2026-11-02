@@ -34,8 +34,6 @@ public static class RuntimeSiloBuilderExtensions
         silo.Services.AddJournalPayloads(modules);
         silo.Services.AddSignalPublisher();
         silo.Services.AddSingleton<SynapseCounters>();
-        silo.Services.AddSingleton<SynapseReconcile>();
-        silo.Services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(sp => sp.GetRequiredService<SynapseReconcile>());
         silo.AddSynapseRetention();
         silo.AddRuntimeServices();
         silo.Services.AddCapabilityBroker();

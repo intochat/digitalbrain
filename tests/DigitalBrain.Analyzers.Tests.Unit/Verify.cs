@@ -27,6 +27,7 @@ internal static class Verify<TAnalyzer> where TAnalyzer : DiagnosticAnalyzer, ne
                 protected AppKey Key(BrainId brain) => default;
                 protected RequestLedger Requests { get; } = new RequestLedger();
                 protected bool Present<TView>(System.Action<TView, TView> publish, System.Func<TView> side, System.Func<TView> main, string operation = "") where TView : class => true;
+                protected T Get<T>(string key) where T : class => default!;
                 protected void RecordError(System.Exception error, string operation = "") { }
                 protected void Swallow(System.Exception error, string reason, string operation = "") { }
             }
@@ -44,6 +45,11 @@ internal static class Verify<TAnalyzer> where TAnalyzer : DiagnosticAnalyzer, ne
             public abstract record Signal;
             [System.AttributeUsage(System.AttributeTargets.Method)] public sealed class OnAttribute : System.Attribute;
         }
+        namespace DigitalBrain.Access
+        {
+            [System.AttributeUsage(System.AttributeTargets.Interface | System.AttributeTargets.Class)]
+            public sealed class ShareableAttribute : System.Attribute;
+        }
         namespace DigitalBrain.Capabilities
         {
             public readonly record struct CapabilityId(string Name, int Major)
@@ -55,6 +61,8 @@ internal static class Verify<TAnalyzer> where TAnalyzer : DiagnosticAnalyzer, ne
         namespace Orleans
         {
             public sealed class GenerateSerializerAttribute : System.Attribute;
+            [System.AttributeUsage(System.AttributeTargets.Class | System.AttributeTargets.Struct | System.AttributeTargets.Interface)]
+            public sealed class AliasAttribute(string alias) : System.Attribute { public string Alias { get; } = alias; }
         }
         """;
 

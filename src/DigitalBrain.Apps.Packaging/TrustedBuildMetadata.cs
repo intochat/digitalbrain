@@ -10,10 +10,10 @@ namespace DigitalBrain.Apps.Packaging;
 /// <summary>Local build seam. Only call with trusted developer types, never while inspecting a received archive.</summary>
 public static class TrustedBuildMetadata
 {
-    public static CompiledAppDescriptor Extract(Type entryType, AppManifest manifest, CompiledAppDescriptor? hostMetadata = null)
+    public static CompiledAppDescriptor Extract(Type entryType, AppManifest? manifest = null, CompiledAppDescriptor? hostMetadata = null)
     {
         ArgumentNullException.ThrowIfNull(entryType);
-        ArgumentNullException.ThrowIfNull(manifest);
+        manifest ??= new AppDefinition(entryType).Manifest;
         if (!typeof(App).IsAssignableFrom(entryType) || entryType.GetCustomAttribute<AppAttribute>()?.Id != manifest.Id)
         { throw new InvalidDataException("Typed manifest and entry app identity disagree."); }
         if (hostMetadata is not null && (hostMetadata.Id != manifest.Id || (hostMetadata.Capabilities.Length != 0 && !hostMetadata.Capabilities.Order(StringComparer.Ordinal).SequenceEqual(manifest.Requires.Capabilities.Select(c => c.ToString()).Order(StringComparer.Ordinal), StringComparer.Ordinal))))

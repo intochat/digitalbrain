@@ -96,29 +96,20 @@ public sealed class SynapseCursorRegistryFacts
     }
 
     [Fact]
-    public async Task The_first_report_indexes_the_brain_once_and_forgetting_the_last_subscriber_removes_it()
+    public async Task GetCursor_returns_reported_cursor_or_null()
     {
         var ct = TestContext.Current.CancellationToken;
         using var home = new TempHome();
         await using var host = await Start(home, new ManualTime(), ct);
         var registry = Grains(host).GetGrain<ISynapseCursorRegistry>("b1");
-        var index = Grains(host).GetGrain<ISynapseRegistryIndex>(SynapseRegistryIndex.Key);
-        await registry.ReportCursor("a", P, 1);
-        Assert.Equal(["b1"], await index.List());
+        Assert.Null(await registry.GetCursor("a", P));
 
-        await index.Remove("b1"); // a later report must not call the index again
-        await registry.ReportCursor("b", P, 2);
-        Assert.Empty(await index.List());
-
-        await index.Add("b1");
-        await registry.Forget("a");
-        Assert.Equal(["b1"], await index.List());
-        await registry.Forget("b");
-        Assert.Empty(await index.List());
+        await registry.ReportCursor("a", P, 42);
+        Assert.Equal(42L, await registry.GetCursor("a", P));
     }
 
     [Fact]
-    public async Task Registry_and_index_survive_a_silo_restart_on_the_file_cluster_store()
+    public async Task Registry_survives_a_silo_restart_on_the_file_cluster_store()
     {
         var ct = TestContext.Current.CancellationToken;
         using var home = new TempHome();
@@ -129,6 +120,6 @@ public sealed class SynapseCursorRegistryFacts
         await host.Restart(ct);
 
         Assert.Equal(5, await Grains(host).GetGrain<ISynapseCursorRegistry>("b1").LowestLive(P));
-        Assert.Equal(["b1"], await Grains(host).GetGrain<ISynapseRegistryIndex>(SynapseRegistryIndex.Key).List());
+        Assert.Equal(5L, await Grains(host).GetGrain<ISynapseCursorRegistry>("b1").GetCursor("a", P));
     }
 }

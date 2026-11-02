@@ -84,12 +84,11 @@ public sealed class SignalLoopAnalyzerFacts
         Assert.Empty(compilation.GetDiagnostics(TestContext.Current.CancellationToken).Where(d => d.Severity == DiagnosticSeverity.Error));
 
         var watch = Stopwatch.StartNew();
-        var diagnostics = await compilation.WithAnalyzers([new SignalLoopAnalyzer(), new ReactionShapeAnalyzer()])
+        var diagnostics = await compilation.WithAnalyzers([new SignalLoopAnalyzer()])
             .GetAnalyzerDiagnosticsAsync(TestContext.Current.CancellationToken);
         watch.Stop();
 
         Assert.Equal(loops, diagnostics.Count(d => d.Id == "DB0013"));
-        Assert.DoesNotContain(diagnostics, d => d.Id == "DB0014");
         Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10), $"analysis took {watch.Elapsed}");
     }
 }

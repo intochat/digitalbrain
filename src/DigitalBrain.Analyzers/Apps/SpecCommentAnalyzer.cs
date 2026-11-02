@@ -7,7 +7,6 @@ namespace DigitalBrain.Analyzers.Apps;
 /// <summary>
 /// DB0027: an app type has a spec comment: a leading <c>/* ... */</c> comment in a file that declares it, or an
 /// AdditionalFiles item named <c>&lt;Type&gt;.spec.md</c> (or <c>&lt;file&gt;.spec.md</c> next to a script <c>app.cs</c>).
-/// Whether the comment agrees with the manifest is DB0024 (08-03).
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class SpecCommentAnalyzer : DiagnosticAnalyzer

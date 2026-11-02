@@ -4,9 +4,14 @@ using Orleans.Concurrency;
 namespace DigitalBrain.Runtime.Orleans.Synapses;
 
 /// <summary>One per brain (keyed by brain key): the synapse cursors on the brain's publishers (04 D-04).</summary>
+[Obsolete("Replaced by subscriber-owned SignalCursor and BrainSignalLog. Retained exclusively for dual-reader fallback during Release N cutover.")]
 [Alias("brain.synapse-cursors")]
 internal interface ISynapseCursorRegistry : IGrainWithStringKey
 {
+    /// <summary>Returns the recorded cursor of the subscriber on the publisher; null when not found.</summary>
+    [ReadOnly]
+    Task<long?> GetCursor(string subscriber, NeuronId publisher);
+
     /// <summary>Records the subscriber's cursor on the publisher at the current time.</summary>
     Task ReportCursor(string subscriber, NeuronId publisher, long cursor);
 

@@ -16,7 +16,6 @@
       "admit",
       "brain.affine-placement",
       "brain.synapse-cursors",
-      "brain.synapse-index",
       "catch-up",
       "db.json-element",
       "db.runtime-invocation",
@@ -34,6 +33,7 @@
       "neuron.synapse-host",
       "post",
       "post-interleaved",
+      "signal.subscriber",
       "storage.brain-entry",
       "storage.brain-record",
       "storage.brain-snapshot",
@@ -44,8 +44,7 @@
     ],
     "neurons": [
       "runtime.listener",
-      "runtime.operation",
-      "runtime.session"
+      "runtime.operation"
     ],
     "signals": [
       "synapse.gap"

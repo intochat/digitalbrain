@@ -50,12 +50,12 @@ public sealed class IntochatAppTemplateFacts
             Assert.Contains("succeeded: 4", test, StringComparison.Ordinal);
             Assert.Contains("failed: 0", test, StringComparison.Ordinal);
 
-            // The analyzers run in the instance: an operation the spec does not describe fails the build with DB0024.
+            // The analyzers run in the instance: defining multiple [App] classes fails the build with DB0030.
             var code = await File.ReadAllTextAsync(source, ct);
             var at = code.LastIndexOf('}');
-            await File.WriteAllTextAsync(source, code[..at] + "    [On]\n    public Task Close(Opened signal) => Task.CompletedTask;\n}\n", ct);
+            await File.WriteAllTextAsync(source, code[..at] + "\n[App(\"extra\")]\npublic sealed class ExtraApp : App { }\n}\n", ct);
             var probe = await Dotnet(app, packages, ["build", Path.Combine(name, name + ".csproj"), "-c", "Release"], ct, expectSuccess: false);
-            Assert.Contains("DB0024", probe, StringComparison.Ordinal);
+            Assert.Contains("DB0030", probe, StringComparison.Ordinal);
         }
         finally
         {

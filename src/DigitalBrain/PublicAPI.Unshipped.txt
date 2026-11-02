@@ -9,6 +9,8 @@ DigitalBrain.Access.PublicAttribute
 DigitalBrain.Access.PublicAttribute.PublicAttribute() -> void
 DigitalBrain.Access.SharedAttribute
 DigitalBrain.Access.SharedAttribute.SharedAttribute() -> void
+DigitalBrain.Access.ShareableAttribute
+DigitalBrain.Access.ShareableAttribute.ShareableAttribute() -> void
 DigitalBrain.App
 DigitalBrain.App.App() -> void
 DigitalBrain.AppAttribute
@@ -1213,3 +1215,48 @@ DigitalBrain.Capabilities.TrustedEdge.AppProxy = 1 -> DigitalBrain.Capabilities.
 DigitalBrain.Capabilities.TrustedEdge.AuthenticatedHttp = 0 -> DigitalBrain.Capabilities.TrustedEdge
 DigitalBrain.Capabilities.TrustedEdge.Platform = 3 -> DigitalBrain.Capabilities.TrustedEdge
 DigitalBrain.Capabilities.TrustedEdge.Scheduler = 2 -> DigitalBrain.Capabilities.TrustedEdge
+DigitalBrain.DeadLetterEntry
+DigitalBrain.DeadLetterEntry.<Clone>$() -> DigitalBrain.DeadLetterEntry!
+DigitalBrain.DeadLetterEntry.At.get -> System.DateTimeOffset
+DigitalBrain.DeadLetterEntry.At.init -> void
+DigitalBrain.DeadLetterEntry.DeadLetterEntry(long Position, string! Publisher, string! SignalType, string! ErrorMessage, System.DateTimeOffset At) -> void
+DigitalBrain.DeadLetterEntry.Deconstruct(out long Position, out string! Publisher, out string! SignalType, out string! ErrorMessage, out System.DateTimeOffset At) -> void
+DigitalBrain.DeadLetterEntry.Equals(DigitalBrain.DeadLetterEntry? other) -> bool
+DigitalBrain.DeadLetterEntry.ErrorMessage.get -> string!
+DigitalBrain.DeadLetterEntry.ErrorMessage.init -> void
+DigitalBrain.DeadLetterEntry.Position.get -> long
+DigitalBrain.DeadLetterEntry.Position.init -> void
+DigitalBrain.DeadLetterEntry.Publisher.get -> string!
+DigitalBrain.DeadLetterEntry.Publisher.init -> void
+DigitalBrain.DeadLetterEntry.SignalType.get -> string!
+DigitalBrain.DeadLetterEntry.SignalType.init -> void
+override DigitalBrain.DeadLetterEntry.Equals(object? obj) -> bool
+override DigitalBrain.DeadLetterEntry.GetHashCode() -> int
+override DigitalBrain.DeadLetterEntry.ToString() -> string!
+static DigitalBrain.DeadLetterEntry.operator !=(DigitalBrain.DeadLetterEntry? left, DigitalBrain.DeadLetterEntry? right) -> bool
+static DigitalBrain.DeadLetterEntry.operator ==(DigitalBrain.DeadLetterEntry? left, DigitalBrain.DeadLetterEntry? right) -> bool
+DigitalBrain.NeuronState
+virtual DigitalBrain.NeuronState.<Clone>$() -> DigitalBrain.NeuronState!
+DigitalBrain.NeuronState.DeadLetters.get -> DigitalBrain.DeadLetterEntry![]!
+DigitalBrain.NeuronState.DeadLetters.init -> void
+DigitalBrain.NeuronState.NeuronState() -> void
+DigitalBrain.NeuronState.NeuronState(DigitalBrain.NeuronState! original) -> void
+DigitalBrain.NeuronState.SignalCursor.get -> long
+DigitalBrain.NeuronState.SignalCursor.init -> void
+override DigitalBrain.NeuronState.Equals(object? obj) -> bool
+override DigitalBrain.NeuronState.GetHashCode() -> int
+override DigitalBrain.NeuronState.ToString() -> string!
+static DigitalBrain.NeuronState.operator !=(DigitalBrain.NeuronState? left, DigitalBrain.NeuronState? right) -> bool
+static DigitalBrain.NeuronState.operator ==(DigitalBrain.NeuronState? left, DigitalBrain.NeuronState? right) -> bool
+virtual DigitalBrain.NeuronState.EqualityContract.get -> System.Type!
+virtual DigitalBrain.NeuronState.Equals(DigitalBrain.NeuronState? other) -> bool
+virtual DigitalBrain.NeuronState.PrintMembers(System.Text.StringBuilder! builder) -> bool
+DigitalBrain.IBrainSignalLog
+DigitalBrain.IBrainSignalLog.AppendSignalAsync(DigitalBrain.NeuronId publisher, DigitalBrain.Signal! signal, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<long>!
+DigitalBrain.IBrainSignalLog.AppendSignalsAsync(DigitalBrain.NeuronId publisher, System.Collections.Generic.IReadOnlyList<DigitalBrain.Signal!>! signals, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<long>!
+DigitalBrain.IBrainSignalLog.BrainId.get -> string!
+DigitalBrain.IBrainSignalLog.ComputeCompactionFloor(long logLatestPosition, System.Collections.Generic.IEnumerable<(string! SubscriberId, long Cursor, System.DateTimeOffset LastActiveAt)>! subscribers, System.DateTimeOffset? now = null) -> long
+DigitalBrain.IBrainSignalLog.EnsureCaughtUpAsync<TState>(DigitalBrain.NeuronId subscriberId, TState! currentState, System.Func<TState!, DigitalBrain.Signal!, System.Threading.CancellationToken, System.Threading.Tasks.Task<TState!>!>! handler, System.Func<TState!, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! commit, long targetPosition, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<TState!>!
+DigitalBrain.IBrainSignalLog.GetLatestPositionAsync(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<long>!
+DigitalBrain.IBrainSignalLog.IsQuarantined(System.DateTimeOffset lastActiveAt, System.DateTimeOffset? now = null) -> bool
+DigitalBrain.IBrainSignalLog.NotifySubscribersAsync(System.Collections.Generic.IEnumerable<string!>! subscribers, long position) -> System.Threading.Tasks.Task!

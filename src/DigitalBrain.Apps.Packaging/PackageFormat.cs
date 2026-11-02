@@ -78,6 +78,8 @@ internal static class PackageFormat
         }
         if (!descriptor.Payload.Any(item => string.Equals(item.Path, descriptor.EntryAssembly, StringComparison.Ordinal)))
         { throw new InvalidDataException("Entry assembly is missing from inventory."); }
+        if (descriptor.Payload.Count(item => item.Path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)) != 1)
+        { throw new InvalidDataException("Package payload must contain exactly one application assembly."); }
     }
 
     private static CompiledContractDescriptor CanonicalContract(CompiledContractDescriptor contract) => contract with { Fields = [.. contract.Fields.OrderBy(f => f.Id)] };

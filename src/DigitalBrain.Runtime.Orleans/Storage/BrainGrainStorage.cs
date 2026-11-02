@@ -23,7 +23,7 @@ internal sealed class BrainGrainStorage(BrainLogs logs, string? fixedBrainScope 
     public Task WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState)
         => WriteStateAsync(stateName, grainId, grainState, "", []);
 
-    /// <summary>Writes the state and the signals its publisher emitted with it as one durable entry; returns the publisher's last sequence.</summary>
+    /// <summary>Writes the state and the signals its publisher emitted with it as one durable entry; returns the unified brain monotonic sequence N.</summary>
     internal Task<long> WriteStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState, string publisher, IReadOnlyList<Signal> signals)
         => WriteStateAsync(stateName, grainId, grainState, publisher, signals, null);
 
@@ -32,15 +32,15 @@ internal sealed class BrainGrainStorage(BrainLogs logs, string? fixedBrainScope 
         ReactionCursor? cursor)
     {
         ArgumentNullException.ThrowIfNull(grainState);
-        var (seq, last) = await Append(stateName, grainId, grainState.ETag, BrainRecordChange.Write, JournalPayloads.EncodeState(grainState.State), publisher, signals, cursor);
+        var (seq, last, pos) = await Append(stateName, grainId, grainState.ETag, BrainRecordChange.Write, JournalPayloads.EncodeState(grainState.State), publisher, signals, cursor);
         grainState.ETag = seq.ToString(CultureInfo.InvariantCulture);
         grainState.RecordExists = true;
-        return last;
+        return pos;
     }
 
-    /// <summary>Appends the <paramref name="signals"/> of <paramref name="publisher"/> as one entry with no state change; returns its last sequence.</summary>
+    /// <summary>Appends the <paramref name="signals"/> of <paramref name="publisher"/> as one entry with no state change; returns the unified brain monotonic sequence N.</summary>
     internal async Task<long> AppendSignalsAsync(string stateName, GrainId grainId, string publisher, IReadOnlyList<Signal> signals, ReactionCursor? cursor = null)
-        => (await Append(stateName, grainId, null, BrainRecordChange.None, [], publisher, signals, cursor)).Last;
+        => (await Append(stateName, grainId, null, BrainRecordChange.None, [], publisher, signals, cursor)).Position;
 
     /// <summary>The journal of the brain <paramref name="grainId"/> belongs to.</summary>
     internal Task<BrainLog> LogOf(GrainId grainId) => Log(grainId);
@@ -57,14 +57,14 @@ internal sealed class BrainGrainStorage(BrainLogs logs, string? fixedBrainScope 
 
     private Task<BrainLog> Log(GrainId grainId) => logs.For(fixedBrainScope ?? BrainStorageKeys.BrainOf(grainId.Key.ToString()!));
 
-    private async Task<(long Sequence, long Last)> Append(string stateName, GrainId grainId, string? etag, BrainRecordChange change, byte[] record,
+    private async Task<(long Sequence, long Last, long Position)> Append(string stateName, GrainId grainId, string? etag, BrainRecordChange change, byte[] record,
         string publisher, IReadOnlyList<Signal> signals, ReactionCursor? cursor = null)
     {
         var log = await Log(grainId);
         var side = cursor is null ? null : new BrainSideWrite(SynapseState.Name, ParseETag(cursor.ETag), cursor.Encode());
         var result = await log.AppendEntry(grainId.ToString(), stateName, ParseETag(etag), change, record, publisher, signals, side, CancellationToken.None);
         cursor?.Committed(result.Sequence.ToString(CultureInfo.InvariantCulture));
-        return result;
+        return (result.Sequence, result.LastSignal, log.LastPosition);
     }
 
     private static long? ParseETag(string? etag) => etag is null ? null : long.TryParse(etag, CultureInfo.InvariantCulture, out var parsed) ? parsed : -1;

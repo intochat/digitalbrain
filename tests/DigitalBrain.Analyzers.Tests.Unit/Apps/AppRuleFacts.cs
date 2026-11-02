@@ -8,7 +8,7 @@ public sealed class AppRulesFacts
     [Fact]
     public void Nine_app_ids_are_reserved_in_order_with_handbook_links()
     {
-        Assert.Equal(["DB0020", "DB0021", "DB0022", "DB0023", "DB0024", "DB0025", "DB0026", "DB0027", "DB0028"], AppRules.All.Select(d => d.Id));
+        Assert.Equal(["DB0020", "DB0021", "DB0022", "DB0023", "DB0025", "DB0026", "DB0027", "DB0028", "DB0030"], AppRules.All.Select(d => d.Id));
         Assert.All(AppRules.All, d =>
         {
             Assert.Equal("DigitalBrain.Apps", d.Category);
@@ -22,11 +22,11 @@ public sealed class AppRulesFacts
     [Fact]
     public void Severities_follow_the_convention_table()
     {
-        foreach (var id in new[] { "DB0020", "DB0021", "DB0022", "DB0023", "DB0027", "DB0028" })
+        foreach (var id in new[] { "DB0020", "DB0021", "DB0022", "DB0023", "DB0027", "DB0028", "DB0030" })
         {
             Assert.Equal(DiagnosticSeverity.Error, AppRules.ById(id)!.DefaultSeverity);
         }
-        foreach (var id in new[] { "DB0024", "DB0025", "DB0026" })
+        foreach (var id in new[] { "DB0025", "DB0026" })
         {
             Assert.Equal(DiagnosticSeverity.Warning, AppRules.ById(id)!.DefaultSeverity);
         }

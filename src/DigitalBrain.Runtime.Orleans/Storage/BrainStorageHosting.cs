@@ -63,6 +63,13 @@ public static class BrainStorageHosting
             sp.GetRequiredService<IOptions<BrainStoreOptions>>(), sp.GetRequiredService<IBrainLogOwnership>()));
         // The adapters' write path shares the per-brain BrainLog (and its writer claim) with the cluster store: one writer per brain.
         services.TryAddSingleton<IBrainJournalWriter>(sp => new BrainJournalWriter(sp.GetRequiredService<BrainLogs>(), sp));
+        services.TryAddSingleton<Func<string, IBrainSignalLog>>(sp => brainId =>
+            new Log.BrainSignalLog(
+                brainId,
+                sp.GetRequiredService<BrainLogs>(),
+                sp.GetService<OrleansSdk.IGrainFactory>(),
+                sp.GetService<TimeProvider>(),
+                sp.GetService<IOptions<RetentionOptions>>()));
         foreach (var descriptor in services.Where(d => d.ServiceType == typeof(IGrainStorage) && Equals(d.ServiceKey, IntoChatOSNames.ClusterGrainStorage)).ToArray())
         { services.Remove(descriptor); }
         services.AddKeyedSingleton<IGrainStorage>(IntoChatOSNames.ClusterGrainStorage, (sp, _) => new BrainGrainStorage(sp.GetRequiredService<BrainLogs>()));

@@ -55,6 +55,26 @@ public sealed class PackageFacts : IDisposable
     }
 
     [Fact]
+    public void TrustedBuildMetadataExtractsWithoutExplicitManifest()
+    {
+        var metadata = TrustedBuildMetadata.Extract(typeof(ExampleApp));
+        Assert.Equal("example.app", metadata.Id);
+        Assert.NotNull(metadata.EntryAssembly);
+        Assert.EndsWith(".dll", metadata.EntryAssembly, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task PackageWriterRejectsMultipleApplicationAssemblies()
+    {
+        var build = Build();
+        File.Copy(typeof(PackageFacts).Assembly.Location, Path.Combine(build, "extra.dll"), true);
+        using var stream = new MemoryStream();
+        var ex = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            new AppPackageWriter().Write(Descriptor(), build, stream, TestContext.Current.CancellationToken));
+        Assert.Contains("Package payload must contain exactly one application assembly", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task WriterExcludesSourcesSecretsAndSharedContracts()
     {
         var build = Build();

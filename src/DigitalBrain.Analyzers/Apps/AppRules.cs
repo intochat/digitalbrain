@@ -32,11 +32,6 @@ public static class AppRules
         "DB0023", "Key composed from strings",
         "App '{0}' composes a key from '{1}' with strings; use the typed key parts of the App base", DiagnosticSeverity.Error);
 
-    /// <summary>The SpecMismatch rule.</summary>
-    public static readonly DiagnosticDescriptor SpecMismatch = Create(
-        "DB0024", "Spec comment and manifest disagree",
-        "App '{0}': {1}", DiagnosticSeverity.Warning);
-
     /// <summary>The HandWrittenJson rule.</summary>
     public static readonly DiagnosticDescriptor HandWrittenJson = Create(
         "DB0025", "Hand-written JSON",
@@ -57,9 +52,15 @@ public static class AppRules
         "DB0028", "Suppressing a DigitalBrain rule",
         "App source may not suppress DigitalBrain rule '{0}'", DiagnosticSeverity.Error);
 
-    /// <summary>All nine app rules in id order.</summary>
+    /// <summary>The SingleAppClass rule.</summary>
+    public static readonly DiagnosticDescriptor SingleAppClass = Create(
+        "DB0030", "Single [App] class in application assembly",
+        "Assembly defines {0} [App] classes ('{1}'); an application assembly must define exactly one class decorated with [App] and inheriting from DigitalBrain.App",
+        DiagnosticSeverity.Error, WellKnownDiagnosticTags.CompilationEnd);
+
+    /// <summary>All app rules in id order.</summary>
     public static readonly ImmutableArray<DiagnosticDescriptor> All = ImmutableArray.Create(
-        AppBase, ModuleRequirement, SwallowingCatch, StringKey, SpecMismatch, HandWrittenJson, ReimplementedHelper, MissingSpec, Suppression);
+        AppBase, ModuleRequirement, SwallowingCatch, StringKey, HandWrittenJson, ReimplementedHelper, MissingSpec, Suppression, SingleAppClass);
 
     /// <summary>The app rule with <paramref name="id"/>, or null.</summary>
     public static DiagnosticDescriptor? ById(string id)
@@ -85,6 +86,6 @@ public static class AppRules
         return null;
     }
 
-    private static DiagnosticDescriptor Create(string id, string title, string message, DiagnosticSeverity severity)
-        => new(id, title, message, Category, severity, isEnabledByDefault: true, helpLinkUri: Help + id.ToLowerInvariant());
+    private static DiagnosticDescriptor Create(string id, string title, string message, DiagnosticSeverity severity, params string[] customTags)
+        => new(id, title, message, Category, severity, isEnabledByDefault: true, helpLinkUri: Help + id.ToLowerInvariant(), customTags: customTags);
 }

@@ -56,12 +56,8 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
         _neuron = neuron;
         _synapses = synapses;
         synapses.Neuron = neuron;
-        // Catch-up runs on every activation, before callers or live references reach the neuron (04 D-12; spike: catch-up first,
-        // live duplicates are then dropped by the cursor).
+        // Load persisted synapse subscription state; catch-up is lazy (O(1) activation).
         await synapses.Load().ConfigureAwait(true);
-        await synapses.CatchUp().ConfigureAwait(true);
-        // A publisher announces its own last again, so subscribers that missed a reference catch up (04 D-01).
-        if (registration.Policy != HostPolicy.Stateless) { await context.HostState.Reannounce().ConfigureAwait(true); }
     }
 
     /// <inheritdoc />
@@ -90,6 +86,7 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
     public async Task<JsonElement?> Invoke(RuntimeInvocation call, CancellationToken cancellationToken = default)
     {
         var (neuron, bound) = Prepare(call);
+        if (_synapses is { } synapses) { await synapses.CatchUp().ConfigureAwait(true); }
         try { return await Binder.InvokeAsync(neuron, bound, call.Arguments, cancellationToken).ConfigureAwait(true); }
         catch (InconsistentStateException error)
         {
@@ -110,6 +107,7 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
     public async Task Post(RuntimeInvocation call)
     {
         var (neuron, bound) = Prepare(call);
+        if (_synapses is { } synapses) { await synapses.CatchUp().ConfigureAwait(true); }
         try { _ = await Binder.InvokeAsync(neuron, bound, call.Arguments, CancellationToken.None).ConfigureAwait(true); }
         finally { await Drain().ConfigureAwait(true); }
     }

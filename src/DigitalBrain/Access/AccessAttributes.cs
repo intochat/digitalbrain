@@ -4,6 +4,7 @@ namespace DigitalBrain.Access;
 /// Who may call a contract method; the kernel checks it once per call against the stamped caller.
 /// Unmarked is the owner rule: the caller's brain is the brain the neuron's key starts with.
 /// On an interface it is the contract's default; on a method it wins over the interface.
+/// Cross-brain capability invocations require the contract interface to be decorated with <see cref="ShareableAttribute"/>.
 /// </summary>
 [AttributeUsage(AttributeTargets.Interface | AttributeTargets.Method, Inherited = false)]
 public abstract class AccessAttribute : Attribute;

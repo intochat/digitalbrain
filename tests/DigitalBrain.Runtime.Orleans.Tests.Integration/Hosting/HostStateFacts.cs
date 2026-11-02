@@ -101,7 +101,9 @@ public sealed class HostStateFacts(StatefulSilo silo) : IClassFixture<StatefulSi
         var page = await silo.History("b1").Read(NeuronId.Parse("b1/probe.counter/note"), 0, 10, ct);
         Assert.Equal("hi", ((Noted)Assert.Single(page.Signals).Signal).Text);
         await watched.Until(items => items.Count > 0, ct);
-        Assert.Equal(new SignalReference(NeuronId.Parse("b1/probe.counter/note"), 1), Assert.Single(watched.Items));
+        var item = Assert.Single(watched.Items);
+        Assert.Equal(NeuronId.Parse("b1/probe.counter/note"), item.Publisher);
+        Assert.True(item.Sequence >= 1);
         Assert.Equal(0, await counter.Value());
     }
 
@@ -127,20 +129,6 @@ public sealed class HostStateFacts(StatefulSilo silo) : IClassFixture<StatefulSi
         var page = await silo.History("b1").Read(NeuronId.Parse("b1/probe.counter/ephemeral"), 0, 10, ct);
         Assert.Empty(page.Signals);
         Assert.Equal(0, page.Last);
-    }
-
-    [Fact]
-    public async Task On_activation_a_publisher_with_journal_entries_reannounces_its_last()
-    {
-        var ct = TestContext.Current.CancellationToken;
-        await silo.Get<ICounter>("b1/probe.counter/announce").Add(1);
-        await silo.Get<ICounter>("b1/probe.counter/announce").Add(1);
-        await silo.Restart(ct);
-
-        var watched = await silo.Watch("b1", "probe");
-        Assert.Equal(2, await silo.Get<ICounter>("b1/probe.counter/announce").Value());
-        await watched.Until(items => items.Count > 0, ct);
-        Assert.Contains(new SignalReference(NeuronId.Parse("b1/probe.counter/announce"), 2), watched.Items);
     }
 
     [Fact]

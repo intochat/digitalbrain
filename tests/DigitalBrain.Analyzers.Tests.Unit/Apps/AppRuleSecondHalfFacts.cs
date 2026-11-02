@@ -118,71 +118,6 @@ public sealed class SpecCommentParserFacts
     }
 }
 
-public sealed class SpecManifestAnalyzerFacts
-{
-    [Fact]
-    public Task Undescribed_handlers_unhandled_operations_and_bad_headers_report_DB0024() => Verify<SpecManifestAnalyzer>.Diagnostics("""
-        /*
-        # A
-
-        Role: Admin
-        Shipped: true
-
-        Invoking "open" shows it. Invoking "export" saves it.
-        */
-        using System.Threading.Tasks;
-        using DigitalBrain;
-        public sealed record Opened : Signal;
-        [App("a")] public sealed class {|DB0024:{|DB0024:A|}|} : App
-        {
-            [On] public Task Open(Opened s) => Task.CompletedTask;
-            [On] public Task {|DB0024:Close|}(Opened s) => Task.CompletedTask;
-        }
-        """);
-
-    [Fact]
-    public Task Spec_and_handlers_that_agree_report_nothing() => Verify<SpecManifestAnalyzer>.Diagnostics("""
-        /*
-        # A
-
-        Role: Optional
-        Shipped: false
-
-        Invoking "open" shows it. The dock posts "clear-all".
-        */
-        using System.Threading.Tasks;
-        using DigitalBrain;
-        public sealed record Opened : Signal;
-        [App("a")] public sealed class A : App
-        {
-            [On] public Task Open(Opened s) => Task.CompletedTask;
-            [On] public Task ClearAll(Opened s) => Task.CompletedTask;
-            public Task NotAnOperation() => Task.CompletedTask;
-        }
-        public sealed class NotApp { [On] public Task Other(Opened s) => Task.CompletedTask; }
-        """);
-
-    [Fact]
-    public Task App_without_spec_is_left_to_DB0027() => Verify<SpecManifestAnalyzer>.Diagnostics("""
-        using System.Threading.Tasks;
-        using DigitalBrain;
-        public sealed record Opened : Signal;
-        [App("a")] public sealed class A : App { [On] public Task Open(Opened s) => Task.CompletedTask; }
-        """);
-
-    [Fact]
-    public Task Sibling_spec_file_is_read_with_the_same_parser()
-    {
-        var test = Verify<SpecManifestAnalyzer>.Create("""
-            using System.Threading.Tasks;
-            using DigitalBrain;
-            public sealed record Opened : Signal;
-            [App("notes")] public sealed class {|DB0024:Notes|} : App { [On] public Task Open(Opened s) => Task.CompletedTask; }
-            """);
-        test.TestState.AdditionalFiles.Add(("Notes.spec.md", "# Notes\n\nOperations: open, archive\n"));
-        return test.RunAsync(TestContext.Current.CancellationToken);
-    }
-}
 
 public sealed class UntypedJsonAnalyzerFacts
 {
@@ -263,15 +198,15 @@ public sealed class BaseBoilerplateAnalyzerFacts
 public sealed class AnalyzerSetFacts
 {
     [Fact]
-    public void All_holds_fourteen_analyzers_covering_every_rule_once()
+    public void All_holds_sixteen_analyzers_covering_every_rule_once()
     {
-        Assert.Equal(14, AnalyzerSet.All.Length);
+        Assert.Equal(16, AnalyzerSet.All.Length);
         var ids = AnalyzerSet.All.SelectMany(a => a.SupportedDiagnostics).Select(d => d.Id).ToArray();
         Assert.Equal(
-            ["DB0001", "DB0002", "DB0003", "DB0013", "DB0014", "DB0020", "DB0021", "DB0022", "DB0023", "DB0024", "DB0025", "DB0026", "DB0027", "DB0028"],
+            ["DB0001", "DB0002", "DB0003", "DB0013", "DB0020", "DB0021", "DB0022", "DB0023", "DB0025", "DB0026", "DB0027", "DB0028", "DB0030", "DB0031", "DB0032", "DB0033"],
             ids.Order(StringComparer.Ordinal));
         Assert.Equal(ids.Length, ids.Distinct(StringComparer.Ordinal).Count());
-        Assert.Contains(AnalyzerSet.All, a => a is ReactionShapeAnalyzer);
+        Assert.Contains(AnalyzerSet.All, a => a is SingleAppClassAnalyzer);
     }
 
     [Fact]

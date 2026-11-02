@@ -8,6 +8,7 @@ namespace DigitalBrain;
 /// <param name="Version">The app version.</param>
 /// <param name="Neurons">The neuron classes the app brings.</param>
 /// <param name="Requires">What the app requires from the brain.</param>
+[Obsolete("App metadata is declared directly via [AppAttribute] and contract interfaces. Explicit AppManifest records are deprecated.")]
 public sealed record AppManifest(string Id, string Name, string Version, IReadOnlyList<Type> Neurons, AppRequirements Requires)
 {
     /// <summary>Optional hex accent color (<c>#RRGGBB</c>) for the app's squircle icon badge.</summary>

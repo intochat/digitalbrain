@@ -31,6 +31,7 @@ internal sealed class SynapseCursorRegistryState
     public bool Indexed { get; set; }
 }
 
+[Obsolete("Replaced by subscriber-owned SignalCursor and BrainSignalLog. Retained exclusively for dual-reader fallback during Release N cutover.")]
 [DigitalBrain.Runtime.Orleans.Placement.BrainAffinePlacement]
 internal sealed class SynapseCursorRegistry(
     [PersistentState("synapse-cursors", IntoChatOSNames.ClusterGrainStorage)] IPersistentState<SynapseCursorRegistryState> state,
@@ -38,6 +39,14 @@ internal sealed class SynapseCursorRegistry(
     TimeProvider time) : Grain, ISynapseCursorRegistry
 {
     private string Brain => this.GetPrimaryKeyString();
+
+    public Task<long?> GetCursor(string subscriber, NeuronId publisher)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(subscriber);
+        var name = Own(publisher);
+        var entry = state.State.Entries.Find(e => e.Publisher == name && e.Subscriber == subscriber);
+        return Task.FromResult(entry is not null ? (long?)entry.Cursor : null);
+    }
 
     public async Task ReportCursor(string subscriber, NeuronId publisher, long cursor)
     {
@@ -51,11 +60,6 @@ internal sealed class SynapseCursorRegistry(
         }
         entry.Cursor = cursor;
         entry.At = time.GetUtcNow();
-        if (!state.State.Indexed)
-        {
-            await GrainFactory.GetGrain<ISynapseRegistryIndex>(SynapseRegistryIndex.Key).Add(Brain);
-            state.State.Indexed = true;
-        }
         await state.WriteStateAsync();
     }
 
@@ -68,11 +72,6 @@ internal sealed class SynapseCursorRegistry(
     public async Task Forget(string subscriber)
     {
         if (state.State.Entries.RemoveAll(e => e.Subscriber == subscriber) == 0) { return; }
-        if (state.State.Entries.Count == 0 && state.State.Indexed)
-        {
-            await GrainFactory.GetGrain<ISynapseRegistryIndex>(SynapseRegistryIndex.Key).Remove(Brain);
-            state.State.Indexed = false;
-        }
         await state.WriteStateAsync();
     }
 

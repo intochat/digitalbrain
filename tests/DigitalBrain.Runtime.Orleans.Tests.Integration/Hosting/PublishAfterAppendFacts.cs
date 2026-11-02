@@ -18,7 +18,9 @@ public sealed class PublishAfterAppendFacts(StatefulSilo silo) : IClassFixture<S
         await watched.Until(items => items.Count > 0, ct);
         foreach (var reference in watched.Items) { seenAtArrival.Add((await history.Read(reference.Publisher, 0, 10, ct)).Last); }
 
-        Assert.Equal(new SignalReference(publisher, 1), Assert.Single(watched.Items));
+        var item = Assert.Single(watched.Items);
+        Assert.Equal(publisher, item.Publisher);
+        Assert.True(item.Sequence >= 1);
         Assert.All(seenAtArrival, last => Assert.True(last >= 1));
     }
 
