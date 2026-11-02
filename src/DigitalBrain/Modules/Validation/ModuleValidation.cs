@@ -1,3 +1,5 @@
+using DigitalBrain.Rules;
+
 namespace DigitalBrain.Modules.Validation;
 
 public static class ModuleValidation
@@ -13,5 +15,13 @@ public static class ModuleValidation
     {
         var issues = Validate(value, validator);
         if (issues.Length != 0) { throw new ModuleValidationException(issues); }
+    }
+
+    public static void Check(string moduleId, params Rule[] rules)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(moduleId);
+        ArgumentNullException.ThrowIfNull(rules);
+        var rejected = DigitalBrain.Rules.Rules.Judge("module." + moduleId, rules);
+        if (rejected is not null) { throw new ModuleValidationException(rejected); }
     }
 }

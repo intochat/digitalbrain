@@ -1389,3 +1389,121 @@ static DigitalBrain.Rules.Rules.Judge(string! operation, params System.ReadOnlyS
 virtual DigitalBrain.Rules.Rule.EqualityContract.get -> System.Type!
 virtual DigitalBrain.Rules.Rule.Equals(DigitalBrain.Rules.Rule? other) -> bool
 virtual DigitalBrain.Rules.Rule.PrintMembers(System.Text.StringBuilder! builder) -> bool
+DigitalBrain.Modules.Validation.ArrayLength<T>
+DigitalBrain.Modules.Validation.ArrayLength<T>.ArrayLength(string! Path, T[]? Value, int Minimum, int Maximum) -> void
+DigitalBrain.Modules.Validation.ArrayLength<T>.Deconstruct(out string! Path, out T[]? Value, out int Minimum, out int Maximum) -> void
+DigitalBrain.Modules.Validation.ArrayLength<T>.Equals(DigitalBrain.Modules.Validation.ArrayLength<T>? other) -> bool
+DigitalBrain.Modules.Validation.ArrayLength<T>.Maximum.get -> int
+DigitalBrain.Modules.Validation.ArrayLength<T>.Maximum.init -> void
+DigitalBrain.Modules.Validation.ArrayLength<T>.Minimum.get -> int
+DigitalBrain.Modules.Validation.ArrayLength<T>.Minimum.init -> void
+DigitalBrain.Modules.Validation.ArrayLength<T>.Path.get -> string!
+DigitalBrain.Modules.Validation.ArrayLength<T>.Path.init -> void
+DigitalBrain.Modules.Validation.ArrayLength<T>.Value.get -> T[]?
+DigitalBrain.Modules.Validation.ArrayLength<T>.Value.init -> void
+DigitalBrain.Modules.Validation.HttpUri
+DigitalBrain.Modules.Validation.HttpUri.Deconstruct(out string! Path, out System.Uri? Value) -> void
+DigitalBrain.Modules.Validation.HttpUri.Equals(DigitalBrain.Modules.Validation.HttpUri? other) -> bool
+DigitalBrain.Modules.Validation.HttpUri.HttpUri(string! Path, System.Uri? Value) -> void
+DigitalBrain.Modules.Validation.HttpUri.Path.get -> string!
+DigitalBrain.Modules.Validation.HttpUri.Path.init -> void
+DigitalBrain.Modules.Validation.HttpUri.Value.get -> System.Uri?
+DigitalBrain.Modules.Validation.HttpUri.Value.init -> void
+DigitalBrain.Modules.Validation.ModuleValidationException.ModuleValidationException(DigitalBrain.Rules.Rejected! rejected) -> void
+DigitalBrain.Modules.Validation.NumberRange
+DigitalBrain.Modules.Validation.NumberRange.Deconstruct(out string! Path, out decimal Value, out decimal Minimum, out decimal Maximum) -> void
+DigitalBrain.Modules.Validation.NumberRange.Equals(DigitalBrain.Modules.Validation.NumberRange? other) -> bool
+DigitalBrain.Modules.Validation.NumberRange.Maximum.get -> decimal
+DigitalBrain.Modules.Validation.NumberRange.Maximum.init -> void
+DigitalBrain.Modules.Validation.NumberRange.Minimum.get -> decimal
+DigitalBrain.Modules.Validation.NumberRange.Minimum.init -> void
+DigitalBrain.Modules.Validation.NumberRange.Path.get -> string!
+DigitalBrain.Modules.Validation.NumberRange.Path.init -> void
+DigitalBrain.Modules.Validation.NumberRange.NumberRange(string! Path, decimal Value, decimal Minimum, decimal Maximum) -> void
+DigitalBrain.Modules.Validation.NumberRange.Value.get -> decimal
+DigitalBrain.Modules.Validation.NumberRange.Value.init -> void
+DigitalBrain.Modules.Validation.Required
+DigitalBrain.Modules.Validation.Required.Deconstruct(out string! Path, out object? Value) -> void
+DigitalBrain.Modules.Validation.Required.Equals(DigitalBrain.Modules.Validation.Required? other) -> bool
+DigitalBrain.Modules.Validation.Required.Path.get -> string!
+DigitalBrain.Modules.Validation.Required.Path.init -> void
+DigitalBrain.Modules.Validation.Required.Required(string! Path, object? Value) -> void
+DigitalBrain.Modules.Validation.Required.Value.get -> object?
+DigitalBrain.Modules.Validation.Required.Value.init -> void
+DigitalBrain.Modules.Validation.StringLength
+DigitalBrain.Modules.Validation.StringLength.Deconstruct(out string! Path, out string? Value, out int Minimum, out int Maximum) -> void
+DigitalBrain.Modules.Validation.StringLength.Equals(DigitalBrain.Modules.Validation.StringLength? other) -> bool
+DigitalBrain.Modules.Validation.StringLength.Maximum.get -> int
+DigitalBrain.Modules.Validation.StringLength.Maximum.init -> void
+DigitalBrain.Modules.Validation.StringLength.Minimum.get -> int
+DigitalBrain.Modules.Validation.StringLength.Minimum.init -> void
+DigitalBrain.Modules.Validation.StringLength.Path.get -> string!
+DigitalBrain.Modules.Validation.StringLength.Path.init -> void
+DigitalBrain.Modules.Validation.StringLength.StringLength(string! Path, string? Value, int Minimum, int Maximum) -> void
+DigitalBrain.Modules.Validation.StringLength.Value.get -> string?
+DigitalBrain.Modules.Validation.StringLength.Value.init -> void
+DigitalBrain.Modules.Validation.Utf8Length
+DigitalBrain.Modules.Validation.Utf8Length.Deconstruct(out string! Path, out string? Value, out int MaximumBytes) -> void
+DigitalBrain.Modules.Validation.Utf8Length.Equals(DigitalBrain.Modules.Validation.Utf8Length? other) -> bool
+DigitalBrain.Modules.Validation.Utf8Length.MaximumBytes.get -> int
+DigitalBrain.Modules.Validation.Utf8Length.MaximumBytes.init -> void
+DigitalBrain.Modules.Validation.Utf8Length.Path.get -> string!
+DigitalBrain.Modules.Validation.Utf8Length.Path.init -> void
+DigitalBrain.Modules.Validation.Utf8Length.Utf8Length(string! Path, string? Value, int MaximumBytes) -> void
+DigitalBrain.Modules.Validation.Utf8Length.Value.get -> string?
+DigitalBrain.Modules.Validation.Utf8Length.Value.init -> void
+override DigitalBrain.Modules.Validation.ArrayLength<T>.<Clone>$() -> DigitalBrain.Modules.Validation.ArrayLength<T>!
+override DigitalBrain.Modules.Validation.ArrayLength<T>.Broken.get -> bool
+override DigitalBrain.Modules.Validation.ArrayLength<T>.Equals(object? obj) -> bool
+override DigitalBrain.Modules.Validation.ArrayLength<T>.GetHashCode() -> int
+override DigitalBrain.Modules.Validation.ArrayLength<T>.Message.get -> string!
+override DigitalBrain.Modules.Validation.ArrayLength<T>.ToString() -> string!
+override DigitalBrain.Modules.Validation.HttpUri.<Clone>$() -> DigitalBrain.Modules.Validation.HttpUri!
+override DigitalBrain.Modules.Validation.HttpUri.Broken.get -> bool
+override DigitalBrain.Modules.Validation.HttpUri.Equals(object? obj) -> bool
+override DigitalBrain.Modules.Validation.HttpUri.GetHashCode() -> int
+override DigitalBrain.Modules.Validation.HttpUri.Message.get -> string!
+override DigitalBrain.Modules.Validation.HttpUri.ToString() -> string!
+override DigitalBrain.Modules.Validation.NumberRange.<Clone>$() -> DigitalBrain.Modules.Validation.NumberRange!
+override DigitalBrain.Modules.Validation.NumberRange.Broken.get -> bool
+override DigitalBrain.Modules.Validation.NumberRange.Equals(object? obj) -> bool
+override DigitalBrain.Modules.Validation.NumberRange.GetHashCode() -> int
+override DigitalBrain.Modules.Validation.NumberRange.Message.get -> string!
+override DigitalBrain.Modules.Validation.NumberRange.ToString() -> string!
+override DigitalBrain.Modules.Validation.Required.<Clone>$() -> DigitalBrain.Modules.Validation.Required!
+override DigitalBrain.Modules.Validation.Required.Broken.get -> bool
+override DigitalBrain.Modules.Validation.Required.Equals(object? obj) -> bool
+override DigitalBrain.Modules.Validation.Required.GetHashCode() -> int
+override DigitalBrain.Modules.Validation.Required.Message.get -> string!
+override DigitalBrain.Modules.Validation.Required.ToString() -> string!
+override DigitalBrain.Modules.Validation.StringLength.<Clone>$() -> DigitalBrain.Modules.Validation.StringLength!
+override DigitalBrain.Modules.Validation.StringLength.Broken.get -> bool
+override DigitalBrain.Modules.Validation.StringLength.Equals(object? obj) -> bool
+override DigitalBrain.Modules.Validation.StringLength.GetHashCode() -> int
+override DigitalBrain.Modules.Validation.StringLength.Message.get -> string!
+override DigitalBrain.Modules.Validation.StringLength.ToString() -> string!
+override DigitalBrain.Modules.Validation.Utf8Length.<Clone>$() -> DigitalBrain.Modules.Validation.Utf8Length!
+override DigitalBrain.Modules.Validation.Utf8Length.Broken.get -> bool
+override DigitalBrain.Modules.Validation.Utf8Length.Equals(object? obj) -> bool
+override DigitalBrain.Modules.Validation.Utf8Length.GetHashCode() -> int
+override DigitalBrain.Modules.Validation.Utf8Length.Message.get -> string!
+override DigitalBrain.Modules.Validation.Utf8Length.ToString() -> string!
+override sealed DigitalBrain.Modules.Validation.ArrayLength<T>.Equals(DigitalBrain.Rules.Rule? other) -> bool
+override sealed DigitalBrain.Modules.Validation.HttpUri.Equals(DigitalBrain.Rules.Rule? other) -> bool
+override sealed DigitalBrain.Modules.Validation.NumberRange.Equals(DigitalBrain.Rules.Rule? other) -> bool
+override sealed DigitalBrain.Modules.Validation.Required.Equals(DigitalBrain.Rules.Rule? other) -> bool
+override sealed DigitalBrain.Modules.Validation.StringLength.Equals(DigitalBrain.Rules.Rule? other) -> bool
+override sealed DigitalBrain.Modules.Validation.Utf8Length.Equals(DigitalBrain.Rules.Rule? other) -> bool
+static DigitalBrain.Modules.Validation.ArrayLength<T>.operator !=(DigitalBrain.Modules.Validation.ArrayLength<T>? left, DigitalBrain.Modules.Validation.ArrayLength<T>? right) -> bool
+static DigitalBrain.Modules.Validation.ArrayLength<T>.operator ==(DigitalBrain.Modules.Validation.ArrayLength<T>? left, DigitalBrain.Modules.Validation.ArrayLength<T>? right) -> bool
+static DigitalBrain.Modules.Validation.HttpUri.operator !=(DigitalBrain.Modules.Validation.HttpUri? left, DigitalBrain.Modules.Validation.HttpUri? right) -> bool
+static DigitalBrain.Modules.Validation.HttpUri.operator ==(DigitalBrain.Modules.Validation.HttpUri? left, DigitalBrain.Modules.Validation.HttpUri? right) -> bool
+static DigitalBrain.Modules.Validation.ModuleValidation.Check(string! moduleId, params DigitalBrain.Rules.Rule![]! rules) -> void
+static DigitalBrain.Modules.Validation.NumberRange.operator !=(DigitalBrain.Modules.Validation.NumberRange? left, DigitalBrain.Modules.Validation.NumberRange? right) -> bool
+static DigitalBrain.Modules.Validation.NumberRange.operator ==(DigitalBrain.Modules.Validation.NumberRange? left, DigitalBrain.Modules.Validation.NumberRange? right) -> bool
+static DigitalBrain.Modules.Validation.Required.operator !=(DigitalBrain.Modules.Validation.Required? left, DigitalBrain.Modules.Validation.Required? right) -> bool
+static DigitalBrain.Modules.Validation.Required.operator ==(DigitalBrain.Modules.Validation.Required? left, DigitalBrain.Modules.Validation.Required? right) -> bool
+static DigitalBrain.Modules.Validation.StringLength.operator !=(DigitalBrain.Modules.Validation.StringLength? left, DigitalBrain.Modules.Validation.StringLength? right) -> bool
+static DigitalBrain.Modules.Validation.StringLength.operator ==(DigitalBrain.Modules.Validation.StringLength? left, DigitalBrain.Modules.Validation.StringLength? right) -> bool
+static DigitalBrain.Modules.Validation.Utf8Length.operator !=(DigitalBrain.Modules.Validation.Utf8Length? left, DigitalBrain.Modules.Validation.Utf8Length? right) -> bool
+static DigitalBrain.Modules.Validation.Utf8Length.operator ==(DigitalBrain.Modules.Validation.Utf8Length? left, DigitalBrain.Modules.Validation.Utf8Length? right) -> bool
