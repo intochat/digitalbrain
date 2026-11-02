@@ -85,7 +85,7 @@ public static class TopologyValidator
         {
             return [new TopologyIssue(key, $"is not registered under Topology={topology.ToConfigValue()}; stream subscriptions need it.")];
         }
-        if (store is MemoryGrainStorage && topology != Topology.Local)
+        if (store is (MemoryGrainStorage or LocalMemoryGrainStorage) && topology == Topology.Cloud)
         {
             return [new TopologyIssue(key, $"is memory-backed under Topology={topology.ToConfigValue()}; it must be durable outside local.")];
         }

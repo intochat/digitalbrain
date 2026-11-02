@@ -35,9 +35,9 @@ public sealed class LocalProfile : ITopologyProfile
     /// <summary>The local bindings, shared by local+cloud.</summary>
     public static Bindings LocalBindings { get; } = new(
         ClusteringBinding.Localhost,
-        GrainStoreBinding.File,
-        StreamsBinding.MemoryWithFilePubSub,
-        RemindersBinding.File,
+        GrainStoreBinding.Memory,
+        StreamsBinding.Memory,
+        RemindersBinding.Memory,
         SecretsBinding.MachineKey,
         HttpBinding.Direct,
         SandboxBinding.LocalContainer,
@@ -113,13 +113,13 @@ public sealed class LocalProfile : ITopologyProfile
             .Select(n => n.Name!));
         foreach (var name in stores.Distinct(StringComparer.Ordinal))
         {
-            silo.AddFileGrainStorage(name, options => options.RootDirectory = StoreDirectory(context.Home, name));
+            silo.Services.AddKeyedSingleton<IGrainStorage>(name, (_, _) => new LocalMemoryGrainStorage(context.Home.State, name));
         }
         // Replaced by the host-bound registration, which ConfigureTopologySilo runs after this.
         silo.Services.AddKeyedSingleton<IGrainStorage>(IntoChatOSNames.ClusterGrainStorage, new UnregisteredClusterStorage());
 
         silo.AddReminders();
-        silo.Services.AddSingleton<IReminderTable>(_ => new FileReminderTable(context.Home));
+        silo.Services.AddSingleton<IReminderTable>(_ => MemoryReminderTable.For(context.Home.State));
         silo.AddMemoryStreams(IntoChatOSNames.SignalStreams);
     }
 

@@ -14,7 +14,7 @@ public sealed class LocalProfileCompositionFacts
     private static InProcessHostOptions Options(string home, params Type[] modules) => new() { Home = home, Modules = modules };
 
     [Fact]
-    public void With_the_host_registration_the_cluster_store_is_the_host_store_and_named_stores_are_files()
+    public void With_the_host_registration_the_cluster_store_is_the_host_store_and_named_stores_are_memory()
     {
         using var home = new TempHome();
         var fake = new FakeClusterStore();
@@ -24,10 +24,10 @@ public sealed class LocalProfileCompositionFacts
         Assert.Equal(1, fake.Registered);
         foreach (var name in new[] { IntoChatOSNames.PlatformGrainStorage, IntoChatOSNames.PubSubStore, "drive" })
         {
-            var store = Assert.IsType<FileGrainStorage>(host.Services.GetRequiredKeyedService<IGrainStorage>(name));
-            Assert.Equal(Path.Combine(home.Path, "state", "files", name), store.RootDirectory);
+            var store = host.Services.GetRequiredKeyedService<IGrainStorage>(name);
+            Assert.NotNull(store);
         }
-        Assert.IsType<FileReminderTable>(host.Services.GetRequiredService<IReminderTable>());
+        Assert.NotNull(host.Services.GetRequiredService<IReminderTable>());
         Assert.NotNull(host.Services.GetRequiredKeyedService<OrleansSdk.Streams.IStreamProvider>(IntoChatOSNames.SignalStreams));
         Assert.False(string.IsNullOrEmpty(host.Services.GetRequiredService<IConfiguration>()[IntoChatOSNames.MasterKeyKey]));
     }

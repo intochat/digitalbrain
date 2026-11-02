@@ -140,38 +140,10 @@ DigitalBrain.Runtime.Orleans.DpapiMachineKeyProtector
 DigitalBrain.Runtime.Orleans.DpapiMachineKeyProtector.DpapiMachineKeyProtector() -> void
 DigitalBrain.Runtime.Orleans.DpapiMachineKeyProtector.Protect(byte[]! key) -> byte[]!
 DigitalBrain.Runtime.Orleans.DpapiMachineKeyProtector.Unprotect(byte[]! stored) -> byte[]!
-DigitalBrain.Runtime.Orleans.FileGrainStorage
-DigitalBrain.Runtime.Orleans.FileGrainStorage.ClearStateAsync<T>(string! stateName, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T>! grainState) -> System.Threading.Tasks.Task!
-DigitalBrain.Runtime.Orleans.FileGrainStorage.FileGrainStorage(string! name, string! rootDirectory, string! serviceId, Orleans.Storage.IGrainStorageSerializer! serializer) -> void
-DigitalBrain.Runtime.Orleans.FileGrainStorage.Participate(Orleans.Runtime.ISiloLifecycle! lifecycle) -> void
-DigitalBrain.Runtime.Orleans.FileGrainStorage.ReadStateAsync<T>(string! stateName, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T>! grainState) -> System.Threading.Tasks.Task!
-DigitalBrain.Runtime.Orleans.FileGrainStorage.RootDirectory.get -> string!
-DigitalBrain.Runtime.Orleans.FileGrainStorage.WriteStateAsync<T>(string! stateName, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T>! grainState) -> System.Threading.Tasks.Task!
-DigitalBrain.Runtime.Orleans.FileGrainStorageHosting
-DigitalBrain.Runtime.Orleans.FileGrainStorageOptions
-DigitalBrain.Runtime.Orleans.FileGrainStorageOptions.FileGrainStorageOptions() -> void
-DigitalBrain.Runtime.Orleans.FileGrainStorageOptions.GrainStorageSerializer.get -> Orleans.Storage.IGrainStorageSerializer?
-DigitalBrain.Runtime.Orleans.FileGrainStorageOptions.GrainStorageSerializer.set -> void
-DigitalBrain.Runtime.Orleans.FileGrainStorageOptions.RootDirectory.get -> string!
-DigitalBrain.Runtime.Orleans.FileGrainStorageOptions.RootDirectory.set -> void
-DigitalBrain.Runtime.Orleans.FileGrainStorageOptions.ServiceId.get -> string?
-DigitalBrain.Runtime.Orleans.FileGrainStorageOptions.ServiceId.set -> void
-DigitalBrain.Runtime.Orleans.FileReminderTable
-DigitalBrain.Runtime.Orleans.FileReminderTable.Dispose() -> void
-DigitalBrain.Runtime.Orleans.FileReminderTable.FileReminderTable(DigitalBrain.Runtime.Orleans.StateHome! home) -> void
-DigitalBrain.Runtime.Orleans.FileReminderTable.FileReminderTable(string! path) -> void
-DigitalBrain.Runtime.Orleans.FileReminderTable.Path.get -> string!
-DigitalBrain.Runtime.Orleans.FileReminderTable.ReadRow(Orleans.Runtime.GrainId grainId, string! reminderName) -> System.Threading.Tasks.Task<Orleans.ReminderEntry?>!
-DigitalBrain.Runtime.Orleans.FileReminderTable.ReadRows(Orleans.Runtime.GrainId grainId) -> System.Threading.Tasks.Task<Orleans.ReminderTableData!>!
-DigitalBrain.Runtime.Orleans.FileReminderTable.ReadRows(uint begin, uint end) -> System.Threading.Tasks.Task<Orleans.ReminderTableData!>!
-DigitalBrain.Runtime.Orleans.FileReminderTable.RemoveRow(Orleans.Runtime.GrainId grainId, string! reminderName, string! eTag) -> System.Threading.Tasks.Task<bool>!
-DigitalBrain.Runtime.Orleans.FileReminderTable.StartAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-DigitalBrain.Runtime.Orleans.FileReminderTable.StopAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-DigitalBrain.Runtime.Orleans.FileReminderTable.TestOnlyClearTable() -> System.Threading.Tasks.Task!
-DigitalBrain.Runtime.Orleans.FileReminderTable.UpsertRow(Orleans.ReminderEntry! entry) -> System.Threading.Tasks.Task<string?>!
 DigitalBrain.Runtime.Orleans.GrainStoreBinding
 DigitalBrain.Runtime.Orleans.GrainStoreBinding.AzureBlob = 2 -> DigitalBrain.Runtime.Orleans.GrainStoreBinding
 DigitalBrain.Runtime.Orleans.GrainStoreBinding.File = 1 -> DigitalBrain.Runtime.Orleans.GrainStoreBinding
+DigitalBrain.Runtime.Orleans.GrainStoreBinding.Memory = 3 -> DigitalBrain.Runtime.Orleans.GrainStoreBinding
 DigitalBrain.Runtime.Orleans.GrainStoreBinding.None = 0 -> DigitalBrain.Runtime.Orleans.GrainStoreBinding
 DigitalBrain.Runtime.Orleans.Hosting.INeuronHost
 DigitalBrain.Runtime.Orleans.Hosting.INeuronHost.Invoke(DigitalBrain.Invocation.RuntimeInvocation! call, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Text.Json.JsonElement?>!
@@ -337,6 +309,7 @@ DigitalBrain.Runtime.Orleans.PlatformGrainStorage
 DigitalBrain.Runtime.Orleans.RemindersBinding
 DigitalBrain.Runtime.Orleans.RemindersBinding.AzureTable = 2 -> DigitalBrain.Runtime.Orleans.RemindersBinding
 DigitalBrain.Runtime.Orleans.RemindersBinding.File = 1 -> DigitalBrain.Runtime.Orleans.RemindersBinding
+DigitalBrain.Runtime.Orleans.RemindersBinding.Memory = 3 -> DigitalBrain.Runtime.Orleans.RemindersBinding
 DigitalBrain.Runtime.Orleans.RemindersBinding.None = 0 -> DigitalBrain.Runtime.Orleans.RemindersBinding
 DigitalBrain.Runtime.Orleans.RetiredSetting
 DigitalBrain.Runtime.Orleans.RetiredSetting.<Clone>$() -> DigitalBrain.Runtime.Orleans.RetiredSetting!
@@ -443,6 +416,7 @@ DigitalBrain.Runtime.Orleans.StateHome.SettingsFile.get -> string!
 DigitalBrain.Runtime.Orleans.StateHome.State.get -> string!
 DigitalBrain.Runtime.Orleans.StreamsBinding
 DigitalBrain.Runtime.Orleans.StreamsBinding.AzureQueue = 2 -> DigitalBrain.Runtime.Orleans.StreamsBinding
+DigitalBrain.Runtime.Orleans.StreamsBinding.Memory = 3 -> DigitalBrain.Runtime.Orleans.StreamsBinding
 DigitalBrain.Runtime.Orleans.StreamsBinding.MemoryWithFilePubSub = 1 -> DigitalBrain.Runtime.Orleans.StreamsBinding
 DigitalBrain.Runtime.Orleans.StreamsBinding.None = 0 -> DigitalBrain.Runtime.Orleans.StreamsBinding
 DigitalBrain.Runtime.Orleans.Synapses.IRetentionPolicy
@@ -518,7 +492,6 @@ DigitalBrain.Runtime.Orleans.UnregisteredClusterStorage.ReadStateAsync<T>(string
 DigitalBrain.Runtime.Orleans.UnregisteredClusterStorage.UnregisteredClusterStorage() -> void
 DigitalBrain.Runtime.Orleans.UnregisteredClusterStorage.WriteStateAsync<T>(string! stateName, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T>! grainState) -> System.Threading.Tasks.Task!
 const DigitalBrain.Runtime.Orleans.ClusterStoreHosting.HookName = "UseClusterStore (or an IClusterStoreRegistration service instance)" -> string!
-const DigitalBrain.Runtime.Orleans.FileReminderTable.FileName = "reminders.json" -> string!
 const DigitalBrain.Runtime.Orleans.IntoChatOSNames.BindKey = "IntoChatOS:Bind" -> string!
 const DigitalBrain.Runtime.Orleans.IntoChatOSNames.CloudKeyVaultKey = "IntoChatOS:Cloud:KeyVault" -> string!
 const DigitalBrain.Runtime.Orleans.IntoChatOSNames.CloudSectionPrefix = "IntoChatOS:Cloud:" -> string!
@@ -623,8 +596,6 @@ static DigitalBrain.Runtime.Orleans.Capabilities.ModuleCapabilityValidator.Valid
 static DigitalBrain.Runtime.Orleans.ClusterStoreHosting.HasClusterStore(Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> bool
 static DigitalBrain.Runtime.Orleans.ClusterStoreHosting.UseClusterStore(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder, DigitalBrain.Runtime.Orleans.IClusterStoreRegistration! registration) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
 static DigitalBrain.Runtime.Orleans.ClusterStoreHosting.UseClusterStore(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder, System.Action<Orleans.Hosting.ISiloBuilder!>! register) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
-static DigitalBrain.Runtime.Orleans.FileGrainStorage.FileNameOf(string! serviceId, string! grainType, string! grainKey, string! stateName) -> string!
-static DigitalBrain.Runtime.Orleans.FileGrainStorageHosting.AddFileGrainStorage(this Orleans.Hosting.ISiloBuilder! silo, string! name, System.Action<DigitalBrain.Runtime.Orleans.FileGrainStorageOptions!>! configure) -> Orleans.Hosting.ISiloBuilder!
 static DigitalBrain.Runtime.Orleans.JournalAppendResult.operator !=(DigitalBrain.Runtime.Orleans.JournalAppendResult? left, DigitalBrain.Runtime.Orleans.JournalAppendResult? right) -> bool
 static DigitalBrain.Runtime.Orleans.JournalAppendResult.operator ==(DigitalBrain.Runtime.Orleans.JournalAppendResult? left, DigitalBrain.Runtime.Orleans.JournalAppendResult? right) -> bool
 static DigitalBrain.Runtime.Orleans.JournalSignalEntry.operator !=(DigitalBrain.Runtime.Orleans.JournalSignalEntry? left, DigitalBrain.Runtime.Orleans.JournalSignalEntry? right) -> bool

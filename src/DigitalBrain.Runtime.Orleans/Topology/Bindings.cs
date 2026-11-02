@@ -24,6 +24,9 @@ public enum GrainStoreBinding
 
     /// <summary>Azure Blob storage.</summary>
     AzureBlob,
+
+    /// <summary>In-memory storage.</summary>
+    Memory,
 }
 
 /// <summary>How streams are carried.</summary>
@@ -37,6 +40,9 @@ public enum StreamsBinding
 
     /// <summary>Azure Queue streams.</summary>
     AzureQueue,
+
+    /// <summary>In-memory streams with memory pub-sub store.</summary>
+    Memory,
 }
 
 /// <summary>Where durable reminders live.</summary>
@@ -50,6 +56,9 @@ public enum RemindersBinding
 
     /// <summary>Azure Table reminders.</summary>
     AzureTable,
+
+    /// <summary>In-memory reminder table.</summary>
+    Memory,
 }
 
 /// <summary>Where secrets live.</summary>

@@ -35,7 +35,6 @@ public sealed class TopologyPubSubStoreFacts
     }
 
     [Theory]
-    [InlineData(Topology.LocalCloud, "local+cloud")]
     [InlineData(Topology.Cloud, "cloud")]
     public void A_memory_PubSubStore_outside_local_is_an_issue_naming_key_and_topology(Topology topology, string value)
     {
@@ -43,14 +42,6 @@ public sealed class TopologyPubSubStoreFacts
         var issue = Assert.Single(TopologyValidator.ValidatePubSubStore(topology, services));
         Assert.Contains(IntoChatOSNames.PubSubStore, issue.Key, StringComparison.Ordinal);
         Assert.Contains("Topology=" + value, issue.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Local_with_the_file_store_passes()
-    {
-        using var home = new TempDirectory();
-        using var services = With(new FileGrainStorage(IntoChatOSNames.PubSubStore, home.Path, "facts", new NoSerializer()));
-        Assert.Empty(TopologyValidator.ValidatePubSubStore(Topology.Local, services));
     }
 
     [Fact]
@@ -65,7 +56,7 @@ public sealed class TopologyPubSubStoreFacts
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Local_profiles_bind_memory_signal_streams_over_the_file_PubSubStore(bool localCloud)
+    public void Local_profiles_bind_memory_signal_streams_over_the_memory_PubSubStore(bool localCloud)
     {
         using var home = new TempDirectory();
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
@@ -76,17 +67,10 @@ public sealed class TopologyPubSubStoreFacts
         builder.UseOrleans(silo => profile.ConfigureSilo(silo, context));
         using var host = builder.Build();
 
-        Assert.IsType<FileGrainStorage>(host.Services.GetRequiredKeyedService<IGrainStorage>(IntoChatOSNames.PubSubStore));
+        Assert.IsType<MemoryGrainStorage>(host.Services.GetRequiredKeyedService<IGrainStorage>(IntoChatOSNames.PubSubStore));
         Assert.IsType<PersistentStreamProvider>(host.Services.GetRequiredKeyedService<IStreamProvider>(IntoChatOSNames.SignalStreams));
         Assert.Contains("Memory", host.Services.GetRequiredKeyedService<IQueueAdapterFactory>(IntoChatOSNames.SignalStreams).GetType().Name, StringComparison.Ordinal);
         Assert.Empty(TopologyValidator.ValidatePubSubStore(topology, host.Services));
-    }
-
-    private sealed class NoSerializer : IGrainStorageSerializer
-    {
-        public BinaryData Serialize<T>(T? input) => throw new NotSupportedException();
-
-        public T Deserialize<T>(BinaryData input) => throw new NotSupportedException();
     }
 
     private sealed class TempDirectory : IDisposable
