@@ -1348,3 +1348,42 @@ static DigitalBrain.Modules.Validation.ModuleValidation.ThrowIfInvalid<T>(T valu
 static DigitalBrain.Modules.Validation.ModuleValidation.Validate<T>(T value, DigitalBrain.Modules.Validation.IModuleValidator<T>! validator) -> DigitalBrain.Modules.Validation.ValidationIssue![]!
 static DigitalBrain.Modules.Validation.ValidationIssue.operator !=(DigitalBrain.Modules.Validation.ValidationIssue? left, DigitalBrain.Modules.Validation.ValidationIssue? right) -> bool
 static DigitalBrain.Modules.Validation.ValidationIssue.operator ==(DigitalBrain.Modules.Validation.ValidationIssue? left, DigitalBrain.Modules.Validation.ValidationIssue? right) -> bool
+DigitalBrain.Rules.Rejected
+DigitalBrain.Rules.Rejected.Deconstruct(out string! Operation, out string![]! Rules, out string![]! Messages) -> void
+DigitalBrain.Rules.Rejected.Equals(DigitalBrain.Rules.Rejected? other) -> bool
+DigitalBrain.Rules.Rejected.Messages.get -> string![]!
+DigitalBrain.Rules.Rejected.Messages.init -> void
+DigitalBrain.Rules.Rejected.Operation.get -> string!
+DigitalBrain.Rules.Rejected.Operation.init -> void
+DigitalBrain.Rules.Rejected.Rejected(string! Operation, string![]! Rules, string![]! Messages) -> void
+DigitalBrain.Rules.Rejected.Rules.get -> string![]!
+DigitalBrain.Rules.Rejected.Rules.init -> void
+DigitalBrain.Rules.Rule
+DigitalBrain.Rules.Rule.Deconstruct(out string! Name) -> void
+DigitalBrain.Rules.Rule.Name.get -> string!
+DigitalBrain.Rules.Rule.Name.init -> void
+DigitalBrain.Rules.Rule.Rule(DigitalBrain.Rules.Rule! original) -> void
+DigitalBrain.Rules.Rule.Rule(string! Name) -> void
+DigitalBrain.Rules.RuleViolationException
+DigitalBrain.Rules.RuleViolationException.Rejected.get -> DigitalBrain.Rules.Rejected!
+DigitalBrain.Rules.RuleViolationException.RuleViolationException(DigitalBrain.Rules.Rejected! rejected) -> void
+DigitalBrain.Rules.Rules
+abstract DigitalBrain.Rules.Rule.<Clone>$() -> DigitalBrain.Rules.Rule!
+abstract DigitalBrain.Rules.Rule.Broken.get -> bool
+abstract DigitalBrain.Rules.Rule.Message.get -> string!
+override DigitalBrain.Rules.Rejected.<Clone>$() -> DigitalBrain.Rules.Rejected!
+override DigitalBrain.Rules.Rejected.Equals(object? obj) -> bool
+override DigitalBrain.Rules.Rejected.GetHashCode() -> int
+override DigitalBrain.Rules.Rejected.ToString() -> string!
+override DigitalBrain.Rules.Rule.Equals(object? obj) -> bool
+override DigitalBrain.Rules.Rule.GetHashCode() -> int
+override DigitalBrain.Rules.Rule.ToString() -> string!
+override sealed DigitalBrain.Rules.Rejected.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.Rules.Rejected.operator !=(DigitalBrain.Rules.Rejected? left, DigitalBrain.Rules.Rejected? right) -> bool
+static DigitalBrain.Rules.Rejected.operator ==(DigitalBrain.Rules.Rejected? left, DigitalBrain.Rules.Rejected? right) -> bool
+static DigitalBrain.Rules.Rule.operator !=(DigitalBrain.Rules.Rule? left, DigitalBrain.Rules.Rule? right) -> bool
+static DigitalBrain.Rules.Rule.operator ==(DigitalBrain.Rules.Rule? left, DigitalBrain.Rules.Rule? right) -> bool
+static DigitalBrain.Rules.Rules.Judge(string! operation, params System.ReadOnlySpan<DigitalBrain.Rules.Rule!> rules) -> DigitalBrain.Rules.Rejected?
+virtual DigitalBrain.Rules.Rule.EqualityContract.get -> System.Type!
+virtual DigitalBrain.Rules.Rule.Equals(DigitalBrain.Rules.Rule? other) -> bool
+virtual DigitalBrain.Rules.Rule.PrintMembers(System.Text.StringBuilder! builder) -> bool
