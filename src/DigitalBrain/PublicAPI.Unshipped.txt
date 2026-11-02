@@ -1324,3 +1324,27 @@ static DigitalBrain.Signals.Watch.Sources.React<T>(DigitalBrain.Signals.Watch.IS
 static DigitalBrain.Signals.Watch.Sources.Stream<T>(DigitalBrain.Signals.Watch.ISignalWatch! brain, DigitalBrain.Signals.Watch.Sources! sources, System.Func<System.Threading.Tasks.Task!>? subscribed, System.Action? reselected, System.Threading.CancellationToken cancellationToken) -> System.Collections.Generic.IAsyncEnumerable<T!>!
 static DigitalBrain.Signals.Watch.Sources.Stream<T>(DigitalBrain.Signals.Watch.ISignalWatch! brain, DigitalBrain.Signals.Watch.Sources! sources, System.Threading.CancellationToken cancellationToken) -> System.Collections.Generic.IAsyncEnumerable<T!>!
 ~override DigitalBrain.NeuronAddress.Equals(object obj) -> bool
+DigitalBrain.Modules.Validation.IModuleValidator<T>
+DigitalBrain.Modules.Validation.IModuleValidator<T>.Validate(T value) -> DigitalBrain.Modules.Validation.ValidationIssue![]!
+DigitalBrain.Modules.Validation.ModuleValidation
+DigitalBrain.Modules.Validation.ModuleValidationException
+DigitalBrain.Modules.Validation.ModuleValidationException.Issues.get -> DigitalBrain.Modules.Validation.ValidationIssue![]!
+DigitalBrain.Modules.Validation.ModuleValidationException.ModuleValidationException(DigitalBrain.Modules.Validation.ValidationIssue![]! issues) -> void
+DigitalBrain.Modules.Validation.ValidationIssue
+DigitalBrain.Modules.Validation.ValidationIssue.<Clone>$() -> DigitalBrain.Modules.Validation.ValidationIssue!
+DigitalBrain.Modules.Validation.ValidationIssue.Code.get -> string!
+DigitalBrain.Modules.Validation.ValidationIssue.Code.init -> void
+DigitalBrain.Modules.Validation.ValidationIssue.Deconstruct(out string! Path, out string! Code, out string! Message) -> void
+DigitalBrain.Modules.Validation.ValidationIssue.Equals(DigitalBrain.Modules.Validation.ValidationIssue? other) -> bool
+DigitalBrain.Modules.Validation.ValidationIssue.Message.get -> string!
+DigitalBrain.Modules.Validation.ValidationIssue.Message.init -> void
+DigitalBrain.Modules.Validation.ValidationIssue.Path.get -> string!
+DigitalBrain.Modules.Validation.ValidationIssue.Path.init -> void
+DigitalBrain.Modules.Validation.ValidationIssue.ValidationIssue(string! Path, string! Code, string! Message) -> void
+override DigitalBrain.Modules.Validation.ValidationIssue.Equals(object? obj) -> bool
+override DigitalBrain.Modules.Validation.ValidationIssue.GetHashCode() -> int
+override DigitalBrain.Modules.Validation.ValidationIssue.ToString() -> string!
+static DigitalBrain.Modules.Validation.ModuleValidation.ThrowIfInvalid<T>(T value, DigitalBrain.Modules.Validation.IModuleValidator<T>! validator) -> void
+static DigitalBrain.Modules.Validation.ModuleValidation.Validate<T>(T value, DigitalBrain.Modules.Validation.IModuleValidator<T>! validator) -> DigitalBrain.Modules.Validation.ValidationIssue![]!
+static DigitalBrain.Modules.Validation.ValidationIssue.operator !=(DigitalBrain.Modules.Validation.ValidationIssue? left, DigitalBrain.Modules.Validation.ValidationIssue? right) -> bool
+static DigitalBrain.Modules.Validation.ValidationIssue.operator ==(DigitalBrain.Modules.Validation.ValidationIssue? left, DigitalBrain.Modules.Validation.ValidationIssue? right) -> bool

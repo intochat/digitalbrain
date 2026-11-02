@@ -410,3 +410,37 @@ DigitalBrain.Capabilities.Storage.StorageVfs.Read(string! filePath, DigitalBrain
 DigitalBrain.Capabilities.Storage.StorageVfs.ReadText(string! filePath, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
 DigitalBrain.Capabilities.Storage.StorageVfs.OpenRead(string! filePath, DigitalBrain.Capabilities.Storage.ByteRange? range = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.StorageReadStream!>!
 DigitalBrain.Capabilities.Storage.StorageVfs.Write(string! filePath, byte[]! content, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Operations.OperationId>!
+DigitalBrain.Capabilities.Storage.Confinement.ConfinementDenied
+DigitalBrain.Capabilities.Storage.Confinement.ConfinementDenied.ConfinementDenied(DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason reason) -> void
+DigitalBrain.Capabilities.Storage.Confinement.ConfinementDenied.Reason.get -> DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason
+DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason
+DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason.Ads = 4 -> DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason
+DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason.Control = 1 -> DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason
+DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason.Device = 3 -> DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason
+DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason.Empty = 0 -> DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason
+DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason.HardDeny = 6 -> DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason
+DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason.LinkEscape = 8 -> DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason
+DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason.Name = 5 -> DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason
+DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason.Outside = 7 -> DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason
+DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason.TooLong = 9 -> DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason
+DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason.Unc = 2 -> DigitalBrain.Capabilities.Storage.Confinement.ConfinementReason
+DigitalBrain.Capabilities.Storage.Confinement.HardDenyList
+DigitalBrain.Capabilities.Storage.Confinement.PathConfinement
+DigitalBrain.Capabilities.Storage.Confinement.PathFlavor
+DigitalBrain.Capabilities.Storage.Confinement.PathFlavor.Unix = 1 -> DigitalBrain.Capabilities.Storage.Confinement.PathFlavor
+DigitalBrain.Capabilities.Storage.Confinement.PathFlavor.Windows = 0 -> DigitalBrain.Capabilities.Storage.Confinement.PathFlavor
+const DigitalBrain.Capabilities.Storage.Confinement.ConfinementDenied.FixedMessage = "That location is not available." -> string!
+const DigitalBrain.Capabilities.Storage.Confinement.PathConfinement.ModelLengthLimit = 32000 -> int
+static DigitalBrain.Capabilities.Storage.Confinement.HardDenyList.For(DigitalBrain.Capabilities.Storage.Confinement.PathFlavor flavor, string? osStateDir, string? secretsDir) -> System.Collections.Generic.IReadOnlyList<string!>!
+static DigitalBrain.Capabilities.Storage.Confinement.PathConfinement.Containing(System.Collections.Generic.IReadOnlyList<string!>! roots, string! full) -> string!
+static DigitalBrain.Capabilities.Storage.Confinement.PathConfinement.Containing(System.Collections.Generic.IReadOnlyList<string!>! roots, string! full, DigitalBrain.Capabilities.Storage.Confinement.PathFlavor flavor) -> string!
+static DigitalBrain.Capabilities.Storage.Confinement.PathConfinement.Current.get -> DigitalBrain.Capabilities.Storage.Confinement.PathFlavor
+static DigitalBrain.Capabilities.Storage.Confinement.PathConfinement.IsInside(string! full, string! root, DigitalBrain.Capabilities.Storage.Confinement.PathFlavor flavor) -> bool
+static DigitalBrain.Capabilities.Storage.Confinement.PathConfinement.Normalize(string! path) -> string!
+static DigitalBrain.Capabilities.Storage.Confinement.PathConfinement.RequireNoLinks(string! path) -> void
+static DigitalBrain.Capabilities.Storage.Confinement.PathConfinement.Resolve(System.Collections.Generic.IReadOnlyList<string!>! roots, string! relativeOrRooted) -> string!
+static DigitalBrain.Capabilities.Storage.Confinement.PathConfinement.Resolve(System.Collections.Generic.IReadOnlyList<string!>! roots, string! relativeOrRooted, DigitalBrain.Capabilities.Storage.Confinement.PathFlavor flavor) -> string!
+static DigitalBrain.Capabilities.Storage.Confinement.PathConfinement.Resolve(System.Collections.Generic.IReadOnlyList<string!>! roots, string! relativeOrRooted, DigitalBrain.Capabilities.Storage.Confinement.PathFlavor flavor, string? osStateDir, string? secretsDir) -> string!
+static DigitalBrain.Capabilities.Storage.Confinement.PathConfinement.ResolveForCreate(System.Collections.Generic.IReadOnlyList<string!>! roots, string! parentRelative, string! name, DigitalBrain.Capabilities.Storage.Confinement.PathFlavor flavor) -> string!
+static DigitalBrain.Capabilities.Storage.Confinement.PathConfinement.ResolveForCreate(System.Collections.Generic.IReadOnlyList<string!>! roots, string! parentRelative, string! name, DigitalBrain.Capabilities.Storage.Confinement.PathFlavor flavor, string? osStateDir, string? secretsDir) -> string!
+static readonly DigitalBrain.Capabilities.Storage.Confinement.HardDenyList.Segments -> string![]!
