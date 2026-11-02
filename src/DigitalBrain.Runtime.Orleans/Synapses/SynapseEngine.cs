@@ -174,6 +174,14 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
         await RemoveSource(from.ToString()).ConfigureAwait(true);
     }
 
+    /// <summary>Removes every synapse this neuron holds, as a session does when it ends.</summary>
+    public async Task RemoveAll()
+    {
+        if (Stateless || Store is null) { return; }
+        if (!_loaded) { await Load().ConfigureAwait(true); }
+        foreach (var source in _state.Sources.Select(item => item.Source).ToArray()) { await RemoveSource(source).ConfigureAwait(true); }
+    }
+
     private async Task RemoveSource(string source)
     {
         var entry = _state.Sources.Find(item => item.Source == source);
