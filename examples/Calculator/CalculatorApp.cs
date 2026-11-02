@@ -18,9 +18,14 @@ Invoking "press" with "7", "+", "5", and "=" updates the display to "12".
 ## Scenario: Clear resets display to 0
 
 Invoking "clear" resets the display back to "0".
+
+## Scenario: Dividing by zero is rejected
+
+Invoking "press" with "8", "/", "0", and "=" is rejected and the display still shows "0".
 */
 using System.Globalization;
 using DigitalBrain;
+using DigitalBrain.Rules;
 using DigitalBrain.UI;
 
 namespace DigitalBrain.Examples.Calculator;
@@ -80,12 +85,23 @@ public sealed record CalculatorState(
         return this;
     }
 
+    /// <summary>The pending operator and divisor that pressing <paramref name="key"/> would evaluate, or none when it evaluates nothing.</summary>
+    internal (string? Operator, double Divisor) Pending(string? key)
+    {
+        var token = key?.Trim();
+        var evaluates = token is "=" or "+" or "-" or "*" or "/"
+            && PendingOperator is not null && Accumulator is not null && (token == "=" || !ResetNext);
+        return evaluates && double.TryParse(Display, NumberStyles.Float, CultureInfo.InvariantCulture, out var divisor)
+            ? (PendingOperator, divisor)
+            : (null, 1d);
+    }
+
     private static double Evaluate(double left, double right, string op) => op switch
     {
         "+" => left + right,
         "-" => left - right,
         "*" => left * right,
-        "/" => right == 0d ? 0d : left / right,
+        "/" => left / right,
         _ => right,
     };
 
@@ -106,7 +122,12 @@ public sealed class CalculatorApp : App<CalculatorState>
 
     /// <summary>Applies a digit or operator key to the calculator.</summary>
     [On]
-    public void Press(string key) => Set(State.Apply(key));
+    public void Press(string key)
+    {
+        var (pending, divisor) = State.Pending(key);
+        Check(nameof(Press), new DivisorNotZero(pending, divisor));
+        Set(State.Apply(key));
+    }
 
     /// <summary>Renders the calculator main view from <see cref="App{TState}.State"/>.</summary>
     public View Render() => new("Calculator", new Column([new Text(State.Display)]));
@@ -117,10 +138,7 @@ public sealed class CalculatorApp : App<CalculatorState>
     {
         ArgumentNullException.ThrowIfNull(app);
         app.Open();
-        if (app.State.Display != "0")
-        {
-            throw new InvalidOperationException($"Expected display '0', got '{app.State.Display}'.");
-        }
+        app.Check("scenario", new DisplayShows("0", app.State.Display));
     }
 
     /// <summary>BDD scenario: 7 + 5 = 12.</summary>
@@ -132,10 +150,7 @@ public sealed class CalculatorApp : App<CalculatorState>
         app.Press("+");
         app.Press("5");
         app.Press("=");
-        if (app.State.Display != "12")
-        {
-            throw new InvalidOperationException($"Expected display '12', got '{app.State.Display}'.");
-        }
+        app.Check("scenario", new DisplayShows("12", app.State.Display));
     }
 
     /// <summary>BDD scenario: Clear resets display to 0.</summary>
@@ -145,9 +160,28 @@ public sealed class CalculatorApp : App<CalculatorState>
         ArgumentNullException.ThrowIfNull(app);
         app.Press("9");
         app.Clear();
-        if (app.State.Display != "0")
+        app.Check("scenario", new DisplayShows("0", app.State.Display));
+    }
+
+    /// <summary>BDD scenario: Dividing by zero is rejected.</summary>
+    [Scenario("Dividing by zero is rejected")]
+    public static void DividingByZeroIsRejected(CalculatorApp app)
+    {
+        ArgumentNullException.ThrowIfNull(app);
+        app.Press("8");
+        app.Press("/");
+        app.Press("0");
+        var rejected = false;
+        try
         {
-            throw new InvalidOperationException($"Expected display '0' after clear, got '{app.State.Display}'.");
+            app.Press("=");
         }
+        catch (RuleViolationException)
+        {
+            rejected = true;
+            app.ClearError();
+        }
+
+        app.Check("scenario", new PressRejected(rejected), new DisplayShows("0", app.State.Display));
     }
 }

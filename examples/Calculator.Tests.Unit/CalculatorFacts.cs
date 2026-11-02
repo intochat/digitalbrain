@@ -1,5 +1,6 @@
 using DigitalBrain;
 using DigitalBrain.Examples.Calculator;
+using DigitalBrain.Rules;
 using DigitalBrain.Testing;
 
 namespace Calculator.Tests.Unit;
@@ -20,14 +21,14 @@ public sealed class CalculatorFacts
 
         Assert.True(report.Passed, report.BaselineError);
         Assert.Equal("calculator", report.AppId);
-        Assert.Equal(3, report.Scenarios.Count);
+        Assert.Equal(4, report.Scenarios.Count);
         Assert.All(report.Scenarios, s => Assert.True(s.Passed, s.Error));
 
         var bdd = os.Get<IBdd>(new NeuronId(new BrainId("test"), "bdd", "calculator"));
         var stored = await bdd.Read(TestContext.Current.CancellationToken);
         Assert.NotNull(stored);
         Assert.True(stored.Passed);
-        Assert.Equal(3, stored.Scenarios.Count);
+        Assert.Equal(4, stored.Scenarios.Count);
     }
 
     [Fact]
@@ -43,6 +44,22 @@ public sealed class CalculatorFacts
 
         Assert.Contains("12", app.Main.Texts);
         await app.Request("clear");
+        Assert.Contains("0", app.Main.Texts);
+    }
+
+    [Fact]
+    public async Task DividingByZeroIsRejected()
+    {
+        await using var os = TestOS.Local();
+        var app = await os.Install<CalculatorApp>();
+
+        await app.Request("press", "8");
+        await app.Request("press", "/");
+        await app.Request("press", "0");
+
+        var error = await Assert.ThrowsAsync<RuleViolationException>(() => app.Request("press", "="));
+
+        Assert.Equal(["divisor.not-zero"], error.Rejected.Rules);
         Assert.Contains("0", app.Main.Texts);
     }
 }
