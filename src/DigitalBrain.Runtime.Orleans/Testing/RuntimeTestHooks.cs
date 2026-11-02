@@ -5,12 +5,14 @@ using DigitalBrain.Runtime.Orleans.Synapses;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Core.Internal;
+using Orleans.Streams;
+using Orleans.Streams.Core;
 
 namespace DigitalBrain.Runtime.Orleans.Testing;
 
 /// <summary>
 /// Runtime controls for facts (04-12, 04-13, 04-15). Not a production entry: internal, reached only by the runtime's own
-/// test assemblies, and it never references the test-kit package.
+/// test assemblies and the host-conformance kit (DigitalBrain.Testing.Silo), and it never references the test-kit package.
 /// </summary>
 internal static class RuntimeTestHooks
 {
@@ -27,6 +29,15 @@ internal static class RuntimeTestHooks
     {
         ArgumentNullException.ThrowIfNull(services);
         services.GetRequiredService<RuntimeClock>().Advance(by);
+    }
+
+    /// <summary>How many live stream subscriptions <paramref name="subscriber"/> holds for <paramref name="signal"/> from <paramref name="source"/>'s brain.</summary>
+    public static async Task<int> SubscriptionCount(IServiceProvider services, NeuronId subscriber, NeuronId source, Type signal)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        var manager = services.GetRequiredService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
+        var all = await manager.GetSubscriptions(RuntimeOptions.IntoChatCompatible.SignalStreams, StreamNames.For(source.Brain.Value, signal)).ConfigureAwait(false);
+        return all.Count(s => s.GrainId.Key.ToString() == subscriber.ToString());
     }
 
     /// <summary>A typed proxy, from outside any neuron, to the hosted neuron <paramref name="id"/>.</summary>

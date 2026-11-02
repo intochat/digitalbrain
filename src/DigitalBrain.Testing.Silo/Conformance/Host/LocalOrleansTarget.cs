@@ -3,7 +3,7 @@ using DigitalBrain.Runtime.Orleans.Testing;
 using DigitalBrain.Spi;
 using DigitalBrain.Testing;
 
-namespace DigitalBrain.Framework.Tests.E2E;
+namespace DigitalBrain.Testing.Conformance.Host;
 
 /// <summary>The local topology (LocalProfile on a temp Home: memory streams, file PubSubStore, BrainLog cluster store).</summary>
 public sealed class LocalOrleansTarget : OrleansFrameworkTarget

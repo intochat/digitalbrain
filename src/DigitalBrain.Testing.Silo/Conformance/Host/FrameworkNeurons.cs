@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using DigitalBrain.Spi;
 
-namespace DigitalBrain.Framework.Tests.E2E;
+namespace DigitalBrain.Testing.Conformance.Host;
 
 // Plain neurons: no Orleans namespace, no grain base. TestOS and the Orleans host grains run the same classes.
 

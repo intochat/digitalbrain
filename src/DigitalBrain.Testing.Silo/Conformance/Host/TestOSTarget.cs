@@ -1,6 +1,6 @@
 using DigitalBrain.Testing;
 
-namespace DigitalBrain.Framework.Tests.E2E;
+namespace DigitalBrain.Testing.Conformance.Host;
 
 /// <summary>TestOS: no actor framework, the clock moves only when told (04-08).</summary>
 public sealed class TestOSTarget : FrameworkTarget

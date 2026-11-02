@@ -1,7 +1,6 @@
-using DigitalBrain.Runtime.Orleans.Azure.Tests.Integration;
 using DigitalBrain.Spi;
 
-namespace DigitalBrain.Framework.Tests.E2E;
+namespace DigitalBrain.Testing.Conformance.Host;
 
 /// <summary>What a fact asks of a host: retention for checkpoints and duplicate delivery. Every target maps it onto its own knobs.</summary>
 public sealed class FrameworkHostOptions
@@ -19,27 +18,13 @@ public sealed class FrameworkHostOptions
     public bool DuplicateDelivery { get; init; }
 }
 
-/// <summary>A place the framework e2e facts run (03-09, 04-15): TestOS, the local topology, or the cloud topology on Azurite.</summary>
+/// <summary>A place the host-conformance facts run (03-09, 04-15): TestOS, the local topology, or a consumer's own host.</summary>
 public abstract class FrameworkTarget
 {
-    /// <summary>The Orleans targets: facts that need the silo's own services (grain probes) run on these.</summary>
-    public static TheoryData<string> Names => new(LocalOrleansTarget.TargetName, AzuriteOrleansTarget.TargetName);
-
-    /// <summary>Every target: the framework fact set runs unchanged on each.</summary>
-    public static TheoryData<string> All => new(TestOSTarget.TargetName, LocalOrleansTarget.TargetName, AzuriteOrleansTarget.TargetName);
-
     public abstract string Name { get; }
 
     /// <summary>Starts a host with the shared controls.</summary>
     public abstract Task<RunningTarget> StartHost(FrameworkHostOptions options, CancellationToken ct);
-
-    public static FrameworkTarget For(string name, AzuriteFixture azurite) => name switch
-    {
-        TestOSTarget.TargetName => new TestOSTarget(),
-        LocalOrleansTarget.TargetName => new LocalOrleansTarget(),
-        AzuriteOrleansTarget.TargetName => new AzuriteOrleansTarget(azurite),
-        _ => throw new ArgumentOutOfRangeException(nameof(name), name, "Unknown framework target."),
-    };
 
     public override string ToString() => Name;
 }

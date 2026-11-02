@@ -21,6 +21,16 @@ public sealed class VocabularyRingFacts
         Assert.Equal(["Microsoft.CodeAnalysis.PublicApiAnalyzers"], Repository.PackageReferences(project));
     }
 
+    // The host-conformance kit is packable: a consumer runs it against its own host without Azure.
+    [Fact]
+    public void TestingSiloReferencesNoAzure()
+    {
+        var project = Repository.ProjectNamed("DigitalBrain.Testing.Silo").Path;
+        Assert.Equal(["DigitalBrain.Runtime.Orleans", "DigitalBrain.Testing"], Repository.ProjectReferences(project).Order(StringComparer.Ordinal));
+        Assert.DoesNotContain(Repository.PackageReferences(project), package => package.Contains("Azure", StringComparison.OrdinalIgnoreCase));
+        Assert.True(File.Exists(Path.Combine(Path.GetDirectoryName(project)!, "Conformance", "Host", "HostConformanceFacts.cs")));
+    }
+
     [Fact]
     public void View_model_references_no_project()
     {

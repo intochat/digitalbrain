@@ -1,16 +1,13 @@
 using DigitalBrain.Runtime.Orleans;
-using DigitalBrain.Runtime.Orleans.Synapses;
 using DigitalBrain.Runtime.Orleans.Testing;
 using DigitalBrain.Spi;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Orleans.Streams;
-using Orleans.Streams.Core;
 
-namespace DigitalBrain.Framework.Tests.E2E;
+namespace DigitalBrain.Testing.Conformance.Host;
 
 /// <summary>The silo's clock for facts: the system clock plus an offset <see cref="RunningTarget.Advance"/> moves. Timers stay real.</summary>
-internal sealed class OffsetClock : TimeProvider
+public sealed class OffsetClock : TimeProvider
 {
     private long _offsetTicks;
 
@@ -20,7 +17,7 @@ internal sealed class OffsetClock : TimeProvider
 }
 
 /// <summary>The shared mapping of the controls onto an Orleans in-process host: <c>RuntimeTestHooks</c> over <see cref="IInProcessHost.Services"/>.</summary>
-internal sealed class OrleansRun(IInProcessHost host, FrameworkHostOptions options) : RunningTarget
+public sealed class OrleansRun(IInProcessHost host, FrameworkHostOptions options) : RunningTarget
 {
     private IServiceProvider Services => host.Services;
 
@@ -69,12 +66,8 @@ internal sealed class OrleansRun(IInProcessHost host, FrameworkHostOptions optio
 
     public override Task Idle() => Task.CompletedTask;
 
-    public override async Task<int> SubscriptionCount(NeuronId subscriber, NeuronId source, Type signal)
-    {
-        var manager = Services.GetRequiredService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
-        var all = await manager.GetSubscriptions(RuntimeOptions.IntoChatCompatible.SignalStreams, StreamNames.For(source.Brain.Value, signal));
-        return all.Count(s => s.GrainId.Key.ToString() == subscriber.ToString());
-    }
+    public override Task<int> SubscriptionCount(NeuronId subscriber, NeuronId source, Type signal)
+        => RuntimeTestHooks.SubscriptionCount(Services, subscriber, source, signal);
 
     public override ValueTask DisposeAsync() => host.DisposeAsync();
 

@@ -1,5 +1,6 @@
 using DigitalBrain.Runtime.Orleans;
 using DigitalBrain.Runtime.Orleans.Azure.Tests.Integration;
+using DigitalBrain.Testing.Conformance.Host;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
@@ -37,9 +38,10 @@ public sealed class BrainProbeGrain([PersistentState("probe", "platform")] IPers
     public Task<int> Recall() => Task.FromResult(state.State.Value);
 }
 
+// Orleans-only: the probe is a grain reached through the silo's own grain factory, so it stays beside the Orleans targets.
 public sealed class BrainActivationFacts(AzuriteFixture azurite)
 {
-    public static TheoryData<string> Targets => FrameworkTarget.Names;
+    public static TheoryData<string> Targets => new(LocalOrleansTarget.TargetName, AzuriteOrleansTarget.TargetName);
 
     [Theory]
     [MemberData(nameof(Targets))]
@@ -47,7 +49,8 @@ public sealed class BrainActivationFacts(AzuriteFixture azurite)
     {
         var ct = TestContext.Current.CancellationToken;
         var brain = new BrainId("e2e-" + Guid.NewGuid().ToString("N"));
-        await using var host = await ((OrleansFrameworkTarget)FrameworkTarget.For(target, azurite)).Start(ct);
+        OrleansFrameworkTarget orleans = target == LocalOrleansTarget.TargetName ? new LocalOrleansTarget() : new AzuriteOrleansTarget(azurite);
+        await using var host = await orleans.Start(ct);
 
         var probe = host.Services.GetRequiredService<IGrainFactory>().GetGrain<IBrainProbeGrain>(brain.Value);
         Assert.Equal(brain.Value, await probe.Ping());

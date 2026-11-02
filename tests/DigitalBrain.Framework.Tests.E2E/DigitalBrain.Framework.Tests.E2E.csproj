@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Framework e2e harness (R4-03): one fact set over every FrameworkTarget. Phase 4 adds the TestOS target. -->
+  <!-- Framework e2e harness (R4-03): the packaged host-conformance facts (DigitalBrain.Testing.Silo) over TestOS, local Orleans and Azurite. -->
   <ItemGroup>
     <ProjectReference Include="../../src/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="../../src/DigitalBrain.Testing.Silo/DigitalBrain.Testing.Silo.csproj" />
     <ProjectReference Include="../../src/DigitalBrain.Runtime.Orleans/DigitalBrain.Runtime.Orleans.csproj" />
     <ProjectReference Include="../../src/DigitalBrain.Runtime.Orleans.Azure/DigitalBrain.Runtime.Orleans.Azure.csproj" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
