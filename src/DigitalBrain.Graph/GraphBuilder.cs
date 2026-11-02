@@ -1,3 +1,4 @@
+using System.Reflection;
 using DigitalBrain.Spi;
 
 namespace DigitalBrain.Graph;
@@ -54,8 +55,43 @@ internal static class GraphBuilder
             await source.Contribute(brain, sink, cancellationToken).ConfigureAwait(false);
         }
 
+        // calls edges come from [assembly: Calls(from, to)], written at build time by the DigitalBrain source generator:
+        // every instance of the calling neuron type calls the contract node. Nothing is loaded or reflected over method bodies.
+        var byType = new Dictionary<string, List<int>>(StringComparer.Ordinal);
+        for (var i = 0; i < sink.Nodes.Count; i++)
+        {
+            if (NeuronId.TryParse(sink.Nodes[i].Id, out var id) && id.Brain == brain)
+            {
+                if (!byType.TryGetValue(id.Type, out var list)) { list = []; byType[id.Type] = list; }
+                list.Add(i);
+            }
+        }
+        foreach (var (from, to) in Calls())
+        {
+            if (!byType.TryGetValue(from, out var callers)) { continue; }
+            var contract = sink.Node("contract:" + to, GraphNodeKind.Contract, to);
+            foreach (var caller in callers) { sink.Edge(caller, contract, GraphEdgeKind.Calls); }
+            // A plain contract resolves to the neuron type of the same name (DefaultNeuronType), so its instances implement it.
+            if (byType.TryGetValue(to, out var implementors))
+            {
+                foreach (var implementor in implementors) { sink.Edge(implementor, contract, GraphEdgeKind.Implements); }
+            }
+        }
+
         var (groups, group) = Grouping.Assign(sink, brain);
         return Csr.Build(revision, sink, groups, group);
+    }
+
+    private static IEnumerable<(string From, string To)> Calls()
+    {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (assembly.IsDynamic) { continue; }
+            CallsAttribute[] attributes;
+            try { attributes = [.. assembly.GetCustomAttributes<CallsAttribute>()]; }
+            catch (Exception error) when (error is TypeLoadException or System.IO.FileNotFoundException or System.Reflection.ReflectionTypeLoadException) { continue; }
+            foreach (var attribute in attributes) { yield return (attribute.From, attribute.To); }
+        }
     }
 
     private static int Endpoint(GraphSink sink, string id, bool local, int root)

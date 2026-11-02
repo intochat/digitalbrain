@@ -16,9 +16,21 @@ internal static class Rules
         return [.. findings];
     }
 
+    // A call goes neuron → contract; the contract is served by the neurons that implement it, so the walk follows Implements in reverse.
     private static void CallCycles(GraphSnapshot g, List<GraphFinding> findings)
     {
-        var scc = Scc.Tarjan(g, CallKinds);
+        var sink = new GraphSink();
+        for (var i = 0; i < g.NodeCount; i++) { sink.Node(g.Ids[i], g.Kinds[i], g.Labels[i]); }
+        for (var from = 0; from < g.NodeCount; from++)
+        {
+            for (var e = g.RowStart[from]; e < g.RowStart[from + 1]; e++)
+            {
+                if (g.EdgeKinds[e] == GraphEdgeKind.Calls) { sink.Edge(from, g.Col[e], GraphEdgeKind.Calls); }
+                else if (g.EdgeKinds[e] == GraphEdgeKind.Implements) { sink.Edge(g.Col[e], from, GraphEdgeKind.Calls); }
+            }
+        }
+        var calls = Csr.Build(g.Revision, sink, [], new int[g.NodeCount]);
+        var scc = Scc.Tarjan(calls, CallKinds);
         var members = new Dictionary<int, List<int>>();
         for (var i = 0; i < g.NodeCount; i++)
         {
@@ -27,10 +39,11 @@ internal static class Rules
         }
         foreach (var list in members.Values)
         {
-            var cycle = list.Count > 1 || SelfLoop(g, list[0]);
+            var neurons = list.Where(i => g.Kinds[i] is not GraphNodeKind.Contract).ToArray();
+            var cycle = neurons.Length > 1 || (neurons.Length == 1 && SelfLoop(g, neurons[0]));
             if (!cycle) { continue; }
-            findings.Add(new GraphFinding("call-cycle", [.. list.Select(i => g.Ids[i])],
-                string.Create(CultureInfo.InvariantCulture, $"{list.Count} node(s) call each other in a cycle; a non-reentrant turn would wait on itself.")));
+            findings.Add(new GraphFinding("call-cycle", [.. neurons.Select(i => g.Ids[i])],
+                string.Create(CultureInfo.InvariantCulture, $"{neurons.Length} neuron(s) call each other in a cycle; a non-reentrant turn would wait on itself.")));
         }
     }
 
