@@ -47,7 +47,7 @@ public static class SynapseObservation
         cancellationToken.ThrowIfCancellationRequested();
         var log = await logs.For(brain).WaitAsync(cancellationToken).ConfigureAwait(false);
         var rows = new List<ObservedSynapse>();
-        foreach (var (grain, record) in log.Named(SynapseState.Name))
+        foreach (var (grain, record) in await log.Named(SynapseState.Name, cancellationToken).ConfigureAwait(false))
         {
             if (SubscriberOf(grain) is not { } subscriber) { continue; }
             var state = JournalPayloads.DecodeState<SynapseState>(record);

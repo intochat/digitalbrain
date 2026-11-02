@@ -111,10 +111,10 @@ internal sealed class BrainLog : IAsyncDisposable
     }
 
     /// <summary>Every stored record of <paramref name="stateName"/>, grain id to a copy of the bytes.</summary>
-    internal List<(string Grain, byte[] Record)> Named(string stateName)
+    internal async Task<List<(string Grain, byte[] Record)>> Named(string stateName, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(stateName);
-        gate.Wait();
+        await gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             RequireOpen();
