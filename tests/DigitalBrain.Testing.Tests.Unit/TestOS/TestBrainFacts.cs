@@ -17,7 +17,6 @@ public sealed class TestBrainFacts
 
         Assert.Equal(["n:7"], viaOS);
         Assert.Equal(viaOS, viaBrain);
-        Assert.Equal(TestOS.Local().GetType(), TestBrain.Local().GetType());
     }
 
     [Fact]

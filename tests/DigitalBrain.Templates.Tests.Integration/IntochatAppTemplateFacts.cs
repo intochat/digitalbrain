@@ -67,6 +67,42 @@ public sealed class IntochatAppTemplateFacts
         }
     }
 
+    [Theory]
+    [InlineData("digitalbrain-module")]
+    [InlineData("intochat-module")]
+    public async Task A_module_instance_builds_with_warnings_as_errors_and_passes_its_tests(string shortName)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var root = Root();
+        var work = Path.Combine(Path.GetTempPath(), "db-module-template-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(work);
+        try
+        {
+            var (feed, version) = await Packages(root, work, ct);
+            var hive = Path.Combine(work, "hive");
+            var template = Path.Combine(root, "templates", "DigitalBrain.Templates", "content", "intochat-module");
+            await Dotnet(work, null, ["new", "install", template, "--debug:custom-hive", hive], ct);
+
+            const string name = "Weather";
+            var module = Path.Combine(work, name);
+            await Dotnet(work, null, ["new", shortName, "-n", name, "-o", module, "--ModuleId", "acme.weather", "--DigitalBrainVersion", version, "--debug:custom-hive", hive], ct);
+            Assert.True(File.Exists(Path.Combine(module, name, name + ".csproj")), name + ".csproj");
+
+            await File.WriteAllTextAsync(Path.Combine(module, "nuget.config"), Config(feed), ct);
+            var packages = Path.Combine(work, "packages");
+            var tests = Path.Combine(module, "tests", name + ".Tests.Unit", name + ".Tests.Unit.csproj");
+            await Dotnet(module, packages, ["build", tests, "-c", "Release", "-warnaserror"], ct);
+            var run = await Dotnet(module, packages, ["test", "--project", tests, "-c", "Release", "--no-build"], ct);
+            Assert.Contains("failed: 0", run, StringComparison.Ordinal);
+        }
+        finally
+        {
+            try { Directory.Delete(work, recursive: true); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+    }
+
     private static async Task<(string Feed, string Version)> Packages(string root, string work, CancellationToken ct)
     {
         if (Environment.GetEnvironmentVariable("DIGITALBRAIN_TEMPLATE_PACKAGES") is { Length: > 0 } given)
