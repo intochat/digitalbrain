@@ -51,8 +51,15 @@ public sealed class MovedTypesFacts
     [Fact]
     public void PersistedTypesStayOutOfTheCore()
     {
-        foreach (var entry in Load().Where(e => e.Persisted))
+        // State, Trace and BrainAffinePlacement reach storage or the journal under an alias; moving them would orphan stored data.
+        foreach (var name in new[] { "State", "Trace", "BrainAffinePlacement" })
+            Assert.DoesNotContain(Core, t => t.Name == name);
+
+        var persisted = Load().Where(e => e.Persisted).ToArray();
+        Assert.NotEmpty(persisted);
+        foreach (var entry in persisted)
         {
+            Assert.False(string.IsNullOrEmpty(entry.Alias), $"{entry.Old} is persisted but the inventory names no alias");
             var simple = entry.Old[(entry.Old.LastIndexOf('.') + 1)..];
             Assert.DoesNotContain(Core, t => t.Name == simple);
         }
