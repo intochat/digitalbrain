@@ -30,6 +30,10 @@ public sealed class ExtractToRuleFix : CodeFixProvider
 
     private static readonly string[] Folders = ["Rules"];
 
+    // Rule and record members a positional parameter would hide or duplicate.
+    private static readonly ImmutableHashSet<string> Reserved = ImmutableHashSet.Create(
+        "Name", "Broken", "Message", "EqualityContract", "ToString", "GetHashCode", "Equals", "PrintMembers", "Deconstruct");
+
     /// <inheritdoc />
     public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(Rules.BareInvariant.Id);
 
@@ -87,8 +91,8 @@ public sealed class ExtractToRuleFix : CodeFixProvider
             var existing = parameters.FindIndex(p => p.Source == source);
             if (existing < 0)
             {
-                var unique = capture.Name;
-                for (var n = 2; parameters.Any(p => p.Name == unique) || unique == name; n++) { unique = capture.Name + n; }
+                var unique = Reserved.Contains(capture.Name) ? capture.Name + "Value" : capture.Name;
+                for (var n = 2; parameters.Any(p => p.Name == unique) || unique == name || Reserved.Contains(unique); n++) { unique = capture.Name + n; }
                 parameters.Add((source, unique, capture.Type));
                 existing = parameters.Count - 1;
             }
@@ -100,7 +104,12 @@ public sealed class ExtractToRuleFix : CodeFixProvider
         var condition = renames.TryGetValue(guard.Condition, out var whole) ? whole : Rewrite(guard.Condition);
 
         var newline = guard.SyntaxTree.GetText(cancellation).ToString().Contains("\r\n") ? "\r\n" : "\n";
-        var text = new StringBuilder().Append("using DigitalBrain.Rules;").Append(newline).Append(newline);
+        // The new file sees the original's usings, so type names in the condition resolve the same way.
+        var text = new StringBuilder();
+        var usings = guard.SyntaxTree.GetCompilationUnitRoot(cancellation).Usings.Select(u => u.WithoutTrivia().ToString())
+            .Where(u => u != "using DigitalBrain.Rules;").Prepend("using DigitalBrain.Rules;").Distinct().OrderBy(u => u.TrimEnd(';'), System.StringComparer.Ordinal);
+        foreach (var directive in usings) { text.Append(directive).Append(newline); }
+        text.Append(newline);
         if (!owner.ContainingNamespace.IsGlobalNamespace) { text.Append("namespace ").Append(owner.ContainingNamespace.ToDisplayString()).Append(';').Append(newline).Append(newline); }
         text.Append("internal sealed record ").Append(name).Append('(').Append(string.Join(", ", parameters.Select(p => p.Type + " " + p.Name)))
             .Append(") : Rule(\"").Append(kebab).Append("\")").Append(newline).Append('{').Append(newline)
@@ -127,10 +136,13 @@ public sealed class ExtractToRuleFix : CodeFixProvider
             var captured = symbol switch
             {
                 ILocalSymbol or IParameterSymbol => node is IdentifierNameSyntax,
-                IFieldSymbol field => !field.IsStatic && !field.IsConst,
-                IPropertySymbol property => !property.IsStatic,
+                // Static and const members are read at the call site too: the record file cannot name the owner's members.
+                IFieldSymbol or IPropertySymbol => true,
                 _ => false,
             };
+            // A method group, or a type the new file cannot see (nested in the owner, or not accessible in the assembly), declines the fix.
+            if (symbol is IMethodSymbol) { return false; }
+            if (symbol is ITypeSymbol named && (named.ContainingType is not null || !model.Compilation.IsSymbolAccessibleWithin(named, model.Compilation.Assembly))) { return false; }
             if (captured)
             {
                 var type = model.GetTypeInfo(expression, cancellation).Type;

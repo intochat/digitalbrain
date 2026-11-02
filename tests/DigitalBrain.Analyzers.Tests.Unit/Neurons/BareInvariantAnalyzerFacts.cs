@@ -133,7 +133,10 @@ public sealed class BareInvariantAnalyzerFacts
             }
             """, main.ReplaceLineEndings("\n"));
         Assert.Equal("""
+            using DigitalBrain;
             using DigitalBrain.Rules;
+            using System;
+            using System.Threading.Tasks;
 
             namespace Shop;
 
@@ -144,6 +147,77 @@ public sealed class BareInvariantAnalyzerFacts
             }
 
             """, rule.ReplaceLineEndings("\n"));
+    }
+
+    [Fact]
+    public Task RuleViolationExceptionIsNotReported() => Diagnostics("""
+        using DigitalBrain;
+        namespace DigitalBrain.Rules { public sealed class RuleViolationException(string message) : System.Exception(message); }
+        public sealed class Cart : Neuron
+        {
+            public void Add() => throw new DigitalBrain.Rules.RuleViolationException("Cart is full");
+        }
+        """);
+
+    [Fact]
+    public async Task FixRenamesCapturesThatCollideWithRuleMembers()
+    {
+        var (main, rule) = await ApplyFix("""
+            using System;
+            using System.Threading.Tasks;
+            using DigitalBrain;
+
+            namespace Shop;
+
+            public sealed class Cart : Neuron
+            {
+                public string Name { get; } = "";
+
+                public async Task Add(string Message)
+                {
+                    if (Name == Message) throw new InvalidOperationException("Cart cannot hold more than itself");
+                    await Task.Yield();
+                }
+            }
+            """);
+        Assert.Contains("await Check(\"add\", new CartCannotHoldMoreThan(Name, Message));", main, StringComparison.Ordinal);
+        Assert.Contains("record CartCannotHoldMoreThan(string NameValue, string MessageValue)", rule, StringComparison.Ordinal);
+        Assert.Contains("Broken => NameValue == MessageValue;", rule, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FixCapturesAPrivateConstAndDeclinesANestedType()
+    {
+        var (main, rule) = await ApplyFix("""
+            using System;
+            using System.Threading.Tasks;
+            using DigitalBrain;
+
+            namespace Shop;
+
+            public sealed class Cart : Neuron
+            {
+                private const int Max = 10;
+
+                public async Task Add(int quantity)
+                {
+                    if (quantity > Max) throw new InvalidOperationException("Cart cannot hold more than ten");
+                    await Task.Yield();
+                }
+            }
+            """);
+        Assert.Contains("new CartCannotHoldMoreThan(quantity, Max)", main, StringComparison.Ordinal);
+        Assert.Contains("Broken => quantity > Max;", rule, StringComparison.Ordinal);
+        Assert.Empty(await Offered("""
+            using System;
+            using System.Threading.Tasks;
+            using DigitalBrain;
+            public sealed class Cart : Neuron
+            {
+                private enum Mode { Open, Closed }
+                public async Task Add(object mode) { if (mode is Mode) throw new InvalidOperationException("Wrong mode"); await Task.Yield(); }
+            }
+            """));
     }
 
     [Fact]
@@ -206,8 +280,13 @@ public sealed class BareInvariantAnalyzerFacts
         var project = solution.GetProject(document.Project.Id)!;
         var added = Assert.Single(project.Documents, d => d.Name == "CartCannotHoldMoreThan.cs");
         Assert.Equal(["Rules"], added.Folders);
-        var errors = (await project.GetCompilationAsync(ct))!.GetDiagnostics(ct).Where(d => d.Severity == DiagnosticSeverity.Error);
-        Assert.Empty(errors);
+        // Consumers build with warnings as errors: the fix may add no warning or error the code did not already have.
+        static string Key(Diagnostic d) => d.Id + ": " + d.GetMessage(System.Globalization.CultureInfo.InvariantCulture);
+        var before = (await document.Project.GetCompilationAsync(ct))!.GetDiagnostics(ct)
+            .Where(d => d.Severity >= DiagnosticSeverity.Warning).Select(Key).ToHashSet();
+        var introduced = (await project.GetCompilationAsync(ct))!.GetDiagnostics(ct)
+            .Where(d => d.Severity >= DiagnosticSeverity.Warning).Select(Key).Where(k => !before.Contains(k));
+        Assert.Empty(introduced);
         return ((await project.GetDocument(document.Id)!.GetTextAsync(ct)).ToString(), (await added.GetTextAsync(ct)).ToString());
     }
 }
