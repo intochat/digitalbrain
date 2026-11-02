@@ -13,6 +13,7 @@
     <Project Path="src/DigitalBrain.Capabilities.Secrets/DigitalBrain.Capabilities.Secrets.csproj" />
     <Project Path="src/DigitalBrain.Capabilities.Identity/DigitalBrain.Capabilities.Identity.csproj" />
     <Project Path="src/DigitalBrain.Runtime.Http/DigitalBrain.Runtime.Http.csproj" />
+    <Project Path="src/DigitalBrain.Graph/DigitalBrain.Graph.csproj" />
   </Folder>
   <Folder Name="/examples/">
     <Project Path="examples/Calculator/Calculator.csproj" />
@@ -33,5 +34,6 @@
     <Project Path="tests/DigitalBrain.Capabilities.Identity.Tests.Unit/DigitalBrain.Capabilities.Identity.Tests.Unit.csproj" />
     <Project Path="tests/DigitalBrain.Runtime.Http.Tests.Unit/DigitalBrain.Runtime.Http.Tests.Unit.csproj" />
     <Project Path="tests/DigitalBrain.Templates.Tests.Integration/DigitalBrain.Templates.Tests.Integration.csproj" />
+    <Project Path="tests/DigitalBrain.Graph.Tests.Unit/DigitalBrain.Graph.Tests.Unit.csproj" />
   </Folder>
 </Solution>
