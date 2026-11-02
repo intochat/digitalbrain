@@ -1,0 +1,200 @@
+{
+  "method": "Reflection over the production assemblies (ProductionArchitecture.Types): persisted when the type or a nested type is [GenerateSerializer], when it is the field, property or array/generic element type of a [GenerateSerializer] type in the OS assemblies, or when it derives from DigitalBrain.Signal. DigitalBrain cannot reference OS types, so its public API adds nothing.",
+  "types": [
+    {
+      "old": "IntoChat.OS.Framework.BrainAffinePlacement",
+      "alias": "os.brain-affine-placement",
+      "persisted": true
+    },
+    {
+      "old": "IntoChat.OS.Framework.BrainAffinePlacementAttribute",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Framework.BrainAffinePlacementDirector",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Framework.IRevisioned`1",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Framework.ISignalJournal",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Framework.IWorkContinuation",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Framework.JournaledSignal",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Framework.MemorySignalJournal",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Framework.MemorySignalJournalOptions",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Framework.Modules.OsModule",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Framework.Modules.Validation.IModuleValidator`1",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Framework.Modules.Validation.ModuleValidation",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Framework.Modules.Validation.ModuleValidationException",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Framework.Modules.Validation.ValidationRules",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Framework.NeutralCallFilter",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Framework.NeutralCallMapping",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Framework.PartSignals",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Framework.SignalJournal",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Framework.TaskBoxing",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.IInitialSignalWait",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.ISelectiveWatch",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.ISignalDelivery",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.ISignalWatch",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.NeuronAliases",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Reaction",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Runtime.INeuronResolver",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Runtime.NeuronAddress",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Runtime.NeuronProxies",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Runtime.Storage.Confinement.ConfinementDenied",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Runtime.Storage.Confinement.ConfinementReason",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Runtime.Storage.Confinement.HardDenyList",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Runtime.Storage.Confinement.PathConfinement",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Runtime.Storage.Confinement.PathFlavor",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.SignalDeliveries",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.SourceSet",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.Sources",
+      "alias": null,
+      "persisted": false
+    },
+    {
+      "old": "IntoChat.OS.State",
+      "alias": "brain.state",
+      "persisted": true
+    },
+    {
+      "old": "IntoChat.OS.Trace",
+      "alias": "brain.trace",
+      "persisted": true
+    },
+    {
+      "old": "IntoChat.OS.WatchStream`1",
+      "alias": null,
+      "persisted": false
+    }
+  ]
+}

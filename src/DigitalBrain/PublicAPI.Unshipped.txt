@@ -1278,3 +1278,49 @@ static DigitalBrain.AppAddress.operator ==(DigitalBrain.AppAddress left, Digital
 virtual DigitalBrain.App.Watches(DigitalBrain.WatchBuilder! watch) -> void
 ~override DigitalBrain.AppAddress.Equals(object obj) -> bool
 ~override DigitalBrain.AppAddress.ToString() -> string
+DigitalBrain.INeuronResolver
+DigitalBrain.INeuronResolver.Resolve<T>(DigitalBrain.BrainId brain, string! relative) -> T!
+DigitalBrain.INeuronResolver.ResolveKey<T>(string! fullKey) -> T!
+DigitalBrain.Invocation.IWorkContinuation
+DigitalBrain.Invocation.IWorkContinuation.Acquire(string! brainScope, string! token) -> System.Threading.Tasks.Task!
+DigitalBrain.Invocation.IWorkContinuation.Release(string! brainScope, string! token) -> System.Threading.Tasks.Task!
+DigitalBrain.NeuronAddress
+DigitalBrain.NeuronAddress.Brain.get -> DigitalBrain.BrainId?
+DigitalBrain.NeuronAddress.Deconstruct(out string! NeuronType, out string! Key) -> void
+DigitalBrain.NeuronAddress.Equals(DigitalBrain.NeuronAddress other) -> bool
+DigitalBrain.NeuronAddress.Key.get -> string!
+DigitalBrain.NeuronAddress.Key.init -> void
+DigitalBrain.NeuronAddress.NeuronAddress() -> void
+DigitalBrain.NeuronAddress.NeuronAddress(string! NeuronType, string! Key) -> void
+DigitalBrain.NeuronAddress.NeuronType.get -> string!
+DigitalBrain.NeuronAddress.NeuronType.init -> void
+DigitalBrain.NeuronAddress.StorageKey.get -> string!
+DigitalBrain.Signals.Watch.IInitialSignalWait
+DigitalBrain.Signals.Watch.IInitialSignalWait.ReachedInitialWaitAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+DigitalBrain.Signals.Watch.IInitialSignalWait.SuppressInitialWait() -> System.IDisposable!
+DigitalBrain.Signals.Watch.ISelectiveWatch
+DigitalBrain.Signals.Watch.ISelectiveWatch.On<T>(object! neuron, string! selector, System.Func<System.Threading.Tasks.Task!>! onSubscribed, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<T!>!
+DigitalBrain.Signals.Watch.ISignalDelivery
+DigitalBrain.Signals.Watch.ISignalDelivery.DeliveredAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+DigitalBrain.Signals.Watch.ISignalWatch
+DigitalBrain.Signals.Watch.ISignalWatch.On<T>(object! neuron, System.Func<System.Threading.Tasks.Task!>! onSubscribed, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<T!>!
+DigitalBrain.Signals.Watch.ISignalWatch.On<T>(object! neuron, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<T!>!
+DigitalBrain.Signals.Watch.SignalDeliveries
+DigitalBrain.Signals.Watch.Sources
+DigitalBrain.Signals.Watch.WatchStream<T>
+DigitalBrain.Signals.Watch.WatchStream<T>.GetAsyncEnumerator(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerator<T>!
+DigitalBrain.Signals.Watch.WatchStream<T>.WatchStream(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<(System.Collections.Generic.IAsyncEnumerable<T>! Signals, System.IAsyncDisposable! Handle)>!>! open, System.Threading.CancellationToken subscriptionCancellation, System.Threading.CancellationToken behaviorCancellation, System.Func<System.Threading.Tasks.Task!>! onSubscribed) -> void
+override DigitalBrain.NeuronAddress.GetHashCode() -> int
+override DigitalBrain.NeuronAddress.ToString() -> string!
+static DigitalBrain.NeuronAddress.IsBrainId(string? value) -> bool
+static DigitalBrain.NeuronAddress.ScopeOf(string! key) -> string?
+static DigitalBrain.NeuronAddress.operator !=(DigitalBrain.NeuronAddress left, DigitalBrain.NeuronAddress right) -> bool
+static DigitalBrain.NeuronAddress.operator ==(DigitalBrain.NeuronAddress left, DigitalBrain.NeuronAddress right) -> bool
+static DigitalBrain.Signals.Watch.SignalDeliveries.Skip(object! signal) -> void
+static DigitalBrain.Signals.Watch.SignalDeliveries.WasSkipped(object! signal) -> bool
+static DigitalBrain.Signals.Watch.Sources.Named<TRegistry, TChange, TMember>(TRegistry! registry, System.Func<TRegistry!, System.Threading.CancellationToken, System.Threading.Tasks.Task<TMember![]!>!>! select) -> DigitalBrain.Signals.Watch.Sources!
+static DigitalBrain.Signals.Watch.Sources.Of(params object![]! neurons) -> DigitalBrain.Signals.Watch.Sources!
+static DigitalBrain.Signals.Watch.Sources.React<T>(DigitalBrain.Signals.Watch.ISignalWatch! brain, DigitalBrain.Signals.Watch.Sources! sources, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! rebuild, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+static DigitalBrain.Signals.Watch.Sources.Stream<T>(DigitalBrain.Signals.Watch.ISignalWatch! brain, DigitalBrain.Signals.Watch.Sources! sources, System.Func<System.Threading.Tasks.Task!>? subscribed, System.Action? reselected, System.Threading.CancellationToken cancellationToken) -> System.Collections.Generic.IAsyncEnumerable<T!>!
+static DigitalBrain.Signals.Watch.Sources.Stream<T>(DigitalBrain.Signals.Watch.ISignalWatch! brain, DigitalBrain.Signals.Watch.Sources! sources, System.Threading.CancellationToken cancellationToken) -> System.Collections.Generic.IAsyncEnumerable<T!>!
+~override DigitalBrain.NeuronAddress.Equals(object obj) -> bool

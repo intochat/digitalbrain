@@ -3,4 +3,7 @@
     <ProjectReference Include="../../src/DigitalBrain/DigitalBrain.csproj" />
     <ProjectReference Include="../../src/DigitalBrain.UI/DigitalBrain.UI.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="MovedTypes.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
