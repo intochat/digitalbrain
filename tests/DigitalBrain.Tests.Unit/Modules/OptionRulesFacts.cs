@@ -1,4 +1,5 @@
 using DigitalBrain.Modules.Validation;
+using DigitalBrain.Rules;
 
 namespace DigitalBrain.Tests.Unit.Modules;
 
@@ -92,6 +93,34 @@ public sealed class OptionRulesFacts
                 new ValidationIssue("Name", "length", "Use between 1 and 8 characters."),
             ],
             ex.Issues);
+    }
+
+    [Fact]
+    public void RuleToStringNeverEchoesTheValue()
+    {
+        const string sentinel = "s3cr3t-sentinel";
+        Rule[] rules =
+        [
+            new Required("Password", sentinel),
+            new StringLength("Password", sentinel, 1, 2),
+            new Utf8Length("Password", sentinel, 1),
+            new ArrayLength<string>("Password", [sentinel], 2, 3),
+            new HttpUri("Password", new Uri("https://example.test/" + sentinel)),
+        ];
+
+        foreach (var rule in rules)
+        {
+            var text = rule.ToString();
+            Assert.DoesNotContain(sentinel, text);
+            Assert.Contains("Password", text);
+        }
+    }
+
+    [Fact]
+    public void ColonInPathStaysInThePath()
+    {
+        var ex = Assert.Throws<ModuleValidationException>(() => ModuleValidation.Check("m", new Required("a:b", null)));
+        Assert.Equal([new ValidationIssue("a:b", "required", "A value is required.")], ex.Issues);
     }
 
     [Fact]

@@ -16,6 +16,9 @@ public sealed record Required(string Path, object? Value) : Rule($"required:{Pat
 
     /// <inheritdoc />
     public override string Message => "A value is required.";
+
+    /// <summary>Names the rule and its path; never the value, which may be a secret.</summary>
+    public override string ToString() => $"Required {{ Name = {Name}, Path = {Path} }}";
 }
 
 /// <summary>Text length in Unicode scalar values is within bounds; null passes.</summary>
@@ -39,6 +42,9 @@ public sealed record StringLength(string Path, string? Value, int Minimum, int M
 
     /// <inheritdoc />
     public override string Message => $"Use between {Minimum} and {Maximum} characters.";
+
+    /// <summary>Names the rule and its path; never the value, which may be a secret.</summary>
+    public override string ToString() => $"StringLength {{ Name = {Name}, Path = {Path}, Minimum = {Minimum}, Maximum = {Maximum} }}";
 }
 
 /// <summary>Text size in UTF-8 bytes is at most the maximum; null passes.</summary>
@@ -59,6 +65,9 @@ public sealed record Utf8Length(string Path, string? Value, int MaximumBytes) : 
 
     /// <inheritdoc />
     public override string Message => $"Use at most {MaximumBytes} UTF-8 bytes.";
+
+    /// <summary>Names the rule and its path; never the value, which may be a secret.</summary>
+    public override string ToString() => $"Utf8Length {{ Name = {Name}, Path = {Path}, MaximumBytes = {MaximumBytes} }}";
 }
 
 /// <summary>An array's item count is within bounds; null passes.</summary>
@@ -81,6 +90,9 @@ public sealed record ArrayLength<T>(string Path, T[]? Value, int Minimum, int Ma
 
     /// <inheritdoc />
     public override string Message => $"Use between {Minimum} and {Maximum} items.";
+
+    /// <summary>Names the rule and its path; never the value, which may be a secret.</summary>
+    public override string ToString() => $"ArrayLength {{ Name = {Name}, Path = {Path}, Minimum = {Minimum}, Maximum = {Maximum} }}";
 }
 
 /// <summary>A number is within bounds, inclusive.</summary>
@@ -102,6 +114,9 @@ public sealed record NumberRange(string Path, decimal Value, decimal Minimum, de
 
     /// <inheritdoc />
     public override string Message => $"Use a value between {Minimum} and {Maximum}.";
+
+    /// <summary>Names the rule and its path; never the value, which may be a secret.</summary>
+    public override string ToString() => $"NumberRange {{ Name = {Name}, Path = {Path}, Minimum = {Minimum}, Maximum = {Maximum} }}";
 }
 
 /// <summary>A URI is absolute with an http or https scheme; null passes.</summary>
@@ -114,6 +129,9 @@ public sealed record HttpUri(string Path, Uri? Value) : Rule($"uri:{Path}")
 
     /// <inheritdoc />
     public override string Message => "Use an absolute HTTP or HTTPS URI.";
+
+    /// <summary>Names the rule and its path; never the value, which may be a secret.</summary>
+    public override string ToString() => $"HttpUri {{ Name = {Name}, Path = {Path} }}";
 }
 
 internal static class Bounds
