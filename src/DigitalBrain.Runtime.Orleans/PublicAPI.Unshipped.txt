@@ -1,7 +1,11 @@
 #nullable enable
 DigitalBrain.Runtime.Orleans.Bindings.Binds(DigitalBrain.Need! need, bool clusterStoreRegistered, DigitalBrain.Runtime.Orleans.RuntimeOptions? options = null) -> bool
+DigitalBrain.Runtime.Orleans.IRuntimeOptionsProfile
+DigitalBrain.Runtime.Orleans.IRuntimeOptionsProfile.Options.get -> DigitalBrain.Runtime.Orleans.RuntimeOptions!
 DigitalBrain.Runtime.Orleans.LocalCloudProfile.LocalCloudProfile(DigitalBrain.Runtime.Orleans.RuntimeOptions? options = null) -> void
+DigitalBrain.Runtime.Orleans.LocalCloudProfile.Options.get -> DigitalBrain.Runtime.Orleans.RuntimeOptions!
 DigitalBrain.Runtime.Orleans.LocalProfile.LocalProfile(DigitalBrain.Runtime.Orleans.RuntimeOptions? options = null) -> void
+DigitalBrain.Runtime.Orleans.LocalProfile.Options.get -> DigitalBrain.Runtime.Orleans.RuntimeOptions!
 DigitalBrain.Runtime.Orleans.MachineKeyConfigurationSource.MachineKeyConfigurationSource(DigitalBrain.Runtime.Orleans.StateHome! home, Microsoft.Extensions.Configuration.IConfiguration? existing, DigitalBrain.Runtime.Orleans.IMachineKeyProtector? protector = null, DigitalBrain.Runtime.Orleans.RuntimeOptions? options = null) -> void
 DigitalBrain.Runtime.Orleans.MachineKeyConfigurationSource.Options.get -> DigitalBrain.Runtime.Orleans.RuntimeOptions!
 DigitalBrain.Runtime.Orleans.Operations.IOperationDriverLifetime
@@ -323,6 +327,8 @@ DigitalBrain.Runtime.Orleans.RetiredSetting.Replacement.init -> void
 DigitalBrain.Runtime.Orleans.RetiredSetting.RetiredSetting(string! Key, string! Replacement) -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions
 DigitalBrain.Runtime.Orleans.RuntimeOptions.<Clone>$() -> DigitalBrain.Runtime.Orleans.RuntimeOptions!
+DigitalBrain.Runtime.Orleans.RuntimeOptions.AuthPostureKey.get -> string!
+DigitalBrain.Runtime.Orleans.RuntimeOptions.AuthPostureKey.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.BindKey.get -> string!
 DigitalBrain.Runtime.Orleans.RuntimeOptions.BindKey.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.CloudKeyVaultKey.get -> string!
@@ -344,6 +350,8 @@ DigitalBrain.Runtime.Orleans.RuntimeOptions.HomeKey.get -> string!
 DigitalBrain.Runtime.Orleans.RuntimeOptions.HomeKey.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.MasterKeyKey.get -> string!
 DigitalBrain.Runtime.Orleans.RuntimeOptions.MasterKeyKey.init -> void
+DigitalBrain.Runtime.Orleans.RuntimeOptions.OsImage.get -> string!
+DigitalBrain.Runtime.Orleans.RuntimeOptions.OsImage.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.PlatformGrainStorage.get -> string!
 DigitalBrain.Runtime.Orleans.RuntimeOptions.PlatformGrainStorage.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.PubSubStore.get -> string!
@@ -351,6 +359,8 @@ DigitalBrain.Runtime.Orleans.RuntimeOptions.PubSubStore.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.RetentionSection.get -> string!
 DigitalBrain.Runtime.Orleans.RuntimeOptions.RetentionSection.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.RuntimeOptions() -> void
+DigitalBrain.Runtime.Orleans.RuntimeOptions.SandboxImage.get -> string!
+DigitalBrain.Runtime.Orleans.RuntimeOptions.SandboxImage.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.SignalStreams.get -> string!
 DigitalBrain.Runtime.Orleans.RuntimeOptions.SignalStreams.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.SignallingSection.get -> string!

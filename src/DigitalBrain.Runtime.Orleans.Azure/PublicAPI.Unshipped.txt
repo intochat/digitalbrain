@@ -12,6 +12,7 @@ DigitalBrain.Runtime.Orleans.Azure.CloudProfile.ConfigureConfiguration(Microsoft
 DigitalBrain.Runtime.Orleans.Azure.CloudProfile.ConfigureServices(Microsoft.Extensions.DependencyInjection.IServiceCollection! services, DigitalBrain.Runtime.Orleans.TopologyContext! context) -> void
 DigitalBrain.Runtime.Orleans.Azure.CloudProfile.ConfigureSilo(Orleans.Hosting.ISiloBuilder! silo, DigitalBrain.Runtime.Orleans.TopologyContext! context) -> void
 DigitalBrain.Runtime.Orleans.Azure.CloudProfile.Defaults.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string?>!
+DigitalBrain.Runtime.Orleans.Azure.CloudProfile.Options.get -> DigitalBrain.Runtime.Orleans.RuntimeOptions!
 DigitalBrain.Runtime.Orleans.Azure.CloudProfile.Services.get -> DigitalBrain.Runtime.Orleans.Services!
 DigitalBrain.Runtime.Orleans.Azure.CloudProfile.Topology.get -> DigitalBrain.Runtime.Orleans.Topology
 DigitalBrain.Runtime.Orleans.Azure.CloudProfile.Validate(Microsoft.Extensions.Configuration.IConfiguration! configuration, System.Collections.Generic.IReadOnlyList<DigitalBrain.ModuleManifest!>! modules) -> System.Collections.Generic.IEnumerable<DigitalBrain.Runtime.Orleans.TopologyIssue!>!

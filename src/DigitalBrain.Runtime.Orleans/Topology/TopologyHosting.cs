@@ -38,6 +38,15 @@ public static class TopologyHosting
         var configuration = builder.Configuration;
         var options = RuntimeOptions.From(builder.Services);
         builder.Services.TryAddSingleton(options);
+        foreach (var profile in additional.OfType<IRuntimeOptionsProfile>())
+        {
+            if (profile.Options != options)
+            {
+                throw new InvalidOperationException(
+                    $"{profile.GetType().Name} was built with RuntimeOptions keyed {profile.Options.TopologyKey} (home {profile.Options.DefaultHomeDirectoryName}), "
+                    + $"but the host registered RuntimeOptions keyed {options.TopologyKey} (home {options.DefaultHomeDirectoryName}); build the profile with the host's options.");
+            }
+        }
 
         // Home comes from the command line, environment or code, never from settings.json itself.
         var home = TryResolveHome(configuration, options);

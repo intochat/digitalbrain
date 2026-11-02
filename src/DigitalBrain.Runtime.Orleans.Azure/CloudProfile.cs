@@ -15,7 +15,7 @@ namespace DigitalBrain.Runtime.Orleans.Azure;
 /// configuration, and blob-lease brain ownership. One account (<see cref="RuntimeOptions.CloudStorageKey"/>) carries tables, blobs and queues.
 /// The <c>cluster</c> store is host-bound (BrainLog); until the host registers it, it is <see cref="UnregisteredClusterStorage"/>.
 /// </summary>
-public sealed class CloudProfile : ITopologyProfile
+public sealed class CloudProfile : ITopologyProfile, IRuntimeOptionsProfile
 {
     /// <summary>The blob container holding one lease blob per brain; provisioned with the environment.</summary>
     public const string LeaseContainer = "brain-leases";
@@ -52,6 +52,9 @@ public sealed class CloudProfile : ITopologyProfile
         ["Microsoft.Storage/storageAccounts", "Microsoft.KeyVault/vaults", "Microsoft.App/managedEnvironments"];
 
     /// <inheritdoc />
+    public RuntimeOptions Options => _options;
+
+    /// <inheritdoc />
     public Topology Topology => Topology.Cloud;
 
     /// <summary>The cloud bindings.</summary>
@@ -79,10 +82,10 @@ public sealed class CloudProfile : ITopologyProfile
         ArgumentNullException.ThrowIfNull(options);
         return new(
             [
-                new ServiceProcess("os", LocalProfile.Image, [TopologyContext.DefaultSiloPort, TopologyContext.DefaultGatewayPort, LocalProfile.HttpPort], [],
+                new ServiceProcess("os", options.OsImage, [TopologyContext.DefaultSiloPort, TopologyContext.DefaultGatewayPort, LocalProfile.HttpPort], [],
                     [EnvironmentName(options.TopologyKey), EnvironmentName(options.CloudStorageKey),
                      EnvironmentName(options.CloudKeyVaultKey), "AZURE_CLIENT_ID"]),
-                new ServiceProcess("os-sandbox", LocalProfile.SandboxImage, [], [], []),
+                new ServiceProcess("os-sandbox", options.SandboxImage, [], [], []),
             ],
             AzureResourceKinds);
     }

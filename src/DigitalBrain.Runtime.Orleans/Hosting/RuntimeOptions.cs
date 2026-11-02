@@ -20,6 +20,9 @@ public sealed record RuntimeOptions
     internal const string IntoChatSignallingSection = "IntoChatOS:Signalling";
     internal const string IntoChatRetentionSection = "IntoChatOS:Signalling:Retention";
     internal const string IntoChatDefaultHomeDirectoryName = ".intochat";
+    internal const string IntoChatAuthPostureKey = "IntoChatOS:Auth:Posture";
+    internal const string IntoChatOsImage = "ghcr.io/intochat/os";
+    internal const string IntoChatSandboxImage = "ghcr.io/intochat/os-sandbox";
 
     /// <summary>Selects the topology: local, local+cloud or cloud.</summary>
     public string TopologyKey { get; init; } = "DigitalBrain:Topology";
@@ -54,6 +57,15 @@ public sealed record RuntimeOptions
     /// <summary>The folder name under the user folder that holds local state when <see cref="HomeKey"/> is unset.</summary>
     public string DefaultHomeDirectoryName { get; init; } = ".digitalbrain";
 
+    /// <summary>The key a local run defaults to <c>Open</c>; cloud topologies leave it required.</summary>
+    public string AuthPostureKey { get; init; } = "DigitalBrain:Auth:Posture";
+
+    /// <summary>The container image of the host process, named by <c>Services</c>.</summary>
+    public string OsImage { get; init; } = "digitalbrain/host";
+
+    /// <summary>The container image of the sandbox process, named by <c>Services</c>.</summary>
+    public string SandboxImage { get; init; } = "digitalbrain/host-sandbox";
+
     /// <summary>The stream pub-sub grain store.</summary>
     public string PubSubStore { get; init; } = "PubSubStore";
 
@@ -86,6 +98,9 @@ public sealed record RuntimeOptions
         SignallingSection = IntoChatSignallingSection,
         RetentionSection = IntoChatRetentionSection,
         DefaultHomeDirectoryName = IntoChatDefaultHomeDirectoryName,
+        AuthPostureKey = IntoChatAuthPostureKey,
+        OsImage = IntoChatOsImage,
+        SandboxImage = IntoChatSandboxImage,
     };
 
     // The options the host registered, or the IntoChat spellings that callers without options have always got.

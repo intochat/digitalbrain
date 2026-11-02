@@ -12,16 +12,16 @@ namespace DigitalBrain.Runtime.Orleans;
 /// reminder table, memory streams for <c>signals</c> over the file <c>PubSubStore</c>, and the machine-key master key.
 /// The <c>cluster</c> store is host-bound (BrainLog); until the host registers it, it is <see cref="UnregisteredClusterStorage"/>.
 /// </summary>
-public sealed class LocalProfile : ITopologyProfile
+public sealed class LocalProfile : ITopologyProfile, IRuntimeOptionsProfile
 {
     /// <summary>The os HTTP port (os Kernel launch settings).</summary>
     public const int HttpPort = 5310;
 
     /// <summary>The os container image.</summary>
-    public const string Image = "ghcr.io/intochat/os";
+    public const string Image = RuntimeOptions.IntoChatOsImage;
 
     /// <summary>The sandbox container image.</summary>
-    public const string SandboxImage = "ghcr.io/intochat/os-sandbox";
+    public const string SandboxImage = RuntimeOptions.IntoChatSandboxImage;
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<RuntimeOptions, Services> ServicesByOptions = new();
 
@@ -35,7 +35,11 @@ public sealed class LocalProfile : ITopologyProfile
         _options = options ?? RuntimeOptions.IntoChatCompatible;
         _reserved = new(StringComparer.OrdinalIgnoreCase) { _options.PlatformGrainStorage, _options.PubSubStore };
         Services = ServicesFor(_options);
+        Defaults = new Dictionary<string, string?> { [_options.AuthPostureKey] = "Open" };
     }
+
+    /// <inheritdoc />
+    public RuntimeOptions Options => _options;
 
     /// <inheritdoc />
     public Topology Topology => Topology.Local;
@@ -69,9 +73,9 @@ public sealed class LocalProfile : ITopologyProfile
     private static Services Build(RuntimeOptions options)
         => new(
             [
-                new ServiceProcess("os", Image, [TopologyContext.DefaultSiloPort, TopologyContext.DefaultGatewayPort, HttpPort], ["<Home>"],
+                new ServiceProcess("os", options.OsImage, [TopologyContext.DefaultSiloPort, TopologyContext.DefaultGatewayPort, HttpPort], ["<Home>"],
                     [EnvironmentName(options.TopologyKey), EnvironmentName(options.HomeKey)]),
-                new ServiceProcess("os-sandbox", SandboxImage, [], [], []),
+                new ServiceProcess("os-sandbox", options.SandboxImage, [], [], []),
             ],
             []);
 
@@ -80,12 +84,9 @@ public sealed class LocalProfile : ITopologyProfile
 
     /// <summary>
     /// Below <c>&lt;Home&gt;/settings.json</c>. A local run defaults auth posture to Open, as the AppHost does.
-    /// local+cloud shares this dictionary. CloudProfile leaves <c>IntoChatOS:Auth:Posture</c> required.
+    /// local+cloud shares this dictionary. CloudProfile leaves the auth posture key required.
     /// </summary>
-    public IReadOnlyDictionary<string, string?> Defaults { get; } = new Dictionary<string, string?>
-    {
-        ["IntoChatOS:Auth:Posture"] = "Open",
-    };
+    public IReadOnlyDictionary<string, string?> Defaults { get; }
 
     /// <summary>The folder of one file grain store.</summary>
     public static string StoreDirectory(StateHome home, string name)

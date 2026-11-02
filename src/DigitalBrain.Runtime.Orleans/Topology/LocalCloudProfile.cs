@@ -9,7 +9,7 @@ namespace DigitalBrain.Runtime.Orleans;
 /// Local plus a connection to a cloud server: the local bindings, an absolute https cloud server address (<see cref="RuntimeOptions.CloudServerAddressKey"/>),
 /// and a loaded module that provides <c>circle@1</c> (the circle module itself arrives in Phase 10).
 /// </summary>
-public sealed class LocalCloudProfile : ITopologyProfile
+public sealed class LocalCloudProfile : ITopologyProfile, IRuntimeOptionsProfile
 {
     /// <summary>The capability a local+cloud host needs a module to provide.</summary>
     public static CapabilityId Circle { get; } = new("circle", 1);
@@ -24,6 +24,9 @@ public sealed class LocalCloudProfile : ITopologyProfile
         _options = options ?? RuntimeOptions.IntoChatCompatible;
         _local = new LocalProfile(_options);
     }
+
+    /// <inheritdoc />
+    public RuntimeOptions Options => _options;
 
     /// <inheritdoc />
     public Topology Topology => Topology.LocalCloud;
