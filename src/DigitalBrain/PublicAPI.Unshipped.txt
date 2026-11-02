@@ -1245,3 +1245,33 @@ virtual DigitalBrain.Signal.PrintMembers(System.Text.StringBuilder! builder) -> 
 ~override DigitalBrain.Operations.OperationId.Equals(object obj) -> bool
 ~static DigitalBrain.Capabilities.CapabilityConnection<TCapability>.operator !=(DigitalBrain.Capabilities.CapabilityConnection<TCapability>? left, DigitalBrain.Capabilities.CapabilityConnection<TCapability>? right) -> bool
 ~static DigitalBrain.Capabilities.CapabilityConnection<TCapability>.operator ==(DigitalBrain.Capabilities.CapabilityConnection<TCapability>? left, DigitalBrain.Capabilities.CapabilityConnection<TCapability>? right) -> bool
+DigitalBrain.App.DeclaredWatches() -> System.Collections.Generic.IReadOnlyList<DigitalBrain.AppWatch!>!
+DigitalBrain.AppAddress
+DigitalBrain.AppAddress.App.get -> string!
+DigitalBrain.AppAddress.App.init -> void
+DigitalBrain.AppAddress.AppAddress() -> void
+DigitalBrain.AppAddress.AppAddress(string! Brain, string! App) -> void
+DigitalBrain.AppAddress.Brain.get -> string!
+DigitalBrain.AppAddress.Brain.init -> void
+DigitalBrain.AppAddress.Deconstruct(out string! Brain, out string! App) -> void
+DigitalBrain.AppAddress.Equals(DigitalBrain.AppAddress other) -> bool
+DigitalBrain.AppWatch
+DigitalBrain.AppWatch.ChangeType.get -> System.Type?
+DigitalBrain.AppWatch.Handle.get -> System.Func<DigitalBrain.Signal!, System.Threading.Tasks.Task!>!
+DigitalBrain.AppWatch.IsSet.get -> bool
+DigitalBrain.AppWatch.Key.get -> System.Func<DigitalBrain.AppAddress, string!>!
+DigitalBrain.AppWatch.MemberType.get -> System.Type?
+DigitalBrain.AppWatch.Name.get -> string!
+DigitalBrain.AppWatch.Select.get -> System.Func<object!, DigitalBrain.AppAddress, System.Threading.CancellationToken, System.Threading.Tasks.Task<string![]!>!>?
+DigitalBrain.AppWatch.SignalType.get -> System.Type!
+DigitalBrain.AppWatch.SourceType.get -> System.Type!
+DigitalBrain.WatchBuilder
+DigitalBrain.WatchBuilder.On<TSource, TSignal>(string! name, System.Func<DigitalBrain.AppAddress, string!>! key, System.Func<TSignal!, System.Threading.Tasks.Task!>! handle) -> void
+DigitalBrain.WatchBuilder.OnEach<TRegistry, TChange, TMember, TSignal>(string! name, System.Func<DigitalBrain.AppAddress, string!>! registry, System.Func<TRegistry!, DigitalBrain.AppAddress, System.Threading.CancellationToken, System.Threading.Tasks.Task<string![]!>!>! select, System.Func<TSignal!, System.Threading.Tasks.Task!>! handle) -> void
+DigitalBrain.WatchBuilder.WatchBuilder() -> void
+override DigitalBrain.AppAddress.GetHashCode() -> int
+static DigitalBrain.AppAddress.operator !=(DigitalBrain.AppAddress left, DigitalBrain.AppAddress right) -> bool
+static DigitalBrain.AppAddress.operator ==(DigitalBrain.AppAddress left, DigitalBrain.AppAddress right) -> bool
+virtual DigitalBrain.App.Watches(DigitalBrain.WatchBuilder! watch) -> void
+~override DigitalBrain.AppAddress.Equals(object obj) -> bool
+~override DigitalBrain.AppAddress.ToString() -> string

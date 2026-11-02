@@ -86,6 +86,20 @@ public abstract class App
         }
     }
 
+    /// <summary>
+    /// Declares the signal sources the app follows whose keys or members are only known at run time (an app's own view, a
+    /// set of buttons a registry names). The host subscribes each one and runs its handler as a turn, like an <c>[On]</c> reaction.
+    /// </summary>
+    protected virtual void Watches(WatchBuilder watch) { }
+
+    /// <summary>The watches the app declares; asked once per load.</summary>
+    public IReadOnlyList<AppWatch> DeclaredWatches()
+    {
+        var builder = new WatchBuilder();
+        Watches(builder);
+        return builder.Watches;
+    }
+
     /// <summary>The request ids this app has handled, so a request delivered twice runs once.</summary>
     protected RequestLedger Requests { get; } = new();
 
