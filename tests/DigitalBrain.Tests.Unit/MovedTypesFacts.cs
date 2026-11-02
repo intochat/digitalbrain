@@ -1,11 +1,9 @@
-using System.Reflection;
 using System.Text.Json;
-using DigitalBrain.Contracts;
 
 namespace DigitalBrain.Tests.Unit;
 
 // The OS inventory of types that move into this core (MovedTypes.json, copied as content): which of them reach storage or the
-// signal journal, and the [NeuronAlias]/[Alias] each carries. A type that moved keeps its alias; a persisted one stays in the OS.
+// signal journal. None of the types that moved carries an alias; the persisted ones (State, Trace, BrainAffinePlacement) stay in the OS.
 public sealed class MovedTypesFacts
 {
     // The inventory entries this assembly now holds, by the OS full name they had, and the full name they have here.
@@ -36,15 +34,6 @@ public sealed class MovedTypesFacts
             Format)!.Types;
 
     private static Type[] Core => typeof(Signal).Assembly.GetTypes();
-
-    [Fact]
-    public void MovedTypesKeepTheirAliases()
-    {
-        foreach (var entry in Load().Where(e => e.Alias is not null && Moved.ContainsKey(e.Old)))
-        {
-            Assert.Contains(Core, t => t.GetCustomAttribute<NeuronAliasAttribute>(inherit: false)?.Alias == entry.Alias);
-        }
-    }
 
     [Fact]
     public void EveryMovedTypeResolvesUnderItsNewNamespace()

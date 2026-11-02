@@ -1,4 +1,3 @@
-
 namespace DigitalBrain.Invocation;
 
 // A neuron queued work that will signal this brain after its caller has returned. The runtime
