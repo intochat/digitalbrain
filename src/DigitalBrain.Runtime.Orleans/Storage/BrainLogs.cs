@@ -12,6 +12,7 @@ internal sealed class BrainLogs : IAsyncDisposable
     private readonly JournalPayloads payloads;
     private readonly TimeProvider time;
     private readonly IRetentionPolicy retention;
+    private readonly IOptions<BrainStoreOptions> options;
     private readonly Dictionary<string, Task<BrainLog>> logs = new(StringComparer.Ordinal);
     private readonly Lock gate = new();
     private readonly IBrainLogFiles? files;
@@ -22,6 +23,7 @@ internal sealed class BrainLogs : IAsyncDisposable
         IOptions<BrainStoreOptions> options, IBrainLogOwnership ownership, IBrainLogFiles? files = null)
     {
         ArgumentNullException.ThrowIfNull(options);
+        this.options = options;
         this.ownership = ownership;
         this.files = files;
         this.keys = keys;
@@ -66,7 +68,7 @@ internal sealed class BrainLogs : IAsyncDisposable
         {
             var directory = keys.DirectoryOf(brainId);
             var lease = await ownership.ClaimAsync(directory, brainId, CancellationToken.None);
-            try { return new(directory, brainId, await keys.GetOrCreate(brainId, CancellationToken.None), serializer, payloads, time, retention, lease, files); }
+            try { return new(directory, brainId, await keys.GetOrCreate(brainId, CancellationToken.None), serializer, payloads, time, retention, lease, files, options.Value); }
             catch { await lease.DisposeAsync(); throw; }
         }
         catch

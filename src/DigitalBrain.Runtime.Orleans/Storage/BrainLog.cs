@@ -26,6 +26,10 @@ internal sealed class BrainLog : IAsyncDisposable
     private readonly IRetentionPolicy retention;
     private readonly IBrainLogLease ownership;
     private readonly IBrainLogFiles files;
+    private readonly int checkpointEntryThreshold;
+    private readonly long checkpointBytesThreshold;
+    private long entriesInGeneration;
+    private long bytesInGeneration;
     // Held across each durable write and read of the journal state; async so no thread blocks behind a writer.
     private readonly SemaphoreSlim gate = new(1, 1);
     private Dictionary<string, Dictionary<string, BrainRecord>> records = new(StringComparer.Ordinal);
@@ -40,7 +44,7 @@ internal sealed class BrainLog : IAsyncDisposable
     private volatile bool disposed;
 
     internal BrainLog(string directory, string brainId, byte[] key, Serializer serializer, JournalPayloads payloads, TimeProvider time,
-        IRetentionPolicy retention, IBrainLogLease ownership, IBrainLogFiles? files = null)
+        IRetentionPolicy retention, IBrainLogLease ownership, IBrainLogFiles? files = null, BrainStoreOptions? options = null)
     {
         this.ownership = ownership;
         this.files = files ?? FileBrainLogFiles.Instance;
@@ -51,8 +55,12 @@ internal sealed class BrainLog : IAsyncDisposable
         this.payloads = payloads;
         this.time = time;
         this.retention = retention;
+        checkpointEntryThreshold = options?.CheckpointEntryThreshold ?? 500;
+        checkpointBytesThreshold = options?.CheckpointBytesThreshold ?? 2 * 1024 * 1024;
         try { Recover(); }
         catch { ReleaseUnopened(ownership); throw; }
+        try { serializer.SerializeToArray(new BrainSnapshot(0, 0, new Dictionary<string, Dictionary<string, BrainRecord>>(), [], [])); }
+        catch { /* Warmup codec */ }
     }
 
     public string BrainId => brainId;
@@ -103,10 +111,10 @@ internal sealed class BrainLog : IAsyncDisposable
     }
 
     /// <summary>Every stored record of <paramref name="stateName"/>, grain id to a copy of the bytes.</summary>
-    internal List<(string Grain, byte[] Record)> Named(string stateName)
+    internal async Task<List<(string Grain, byte[] Record)>> Named(string stateName, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(stateName);
-        gate.Wait();
+        await gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             RequireOpen();
@@ -206,11 +214,23 @@ internal sealed class BrainLog : IAsyncDisposable
                 FlushToDisk(stream);
                 // Deserialize the durable bytes so callers cannot mutate the stored projection.
                 Apply(serializer.Deserialize<BrainEntry>(plain)!);
+                entriesInGeneration++;
+                bytesInGeneration += frame.Length;
             }
             catch (Exception error) { failure = error; throw; }
-            return (sequence, encoded.Length > 0 ? marks[publisher].Last : marks.GetValueOrDefault(publisher).Last);
+            var needsCheckpoint = (checkpointEntryThreshold > 0 && entriesInGeneration >= checkpointEntryThreshold)
+                || (checkpointBytesThreshold > 0 && bytesInGeneration >= checkpointBytesThreshold);
+            var result = (sequence, encoded.Length > 0 ? marks[publisher].Last : marks.GetValueOrDefault(publisher).Last);
+            if (!needsCheckpoint) { return result; }
         }
         finally { gate.Release(); }
+
+        try { await Checkpoint(ct).ConfigureAwait(false); }
+        catch (Exception error) when (error is not OutOfMemoryException)
+        {
+            // Auto-checkpoint is best effort; the append write itself succeeded.
+        }
+        return (sequence, encoded.Length > 0 ? marks[publisher].Last : marks.GetValueOrDefault(publisher).Last);
     }
 
     /// <summary>Held signals of <paramref name="publisher"/> after <paramref name="since"/> (publisher sequences), with its floor and last.</summary>
@@ -262,6 +282,11 @@ internal sealed class BrainLog : IAsyncDisposable
         {
             RequireOpen();
             ct.ThrowIfCancellationRequested();
+            var hasFloorAdvances = floors.Any(pair => marks.TryGetValue(pair.Publisher, out var m) && pair.Floor > m.Floor);
+            if (generation != "initial" && entriesInGeneration == 0 && !hasFloorAdvances)
+            {
+                return;
+            }
             foreach (var (publisher, floor) in floors) { Trim(publisher, floor); }
             var started = ownership.BeginWrite();
             var previous = generation;
@@ -285,6 +310,8 @@ internal sealed class BrainLog : IAsyncDisposable
                 throw;
             }
             generation = next;
+            entriesInGeneration = 0;
+            bytesInGeneration = 0;
             // Old complete generation remains until the manifest points to the new one.
             foreach (var suffix in new[] { ".snapshot", ".log" })
             {
@@ -365,6 +392,7 @@ internal sealed class BrainLog : IAsyncDisposable
         { throw new InvalidDataException("The brain checkpoint manifest is missing; refusing to reset existing data."); }
         using var stream = files.OpenRead(Journal);
         long valid = DetectFormat(stream);
+        entriesInGeneration = 0;
         Span<byte> header = stackalloc byte[4];
         while (stream.Position < stream.Length)
         {
@@ -380,9 +408,11 @@ internal sealed class BrainLog : IAsyncDisposable
                 || (entry.Signals.Length > 0 && entry.FirstSignal != marks.GetValueOrDefault(entry.Publisher).Last + 1))
             { throw new InvalidDataException("The local brain log is not contiguous."); }
             Apply(entry);
+            entriesInGeneration++;
             valid = stream.Position;
         }
         if (valid != stream.Length) { stream.SetLength(valid); FlushToDisk(stream); }
+        bytesInGeneration = valid;
     }
 
     // Held signals of each publisher run contiguously from Floor + 1 to Last; positions rise strictly.

@@ -20,6 +20,12 @@ public sealed class BrainStoreOptions
 {
     /// <summary>The brain store directory.</summary>
     public string Directory { get; set; } = StateHome.Default().State;
+
+    /// <summary>Number of entries written to a generation before auto-checkpointing (default: 500; 0 disables).</summary>
+    public int CheckpointEntryThreshold { get; set; } = 500;
+
+    /// <summary>Size in bytes of the uncompacted journal file before auto-checkpointing (default: 2 MiB; 0 disables).</summary>
+    public long CheckpointBytesThreshold { get; set; } = 2 * 1024 * 1024;
 }
 
 // Default custody: an HKDF-derived master per account from IntoChatOS:MasterKey (the os configured custody's derivation).
