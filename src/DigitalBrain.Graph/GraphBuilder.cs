@@ -52,7 +52,9 @@ internal static class GraphBuilder
 
         foreach (var source in sources)
         {
-            await source.Contribute(brain, sink, cancellationToken).ConfigureAwait(false);
+            // One source that cannot read its store this time does not blank the brain: the picture is drawn without it.
+            try { await source.Contribute(brain, sink, cancellationToken).ConfigureAwait(false); }
+            catch (Exception error) when (error is not OperationCanceledException) { continue; }
         }
 
         // calls edges come from [assembly: Calls(from, to)], written at build time by the DigitalBrain source generator:
@@ -103,10 +105,22 @@ internal static class GraphBuilder
             return sink.Node("external:" + foreign, GraphNodeKind.External, foreign);
         }
         if (sink.IndexOf(id) is var known and >= 0) { return known; }
+        if (Session(sink, id) is var served and >= 0) { return served; }
         var kind = NeuronId.TryParse(id, out var neuronId) ? KindOf(neuronId.Type) : GraphNodeKind.Neuron;
         var node = sink.Node(id, kind, LabelOf(id));
         sink.Edge(root, node, GraphEdgeKind.Owns);
         return node;
+    }
+
+    /// <summary>
+    /// A runtime session subscribes on behalf of the program it serves: its key is "{runtime}/{program id}". When that program is a
+    /// node already, the subscription is the program's; otherwise -1 and the session is drawn as itself.
+    /// </summary>
+    internal static int Session(GraphSink sink, string id)
+    {
+        if (!NeuronId.TryParse(id, out var session) || session.Type != "runtime.session") { return -1; }
+        var slash = session.Key.IndexOf('/', StringComparison.Ordinal);
+        return slash > 0 && slash < session.Key.Length - 1 ? sink.IndexOf(session.Key[(slash + 1)..]) : -1;
     }
 
     internal static GraphNodeKind KindOf(string type)

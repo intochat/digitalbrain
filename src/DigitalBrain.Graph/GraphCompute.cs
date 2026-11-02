@@ -15,6 +15,14 @@ public static class GraphCompute
         return Csr.Build(revision, sink, [], group);
     }
 
+    /// <summary>A snapshot of <paramref name="sink"/> grouped as the brain graph groups <paramref name="brain"/>'s nodes (by module prefix).</summary>
+    public static GraphSnapshot Build(GraphSink sink, BrainId brain, long revision = 0)
+    {
+        ArgumentNullException.ThrowIfNull(sink);
+        var (groups, group) = Grouping.Assign(sink, brain);
+        return Csr.Build(revision, sink, groups, group);
+    }
+
     /// <summary>PageRank with <paramref name="teleport"/> as the personal vector (seed weights by node index), or uniform when null.</summary>
     public static float[] PageRank(GraphSnapshot graph, float[]? teleport = null, float damping = 0.85f, int iterations = 20)
     {

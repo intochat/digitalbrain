@@ -36,3 +36,18 @@ public sealed class CallsFacts
         Assert.Equal([follower.ToString(), ticker.ToString()], cycle.Nodes.Order());
     }
 }
+
+public sealed class SessionAttributionFacts
+{
+    [Fact]
+    public void ARuntimeSessionSubscriptionBelongsToTheProgramItServes()
+    {
+        var sink = new GraphSink();
+        var app = sink.Node("ada/apps/desktop", GraphNodeKind.App, "apps/desktop");
+
+        Assert.Equal(app, GraphBuilder.Session(sink, "ada/runtime.session/csharp/ada/apps/desktop"));
+        Assert.Equal(-1, GraphBuilder.Session(sink, "ada/runtime.session/csharp/ada/apps/other"));
+        Assert.Equal(-1, GraphBuilder.Session(sink, "ada/runtime.session/client"));
+        Assert.Equal(-1, GraphBuilder.Session(sink, "ada/probe.ticker/t"));
+    }
+}
