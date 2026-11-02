@@ -8,7 +8,7 @@
   "identity": "DigitalBrain.Module.CSharp",
   "name": "DigitalBrain module",
   "description": "A DigitalBrain module with a manifest, a contract, one internal neuron and a unit test.",
-  "shortName": "intochat-module",
+  "shortName": ["digitalbrain-module", "intochat-module"],
   "tags": {
     "language": "C#",
     "type": "project"

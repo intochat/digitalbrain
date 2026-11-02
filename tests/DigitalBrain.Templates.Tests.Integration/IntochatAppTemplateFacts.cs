@@ -4,7 +4,7 @@ using System.Text;
 
 namespace DigitalBrain.Templates.Tests.Integration;
 
-// D-07 / APPS-05: `dotnet new intochat-app -n Notes` gives Notes.cs, Notes.spec.md and NotesFacts.cs; the instance builds with
+// D-07 / APPS-05: `dotnet new digitalbrain-app -n Notes` (and its alias `intochat-app`) gives Notes.cs, Notes.spec.md and NotesFacts.cs; the instance builds with
 // -warnaserror (so zero analyzer diagnostics) and its generated baseline passes unchanged.
 //
 // Packages: DIGITALBRAIN_TEMPLATE_PACKAGES names a folder of packed DigitalBrain packages (CI passes the build job's artifacts);
@@ -19,9 +19,11 @@ public sealed class IntochatAppTemplateFacts
     ];
 
     [Theory]
-    [InlineData("Notes", null, "notes")]
-    [InlineData("Foo.Bar", "acme.foo-bar", "acme.foo-bar")]
-    public async Task An_instance_builds_with_warnings_as_errors_and_passes_its_baseline(string name, string? appId, string expectedId)
+    [InlineData("digitalbrain-app", "Notes", null, "notes")]
+    [InlineData("intochat-app", "Notes", null, "notes")]
+    [InlineData("digitalbrain-app", "Foo.Bar", "acme.foo-bar", "acme.foo-bar")]
+    [InlineData("intochat-app", "Foo.Bar", "acme.foo-bar", "acme.foo-bar")]
+    public async Task An_instance_builds_with_warnings_as_errors_and_passes_its_baseline(string shortName, string name, string? appId, string expectedId)
     {
         var ct = TestContext.Current.CancellationToken;
         var root = Root();
@@ -35,7 +37,7 @@ public sealed class IntochatAppTemplateFacts
             await Dotnet(work, null, ["new", "install", template, "--debug:custom-hive", hive], ct);
 
             var app = Path.Combine(work, name);
-            string[] create = ["new", "intochat-app", "-n", name, "-o", app, "--DigitalBrainVersion", version, "--debug:custom-hive", hive];
+            string[] create = ["new", shortName, "-n", name, "-o", app, "--DigitalBrainVersion", version, "--debug:custom-hive", hive];
             await Dotnet(work, null, appId is null ? create : [.. create, "--AppId", appId], ct);
             var source = Path.Combine(app, name, name + ".cs");
             Assert.True(File.Exists(source), name + ".cs");

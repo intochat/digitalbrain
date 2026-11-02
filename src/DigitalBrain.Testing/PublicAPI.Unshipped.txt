@@ -356,6 +356,7 @@ DigitalBrain.Testing.TestJournal.Read(DigitalBrain.NeuronId publisher, long sinc
 DigitalBrain.Testing.TestJournal.Read(long since, int limit, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.SignalPage!>!
 DigitalBrain.Testing.TestJournal.Saves.get -> int
 DigitalBrain.Testing.TestJournal.Signals(DigitalBrain.NeuronId publisher) -> System.Collections.Generic.IReadOnlyList<DigitalBrain.JournaledSignal!>!
+DigitalBrain.Testing.TestBrain
 DigitalBrain.Testing.TestOS
 DigitalBrain.Testing.TestOS.Activate(DigitalBrain.NeuronId id) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.TestOS.Brains(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string![]!>!
@@ -461,6 +462,8 @@ static DigitalBrain.Testing.Conformance.Storage.StorageSubject.operator !=(Digit
 static DigitalBrain.Testing.Conformance.Storage.StorageSubject.operator ==(DigitalBrain.Testing.Conformance.Storage.StorageSubject? left, DigitalBrain.Testing.Conformance.Storage.StorageSubject? right) -> bool
 static DigitalBrain.Testing.NeuronHarness.Create<TNeuron>(DigitalBrain.NeuronId id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Testing.NeuronHarness<TNeuron!>!>!
 static DigitalBrain.Testing.SiloHost.Local(System.Action<DigitalBrain.InProcessHostOptions!>? configure = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Spi.IInProcessHost!>!
+static DigitalBrain.Testing.TestBrain.DefinitionOf(System.Type! appType) -> DigitalBrain.AppDefinition!
+static DigitalBrain.Testing.TestBrain.Local(System.Action<DigitalBrain.Testing.TestOSOptions!>? configure = null) -> DigitalBrain.Testing.TestOS!
 static DigitalBrain.Testing.TestOS.Local(System.Action<DigitalBrain.Testing.TestOSOptions!>? configure = null) -> DigitalBrain.Testing.TestOS!
 static DigitalBrain.Testing.TestOS.DefinitionOf(System.Type! appType) -> DigitalBrain.AppDefinition!
 static DigitalBrain.Testing.TestOSSecretsIdentityExtensions.WithIdentity(this DigitalBrain.Testing.TestOS! os, string! name) -> DigitalBrain.Testing.TestOS!

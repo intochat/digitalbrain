@@ -8,7 +8,7 @@
   "identity": "DigitalBrain.App.CSharp",
   "name": "DigitalBrain app",
   "description": "An IntoChat app that follows the app convention: X.cs, X.spec.md and XFacts.cs with the generated baseline test.",
-  "shortName": "intochat-app",
+  "shortName": ["digitalbrain-app", "intochat-app"],
   "tags": {
     "language": "C#",
     "type": "project"
