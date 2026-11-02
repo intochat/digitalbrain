@@ -150,6 +150,27 @@ public sealed class BareInvariantAnalyzerFacts
     }
 
     [Fact]
+    public Task StaticMethodsAreExempt() => Diagnostics("""
+        using System;
+        using DigitalBrain;
+        public sealed class Cart : Neuron
+        {
+            public static void Verify(int quantity) { if (quantity > 10) { throw new InvalidOperationException("Too many"); } }
+        }
+        """);
+
+    [Fact]
+    public Task ScenarioMethodsAreExempt() => Diagnostics("""
+        using System;
+        using DigitalBrain;
+        public sealed class Cart : Neuron
+        {
+            [Scenario("Cart holds ten")]
+            public void Holds(int quantity) { if (quantity > 10) { throw new InvalidOperationException("Too many"); } }
+        }
+        """);
+
+    [Fact]
     public Task RuleViolationExceptionIsNotReported() => Diagnostics("""
         using DigitalBrain;
         namespace DigitalBrain.Rules { public sealed class RuleViolationException(string message) : System.Exception(message); }

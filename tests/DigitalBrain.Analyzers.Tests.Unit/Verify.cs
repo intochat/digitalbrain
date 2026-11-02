@@ -45,6 +45,7 @@ internal static class Verify<TAnalyzer> where TAnalyzer : DiagnosticAnalyzer, ne
             public sealed class ModuleManifest { }
             public abstract record Signal;
             [System.AttributeUsage(System.AttributeTargets.Method)] public sealed class OnAttribute : System.Attribute;
+            [System.AttributeUsage(System.AttributeTargets.Method)] public sealed class ScenarioAttribute(string title) : System.Attribute;
         }
         namespace DigitalBrain.Rules
         {

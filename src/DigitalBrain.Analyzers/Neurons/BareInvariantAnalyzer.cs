@@ -9,7 +9,7 @@ namespace DigitalBrain.Analyzers.Neurons;
 /// <summary>
 /// DB0040 (opt-in): <c>throw new InvalidOperationException("...")</c> (or ArgumentException, InvalidDataException) with a message in a
 /// public or [On] method of a neuron or app states an invariant that belongs in a Rule judged by Check. Guard calls (ThrowIf*),
-/// rethrows inside catch, UnauthorizedAccessException and nameof-only ArgumentException are not invariants.
+/// rethrows inside catch, static and [Scenario] methods (verification, not behavior), UnauthorizedAccessException and nameof-only ArgumentException are not invariants.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class BareInvariantAnalyzer : DiagnosticAnalyzer
@@ -44,6 +44,7 @@ public sealed class BareInvariantAnalyzer : DiagnosticAnalyzer
             || !Invariants.Contains(Rules.FullName(exception))) { return; }
         if (context.SemanticModel.GetDeclaredSymbol(declaration, context.CancellationToken) is not { } method) { return; }
         if (method.DeclaredAccessibility != Accessibility.Public && !Rules.Has(method, "DigitalBrain.OnAttribute")) { return; }
+        if (method.IsStatic || Rules.Has(method, "DigitalBrain.ScenarioAttribute")) { return; }
         var owner = method.ContainingType;
         if (!Rules.DerivesFrom(owner, "DigitalBrain.Neuron") && !Rules.DerivesFrom(owner, "DigitalBrain.App")) { return; }
         context.ReportDiagnostic(Diagnostic.Create(Rules.BareInvariant, context.Node.GetLocation(), method.Name, exception.Name));
