@@ -13,7 +13,7 @@ $version = "$((Get-Content (Join-Path $root 'VERSION') -Raw).Trim())-preview.$Pr
 New-Item -ItemType Directory -Force -Path $Feed | Out-Null
 
 $ids = 'DigitalBrain', 'DigitalBrain.UI', 'DigitalBrain.Testing', 'DigitalBrain.Analyzers', 'DigitalBrain.Templates',
-    'DigitalBrain.Runtime.Orleans', 'DigitalBrain.Runtime.Orleans.Azure', 'DigitalBrain.Capabilities.Storage', 'DigitalBrain.Capabilities.Secrets', 'DigitalBrain.Capabilities.Identity', 'DigitalBrain.Runtime.Http',
+    'DigitalBrain.Runtime.Orleans', 'DigitalBrain.Runtime.Orleans.Azure', 'DigitalBrain.Capabilities.Storage', 'DigitalBrain.Capabilities.Secrets', 'DigitalBrain.Capabilities.Identity', 'DigitalBrain.Capabilities.Compute', 'DigitalBrain.Runtime.Http',
     'DigitalBrain.Testing.Silo', 'DigitalBrain.Graph', 'DigitalBrain.Apps.Packaging', 'DigitalBrain.Runtime.Apps'
 foreach ($id in $ids) {
     if (Test-Path (Join-Path $Feed "$id.$version.nupkg")) { throw "$id.$version.nupkg exists in $Feed; bump the preview number" }

@@ -12,6 +12,7 @@
     <Project Path="src/DigitalBrain.Capabilities.Storage/DigitalBrain.Capabilities.Storage.csproj" />
     <Project Path="src/DigitalBrain.Capabilities.Secrets/DigitalBrain.Capabilities.Secrets.csproj" />
     <Project Path="src/DigitalBrain.Capabilities.Identity/DigitalBrain.Capabilities.Identity.csproj" />
+    <Project Path="src/DigitalBrain.Capabilities.Compute/DigitalBrain.Capabilities.Compute.csproj" />
     <Project Path="src/DigitalBrain.Runtime.Http/DigitalBrain.Runtime.Http.csproj" />
     <Project Path="src/DigitalBrain.Runtime.Apps/DigitalBrain.Runtime.Apps.csproj" />
     <Project Path="src/DigitalBrain.Graph/DigitalBrain.Graph.csproj" />
@@ -34,6 +35,7 @@
     <Project Path="tests/DigitalBrain.Capabilities.Storage.Tests.Unit/DigitalBrain.Capabilities.Storage.Tests.Unit.csproj" />
     <Project Path="tests/DigitalBrain.Capabilities.Secrets.Tests.Unit/DigitalBrain.Capabilities.Secrets.Tests.Unit.csproj" />
     <Project Path="tests/DigitalBrain.Capabilities.Identity.Tests.Unit/DigitalBrain.Capabilities.Identity.Tests.Unit.csproj" />
+    <Project Path="tests/DigitalBrain.Capabilities.Compute.Tests.Unit/DigitalBrain.Capabilities.Compute.Tests.Unit.csproj" />
     <Project Path="tests/DigitalBrain.Runtime.Http.Tests.Unit/DigitalBrain.Runtime.Http.Tests.Unit.csproj" />
     <Project Path="tests/DigitalBrain.Runtime.Apps.Tests.Unit/DigitalBrain.Runtime.Apps.Tests.Unit.csproj" />
     <Project Path="tests/DigitalBrain.Templates.Tests.Integration/DigitalBrain.Templates.Tests.Integration.csproj" />

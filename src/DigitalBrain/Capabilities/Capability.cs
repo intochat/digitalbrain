@@ -2,10 +2,20 @@ namespace DigitalBrain.Capabilities;
 
 /// <summary>
 /// The capabilities the platform ships contracts for. <c>V1Id</c> is the literal manifests and analyzers compare against;
-/// <c>V1</c> is the typed id. There is no compute capability in 0.7.0.
+/// <c>V1</c> is the typed id.
 /// </summary>
 public static class Capability
 {
+    /// <summary>Compute accounting: costs, funding, budgets and external-call metering.</summary>
+    public static class Compute
+    {
+        /// <summary>The string form of <see cref="V1"/>.</summary>
+        public const string V1Id = "compute@1";
+
+        /// <summary>compute@1.</summary>
+        public static CapabilityId V1 { get; } = CapabilityId.Parse(V1Id);
+    }
+
     /// <summary>Files and folders in a storage connection.</summary>
     public static class Storage
     {

@@ -1,0 +1,402 @@
+#nullable enable
+~override DigitalBrain.Capabilities.Compute.ExternalCallHandle.Equals(object obj) -> bool
+~override DigitalBrain.Capabilities.Compute.ExternalCallHandle.ToString() -> string
+~override DigitalBrain.Capabilities.Compute.Funding.Equals(object obj) -> bool
+~override DigitalBrain.Capabilities.Compute.Funding.ToString() -> string
+DigitalBrain.Capabilities.Compute.BudgetExhaustedException
+DigitalBrain.Capabilities.Compute.BudgetExhaustedException.BudgetExhaustedException(string! traceId) -> void
+DigitalBrain.Capabilities.Compute.BudgetExhaustedException.TraceId.get -> string!
+DigitalBrain.Capabilities.Compute.ComputeTracePage
+DigitalBrain.Capabilities.Compute.ComputeTracePage.<Clone>$() -> DigitalBrain.Capabilities.Compute.ComputeTracePage!
+DigitalBrain.Capabilities.Compute.ComputeTracePage.ChargedMicros.get -> long
+DigitalBrain.Capabilities.Compute.ComputeTracePage.ChargedMicros.init -> void
+DigitalBrain.Capabilities.Compute.ComputeTracePage.ComputeTracePage() -> void
+DigitalBrain.Capabilities.Compute.ComputeTracePage.ContinuationToken.get -> string?
+DigitalBrain.Capabilities.Compute.ComputeTracePage.ContinuationToken.init -> void
+DigitalBrain.Capabilities.Compute.ComputeTracePage.Equals(DigitalBrain.Capabilities.Compute.ComputeTracePage? other) -> bool
+DigitalBrain.Capabilities.Compute.ComputeTracePage.KnownListPriceMicros.get -> long
+DigitalBrain.Capabilities.Compute.ComputeTracePage.KnownListPriceMicros.init -> void
+DigitalBrain.Capabilities.Compute.ComputeTracePage.PendingCount.get -> long
+DigitalBrain.Capabilities.Compute.ComputeTracePage.PendingCount.init -> void
+DigitalBrain.Capabilities.Compute.ComputeTracePage.Rows.get -> DigitalBrain.Capabilities.Compute.Cost![]!
+DigitalBrain.Capabilities.Compute.ComputeTracePage.Rows.init -> void
+DigitalBrain.Capabilities.Compute.ComputeTracePage.SnapshotWatermark.get -> long
+DigitalBrain.Capabilities.Compute.ComputeTracePage.SnapshotWatermark.init -> void
+DigitalBrain.Capabilities.Compute.ComputeTracePage.Status.get -> DigitalBrain.Capabilities.Compute.TraceDetailStatus
+DigitalBrain.Capabilities.Compute.ComputeTracePage.Status.init -> void
+DigitalBrain.Capabilities.Compute.ComputeTracePage.UnknownCount.get -> long
+DigitalBrain.Capabilities.Compute.ComputeTracePage.UnknownCount.init -> void
+DigitalBrain.Capabilities.Compute.ComputeTracePage.UnpricedCount.get -> long
+DigitalBrain.Capabilities.Compute.ComputeTracePage.UnpricedCount.init -> void
+DigitalBrain.Capabilities.Compute.Cost
+DigitalBrain.Capabilities.Compute.Cost.<Clone>$() -> DigitalBrain.Capabilities.Compute.Cost!
+DigitalBrain.Capabilities.Compute.Cost.App.get -> string?
+DigitalBrain.Capabilities.Compute.Cost.App.init -> void
+DigitalBrain.Capabilities.Compute.Cost.At.get -> System.DateTimeOffset
+DigitalBrain.Capabilities.Compute.Cost.At.init -> void
+DigitalBrain.Capabilities.Compute.Cost.AttemptState.get -> DigitalBrain.Capabilities.Compute.ExternalCallState?
+DigitalBrain.Capabilities.Compute.Cost.AttemptState.init -> void
+DigitalBrain.Capabilities.Compute.Cost.ChargePolicy.get -> DigitalBrain.Capabilities.Compute.ExternalChargePolicy?
+DigitalBrain.Capabilities.Compute.Cost.ChargePolicy.init -> void
+DigitalBrain.Capabilities.Compute.Cost.Cost() -> void
+DigitalBrain.Capabilities.Compute.Cost.CostId.get -> string!
+DigitalBrain.Capabilities.Compute.Cost.CostId.init -> void
+DigitalBrain.Capabilities.Compute.Cost.Equals(DigitalBrain.Capabilities.Compute.Cost? other) -> bool
+DigitalBrain.Capabilities.Compute.Cost.EstimatedListPriceMicros.get -> long?
+DigitalBrain.Capabilities.Compute.Cost.EstimatedListPriceMicros.init -> void
+DigitalBrain.Capabilities.Compute.Cost.FundingKind.get -> DigitalBrain.Capabilities.Compute.FundingKind?
+DigitalBrain.Capabilities.Compute.Cost.FundingKind.init -> void
+DigitalBrain.Capabilities.Compute.Cost.InvocationId.get -> string?
+DigitalBrain.Capabilities.Compute.Cost.InvocationId.init -> void
+DigitalBrain.Capabilities.Compute.Cost.Item.get -> string!
+DigitalBrain.Capabilities.Compute.Cost.Item.init -> void
+DigitalBrain.Capabilities.Compute.Cost.Kind.get -> DigitalBrain.Capabilities.Compute.CostKind
+DigitalBrain.Capabilities.Compute.Cost.Kind.init -> void
+DigitalBrain.Capabilities.Compute.Cost.ListPriceMicros.get -> long?
+DigitalBrain.Capabilities.Compute.Cost.ListPriceMicros.init -> void
+DigitalBrain.Capabilities.Compute.Cost.Micros.get -> long
+DigitalBrain.Capabilities.Compute.Cost.Micros.init -> void
+DigitalBrain.Capabilities.Compute.Cost.Neuron.get -> string?
+DigitalBrain.Capabilities.Compute.Cost.Neuron.init -> void
+DigitalBrain.Capabilities.Compute.Cost.Outcome.get -> DigitalBrain.Capabilities.Compute.ExternalCallOutcomeKind?
+DigitalBrain.Capabilities.Compute.Cost.Outcome.init -> void
+DigitalBrain.Capabilities.Compute.Cost.PricingStatus.get -> DigitalBrain.Capabilities.Compute.PricingStatus?
+DigitalBrain.Capabilities.Compute.Cost.PricingStatus.init -> void
+DigitalBrain.Capabilities.Compute.Cost.ProviderRequestId.get -> string?
+DigitalBrain.Capabilities.Compute.Cost.ProviderRequestId.init -> void
+DigitalBrain.Capabilities.Compute.Cost.Quantity.get -> decimal
+DigitalBrain.Capabilities.Compute.Cost.Quantity.init -> void
+DigitalBrain.Capabilities.Compute.Cost.Synapse.get -> string?
+DigitalBrain.Capabilities.Compute.Cost.Synapse.init -> void
+DigitalBrain.Capabilities.Compute.Cost.TariffVersion.get -> string?
+DigitalBrain.Capabilities.Compute.Cost.TariffVersion.init -> void
+DigitalBrain.Capabilities.Compute.Cost.TraceId.get -> string!
+DigitalBrain.Capabilities.Compute.Cost.TraceId.init -> void
+DigitalBrain.Capabilities.Compute.Cost.Unit.get -> string!
+DigitalBrain.Capabilities.Compute.Cost.Unit.init -> void
+DigitalBrain.Capabilities.Compute.CostKind
+DigitalBrain.Capabilities.Compute.CostKind.ExternalProvider = 5 -> DigitalBrain.Capabilities.Compute.CostKind
+DigitalBrain.Capabilities.Compute.CostKind.Http = 2 -> DigitalBrain.Capabilities.Compute.CostKind
+DigitalBrain.Capabilities.Compute.CostKind.Model = 0 -> DigitalBrain.Capabilities.Compute.CostKind
+DigitalBrain.Capabilities.Compute.CostKind.Operation = 4 -> DigitalBrain.Capabilities.Compute.CostKind
+DigitalBrain.Capabilities.Compute.CostKind.Script = 1 -> DigitalBrain.Capabilities.Compute.CostKind
+DigitalBrain.Capabilities.Compute.CostKind.Storage = 3 -> DigitalBrain.Capabilities.Compute.CostKind
+DigitalBrain.Capabilities.Compute.CostRow
+DigitalBrain.Capabilities.Compute.CostRow.<Clone>$() -> DigitalBrain.Capabilities.Compute.CostRow!
+DigitalBrain.Capabilities.Compute.CostRow.CostRow(string! Key, long Micros, long Count) -> void
+DigitalBrain.Capabilities.Compute.CostRow.Count.get -> long
+DigitalBrain.Capabilities.Compute.CostRow.Count.init -> void
+DigitalBrain.Capabilities.Compute.CostRow.Deconstruct(out string! Key, out long Micros, out long Count) -> void
+DigitalBrain.Capabilities.Compute.CostRow.Equals(DigitalBrain.Capabilities.Compute.CostRow? other) -> bool
+DigitalBrain.Capabilities.Compute.CostRow.Key.get -> string!
+DigitalBrain.Capabilities.Compute.CostRow.Key.init -> void
+DigitalBrain.Capabilities.Compute.CostRow.KnownListPriceMicros.get -> long?
+DigitalBrain.Capabilities.Compute.CostRow.KnownListPriceMicros.init -> void
+DigitalBrain.Capabilities.Compute.CostRow.Micros.get -> long
+DigitalBrain.Capabilities.Compute.CostRow.Micros.init -> void
+DigitalBrain.Capabilities.Compute.CostRow.PendingCount.get -> long?
+DigitalBrain.Capabilities.Compute.CostRow.PendingCount.init -> void
+DigitalBrain.Capabilities.Compute.CostRow.UnknownCount.get -> long?
+DigitalBrain.Capabilities.Compute.CostRow.UnknownCount.init -> void
+DigitalBrain.Capabilities.Compute.CostRow.UnpricedCount.get -> long?
+DigitalBrain.Capabilities.Compute.CostRow.UnpricedCount.init -> void
+DigitalBrain.Capabilities.Compute.CostSubject
+DigitalBrain.Capabilities.Compute.CostSubject.<Clone>$() -> DigitalBrain.Capabilities.Compute.CostSubject!
+DigitalBrain.Capabilities.Compute.CostSubject.App.get -> string?
+DigitalBrain.Capabilities.Compute.CostSubject.App.init -> void
+DigitalBrain.Capabilities.Compute.CostSubject.CostSubject(string? Synapse = null, string? App = null, string? Neuron = null) -> void
+DigitalBrain.Capabilities.Compute.CostSubject.Deconstruct(out string? Synapse, out string? App, out string? Neuron) -> void
+DigitalBrain.Capabilities.Compute.CostSubject.Equals(DigitalBrain.Capabilities.Compute.CostSubject? other) -> bool
+DigitalBrain.Capabilities.Compute.CostSubject.Neuron.get -> string?
+DigitalBrain.Capabilities.Compute.CostSubject.Neuron.init -> void
+DigitalBrain.Capabilities.Compute.CostSubject.Synapse.get -> string?
+DigitalBrain.Capabilities.Compute.CostSubject.Synapse.init -> void
+DigitalBrain.Capabilities.Compute.CostSummary
+DigitalBrain.Capabilities.Compute.CostSummary.<Clone>$() -> DigitalBrain.Capabilities.Compute.CostSummary!
+DigitalBrain.Capabilities.Compute.CostSummary.BalanceMicros.get -> long
+DigitalBrain.Capabilities.Compute.CostSummary.BalanceMicros.init -> void
+DigitalBrain.Capabilities.Compute.CostSummary.CostSummary(long BalanceMicros, long SpentMicros, DigitalBrain.Capabilities.Compute.CostRow![]! Rows) -> void
+DigitalBrain.Capabilities.Compute.CostSummary.Deconstruct(out long BalanceMicros, out long SpentMicros, out DigitalBrain.Capabilities.Compute.CostRow![]! Rows) -> void
+DigitalBrain.Capabilities.Compute.CostSummary.Equals(DigitalBrain.Capabilities.Compute.CostSummary? other) -> bool
+DigitalBrain.Capabilities.Compute.CostSummary.KnownListPriceMicros.get -> long?
+DigitalBrain.Capabilities.Compute.CostSummary.KnownListPriceMicros.init -> void
+DigitalBrain.Capabilities.Compute.CostSummary.PendingCount.get -> long?
+DigitalBrain.Capabilities.Compute.CostSummary.PendingCount.init -> void
+DigitalBrain.Capabilities.Compute.CostSummary.Rows.get -> DigitalBrain.Capabilities.Compute.CostRow![]!
+DigitalBrain.Capabilities.Compute.CostSummary.Rows.init -> void
+DigitalBrain.Capabilities.Compute.CostSummary.SpentMicros.get -> long
+DigitalBrain.Capabilities.Compute.CostSummary.SpentMicros.init -> void
+DigitalBrain.Capabilities.Compute.CostSummary.UnknownCount.get -> long?
+DigitalBrain.Capabilities.Compute.CostSummary.UnknownCount.init -> void
+DigitalBrain.Capabilities.Compute.CostSummary.UnpricedCount.get -> long?
+DigitalBrain.Capabilities.Compute.CostSummary.UnpricedCount.init -> void
+DigitalBrain.Capabilities.Compute.ExternalAccountingStatus
+DigitalBrain.Capabilities.Compute.ExternalAccountingStatus.CancelledBeforeDispatch = 2 -> DigitalBrain.Capabilities.Compute.ExternalAccountingStatus
+DigitalBrain.Capabilities.Compute.ExternalAccountingStatus.Pending = 0 -> DigitalBrain.Capabilities.Compute.ExternalAccountingStatus
+DigitalBrain.Capabilities.Compute.ExternalAccountingStatus.Settled = 1 -> DigitalBrain.Capabilities.Compute.ExternalAccountingStatus
+DigitalBrain.Capabilities.Compute.ExternalCallCompletion
+DigitalBrain.Capabilities.Compute.ExternalCallCompletion.<Clone>$() -> DigitalBrain.Capabilities.Compute.ExternalCallCompletion!
+DigitalBrain.Capabilities.Compute.ExternalCallCompletion.Cost.get -> DigitalBrain.Capabilities.Compute.Cost?
+DigitalBrain.Capabilities.Compute.ExternalCallCompletion.Cost.init -> void
+DigitalBrain.Capabilities.Compute.ExternalCallCompletion.Deconstruct(out DigitalBrain.Capabilities.Compute.ExternalCallHandle Handle, out DigitalBrain.Capabilities.Compute.ExternalAccountingStatus Status, out DigitalBrain.Capabilities.Compute.Cost? Cost) -> void
+DigitalBrain.Capabilities.Compute.ExternalCallCompletion.Equals(DigitalBrain.Capabilities.Compute.ExternalCallCompletion? other) -> bool
+DigitalBrain.Capabilities.Compute.ExternalCallCompletion.ExternalCallCompletion(DigitalBrain.Capabilities.Compute.ExternalCallHandle Handle, DigitalBrain.Capabilities.Compute.ExternalAccountingStatus Status, DigitalBrain.Capabilities.Compute.Cost? Cost = null) -> void
+DigitalBrain.Capabilities.Compute.ExternalCallCompletion.Handle.get -> DigitalBrain.Capabilities.Compute.ExternalCallHandle
+DigitalBrain.Capabilities.Compute.ExternalCallCompletion.Handle.init -> void
+DigitalBrain.Capabilities.Compute.ExternalCallCompletion.Status.get -> DigitalBrain.Capabilities.Compute.ExternalAccountingStatus
+DigitalBrain.Capabilities.Compute.ExternalCallCompletion.Status.init -> void
+DigitalBrain.Capabilities.Compute.ExternalCallHandle
+DigitalBrain.Capabilities.Compute.ExternalCallHandle.Deconstruct(out string! Value) -> void
+DigitalBrain.Capabilities.Compute.ExternalCallHandle.Equals(DigitalBrain.Capabilities.Compute.ExternalCallHandle other) -> bool
+DigitalBrain.Capabilities.Compute.ExternalCallHandle.ExternalCallHandle() -> void
+DigitalBrain.Capabilities.Compute.ExternalCallHandle.ExternalCallHandle(string! Value) -> void
+DigitalBrain.Capabilities.Compute.ExternalCallHandle.Value.get -> string!
+DigitalBrain.Capabilities.Compute.ExternalCallHandle.Value.init -> void
+DigitalBrain.Capabilities.Compute.ExternalCallHandler
+DigitalBrain.Capabilities.Compute.ExternalCallHandler.ExternalCallHandler(DigitalBrain.Capabilities.Compute.ICostMeter! meter, DigitalBrain.Capabilities.Compute.ModulePriceListRegistry! registry, DigitalBrain.Capabilities.Compute.IExternalCallContextAccessor! context, System.TimeProvider? clock = null, Microsoft.Extensions.Logging.ILogger<DigitalBrain.Capabilities.Compute.ExternalCallHandler!>? logger = null) -> void
+DigitalBrain.Capabilities.Compute.ExternalCallHttp
+DigitalBrain.Capabilities.Compute.ExternalCallMetadata
+DigitalBrain.Capabilities.Compute.ExternalCallMetadata.<Clone>$() -> DigitalBrain.Capabilities.Compute.ExternalCallMetadata!
+DigitalBrain.Capabilities.Compute.ExternalCallMetadata.Deconstruct(out string! Operation, out DigitalBrain.Capabilities.Compute.Funding Funding, out DigitalBrain.Capabilities.Compute.CostSubject? Subject, out string! InvocationId) -> void
+DigitalBrain.Capabilities.Compute.ExternalCallMetadata.Equals(DigitalBrain.Capabilities.Compute.ExternalCallMetadata? other) -> bool
+DigitalBrain.Capabilities.Compute.ExternalCallMetadata.ExternalCallMetadata(string! Operation, DigitalBrain.Capabilities.Compute.Funding Funding, DigitalBrain.Capabilities.Compute.CostSubject? Subject, string! InvocationId) -> void
+DigitalBrain.Capabilities.Compute.ExternalCallMetadata.Funding.get -> DigitalBrain.Capabilities.Compute.Funding
+DigitalBrain.Capabilities.Compute.ExternalCallMetadata.Funding.init -> void
+DigitalBrain.Capabilities.Compute.ExternalCallMetadata.InvocationId.get -> string!
+DigitalBrain.Capabilities.Compute.ExternalCallMetadata.InvocationId.init -> void
+DigitalBrain.Capabilities.Compute.ExternalCallMetadata.Operation.get -> string!
+DigitalBrain.Capabilities.Compute.ExternalCallMetadata.Operation.init -> void
+DigitalBrain.Capabilities.Compute.ExternalCallMetadata.Subject.get -> DigitalBrain.Capabilities.Compute.CostSubject?
+DigitalBrain.Capabilities.Compute.ExternalCallMetadata.Subject.init -> void
+DigitalBrain.Capabilities.Compute.ExternalCallOutcome
+DigitalBrain.Capabilities.Compute.ExternalCallOutcome.<Clone>$() -> DigitalBrain.Capabilities.Compute.ExternalCallOutcome!
+DigitalBrain.Capabilities.Compute.ExternalCallOutcome.Deconstruct(out DigitalBrain.Capabilities.Compute.ExternalCallOutcomeKind Kind, out int? HttpStatusCode, out string? ProviderRequestId) -> void
+DigitalBrain.Capabilities.Compute.ExternalCallOutcome.Equals(DigitalBrain.Capabilities.Compute.ExternalCallOutcome? other) -> bool
+DigitalBrain.Capabilities.Compute.ExternalCallOutcome.ExternalCallOutcome(DigitalBrain.Capabilities.Compute.ExternalCallOutcomeKind Kind, int? HttpStatusCode = null, string? ProviderRequestId = null) -> void
+DigitalBrain.Capabilities.Compute.ExternalCallOutcome.HttpStatusCode.get -> int?
+DigitalBrain.Capabilities.Compute.ExternalCallOutcome.HttpStatusCode.init -> void
+DigitalBrain.Capabilities.Compute.ExternalCallOutcome.Kind.get -> DigitalBrain.Capabilities.Compute.ExternalCallOutcomeKind
+DigitalBrain.Capabilities.Compute.ExternalCallOutcome.Kind.init -> void
+DigitalBrain.Capabilities.Compute.ExternalCallOutcome.ProviderRequestId.get -> string?
+DigitalBrain.Capabilities.Compute.ExternalCallOutcome.ProviderRequestId.init -> void
+DigitalBrain.Capabilities.Compute.ExternalCallOutcomeKind
+DigitalBrain.Capabilities.Compute.ExternalCallOutcomeKind.CancelledAfterDispatch = 4 -> DigitalBrain.Capabilities.Compute.ExternalCallOutcomeKind
+DigitalBrain.Capabilities.Compute.ExternalCallOutcomeKind.CancelledBeforeDispatch = 3 -> DigitalBrain.Capabilities.Compute.ExternalCallOutcomeKind
+DigitalBrain.Capabilities.Compute.ExternalCallOutcomeKind.HttpFailed = 1 -> DigitalBrain.Capabilities.Compute.ExternalCallOutcomeKind
+DigitalBrain.Capabilities.Compute.ExternalCallOutcomeKind.Succeeded = 0 -> DigitalBrain.Capabilities.Compute.ExternalCallOutcomeKind
+DigitalBrain.Capabilities.Compute.ExternalCallOutcomeKind.TransportFailed = 2 -> DigitalBrain.Capabilities.Compute.ExternalCallOutcomeKind
+DigitalBrain.Capabilities.Compute.ExternalCallOutcomeKind.Uncertain = 5 -> DigitalBrain.Capabilities.Compute.ExternalCallOutcomeKind
+DigitalBrain.Capabilities.Compute.ExternalCallRequest
+DigitalBrain.Capabilities.Compute.ExternalCallRequest.<Clone>$() -> DigitalBrain.Capabilities.Compute.ExternalCallRequest!
+DigitalBrain.Capabilities.Compute.ExternalCallRequest.CostId.get -> string!
+DigitalBrain.Capabilities.Compute.ExternalCallRequest.CostId.init -> void
+DigitalBrain.Capabilities.Compute.ExternalCallRequest.Equals(DigitalBrain.Capabilities.Compute.ExternalCallRequest? other) -> bool
+DigitalBrain.Capabilities.Compute.ExternalCallRequest.ExternalCallRequest() -> void
+DigitalBrain.Capabilities.Compute.ExternalCallRequest.Funding.get -> DigitalBrain.Capabilities.Compute.Funding
+DigitalBrain.Capabilities.Compute.ExternalCallRequest.Funding.init -> void
+DigitalBrain.Capabilities.Compute.ExternalCallRequest.InvocationId.get -> string!
+DigitalBrain.Capabilities.Compute.ExternalCallRequest.InvocationId.init -> void
+DigitalBrain.Capabilities.Compute.ExternalCallRequest.Operation.get -> string!
+DigitalBrain.Capabilities.Compute.ExternalCallRequest.Operation.init -> void
+DigitalBrain.Capabilities.Compute.ExternalCallRequest.Quantity.get -> decimal
+DigitalBrain.Capabilities.Compute.ExternalCallRequest.Quantity.init -> void
+DigitalBrain.Capabilities.Compute.ExternalCallRequest.Subject.get -> DigitalBrain.Capabilities.Compute.CostSubject?
+DigitalBrain.Capabilities.Compute.ExternalCallRequest.Subject.init -> void
+DigitalBrain.Capabilities.Compute.ExternalCallRequest.Unit.get -> string!
+DigitalBrain.Capabilities.Compute.ExternalCallRequest.Unit.init -> void
+DigitalBrain.Capabilities.Compute.ExternalCallState
+DigitalBrain.Capabilities.Compute.ExternalCallState.CancelledBeforeDispatch = 4 -> DigitalBrain.Capabilities.Compute.ExternalCallState
+DigitalBrain.Capabilities.Compute.ExternalCallState.DispatchStarted = 1 -> DigitalBrain.Capabilities.Compute.ExternalCallState
+DigitalBrain.Capabilities.Compute.ExternalCallState.OutcomeKnown = 2 -> DigitalBrain.Capabilities.Compute.ExternalCallState
+DigitalBrain.Capabilities.Compute.ExternalCallState.Reserved = 0 -> DigitalBrain.Capabilities.Compute.ExternalCallState
+DigitalBrain.Capabilities.Compute.ExternalCallState.Settled = 3 -> DigitalBrain.Capabilities.Compute.ExternalCallState
+DigitalBrain.Capabilities.Compute.ExternalCallState.Uncertain = 5 -> DigitalBrain.Capabilities.Compute.ExternalCallState
+DigitalBrain.Capabilities.Compute.ExternalChargePolicy
+DigitalBrain.Capabilities.Compute.ExternalChargePolicy.EveryDispatchedAttempt = 1 -> DigitalBrain.Capabilities.Compute.ExternalChargePolicy
+DigitalBrain.Capabilities.Compute.ExternalChargePolicy.Informational = 3 -> DigitalBrain.Capabilities.Compute.ExternalChargePolicy
+DigitalBrain.Capabilities.Compute.ExternalChargePolicy.SuccessfulResponse = 2 -> DigitalBrain.Capabilities.Compute.ExternalChargePolicy
+DigitalBrain.Capabilities.Compute.ExternalChargePolicy.Unspecified = 0 -> DigitalBrain.Capabilities.Compute.ExternalChargePolicy
+DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor
+DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor.<Clone>$() -> DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor!
+DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor.Deconstruct(out string! Name, out string! Integration, out string! Unit) -> void
+DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor.Equals(DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor? other) -> bool
+DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor.ExternalOperationDescriptor(string! Name, string! Integration, string! Unit) -> void
+DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor.Integration.get -> string!
+DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor.Integration.init -> void
+DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor.Name.get -> string!
+DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor.Name.init -> void
+DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor.Unit.get -> string!
+DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor.Unit.init -> void
+DigitalBrain.Capabilities.Compute.Funding
+DigitalBrain.Capabilities.Compute.Funding.CircleKey.get -> string?
+DigitalBrain.Capabilities.Compute.Funding.CircleKey.init -> void
+DigitalBrain.Capabilities.Compute.Funding.Deconstruct(out DigitalBrain.Capabilities.Compute.FundingKind Kind, out string? CircleKey) -> void
+DigitalBrain.Capabilities.Compute.Funding.Equals(DigitalBrain.Capabilities.Compute.Funding other) -> bool
+DigitalBrain.Capabilities.Compute.Funding.Funding() -> void
+DigitalBrain.Capabilities.Compute.Funding.Funding(DigitalBrain.Capabilities.Compute.FundingKind Kind, string? CircleKey = null) -> void
+DigitalBrain.Capabilities.Compute.Funding.Kind.get -> DigitalBrain.Capabilities.Compute.FundingKind
+DigitalBrain.Capabilities.Compute.Funding.Kind.init -> void
+DigitalBrain.Capabilities.Compute.FundingKind
+DigitalBrain.Capabilities.Compute.FundingKind.Circle = 3 -> DigitalBrain.Capabilities.Compute.FundingKind
+DigitalBrain.Capabilities.Compute.FundingKind.Integration = 2 -> DigitalBrain.Capabilities.Compute.FundingKind
+DigitalBrain.Capabilities.Compute.FundingKind.Local = 0 -> DigitalBrain.Capabilities.Compute.FundingKind
+DigitalBrain.Capabilities.Compute.FundingKind.OwnConnection = 1 -> DigitalBrain.Capabilities.Compute.FundingKind
+DigitalBrain.Capabilities.Compute.ICostMeter
+DigitalBrain.Capabilities.Compute.ICostMeter.BeginExternalCallAsync(DigitalBrain.Capabilities.Compute.ExternalCallRequest! request, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<DigitalBrain.Capabilities.Compute.ExternalCallHandle>
+DigitalBrain.Capabilities.Compute.ICostMeter.CompleteExternalCallAsync(DigitalBrain.Capabilities.Compute.ExternalCallHandle handle, DigitalBrain.Capabilities.Compute.ExternalCallOutcome! outcome, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<DigitalBrain.Capabilities.Compute.ExternalCallCompletion!>
+DigitalBrain.Capabilities.Compute.ICostMeter.MarkExternalCallDispatchStartedAsync(DigitalBrain.Capabilities.Compute.ExternalCallHandle handle, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+DigitalBrain.Capabilities.Compute.ICostMeter.RecordAsync(DigitalBrain.Capabilities.Compute.CostKind kind, string! item, decimal quantity, string! unit, DigitalBrain.Capabilities.Compute.Funding funding, string! costId, System.Threading.CancellationToken cancellationToken, DigitalBrain.Capabilities.Compute.CostSubject? subject = null) -> System.Threading.Tasks.ValueTask<DigitalBrain.Capabilities.Compute.Cost!>
+DigitalBrain.Capabilities.Compute.IExternalCallContextAccessor
+DigitalBrain.Capabilities.Compute.IExternalCallContextAccessor.RequireTraceId() -> string!
+DigitalBrain.Capabilities.Compute.IPriceList
+DigitalBrain.Capabilities.Compute.IPriceList.MicrosPerUnit(DigitalBrain.Capabilities.Compute.CostKind kind, string! item) -> long?
+DigitalBrain.Capabilities.Compute.IPriceList.Quote(DigitalBrain.Capabilities.Compute.CostKind kind, string! item, string! unit) -> DigitalBrain.Capabilities.Compute.PriceQuote!
+DigitalBrain.Capabilities.Compute.ISingleAttemptHttpTransport
+DigitalBrain.Capabilities.Compute.MeteredHttpClientRegistration
+DigitalBrain.Capabilities.Compute.MeteredHttpClientRegistration.<Clone>$() -> DigitalBrain.Capabilities.Compute.MeteredHttpClientRegistration!
+DigitalBrain.Capabilities.Compute.MeteredHttpClientRegistration.Deconstruct(out string! Name) -> void
+DigitalBrain.Capabilities.Compute.MeteredHttpClientRegistration.Equals(DigitalBrain.Capabilities.Compute.MeteredHttpClientRegistration? other) -> bool
+DigitalBrain.Capabilities.Compute.MeteredHttpClientRegistration.MeteredHttpClientRegistration(string! Name) -> void
+DigitalBrain.Capabilities.Compute.MeteredHttpClientRegistration.Name.get -> string!
+DigitalBrain.Capabilities.Compute.MeteredHttpClientRegistration.Name.init -> void
+DigitalBrain.Capabilities.Compute.MeteredHttpClients
+DigitalBrain.Capabilities.Compute.ModulePriceListRegistration
+DigitalBrain.Capabilities.Compute.ModulePriceListRegistration.ModuleId.get -> string!
+DigitalBrain.Capabilities.Compute.ModulePriceListRegistration.ModulePriceListRegistration(string! moduleId, System.Type! priceListType, DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor![]! operations) -> void
+DigitalBrain.Capabilities.Compute.ModulePriceListRegistration.Operations.get -> DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor![]!
+DigitalBrain.Capabilities.Compute.ModulePriceListRegistration.PriceListType.get -> System.Type!
+DigitalBrain.Capabilities.Compute.ModulePriceListRegistry
+DigitalBrain.Capabilities.Compute.ModulePriceListRegistry.GetOperation(string! operation) -> DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor!
+DigitalBrain.Capabilities.Compute.ModulePriceListRegistry.ModulePriceListRegistry(System.Collections.Generic.IEnumerable<DigitalBrain.Capabilities.Compute.ModulePriceListRegistration!>! registrations) -> void
+DigitalBrain.Capabilities.Compute.ModulePriceListRegistry.Resolve(string! operation) -> DigitalBrain.Capabilities.Compute.ModulePriceListRegistration!
+DigitalBrain.Capabilities.Compute.ModulePriceLists
+DigitalBrain.Capabilities.Compute.PriceQuote
+DigitalBrain.Capabilities.Compute.PriceQuote.<Clone>$() -> DigitalBrain.Capabilities.Compute.PriceQuote!
+DigitalBrain.Capabilities.Compute.PriceQuote.ChargePolicy.get -> DigitalBrain.Capabilities.Compute.ExternalChargePolicy
+DigitalBrain.Capabilities.Compute.PriceQuote.ChargePolicy.init -> void
+DigitalBrain.Capabilities.Compute.PriceQuote.EffectiveFrom.get -> System.DateTimeOffset?
+DigitalBrain.Capabilities.Compute.PriceQuote.EffectiveFrom.init -> void
+DigitalBrain.Capabilities.Compute.PriceQuote.Equals(DigitalBrain.Capabilities.Compute.PriceQuote? other) -> bool
+DigitalBrain.Capabilities.Compute.PriceQuote.MicrosPerUnit.get -> long?
+DigitalBrain.Capabilities.Compute.PriceQuote.MicrosPerUnit.init -> void
+DigitalBrain.Capabilities.Compute.PriceQuote.PriceQuote() -> void
+DigitalBrain.Capabilities.Compute.PriceQuote.Source.get -> string?
+DigitalBrain.Capabilities.Compute.PriceQuote.Source.init -> void
+DigitalBrain.Capabilities.Compute.PriceQuote.Status.get -> DigitalBrain.Capabilities.Compute.PricingStatus
+DigitalBrain.Capabilities.Compute.PriceQuote.TariffVersion.get -> string?
+DigitalBrain.Capabilities.Compute.PriceQuote.TariffVersion.init -> void
+DigitalBrain.Capabilities.Compute.PriceQuote.Unit.get -> string!
+DigitalBrain.Capabilities.Compute.PriceQuote.Unit.init -> void
+DigitalBrain.Capabilities.Compute.PricingStatus
+DigitalBrain.Capabilities.Compute.PricingStatus.Known = 2 -> DigitalBrain.Capabilities.Compute.PricingStatus
+DigitalBrain.Capabilities.Compute.PricingStatus.Unknown = 0 -> DigitalBrain.Capabilities.Compute.PricingStatus
+DigitalBrain.Capabilities.Compute.PricingStatus.Unpriced = 1 -> DigitalBrain.Capabilities.Compute.PricingStatus
+DigitalBrain.Capabilities.Compute.Trace
+DigitalBrain.Capabilities.Compute.Trace.<Clone>$() -> DigitalBrain.Capabilities.Compute.Trace!
+DigitalBrain.Capabilities.Compute.Trace.BrainId.get -> string!
+DigitalBrain.Capabilities.Compute.Trace.BrainId.init -> void
+DigitalBrain.Capabilities.Compute.Trace.BudgetMicros.get -> long?
+DigitalBrain.Capabilities.Compute.Trace.BudgetMicros.init -> void
+DigitalBrain.Capabilities.Compute.Trace.Equals(DigitalBrain.Capabilities.Compute.Trace? other) -> bool
+DigitalBrain.Capabilities.Compute.Trace.Origin.get -> DigitalBrain.NeuronId
+DigitalBrain.Capabilities.Compute.Trace.Origin.init -> void
+DigitalBrain.Capabilities.Compute.Trace.PayerAccountId.get -> string!
+DigitalBrain.Capabilities.Compute.Trace.PayerAccountId.init -> void
+DigitalBrain.Capabilities.Compute.Trace.Trace() -> void
+DigitalBrain.Capabilities.Compute.Trace.TraceId.get -> string!
+DigitalBrain.Capabilities.Compute.Trace.TraceId.init -> void
+DigitalBrain.Capabilities.Compute.TraceContext
+DigitalBrain.Capabilities.Compute.TraceDetailStatus
+DigitalBrain.Capabilities.Compute.TraceDetailStatus.Complete = 0 -> DigitalBrain.Capabilities.Compute.TraceDetailStatus
+DigitalBrain.Capabilities.Compute.TraceDetailStatus.DetailUnavailable = 3 -> DigitalBrain.Capabilities.Compute.TraceDetailStatus
+DigitalBrain.Capabilities.Compute.TraceDetailStatus.Expired = 2 -> DigitalBrain.Capabilities.Compute.TraceDetailStatus
+DigitalBrain.Capabilities.Compute.TraceDetailStatus.Incomplete = 1 -> DigitalBrain.Capabilities.Compute.TraceDetailStatus
+DigitalBrain.Capabilities.Compute.UsageGrouping
+DigitalBrain.Capabilities.Compute.UsageGrouping.App = 1 -> DigitalBrain.Capabilities.Compute.UsageGrouping
+DigitalBrain.Capabilities.Compute.UsageGrouping.Kind = 4 -> DigitalBrain.Capabilities.Compute.UsageGrouping
+DigitalBrain.Capabilities.Compute.UsageGrouping.Neuron = 3 -> DigitalBrain.Capabilities.Compute.UsageGrouping
+DigitalBrain.Capabilities.Compute.UsageGrouping.Origin = 0 -> DigitalBrain.Capabilities.Compute.UsageGrouping
+DigitalBrain.Capabilities.Compute.UsageGrouping.Synapse = 2 -> DigitalBrain.Capabilities.Compute.UsageGrouping
+override DigitalBrain.Capabilities.Compute.ComputeTracePage.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Compute.ComputeTracePage.GetHashCode() -> int
+override DigitalBrain.Capabilities.Compute.ComputeTracePage.ToString() -> string!
+override DigitalBrain.Capabilities.Compute.Cost.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Compute.Cost.GetHashCode() -> int
+override DigitalBrain.Capabilities.Compute.Cost.ToString() -> string!
+override DigitalBrain.Capabilities.Compute.CostRow.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Compute.CostRow.GetHashCode() -> int
+override DigitalBrain.Capabilities.Compute.CostRow.ToString() -> string!
+override DigitalBrain.Capabilities.Compute.CostSubject.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Compute.CostSubject.GetHashCode() -> int
+override DigitalBrain.Capabilities.Compute.CostSubject.ToString() -> string!
+override DigitalBrain.Capabilities.Compute.CostSummary.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Compute.CostSummary.GetHashCode() -> int
+override DigitalBrain.Capabilities.Compute.CostSummary.ToString() -> string!
+override DigitalBrain.Capabilities.Compute.ExternalCallCompletion.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Compute.ExternalCallCompletion.GetHashCode() -> int
+override DigitalBrain.Capabilities.Compute.ExternalCallCompletion.ToString() -> string!
+override DigitalBrain.Capabilities.Compute.ExternalCallHandle.GetHashCode() -> int
+override DigitalBrain.Capabilities.Compute.ExternalCallMetadata.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Compute.ExternalCallMetadata.GetHashCode() -> int
+override DigitalBrain.Capabilities.Compute.ExternalCallMetadata.ToString() -> string!
+override DigitalBrain.Capabilities.Compute.ExternalCallOutcome.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Compute.ExternalCallOutcome.GetHashCode() -> int
+override DigitalBrain.Capabilities.Compute.ExternalCallOutcome.ToString() -> string!
+override DigitalBrain.Capabilities.Compute.ExternalCallRequest.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Compute.ExternalCallRequest.GetHashCode() -> int
+override DigitalBrain.Capabilities.Compute.ExternalCallRequest.ToString() -> string!
+override DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor.GetHashCode() -> int
+override DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor.ToString() -> string!
+override DigitalBrain.Capabilities.Compute.Funding.GetHashCode() -> int
+override DigitalBrain.Capabilities.Compute.MeteredHttpClientRegistration.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Compute.MeteredHttpClientRegistration.GetHashCode() -> int
+override DigitalBrain.Capabilities.Compute.MeteredHttpClientRegistration.ToString() -> string!
+override DigitalBrain.Capabilities.Compute.PriceQuote.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Compute.PriceQuote.GetHashCode() -> int
+override DigitalBrain.Capabilities.Compute.PriceQuote.ToString() -> string!
+override DigitalBrain.Capabilities.Compute.Trace.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Compute.Trace.GetHashCode() -> int
+override DigitalBrain.Capabilities.Compute.Trace.ToString() -> string!
+static DigitalBrain.Capabilities.Compute.ComputeTracePage.operator !=(DigitalBrain.Capabilities.Compute.ComputeTracePage? left, DigitalBrain.Capabilities.Compute.ComputeTracePage? right) -> bool
+static DigitalBrain.Capabilities.Compute.ComputeTracePage.operator ==(DigitalBrain.Capabilities.Compute.ComputeTracePage? left, DigitalBrain.Capabilities.Compute.ComputeTracePage? right) -> bool
+static DigitalBrain.Capabilities.Compute.Cost.operator !=(DigitalBrain.Capabilities.Compute.Cost? left, DigitalBrain.Capabilities.Compute.Cost? right) -> bool
+static DigitalBrain.Capabilities.Compute.Cost.operator ==(DigitalBrain.Capabilities.Compute.Cost? left, DigitalBrain.Capabilities.Compute.Cost? right) -> bool
+static DigitalBrain.Capabilities.Compute.CostRow.operator !=(DigitalBrain.Capabilities.Compute.CostRow? left, DigitalBrain.Capabilities.Compute.CostRow? right) -> bool
+static DigitalBrain.Capabilities.Compute.CostRow.operator ==(DigitalBrain.Capabilities.Compute.CostRow? left, DigitalBrain.Capabilities.Compute.CostRow? right) -> bool
+static DigitalBrain.Capabilities.Compute.CostSubject.operator !=(DigitalBrain.Capabilities.Compute.CostSubject? left, DigitalBrain.Capabilities.Compute.CostSubject? right) -> bool
+static DigitalBrain.Capabilities.Compute.CostSubject.operator ==(DigitalBrain.Capabilities.Compute.CostSubject? left, DigitalBrain.Capabilities.Compute.CostSubject? right) -> bool
+static DigitalBrain.Capabilities.Compute.CostSummary.operator !=(DigitalBrain.Capabilities.Compute.CostSummary? left, DigitalBrain.Capabilities.Compute.CostSummary? right) -> bool
+static DigitalBrain.Capabilities.Compute.CostSummary.operator ==(DigitalBrain.Capabilities.Compute.CostSummary? left, DigitalBrain.Capabilities.Compute.CostSummary? right) -> bool
+static DigitalBrain.Capabilities.Compute.ExternalCallCompletion.operator !=(DigitalBrain.Capabilities.Compute.ExternalCallCompletion? left, DigitalBrain.Capabilities.Compute.ExternalCallCompletion? right) -> bool
+static DigitalBrain.Capabilities.Compute.ExternalCallCompletion.operator ==(DigitalBrain.Capabilities.Compute.ExternalCallCompletion? left, DigitalBrain.Capabilities.Compute.ExternalCallCompletion? right) -> bool
+static DigitalBrain.Capabilities.Compute.ExternalCallHandle.operator !=(DigitalBrain.Capabilities.Compute.ExternalCallHandle left, DigitalBrain.Capabilities.Compute.ExternalCallHandle right) -> bool
+static DigitalBrain.Capabilities.Compute.ExternalCallHandle.operator ==(DigitalBrain.Capabilities.Compute.ExternalCallHandle left, DigitalBrain.Capabilities.Compute.ExternalCallHandle right) -> bool
+static DigitalBrain.Capabilities.Compute.ExternalCallHttp.GetExternalAccounting(this System.Net.Http.HttpResponseMessage! response) -> DigitalBrain.Capabilities.Compute.ExternalCallCompletion?
+static DigitalBrain.Capabilities.Compute.ExternalCallHttp.SetExternalCall(this System.Net.Http.HttpRequestMessage! request, DigitalBrain.Capabilities.Compute.ExternalCallMetadata! metadata) -> void
+static DigitalBrain.Capabilities.Compute.ExternalCallMetadata.operator !=(DigitalBrain.Capabilities.Compute.ExternalCallMetadata? left, DigitalBrain.Capabilities.Compute.ExternalCallMetadata? right) -> bool
+static DigitalBrain.Capabilities.Compute.ExternalCallMetadata.operator ==(DigitalBrain.Capabilities.Compute.ExternalCallMetadata? left, DigitalBrain.Capabilities.Compute.ExternalCallMetadata? right) -> bool
+static DigitalBrain.Capabilities.Compute.ExternalCallOutcome.operator !=(DigitalBrain.Capabilities.Compute.ExternalCallOutcome? left, DigitalBrain.Capabilities.Compute.ExternalCallOutcome? right) -> bool
+static DigitalBrain.Capabilities.Compute.ExternalCallOutcome.operator ==(DigitalBrain.Capabilities.Compute.ExternalCallOutcome? left, DigitalBrain.Capabilities.Compute.ExternalCallOutcome? right) -> bool
+static DigitalBrain.Capabilities.Compute.ExternalCallRequest.operator !=(DigitalBrain.Capabilities.Compute.ExternalCallRequest? left, DigitalBrain.Capabilities.Compute.ExternalCallRequest? right) -> bool
+static DigitalBrain.Capabilities.Compute.ExternalCallRequest.operator ==(DigitalBrain.Capabilities.Compute.ExternalCallRequest? left, DigitalBrain.Capabilities.Compute.ExternalCallRequest? right) -> bool
+static DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor.operator !=(DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor? left, DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor? right) -> bool
+static DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor.operator ==(DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor? left, DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor? right) -> bool
+static DigitalBrain.Capabilities.Compute.Funding.Circle(string! circleKey) -> DigitalBrain.Capabilities.Compute.Funding
+static DigitalBrain.Capabilities.Compute.Funding.Integration.get -> DigitalBrain.Capabilities.Compute.Funding
+static DigitalBrain.Capabilities.Compute.Funding.Local.get -> DigitalBrain.Capabilities.Compute.Funding
+static DigitalBrain.Capabilities.Compute.Funding.operator !=(DigitalBrain.Capabilities.Compute.Funding left, DigitalBrain.Capabilities.Compute.Funding right) -> bool
+static DigitalBrain.Capabilities.Compute.Funding.operator ==(DigitalBrain.Capabilities.Compute.Funding left, DigitalBrain.Capabilities.Compute.Funding right) -> bool
+static DigitalBrain.Capabilities.Compute.Funding.OwnConnection.get -> DigitalBrain.Capabilities.Compute.Funding
+static DigitalBrain.Capabilities.Compute.MeteredHttpClientRegistration.operator !=(DigitalBrain.Capabilities.Compute.MeteredHttpClientRegistration? left, DigitalBrain.Capabilities.Compute.MeteredHttpClientRegistration? right) -> bool
+static DigitalBrain.Capabilities.Compute.MeteredHttpClientRegistration.operator ==(DigitalBrain.Capabilities.Compute.MeteredHttpClientRegistration? left, DigitalBrain.Capabilities.Compute.MeteredHttpClientRegistration? right) -> bool
+static DigitalBrain.Capabilities.Compute.MeteredHttpClients.AddMeteredHttpClient(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! name) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
+static DigitalBrain.Capabilities.Compute.ModulePriceLists.AddModulePriceList<TPriceList>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! moduleId, DigitalBrain.Capabilities.Compute.ExternalOperationDescriptor![]! operations) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static DigitalBrain.Capabilities.Compute.PriceQuote.operator !=(DigitalBrain.Capabilities.Compute.PriceQuote? left, DigitalBrain.Capabilities.Compute.PriceQuote? right) -> bool
+static DigitalBrain.Capabilities.Compute.PriceQuote.operator ==(DigitalBrain.Capabilities.Compute.PriceQuote? left, DigitalBrain.Capabilities.Compute.PriceQuote? right) -> bool
+static DigitalBrain.Capabilities.Compute.Trace.operator !=(DigitalBrain.Capabilities.Compute.Trace? left, DigitalBrain.Capabilities.Compute.Trace? right) -> bool
+static DigitalBrain.Capabilities.Compute.Trace.operator ==(DigitalBrain.Capabilities.Compute.Trace? left, DigitalBrain.Capabilities.Compute.Trace? right) -> bool
+static DigitalBrain.Capabilities.Compute.TraceContext.Begin(string! payerAccountId, string! brainId, DigitalBrain.NeuronId origin, long? budgetMicros = null) -> DigitalBrain.Capabilities.Compute.Trace!
+static DigitalBrain.Capabilities.Compute.TraceContext.Current.get -> DigitalBrain.Capabilities.Compute.Trace?
+static DigitalBrain.Capabilities.Compute.TraceContext.Enter(DigitalBrain.Capabilities.Compute.Trace! trace) -> System.IDisposable!
+static DigitalBrain.Capabilities.Compute.TraceContext.OriginOf(string! brainId, string! osKey) -> DigitalBrain.NeuronId

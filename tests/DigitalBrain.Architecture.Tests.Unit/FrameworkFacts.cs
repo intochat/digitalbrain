@@ -14,11 +14,15 @@ public sealed class VocabularyRingFacts
     [InlineData("DigitalBrain.Capabilities.Storage")]
     [InlineData("DigitalBrain.Capabilities.Secrets")]
     [InlineData("DigitalBrain.Capabilities.Identity")]
+    [InlineData("DigitalBrain.Capabilities.Compute")]
     public void Capability_contract_references_only_the_core(string name)
     {
         var project = Repository.ProjectNamed(name).Path;
         Assert.Equal(["DigitalBrain"], Repository.ProjectReferences(project));
-        Assert.Equal(["Microsoft.CodeAnalysis.PublicApiAnalyzers"], Repository.PackageReferences(project));
+        string[] expectedPackages = name == "DigitalBrain.Capabilities.Compute"
+            ? ["Microsoft.CodeAnalysis.PublicApiAnalyzers", "Microsoft.Extensions.Http"]
+            : ["Microsoft.CodeAnalysis.PublicApiAnalyzers"];
+        Assert.Equal(expectedPackages, Repository.PackageReferences(project).Order(StringComparer.Ordinal));
     }
 
     // The host-conformance kit is packable: a consumer runs it against its own host without Azure.
@@ -56,7 +60,7 @@ public sealed class VocabularyRingFacts
 // V-02: no Orleans library anywhere in the restore graph of the core-side projects.
 public sealed class CoreHasNoOrleansFacts
 {
-    public static readonly TheoryData<string> CoreProjects = new() { "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Analyzers", "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity", "DigitalBrain.Runtime.Http", "DigitalBrain.Runtime.Apps" };
+    public static readonly TheoryData<string> CoreProjects = new() { "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Analyzers", "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity", "DigitalBrain.Capabilities.Compute", "DigitalBrain.Runtime.Http", "DigitalBrain.Runtime.Apps" };
 
     [Theory]
     [MemberData(nameof(CoreProjects))]
@@ -76,7 +80,7 @@ public sealed class CoreHasNoOrleansFacts
     }
 
     // 04-03 (CORE-01, T-04-08): the built core assemblies reference no Orleans assembly and declare no Orleans namespace.
-    public static readonly TheoryData<string> CoreAssemblies = new() { "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity", "DigitalBrain.Runtime.Http", "DigitalBrain.Runtime.Apps" };
+    public static readonly TheoryData<string> CoreAssemblies = new() { "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity", "DigitalBrain.Capabilities.Compute", "DigitalBrain.Runtime.Http", "DigitalBrain.Runtime.Apps" };
 
     private static Assembly Anchor(string name) => name switch
     {
@@ -86,6 +90,7 @@ public sealed class CoreHasNoOrleansFacts
         "DigitalBrain.Capabilities.Storage" => typeof(DigitalBrain.Capabilities.Storage.IStorage).Assembly, // 05-02, D-15
         "DigitalBrain.Capabilities.Secrets" => typeof(DigitalBrain.Capabilities.Secrets.ISecrets).Assembly, // 05-03, D-15
         "DigitalBrain.Capabilities.Identity" => typeof(DigitalBrain.Capabilities.Identity.IIdentity).Assembly, // 05-03, D-15
+        "DigitalBrain.Capabilities.Compute" => typeof(DigitalBrain.Capabilities.Compute.ICostMeter).Assembly,
         "DigitalBrain.Runtime.Http" => typeof(DigitalBrain.Runtime.Http.IModuleHttpSurface).Assembly, // 09-03, R4-06: ASP.NET, never Orleans
         "DigitalBrain.Runtime.Apps" => typeof(DigitalBrain.Runtime.Apps.InProcessAppHost).Assembly,
         _ => throw new ArgumentOutOfRangeException(nameof(name)),
@@ -119,7 +124,7 @@ public sealed class ReferenceClosureFacts
     public void Core_closure_is_clean()
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        var pending = new Stack<Assembly>([typeof(Signal).Assembly, typeof(DigitalBrain.UI.View).Assembly, typeof(DigitalBrain.Capabilities.Storage.IStorage).Assembly, typeof(DigitalBrain.Capabilities.Secrets.ISecrets).Assembly, typeof(DigitalBrain.Capabilities.Identity.IIdentity).Assembly]);
+        var pending = new Stack<Assembly>([typeof(Signal).Assembly, typeof(DigitalBrain.UI.View).Assembly, typeof(DigitalBrain.Capabilities.Storage.IStorage).Assembly, typeof(DigitalBrain.Capabilities.Secrets.ISecrets).Assembly, typeof(DigitalBrain.Capabilities.Identity.IIdentity).Assembly, typeof(DigitalBrain.Capabilities.Compute.ICostMeter).Assembly]);
         while (pending.TryPop(out var assembly))
         {
             foreach (var reference in assembly.GetReferencedAssemblies())
@@ -144,7 +149,7 @@ public sealed class PackageIdAllowlistFacts
 {
     private static readonly string[] Folders = ["src", "templates"];
 
-    private const int Floor = 11; // 05-02: + DigitalBrain.Capabilities.Storage; 05-03: + .Secrets, .Identity; 09-03: + DigitalBrain.Runtime.Http.
+    private const int Floor = 12; // 05-02: + DigitalBrain.Capabilities.Storage; 05-03: + .Secrets, .Identity; 09-03: + DigitalBrain.Runtime.Http; 0.13: + .Compute.
 
     [Fact]
     public void Packable_ids_are_digitalbrain()
