@@ -11,13 +11,13 @@ public sealed class MachineKeyFacts : IDisposable
     public void Dispose() { if (Directory.Exists(_home)) { Directory.Delete(_home, recursive: true); } }
 
     private static StateHome Resolve(Microsoft.Extensions.Configuration.IConfiguration? configuration)
-        => StateHome.Resolve(configuration, RuntimeOptions.IntoChatCompatible);
+        => StateHome.Resolve(configuration, RuntimeOptions.Default);
 
     private StateHome Home() => Resolve(new ConfigurationBuilder()
-        .AddInMemoryCollection(new Dictionary<string, string?> { [RuntimeOptions.IntoChatCompatible.HomeKey] = _home }).Build());
+        .AddInMemoryCollection(new Dictionary<string, string?> { [RuntimeOptions.Default.HomeKey] = _home }).Build());
 
     private string? Key(IConfiguration? existing = null)
-        => new ConfigurationBuilder().Add(new MachineKeyConfigurationSource(Home(), existing)).Build()[RuntimeOptions.IntoChatCompatible.MasterKeyKey];
+        => new ConfigurationBuilder().Add(new MachineKeyConfigurationSource(Home(), existing)).Build()[RuntimeOptions.Default.MasterKeyKey];
 
     [Fact]
     public void First_start_creates_the_key_file_and_supplies_a_32_byte_base64_key()
@@ -34,7 +34,7 @@ public sealed class MachineKeyFacts : IDisposable
     public void An_explicit_master_key_wins_and_no_file_is_created()
     {
         var explicitKey = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { [RuntimeOptions.IntoChatCompatible.MasterKeyKey] = "explicit" }).Build();
+            .AddInMemoryCollection(new Dictionary<string, string?> { [RuntimeOptions.Default.MasterKeyKey] = "explicit" }).Build();
         Assert.Null(Key(explicitKey));
         Assert.False(File.Exists(Path.Combine(_home, "secrets", MachineKeyConfigurationSource.FileName)));
     }
@@ -47,7 +47,7 @@ public sealed class MachineKeyFacts : IDisposable
 
         var error = Assert.Throws<InvalidOperationException>(() => Key());
 
-        Assert.Contains(RuntimeOptions.IntoChatCompatible.MasterKeyKey, error.Message, StringComparison.Ordinal);
+        Assert.Contains(RuntimeOptions.Default.MasterKeyKey, error.Message, StringComparison.Ordinal);
         Assert.Contains(MachineKeyConfigurationSource.FileName, error.Message, StringComparison.Ordinal);
         Assert.False(File.Exists(Path.Combine(_home, "secrets", MachineKeyConfigurationSource.FileName)));
     }

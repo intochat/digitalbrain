@@ -26,7 +26,7 @@ public sealed class ConfigurationPrecedenceFacts : IDisposable
         Environment.SetEnvironmentVariable(_prefix + "Sample__Key", environment ? "env" : null);
 
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
-        builder.Configuration.AddInMemoryCollection([new(RuntimeOptions.IntoChatCompatible.HomeKey, _home)]);
+        builder.Configuration.AddInMemoryCollection([new(RuntimeOptions.Default.HomeKey, _home)]);
         builder.Configuration.AddEnvironmentVariables(_prefix);
         builder.Configuration.AddCommandLine(commandLine ? ["--Sample:Key=cli"] : []);
 

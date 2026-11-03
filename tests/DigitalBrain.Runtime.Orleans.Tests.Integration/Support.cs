@@ -52,7 +52,7 @@ public sealed class FakeClusterStore : IClusterStoreRegistration, IGrainStorage
     public void Register(ISiloBuilder silo)
     {
         Registered++;
-        silo.Services.AddKeyedSingleton<IGrainStorage>(RuntimeOptions.IntoChatCompatible.ClusterGrainStorage, this);
+        silo.Services.AddKeyedSingleton<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage, this);
     }
 
     public Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState) => Task.CompletedTask;

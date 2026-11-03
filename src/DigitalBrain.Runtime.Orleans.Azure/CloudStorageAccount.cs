@@ -34,10 +34,10 @@ public sealed class CloudStorageAccount
     /// <summary>Parses the configured value; null with an issue naming the cloud storage key otherwise.</summary>
     /// <param name="value">The configured value.</param>
     /// <param name="issue">The issue when the value is invalid.</param>
-    /// <param name="options">Names the cloud storage key; null means <see cref="RuntimeOptions.IntoChatCompatible"/>.</param>
+    /// <param name="options">Names the cloud storage key; null means <see cref="RuntimeOptions.Default"/>.</param>
     public static CloudStorageAccount? TryParse(string? value, out TopologyIssue? issue, RuntimeOptions? options = null)
     {
-        var key = (options ?? RuntimeOptions.IntoChatCompatible).CloudStorageKey;
+        var key = (options ?? RuntimeOptions.Default).CloudStorageKey;
         issue = null;
         if (string.IsNullOrWhiteSpace(value))
         {

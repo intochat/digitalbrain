@@ -41,7 +41,7 @@ public sealed class SignalPublisherFacts
         var faults = new PublishFaults();
         var publisher = new SignalPublisher(host.Services, faults);
         var received = new Received();
-        var provider = host.Services.GetRequiredKeyedService<IStreamProvider>(RuntimeOptions.IntoChatCompatible.SignalStreams);
+        var provider = host.Services.GetRequiredKeyedService<IStreamProvider>(RuntimeOptions.Default.SignalStreams);
         await received.Watch(provider, "files");
         await received.Watch(provider, "chat");
         return (host, publisher, faults, received);

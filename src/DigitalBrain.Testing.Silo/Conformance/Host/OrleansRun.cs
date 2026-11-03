@@ -21,11 +21,11 @@ public sealed class OrleansRun(IInProcessHost host, FrameworkHostOptions options
 {
     private IServiceProvider Services => host.Services;
 
-    /// <summary>Retention for the options path <c>IntoChatOS:Signalling:Retention</c>.</summary>
+    /// <summary>Retention for the options path <see cref="RuntimeOptions.RetentionSection"/>.</summary>
     public static Dictionary<string, string?> Configuration(FrameworkHostOptions options)
     {
         var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        var Retention = RuntimeOptions.IntoChatCompatible.RetentionSection;
+        var Retention = RuntimeOptions.Default.RetentionSection;
         if (options.HistoryWindowSignals is { } signals) { values[Retention + ":HistoryWindowSignals"] = signals.ToString(System.Globalization.CultureInfo.InvariantCulture); }
         if (options.HistoryWindowAge is { } age) { values[Retention + ":HistoryWindowAge"] = age.ToString("c"); }
         if (options.StaleCursorAfter is { } stale) { values[Retention + ":StaleCursorAfter"] = stale.ToString("c"); }

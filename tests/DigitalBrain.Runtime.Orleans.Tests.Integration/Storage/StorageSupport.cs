@@ -63,7 +63,7 @@ internal sealed class BrainStore : IAsyncDisposable
 
     internal BrainLogs Logs => provider.GetRequiredService<BrainLogs>();
 
-    internal BrainGrainStorage Storage => (BrainGrainStorage)provider.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.IntoChatCompatible.ClusterGrainStorage);
+    internal BrainGrainStorage Storage => (BrainGrainStorage)provider.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage);
 
     internal JournalPayloads Payloads => provider.GetRequiredService<JournalPayloads>();
 
@@ -104,8 +104,8 @@ internal sealed class BrainStore : IAsyncDisposable
         var services = new ServiceCollection();
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            [RuntimeOptions.IntoChatCompatible.HomeKey] = home,
-            [RuntimeOptions.IntoChatCompatible.MasterKeyKey] = "test-master-key-0123456789",
+            [RuntimeOptions.Default.HomeKey] = home,
+            [RuntimeOptions.Default.MasterKeyKey] = "test-master-key-0123456789",
         }).Build();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddSerializer(serializer => serializer.AddAssembly(typeof(BrainLog).Assembly));

@@ -28,7 +28,7 @@ public static class RuntimeSiloBuilderExtensions
     /// <summary>
     /// <see cref="AddDigitalBrainRuntime(ISiloBuilder, Assembly[])"/> with the key and store names the host chose. A null
     /// <paramref name="options"/> keeps the options the host registered with <see cref="TopologyHosting.UseRuntimeOptions"/>, or
-    /// <see cref="RuntimeOptions.IntoChatCompatible"/> when it registered none.
+    /// <see cref="RuntimeOptions.Default"/> when it registered none.
     /// </summary>
     /// <exception cref="InvalidOperationException">The runtime was already added to this silo.</exception>
     public static ISiloBuilder AddDigitalBrainRuntime(this ISiloBuilder silo, RuntimeOptions? options, params Assembly[] modules)
@@ -45,7 +45,7 @@ public static class RuntimeSiloBuilderExtensions
             silo.Services.RemoveAll<RuntimeOptions>();
             silo.Services.AddSingleton(options);
         }
-        else { silo.Services.TryAddSingleton(RuntimeOptions.IntoChatCompatible); }
+        else { silo.Services.TryAddSingleton(RuntimeOptions.Default); }
         silo.AddNeuronHosting(modules);
         silo.Services.AddJournalPayloads(modules);
         silo.Services.AddSignalPublisher();

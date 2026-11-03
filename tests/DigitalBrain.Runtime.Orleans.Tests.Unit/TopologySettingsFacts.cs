@@ -18,13 +18,13 @@ public sealed class TopologySettingsFacts
     [InlineData("cloud", Topology.Cloud)]
     public void Accepts_the_three_values(string value, Topology expected)
     {
-        var pairs = new List<(string, string?)> { (RuntimeOptions.IntoChatCompatible.TopologyKey, value) };
+        var pairs = new List<(string, string?)> { (RuntimeOptions.Default.TopologyKey, value) };
         if (expected == Topology.Cloud)
         {
-            pairs.Add((RuntimeOptions.IntoChatCompatible.CloudStorageKey, "s"));
-            pairs.Add((RuntimeOptions.IntoChatCompatible.CloudKeyVaultKey, "k"));
+            pairs.Add((RuntimeOptions.Default.CloudStorageKey, "s"));
+            pairs.Add((RuntimeOptions.Default.CloudKeyVaultKey, "k"));
         }
-        if (expected == Topology.LocalCloud) { pairs.Add((RuntimeOptions.IntoChatCompatible.CloudServerAddressKey, "https://x")); }
+        if (expected == Topology.LocalCloud) { pairs.Add((RuntimeOptions.Default.CloudServerAddressKey, "https://x")); }
 
         var settings = TopologySettings.Parse(Config.Of([.. pairs]), []);
 
@@ -50,7 +50,7 @@ public sealed class TopologySettingsFacts
     [Fact]
     public void Local_cloud_alias_is_accepted_with_a_warning()
     {
-        var settings = TopologySettings.Parse(Config.Of((RuntimeOptions.IntoChatCompatible.TopologyKey, "local-cloud"), (RuntimeOptions.IntoChatCompatible.CloudServerAddressKey, "https://x")), []);
+        var settings = TopologySettings.Parse(Config.Of((RuntimeOptions.Default.TopologyKey, "local-cloud"), (RuntimeOptions.Default.CloudServerAddressKey, "https://x")), []);
 
         Assert.True(settings.IsValid);
         Assert.Equal(Topology.LocalCloud, settings.Topology);
@@ -63,10 +63,10 @@ public sealed class TopologySettingsFacts
     [InlineData("clouds-y")]
     public void Unknown_value_names_the_three_allowed_values(string value)
     {
-        var settings = TopologySettings.Parse(Config.Of((RuntimeOptions.IntoChatCompatible.TopologyKey, value)), []);
+        var settings = TopologySettings.Parse(Config.Of((RuntimeOptions.Default.TopologyKey, value)), []);
 
         var issue = Assert.Single(settings.Issues);
-        Assert.Equal(RuntimeOptions.IntoChatCompatible.TopologyKey, issue.Key);
+        Assert.Equal(RuntimeOptions.Default.TopologyKey, issue.Key);
         Assert.Contains("local, local+cloud or cloud", issue.Message, StringComparison.Ordinal);
         Assert.DoesNotContain(value, issue.ToString(), StringComparison.Ordinal);
     }
@@ -84,18 +84,18 @@ public sealed class TopologySettingsFacts
     [Fact]
     public void Absent_topology_with_cloud_storage_asks_to_set_topology()
     {
-        var settings = TopologySettings.Parse(Config.Of((RuntimeOptions.IntoChatCompatible.CloudStorageKey, "x")), []);
+        var settings = TopologySettings.Parse(Config.Of((RuntimeOptions.Default.CloudStorageKey, "x")), []);
 
         var issue = Assert.Single(settings.Issues);
-        Assert.Contains("set IntoChatOS:Topology", issue.Message, StringComparison.Ordinal);
+        Assert.Contains("set DigitalBrain:Topology", issue.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void Invalid_home_is_an_issue_not_an_exception()
     {
-        var settings = TopologySettings.Parse(Config.Of((RuntimeOptions.IntoChatCompatible.HomeKey, "relative/path")), []);
+        var settings = TopologySettings.Parse(Config.Of((RuntimeOptions.Default.HomeKey, "relative/path")), []);
 
         Assert.Null(settings.Home);
-        Assert.Contains(settings.Issues, issue => issue.Key == RuntimeOptions.IntoChatCompatible.HomeKey);
+        Assert.Contains(settings.Issues, issue => issue.Key == RuntimeOptions.Default.HomeKey);
     }
 }

@@ -36,7 +36,7 @@ internal static class RuntimeTestHooks
     {
         ArgumentNullException.ThrowIfNull(services);
         var manager = services.GetRequiredService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
-        var all = await manager.GetSubscriptions(RuntimeOptions.IntoChatCompatible.SignalStreams, StreamNames.For(source.Brain.Value, signal)).ConfigureAwait(false);
+        var all = await manager.GetSubscriptions(RuntimeOptions.From(services).SignalStreams, StreamNames.For(source.Brain.Value, signal)).ConfigureAwait(false);
         return all.Count(s => s.GrainId.Key.ToString() == subscriber.ToString());
     }
 

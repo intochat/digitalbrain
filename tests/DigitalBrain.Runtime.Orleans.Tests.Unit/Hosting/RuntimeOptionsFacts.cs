@@ -1,47 +1,43 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Runtime.Orleans.Tests.Unit.Hosting;
 
 public sealed class RuntimeOptionsFacts
 {
     [Fact]
-    public void DefaultOptionsHaveNoProductName()
+    public void DefaultNamesNoProduct()
     {
         foreach (var p in typeof(RuntimeOptions).GetProperties().Where(p => p.PropertyType == typeof(string)))
-            Assert.DoesNotContain("IntoChat", (string)p.GetValue(RuntimeOptions.Default)!, StringComparison.OrdinalIgnoreCase);
+        {
+            if (p.GetValue(RuntimeOptions.Default) is string value)
+            {
+                Assert.DoesNotContain("IntoChat", value, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+        Assert.Null(RuntimeOptions.Default.OsImage);
+        Assert.Null(RuntimeOptions.Default.SandboxImage);
     }
 
     [Fact]
-    public void ObsoleteNamesResolveTheSameHome()
+    public void ResolveReturnsTheRegisteredInstance()
     {
-        var config = new ConfigurationBuilder().AddInMemoryCollection([new("IntoChatOS:Home", "~/x")]).Build();
-        #pragma warning disable CS0618
-        Assert.Equal(StateHome.Resolve(config).Path, StateHome.Resolve(config, RuntimeOptions.IntoChatCompatible).Path);
-        Assert.Equal(IntoChatOSNames.HomeKey, RuntimeOptions.IntoChatCompatible.HomeKey);
-        #pragma warning restore CS0618
+        var custom = new RuntimeOptions { TopologyKey = "Custom:Topology", DefaultHomeDirectoryName = ".custom" };
+        using var sp = new ServiceCollection().AddSingleton(custom).BuildServiceProvider();
+        Assert.Same(custom, RuntimeOptions.Resolve(sp));
+    }
+
+    [Fact]
+    public void ResolveWithoutRegistrationReturnsDefault()
+    {
+        using var sp = new ServiceCollection().BuildServiceProvider();
+        Assert.Same(RuntimeOptions.Default, RuntimeOptions.Resolve(sp));
     }
 
     [Fact]
     public void DefaultHomeIsDigitalBrainFolder()
     {
         Assert.EndsWith(".digitalbrain", StateHome.Resolve(null, RuntimeOptions.Default).Path);
-    }
-
-    [Fact]
-    public void ObsoleteShimKeepsEveryStringOfTheCompatibleOptions()
-    {
-        var o = RuntimeOptions.IntoChatCompatible;
-        #pragma warning disable CS0618
-        Assert.Equal(
-            [IntoChatOSNames.TopologyKey, IntoChatOSNames.HomeKey, IntoChatOSNames.BindKey, IntoChatOSNames.CloudStorageKey,
-             IntoChatOSNames.CloudKeyVaultKey, IntoChatOSNames.CloudServerAddressKey, IntoChatOSNames.MasterKeyKey,
-             IntoChatOSNames.CloudSectionPrefix, IntoChatOSNames.Signalling.Section, IntoChatOSNames.Signalling.Retention,
-             IntoChatOSNames.PubSubStore, IntoChatOSNames.SignalStreams, IntoChatOSNames.PlatformGrainStorage,
-             IntoChatOSNames.ClusterGrainStorage, IntoChatOSNames.GrainStateContainer, StateHome.DefaultDirectoryName],
-            [o.TopologyKey, o.HomeKey, o.BindKey, o.CloudStorageKey, o.CloudKeyVaultKey, o.CloudServerAddressKey, o.MasterKeyKey,
-             o.CloudSectionPrefix, o.SignallingSection, o.RetentionSection, o.PubSubStore, o.SignalStreams, o.PlatformGrainStorage,
-             o.ClusterGrainStorage, o.GrainStateContainer, o.DefaultHomeDirectoryName]);
-        #pragma warning restore CS0618
     }
 
     [Fact]

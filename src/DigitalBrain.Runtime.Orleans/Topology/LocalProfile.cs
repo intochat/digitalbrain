@@ -18,10 +18,10 @@ public sealed class LocalProfile : ITopologyProfile, IRuntimeOptionsHolder
     public const int HttpPort = 5310;
 
     /// <summary>The os container image.</summary>
-    public const string Image = RuntimeOptions.IntoChatOsImage;
+    public const string Image = "ghcr.io/intochat/os";
 
     /// <summary>The sandbox container image.</summary>
-    public const string SandboxImage = RuntimeOptions.IntoChatSandboxImage;
+    public const string SandboxImage = "ghcr.io/intochat/os-sandbox";
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<RuntimeOptions, Services> ServicesByOptions = new();
 
@@ -29,10 +29,10 @@ public sealed class LocalProfile : ITopologyProfile, IRuntimeOptionsHolder
     private readonly HashSet<string> _reserved;
 
     /// <summary>Creates the local topology.</summary>
-    /// <param name="options">The runtime's key and store names; null means <see cref="RuntimeOptions.IntoChatCompatible"/>.</param>
+    /// <param name="options">The runtime's key and store names; null means <see cref="RuntimeOptions.Default"/>.</param>
     public LocalProfile(RuntimeOptions? options = null)
     {
-        _options = options ?? RuntimeOptions.IntoChatCompatible;
+        _options = options ?? RuntimeOptions.Default;
         _reserved = new(StringComparer.OrdinalIgnoreCase) { _options.PlatformGrainStorage, _options.PubSubStore };
         Services = ServicesFor(_options);
         Defaults = new Dictionary<string, string?> { [_options.AuthPostureKey] = "Open" };
@@ -60,8 +60,8 @@ public sealed class LocalProfile : ITopologyProfile, IRuntimeOptionsHolder
     /// <inheritdoc />
     public Bindings Bindings => LocalBindings;
 
-    /// <summary>The local process shape with the <see cref="RuntimeOptions.IntoChatCompatible"/> environment names.</summary>
-    public static Services LocalServices { get; } = ServicesFor(RuntimeOptions.IntoChatCompatible);
+    /// <summary>The local process shape with the <see cref="RuntimeOptions.Default"/> environment names.</summary>
+    public static Services LocalServices { get; } = ServicesFor(RuntimeOptions.Default);
 
     /// <summary>The local process shape for <paramref name="options"/>, shared by local+cloud. Equal options give the same instance.</summary>
     public static Services ServicesFor(RuntimeOptions options)

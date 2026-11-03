@@ -33,13 +33,13 @@ public sealed class LocalSiloHostFactory : IInProcessHostFactory
 
     /// <summary>
     /// <see cref="LocalSiloHostFactory(IClusterStoreRegistration?, Action{IServiceCollection}?)"/> with the key and store names of
-    /// <paramref name="options"/>; null means <see cref="RuntimeOptions.IntoChatCompatible"/>.
+    /// <paramref name="options"/>; null means <see cref="RuntimeOptions.Default"/>.
     /// </summary>
     public LocalSiloHostFactory(IClusterStoreRegistration? clusterStore, Action<IServiceCollection>? configureServices, RuntimeOptions? options)
     {
         _clusterStore = clusterStore ?? new Unregistered();
         _configureServices = configureServices;
-        _options = options ?? RuntimeOptions.IntoChatCompatible;
+        _options = options ?? RuntimeOptions.Default;
     }
 
     /// <inheritdoc />

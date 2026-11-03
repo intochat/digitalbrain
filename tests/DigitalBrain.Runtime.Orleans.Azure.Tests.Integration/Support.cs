@@ -49,7 +49,7 @@ public sealed class FakeClusterStore : IClusterStoreRegistration, IGrainStorage
     public void Register(ISiloBuilder silo)
     {
         Registered++;
-        silo.Services.AddKeyedSingleton<IGrainStorage>(RuntimeOptions.IntoChatCompatible.ClusterGrainStorage, this);
+        silo.Services.AddKeyedSingleton<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage, this);
     }
 
     public Task ReadStateAsync<T>(string stateName, GrainId grainId, IGrainState<T> grainState) => Task.CompletedTask;
@@ -66,21 +66,21 @@ internal static class CloudHosts
 
     /// <summary>Replaces Key Vault with an in-memory source holding the master key (tests only).</summary>
     public static CloudProfile Profile() => new((builder, _) => builder.AddInMemoryCollection(
-        new Dictionary<string, string?> { [RuntimeOptions.IntoChatCompatible.MasterKeyKey] = MasterKey }));
+        new Dictionary<string, string?> { [RuntimeOptions.Default.MasterKeyKey] = MasterKey }));
 
     public static IHost Build(string storage, string home, IClusterStoreRegistration? cluster, string clusterId, params Type[] modules)
         => Build(storage, home, cluster, clusterId, Vault, production: false, modules);
 
-    /// <summary>A null vault leaves IntoChatOS:Cloud:KeyVault unset; production uses the real profile (no vault source swap).</summary>
+    /// <summary>A null vault leaves DigitalBrain:Cloud:KeyVault unset; production uses the real profile (no vault source swap).</summary>
     public static IHost Build(string storage, string home, IClusterStoreRegistration? cluster, string clusterId, string? vault, bool production, params Type[] modules)
     {
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            [RuntimeOptions.IntoChatCompatible.TopologyKey] = "cloud",
-            [RuntimeOptions.IntoChatCompatible.HomeKey] = home,
-            [RuntimeOptions.IntoChatCompatible.CloudStorageKey] = storage,
-            [RuntimeOptions.IntoChatCompatible.CloudKeyVaultKey] = vault,
+            [RuntimeOptions.Default.TopologyKey] = "cloud",
+            [RuntimeOptions.Default.HomeKey] = home,
+            [RuntimeOptions.Default.CloudStorageKey] = storage,
+            [RuntimeOptions.Default.CloudKeyVaultKey] = vault,
             [TopologyContext.SiloPortKey] = Ports.Free().ToString(System.Globalization.CultureInfo.InvariantCulture),
             [TopologyContext.GatewayPortKey] = Ports.Free().ToString(System.Globalization.CultureInfo.InvariantCulture),
             ["Orleans:ClusterId"] = clusterId,

@@ -127,7 +127,7 @@ public static class TopologyHosting
 
     /// <summary>
     /// Names the configuration keys, stores and default home the runtime uses on this host. Call it before <see cref="UseTopology"/>;
-    /// without it the host gets <see cref="RuntimeOptions.IntoChatCompatible"/>.
+    /// without it the host gets <see cref="RuntimeOptions.Default"/>.
     /// </summary>
     public static IHostApplicationBuilder UseRuntimeOptions(this IHostApplicationBuilder builder, RuntimeOptions options)
     {

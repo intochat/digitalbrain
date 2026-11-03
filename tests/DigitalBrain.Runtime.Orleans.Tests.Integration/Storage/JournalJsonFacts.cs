@@ -141,12 +141,12 @@ public sealed class JournalJsonFacts
         var pubsub = new FakeStorage();
         await using var store = new BrainStore(home.Path, services =>
         {
-            services.AddKeyedSingleton<IGrainStorage>(RuntimeOptions.IntoChatCompatible.PubSubStore, pubsub);
-            services.AddKeyedSingleton<IGrainStorage>(RuntimeOptions.IntoChatCompatible.ClusterGrainStorage, new FakeStorage());
+            services.AddKeyedSingleton<IGrainStorage>(RuntimeOptions.Default.PubSubStore, pubsub);
+            services.AddKeyedSingleton<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage, new FakeStorage());
         });
-        Assert.Same(pubsub, store.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.IntoChatCompatible.PubSubStore));
-        Assert.IsType<BrainGrainStorage>(store.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.IntoChatCompatible.ClusterGrainStorage));
-        Assert.Single(store.Services.GetKeyedServices<IGrainStorage>(RuntimeOptions.IntoChatCompatible.ClusterGrainStorage));
+        Assert.Same(pubsub, store.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.PubSubStore));
+        Assert.IsType<BrainGrainStorage>(store.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage));
+        Assert.Single(store.Services.GetKeyedServices<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage));
     }
 
     private sealed class FakeStorage : IGrainStorage

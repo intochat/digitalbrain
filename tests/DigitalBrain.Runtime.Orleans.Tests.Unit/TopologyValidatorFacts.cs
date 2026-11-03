@@ -5,14 +5,14 @@ public sealed class TopologyValidatorFacts
     private const string Sentinel = "s3cr3t-SENTINEL-value";
 
     [Theory]
-    [InlineData("local", "IntoChatOS:Cloud:Storage")]
-    [InlineData("local+cloud", "IntoChatOS:Cloud:Storage")]
-    [InlineData("local", "IntoChatOS:Cloud:KeyVault")]
-    [InlineData("local+cloud", "IntoChatOS:Cloud:KeyVault")]
+    [InlineData("local", "DigitalBrain:Cloud:Storage")]
+    [InlineData("local+cloud", "DigitalBrain:Cloud:Storage")]
+    [InlineData("local", "DigitalBrain:Cloud:KeyVault")]
+    [InlineData("local+cloud", "DigitalBrain:Cloud:KeyVault")]
     public void Cloud_keys_under_non_cloud_topology_require_cloud(string topology, string key)
     {
-        var pairs = new List<(string, string?)> { (RuntimeOptions.IntoChatCompatible.TopologyKey, topology), (key, Sentinel) };
-        if (topology == "local+cloud") { pairs.Add((RuntimeOptions.IntoChatCompatible.CloudServerAddressKey, Sentinel)); }
+        var pairs = new List<(string, string?)> { (RuntimeOptions.Default.TopologyKey, topology), (key, Sentinel) };
+        if (topology == "local+cloud") { pairs.Add((RuntimeOptions.Default.CloudServerAddressKey, Sentinel)); }
 
         var issues = TopologyValidator.Validate(Config.Of([.. pairs]), []);
 
@@ -26,15 +26,15 @@ public sealed class TopologyValidatorFacts
     [InlineData("cloud")]
     public void Server_address_requires_local_cloud(string topology)
     {
-        var pairs = new List<(string, string?)> { (RuntimeOptions.IntoChatCompatible.TopologyKey, topology), (RuntimeOptions.IntoChatCompatible.CloudServerAddressKey, Sentinel) };
+        var pairs = new List<(string, string?)> { (RuntimeOptions.Default.TopologyKey, topology), (RuntimeOptions.Default.CloudServerAddressKey, Sentinel) };
         if (topology == "cloud")
         {
-            pairs.Add((RuntimeOptions.IntoChatCompatible.CloudStorageKey, Sentinel));
-            pairs.Add((RuntimeOptions.IntoChatCompatible.CloudKeyVaultKey, Sentinel));
+            pairs.Add((RuntimeOptions.Default.CloudStorageKey, Sentinel));
+            pairs.Add((RuntimeOptions.Default.CloudKeyVaultKey, Sentinel));
         }
 
         var issue = Assert.Single(TopologyValidator.Validate(Config.Of([.. pairs]), []));
-        Assert.Equal(RuntimeOptions.IntoChatCompatible.CloudServerAddressKey, issue.Key);
+        Assert.Equal(RuntimeOptions.Default.CloudServerAddressKey, issue.Key);
         Assert.Contains("requires Topology=local+cloud", issue.Message, StringComparison.Ordinal);
     }
 
@@ -42,17 +42,17 @@ public sealed class TopologyValidatorFacts
     public void Cloud_missing_storage_is_an_issue_and_a_missing_vault_is_a_warning()
     {
         // 04-CONTEXT R4-08: the vault is optional; without it secrets come from the machine key.
-        var settings = TopologySettings.Parse(Config.Of((RuntimeOptions.IntoChatCompatible.TopologyKey, "cloud")), []);
+        var settings = TopologySettings.Parse(Config.Of((RuntimeOptions.Default.TopologyKey, "cloud")), []);
 
-        Assert.Equal([RuntimeOptions.IntoChatCompatible.CloudStorageKey], settings.Issues.Select(i => i.Key));
-        Assert.Contains(settings.Warnings, w => w.Contains(RuntimeOptions.IntoChatCompatible.CloudKeyVaultKey, StringComparison.Ordinal));
+        Assert.Equal([RuntimeOptions.Default.CloudStorageKey], settings.Issues.Select(i => i.Key));
+        Assert.Contains(settings.Warnings, w => w.Contains(RuntimeOptions.Default.CloudKeyVaultKey, StringComparison.Ordinal));
     }
 
     [Fact]
     public void Local_cloud_missing_server_address_is_an_issue()
     {
-        var issue = Assert.Single(TopologyValidator.Validate(Config.Of((RuntimeOptions.IntoChatCompatible.TopologyKey, "local+cloud")), []));
-        Assert.Equal(RuntimeOptions.IntoChatCompatible.CloudServerAddressKey, issue.Key);
+        var issue = Assert.Single(TopologyValidator.Validate(Config.Of((RuntimeOptions.Default.TopologyKey, "local+cloud")), []));
+        Assert.Equal(RuntimeOptions.Default.CloudServerAddressKey, issue.Key);
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public sealed class TopologyValidatorFacts
     {
         RetiredSetting[] retired = [new("IntoChatOS:Preset", "IntoChatOS:Topology")];
 
-        var issues = TopologyValidator.Validate(Config.Of((RuntimeOptions.IntoChatCompatible.TopologyKey, "local"), ("IntoChatOS:Preset", Sentinel)), retired);
+        var issues = TopologyValidator.Validate(Config.Of((RuntimeOptions.Default.TopologyKey, "local"), ("IntoChatOS:Preset", Sentinel)), retired);
 
         var issue = Assert.Single(issues);
         Assert.Equal("IntoChatOS:Preset", issue.Key);
@@ -74,7 +74,7 @@ public sealed class TopologyValidatorFacts
 
         var issues = TopologyValidator.Validate(Config.Of(("IntoChatOS:Preset", Sentinel)), retired);
 
-        Assert.Equal(["IntoChatOS:Preset", RuntimeOptions.IntoChatCompatible.TopologyKey], issues.Select(i => i.Key));
+        Assert.Equal(["IntoChatOS:Preset", RuntimeOptions.Default.TopologyKey], issues.Select(i => i.Key));
     }
 
     [Fact]
@@ -82,10 +82,10 @@ public sealed class TopologyValidatorFacts
     {
         RetiredSetting[] retired = [new("IntoChatOS:Profile", "IntoChatOS:Topology")];
         var configuration = Config.Of(
-            (RuntimeOptions.IntoChatCompatible.TopologyKey, "local"),
-            (RuntimeOptions.IntoChatCompatible.CloudStorageKey, Sentinel),
-            (RuntimeOptions.IntoChatCompatible.CloudKeyVaultKey, Sentinel),
-            (RuntimeOptions.IntoChatCompatible.CloudServerAddressKey, Sentinel),
+            (RuntimeOptions.Default.TopologyKey, "local"),
+            (RuntimeOptions.Default.CloudStorageKey, Sentinel),
+            (RuntimeOptions.Default.CloudKeyVaultKey, Sentinel),
+            (RuntimeOptions.Default.CloudServerAddressKey, Sentinel),
             ("IntoChatOS:Profile", Sentinel));
 
         var issues = TopologyValidator.Validate(configuration, retired);

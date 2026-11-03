@@ -24,14 +24,14 @@ public sealed class CloudProfile : ITopologyProfile, IRuntimeOptionsHolder
     private readonly RuntimeOptions _options;
     private readonly Action<IConfigurationBuilder, Uri>? _keyVaultSource;
 
-    /// <summary>The production topology: Key Vault through <c>DefaultAzureCredential</c>, <see cref="RuntimeOptions.IntoChatCompatible"/> names.</summary>
-    public CloudProfile() : this(RuntimeOptions.IntoChatCompatible, null) { }
+    /// <summary>The production topology: Key Vault through <c>DefaultAzureCredential</c>, <see cref="RuntimeOptions.Default"/> names.</summary>
+    public CloudProfile() : this(RuntimeOptions.Default, null) { }
 
     /// <summary>
     /// A cloud topology whose Key Vault source is replaced (tests on Azurite only; production code never passes one).
     /// Null keeps the production source.
     /// </summary>
-    public CloudProfile(Action<IConfigurationBuilder, Uri>? keyVaultSource) : this(RuntimeOptions.IntoChatCompatible, keyVaultSource) { }
+    public CloudProfile(Action<IConfigurationBuilder, Uri>? keyVaultSource) : this(RuntimeOptions.Default, keyVaultSource) { }
 
     /// <summary>A cloud topology with the key and store names the host chose.</summary>
     /// <param name="options">The runtime's key and store names.</param>
@@ -73,8 +73,8 @@ public sealed class CloudProfile : ITopologyProfile, IRuntimeOptionsHolder
     /// <inheritdoc />
     public Bindings Bindings => CloudBindings;
 
-    /// <summary>The cloud process shape with the <see cref="RuntimeOptions.IntoChatCompatible"/> environment names.</summary>
-    public static Services CloudServices { get; } = ServicesFor(RuntimeOptions.IntoChatCompatible);
+    /// <summary>The cloud process shape with the <see cref="RuntimeOptions.Default"/> environment names.</summary>
+    public static Services CloudServices { get; } = ServicesFor(RuntimeOptions.Default);
 
     /// <summary>The cloud process shape for <paramref name="options"/>.</summary>
     public static Services ServicesFor(RuntimeOptions options)
@@ -119,10 +119,10 @@ public sealed class CloudProfile : ITopologyProfile, IRuntimeOptionsHolder
     /// <summary>The key vault URI, or null with an issue naming the cloud key vault key.</summary>
     /// <param name="value">The configured value.</param>
     /// <param name="issue">The issue when the value is missing or invalid.</param>
-    /// <param name="options">Names the key vault key; null means <see cref="RuntimeOptions.IntoChatCompatible"/>.</param>
+    /// <param name="options">Names the key vault key; null means <see cref="RuntimeOptions.Default"/>.</param>
     public static Uri? KeyVault(string? value, out TopologyIssue? issue, RuntimeOptions? options = null)
     {
-        var key = (options ?? RuntimeOptions.IntoChatCompatible).CloudKeyVaultKey;
+        var key = (options ?? RuntimeOptions.Default).CloudKeyVaultKey;
         issue = null;
         if (string.IsNullOrWhiteSpace(value))
         {

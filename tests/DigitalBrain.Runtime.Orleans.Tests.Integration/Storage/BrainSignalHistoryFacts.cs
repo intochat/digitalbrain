@@ -96,16 +96,16 @@ public sealed class BrainSignalHistoryFacts
         var registration = new WithRetention(new BrainStorageRegistration(BrainStore.TestAssembly));
         await using (var host = await new LocalSiloHostFactory(registration).Start(new InProcessHostOptions { Home = home.Path }, ct))
         {
-            Assert.IsType<BrainGrainStorage>(host.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.IntoChatCompatible.ClusterGrainStorage));
+            Assert.IsType<BrainGrainStorage>(host.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage));
             Assert.NotNull(host.Services.GetRequiredService<BrainSignalHistories>());
-            var cluster = host.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.IntoChatCompatible.ClusterGrainStorage);
+            var cluster = host.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage);
             var grainState = new TestGrainState<SynapseState> { State = new SynapseState { Sources = [new SynapseSource { Source = BrainStore.P.ToString(), Cursor = 5 }] } };
             await cluster.WriteStateAsync(SynapseState.Name, GrainId.Create("neuron.host", "b1/probe/s"), grainState);
         }
         await using (var host = await new LocalSiloHostFactory(registration).Start(new InProcessHostOptions { Home = home.Path }, ct))
         {
             // The state was written into the b1 journal (JSON) and reads back after a restart.
-            var cluster = host.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.IntoChatCompatible.ClusterGrainStorage);
+            var cluster = host.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage);
             var grainState = new TestGrainState<SynapseState>();
             await cluster.ReadStateAsync(SynapseState.Name, GrainId.Create("neuron.host", "b1/probe/s"), grainState);
             Assert.Equal(5, grainState.State.Sources[0].Cursor);

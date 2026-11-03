@@ -18,10 +18,10 @@ public sealed class LocalCloudProfile : ITopologyProfile, IRuntimeOptionsHolder
     private readonly LocalProfile _local;
 
     /// <summary>Creates the local+cloud topology.</summary>
-    /// <param name="options">The runtime's key and store names; null means <see cref="RuntimeOptions.IntoChatCompatible"/>.</param>
+    /// <param name="options">The runtime's key and store names; null means <see cref="RuntimeOptions.Default"/>.</param>
     public LocalCloudProfile(RuntimeOptions? options = null)
     {
-        _options = options ?? RuntimeOptions.IntoChatCompatible;
+        _options = options ?? RuntimeOptions.Default;
         _local = new LocalProfile(_options);
     }
 

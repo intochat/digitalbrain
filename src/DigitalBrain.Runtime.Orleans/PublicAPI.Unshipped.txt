@@ -350,7 +350,7 @@ DigitalBrain.Runtime.Orleans.RuntimeOptions.HomeKey.get -> string!
 DigitalBrain.Runtime.Orleans.RuntimeOptions.HomeKey.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.MasterKeyKey.get -> string!
 DigitalBrain.Runtime.Orleans.RuntimeOptions.MasterKeyKey.init -> void
-DigitalBrain.Runtime.Orleans.RuntimeOptions.OsImage.get -> string!
+DigitalBrain.Runtime.Orleans.RuntimeOptions.OsImage.get -> string?
 DigitalBrain.Runtime.Orleans.RuntimeOptions.OsImage.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.PlatformGrainStorage.get -> string!
 DigitalBrain.Runtime.Orleans.RuntimeOptions.PlatformGrainStorage.init -> void
@@ -359,7 +359,7 @@ DigitalBrain.Runtime.Orleans.RuntimeOptions.PubSubStore.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.RetentionSection.get -> string!
 DigitalBrain.Runtime.Orleans.RuntimeOptions.RetentionSection.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.RuntimeOptions() -> void
-DigitalBrain.Runtime.Orleans.RuntimeOptions.SandboxImage.get -> string!
+DigitalBrain.Runtime.Orleans.RuntimeOptions.SandboxImage.get -> string?
 DigitalBrain.Runtime.Orleans.RuntimeOptions.SandboxImage.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.SignalStreams.get -> string!
 DigitalBrain.Runtime.Orleans.RuntimeOptions.SignalStreams.init -> void
@@ -378,17 +378,17 @@ DigitalBrain.Runtime.Orleans.SecretsBinding.MachineKey = 1 -> DigitalBrain.Runti
 DigitalBrain.Runtime.Orleans.SecretsBinding.None = 0 -> DigitalBrain.Runtime.Orleans.SecretsBinding
 DigitalBrain.Runtime.Orleans.ServiceProcess
 DigitalBrain.Runtime.Orleans.ServiceProcess.<Clone>$() -> DigitalBrain.Runtime.Orleans.ServiceProcess!
-DigitalBrain.Runtime.Orleans.ServiceProcess.Deconstruct(out string! Name, out string! Image, out System.Collections.Generic.IReadOnlyList<int>! Ports, out System.Collections.Generic.IReadOnlyList<string!>! Volumes, out System.Collections.Generic.IReadOnlyList<string!>! EnvironmentKeys) -> void
+DigitalBrain.Runtime.Orleans.ServiceProcess.Deconstruct(out string! Name, out string? Image, out System.Collections.Generic.IReadOnlyList<int>! Ports, out System.Collections.Generic.IReadOnlyList<string!>! Volumes, out System.Collections.Generic.IReadOnlyList<string!>! EnvironmentKeys) -> void
 DigitalBrain.Runtime.Orleans.ServiceProcess.EnvironmentKeys.get -> System.Collections.Generic.IReadOnlyList<string!>!
 DigitalBrain.Runtime.Orleans.ServiceProcess.EnvironmentKeys.init -> void
 DigitalBrain.Runtime.Orleans.ServiceProcess.Equals(DigitalBrain.Runtime.Orleans.ServiceProcess? other) -> bool
-DigitalBrain.Runtime.Orleans.ServiceProcess.Image.get -> string!
+DigitalBrain.Runtime.Orleans.ServiceProcess.Image.get -> string?
 DigitalBrain.Runtime.Orleans.ServiceProcess.Image.init -> void
 DigitalBrain.Runtime.Orleans.ServiceProcess.Name.get -> string!
 DigitalBrain.Runtime.Orleans.ServiceProcess.Name.init -> void
 DigitalBrain.Runtime.Orleans.ServiceProcess.Ports.get -> System.Collections.Generic.IReadOnlyList<int>!
 DigitalBrain.Runtime.Orleans.ServiceProcess.Ports.init -> void
-DigitalBrain.Runtime.Orleans.ServiceProcess.ServiceProcess(string! Name, string! Image, System.Collections.Generic.IReadOnlyList<int>! Ports, System.Collections.Generic.IReadOnlyList<string!>! Volumes, System.Collections.Generic.IReadOnlyList<string!>! EnvironmentKeys) -> void
+DigitalBrain.Runtime.Orleans.ServiceProcess.ServiceProcess(string! Name, string? Image, System.Collections.Generic.IReadOnlyList<int>! Ports, System.Collections.Generic.IReadOnlyList<string!>! Volumes, System.Collections.Generic.IReadOnlyList<string!>! EnvironmentKeys) -> void
 DigitalBrain.Runtime.Orleans.ServiceProcess.Volumes.get -> System.Collections.Generic.IReadOnlyList<string!>!
 DigitalBrain.Runtime.Orleans.ServiceProcess.Volumes.init -> void
 DigitalBrain.Runtime.Orleans.Services
@@ -560,7 +560,7 @@ const DigitalBrain.Runtime.Orleans.LocalProfile.Image = "ghcr.io/intochat/os" ->
 const DigitalBrain.Runtime.Orleans.LocalProfile.SandboxImage = "ghcr.io/intochat/os-sandbox" -> string!
 const DigitalBrain.Runtime.Orleans.MachineKeyConfigurationSource.FileName = "master.key" -> string!
 const DigitalBrain.Runtime.Orleans.Signalling.SessionSynapses.NeuronType = "runtime.session" -> string!
-const DigitalBrain.Runtime.Orleans.StateHome.DefaultDirectoryName = ".intochat" -> string!
+const DigitalBrain.Runtime.Orleans.StateHome.DefaultDirectoryName = ".digitalbrain" -> string!
 const DigitalBrain.Runtime.Orleans.TopologyContext.DefaultGatewayPort = 30000 -> int
 const DigitalBrain.Runtime.Orleans.TopologyContext.DefaultSiloPort = 11111 -> int
 const DigitalBrain.Runtime.Orleans.TopologyContext.GatewayPortKey = "Orleans:Endpoints:GatewayPort" -> string!
@@ -669,7 +669,7 @@ static DigitalBrain.Runtime.Orleans.PlatformGrainStorage.ForScope(System.IServic
 static DigitalBrain.Runtime.Orleans.RetiredSetting.operator !=(DigitalBrain.Runtime.Orleans.RetiredSetting? left, DigitalBrain.Runtime.Orleans.RetiredSetting? right) -> bool
 static DigitalBrain.Runtime.Orleans.RetiredSetting.operator ==(DigitalBrain.Runtime.Orleans.RetiredSetting? left, DigitalBrain.Runtime.Orleans.RetiredSetting? right) -> bool
 static DigitalBrain.Runtime.Orleans.RuntimeOptions.Default.get -> DigitalBrain.Runtime.Orleans.RuntimeOptions!
-static DigitalBrain.Runtime.Orleans.RuntimeOptions.IntoChatCompatible.get -> DigitalBrain.Runtime.Orleans.RuntimeOptions!
+static DigitalBrain.Runtime.Orleans.RuntimeOptions.Resolve(System.IServiceProvider! services) -> DigitalBrain.Runtime.Orleans.RuntimeOptions!
 static DigitalBrain.Runtime.Orleans.RuntimeOptions.operator !=(DigitalBrain.Runtime.Orleans.RuntimeOptions? left, DigitalBrain.Runtime.Orleans.RuntimeOptions? right) -> bool
 static DigitalBrain.Runtime.Orleans.RuntimeOptions.operator ==(DigitalBrain.Runtime.Orleans.RuntimeOptions? left, DigitalBrain.Runtime.Orleans.RuntimeOptions? right) -> bool
 static DigitalBrain.Runtime.Orleans.RuntimeSiloBuilderExtensions.AddDigitalBrainRuntime(this Orleans.Hosting.ISiloBuilder! silo, DigitalBrain.Runtime.Orleans.RuntimeOptions? options, params System.Reflection.Assembly![]! modules) -> Orleans.Hosting.ISiloBuilder!

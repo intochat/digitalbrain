@@ -16,10 +16,10 @@ public sealed class MachineKeyConfigurationSource : IConfigurationSource
     /// <param name="home">Where the key and state live.</param>
     /// <param name="existing">The configuration built so far; an explicit master key there wins.</param>
     /// <param name="protector">null uses <see cref="MachineKeyProtectors.ForCurrentPlatform"/>.</param>
-    /// <param name="options">Names the master key; null means <see cref="RuntimeOptions.IntoChatCompatible"/>.</param>
+    /// <param name="options">Names the master key; null means <see cref="RuntimeOptions.Default"/>.</param>
     public MachineKeyConfigurationSource(StateHome home, IConfiguration? existing, IMachineKeyProtector? protector = null, RuntimeOptions? options = null)
     {
-        Options = options ?? RuntimeOptions.IntoChatCompatible;
+        Options = options ?? RuntimeOptions.Default;
         Home = home ?? throw new ArgumentNullException(nameof(home));
         Existing = existing;
         Protector = protector ?? MachineKeyProtectors.ForCurrentPlatform();

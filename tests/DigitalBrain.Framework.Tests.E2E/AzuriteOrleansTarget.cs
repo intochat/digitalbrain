@@ -97,21 +97,21 @@ public sealed class AzuriteOrleansTarget(AzuriteFixture azurite) : OrleansFramew
             var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
             var values = new Dictionary<string, string?>
             {
-                [RuntimeOptions.IntoChatCompatible.TopologyKey] = "cloud",
-                [RuntimeOptions.IntoChatCompatible.HomeKey] = Home,
-                [RuntimeOptions.IntoChatCompatible.CloudStorageKey] = storage,
+                [RuntimeOptions.Default.TopologyKey] = "cloud",
+                [RuntimeOptions.Default.HomeKey] = Home,
+                [RuntimeOptions.Default.CloudStorageKey] = storage,
                 [TopologyContext.SiloPortKey] = FreePort().ToString(CultureInfo.InvariantCulture),
                 [TopologyContext.GatewayPortKey] = FreePort().ToString(CultureInfo.InvariantCulture),
             };
             // The 03-09 probe host keeps its vault URL with the in-memory master key; framework hosts run with no vault at all.
-            if (modules is null) { values[RuntimeOptions.IntoChatCompatible.CloudKeyVaultKey] = "https://e2e-vault.vault.azure.net/"; }
+            if (modules is null) { values[RuntimeOptions.Default.CloudKeyVaultKey] = "https://e2e-vault.vault.azure.net/"; }
             foreach (var (key, value) in configuration ?? new Dictionary<string, string?>()) { values[key] = value; }
             builder.Configuration.AddInMemoryCollection(values);
             if (modules is null)
             {
                 builder.UseClusterStore(_ => { });
                 var cloud = new CloudProfile((config, _) => config.AddInMemoryCollection(
-                    new Dictionary<string, string?> { [RuntimeOptions.IntoChatCompatible.MasterKeyKey] = MasterKey }));
+                    new Dictionary<string, string?> { [RuntimeOptions.Default.MasterKeyKey] = MasterKey }));
                 builder.UseTopology([], [], cloud);
             }
             else

@@ -7,8 +7,8 @@ namespace DigitalBrain.Runtime.Orleans;
 /// <summary>Where local state lives: the <see cref="RuntimeOptions.HomeKey"/> value, or <c>~/&lt;DefaultHomeDirectoryName&gt;</c> when unset (P2-D-13).</summary>
 public sealed record StateHome
 {
-    /// <summary>The default folder name under the user folder of <see cref="RuntimeOptions.IntoChatCompatible"/>.</summary>
-    public const string DefaultDirectoryName = RuntimeOptions.IntoChatDefaultHomeDirectoryName;
+    /// <summary>The default folder name under the user folder of <see cref="RuntimeOptions.Default"/>.</summary>
+    public const string DefaultDirectoryName = ".digitalbrain";
 
     private StateHome(string path) => Path = path;
 
@@ -30,18 +30,18 @@ public sealed record StateHome
     /// <summary><c>&lt;Home&gt;/settings.json</c>.</summary>
     public string SettingsFile => System.IO.Path.Combine(Path, "settings.json");
 
-    /// <summary>Resolves Home with the <see cref="RuntimeOptions.IntoChatCompatible"/> spellings; a leading <c>~</c> expands to the user folder.</summary>
+    /// <summary>Resolves Home with the <see cref="RuntimeOptions.Default"/> spellings; a leading <c>~</c> expands to the user folder.</summary>
     /// <exception cref="InvalidOperationException">The value is relative or names an existing file. Names the key only.</exception>
-    [Obsolete("Pass RuntimeOptions; removed in 0.13.")]
-    public static StateHome Resolve(IConfiguration? configuration) => Resolve(configuration, RuntimeOptions.IntoChatCompatible);
+    [Obsolete("Pass RuntimeOptions; removed in 0.14.")]
+    public static StateHome Resolve(IConfiguration? configuration) => Resolve(configuration, RuntimeOptions.Default);
 
     /// <summary>Resolves Home; a leading <c>~</c> expands to the user folder.</summary>
     /// <param name="configuration">The configuration holding the home key.</param>
-    /// <param name="options">Names the home key and the default folder; null means <see cref="RuntimeOptions.IntoChatCompatible"/>.</param>
+    /// <param name="options">Names the home key and the default folder; null means <see cref="RuntimeOptions.Default"/>.</param>
     /// <exception cref="InvalidOperationException">The value is relative or names an existing file. Names the key only.</exception>
     public static StateHome Resolve(IConfiguration? configuration, RuntimeOptions? options = null)
     {
-        options ??= RuntimeOptions.IntoChatCompatible;
+        options ??= RuntimeOptions.Default;
         var configured = configuration?[options.HomeKey];
         if (string.IsNullOrWhiteSpace(configured)) { return Default(options); }
         configured = configured.Trim();
@@ -61,8 +61,8 @@ public sealed record StateHome
         return new StateHome(full);
     }
 
-    /// <summary><c>~/.intochat</c>, the default of <see cref="RuntimeOptions.IntoChatCompatible"/>.</summary>
-    public static StateHome Default() => Default(RuntimeOptions.IntoChatCompatible);
+    /// <summary><c>~/.digitalbrain</c>, the default of <see cref="RuntimeOptions.Default"/>.</summary>
+    public static StateHome Default() => Default(RuntimeOptions.Default);
 
     /// <summary>The user folder plus <see cref="RuntimeOptions.DefaultHomeDirectoryName"/>.</summary>
     public static StateHome Default(RuntimeOptions options)

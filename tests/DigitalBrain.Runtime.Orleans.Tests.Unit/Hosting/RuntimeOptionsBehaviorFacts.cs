@@ -85,7 +85,8 @@ public sealed class RuntimeOptionsBehaviorFacts : IDisposable
         builder.Configuration.AddInMemoryCollection([new("DigitalBrain:Home", _home)]);
         builder.UseRuntimeOptions(RuntimeOptions.Default);
 
-        var thrown = Assert.Throws<InvalidOperationException>(() => builder.UseTopology([], [], new LocalProfile()));
+        var other = new RuntimeOptions { TopologyKey = "IntoChatOS:Topology", DefaultHomeDirectoryName = ".intochat" };
+        var thrown = Assert.Throws<InvalidOperationException>(() => builder.UseTopology([], [], new LocalProfile(other)));
 
         Assert.Contains("IntoChatOS:Topology", thrown.Message, StringComparison.Ordinal);
         Assert.Contains("DigitalBrain:Topology", thrown.Message, StringComparison.Ordinal);

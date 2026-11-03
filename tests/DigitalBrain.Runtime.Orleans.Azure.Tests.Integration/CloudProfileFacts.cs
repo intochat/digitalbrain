@@ -11,8 +11,8 @@ public sealed class CloudProfileFacts(AzuriteFixture azurite)
     private static IConfiguration Configuration(string? storage, string? vault) => new ConfigurationBuilder()
         .AddInMemoryCollection(new Dictionary<string, string?>
         {
-            [RuntimeOptions.IntoChatCompatible.CloudStorageKey] = storage,
-            [RuntimeOptions.IntoChatCompatible.CloudKeyVaultKey] = vault,
+            [RuntimeOptions.Default.CloudStorageKey] = storage,
+            [RuntimeOptions.Default.CloudKeyVaultKey] = vault,
         })
         .Build();
 
@@ -21,7 +21,7 @@ public sealed class CloudProfileFacts(AzuriteFixture azurite)
     {
         // 04-CONTEXT R4-08: without a vault the cloud topology uses the machine-key secrets source.
         var issue = Assert.Single(new CloudProfile().Validate(Configuration(null, null), []));
-        Assert.Equal(RuntimeOptions.IntoChatCompatible.CloudStorageKey, issue.Key);
+        Assert.Equal(RuntimeOptions.Default.CloudStorageKey, issue.Key);
     }
 
     [Fact]
@@ -32,9 +32,9 @@ public sealed class CloudProfileFacts(AzuriteFixture azurite)
         using var home = new TempHome();
         using var host = CloudHosts.Build(storage, home.Path, new FakeClusterStore(), "v" + Guid.NewGuid().ToString("N")[..12], vault: null, production: true);
 
-        Assert.False(string.IsNullOrEmpty(host.Services.GetRequiredService<IConfiguration>()[RuntimeOptions.IntoChatCompatible.MasterKeyKey]));
+        Assert.False(string.IsNullOrEmpty(host.Services.GetRequiredService<IConfiguration>()[RuntimeOptions.Default.MasterKeyKey]));
         Assert.Contains(host.Services.GetRequiredService<TopologySettings>().Warnings,
-            w => w.Contains(RuntimeOptions.IntoChatCompatible.CloudKeyVaultKey, StringComparison.Ordinal));
+            w => w.Contains(RuntimeOptions.Default.CloudKeyVaultKey, StringComparison.Ordinal));
         await host.StartAsync(ct);
         await host.StopAsync(ct);
     }
@@ -46,7 +46,7 @@ public sealed class CloudProfileFacts(AzuriteFixture azurite)
     public void A_key_vault_that_is_not_an_https_uri_is_an_issue(string vault)
     {
         var issue = Assert.Single(new CloudProfile().Validate(Configuration("UseDevelopmentStorage=true", vault), []));
-        Assert.Equal(RuntimeOptions.IntoChatCompatible.CloudKeyVaultKey, issue.Key);
+        Assert.Equal(RuntimeOptions.Default.CloudKeyVaultKey, issue.Key);
     }
 
     [Fact]
@@ -93,8 +93,8 @@ public sealed class CloudProfileFacts(AzuriteFixture azurite)
         Assert.Equal(["os", "os-sandbox"], services.Processes.Select(p => p.Name));
         Assert.Equal(["Microsoft.Storage/storageAccounts", "Microsoft.KeyVault/vaults", "Microsoft.App/managedEnvironments"], services.AzureResourceKinds);
         var os = services.Processes[0];
-        Assert.Contains("IntoChatOS__Cloud__Storage", os.EnvironmentKeys);
-        Assert.Contains("IntoChatOS__Cloud__KeyVault", os.EnvironmentKeys);
+        Assert.Contains("DigitalBrain__Cloud__Storage", os.EnvironmentKeys);
+        Assert.Contains("DigitalBrain__Cloud__KeyVault", os.EnvironmentKeys);
     }
 
     [Fact]
@@ -108,8 +108,8 @@ public sealed class CloudProfileFacts(AzuriteFixture azurite)
         var builder = Microsoft.Extensions.Hosting.Host.CreateEmptyApplicationBuilder(new());
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            [RuntimeOptions.IntoChatCompatible.TopologyKey] = "cloud",
-            [RuntimeOptions.IntoChatCompatible.HomeKey] = home.Path,
+            [RuntimeOptions.Default.TopologyKey] = "cloud",
+            [RuntimeOptions.Default.HomeKey] = home.Path,
         });
         var error = Assert.Throws<InvalidOperationException>(() => builder.UseTopology([], []));
         Assert.Contains(TopologyHosting.CloudPackage, error.Message, StringComparison.Ordinal);
@@ -125,20 +125,20 @@ public sealed class CloudProfileFacts(AzuriteFixture azurite)
         using var host = CloudHosts.Build(unreachable, home.Path, fake, "facts", typeof(DriveModule));
         var services = host.Services;
 
-        Assert.Same(fake, services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.IntoChatCompatible.ClusterGrainStorage));
-        foreach (var name in new[] { RuntimeOptions.IntoChatCompatible.PlatformGrainStorage, RuntimeOptions.IntoChatCompatible.PubSubStore, "drive" })
+        Assert.Same(fake, services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage));
+        foreach (var name in new[] { RuntimeOptions.Default.PlatformGrainStorage, RuntimeOptions.Default.PubSubStore, "drive" })
         {
             Assert.IsType<AzureBlobGrainStorage>(services.GetRequiredKeyedService<IGrainStorage>(name));
-            Assert.Equal(RuntimeOptions.IntoChatCompatible.GrainStateContainer, services.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<AzureBlobStorageOptions>>().Get(name).ContainerName);
+            Assert.Equal(RuntimeOptions.Default.GrainStateContainer, services.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<AzureBlobStorageOptions>>().Get(name).ContainerName);
         }
         Assert.Contains("Azure", services.GetRequiredService<IMembershipTable>().GetType().Name, StringComparison.Ordinal);
         Assert.Contains("Azure", services.GetRequiredService<IReminderTable>().GetType().Name, StringComparison.Ordinal);
-        Assert.NotNull(services.GetRequiredKeyedService<IStreamProvider>(RuntimeOptions.IntoChatCompatible.SignalStreams));
-        var queues = services.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<AzureQueueOptions>>().Get(RuntimeOptions.IntoChatCompatible.SignalStreams);
+        Assert.NotNull(services.GetRequiredKeyedService<IStreamProvider>(RuntimeOptions.Default.SignalStreams));
+        var queues = services.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<AzureQueueOptions>>().Get(RuntimeOptions.Default.SignalStreams);
         Assert.Equal(["signals-0"], queues.QueueNames);
         Assert.NotNull(queues.QueueServiceClient);
         Assert.IsType<BlobLeaseBrainLogOwnership>(services.GetRequiredService<IBrainLogOwnership>());
         Assert.Same(services.GetRequiredService<IBrainLogOwnership>(), services.GetRequiredService<IBrainOwnershipCounters>());
-        Assert.Equal(CloudHosts.MasterKey, services.GetRequiredService<IConfiguration>()[RuntimeOptions.IntoChatCompatible.MasterKeyKey]);
+        Assert.Equal(CloudHosts.MasterKey, services.GetRequiredService<IConfiguration>()[RuntimeOptions.Default.MasterKeyKey]);
     }
 }

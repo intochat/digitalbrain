@@ -11,14 +11,14 @@ public sealed class TopologySelectionFacts : IDisposable
     private HostApplicationBuilder Builder(params (string Key, string? Value)[] pairs)
     {
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
-        builder.Configuration.AddInMemoryCollection([new(RuntimeOptions.IntoChatCompatible.HomeKey, _home), .. pairs.Select(p => new KeyValuePair<string, string?>(p.Key, p.Value))]);
+        builder.Configuration.AddInMemoryCollection([new(RuntimeOptions.Default.HomeKey, _home), .. pairs.Select(p => new KeyValuePair<string, string?>(p.Key, p.Value))]);
         return builder;
     }
 
     [Fact]
     public void Cloud_without_cloud_implementation_names_the_azure_package()
     {
-        var builder = Builder((RuntimeOptions.IntoChatCompatible.TopologyKey, "cloud"), (RuntimeOptions.IntoChatCompatible.CloudStorageKey, "s"), (RuntimeOptions.IntoChatCompatible.CloudKeyVaultKey, "k"));
+        var builder = Builder((RuntimeOptions.Default.TopologyKey, "cloud"), (RuntimeOptions.Default.CloudStorageKey, "s"), (RuntimeOptions.Default.CloudKeyVaultKey, "k"));
 
         var thrown = Assert.Throws<InvalidOperationException>(() => builder.UseTopology([], []));
 
@@ -28,7 +28,7 @@ public sealed class TopologySelectionFacts : IDisposable
     [Fact]
     public void Settings_and_implementation_issues_are_thrown_once_together()
     {
-        var builder = Builder((RuntimeOptions.IntoChatCompatible.TopologyKey, "local"), ("IntoChatOS:Preset", "x"));
+        var builder = Builder((RuntimeOptions.Default.TopologyKey, "local"), ("IntoChatOS:Preset", "x"));
         var local = new FakeTopology(Topology.Local, issues: new TopologyIssue("IntoChatOS:Sample", "is wrong."));
 
         var thrown0 = Assert.Throws<InvalidOperationException>(() => builder.UseTopology([], [new("IntoChatOS:Preset", "IntoChatOS:Topology")], local));
@@ -36,7 +36,7 @@ public sealed class TopologySelectionFacts : IDisposable
         Assert.Contains("IntoChatOS:Sample: is wrong.", thrown0.Message, StringComparison.Ordinal);
         Assert.False(local.ServicesConfigured);
 
-        var second = Builder((RuntimeOptions.IntoChatCompatible.TopologyKey, "local"));
+        var second = Builder((RuntimeOptions.Default.TopologyKey, "local"));
         var unbound = new FakeTopology(Topology.Local, Bindings.Unbound, issues: new TopologyIssue("IntoChatOS:Sample", "is wrong."));
         var thrown = Assert.Throws<InvalidOperationException>(() => second.UseTopology([Manifests.Needing("m", Need.Http)], [], unbound));
         Assert.Contains("IntoChatOS:Sample: is wrong.", thrown.Message, StringComparison.Ordinal);
@@ -49,11 +49,11 @@ public sealed class TopologySelectionFacts : IDisposable
     {
         // Home relative: a settings issue that does not block selection of the topology.
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
-        builder.Configuration.AddInMemoryCollection([new(RuntimeOptions.IntoChatCompatible.HomeKey, "relative/home")]);
+        builder.Configuration.AddInMemoryCollection([new(RuntimeOptions.Default.HomeKey, "relative/home")]);
 
         var thrown = Assert.Throws<InvalidOperationException>(() => builder.UseTopology([], [], new FakeTopology(Topology.Local)));
 
-        Assert.Contains(RuntimeOptions.IntoChatCompatible.HomeKey, thrown.Message, StringComparison.Ordinal);
+        Assert.Contains(RuntimeOptions.Default.HomeKey, thrown.Message, StringComparison.Ordinal);
     }
 
     [Fact]

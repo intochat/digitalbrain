@@ -18,9 +18,9 @@ public sealed class CloudSignalStreamsFacts(AzuriteFixture azurite)
         using var host = CloudHosts.Build(storage, home.Path, new FakeClusterStore(), "s" + Guid.NewGuid().ToString("N")[..12]);
         var services = host.Services;
 
-        Assert.IsType<AzureBlobGrainStorage>(services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.IntoChatCompatible.PubSubStore));
-        Assert.IsType<PersistentStreamProvider>(services.GetRequiredKeyedService<IStreamProvider>(RuntimeOptions.IntoChatCompatible.SignalStreams));
-        Assert.Contains("AzureQueue", services.GetRequiredKeyedService<IQueueAdapterFactory>(RuntimeOptions.IntoChatCompatible.SignalStreams).GetType().Name, StringComparison.Ordinal);
+        Assert.IsType<AzureBlobGrainStorage>(services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.PubSubStore));
+        Assert.IsType<PersistentStreamProvider>(services.GetRequiredKeyedService<IStreamProvider>(RuntimeOptions.Default.SignalStreams));
+        Assert.Contains("AzureQueue", services.GetRequiredKeyedService<IQueueAdapterFactory>(RuntimeOptions.Default.SignalStreams).GetType().Name, StringComparison.Ordinal);
         Assert.Empty(TopologyValidator.ValidatePubSubStore(Topology.Cloud, services));
 
         await host.StartAsync(ct); // the startup PubSubStore check runs at ServiceLifecycleStage.First

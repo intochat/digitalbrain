@@ -6,7 +6,7 @@ namespace DigitalBrain.Runtime.Orleans;
 /// <param name="Ports">The ports it listens on.</param>
 /// <param name="Volumes">The volumes it mounts.</param>
 /// <param name="EnvironmentKeys">The environment variable names it reads.</param>
-public sealed record ServiceProcess(string Name, string Image, IReadOnlyList<int> Ports, IReadOnlyList<string> Volumes, IReadOnlyList<string> EnvironmentKeys);
+public sealed record ServiceProcess(string Name, string? Image, IReadOnlyList<int> Ports, IReadOnlyList<string> Volumes, IReadOnlyList<string> EnvironmentKeys);
 
 /// <summary>The process shape of a topology. Aspire, the CLI and the installer render it; none keeps its own description.</summary>
 /// <param name="Processes">The processes.</param>

@@ -40,7 +40,7 @@ public static class TopologyValidator
 
     /// <summary>Validates topology, cloud and retired keys. Reads configuration only.</summary>
     public static IReadOnlyList<TopologyIssue> Validate(IConfiguration configuration, IReadOnlyList<RetiredSetting> retired, RuntimeOptions? options = null)
-        => Evaluate(configuration, retired, options ?? RuntimeOptions.IntoChatCompatible).Issues;
+        => Evaluate(configuration, retired, options ?? RuntimeOptions.Default).Issues;
 
     /// <summary>Every module need the bindings leave unbound, by module id and need kind (R4-02).</summary>
     public static IReadOnlyList<TopologyIssue> ValidateNeeds(Topology topology, Bindings bindings, IReadOnlyList<ModuleManifest> modules)
@@ -53,7 +53,7 @@ public static class TopologyValidator
     public static IReadOnlyList<TopologyIssue> ValidateNeeds(
         Topology topology, Bindings bindings, IReadOnlyList<ModuleManifest> modules, bool clusterStoreRegistered, RuntimeOptions? options = null)
     {
-        options ??= RuntimeOptions.IntoChatCompatible;
+        options ??= RuntimeOptions.Default;
         ArgumentNullException.ThrowIfNull(bindings);
         ArgumentNullException.ThrowIfNull(modules);
         var hostBound = bindings.ClusterStore == ClusterStoreBinding.HostBound;

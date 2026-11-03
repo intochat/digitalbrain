@@ -169,7 +169,7 @@ public sealed record Bindings(
     public bool Binds(Need need, bool clusterStoreRegistered, RuntimeOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(need);
-        return IsClusterStore(need, options ?? RuntimeOptions.IntoChatCompatible)
+        return IsClusterStore(need, options ?? RuntimeOptions.Default)
             ? ClusterStore == ClusterStoreBinding.HostBound && clusterStoreRegistered
             : Binds(need.Kind);
     }

@@ -4,26 +4,10 @@ namespace DigitalBrain.Runtime.Orleans;
 
 /// <summary>
 /// The configuration keys, store names and default home folder the runtime uses. The host fills it once; the runtime reads it
-/// from the service collection. <see cref="Default"/> names the keys after DigitalBrain; <see cref="IntoChatCompatible"/> keeps the
-/// spellings of the <c>IntoChatOS:</c> hosts.
+/// from the service collection, falling back to <see cref="Default"/>.
 /// </summary>
 public sealed record RuntimeOptions
 {
-    internal const string IntoChatTopologyKey = "IntoChatOS:Topology";
-    internal const string IntoChatHomeKey = "IntoChatOS:Home";
-    internal const string IntoChatBindKey = "IntoChatOS:Bind";
-    internal const string IntoChatCloudStorageKey = "IntoChatOS:Cloud:Storage";
-    internal const string IntoChatCloudKeyVaultKey = "IntoChatOS:Cloud:KeyVault";
-    internal const string IntoChatCloudServerAddressKey = "IntoChatOS:Cloud:ServerAddress";
-    internal const string IntoChatMasterKeyKey = "IntoChatOS:MasterKey";
-    internal const string IntoChatCloudSectionPrefix = "IntoChatOS:Cloud:";
-    internal const string IntoChatSignallingSection = "IntoChatOS:Signalling";
-    internal const string IntoChatRetentionSection = "IntoChatOS:Signalling:Retention";
-    internal const string IntoChatDefaultHomeDirectoryName = ".intochat";
-    internal const string IntoChatAuthPostureKey = "IntoChatOS:Auth:Posture";
-    internal const string IntoChatOsImage = "ghcr.io/intochat/os";
-    internal const string IntoChatSandboxImage = "ghcr.io/intochat/os-sandbox";
-
     /// <summary>Selects the topology: local, local+cloud or cloud.</summary>
     public string TopologyKey { get; init; } = "DigitalBrain:Topology";
 
@@ -61,10 +45,10 @@ public sealed record RuntimeOptions
     public string AuthPostureKey { get; init; } = "DigitalBrain:Auth:Posture";
 
     /// <summary>The container image of the host process, named by <c>Services</c>.</summary>
-    public string OsImage { get; init; } = "digitalbrain/host";
+    public string? OsImage { get; init; }
 
     /// <summary>The container image of the sandbox process, named by <c>Services</c>.</summary>
-    public string SandboxImage { get; init; } = "digitalbrain/host-sandbox";
+    public string? SandboxImage { get; init; }
 
     /// <summary>The stream pub-sub grain store.</summary>
     public string PubSubStore { get; init; } = "PubSubStore";
@@ -79,35 +63,21 @@ public sealed record RuntimeOptions
     public string ClusterGrainStorage { get; init; } = "cluster";
 
     /// <summary>The grain state container.</summary>
-    public string GrainStateContainer { get; init; } = "os-state";
+    public string GrainStateContainer { get; init; } = "brain-state";
 
     /// <summary>Keys named after DigitalBrain, home <c>~/.digitalbrain</c>.</summary>
     public static RuntimeOptions Default { get; } = new();
 
-    /// <summary>The key spellings and home <c>~/.intochat</c> that the original product's hosts have always used.</summary>
-    public static RuntimeOptions IntoChatCompatible { get; } = new()
+    /// <summary>The options the host registered, or <see cref="Default"/> when it registered none.</summary>
+    public static RuntimeOptions Resolve(IServiceProvider services)
     {
-        TopologyKey = IntoChatTopologyKey,
-        HomeKey = IntoChatHomeKey,
-        BindKey = IntoChatBindKey,
-        CloudStorageKey = IntoChatCloudStorageKey,
-        CloudKeyVaultKey = IntoChatCloudKeyVaultKey,
-        CloudServerAddressKey = IntoChatCloudServerAddressKey,
-        MasterKeyKey = IntoChatMasterKeyKey,
-        CloudSectionPrefix = IntoChatCloudSectionPrefix,
-        SignallingSection = IntoChatSignallingSection,
-        RetentionSection = IntoChatRetentionSection,
-        DefaultHomeDirectoryName = IntoChatDefaultHomeDirectoryName,
-        AuthPostureKey = IntoChatAuthPostureKey,
-        OsImage = IntoChatOsImage,
-        SandboxImage = IntoChatSandboxImage,
-    };
+        ArgumentNullException.ThrowIfNull(services);
+        return services.GetService<RuntimeOptions>() ?? Default;
+    }
 
-    // The options the host registered, or the compatible spellings that callers without options have always got.
-    internal static RuntimeOptions From(IServiceProvider services)
-        => services.GetService<RuntimeOptions>() ?? IntoChatCompatible;
+    internal static RuntimeOptions From(IServiceProvider services) => Resolve(services);
 
     internal static RuntimeOptions From(IServiceCollection services)
         => services.LastOrDefault(d => d.ServiceType == typeof(RuntimeOptions) && !d.IsKeyedService)?.ImplementationInstance as RuntimeOptions
-            ?? IntoChatCompatible;
+            ?? Default;
 }

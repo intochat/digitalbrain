@@ -84,14 +84,14 @@ public sealed class RetentionPolicyFacts
     {
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            [RuntimeOptions.IntoChatCompatible.RetentionSection + ":HistoryWindowAge"] = "1.00:00:00",
-            [RuntimeOptions.IntoChatCompatible.RetentionSection + ":HistoryWindowSignals"] = "42",
-            [RuntimeOptions.IntoChatCompatible.RetentionSection + ":StaleCursorAfter"] = "02:00:00",
+            [RuntimeOptions.Default.RetentionSection + ":HistoryWindowAge"] = "1.00:00:00",
+            [RuntimeOptions.Default.RetentionSection + ":HistoryWindowSignals"] = "42",
+            [RuntimeOptions.Default.RetentionSection + ":StaleCursorAfter"] = "02:00:00",
         }).Build();
         var services = new ServiceCollection().AddSingleton<IConfiguration>(config);
-        SynapseRetentionHosting.AddRetentionOptions(services, RuntimeOptions.IntoChatCompatible);
+        SynapseRetentionHosting.AddRetentionOptions(services, RuntimeOptions.Default);
         var o = services.BuildServiceProvider().GetRequiredService<IOptions<RetentionOptions>>().Value;
         Assert.Equal((TimeSpan.FromDays(1), 42, TimeSpan.FromHours(2)), (o.HistoryWindowAge, o.HistoryWindowSignals, o.StaleCursorAfter));
-        Assert.Equal("IntoChatOS:Signalling:Retention", RuntimeOptions.IntoChatCompatible.RetentionSection);
+        Assert.Equal("DigitalBrain:Signalling:Retention", RuntimeOptions.Default.RetentionSection);
     }
 }

@@ -100,8 +100,8 @@ public sealed class HostActivationFacts
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            [RuntimeOptions.IntoChatCompatible.TopologyKey] = Topology.Local.ToConfigValue(),
-            [RuntimeOptions.IntoChatCompatible.HomeKey] = home.Path,
+            [RuntimeOptions.Default.TopologyKey] = Topology.Local.ToConfigValue(),
+            [RuntimeOptions.Default.HomeKey] = home.Path,
         });
         builder.UseClusterStore(new BrainStorageRegistration(typeof(HostingModule).Assembly));
         builder.UseModuleTopology([typeof(HostingModule)], []);
@@ -110,7 +110,7 @@ public sealed class HostActivationFacts
             silo.ConfigureTopologySilo();
             var error = Assert.Throws<InvalidOperationException>(() => silo.AddDigitalBrainRuntime(typeof(HostingModule).Assembly));
             Assert.Contains("already", error.Message);
-            Assert.Single(silo.Services, d => d.ServiceType == typeof(IStreamProvider) && Equals(d.ServiceKey, RuntimeOptions.IntoChatCompatible.SignalStreams));
+            Assert.Single(silo.Services, d => d.ServiceType == typeof(IStreamProvider) && Equals(d.ServiceKey, RuntimeOptions.Default.SignalStreams));
         });
         using var built = builder.Build();
         var services = built.Services;

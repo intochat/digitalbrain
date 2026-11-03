@@ -28,7 +28,7 @@ public sealed class StatefulSilo : IAsyncLifetime
     internal async Task<References> Watch(string brain, string signalNamespace)
     {
         var references = new References();
-        var provider = Services.GetRequiredKeyedService<IStreamProvider>(RuntimeOptions.IntoChatCompatible.SignalStreams);
+        var provider = Services.GetRequiredKeyedService<IStreamProvider>(RuntimeOptions.Default.SignalStreams);
         await provider.GetStream<SignalReference>(StreamId.Create(StreamNames.NamespacePrefix + signalNamespace, brain)).SubscribeAsync((item, _) =>
         {
             references.Items.Enqueue(item);

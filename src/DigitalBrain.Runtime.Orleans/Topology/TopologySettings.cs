@@ -15,7 +15,7 @@ public sealed record TopologySettings(Topology Topology, StateHome? Home, IReadO
     /// <summary>Parses configuration without throwing; problems are returned as issues.</summary>
     public static TopologySettings Parse(IConfiguration configuration, IReadOnlyList<RetiredSetting> retired, RuntimeOptions? options = null)
     {
-        options ??= RuntimeOptions.IntoChatCompatible;
+        options ??= RuntimeOptions.Default;
         var (topology, issues, warnings) = TopologyValidator.Evaluate(configuration, retired, options);
         var all = issues.ToList();
         StateHome? home = null;
