@@ -1621,3 +1621,94 @@ override DigitalBrain.AppNavigated.ToString() -> string!
 override sealed DigitalBrain.AppNavigated.Equals(DigitalBrain.Signal? other) -> bool
 static DigitalBrain.AppNavigated.operator !=(DigitalBrain.AppNavigated? left, DigitalBrain.AppNavigated? right) -> bool
 static DigitalBrain.AppNavigated.operator ==(DigitalBrain.AppNavigated? left, DigitalBrain.AppNavigated? right) -> bool
+~override DigitalBrain.Modules.Options.ModuleId.Equals(object obj) -> bool
+const DigitalBrain.Modules.Options.ModuleOptionsSerialization.OptionsKeySuffix = ":Options" -> string!
+DigitalBrain.Brains.BrainKey
+DigitalBrain.Brains.BrainScope
+DigitalBrain.Brains.BrainScope.<Clone>$() -> DigitalBrain.Brains.BrainScope!
+DigitalBrain.Brains.BrainScope.BrainScope(string! Id, string! Owner) -> void
+DigitalBrain.Brains.BrainScope.Deconstruct(out string! Id, out string! Owner) -> void
+DigitalBrain.Brains.BrainScope.Equals(DigitalBrain.Brains.BrainScope? other) -> bool
+DigitalBrain.Brains.BrainScope.Id.get -> string!
+DigitalBrain.Brains.BrainScope.Id.init -> void
+DigitalBrain.Brains.BrainScope.Owner.get -> string!
+DigitalBrain.Brains.BrainScope.Owner.init -> void
+DigitalBrain.Brains.CallerAdmission
+DigitalBrain.Errors.ServiceUnavailableException
+DigitalBrain.Errors.ServiceUnavailableException.ServiceUnavailableException(string! message) -> void
+DigitalBrain.Errors.StaleActionException
+DigitalBrain.Errors.StaleActionException.StaleActionException(string! message) -> void
+DigitalBrain.Log.Swallow
+DigitalBrain.Modules.Configuration.ConfigurationKeyGrammar
+DigitalBrain.Modules.Configuration.ModuleConfiguration
+DigitalBrain.Modules.Configuration.ModuleConfigurationOptions
+DigitalBrain.Modules.Configuration.ModuleConfigurationOptions.ModuleConfigurationOptions() -> void
+DigitalBrain.Modules.Configuration.ModuleConfigurationOptions.Root.get -> string!
+DigitalBrain.Modules.Configuration.ModuleConfigurationOptions.Root.init -> void
+DigitalBrain.Modules.Options.IModuleOptions
+DigitalBrain.Modules.Options.IModuleOptions.Validate() -> void
+DigitalBrain.Modules.Options.ModuleId
+DigitalBrain.Modules.Options.ModuleId.Equals(DigitalBrain.Modules.Options.ModuleId other) -> bool
+DigitalBrain.Modules.Options.ModuleId.ModuleId() -> void
+DigitalBrain.Modules.Options.ModuleId.ModuleId(string! value) -> void
+DigitalBrain.Modules.Options.ModuleId.Value.get -> string!
+DigitalBrain.Modules.Options.ModuleOptionsSerialization
+DigitalBrain.Modules.Options.ModuleSettingsValidation
+DigitalBrain.Modules.Options.SettingAttribute
+DigitalBrain.Modules.Options.SettingAttribute.Integration.get -> string?
+DigitalBrain.Modules.Options.SettingAttribute.Integration.init -> void
+DigitalBrain.Modules.Options.SettingAttribute.Name.get -> string?
+DigitalBrain.Modules.Options.SettingAttribute.Optional.get -> bool
+DigitalBrain.Modules.Options.SettingAttribute.Optional.init -> void
+DigitalBrain.Modules.Options.SettingAttribute.Required.get -> bool
+DigitalBrain.Modules.Options.SettingAttribute.Required.init -> void
+DigitalBrain.Modules.Options.SettingAttribute.SettingAttribute(string? name = null) -> void
+override DigitalBrain.Brains.BrainScope.Equals(object? obj) -> bool
+override DigitalBrain.Brains.BrainScope.GetHashCode() -> int
+override DigitalBrain.Brains.BrainScope.ToString() -> string!
+override DigitalBrain.Modules.Options.ModuleId.GetHashCode() -> int
+override DigitalBrain.Modules.Options.ModuleId.ToString() -> string!
+static DigitalBrain.Brains.BrainKey.BelongsTo(string! key, string! brain) -> bool
+static DigitalBrain.Brains.BrainKey.BrainOf(string! key) -> string!
+static DigitalBrain.Brains.BrainKey.ScopeOf(string! key) -> string?
+static DigitalBrain.Brains.BrainScope.Create(string! owner, string! name) -> DigitalBrain.Brains.BrainScope!
+static DigitalBrain.Brains.BrainScope.CurrentId() -> string!
+static DigitalBrain.Brains.BrainScope.IsValidId(string? value) -> bool
+static DigitalBrain.Brains.BrainScope.operator !=(DigitalBrain.Brains.BrainScope? left, DigitalBrain.Brains.BrainScope? right) -> bool
+static DigitalBrain.Brains.BrainScope.operator ==(DigitalBrain.Brains.BrainScope? left, DigitalBrain.Brains.BrainScope? right) -> bool
+static DigitalBrain.Brains.CallerAdmission.RequireBrainMember(string! brainId, string! message) -> void
+static DigitalBrain.Brains.CallerAdmission.RequireNotAppCaller(string! message) -> void
+static DigitalBrain.Brains.CallerAdmission.RequirePerson(string! message) -> void
+static DigitalBrain.Brains.CallerAdmission.RequireSameBrain(string! brainId, string? appId = null, string? target = null) -> void
+static DigitalBrain.Log.Swallow.LogSwallowed(this Microsoft.Extensions.Logging.ILogger! logger, System.Exception! exception, string! what) -> void
+static DigitalBrain.Log.Swallow.TryAsync(System.Func<System.Threading.Tasks.Task!>! work, Microsoft.Extensions.Logging.ILogger! logger, string! what) -> System.Threading.Tasks.Task!
+static DigitalBrain.Modules.Configuration.ConfigurationKeyGrammar.EnvironmentName(string! configurationKey) -> string!
+static DigitalBrain.Modules.Configuration.ConfigurationKeyGrammar.IntegrationKey(string! id, string! field) -> string!
+static DigitalBrain.Modules.Configuration.ModuleConfiguration.CompositionModuleOptionsSection(string! compositionName, DigitalBrain.Modules.Options.ModuleId moduleId) -> string!
+static DigitalBrain.Modules.Configuration.ModuleConfiguration.CompositionModuleOptionsSection(string! compositionName, string! moduleId) -> string!
+static DigitalBrain.Modules.Configuration.ModuleConfiguration.ConfigurationName(string! environmentName) -> string!
+static DigitalBrain.Modules.Configuration.ModuleConfiguration.ConnectionsPublicOriginKey.get -> string!
+static DigitalBrain.Modules.Configuration.ModuleConfiguration.ConnectionsSectionName.get -> string!
+static DigitalBrain.Modules.Configuration.ModuleConfiguration.ConnectionsTokenEndpointKey(string! connectorId) -> string!
+static DigitalBrain.Modules.Configuration.ModuleConfiguration.DiagnosticsKey.get -> string!
+static DigitalBrain.Modules.Configuration.ModuleConfiguration.EnvironmentName(string! configurationKey) -> string!
+static DigitalBrain.Modules.Configuration.ModuleConfiguration.EnvironmentName(string! configurationRoot, string! name) -> string!
+static DigitalBrain.Modules.Configuration.ModuleConfiguration.Flatten(object! options, string! section, bool omitDefaults = false) -> System.Collections.Generic.Dictionary<string!, string?>!
+static DigitalBrain.Modules.Configuration.ModuleConfiguration.IntegrationEnvironmentName(string! integrationId, string! field) -> string!
+static DigitalBrain.Modules.Configuration.ModuleConfiguration.IntegrationsSectionName.get -> string!
+static DigitalBrain.Modules.Configuration.ModuleConfiguration.ModuleOptionsSection(DigitalBrain.Modules.Options.ModuleId moduleId) -> string!
+static DigitalBrain.Modules.Configuration.ModuleConfiguration.ModuleOptionsSection(string! moduleId) -> string!
+static DigitalBrain.Modules.Configuration.ModuleConfiguration.ModuleSection(DigitalBrain.Modules.Options.ModuleId moduleId) -> string!
+static DigitalBrain.Modules.Configuration.ModuleConfiguration.ModuleSection(string! moduleId) -> string!
+static DigitalBrain.Modules.Configuration.ModuleConfiguration.ModulesSectionName.get -> string!
+static DigitalBrain.Modules.Configuration.ModuleConfiguration.WorkshopSectionName.get -> string!
+static DigitalBrain.Modules.Configuration.ModuleConfigurationOptions.Current.get -> DigitalBrain.Modules.Configuration.ModuleConfigurationOptions!
+static DigitalBrain.Modules.Configuration.ModuleConfigurationOptions.Current.set -> void
+static DigitalBrain.Modules.Options.ModuleId.operator !=(DigitalBrain.Modules.Options.ModuleId left, DigitalBrain.Modules.Options.ModuleId right) -> bool
+static DigitalBrain.Modules.Options.ModuleId.operator ==(DigitalBrain.Modules.Options.ModuleId left, DigitalBrain.Modules.Options.ModuleId right) -> bool
+static DigitalBrain.Modules.Options.ModuleOptionsSerialization.FlattenOptions<TOptions>(TOptions! options, string! moduleName) -> System.Collections.Generic.Dictionary<string!, string?>!
+static DigitalBrain.Modules.Options.ModuleOptionsSerialization.GetModuleOptions<TOptions>(this Microsoft.Extensions.Configuration.IConfiguration! configuration, string! moduleName) -> TOptions!
+static DigitalBrain.Modules.Options.ModuleOptionsSerialization.OptionsKey(string! moduleName) -> string!
+static DigitalBrain.Modules.Options.ModuleOptionsSerialization.Validate<TOptions>(TOptions! options, string! moduleName) -> void
+static DigitalBrain.Modules.Options.ModuleOptionsSerialization.ValidateRequired<TOptions>(TOptions! options, string! moduleName) -> void
+static DigitalBrain.Modules.Options.ModuleSettingsValidation.IsCredentialName(string! name) -> bool

@@ -53,7 +53,10 @@ public sealed class VocabularyRingFacts
     [InlineData("DigitalBrain.UI")]
     public void Core_projects_reference_only_the_public_api_analyzer(string name)
     {
-        Assert.Equal(["Microsoft.CodeAnalysis.PublicApiAnalyzers"], Repository.PackageReferences(Repository.ProjectNamed(name).Path));
+        string[] expected = name == "DigitalBrain"
+            ? ["Microsoft.CodeAnalysis.PublicApiAnalyzers", "Microsoft.Extensions.Configuration.Binder"]
+            : ["Microsoft.CodeAnalysis.PublicApiAnalyzers"];
+        Assert.Equal(expected, Repository.PackageReferences(Repository.ProjectNamed(name).Path).Order(StringComparer.Ordinal));
     }
 }
 

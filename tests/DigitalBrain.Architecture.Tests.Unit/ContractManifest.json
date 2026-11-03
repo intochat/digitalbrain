@@ -43,7 +43,8 @@
     ],
     "neurons": [
       "runtime.listener",
-      "runtime.operation"
+      "runtime.operation",
+      "runtime.session"
     ],
     "signals": [
       "synapse.gap"

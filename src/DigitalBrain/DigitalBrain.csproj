@@ -9,12 +9,16 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
     <AdditionalFiles Include="PublicAPI.Shipped.txt" />
     <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
     <None Include="README.md" Pack="true" PackagePath="/" Condition="Exists('README.md')" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Tests.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Runtime.Orleans" />
+    <InternalsVisibleTo Include="DigitalBrain.Testing" />
+    <InternalsVisibleTo Include="DigitalBrain.Capabilities.Connections" />
   </ItemGroup>
   <ItemGroup>
     <!-- Analyzer-only (03-04): no assembly reference. NuGet drops ReferenceOutputAssembly=false references from the
