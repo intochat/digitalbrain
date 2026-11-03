@@ -226,6 +226,7 @@ jobs:
     environment: nuget-preview
     permissions:
       contents: read
+      packages: write
       id-token: write
     concurrency:
       group: publish-main
@@ -276,6 +277,19 @@ jobs:
           NUGET_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
         run: dotnet nuget push "artifacts/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "${NUGET_KEY}" --skip-duplicate
 
+      - name: Push to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: dotnet nuget push "artifacts/*.nupkg" --source https://nuget.pkg.github.com/intochat/index.json --api-key "${GITHUB_TOKEN}" --skip-duplicate
+
+      - name: Notify consumers
+        env:
+          GH_TOKEN: ${{ secrets.OS_DOWNSTREAM_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh api repos/intochat/modules/dispatches -f event_type=digitalbrain-published -F client_payload[version]="${VERSION}"
+          gh api repos/intochat/os/dispatches -f event_type=digitalbrain-published -F client_payload[version]="${VERSION}"
+
   # The external-author path: the template from nuget.org with the just-published preview.
   template-feed:
     name: template-feed
@@ -293,59 +307,3 @@ jobs:
         env:
           VERSION: ${{ needs.publish.outputs.version }}
         run: bash scripts/ci/template-smoke.sh feed "$RUNNER_TEMP/t" "$VERSION"
-
-  # Report-only; replaces the os platform downstream job (R4-03). Not in the ci gate.
-  # Builds intochat/os (branch os-0-7-0) against the just-published preview.
-  downstream:
-    name: downstream
-    needs: [publish]
-    continue-on-error: true
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    env:
-      VERSION: ${{ needs.publish.outputs.version }}
-      HAS_OS_TOKEN: ${{ secrets.OS_DOWNSTREAM_TOKEN != '' }}
-    steps:
-      - name: Wait for nuget.org to index the preview
-        run: |
-          url="https://api.nuget.org/v3-flatcontainer/digitalbrain.runtime.orleans/index.json"
-          deadline=$(( $(date +%s) + 1200 ))
-          until curl -sf "$url" | grep -q "\"${VERSION}\""; do
-            [ "$(date +%s)" -lt "$deadline" ] || { echo "::error::${VERSION} not indexed after 20 minutes"; exit 1; }
-            sleep 30
-          done
-
-      - name: Check out intochat/os (private, with token)
-        if: env.HAS_OS_TOKEN == 'true'
-        uses: actions/checkout@v7
-        with:
-          repository: intochat/os
-          ref: os-0-7-0
-          path: os
-          token: ${{ secrets.OS_DOWNSTREAM_TOKEN }}
-          persist-credentials: false
-
-      - name: Check out intochat/os (public)
-        if: env.HAS_OS_TOKEN != 'true'
-        uses: actions/checkout@v7
-        with:
-          repository: intochat/os
-          ref: os-0-7-0
-          path: os
-          persist-credentials: false
-
-      - uses: actions/setup-dotnet@v6
-        with:
-          global-json-file: os/global.json
-
-      - name: Pin os to the fresh preview
-        working-directory: os
-        run: |
-          sed -i -E "s#(<PackageVersion Include=\"DigitalBrain[^\"]*\" Version=\")0\.6\.0-preview\.[^\"]*(\")#\1${VERSION}\2#g" Directory.Packages.props
-          grep -n 'DigitalBrain' Directory.Packages.props || echo "os does not reference DigitalBrain yet"
-
-      - name: Build os kernel and run os architecture facts
-        working-directory: os
-        run: |
-          dotnet build src/IntoChat.OS.Kernel/IntoChat.OS.Kernel/IntoChat.OS.Kernel.csproj -c Release
-          dotnet test --project src/Testing/IntoChat.OS.Architecture.Tests.Unit/IntoChat.OS.Architecture.Tests.Unit.csproj -c Release

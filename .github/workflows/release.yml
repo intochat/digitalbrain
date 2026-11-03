@@ -70,3 +70,11 @@ jobs:
         env:
           NUGET_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
         run: dotnet nuget push "artifacts/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "${NUGET_KEY}"
+
+      - name: Notify consumers
+        env:
+          GH_TOKEN: ${{ secrets.OS_DOWNSTREAM_TOKEN }}
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          gh api repos/intochat/modules/dispatches -f event_type=digitalbrain-published -F client_payload[version]="${VERSION}"
+          gh api repos/intochat/os/dispatches -f event_type=digitalbrain-published -F client_payload[version]="${VERSION}"
