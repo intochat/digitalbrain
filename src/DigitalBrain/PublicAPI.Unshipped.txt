@@ -1712,3 +1712,112 @@ static DigitalBrain.Modules.Options.ModuleOptionsSerialization.OptionsKey(string
 static DigitalBrain.Modules.Options.ModuleOptionsSerialization.Validate<TOptions>(TOptions! options, string! moduleName) -> void
 static DigitalBrain.Modules.Options.ModuleOptionsSerialization.ValidateRequired<TOptions>(TOptions! options, string! moduleName) -> void
 static DigitalBrain.Modules.Options.ModuleSettingsValidation.IsCredentialName(string! name) -> bool
+
+const DigitalBrain.Brains.IBrain.Type = "brain" -> string!
+DigitalBrain.Brains.BrainState
+DigitalBrain.Brains.BrainState.<Clone>$() -> DigitalBrain.Brains.BrainState!
+DigitalBrain.Brains.BrainState.BrainState(DigitalBrain.Brains.Owner! Owner, System.DateTimeOffset CreatedAt) -> void
+DigitalBrain.Brains.BrainState.CreatedAt.get -> System.DateTimeOffset
+DigitalBrain.Brains.BrainState.CreatedAt.init -> void
+DigitalBrain.Brains.BrainState.Deconstruct(out DigitalBrain.Brains.Owner! Owner, out System.DateTimeOffset CreatedAt) -> void
+DigitalBrain.Brains.BrainState.Equals(DigitalBrain.Brains.BrainState? other) -> bool
+DigitalBrain.Brains.BrainState.Owner.get -> DigitalBrain.Brains.Owner!
+DigitalBrain.Brains.BrainState.Owner.init -> void
+DigitalBrain.Brains.IBrain
+DigitalBrain.Brains.IBrain.Create(DigitalBrain.Brains.Owner! owner) -> System.Threading.Tasks.Task!
+DigitalBrain.Brains.IBrain.Key(string! brainId) -> string!
+DigitalBrain.Brains.IBrain.Read() -> System.Threading.Tasks.Task<DigitalBrain.Brains.BrainState!>!
+DigitalBrain.Brains.Owner
+DigitalBrain.Brains.Owner.<Clone>$() -> DigitalBrain.Brains.Owner!
+DigitalBrain.Brains.Owner.AccountId.get -> string!
+DigitalBrain.Brains.Owner.AccountId.init -> void
+DigitalBrain.Brains.Owner.Deconstruct(out string! AccountId) -> void
+DigitalBrain.Brains.Owner.Equals(DigitalBrain.Brains.Owner? other) -> bool
+DigitalBrain.Brains.Owner.Owner(string! AccountId) -> void
+DigitalBrain.Contracts.ConnectionContractAttribute
+DigitalBrain.Contracts.ConnectionContractAttribute.ConnectionContractAttribute() -> void
+DigitalBrain.Contracts.PlainNeuronContracts
+DigitalBrain.Signals.Activated
+DigitalBrain.Signals.Activated.Activated(DigitalBrain.Brains.Owner! Owner) -> void
+DigitalBrain.Signals.Activated.Deconstruct(out DigitalBrain.Brains.Owner! Owner) -> void
+DigitalBrain.Signals.Activated.Equals(DigitalBrain.Signals.Activated? other) -> bool
+DigitalBrain.Signals.Activated.Owner.get -> DigitalBrain.Brains.Owner!
+DigitalBrain.Signals.Activated.Owner.init -> void
+DigitalBrain.Signals.Created
+DigitalBrain.Signals.Created.Created(DigitalBrain.Brains.Owner! Owner) -> void
+DigitalBrain.Signals.Created.Deconstruct(out DigitalBrain.Brains.Owner! Owner) -> void
+DigitalBrain.Signals.Created.Equals(DigitalBrain.Signals.Created? other) -> bool
+DigitalBrain.Signals.Created.Owner.get -> DigitalBrain.Brains.Owner!
+DigitalBrain.Signals.Created.Owner.init -> void
+DigitalBrain.Signals.InstanceCreated
+DigitalBrain.Signals.InstanceCreated.Deconstruct(out string! Type, out string! Key) -> void
+DigitalBrain.Signals.InstanceCreated.Equals(DigitalBrain.Signals.InstanceCreated? other) -> bool
+DigitalBrain.Signals.InstanceCreated.InstanceCreated(string! Type, string! Key) -> void
+DigitalBrain.Signals.InstanceCreated.Key.get -> string!
+DigitalBrain.Signals.InstanceCreated.Key.init -> void
+DigitalBrain.Signals.InstanceCreated.Type.get -> string!
+DigitalBrain.Signals.InstanceCreated.Type.init -> void
+DigitalBrain.Signals.InstanceRetired
+DigitalBrain.Signals.InstanceRetired.Deconstruct(out string! Type, out string! Key) -> void
+DigitalBrain.Signals.InstanceRetired.Equals(DigitalBrain.Signals.InstanceRetired? other) -> bool
+DigitalBrain.Signals.InstanceRetired.InstanceRetired(string! Type, string! Key) -> void
+DigitalBrain.Signals.InstanceRetired.Key.get -> string!
+DigitalBrain.Signals.InstanceRetired.Key.init -> void
+DigitalBrain.Signals.InstanceRetired.Type.get -> string!
+DigitalBrain.Signals.InstanceRetired.Type.init -> void
+DigitalBrain.Signals.TypeAdded
+DigitalBrain.Signals.TypeAdded.Deconstruct(out string! Name) -> void
+DigitalBrain.Signals.TypeAdded.Equals(DigitalBrain.Signals.TypeAdded? other) -> bool
+DigitalBrain.Signals.TypeAdded.Name.get -> string!
+DigitalBrain.Signals.TypeAdded.Name.init -> void
+DigitalBrain.Signals.TypeAdded.TypeAdded(string! Name) -> void
+override DigitalBrain.Brains.BrainState.Equals(object? obj) -> bool
+override DigitalBrain.Brains.BrainState.GetHashCode() -> int
+override DigitalBrain.Brains.BrainState.ToString() -> string!
+override DigitalBrain.Brains.Owner.Equals(object? obj) -> bool
+override DigitalBrain.Brains.Owner.GetHashCode() -> int
+override DigitalBrain.Brains.Owner.ToString() -> string!
+override DigitalBrain.Signals.Activated.<Clone>$() -> DigitalBrain.Signals.Activated!
+override DigitalBrain.Signals.Activated.Equals(object? obj) -> bool
+override DigitalBrain.Signals.Activated.GetHashCode() -> int
+override DigitalBrain.Signals.Activated.ToString() -> string!
+override DigitalBrain.Signals.Created.<Clone>$() -> DigitalBrain.Signals.Created!
+override DigitalBrain.Signals.Created.Equals(object? obj) -> bool
+override DigitalBrain.Signals.Created.GetHashCode() -> int
+override DigitalBrain.Signals.Created.ToString() -> string!
+override DigitalBrain.Signals.InstanceCreated.<Clone>$() -> DigitalBrain.Signals.InstanceCreated!
+override DigitalBrain.Signals.InstanceCreated.Equals(object? obj) -> bool
+override DigitalBrain.Signals.InstanceCreated.GetHashCode() -> int
+override DigitalBrain.Signals.InstanceCreated.ToString() -> string!
+override DigitalBrain.Signals.InstanceRetired.<Clone>$() -> DigitalBrain.Signals.InstanceRetired!
+override DigitalBrain.Signals.InstanceRetired.Equals(object? obj) -> bool
+override DigitalBrain.Signals.InstanceRetired.GetHashCode() -> int
+override DigitalBrain.Signals.InstanceRetired.ToString() -> string!
+override DigitalBrain.Signals.TypeAdded.<Clone>$() -> DigitalBrain.Signals.TypeAdded!
+override DigitalBrain.Signals.TypeAdded.Equals(object? obj) -> bool
+override DigitalBrain.Signals.TypeAdded.GetHashCode() -> int
+override DigitalBrain.Signals.TypeAdded.ToString() -> string!
+override sealed DigitalBrain.Signals.Activated.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Signals.Created.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Signals.InstanceCreated.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Signals.InstanceRetired.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Signals.TypeAdded.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.Brains.BrainState.operator !=(DigitalBrain.Brains.BrainState? left, DigitalBrain.Brains.BrainState? right) -> bool
+static DigitalBrain.Brains.BrainState.operator ==(DigitalBrain.Brains.BrainState? left, DigitalBrain.Brains.BrainState? right) -> bool
+static DigitalBrain.Brains.Owner.operator !=(DigitalBrain.Brains.Owner? left, DigitalBrain.Brains.Owner? right) -> bool
+static DigitalBrain.Brains.Owner.operator ==(DigitalBrain.Brains.Owner? left, DigitalBrain.Brains.Owner? right) -> bool
+static DigitalBrain.Contracts.PlainNeuronContracts.ConnectorOf(string! fullKey) -> string?
+static DigitalBrain.Contracts.PlainNeuronContracts.IdOf(System.Type! contract, string! fullKey) -> DigitalBrain.NeuronId
+static DigitalBrain.Contracts.PlainNeuronContracts.Is(System.Type! type) -> bool
+static DigitalBrain.Contracts.PlainNeuronContracts.IsConnection(System.Type! type) -> bool
+static DigitalBrain.Contracts.PlainNeuronContracts.TypeOf(System.Type! contract) -> string?
+static DigitalBrain.Signals.Activated.operator !=(DigitalBrain.Signals.Activated? left, DigitalBrain.Signals.Activated? right) -> bool
+static DigitalBrain.Signals.Activated.operator ==(DigitalBrain.Signals.Activated? left, DigitalBrain.Signals.Activated? right) -> bool
+static DigitalBrain.Signals.Created.operator !=(DigitalBrain.Signals.Created? left, DigitalBrain.Signals.Created? right) -> bool
+static DigitalBrain.Signals.Created.operator ==(DigitalBrain.Signals.Created? left, DigitalBrain.Signals.Created? right) -> bool
+static DigitalBrain.Signals.InstanceCreated.operator !=(DigitalBrain.Signals.InstanceCreated? left, DigitalBrain.Signals.InstanceCreated? right) -> bool
+static DigitalBrain.Signals.InstanceCreated.operator ==(DigitalBrain.Signals.InstanceCreated? left, DigitalBrain.Signals.InstanceCreated? right) -> bool
+static DigitalBrain.Signals.InstanceRetired.operator !=(DigitalBrain.Signals.InstanceRetired? left, DigitalBrain.Signals.InstanceRetired? right) -> bool
+static DigitalBrain.Signals.InstanceRetired.operator ==(DigitalBrain.Signals.InstanceRetired? left, DigitalBrain.Signals.InstanceRetired? right) -> bool
+static DigitalBrain.Signals.TypeAdded.operator !=(DigitalBrain.Signals.TypeAdded? left, DigitalBrain.Signals.TypeAdded? right) -> bool
+static DigitalBrain.Signals.TypeAdded.operator ==(DigitalBrain.Signals.TypeAdded? left, DigitalBrain.Signals.TypeAdded? right) -> bool

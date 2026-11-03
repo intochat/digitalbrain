@@ -86,7 +86,9 @@ public sealed partial class RuntimeTypeFacts
         return kind switch
         {
             "neurons" => new(names.Where(name => name.StartsWith("runtime.", StringComparison.Ordinal)), StringComparer.Ordinal),
-            "signals" => new(names.Where(name => name.StartsWith("synapse.", StringComparison.Ordinal)), StringComparer.Ordinal),
+            "signals" => new(names.Where(name => name.StartsWith("synapse.", StringComparison.Ordinal)
+                || name.StartsWith("brain.", StringComparison.Ordinal)
+                || name.StartsWith("kernel.", StringComparison.Ordinal)), StringComparer.Ordinal),
             _ => names,
         };
     }

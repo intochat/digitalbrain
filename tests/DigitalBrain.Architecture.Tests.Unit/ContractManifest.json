@@ -47,6 +47,11 @@
       "runtime.session"
     ],
     "signals": [
+      "brain.activated",
+      "brain.created",
+      "kernel.instance-created",
+      "kernel.instance-retired",
+      "kernel.type-added",
       "synapse.gap"
     ]
   }
