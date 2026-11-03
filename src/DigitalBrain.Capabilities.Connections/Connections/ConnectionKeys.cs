@@ -27,6 +27,13 @@ public static class ConnectionKeys
         return NeuronUri(brainId, connectorId, connectionId);
     }
 
+    public static NeuronId IdFor(string key)
+    {
+        var (brain, connector, _) = Parse(key);
+        var normalized = StripScheme(key);
+        return new NeuronId(new BrainId(brain), connector, normalized[(brain.Length + 1)..]);
+    }
+
     public static (string BrainId, string ConnectorId, string ConnectionId) Parse(string key)
     {
         ArgumentNullException.ThrowIfNull(key);

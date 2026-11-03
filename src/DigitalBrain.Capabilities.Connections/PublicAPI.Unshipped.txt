@@ -1,4 +1,5 @@
 #nullable enable
+abstract DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.ProbeAsync(DigitalBrain.Capabilities.Connections.Credential! credential, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.ConnectionProbeResult!>!
 const DigitalBrain.Capabilities.Connections.ConnectionKeys.NeuronScheme = "neuron://" -> string!
 const DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.OtlpEndpointVariable = "OTEL_EXPORTER_OTLP_ENDPOINT" -> string!
 const DigitalBrain.Capabilities.Connections.IConnectionCatalogUpdates.TypeName = "integrations.accounts" -> string!
@@ -64,6 +65,37 @@ DigitalBrain.Capabilities.Connections.ConnectionFailing.Detail.get -> string!
 DigitalBrain.Capabilities.Connections.ConnectionFailing.Detail.init -> void
 DigitalBrain.Capabilities.Connections.ConnectionFailing.Equals(DigitalBrain.Capabilities.Connections.ConnectionFailing? other) -> bool
 DigitalBrain.Capabilities.Connections.ConnectionKeys
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.Adopt(string! authMethodId, string? account) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.ConnectionView!>!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.Commit(TState! next, params DigitalBrain.Signal![]! signals) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.Connect(string! authMethodId, string! value) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.ConnectionView!>!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.ConnectionNeuron() -> void
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.Disconnect() -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.ExportFor(string! brainId) -> System.Threading.Tasks.Task<System.Collections.Generic.Dictionary<string!, DigitalBrain.Capabilities.Secrets.SealedSecret!>!>!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.FullKey.get -> string!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.Import(string! authMethodId, string? account, System.Collections.Generic.Dictionary<string!, DigitalBrain.Capabilities.Secrets.SealedSecret!>! secrets, DigitalBrain.Capabilities.Connections.ConnectionStatus status, string? detail) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.ConnectionView!>!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.IsSharedInto(string! brainId, string! app) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.IsSharedWith(string! principalId) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.Key.get -> (string! Brain, string! Connector, string! Connection)
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.MarkExpired(string! detail) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.MarkFailing(string! detail) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.Probe() -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.ConnectionView!>!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.PublishAsync(DigitalBrain.Signal! signal) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.Read() -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.ConnectionView!>!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.Restore(TState! before) -> void
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.SaveQuietly(TState! next) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.ServiceProvider.get -> System.IServiceProvider!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.ShareInto(string! brainId, string! app) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.ShareWith(string! principalId) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.Snapshot.get -> TState!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.UnshareFrom(string! brainId, string! app) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.UnshareWith(string! principalId) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.UseCredentialAsync<T>(System.Func<DigitalBrain.Capabilities.Connections.Credential!, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! call, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<T>!
+DigitalBrain.Capabilities.Connections.ConnectionNeuronTypes
+DigitalBrain.Capabilities.Connections.ConnectionNeuronTypes.ConnectionNeuronTypes(System.Collections.Generic.IEnumerable<System.Type!>! modules) -> void
+DigitalBrain.Capabilities.Connections.ConnectionNeuronTypes.NeuronOf(string! connector) -> System.Type?
+DigitalBrain.Capabilities.Connections.ConnectionNeuronTypes.ProvidesOf(string! connector) -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.CapabilityId>!
+DigitalBrain.Capabilities.Connections.ConnectionNeuronTypes.Types.get -> System.Collections.Generic.IReadOnlySet<string!>!
 DigitalBrain.Capabilities.Connections.ConnectionProbeOutcome
 DigitalBrain.Capabilities.Connections.ConnectionProbeOutcome.Connected = 0 -> DigitalBrain.Capabilities.Connections.ConnectionProbeOutcome
 DigitalBrain.Capabilities.Connections.ConnectionProbeOutcome.Expired = 1 -> DigitalBrain.Capabilities.Connections.ConnectionProbeOutcome
@@ -517,6 +549,7 @@ override sealed DigitalBrain.Capabilities.Connections.ConnectionConnected.Equals
 override sealed DigitalBrain.Capabilities.Connections.ConnectionDisconnected.Equals(DigitalBrain.Signal? other) -> bool
 override sealed DigitalBrain.Capabilities.Connections.ConnectionExpired.Equals(DigitalBrain.Signal? other) -> bool
 override sealed DigitalBrain.Capabilities.Connections.ConnectionFailing.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.OnActivate(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 override sealed DigitalBrain.Capabilities.Connections.ConnectionUpdated.Equals(DigitalBrain.Signal? other) -> bool
 override sealed DigitalBrain.Capabilities.Connections.Requests.ConnectionRequested.Equals(DigitalBrain.Signal? other) -> bool
 override sealed DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.Equals(DigitalBrain.Signal? other) -> bool
@@ -531,11 +564,14 @@ static DigitalBrain.Capabilities.Connections.ConnectionExpired.operator ==(Digit
 static DigitalBrain.Capabilities.Connections.ConnectionFailing.operator !=(DigitalBrain.Capabilities.Connections.ConnectionFailing? left, DigitalBrain.Capabilities.Connections.ConnectionFailing? right) -> bool
 static DigitalBrain.Capabilities.Connections.ConnectionFailing.operator ==(DigitalBrain.Capabilities.Connections.ConnectionFailing? left, DigitalBrain.Capabilities.Connections.ConnectionFailing? right) -> bool
 static DigitalBrain.Capabilities.Connections.ConnectionKeys.For(string! brainId, string! connectorId, string! connectionId) -> string!
+static DigitalBrain.Capabilities.Connections.ConnectionKeys.IdFor(string! key) -> DigitalBrain.NeuronId
 static DigitalBrain.Capabilities.Connections.ConnectionKeys.Is(string! key) -> bool
 static DigitalBrain.Capabilities.Connections.ConnectionKeys.NeuronUri(string! brainId, string! connectorId, string! connectionId) -> string!
 static DigitalBrain.Capabilities.Connections.ConnectionKeys.NeuronUri(string! key) -> string!
 static DigitalBrain.Capabilities.Connections.ConnectionKeys.Parse(string! key) -> (string! BrainId, string! ConnectorId, string! ConnectionId)
 static DigitalBrain.Capabilities.Connections.ConnectionKeys.TryParse(string? key, out (string! BrainId, string! ConnectorId, string! ConnectionId) parsed) -> bool
+static DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.AssertZeroTokenReturn<T>(T result, DigitalBrain.Capabilities.Connections.Credential! credential) -> void
+static DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.AssertZeroTokenReturnType<T>() -> void
 static DigitalBrain.Capabilities.Connections.ConnectionProbeResult.Connected(string! detail = "The connector probe succeeded.") -> DigitalBrain.Capabilities.Connections.ConnectionProbeResult!
 static DigitalBrain.Capabilities.Connections.ConnectionProbeResult.Expired(string! detail) -> DigitalBrain.Capabilities.Connections.ConnectionProbeResult!
 static DigitalBrain.Capabilities.Connections.ConnectionProbeResult.Failing(string! detail) -> DigitalBrain.Capabilities.Connections.ConnectionProbeResult!
@@ -592,3 +628,9 @@ static DigitalBrain.Capabilities.Connections.Requests.ConnectorOffer.operator !=
 static DigitalBrain.Capabilities.Connections.Requests.ConnectorOffer.operator ==(DigitalBrain.Capabilities.Connections.Requests.ConnectorOffer? left, DigitalBrain.Capabilities.Connections.Requests.ConnectorOffer? right) -> bool
 static DigitalBrain.Capabilities.Connections.Sealing.BrainSeal.IsBrainSealed(DigitalBrain.Capabilities.Secrets.SealedSecret! secret) -> bool
 static DigitalBrain.Capabilities.Connections.Sealing.BrainSeal.KeyId(string! brainId) -> string!
+virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.AcceptGrant(DigitalBrain.Capabilities.Connections.OAuthGrant! grant) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.ConnectionView!>!
+virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.AcceptGrantAsync(DigitalBrain.Capabilities.Connections.OAuthGrant! grant) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.OAuthGrant!>!
+virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.Activated(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.OnConnectedAsync() -> System.Threading.Tasks.Task!
+virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.OnDisconnectedAsync() -> System.Threading.Tasks.Task!
+virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.RefreshAsync(DigitalBrain.Capabilities.Connections.Credential! credential, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.OAuthGrant!>!

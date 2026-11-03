@@ -1,0 +1,1 @@
+{"authMethodId":"oauth","status":"Connected","secrets":[{"name":"access","keyId":"mk1","ciphertext":"cipher-access"},{"name":"refresh","keyId":"mk1","ciphertext":"cipher-refresh"}],"account":"alice@example.com","scopes":"read write","expiresAt":null,"lastProbedAt":null,"detail":null,"sharedInto":["brain-2/app-1"]}
