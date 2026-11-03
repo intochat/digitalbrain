@@ -1,4 +1,5 @@
 using DigitalBrain.Capabilities;
+using DigitalBrain.Capabilities.Connections.Broker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;

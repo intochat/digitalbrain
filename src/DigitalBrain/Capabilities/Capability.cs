@@ -16,6 +16,16 @@ public static class Capability
         public static CapabilityId V1 { get; } = CapabilityId.Parse(V1Id);
     }
 
+    /// <summary>Connectors, integrations, connections, connection requests, capability broker bindings and secret sealing.</summary>
+    public static class Connections
+    {
+        /// <summary>The string form of <see cref="V1"/>.</summary>
+        public const string V1Id = "connections@1";
+
+        /// <summary>connections@1.</summary>
+        public static CapabilityId V1 { get; } = CapabilityId.Parse(V1Id);
+    }
+
     /// <summary>Files and folders in a storage connection.</summary>
     public static class Storage
     {

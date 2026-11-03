@@ -76,16 +76,18 @@ public sealed class CapabilityIdFacts
     public void Capability_constants_are_storage_secrets_identity_v1()
     {
         Assert.Equal("compute@1", Capability.Compute.V1.ToString());
+        Assert.Equal("connections@1", Capability.Connections.V1.ToString());
         Assert.Equal("storage@1", Capability.Storage.V1.ToString());
         Assert.Equal("secrets@1", Capability.Secrets.V1.ToString());
         Assert.Equal("identity@1", Capability.Identity.V1.ToString());
         Assert.Equal(Capability.Compute.V1Id, Capability.Compute.V1.ToString());
+        Assert.Equal(Capability.Connections.V1Id, Capability.Connections.V1.ToString());
         Assert.Equal(Capability.Storage.V1Id, Capability.Storage.V1.ToString());
         Assert.Equal(Capability.Secrets.V1Id, Capability.Secrets.V1.ToString());
         Assert.Equal(Capability.Identity.V1Id, Capability.Identity.V1.ToString());
 
         var nested = typeof(Capability).GetNestedTypes(BindingFlags.Public).Select(type => type.Name).Order(StringComparer.Ordinal);
-        Assert.Equal(["Compute", "Identity", "Secrets", "Storage"], nested);
+        Assert.Equal(["Compute", "Connections", "Identity", "Secrets", "Storage"], nested);
     }
 
     [Fact]

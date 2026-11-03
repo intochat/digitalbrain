@@ -80,24 +80,9 @@ DigitalBrain.Runtime.Orleans.BrainStoreOptions.CheckpointEntriesThreshold.get ->
 DigitalBrain.Runtime.Orleans.BrainStoreOptions.CheckpointEntriesThreshold.set -> void
 DigitalBrain.Runtime.Orleans.BrainStoreOptions.Directory.get -> string!
 DigitalBrain.Runtime.Orleans.BrainStoreOptions.Directory.set -> void
-DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection
-DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.<Clone>$() -> DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection!
-DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.BrainConnection(string! Key, string! Label, bool Connected, System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.CapabilityId>! Provides, string? Root) -> void
-DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.Connected.get -> bool
-DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.Connected.init -> void
-DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.Deconstruct(out string! Key, out string! Label, out bool Connected, out System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.CapabilityId>! Provides, out string? Root) -> void
-DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.Equals(DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection? other) -> bool
-DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.Key.get -> string!
-DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.Key.init -> void
-DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.Label.get -> string!
-DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.Label.init -> void
-DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.Provides.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.CapabilityId>!
-DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.Provides.init -> void
-DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.Root.get -> string?
-DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.Root.init -> void
 DigitalBrain.Runtime.Orleans.Capabilities.CapabilityBroker
 DigitalBrain.Runtime.Orleans.Capabilities.CapabilityBroker.CallerApp.get -> string!
-DigitalBrain.Runtime.Orleans.Capabilities.CapabilityBroker.CapabilityBroker(DigitalBrain.Runtime.Orleans.Capabilities.CapabilityRegistry! registry, DigitalBrain.Runtime.Orleans.Capabilities.ICapabilityConnections! connections, System.IServiceProvider! services, System.Collections.Generic.IEnumerable<DigitalBrain.Runtime.Orleans.Capabilities.ICapabilityBindingInterceptor!>! interceptors) -> void
+DigitalBrain.Runtime.Orleans.Capabilities.CapabilityBroker.CapabilityBroker(DigitalBrain.Runtime.Orleans.Capabilities.CapabilityRegistry! registry, DigitalBrain.Capabilities.Connections.Broker.ICapabilityConnections! connections, System.IServiceProvider! services, System.Collections.Generic.IEnumerable<DigitalBrain.Capabilities.Connections.Broker.ICapabilityBindingInterceptor!>! interceptors) -> void
 DigitalBrain.Runtime.Orleans.Capabilities.CapabilityBroker.ForApp(string! callerApp) -> DigitalBrain.Runtime.Orleans.Capabilities.CapabilityBroker!
 DigitalBrain.Runtime.Orleans.Capabilities.CapabilityBroker.Resolve<TCapability>(DigitalBrain.BrainId brain, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<TCapability!>!
 DigitalBrain.Runtime.Orleans.Capabilities.CapabilityBroker.ResolveAll<TCapability>(DigitalBrain.BrainId brain, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.CapabilityConnection<TCapability!>!>!>!
@@ -117,12 +102,6 @@ DigitalBrain.Runtime.Orleans.Capabilities.CapabilityRegistry.ContractOf(DigitalB
 DigitalBrain.Runtime.Orleans.Capabilities.CapabilityRegistry.IsSingle(DigitalBrain.Capabilities.CapabilityId capability) -> bool
 DigitalBrain.Runtime.Orleans.Capabilities.CapabilityRegistry.Known(DigitalBrain.Capabilities.CapabilityId capability) -> bool
 DigitalBrain.Runtime.Orleans.Capabilities.CapabilityRegistry.Register(DigitalBrain.Capabilities.CapabilityId capability, System.Type? contract, DigitalBrain.Runtime.Orleans.Capabilities.CapabilityConnectionMode mode) -> void
-DigitalBrain.Runtime.Orleans.Capabilities.ICapabilityBindingInterceptor
-DigitalBrain.Runtime.Orleans.Capabilities.ICapabilityBindingInterceptor.Wrap<TCapability>(DigitalBrain.BrainId brain, DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection! connection, string! callerApp, TCapability! capability) -> TCapability!
-DigitalBrain.Runtime.Orleans.Capabilities.ICapabilityConnections
-DigitalBrain.Runtime.Orleans.Capabilities.ICapabilityConnections.Bind<TCapability>(DigitalBrain.BrainId brain, string! key, string! callerApp, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<TCapability!>!
-DigitalBrain.Runtime.Orleans.Capabilities.ICapabilityConnections.ListInOrder(DigitalBrain.BrainId brain, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection!>!>!
-DigitalBrain.Runtime.Orleans.Capabilities.ICapabilityConnections.RequestConnection(DigitalBrain.BrainId brain, DigitalBrain.Capabilities.CapabilityId capability, string! callerApp, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 DigitalBrain.Runtime.Orleans.Capabilities.KitCoverage
 DigitalBrain.Runtime.Orleans.Capabilities.KitGap
 DigitalBrain.Runtime.Orleans.Capabilities.KitGap.<Clone>$() -> DigitalBrain.Runtime.Orleans.Capabilities.KitGap!
@@ -574,9 +553,6 @@ override DigitalBrain.Runtime.Orleans.Bindings.ToString() -> string!
 override DigitalBrain.Runtime.Orleans.BrainOwnershipCounts.Equals(object? obj) -> bool
 override DigitalBrain.Runtime.Orleans.BrainOwnershipCounts.GetHashCode() -> int
 override DigitalBrain.Runtime.Orleans.BrainOwnershipCounts.ToString() -> string!
-override DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.Equals(object? obj) -> bool
-override DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.GetHashCode() -> int
-override DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.ToString() -> string!
 override DigitalBrain.Runtime.Orleans.Capabilities.KitGap.Equals(object? obj) -> bool
 override DigitalBrain.Runtime.Orleans.Capabilities.KitGap.GetHashCode() -> int
 override DigitalBrain.Runtime.Orleans.Capabilities.KitGap.ToString() -> string!
@@ -635,8 +611,6 @@ static DigitalBrain.Runtime.Orleans.BrainOwnershipCounts.operator !=(DigitalBrai
 static DigitalBrain.Runtime.Orleans.BrainOwnershipCounts.operator ==(DigitalBrain.Runtime.Orleans.BrainOwnershipCounts? left, DigitalBrain.Runtime.Orleans.BrainOwnershipCounts? right) -> bool
 static DigitalBrain.Runtime.Orleans.BrainStorageHosting.AddBrainStorage(this Orleans.Hosting.ISiloBuilder! silo, params System.Reflection.Assembly![]! signalAssemblies) -> Orleans.Hosting.ISiloBuilder!
 static DigitalBrain.Runtime.Orleans.BrainStorageHosting.AddJournalPayloads(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, params System.Reflection.Assembly![]! assemblies) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.operator !=(DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection? left, DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection? right) -> bool
-static DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection.operator ==(DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection? left, DigitalBrain.Runtime.Orleans.Capabilities.BrainConnection? right) -> bool
 static DigitalBrain.Runtime.Orleans.Capabilities.CapabilityBroker.SingleRegistrationIssues(DigitalBrain.Runtime.Orleans.Capabilities.CapabilityRegistry! registry, Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> System.Collections.Generic.IReadOnlyList<string!>!
 static DigitalBrain.Runtime.Orleans.Capabilities.CapabilityHosting.ConfigureCapabilities(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder, System.Action<DigitalBrain.Runtime.Orleans.Capabilities.CapabilityRegistry!>! configure) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
 static DigitalBrain.Runtime.Orleans.Capabilities.KitCoverage.HasKitSubclass(System.Collections.Generic.IEnumerable<System.Type!>! types, System.Type! kitBase) -> bool

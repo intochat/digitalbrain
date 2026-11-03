@@ -1,6 +1,4 @@
-using DigitalBrain.Capabilities;
-
-namespace DigitalBrain.Runtime.Orleans.Capabilities;
+namespace DigitalBrain.Capabilities.Connections.Broker;
 
 /// <summary>One connection of a brain as the host lists it.</summary>
 /// <param name="Key">The stable connection key in the brain's Settings.</param>
@@ -11,7 +9,7 @@ namespace DigitalBrain.Runtime.Orleans.Capabilities;
 public sealed record BrainConnection(string Key, string Label, bool Connected, IReadOnlyList<CapabilityId> Provides, string? Root);
 
 /// <summary>
-/// The host SPI behind <see cref="CapabilityBroker"/> (R4-02, D-10): the os kernel implements it over its connection requests.
+/// The host SPI behind the capability broker (R4-02, D-10): the host implements it over its connection requests.
 /// The runtime never reads Settings itself.
 /// </summary>
 public interface ICapabilityConnections

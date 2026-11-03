@@ -1,4 +1,5 @@
 using DigitalBrain.Capabilities;
+using DigitalBrain.Capabilities.Connections.Broker;
 using DigitalBrain.Capabilities.Storage;
 using DigitalBrain.Confirmation;
 using DigitalBrain.Operations;

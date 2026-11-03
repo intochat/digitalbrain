@@ -1,5 +1,6 @@
 using System.Text;
 using DigitalBrain.Capabilities;
+using DigitalBrain.Capabilities.Connections.Broker;
 using DigitalBrain.Capabilities.Storage;
 using DigitalBrain.Contracts;
 using DigitalBrain.Operations;

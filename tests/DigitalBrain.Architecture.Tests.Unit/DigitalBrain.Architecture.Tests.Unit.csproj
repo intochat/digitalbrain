@@ -7,6 +7,7 @@
     <ProjectReference Include="../../src/DigitalBrain.Capabilities.Secrets/DigitalBrain.Capabilities.Secrets.csproj" />
     <ProjectReference Include="../../src/DigitalBrain.Capabilities.Identity/DigitalBrain.Capabilities.Identity.csproj" />
     <ProjectReference Include="../../src/DigitalBrain.Capabilities.Compute/DigitalBrain.Capabilities.Compute.csproj" />
+    <ProjectReference Include="../../src/DigitalBrain.Capabilities.Connections/DigitalBrain.Capabilities.Connections.csproj" />
     <ProjectReference Include="../../src/DigitalBrain.Runtime.Http/DigitalBrain.Runtime.Http.csproj" />
     <ProjectReference Include="../../src/DigitalBrain.Runtime.Apps/DigitalBrain.Runtime.Apps.csproj" />
   </ItemGroup>

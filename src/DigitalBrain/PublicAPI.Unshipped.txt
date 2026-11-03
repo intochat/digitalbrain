@@ -22,6 +22,7 @@ const DigitalBrain.App.SwallowedKept = 64 -> int
 const DigitalBrain.Apps.SpecComment.MaxLength = 65536 -> int
 const DigitalBrain.Capabilities.AppPrincipal.Prefix = "app:" -> string!
 const DigitalBrain.Capabilities.Capability.Compute.V1Id = "compute@1" -> string!
+const DigitalBrain.Capabilities.Capability.Connections.V1Id = "connections@1" -> string!
 const DigitalBrain.Capabilities.Capability.Identity.V1Id = "identity@1" -> string!
 const DigitalBrain.Capabilities.Capability.Secrets.V1Id = "secrets@1" -> string!
 const DigitalBrain.Capabilities.Capability.Storage.V1Id = "storage@1" -> string!
@@ -334,6 +335,7 @@ DigitalBrain.Capabilities.CallerKind.Scheduler = 3 -> DigitalBrain.Capabilities.
 DigitalBrain.Capabilities.CallerKind.User = 0 -> DigitalBrain.Capabilities.CallerKind
 DigitalBrain.Capabilities.Capability
 DigitalBrain.Capabilities.Capability.Compute
+DigitalBrain.Capabilities.Capability.Connections
 DigitalBrain.Capabilities.Capability.Identity
 DigitalBrain.Capabilities.Capability.Secrets
 DigitalBrain.Capabilities.Capability.Storage
@@ -1427,6 +1429,7 @@ static DigitalBrain.Capabilities.AppPrincipal.AppKeyOf(string? principalId) -> s
 static DigitalBrain.Capabilities.AppPrincipal.Id(string! appKey) -> string!
 static DigitalBrain.Capabilities.AppPrincipal.IsApp(string? principalId) -> bool
 static DigitalBrain.Capabilities.Capability.Compute.V1.get -> DigitalBrain.Capabilities.CapabilityId
+static DigitalBrain.Capabilities.Capability.Connections.V1.get -> DigitalBrain.Capabilities.CapabilityId
 static DigitalBrain.Capabilities.Capability.Identity.V1.get -> DigitalBrain.Capabilities.CapabilityId
 static DigitalBrain.Capabilities.Capability.Secrets.V1.get -> DigitalBrain.Capabilities.CapabilityId
 static DigitalBrain.Capabilities.Capability.Storage.V1.get -> DigitalBrain.Capabilities.CapabilityId
