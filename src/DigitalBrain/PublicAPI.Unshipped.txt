@@ -1595,3 +1595,7 @@ virtual DigitalBrain.Rules.Rule.PrintMembers(System.Text.StringBuilder! builder)
 virtual DigitalBrain.Signal.EqualityContract.get -> System.Type!
 virtual DigitalBrain.Signal.Equals(DigitalBrain.Signal? other) -> bool
 virtual DigitalBrain.Signal.PrintMembers(System.Text.StringBuilder! builder) -> bool
+DigitalBrain.ScenarioVerdict.Main.get -> object?
+DigitalBrain.ScenarioVerdict.Main.init -> void
+DigitalBrain.ScenarioVerdict.Side.get -> object?
+DigitalBrain.ScenarioVerdict.Side.init -> void

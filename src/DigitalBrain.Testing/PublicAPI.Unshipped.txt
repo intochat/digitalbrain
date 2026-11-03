@@ -626,3 +626,28 @@ DigitalBrain.Testing.Conformance.Storage.StorageConformance<TStorage>.RenameOver
 DigitalBrain.Testing.BddRunner
 static DigitalBrain.Testing.BddRunner.VerifyTypeAsync(System.Type! appType, System.Action<DigitalBrain.Testing.TestOS!>? fakes = null, DigitalBrain.Testing.TestOS? targetOs = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.BddReport!>!
 static DigitalBrain.Testing.BddRunner.VerifyAsync<TApp>(System.Action<DigitalBrain.Testing.TestOS!>? fakes = null, DigitalBrain.Testing.TestOS? targetOs = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.BddReport!>!
+DigitalBrain.Testing.IInstalledApp.RefreshPresentation() -> void
+DigitalBrain.Testing.Views.ViewFixture
+DigitalBrain.Testing.Views.ViewFixture.<Clone>$() -> DigitalBrain.Testing.Views.ViewFixture!
+DigitalBrain.Testing.Views.ViewFixture.AppId.get -> string!
+DigitalBrain.Testing.Views.ViewFixture.AppId.init -> void
+DigitalBrain.Testing.Views.ViewFixture.Deconstruct(out string! AppId, out string! Scenario, out DigitalBrain.UI.View? Side, out DigitalBrain.UI.View? Main) -> void
+DigitalBrain.Testing.Views.ViewFixture.Equals(DigitalBrain.Testing.Views.ViewFixture? other) -> bool
+DigitalBrain.Testing.Views.ViewFixture.Main.get -> DigitalBrain.UI.View?
+DigitalBrain.Testing.Views.ViewFixture.Main.init -> void
+DigitalBrain.Testing.Views.ViewFixture.Scenario.get -> string!
+DigitalBrain.Testing.Views.ViewFixture.Scenario.init -> void
+DigitalBrain.Testing.Views.ViewFixture.Side.get -> DigitalBrain.UI.View?
+DigitalBrain.Testing.Views.ViewFixture.Side.init -> void
+DigitalBrain.Testing.Views.ViewFixture.ViewFixture(string! AppId, string! Scenario, DigitalBrain.UI.View? Side, DigitalBrain.UI.View? Main) -> void
+DigitalBrain.Testing.Views.ViewFixtureMismatchException
+DigitalBrain.Testing.Views.ViewFixtureMismatchException.ViewFixtureMismatchException(string! message) -> void
+DigitalBrain.Testing.Views.ViewFixtures
+override DigitalBrain.Testing.Views.ViewFixture.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Views.ViewFixture.GetHashCode() -> int
+override DigitalBrain.Testing.Views.ViewFixture.ToString() -> string!
+static DigitalBrain.Testing.Views.ViewFixture.operator !=(DigitalBrain.Testing.Views.ViewFixture? left, DigitalBrain.Testing.Views.ViewFixture? right) -> bool
+static DigitalBrain.Testing.Views.ViewFixture.operator ==(DigitalBrain.Testing.Views.ViewFixture? left, DigitalBrain.Testing.Views.ViewFixture? right) -> bool
+static DigitalBrain.Testing.Views.ViewFixtures.Slug(string! title) -> string!
+static DigitalBrain.Testing.Views.ViewFixtures.Verify(DigitalBrain.BddReport! report, string! directory) -> void
+static DigitalBrain.Testing.Views.ViewFixtures.Write(DigitalBrain.BddReport! report, string! directory) -> void

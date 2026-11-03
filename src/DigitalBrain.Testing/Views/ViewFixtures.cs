@@ -1,0 +1,134 @@
+using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using DigitalBrain.UI;
+
+namespace DigitalBrain.Testing.Views;
+
+/// <summary>Writes and verifies deterministic JSON view fixtures produced by <see cref="BddRunner"/>.</summary>
+public static class ViewFixtures
+{
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.Never,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    /// <summary>Writes one <c>&lt;scenario-slug&gt;.json</c> file per scenario in <paramref name="report"/> that has a non-null side or main view.</summary>
+    public static void Write(BddReport report, string directory)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
+        Directory.CreateDirectory(directory);
+
+        foreach (var scenario in report.Scenarios)
+        {
+            var side = scenario.Side as View;
+            var main = scenario.Main as View;
+            if (side is null && main is null)
+            {
+                continue;
+            }
+
+            var path = Path.Combine(directory, $"{Slug(scenario.Title)}.json");
+            var fixture = new ViewFixture(report.AppId, scenario.Title, side, main);
+            var json = Serialize(fixture);
+            File.WriteAllText(path, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        }
+    }
+
+    /// <summary>Verifies that the views produced in <paramref name="report"/> match the fixtures in <paramref name="directory"/>, or writes them when <c>DIGITALBRAIN_UPDATE_VIEWS=1</c>.</summary>
+    public static void Verify(BddReport report, string directory)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
+
+        if (string.Equals(Environment.GetEnvironmentVariable("DIGITALBRAIN_UPDATE_VIEWS"), "1", StringComparison.Ordinal))
+        {
+            Write(report, directory);
+            return;
+        }
+
+        foreach (var scenario in report.Scenarios)
+        {
+            var side = scenario.Side as View;
+            var main = scenario.Main as View;
+            if (side is null && main is null)
+            {
+                continue;
+            }
+
+            var fileName = $"{Slug(scenario.Title)}.json";
+            var path = Path.Combine(directory, fileName);
+            var expectedFixture = new ViewFixture(report.AppId, scenario.Title, side, main);
+            var actualJson = Serialize(expectedFixture);
+
+            if (!File.Exists(path))
+            {
+                throw new ViewFixtureMismatchException(
+                    $"Missing view fixture '{path}' for scenario '{scenario.Title}' of app '{report.AppId}'. Run with DIGITALBRAIN_UPDATE_VIEWS=1 to write fixtures.");
+            }
+
+            var onDiskJson = NormalizeLineEndings(File.ReadAllText(path, Encoding.UTF8));
+            if (!string.Equals(onDiskJson, actualJson, StringComparison.Ordinal))
+            {
+                throw new ViewFixtureMismatchException(
+                    BuildMismatchMessage(report.AppId, scenario.Title, path, onDiskJson, actualJson));
+            }
+        }
+    }
+
+    /// <summary>Converts a scenario title to its lowercase ASCII kebab-case file slug.</summary>
+    public static string Slug(string title)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        var lower = title.Trim().ToLowerInvariant();
+        var sb = new StringBuilder(lower.Length);
+        var previousDash = false;
+        foreach (var ch in lower)
+        {
+            if (char.IsAsciiLetterOrDigit(ch))
+            {
+                sb.Append(ch);
+                previousDash = false;
+            }
+            else if (!previousDash && sb.Length > 0)
+            {
+                sb.Append('-');
+                previousDash = true;
+            }
+        }
+        if (sb.Length > 0 && sb[^1] == '-')
+        {
+            sb.Length--;
+        }
+        return sb.Length == 0 ? "scenario" : sb.ToString();
+    }
+
+    private static string Serialize(ViewFixture fixture)
+        => NormalizeLineEndings(JsonSerializer.Serialize(fixture, JsonOptions));
+
+    private static string NormalizeLineEndings(string text)
+        => text.Replace("\r\n", "\n", StringComparison.Ordinal).TrimEnd('\n') + "\n";
+
+    private static string BuildMismatchMessage(string appId, string scenario, string path, string expected, string actual)
+    {
+        var expectedLines = expected.Split('\n');
+        var actualLines = actual.Split('\n');
+        var max = Math.Max(expectedLines.Length, actualLines.Length);
+        for (var i = 0; i < max; i++)
+        {
+            var e = i < expectedLines.Length ? expectedLines[i] : "<eof>";
+            var a = i < actualLines.Length ? actualLines[i] : "<eof>";
+            if (!string.Equals(e, a, StringComparison.Ordinal))
+            {
+                var diffLine = i + 1;
+                return $"View fixture mismatch for app '{appId}', scenario '{scenario}' at {path}:{diffLine}:\n  expected: {e}\n  actual:   {a}";
+            }
+        }
+        return $"View fixture mismatch for app '{appId}', scenario '{scenario}' at {path}.";
+    }
+}

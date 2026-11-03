@@ -23,4 +23,7 @@ public interface IInstalledApp
 
     /// <summary>Runs <paramref name="operation"/> as a turn; a null <paramref name="argument"/> is the empty input.</summary>
     Task Request(string operation, object? argument = null);
+
+    /// <summary>Refreshes the latest presentation from the app's <c>Side</c>/<c>RenderSide</c> and <c>Main</c>/<c>Render</c> members.</summary>
+    void RefreshPresentation();
 }

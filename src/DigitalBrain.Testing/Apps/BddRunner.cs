@@ -134,27 +134,29 @@ public static class BddRunner
             }
 
             await os.Idle().ConfigureAwait(false);
+            installed.RefreshPresentation();
+            var presentation = installed.Presentation;
 
             if (os.Failures.Count > 0)
             {
                 var failure = os.Failures.First();
                 var err = $"{failure.GetType().Name}: {failure.Message}";
-                return new ScenarioVerdict(title, false, err, watch.Elapsed) { Steps = BuildStepVerdicts(attribute.Steps, false, err, watch.Elapsed), Language = language };
+                return new ScenarioVerdict(title, false, err, watch.Elapsed) { Steps = BuildStepVerdicts(attribute.Steps, false, err, watch.Elapsed), Language = language, Side = presentation.Side, Main = presentation.Main };
             }
 
             if (installed.Instance.RecordedError is { } recorded)
             {
                 var err = $"{recorded.Operation}: {recorded.Kind}: {recorded.Message}";
-                return new ScenarioVerdict(title, false, err, watch.Elapsed) { Steps = BuildStepVerdicts(attribute.Steps, false, err, watch.Elapsed), Language = language };
+                return new ScenarioVerdict(title, false, err, watch.Elapsed) { Steps = BuildStepVerdicts(attribute.Steps, false, err, watch.Elapsed), Language = language, Side = presentation.Side, Main = presentation.Main };
             }
 
             if (installed.PresentationError is { } presentationError)
             {
                 var err = $"{presentationError.GetType().Name}: {presentationError.Message}";
-                return new ScenarioVerdict(title, false, err, watch.Elapsed) { Steps = BuildStepVerdicts(attribute.Steps, false, err, watch.Elapsed), Language = language };
+                return new ScenarioVerdict(title, false, err, watch.Elapsed) { Steps = BuildStepVerdicts(attribute.Steps, false, err, watch.Elapsed), Language = language, Side = presentation.Side, Main = presentation.Main };
             }
 
-            return new ScenarioVerdict(title, true, null, watch.Elapsed) { Steps = BuildStepVerdicts(attribute.Steps, true, null, watch.Elapsed), Language = language };
+            return new ScenarioVerdict(title, true, null, watch.Elapsed) { Steps = BuildStepVerdicts(attribute.Steps, true, null, watch.Elapsed), Language = language, Side = presentation.Side, Main = presentation.Main };
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {

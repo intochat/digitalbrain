@@ -154,6 +154,8 @@ public sealed partial class InstalledApp<TApp>
     private object? Service(Type type) => type == typeof(IPresenter) ? new Presenter(this) : _os.Services.GetService(type);
 
     // Reads the app's Side/RenderSide and Main/Render views, if it declares them, after each turn.
+    void IInstalledApp.RefreshPresentation() => Refresh();
+
     private void Refresh()
     {
         var side = Read("Side") ?? InvokeRender("RenderSide");

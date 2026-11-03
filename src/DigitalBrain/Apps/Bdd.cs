@@ -47,6 +47,12 @@ public sealed record ScenarioVerdict(
 
     /// <summary>BCP-47 language code of the scenario specification.</summary>
     public string Language { get; init; } = "en";
+
+    /// <summary>The final side view presented when the scenario finished, or null.</summary>
+    public object? Side { get; init; }
+
+    /// <summary>The final main view presented when the scenario finished, or null.</summary>
+    public object? Main { get; init; }
 }
 
 /// <summary>The aggregate BDD verification report for an app, combining its operation baseline and all <see cref="ScenarioAttribute"/> scenarios.</summary>
