@@ -31,9 +31,12 @@ public static class CapabilityRegistration
     public static IServiceCollection AddIdentityCapability<TPort>(this IServiceCollection services) where TPort : class, IIdentityDirectoryPort
     {
         ArgumentNullException.ThrowIfNull(services);
+        CapabilityHosting.RemoveDeniedIdentityFallbacks(services);
         services.TryAddSingleton<TPort>();
         services.AddKeyedSingleton<IIdentity>(Capability.Identity.V1Id, (sp, _) => new IdentityCapability(sp.GetRequiredService<TPort>()));
         services.AddKeyedSingleton<IGrants>(Capability.Identity.V1Id, (sp, _) => new GrantsCapability(sp.GetRequiredService<TPort>()));
+        services.TryAddSingleton<IIdentity>(sp => sp.GetRequiredKeyedService<IIdentity>(Capability.Identity.V1Id));
+        services.TryAddSingleton<IGrants>(sp => sp.GetRequiredKeyedService<IGrants>(Capability.Identity.V1Id));
         return services;
     }
 

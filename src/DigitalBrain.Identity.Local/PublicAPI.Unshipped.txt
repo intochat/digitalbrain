@@ -1,0 +1,18 @@
+#nullable enable
+DigitalBrain.Identity.Local.Custody.FileMasterKeyCustody
+DigitalBrain.Identity.Local.Custody.FileMasterKeyCustody.FileMasterKeyCustody(string! directory) -> void
+DigitalBrain.Identity.Local.Custody.FileMasterKeyCustody.Unwrap(string! accountId, string! context, byte[]! wrapped) -> byte[]!
+DigitalBrain.Identity.Local.Custody.FileMasterKeyCustody.Wrap(string! accountId, string! context, byte[]! secret) -> byte[]!
+DigitalBrain.Identity.Local.Custody.IMasterKeyCustody
+DigitalBrain.Identity.Local.Custody.IMasterKeyCustody.Unwrap(string! accountId, string! context, byte[]! wrapped) -> byte[]!
+DigitalBrain.Identity.Local.Custody.IMasterKeyCustody.Wrap(string! accountId, string! context, byte[]! secret) -> byte[]!
+DigitalBrain.Identity.Local.Custody.MasterKeyCustodyKind
+DigitalBrain.Identity.Local.Custody.MasterKeyCustodyKind.Configured = 0 -> DigitalBrain.Identity.Local.Custody.MasterKeyCustodyKind
+DigitalBrain.Identity.Local.Custody.MasterKeyCustodyKind.File = 2 -> DigitalBrain.Identity.Local.Custody.MasterKeyCustodyKind
+DigitalBrain.Identity.Local.Custody.MasterKeyCustodyKind.Tpm = 1 -> DigitalBrain.Identity.Local.Custody.MasterKeyCustodyKind
+DigitalBrain.Identity.Local.Custody.SegmentSeal
+static DigitalBrain.Identity.Local.Custody.SegmentSeal.Close(byte[]! key, string! context, byte[]! plaintext) -> byte[]!
+static DigitalBrain.Identity.Local.Custody.SegmentSeal.Open(byte[]! key, string! context, byte[]! sealedBytes) -> byte[]!
+DigitalBrain.Identity.Local.LocalIdentityHosting
+static DigitalBrain.Identity.Local.LocalIdentityHosting.AddLocalIdentity(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Func<System.Type!, string!, object!>! neuronResolver) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static DigitalBrain.Identity.Local.LocalIdentityHosting.AddLocalIdentity(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Func<System.Type!, string!, object!>! neuronResolver, string! homeDirectory) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

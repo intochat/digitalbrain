@@ -94,7 +94,7 @@ public sealed class CapabilityBroker : ICapabilityBroker
         {
             var key = capability.ToString();
             var bindings = registry.BindingsOf(capability);
-            var count = services.Count(descriptor => descriptor.IsKeyedService && bindings.Contains(descriptor.ServiceType)
+            var count = services.Count(descriptor => descriptor.IsKeyedService && !CapabilityHosting.IsDeniedIdentityFallback(descriptor) && bindings.Contains(descriptor.ServiceType)
                 && key.Equals(descriptor.ServiceKey as string, StringComparison.Ordinal));
             if (count > 1) { issues.Add($"{count} implementations of {capability} are registered; a single-connection capability has exactly one."); }
         }

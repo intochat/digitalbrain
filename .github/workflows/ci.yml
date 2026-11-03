@@ -95,6 +95,8 @@ jobs:
             tests/DigitalBrain.Capabilities.Secrets.Tests.Unit \
             tests/DigitalBrain.Capabilities.Identity.Tests.Unit \
             tests/DigitalBrain.Capabilities.Compute.Tests.Unit \
+            tests/DigitalBrain.Capabilities.Connections.Tests.Unit \
+            tests/DigitalBrain.Identity.Local.Tests.Unit \
             examples/Calculator.Tests.Unit; do
             name=$(basename "$project")
             dotnet test --project "$project/$name.csproj" -c Release
@@ -165,7 +167,7 @@ jobs:
       - name: No Orleans in the core packages
         run: |
           status=0
-          for name in DigitalBrain DigitalBrain.UI DigitalBrain.Testing DigitalBrain.Analyzers DigitalBrain.Runtime.Apps DigitalBrain.Capabilities.Compute DigitalBrain.Capabilities.Connections; do
+          for name in DigitalBrain DigitalBrain.UI DigitalBrain.Testing DigitalBrain.Analyzers DigitalBrain.Runtime.Apps DigitalBrain.Capabilities.Compute DigitalBrain.Capabilities.Connections DigitalBrain.Identity.Local; do
             project="src/$name/$name.csproj"
             dotnet restore "$project" -v quiet
             if dotnet list "$project" package --include-transitive | grep -i orleans; then
@@ -254,17 +256,17 @@ jobs:
           dotnet pack DigitalBrain.slnx -c Release -o artifacts "-p:VersionSuffix=preview.${RUN_NUMBER}"
           dotnet pack templates/DigitalBrain.Templates/DigitalBrain.Templates.csproj -c Release -o artifacts "-p:VersionSuffix=preview.${RUN_NUMBER}"
 
-      # DIST-04: only the sixteen DigitalBrain ids leave this repository.
+      # DIST-04: only the eighteen DigitalBrain ids leave this repository.
       - name: Package allowlist
         run: |
-          allowed=" DigitalBrain DigitalBrain.UI DigitalBrain.Testing DigitalBrain.Analyzers DigitalBrain.Templates DigitalBrain.Runtime.Orleans DigitalBrain.Runtime.Orleans.Azure DigitalBrain.Capabilities.Storage DigitalBrain.Capabilities.Secrets DigitalBrain.Capabilities.Identity DigitalBrain.Capabilities.Compute DigitalBrain.Runtime.Http DigitalBrain.Testing.Silo DigitalBrain.Graph DigitalBrain.Apps.Packaging DigitalBrain.Runtime.Apps "
+          allowed=" DigitalBrain DigitalBrain.UI DigitalBrain.Testing DigitalBrain.Analyzers DigitalBrain.Templates DigitalBrain.Runtime.Orleans DigitalBrain.Runtime.Orleans.Azure DigitalBrain.Capabilities.Storage DigitalBrain.Capabilities.Secrets DigitalBrain.Capabilities.Identity DigitalBrain.Capabilities.Compute DigitalBrain.Capabilities.Connections DigitalBrain.Identity.Local DigitalBrain.Runtime.Http DigitalBrain.Testing.Silo DigitalBrain.Graph DigitalBrain.Apps.Packaging DigitalBrain.Runtime.Apps "
           version='${{ steps.version.outputs.version }}'
           count=0
           for pkg in artifacts/*.nupkg; do
             id=$(basename "$pkg" ".${version}.nupkg")
             case "$allowed" in *" $id "*) count=$((count + 1)) ;; *) echo "::error::unexpected package $pkg"; exit 1 ;; esac
           done
-          [ "$count" -eq 16 ] || { echo "::error::expected 16 packages, got $count"; exit 1; }
+          [ "$count" -eq 18 ] || { echo "::error::expected 18 packages, got $count"; exit 1; }
 
       - name: NuGet login (Trusted Publishing)
         id: login
