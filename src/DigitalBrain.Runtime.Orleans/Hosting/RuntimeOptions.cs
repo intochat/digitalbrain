@@ -65,6 +65,9 @@ public sealed record RuntimeOptions
     /// <summary>The grain state container.</summary>
     public string GrainStateContainer { get; init; } = "brain-state";
 
+    /// <summary>The configuration key that selects the master-key custody kind.</summary>
+    public string CustodyConfigurationKey { get; init; } = "DigitalBrain:Platform:Storage:Custody";
+
     /// <summary>Keys named after DigitalBrain, home <c>~/.digitalbrain</c>.</summary>
     public static RuntimeOptions Default { get; } = new();
 
@@ -73,6 +76,13 @@ public sealed record RuntimeOptions
     {
         ArgumentNullException.ThrowIfNull(services);
         return services.GetService<RuntimeOptions>() ?? Default;
+    }
+
+    /// <summary>The options the host registered in <paramref name="services"/>, or <see cref="Default"/> when it registered none.</summary>
+    public static RuntimeOptions Resolve(IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        return From(services);
     }
 
     internal static RuntimeOptions From(IServiceProvider services) => Resolve(services);

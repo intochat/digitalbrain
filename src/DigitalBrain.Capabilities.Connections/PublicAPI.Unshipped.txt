@@ -587,6 +587,7 @@ static DigitalBrain.Capabilities.Connections.Connectors.ConnectorDefinition.oper
 static DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.ConnectionString(this Microsoft.Extensions.Configuration.IConfiguration! configuration, string! name) -> string?
 static DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.HostKey(this Microsoft.Extensions.Configuration.IConfiguration! configuration, string! key, string? legacyKey = null) -> string?
 static DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.IntegrationValue(this Microsoft.Extensions.Configuration.IConfiguration! configuration, string! integrationId, string! field) -> string?
+static DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.IntegrationValue(this Microsoft.Extensions.Configuration.IConfiguration! configuration, DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema! schema, string! field) -> string?
 static DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.IsModuleOptionSet(this Microsoft.Extensions.Configuration.IConfiguration! configuration, string! moduleId, string! optionName) -> bool
 static DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.OtlpEndpoint(this Microsoft.Extensions.Configuration.IConfiguration! configuration) -> string?
 static DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.Parameter(this Microsoft.Extensions.Configuration.IConfiguration! configuration, string! name) -> string?
@@ -634,3 +635,34 @@ virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.Activated
 virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.OnConnectedAsync() -> System.Threading.Tasks.Task!
 virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.OnDisconnectedAsync() -> System.Threading.Tasks.Task!
 virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.RefreshAsync(DigitalBrain.Capabilities.Connections.Credential! credential, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.OAuthGrant!>!
+
+static DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.For(string! id, string! displayName) -> DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema!
+static DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.operator !=(DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema? left, DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema? right) -> bool
+static DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.operator ==(DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema? left, DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema? right) -> bool
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.<Clone>$() -> DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.AllFields.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Deconstruct(out string! Id, out string! DisplayName, out string![]! SecretFields, out string![]! SettingFields) -> void
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.DisplayName.get -> string!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.DisplayName.init -> void
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Equals(DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema? other) -> bool
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Id.get -> string!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Id.init -> void
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.IntegrationSchema(string! Id, string! DisplayName, string![]! SecretFields, string![]! SettingFields) -> void
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.IsSetting(string! field) -> bool
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Key(string! field) -> string!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.OffersSecret(string! field) -> DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.OffersSetting(string! field) -> DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.OptionalSecretFields.get -> string![]!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.OptionalSecretFields.init -> void
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.OptionalSettingFields.get -> string![]!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.OptionalSettingFields.init -> void
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.RequiredFields.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.RequiresSecret(string! field) -> DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.RequiresSetting(string! field) -> DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.SecretFields.get -> string![]!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.SecretFields.init -> void
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.SettingFields.get -> string![]!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.SettingFields.init -> void
+override DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.GetHashCode() -> int
+override DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.ToString() -> string!

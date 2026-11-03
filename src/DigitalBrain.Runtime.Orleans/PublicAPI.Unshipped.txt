@@ -320,6 +320,8 @@ DigitalBrain.Runtime.Orleans.RuntimeOptions.CloudStorageKey.get -> string!
 DigitalBrain.Runtime.Orleans.RuntimeOptions.CloudStorageKey.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.ClusterGrainStorage.get -> string!
 DigitalBrain.Runtime.Orleans.RuntimeOptions.ClusterGrainStorage.init -> void
+DigitalBrain.Runtime.Orleans.RuntimeOptions.CustodyConfigurationKey.get -> string!
+DigitalBrain.Runtime.Orleans.RuntimeOptions.CustodyConfigurationKey.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.DefaultHomeDirectoryName.get -> string!
 DigitalBrain.Runtime.Orleans.RuntimeOptions.DefaultHomeDirectoryName.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.Equals(DigitalBrain.Runtime.Orleans.RuntimeOptions? other) -> bool
@@ -853,3 +855,4 @@ static DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.Require() 
 static DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.StampScope(DigitalBrain.Capabilities.CapabilityCaller! context) -> System.IDisposable!
 static DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.TryGet(out DigitalBrain.Capabilities.CapabilityCaller? context) -> bool
 static DigitalBrain.Runtime.Orleans.Compute.TraceRequestContext.OriginOf(string! brainId, string! osKey) -> DigitalBrain.NeuronId
+static DigitalBrain.Runtime.Orleans.RuntimeOptions.Resolve(Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> DigitalBrain.Runtime.Orleans.RuntimeOptions!

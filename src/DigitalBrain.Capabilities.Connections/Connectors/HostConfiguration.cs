@@ -14,6 +14,12 @@ public static class HostConfiguration
     public static string? IntegrationValue(this IConfiguration configuration, string integrationId, string field) =>
         configuration.FirstNonWhiteSpace(IntegrationSchema.Key(integrationId, field));
 
+    public static string? IntegrationValue(this IConfiguration configuration, IntegrationSchema schema, string field)
+    {
+        ArgumentNullException.ThrowIfNull(schema);
+        return configuration.FirstNonWhiteSpace(schema.Key(field));
+    }
+
     public static string? OtlpEndpoint(this IConfiguration configuration) =>
         configuration.FirstNonWhiteSpace(OtlpEndpointVariable);
 
