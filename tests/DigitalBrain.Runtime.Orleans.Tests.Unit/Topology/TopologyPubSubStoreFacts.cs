@@ -67,7 +67,7 @@ public sealed class TopologyPubSubStoreFacts
         builder.UseOrleans(silo => profile.ConfigureSilo(silo, context));
         using var host = builder.Build();
 
-        Assert.IsType<MemoryGrainStorage>(host.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.PubSubStore));
+        Assert.IsType<LocalMemoryGrainStorage>(host.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.PubSubStore));
         Assert.IsType<PersistentStreamProvider>(host.Services.GetRequiredKeyedService<IStreamProvider>(RuntimeOptions.Default.SignalStreams));
         Assert.Contains("Memory", host.Services.GetRequiredKeyedService<IQueueAdapterFactory>(RuntimeOptions.Default.SignalStreams).GetType().Name, StringComparison.Ordinal);
         Assert.Empty(TopologyValidator.ValidatePubSubStore(topology, host.Services));
