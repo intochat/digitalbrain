@@ -1,4 +1,7 @@
+using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Capabilities;
+using DigitalBrain.Capabilities.Compute;
+using Orleans;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Runtime.Orleans.Capabilities;
@@ -11,7 +14,13 @@ namespace DigitalBrain.Runtime.Orleans.Capabilities;
 /// </summary>
 public static class RuntimeCallerContext
 {
-    private const string PrincipalKey = "db.cap.principal";
+    /// <summary>The Orleans RequestContext key for the principal.</summary>
+    public const string RequestContextKey = "db.cap.principal";
+
+    /// <summary>The Orleans RequestContext key for trusted internal module calls.</summary>
+    public const string ModuleCallKey = "intochatos.trusted-module-call";
+
+    private const string PrincipalKey = RequestContextKey;
     private const string AccountKey = "db.cap.account";
     private const string BrainKey = "db.cap.brain";
     private const string AppKey = "db.cap.app";
@@ -49,6 +58,55 @@ public static class RuntimeCallerContext
         return new Restore(previous);
     }
 
+    /// <summary>Validates that <paramref name="context"/> is trusted, stamps it on the current flow, and starts an edge trace if none is active.</summary>
+    public static IDisposable StampScope(CapabilityCaller context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        if (!IsTrusted(context))
+        {
+            throw new UntrustedCallerException(
+                $"Caller kind {context.Kind} cannot be stamped by {context.StampedBy}.");
+        }
+
+        var scope = Stamp(context);
+        if (TraceContext.Current is null)
+        {
+            var origin = new NeuronId(new BrainId(context.BrainId), "edge", "request");
+            var traceScope = TraceContext.Enter(TraceContext.Begin(context.AccountId, context.BrainId, origin));
+            return new CombinedScope(scope, traceScope);
+        }
+        return scope;
+    }
+
+    /// <summary>Gets the currently stamped caller if present.</summary>
+    public static bool TryGet([NotNullWhen(true)] out CapabilityCaller? context)
+    {
+        context = Current;
+        return context is not null;
+    }
+
+    /// <summary>Returns the currently stamped caller or throws <see cref="UntrustedCallerException"/>.</summary>
+    public static CapabilityCaller Require()
+        => TryGet(out var context)
+            ? context
+            : throw new UntrustedCallerException("No caller context was stamped at a trusted edge.");
+
+    /// <summary>Returns true when <paramref name="caller"/> originated from a model turn.</summary>
+    public static bool IsModelOriginated(CapabilityCaller caller)
+    {
+        ArgumentNullException.ThrowIfNull(caller);
+        return caller.ConversationId is not null;
+    }
+
+    /// <summary>Returns true when <paramref name="context"/> carries all required fields and valid enum values.</summary>
+    public static bool IsTrusted(CapabilityCaller context)
+        => context is not null
+            && !string.IsNullOrWhiteSpace(context.PrincipalId)
+            && !string.IsNullOrWhiteSpace(context.AccountId)
+            && !string.IsNullOrWhiteSpace(context.BrainId)
+            && Enum.IsDefined(context.Kind)
+            && Enum.IsDefined(context.StampedBy);
+
     private static void Write(object?[] values)
     {
         for (var i = 0; i < Keys.Length; i++)
@@ -62,4 +120,27 @@ public static class RuntimeCallerContext
     {
         public void Dispose() => Write(previous);
     }
+
+    private sealed class CombinedScope(IDisposable callerScope, IDisposable traceScope) : IDisposable
+    {
+        public void Dispose()
+        {
+            traceScope.Dispose();
+            callerScope.Dispose();
+        }
+    }
+}
+
+/// <summary>Thrown when a call requires a trusted edge caller stamp and none (or an invalid one) is present.</summary>
+[GenerateSerializer, Alias("enforcement.untrusted-caller")]
+public sealed class UntrustedCallerException : Exception
+{
+    /// <summary>Creates the exception with its message.</summary>
+    public UntrustedCallerException(string message) : base(message) { }
+
+    /// <summary>Creates the exception with its message and inner cause.</summary>
+    public UntrustedCallerException(string message, Exception innerException) : base(message, innerException) { }
+
+    /// <summary>Creates the exception.</summary>
+    public UntrustedCallerException() { }
 }

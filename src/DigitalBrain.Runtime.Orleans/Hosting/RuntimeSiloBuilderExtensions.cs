@@ -1,5 +1,6 @@
 using System.Reflection;
 using DigitalBrain.Runtime.Orleans.Capabilities;
+using DigitalBrain.Runtime.Orleans.Compute;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Signalling;
 using DigitalBrain.Runtime.Orleans.Synapses;
@@ -53,6 +54,7 @@ public static class RuntimeSiloBuilderExtensions
         silo.AddSynapseRetention();
         silo.AddRuntimeServices();
         silo.Services.AddCapabilityBroker();
+        silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IOutgoingGrainCallFilter, TraceOutgoingFilter>());
         return silo;
     }
 

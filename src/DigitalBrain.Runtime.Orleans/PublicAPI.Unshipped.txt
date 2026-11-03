@@ -827,3 +827,29 @@ static DigitalBrain.Runtime.Orleans.SynapseObservation.List(System.IServiceProvi
 DigitalBrain.Runtime.Orleans.Hosting.INeuronHost.InspectState(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Text.Json.JsonElement?>!
 DigitalBrain.Runtime.Orleans.Signalling.ISignalSubscriber
 DigitalBrain.Runtime.Orleans.Signalling.ISignalSubscriber.Notify(long position) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Capabilities.CallerContextStamper
+DigitalBrain.Runtime.Orleans.Capabilities.UntrustedCallerException
+DigitalBrain.Runtime.Orleans.Capabilities.UntrustedCallerException.UntrustedCallerException() -> void
+DigitalBrain.Runtime.Orleans.Capabilities.UntrustedCallerException.UntrustedCallerException(string! message) -> void
+DigitalBrain.Runtime.Orleans.Capabilities.UntrustedCallerException.UntrustedCallerException(string! message, System.Exception! innerException) -> void
+DigitalBrain.Runtime.Orleans.Compute.TraceOutgoingFilter
+DigitalBrain.Runtime.Orleans.Compute.TraceOutgoingFilter.Invoke(Orleans.IOutgoingGrainCallContext! context) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Compute.TraceOutgoingFilter.TraceOutgoingFilter() -> void
+DigitalBrain.Runtime.Orleans.Compute.TraceRequestContext
+const DigitalBrain.Runtime.Orleans.Capabilities.CallerContextStamper.ModuleCallKey = "intochatos.trusted-module-call" -> string!
+const DigitalBrain.Runtime.Orleans.Capabilities.CallerContextStamper.RequestContextKey = "db.cap.principal" -> string!
+const DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.ModuleCallKey = "intochatos.trusted-module-call" -> string!
+const DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.RequestContextKey = "db.cap.principal" -> string!
+const DigitalBrain.Runtime.Orleans.Compute.TraceRequestContext.RequestContextKey = "intochatos.trace" -> string!
+static DigitalBrain.Runtime.Orleans.Capabilities.CallerContextStamper.IsModelOriginated(DigitalBrain.Capabilities.CapabilityCaller! caller) -> bool
+static DigitalBrain.Runtime.Orleans.Capabilities.CallerContextStamper.IsTrusted(DigitalBrain.Capabilities.CapabilityCaller! context) -> bool
+static DigitalBrain.Runtime.Orleans.Capabilities.CallerContextStamper.Require() -> DigitalBrain.Capabilities.CapabilityCaller!
+static DigitalBrain.Runtime.Orleans.Capabilities.CallerContextStamper.Stamp(DigitalBrain.Capabilities.CapabilityCaller! context) -> DigitalBrain.Capabilities.CapabilityCaller!
+static DigitalBrain.Runtime.Orleans.Capabilities.CallerContextStamper.StampScope(DigitalBrain.Capabilities.CapabilityCaller! context) -> System.IDisposable!
+static DigitalBrain.Runtime.Orleans.Capabilities.CallerContextStamper.TryGet(out DigitalBrain.Capabilities.CapabilityCaller? context) -> bool
+static DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.IsModelOriginated(DigitalBrain.Capabilities.CapabilityCaller! caller) -> bool
+static DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.IsTrusted(DigitalBrain.Capabilities.CapabilityCaller! context) -> bool
+static DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.Require() -> DigitalBrain.Capabilities.CapabilityCaller!
+static DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.StampScope(DigitalBrain.Capabilities.CapabilityCaller! context) -> System.IDisposable!
+static DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.TryGet(out DigitalBrain.Capabilities.CapabilityCaller? context) -> bool
+static DigitalBrain.Runtime.Orleans.Compute.TraceRequestContext.OriginOf(string! brainId, string! osKey) -> DigitalBrain.NeuronId

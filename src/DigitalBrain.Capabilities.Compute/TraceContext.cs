@@ -4,16 +4,23 @@ namespace DigitalBrain.Capabilities.Compute;
 
 public static class TraceContext
 {
-    private static readonly AsyncLocal<Trace?> Ambient = new();
+    public const string RequestContextKey = "intochatos.trace";
 
-    public static Trace? Current => Ambient.Value;
+    private static readonly AsyncLocal<Trace?> Ambient = new();
+    private static Func<string, object?>? s_requestContextGet;
+    private static Action<string, object>? s_requestContextSet;
+    private static Func<string, bool>? s_requestContextRemove;
+
+    public static Trace? Current => RequestContextGet()?.Invoke(RequestContextKey) as Trace ?? Ambient.Value;
 
     public static IDisposable Enter(Trace trace)
     {
         ArgumentNullException.ThrowIfNull(trace);
-        var previous = Ambient.Value;
+        var previousAmbient = Ambient.Value;
+        var previousRequest = RequestContextGet()?.Invoke(RequestContextKey);
         Ambient.Value = trace;
-        return new Scope(previous);
+        RequestContextSet()?.Invoke(RequestContextKey, trace);
+        return new Scope(previousAmbient, previousRequest);
     }
 
     public static NeuronId OriginOf(string brainId, string osKey)
@@ -44,8 +51,67 @@ public static class TraceContext
         };
     }
 
-    private sealed class Scope(Trace? previous) : IDisposable
+    private static Func<string, object?>? RequestContextGet()
     {
-        public void Dispose() => Ambient.Value = previous;
+        if (s_requestContextGet is not null) { return s_requestContextGet; }
+        var method = FindRequestContextType()?.GetMethod("Get", [typeof(string)]);
+        if (method is not null)
+        {
+            s_requestContextGet = method.CreateDelegate<Func<string, object?>>();
+            return s_requestContextGet;
+        }
+        return null;
+    }
+
+    private static Action<string, object>? RequestContextSet()
+    {
+        if (s_requestContextSet is not null) { return s_requestContextSet; }
+        var method = FindRequestContextType()?.GetMethod("Set", [typeof(string), typeof(object)]);
+        if (method is not null)
+        {
+            s_requestContextSet = method.CreateDelegate<Action<string, object>>();
+            return s_requestContextSet;
+        }
+        return null;
+    }
+
+    private static Func<string, bool>? RequestContextRemove()
+    {
+        if (s_requestContextRemove is not null) { return s_requestContextRemove; }
+        var method = FindRequestContextType()?.GetMethod("Remove", [typeof(string)]);
+        if (method is not null)
+        {
+            s_requestContextRemove = method.CreateDelegate<Func<string, bool>>();
+            return s_requestContextRemove;
+        }
+        return null;
+    }
+
+    private static Type? FindRequestContextType()
+    {
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (string.Equals(assembly.GetName().Name, "Orleans.Core.Abstractions", StringComparison.Ordinal))
+            {
+                return assembly.GetType("Orleans.Runtime.RequestContext");
+            }
+        }
+        return null;
+    }
+
+    private sealed class Scope(Trace? previousAmbient, object? previousRequest) : IDisposable
+    {
+        public void Dispose()
+        {
+            Ambient.Value = previousAmbient;
+            if (previousRequest is null)
+            {
+                _ = RequestContextRemove()?.Invoke(RequestContextKey);
+            }
+            else
+            {
+                RequestContextSet()?.Invoke(RequestContextKey, previousRequest);
+            }
+        }
     }
 }

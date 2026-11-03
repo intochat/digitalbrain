@@ -400,3 +400,4 @@ static DigitalBrain.Capabilities.Compute.TraceContext.Begin(string! payerAccount
 static DigitalBrain.Capabilities.Compute.TraceContext.Current.get -> DigitalBrain.Capabilities.Compute.Trace?
 static DigitalBrain.Capabilities.Compute.TraceContext.Enter(DigitalBrain.Capabilities.Compute.Trace! trace) -> System.IDisposable!
 static DigitalBrain.Capabilities.Compute.TraceContext.OriginOf(string! brainId, string! osKey) -> DigitalBrain.NeuronId
+const DigitalBrain.Capabilities.Compute.TraceContext.RequestContextKey = "intochatos.trace" -> string!
