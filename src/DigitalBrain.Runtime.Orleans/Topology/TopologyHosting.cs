@@ -105,8 +105,9 @@ public static class TopologyHosting
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(modules);
-        var selected = builder.UseTopology([.. modules.Select(ModuleManifest.Of)], retired, additional);
-        builder.Services.AddSingleton(new ModuleAssemblies([.. modules.Select(module => module.Assembly).Distinct()], [.. modules]));
+        var moduleTypes = modules.Where(static t => !typeof(App).IsAssignableFrom(t)).ToArray();
+        var selected = builder.UseTopology([.. moduleTypes.Select(ModuleManifest.Of)], retired, additional);
+        builder.Services.AddSingleton(new ModuleAssemblies([.. modules.Select(module => module.Assembly).Distinct()], moduleTypes));
         return selected;
     }
 
@@ -149,7 +150,7 @@ public static class TopologyHosting
         var moduleTypes = silo.Services.Select(d => d.ImplementationInstance).OfType<ModuleAssemblies>().SelectMany(m => m.Modules).Distinct().ToList();
         Capabilities.ModuleCapabilityValidator.Validate(Capabilities.CapabilityHosting.Registry(silo.Services), moduleTypes);
         // The one runtime composition call: every topology gets the host grains, journal payloads, publishing and retention.
-        silo.AddDigitalBrainRuntime([.. silo.Services.Select(d => d.ImplementationInstance).OfType<ModuleAssemblies>().SelectMany(m => m.Assemblies).Distinct()]);
+        silo.AddDigitalBrainRuntime([.. silo.Services.Select(d => d.ImplementationInstance).OfType<ModuleAssemblies>().SelectMany(m => m.Assemblies).Append(typeof(Signal).Assembly).Distinct()]);
         // The host-bound cluster store goes last, so it replaces any cluster registration the topology made.
         foreach (var registration in ClusterStoreHosting.Registrations(silo.Services)) { registration.Register(silo); }
         silo.AddPlacementDirector<Placement.BrainAffinePlacement, Placement.BrainAffinePlacementDirector>();

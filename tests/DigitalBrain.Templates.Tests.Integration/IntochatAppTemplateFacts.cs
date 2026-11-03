@@ -14,7 +14,7 @@ public sealed class IntochatAppTemplateFacts
 {
     private static readonly string[] Packed =
     [
-        "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing",
+        "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Testing.Silo", "DigitalBrain.Runtime.Orleans",
         "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity",
     ];
 
@@ -42,7 +42,9 @@ public sealed class IntochatAppTemplateFacts
             var source = Path.Combine(app, name, name + ".cs");
             Assert.True(File.Exists(source), name + ".cs");
             Assert.True(File.Exists(Path.Combine(app, name, name + ".spec.md")), name + ".spec.md");
+            Assert.True(File.Exists(Path.Combine(app, name, "views", ".gitkeep")), "views/.gitkeep");
             Assert.True(File.Exists(Path.Combine(app, name + ".Tests.Unit", name + "Facts.cs")), name + "Facts.cs");
+            Assert.True(File.Exists(Path.Combine(app, name + ".Tests.Integration", name + "RuntimeFacts.cs")), name + "RuntimeFacts.cs");
             Assert.Contains($"[App(\"{expectedId}\")]", await File.ReadAllTextAsync(source, ct), StringComparison.Ordinal);
 
             await File.WriteAllTextAsync(Path.Combine(app, "nuget.config"), Config(feed), ct);
@@ -51,6 +53,9 @@ public sealed class IntochatAppTemplateFacts
             var test = await Dotnet(app, packages, ["test", "--project", Path.Combine(name + ".Tests.Unit", name + ".Tests.Unit.csproj"), "-c", "Release", "--no-build"], ct);
             Assert.Contains("succeeded: 4", test, StringComparison.Ordinal);
             Assert.Contains("failed: 0", test, StringComparison.Ordinal);
+            var integrationTest = await Dotnet(app, packages, ["test", "--project", Path.Combine(name + ".Tests.Integration", name + ".Tests.Integration.csproj"), "-c", "Release", "--no-build"], ct);
+            Assert.Contains("succeeded: 2", integrationTest, StringComparison.Ordinal);
+            Assert.Contains("failed: 0", integrationTest, StringComparison.Ordinal);
 
             // The analyzers run in the instance: defining multiple [App] classes fails the build with DB0030.
             var code = await File.ReadAllTextAsync(source, ct);

@@ -5,16 +5,19 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
-  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests.Unit'))">
+  <PropertyGroup Condition="$(MSBuildProjectName.Contains('.Tests.'))">
     <OutputType>Exe</OutputType>
     <IsTestProject>true</IsTestProject>
     <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
     <TestingPlatformDotnetTestSupport>true</TestingPlatformDotnetTestSupport>
     <NoWarn>$(NoWarn);CA1707</NoWarn>
   </PropertyGroup>
-  <ItemGroup Condition="$(MSBuildProjectName.EndsWith('.Tests.Unit'))">
+  <ItemGroup Condition="$(MSBuildProjectName.Contains('.Tests.'))">
     <PackageReference Include="DigitalBrain.Testing" />
     <PackageReference Include="xunit.v3.mtp-v2" />
     <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup Condition="$(MSBuildProjectName.EndsWith('.Tests.Integration'))">
+    <PackageReference Include="DigitalBrain.Testing.Silo" />
   </ItemGroup>
 </Project>

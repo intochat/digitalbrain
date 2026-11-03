@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../Calculator/Calculator.csproj" />
+    <ProjectReference Include="../../src/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="../../src/DigitalBrain.Testing.Silo/DigitalBrain.Testing.Silo.csproj" />
+  </ItemGroup>
+</Project>

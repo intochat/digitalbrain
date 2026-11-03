@@ -44,10 +44,19 @@ public abstract class BothRuntimesFixture : IAsyncLifetime
 
     // A runtime of kind that the caller disposes; home keeps the silo's state folder (null: a fresh temporary one) and
     // siloServices runs after ConfigureSilo (fault injection, controls).
+    [Module("both-runtimes-core")]
+    private sealed class CoreModule : Module
+    {
+        public static ModuleManifest Manifest { get; } = new([], [], [], [], []);
+    }
+
     public async Task<INeuronRuntime> Start(NeuronRuntimeKind kind, CancellationToken ct, string? home = null, Action<IServiceCollection>? siloServices = null)
     {
         var modules = Modules;
-        if (modules.Count == 0) { throw new InvalidOperationException("A both-runtimes fixture needs at least one module."); }
+        if (modules.Count == 0)
+        {
+            modules = [typeof(CoreModule)];
+        }
         return kind switch
         {
             NeuronRuntimeKind.TestOS => TestOSRuntime.Start(Brain, modules, TestOSServices()),
@@ -80,6 +89,7 @@ public abstract class BothRuntimesFixture : IAsyncLifetime
         public static TestOSRuntime Start(BrainId brain, IReadOnlyList<Type> modules, IServiceProvider? services = null)
         {
             var os = TestOS.Local(options => options.Services = services);
+            os.Register(typeof(Signal).Assembly);
             foreach (var assembly in modules.Select(module => module.Assembly).Distinct()) { os.Register(assembly); }
             return new TestOSRuntime(os, brain);
         }
@@ -113,7 +123,7 @@ public abstract class BothRuntimesFixture : IAsyncLifetime
         public static async Task<SiloRuntime> Start(BrainId brain, IReadOnlyList<Type> modules, Action<IServiceCollection> configure,
             IReadOnlyDictionary<string, string?> configuration, string? home, CancellationToken ct)
         {
-            Assembly[] assemblies = [.. modules.Select(module => module.Assembly).Distinct()];
+            Assembly[] assemblies = [.. modules.Select(module => module.Assembly).Append(typeof(Signal).Assembly).Distinct()];
             var factory = new LocalSiloHostFactory(new BrainStorageRegistration(assemblies), configure);
             var options = new InProcessHostOptions { Home = home, Modules = modules, Configuration = configuration };
             var host = await factory.Start(options, ct).ConfigureAwait(false);

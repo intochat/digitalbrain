@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="AppName/AppName.csproj" />
   <Project Path="AppName.Tests.Unit/AppName.Tests.Unit.csproj" />
+  <Project Path="AppName.Tests.Integration/AppName.Tests.Integration.csproj" />
 </Solution>

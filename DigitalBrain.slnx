@@ -19,6 +19,7 @@
   <Folder Name="/examples/">
     <Project Path="examples/Calculator/Calculator.csproj" />
     <Project Path="examples/Calculator.Tests.Unit/Calculator.Tests.Unit.csproj" />
+    <Project Path="examples/Calculator.Tests.Integration/Calculator.Tests.Integration.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/DigitalBrain.Tests.Unit/DigitalBrain.Tests.Unit.csproj" />

@@ -2,6 +2,7 @@ using DigitalBrain;
 using DigitalBrain.Examples.Calculator;
 using DigitalBrain.Rules;
 using DigitalBrain.Testing;
+using DigitalBrain.Testing.Views;
 
 namespace Calculator.Tests.Unit;
 
@@ -23,6 +24,8 @@ public sealed class CalculatorFacts
         Assert.Equal("calculator", report.AppId);
         Assert.Equal(4, report.Scenarios.Count);
         Assert.All(report.Scenarios, s => Assert.True(s.Passed, s.Error));
+
+        ViewFixtures.Verify(report, ViewsDirectory());
 
         var bdd = os.Get<IBdd>(new NeuronId(new BrainId("test"), "bdd", "calculator"));
         var stored = await bdd.Read(TestContext.Current.CancellationToken);
@@ -61,5 +64,18 @@ public sealed class CalculatorFacts
 
         Assert.Equal(["divisor.not-zero"], error.Rejected.Rules);
         Assert.Contains("0", app.Main.Texts);
+    }
+
+    private static string ViewsDirectory()
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+        {
+            var candidate = Path.Combine(dir.FullName, "examples", "Calculator", "views");
+            if (File.Exists(Path.Combine(dir.FullName, "examples", "Calculator", "Calculator.csproj")))
+            {
+                return candidate;
+            }
+        }
+        throw new InvalidOperationException("Could not locate examples/Calculator from " + AppContext.BaseDirectory);
     }
 }

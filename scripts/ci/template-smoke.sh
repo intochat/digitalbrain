@@ -92,6 +92,7 @@ for entry in Notes:acme.notes Foo.Bar:acme.foo-bar; do
   name=${entry%%:*}
   dir=$(instantiate intochat-app "$name" --AppId "${entry##*:}")
   run "$dir" "$name.Tests.Unit/$name.Tests.Unit.csproj"
+  run "$dir" "$name.Tests.Integration/$name.Tests.Integration.csproj"
 done
 
 for entry in Weather:acme.weather MyModule:acme.my-module; do
