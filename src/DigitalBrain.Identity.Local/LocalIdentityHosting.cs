@@ -1,4 +1,8 @@
+using DigitalBrain.Capabilities.Connections.Sealing;
+using DigitalBrain.Capabilities.Secrets;
 using DigitalBrain.Identity.Local.Custody;
+using DigitalBrain.Identity.Local.Vault;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -39,6 +43,16 @@ public static class LocalIdentityHosting
             throw new InvalidOperationException(
                 $"{nameof(AddLocalIdentity)} requires an {nameof(IMasterKeyCustody)} registration; pass a homeDirectory for {nameof(FileMasterKeyCustody)} or register {nameof(IMasterKeyCustody)} first.");
         }
+
+        services.TryAddSingleton(sp => new MasterKeyWrapper(sp.GetRequiredService<IMasterKeyCustody>()));
+        services.TryAddSingleton(sp => new LocalSecretSealer(sp.GetRequiredService<IMasterKeyCustody>()));
+        services.TryAddSingleton<ISecretSealer>(sp => sp.GetRequiredService<LocalSecretSealer>());
+        services.TryAddSingleton<IBrainSecretSealer>(sp => sp.GetRequiredService<LocalSecretSealer>());
+        services.TryAddSingleton(sp => new LocalVaultPort(
+            neuronResolver,
+            sp.GetRequiredService<IMasterKeyCustody>(),
+            sp.GetService<IConfiguration>()));
+        services.TryAddSingleton<ISecretVaultPort>(sp => sp.GetRequiredService<LocalVaultPort>());
         return services;
     }
 }
