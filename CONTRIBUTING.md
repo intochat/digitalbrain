@@ -26,14 +26,13 @@ To try a change in a consuming repository before it is published, pack into a fl
 and point the consumer at it through its optional, git-ignored `Directory.Build.local.props`:
 
 ```bash
-dotnet pack DigitalBrain.slnx -c Release -o <feed> -p:VersionSuffix=preview.local.$(date +%y%m%d%H%M%S)
-dotnet pack templates/DigitalBrain.Templates/DigitalBrain.Templates.csproj -c Release -o <feed> -p:VersionSuffix=preview.local.<same stamp>
+dotnet run scripts/pack-local.cs -- --feed <folder>
 ```
 
 Each consumer's `Directory.Build.props` imports `Directory.Build.local.props` when present. In the consumer, create
-`Directory.Build.local.props` (git-ignored) setting `<RestoreAdditionalProjectSources>` to `<feed>` and, when needed,
+`Directory.Build.local.props` (git-ignored) setting `<RestoreAdditionalProjectSources>` to `<folder>` and, when needed,
 overriding a `PackageVersion` with `Update`. Never commit a local feed path into any repository.
-`scripts/pack-local.ps1` and `scripts/pack-local.sh` pack a fixed `preview.N` into a feed folder the same way.
+Each repository (`digitalbrain`, `modules`, `os`) maintains its own `VERSION` independently.
 
 ## Pull requests
 
