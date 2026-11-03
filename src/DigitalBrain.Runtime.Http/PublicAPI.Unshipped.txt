@@ -7,7 +7,47 @@ DigitalBrain.Runtime.Http.ISessionIssuer.EndAsync(Microsoft.AspNetCore.Http.Http
 DigitalBrain.Runtime.Http.ISessionIssuer.IssueAsync(Microsoft.AspNetCore.Http.HttpContext! http, DigitalBrain.Capabilities.Identity.SessionRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.SessionIssued!>!
 DigitalBrain.Runtime.Http.ModuleHttpSurfaces
 DigitalBrain.Runtime.Http.SessionPrincipal
+DigitalBrain.Runtime.Http.Surface.BrainRoutes
+DigitalBrain.Runtime.Http.Surface.ForwardedHeadersHosting
+DigitalBrain.Runtime.Http.Surface.ForwardedHeadersSetup
+DigitalBrain.Runtime.Http.Surface.ForwardedHeadersSetup.Configure(System.Action<Microsoft.AspNetCore.Builder.IApplicationBuilder!>! next) -> System.Action<Microsoft.AspNetCore.Builder.IApplicationBuilder!>!
+DigitalBrain.Runtime.Http.Surface.ForwardedHeadersSetup.ForwardedHeadersSetup(Microsoft.Extensions.Configuration.IConfiguration! configuration, string? section = null) -> void
+DigitalBrain.Runtime.Http.Surface.HttpProblems
+DigitalBrain.Runtime.Http.Surface.IBrainAccess
+DigitalBrain.Runtime.Http.Surface.IBrainAccess.CanAccessAsync(string! principalId, string! accountId, string! brainId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<bool>
+DigitalBrain.Runtime.Http.Surface.IHttpModule
+DigitalBrain.Runtime.Http.Surface.IHttpModule.Configure(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> void
+DigitalBrain.Runtime.Http.Surface.IHttpSurface
+DigitalBrain.Runtime.Http.Surface.IHttpSurface.Map(Microsoft.AspNetCore.Builder.IApplicationBuilder! app) -> void
+DigitalBrain.Runtime.Http.Surface.IRequestThrottle
+DigitalBrain.Runtime.Http.Surface.IRequestThrottle.HitAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<DigitalBrain.Runtime.Http.Surface.ThrottleResult!>
+DigitalBrain.Runtime.Http.Surface.IpPrefix
+DigitalBrain.Runtime.Http.Surface.IpThrottleFilter
+DigitalBrain.Runtime.Http.Surface.IpThrottleFilter.InvokeAsync(Microsoft.AspNetCore.Http.EndpointFilterInvocationContext! context, Microsoft.AspNetCore.Http.EndpointFilterDelegate! next) -> System.Threading.Tasks.ValueTask<object?>
+DigitalBrain.Runtime.Http.Surface.IpThrottleFilter.IpThrottleFilter(DigitalBrain.Runtime.Http.Surface.IRequestThrottle! throttle) -> void
+DigitalBrain.Runtime.Http.Surface.ReturnUrlValidator
+DigitalBrain.Runtime.Http.Surface.ReturnUrlValidator.IsAllowed(string? returnUrl) -> bool
+DigitalBrain.Runtime.Http.Surface.ReturnUrlValidator.ReturnUrlValidator(System.Collections.Generic.IEnumerable<string!>! allowedOrigins) -> void
+DigitalBrain.Runtime.Http.Surface.SlidingWindowThrottle
+DigitalBrain.Runtime.Http.Surface.SlidingWindowThrottle.HitAsync(string! key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<DigitalBrain.Runtime.Http.Surface.ThrottleResult!>
+DigitalBrain.Runtime.Http.Surface.SlidingWindowThrottle.SlidingWindowThrottle(int limit, System.TimeSpan window, System.TimeProvider! clock) -> void
+DigitalBrain.Runtime.Http.Surface.ThrottleResult
+DigitalBrain.Runtime.Http.Surface.ThrottleResult.<Clone>$() -> DigitalBrain.Runtime.Http.Surface.ThrottleResult!
+DigitalBrain.Runtime.Http.Surface.ThrottleResult.Allowed.get -> bool
+DigitalBrain.Runtime.Http.Surface.ThrottleResult.Allowed.init -> void
+DigitalBrain.Runtime.Http.Surface.ThrottleResult.Deconstruct(out bool Allowed, out System.DateTimeOffset? RetryAt) -> void
+DigitalBrain.Runtime.Http.Surface.ThrottleResult.Equals(DigitalBrain.Runtime.Http.Surface.ThrottleResult? other) -> bool
+DigitalBrain.Runtime.Http.Surface.ThrottleResult.RetryAt.get -> System.DateTimeOffset?
+DigitalBrain.Runtime.Http.Surface.ThrottleResult.RetryAt.init -> void
+DigitalBrain.Runtime.Http.Surface.ThrottleResult.ThrottleResult(bool Allowed, System.DateTimeOffset? RetryAt) -> void
 const DigitalBrain.Runtime.Http.SessionPrincipal.SessionIdClaim = "sid" -> string!
+const DigitalBrain.Runtime.Http.Surface.HttpProblems.MaxBodyBytes = 4096 -> int
+const DigitalBrain.Runtime.Http.Surface.HttpProblems.RateLimitedCode = "RATE_LIMITED" -> string!
+const DigitalBrain.Runtime.Http.Surface.HttpProblems.RequestInvalid = "REQUEST_INVALID" -> string!
+const DigitalBrain.Runtime.Http.Surface.IpPrefix.Unknown = "unknown" -> string!
+override DigitalBrain.Runtime.Http.Surface.ThrottleResult.Equals(object? obj) -> bool
+override DigitalBrain.Runtime.Http.Surface.ThrottleResult.GetHashCode() -> int
+override DigitalBrain.Runtime.Http.Surface.ThrottleResult.ToString() -> string!
 static DigitalBrain.Runtime.Http.BrainRouteGroups.Brain(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! suffix = "") -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!
 static DigitalBrain.Runtime.Http.BrainRouteGroups.MemberOf(Microsoft.AspNetCore.Http.HttpContext! http) -> DigitalBrain.Capabilities.Identity.Member?
 static DigitalBrain.Runtime.Http.BrainRouteGroups.Session(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! suffix = "") -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!
@@ -16,3 +56,17 @@ static DigitalBrain.Runtime.Http.ModuleHttpSurfaces.MapModuleHttpSurfaces(this M
 static DigitalBrain.Runtime.Http.SessionPrincipal.Create(DigitalBrain.Capabilities.Identity.SessionRequest! request, DigitalBrain.Capabilities.Identity.SessionIssued! issued, string! authenticationType) -> System.Security.Claims.ClaimsPrincipal!
 static DigitalBrain.Runtime.Http.SessionPrincipal.PrincipalId(System.Security.Claims.ClaimsPrincipal? user) -> string?
 static DigitalBrain.Runtime.Http.SessionPrincipal.SessionId(System.Security.Claims.ClaimsPrincipal? user) -> string?
+static DigitalBrain.Runtime.Http.Surface.BrainRoutes.Group(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! suffix = "") -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!
+static DigitalBrain.Runtime.Http.Surface.BrainRoutes.SessionGroup(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! suffix = "") -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!
+static DigitalBrain.Runtime.Http.Surface.ForwardedHeadersHosting.AddForwardedHeadersSetup(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string? section = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static DigitalBrain.Runtime.Http.Surface.ForwardedHeadersSetup.CreateOptions(Microsoft.Extensions.Configuration.IConfiguration! configuration, string? section = null) -> Microsoft.AspNetCore.Builder.ForwardedHeadersOptions!
+static DigitalBrain.Runtime.Http.Surface.ForwardedHeadersSetup.DefaultSection.get -> string!
+static DigitalBrain.Runtime.Http.Surface.HttpProblems.BadRequest(string! code) -> Microsoft.AspNetCore.Http.IResult!
+static DigitalBrain.Runtime.Http.Surface.HttpProblems.Code(int status, string! code) -> Microsoft.AspNetCore.Http.IResult!
+static DigitalBrain.Runtime.Http.Surface.HttpProblems.RateLimited(System.DateTimeOffset? retryAt) -> Microsoft.AspNetCore.Http.IResult!
+static DigitalBrain.Runtime.Http.Surface.HttpProblems.ReadAsync<T>(Microsoft.AspNetCore.Http.HttpRequest! request, int maxBodyBytes = 4096) -> System.Threading.Tasks.Task<(T? Body, Microsoft.AspNetCore.Http.IResult? Failure)>!
+static DigitalBrain.Runtime.Http.Surface.HttpProblems.ReadValidatedAsync<T>(Microsoft.AspNetCore.Http.HttpRequest! request, DigitalBrain.Modules.Validation.IModuleValidator<T!>! validator, int maxBodyBytes = 4096, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<(T? Body, Microsoft.AspNetCore.Http.IResult? Failure)>!
+static DigitalBrain.Runtime.Http.Surface.HttpProblems.Validation(DigitalBrain.Modules.Validation.ValidationIssue![]! issues) -> Microsoft.AspNetCore.Http.IResult!
+static DigitalBrain.Runtime.Http.Surface.IpPrefix.Truncate(string? address) -> string!
+static DigitalBrain.Runtime.Http.Surface.ThrottleResult.operator !=(DigitalBrain.Runtime.Http.Surface.ThrottleResult? left, DigitalBrain.Runtime.Http.Surface.ThrottleResult? right) -> bool
+static DigitalBrain.Runtime.Http.Surface.ThrottleResult.operator ==(DigitalBrain.Runtime.Http.Surface.ThrottleResult? left, DigitalBrain.Runtime.Http.Surface.ThrottleResult? right) -> bool
