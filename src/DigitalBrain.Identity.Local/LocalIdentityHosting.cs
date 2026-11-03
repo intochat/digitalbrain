@@ -1,6 +1,9 @@
+using DigitalBrain.Capabilities.Connections;
+using DigitalBrain.Capabilities.Connections.Broker;
 using DigitalBrain.Capabilities.Connections.Sealing;
 using DigitalBrain.Capabilities.Identity;
 using DigitalBrain.Capabilities.Secrets;
+using DigitalBrain.Identity.Local.Connections;
 using DigitalBrain.Identity.Local.Custody;
 using DigitalBrain.Identity.Local.Directory;
 using DigitalBrain.Identity.Local.Vault;
@@ -60,6 +63,10 @@ public static class LocalIdentityHosting
             sp.GetService<TimeProvider>()));
         services.TryAddSingleton<IIdentityDirectoryPort>(sp => sp.GetRequiredService<LocalDirectoryPort>());
         services.TryAddSingleton<IIdentitySessionPort>(sp => sp.GetRequiredService<LocalDirectoryPort>());
+        services.TryAddSingleton(sp => new LocalConnections(
+            neuronResolver,
+            sp.GetService<ConnectionNeuronTypes>()));
+        services.TryAddSingleton<ICapabilityConnections>(sp => sp.GetRequiredService<LocalConnections>());
         return services;
     }
 }

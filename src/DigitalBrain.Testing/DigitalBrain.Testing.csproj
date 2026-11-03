@@ -13,6 +13,7 @@
     <ProjectReference Include="../DigitalBrain.Capabilities.Storage/DigitalBrain.Capabilities.Storage.csproj" />
     <ProjectReference Include="../DigitalBrain.Capabilities.Secrets/DigitalBrain.Capabilities.Secrets.csproj" />
     <ProjectReference Include="../DigitalBrain.Capabilities.Identity/DigitalBrain.Capabilities.Identity.csproj" />
+    <ProjectReference Include="../DigitalBrain.Capabilities.Connections/DigitalBrain.Capabilities.Connections.csproj" />
     <PackageReference Include="xunit.v3.extensibility.core" />
     <PackageReference Include="xunit.v3.assert" />
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />

@@ -262,3 +262,34 @@ DigitalBrain.Identity.Local.Vault.VaultState.Owner.get -> string!
 DigitalBrain.Identity.Local.Vault.VaultState.Owner.set -> void
 DigitalBrain.Identity.Local.Vault.VaultState.WrappedOwnerKey.get -> string!
 DigitalBrain.Identity.Local.Vault.VaultState.WrappedOwnerKey.set -> void
+DigitalBrain.Identity.Local.Connections.ConnectionIndexNeuron
+DigitalBrain.Identity.Local.Connections.ConnectionIndexNeuron.ConnectionIndexNeuron() -> void
+DigitalBrain.Identity.Local.Connections.ConnectionIndexNeuron.List() -> System.Threading.Tasks.Task<string![]!>!
+DigitalBrain.Identity.Local.Connections.ConnectionIndexNeuron.Track(string! connectionKey) -> System.Threading.Tasks.Task!
+DigitalBrain.Identity.Local.Connections.ConnectionIndexNeuron.Untrack(string! connectionKey) -> System.Threading.Tasks.Task!
+DigitalBrain.Identity.Local.Connections.ConnectionIndexState
+DigitalBrain.Identity.Local.Connections.ConnectionIndexState.ConnectionIndexState() -> void
+DigitalBrain.Identity.Local.Connections.ConnectionIndexState.Keys.get -> string![]!
+DigitalBrain.Identity.Local.Connections.ConnectionIndexState.Keys.set -> void
+DigitalBrain.Identity.Local.Connections.ConnectionRequestsNeuron
+DigitalBrain.Identity.Local.Connections.ConnectionRequestsNeuron.Changed(string! connectionKey) -> System.Threading.Tasks.Task!
+DigitalBrain.Identity.Local.Connections.ConnectionRequestsNeuron.ConnectionRequestsNeuron(System.Collections.Generic.IEnumerable<DigitalBrain.Capabilities.Connections.Connectors.ConnectorDefinition!>? connectors = null) -> void
+DigitalBrain.Identity.Local.Connections.ConnectionRequestsNeuron.ListConnections() -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary![]!>!
+DigitalBrain.Identity.Local.Connections.ConnectionRequestsNeuron.ListKinds() -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.Requests.ConnectorKind![]!>!
+DigitalBrain.Identity.Local.Connections.ConnectionRequestsNeuron.ListOffers() -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.Requests.ConnectorOffer![]!>!
+DigitalBrain.Identity.Local.Connections.ConnectionRequestsNeuron.ListPending() -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.Requests.ConnectionRef![]!>!
+DigitalBrain.Identity.Local.Connections.ConnectionRequestsNeuron.Reorder(string![]! keys) -> System.Threading.Tasks.Task!
+DigitalBrain.Identity.Local.Connections.ConnectionRequestsNeuron.Request(string! kind) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.Requests.ConnectionRef!>!
+DigitalBrain.Identity.Local.Connections.ConnectionRequestsState
+DigitalBrain.Identity.Local.Connections.ConnectionRequestsState.ConnectionRequestsState() -> void
+DigitalBrain.Identity.Local.Connections.ConnectionRequestsState.Order.get -> string![]!
+DigitalBrain.Identity.Local.Connections.ConnectionRequestsState.Order.set -> void
+DigitalBrain.Identity.Local.Connections.ConnectionRequestsState.Pending.get -> DigitalBrain.Capabilities.Connections.Requests.ConnectionRef![]!
+DigitalBrain.Identity.Local.Connections.ConnectionRequestsState.Pending.set -> void
+DigitalBrain.Identity.Local.Connections.ConnectionRequestsState.Revision.get -> long
+DigitalBrain.Identity.Local.Connections.ConnectionRequestsState.Revision.set -> void
+DigitalBrain.Identity.Local.Connections.LocalConnections
+DigitalBrain.Identity.Local.Connections.LocalConnections.Bind<TCapability>(DigitalBrain.BrainId brain, string! key, string! callerApp, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<TCapability!>!
+DigitalBrain.Identity.Local.Connections.LocalConnections.ListInOrder(DigitalBrain.BrainId brain, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Connections.Broker.BrainConnection!>!>!
+DigitalBrain.Identity.Local.Connections.LocalConnections.LocalConnections(System.Func<System.Type!, string!, object!>! neuronResolver, DigitalBrain.Capabilities.Connections.ConnectionNeuronTypes? neuronTypes = null) -> void
+DigitalBrain.Identity.Local.Connections.LocalConnections.RequestConnection(DigitalBrain.BrainId brain, DigitalBrain.Capabilities.CapabilityId capability, string! callerApp, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!

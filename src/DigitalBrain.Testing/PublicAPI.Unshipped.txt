@@ -651,3 +651,39 @@ static DigitalBrain.Testing.Views.ViewFixture.operator ==(DigitalBrain.Testing.V
 static DigitalBrain.Testing.Views.ViewFixtures.Slug(string! title) -> string!
 static DigitalBrain.Testing.Views.ViewFixtures.Verify(DigitalBrain.BddReport! report, string! directory) -> void
 static DigitalBrain.Testing.Views.ViewFixtures.Write(DigitalBrain.BddReport! report, string! directory) -> void
+DigitalBrain.Testing.Conformance.Connections.ConnectionsConformance<TConnections>
+DigitalBrain.Testing.Conformance.Connections.ConnectionsConformance<TConnections>.BindUnknownKeyThrowsNotFound() -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Connections.ConnectionsConformance<TConnections>.ConnectionsConformance() -> void
+DigitalBrain.Testing.Conformance.Connections.ConnectionsConformance<TConnections>.ListInOrderIsEmptyForANewBrain() -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Connections.ConnectionsConformance<TConnections>.ReorderIsRespectedByListInOrder() -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Connections.ConnectionsConformance<TConnections>.RequestConnectionRaisesConnectionRequested() -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Connections.ConnectionsConformance<TConnections>.RequestThenListPendingContainsIt() -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Connections.ConnectionsConformance<TConnections>.TrackThenListInOrderContainsTheConnection() -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.<Clone>$() -> DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject!
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Brain.get -> DigitalBrain.BrainId
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Brain.init -> void
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Callers.get -> DigitalBrain.Testing.Conformance.CallerScope!
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Callers.init -> void
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Capability.get -> DigitalBrain.Capabilities.CapabilityId
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Capability.init -> void
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Connections.get -> DigitalBrain.Capabilities.Connections.Broker.ICapabilityConnections!
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Connections.init -> void
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.ConnectionsSubject(DigitalBrain.Capabilities.Connections.Broker.ICapabilityConnections! Connections, DigitalBrain.Capabilities.Connections.Requests.IConnectionRequests! Requests, DigitalBrain.Testing.Conformance.CallerScope! Callers) -> void
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.ConnectorKind.get -> string!
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.ConnectorKind.init -> void
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Deconstruct(out DigitalBrain.Capabilities.Connections.Broker.ICapabilityConnections! Connections, out DigitalBrain.Capabilities.Connections.Requests.IConnectionRequests! Requests, out DigitalBrain.Testing.Conformance.CallerScope! Callers) -> void
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Equals(DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject? other) -> bool
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Index.get -> DigitalBrain.Capabilities.Connections.IConnectionIndex?
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Index.init -> void
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.RequestedSignals.get -> System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Connections.Requests.ConnectionRequested!>!>!>?
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.RequestedSignals.init -> void
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Requests.get -> DigitalBrain.Capabilities.Connections.Requests.IConnectionRequests!
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Requests.init -> void
+abstract DigitalBrain.Testing.Conformance.Connections.ConnectionsConformance<TConnections>.Connect(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject!>!
+const DigitalBrain.Testing.Conformance.Connections.ConnectionsConformance<TConnections>.Timeout = 30000 -> int
+override DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.GetHashCode() -> int
+override DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.ToString() -> string!
+static DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.operator !=(DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject? left, DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject? right) -> bool
+static DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.operator ==(DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject? left, DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject? right) -> bool
