@@ -134,6 +134,13 @@ DigitalBrain.Apps.AppRole.Default = 1 -> DigitalBrain.Apps.AppRole
 DigitalBrain.Apps.AppRole.Example = 3 -> DigitalBrain.Apps.AppRole
 DigitalBrain.Apps.AppRole.Optional = 2 -> DigitalBrain.Apps.AppRole
 DigitalBrain.Apps.AppRole.Shell = 0 -> DigitalBrain.Apps.AppRole
+DigitalBrain.Apps.Hosting.AppTurns
+DigitalBrain.Apps.Hosting.AppTurns.App.get -> DigitalBrain.App!
+DigitalBrain.Apps.Hosting.AppTurns.AppTurns(DigitalBrain.App! app, DigitalBrain.AppDefinition! definition, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>? afterTurn = null) -> void
+DigitalBrain.Apps.Hosting.AppTurns.Definition.get -> DigitalBrain.AppDefinition!
+DigitalBrain.Apps.Hosting.AppTurns.Enqueue(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Apps.Hosting.AppTurns.PresentationError.get -> System.Exception?
+DigitalBrain.Apps.Hosting.AppTurns.Request(string! operation, object? argument, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 DigitalBrain.Apps.Hosting.BehaviorIds
 DigitalBrain.Apps.Hosting.BehaviorView
 DigitalBrain.Apps.Hosting.BehaviorView.<Clone>$() -> DigitalBrain.Apps.Hosting.BehaviorView!

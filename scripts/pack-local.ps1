@@ -1,4 +1,4 @@
-# Pack the fourteen DigitalBrain packages as <VERSION>-preview.<N> into a flat local feed (outside every repository).
+# Pack the fifteen DigitalBrain packages as <VERSION>-preview.<N> into a flat local feed (outside every repository).
 #
 # Usage: scripts/pack-local.ps1 -Preview 1 [-Feed E:/intochat/nuget]
 # Bump the preview number after every digitalbrain change; consumers pin the exact version.
@@ -14,7 +14,7 @@ New-Item -ItemType Directory -Force -Path $Feed | Out-Null
 
 $ids = 'DigitalBrain', 'DigitalBrain.UI', 'DigitalBrain.Testing', 'DigitalBrain.Analyzers', 'DigitalBrain.Templates',
     'DigitalBrain.Runtime.Orleans', 'DigitalBrain.Runtime.Orleans.Azure', 'DigitalBrain.Capabilities.Storage', 'DigitalBrain.Capabilities.Secrets', 'DigitalBrain.Capabilities.Identity', 'DigitalBrain.Runtime.Http',
-    'DigitalBrain.Testing.Silo', 'DigitalBrain.Graph', 'DigitalBrain.Apps.Packaging'
+    'DigitalBrain.Testing.Silo', 'DigitalBrain.Graph', 'DigitalBrain.Apps.Packaging', 'DigitalBrain.Runtime.Apps'
 foreach ($id in $ids) {
     if (Test-Path (Join-Path $Feed "$id.$version.nupkg")) { throw "$id.$version.nupkg exists in $Feed; bump the preview number" }
 }

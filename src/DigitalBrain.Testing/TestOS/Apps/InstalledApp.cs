@@ -1,4 +1,5 @@
 using System.Reflection;
+using DigitalBrain.Apps.Hosting;
 
 namespace DigitalBrain.Testing;
 
@@ -12,10 +13,9 @@ public sealed partial class InstalledApp<TApp> : IInstalledApp where TApp : App
     App IInstalledApp.Instance => App;
 
     private readonly TestOS _os;
-    private readonly Lock _gate = new();
-    private Task _tail = Task.CompletedTask;
     private readonly AppDefinition _definition;
     private TApp? _app;
+    private AppTurns? _turns;
 
     internal InstalledApp(TestOS os, AppDefinition definition)
     {
@@ -41,66 +41,60 @@ public sealed partial class InstalledApp<TApp> : IInstalledApp where TApp : App
     public Task Request(string operation, object? argument = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(operation);
-        if (_definition.FindOperation(operation) is not { } method)
+        if (_definition.FindOperation(operation) is null)
         {
             throw new ArgumentException(
                 $"App '{Definition.Id}' has no operation '{operation}'. Operations: {string.Join(", ", Operations)}.", nameof(operation));
         }
-        return _os.Track(Turn(method, argument));
-    }
-
-    internal Task Start() => _os.Track(Turn(null, null));
-
-    // Turns run one at a time, in request order.
-    private Task Turn(MethodInfo? method, object? argument)
-    {
-        lock (_gate)
+        if (_turns is null)
         {
-            var turn = RunAfter(_tail, method, argument);
-            _tail = turn.ContinueWith(static _ => { }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
-            return turn;
+            throw new InvalidOperationException($"App '{Definition.Id}' is not started.");
         }
+        return _os.Track(_turns.Request(operation, argument, CancellationToken.None));
     }
 
-    private async Task RunAfter(Task previous, MethodInfo? method, object? argument)
+    internal Task Start()
     {
-        await previous.ConfigureAwait(false);
-        await Task.Yield();
-        if (_app is null)
+        _app = (TApp)_definition.Create(Service);
+        _app.AttachNeuronResolver((contractType, key) =>
         {
-            _app = (TApp)_definition.Create(Service);
-            _app.AttachNeuronResolver((contractType, key) =>
+            var typeName = contractType.GetCustomAttribute<DigitalBrain.Contracts.DefaultNeuronTypeAttribute>(false)?.Type
+                ?? contractType.GetCustomAttribute<DigitalBrain.Contracts.NeuronAliasAttribute>(false)?.Alias
+                ?? throw new InvalidOperationException($"Contract {contractType.FullName} has no [DefaultNeuronType] or [NeuronAlias] attribute.");
+            var id = new NeuronId(new BrainId("local"), typeName, key);
+            try
             {
-                var typeName = contractType.GetCustomAttribute<DigitalBrain.Contracts.DefaultNeuronTypeAttribute>(false)?.Type
-                    ?? contractType.GetCustomAttribute<DigitalBrain.Contracts.NeuronAliasAttribute>(false)?.Alias
-                    ?? throw new InvalidOperationException($"Contract {contractType.FullName} has no [DefaultNeuronType] or [NeuronAlias] attribute.");
-                var id = new NeuronId(new BrainId("local"), typeName, key);
-                try
-                {
-                    return typeof(TestOS).GetMethod(nameof(TestOS.Get))!.MakeGenericMethod(contractType).Invoke(_os, [id])!;
-                }
-                catch (TargetInvocationException error) when (error.InnerException is not null)
-                {
-                    System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(error.InnerException).Throw();
-                    throw;
-                }
-            });
-            _app.AttachCapabilityResolver(capabilityType =>
+                return typeof(TestOS).GetMethod(nameof(TestOS.Get))!.MakeGenericMethod(contractType).Invoke(_os, [id])!;
+            }
+            catch (TargetInvocationException error) when (error.InnerException is not null)
             {
-                var alias = capabilityType.GetCustomAttribute<DigitalBrain.Contracts.NeuronAliasAttribute>(false)?.Alias
-                    ?? capabilityType.GetCustomAttribute<DigitalBrain.Contracts.DefaultNeuronTypeAttribute>(false)?.Type
-                    ?? capabilityType.Name.ToLowerInvariant();
-                var id = new NeuronId(new BrainId("local"), alias, alias);
-                try
-                {
-                    return typeof(TestOS).GetMethod(nameof(TestOS.Get))!.MakeGenericMethod(capabilityType).Invoke(_os, [id])!;
-                }
-                catch (TargetInvocationException error) when (error.InnerException is not null)
-                {
-                    System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(error.InnerException).Throw();
-                    throw;
-                }
-            });
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(error.InnerException).Throw();
+                throw;
+            }
+        });
+        _app.AttachCapabilityResolver(capabilityType =>
+        {
+            var alias = capabilityType.GetCustomAttribute<DigitalBrain.Contracts.NeuronAliasAttribute>(false)?.Alias
+                ?? capabilityType.GetCustomAttribute<DigitalBrain.Contracts.DefaultNeuronTypeAttribute>(false)?.Type
+                ?? capabilityType.Name.ToLowerInvariant();
+            var id = new NeuronId(new BrainId("local"), alias, alias);
+            try
+            {
+                return typeof(TestOS).GetMethod(nameof(TestOS.Get))!.MakeGenericMethod(capabilityType).Invoke(_os, [id])!;
+            }
+            catch (TargetInvocationException error) when (error.InnerException is not null)
+            {
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(error.InnerException).Throw();
+                throw;
+            }
+        });
+        _turns = new AppTurns(_app, _definition, _ =>
+        {
+            Refresh();
+            return Task.CompletedTask;
+        });
+        return _os.Track(_turns.Enqueue(async _ =>
+        {
             foreach (var sub in _definition.SignalSubscriptions)
             {
                 var register = typeof(InstalledApp<TApp>)
@@ -108,18 +102,7 @@ public sealed partial class InstalledApp<TApp> : IInstalledApp where TApp : App
                     .MakeGenericMethod(sub.SignalType);
                 await ((Task)register.Invoke(this, [sub])!).ConfigureAwait(false);
             }
-        }
-        try
-        {
-            if (method is not null)
-            {
-                await _definition.Invoke(_app, method.Name, argument).ConfigureAwait(false);
-            }
-        }
-        finally
-        {
-            Refresh();
-        }
+        }));
     }
 
     private Task<IAsyncDisposable> RegisterSignalSubscription<TSignal>(AppSignalSubscription sub) where TSignal : Signal
@@ -127,6 +110,6 @@ public sealed partial class InstalledApp<TApp> : IInstalledApp where TApp : App
             $"app:{Definition.Id}:{sub.OperationName}",
             (publisher, signal, _) => string.Equals(publisher.Key, sub.SourceKey, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(publisher.Type, sub.SourceKey, StringComparison.OrdinalIgnoreCase)
-                ? Turn(sub.Method, signal)
+                ? _os.Track(_turns!.Request(sub.Method.Name, signal, CancellationToken.None))
                 : Task.CompletedTask);
 }

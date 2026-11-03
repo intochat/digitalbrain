@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../src/DigitalBrain.Runtime.Apps/DigitalBrain.Runtime.Apps.csproj" />
+    <ProjectReference Include="../../examples/Calculator/Calculator.csproj" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+</Project>
