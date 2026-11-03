@@ -79,12 +79,12 @@ public sealed class FileMasterKeyCustody : IMasterKeyCustody
     {
         if (OperatingSystem.IsWindows())
         {
-            Directory.CreateDirectory(directory);
+            System.IO.Directory.CreateDirectory(directory);
         }
         else
         {
             const UnixFileMode owner = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
-            Directory.CreateDirectory(directory, owner);
+            System.IO.Directory.CreateDirectory(directory, owner);
         }
     }
 

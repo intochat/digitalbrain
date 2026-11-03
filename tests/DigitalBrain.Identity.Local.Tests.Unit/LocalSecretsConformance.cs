@@ -59,9 +59,9 @@ public sealed class LocalSecretsConformance : SecretsConformance<ISecrets>, IAsy
             await _os.DisposeAsync();
         }
 
-        if (Directory.Exists(_directory))
+        if (System.IO.Directory.Exists(_directory))
         {
-            Directory.Delete(_directory, recursive: true);
+            System.IO.Directory.Delete(_directory, recursive: true);
         }
     }
 

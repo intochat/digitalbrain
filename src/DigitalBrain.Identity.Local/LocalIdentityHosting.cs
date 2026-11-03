@@ -1,6 +1,8 @@
 using DigitalBrain.Capabilities.Connections.Sealing;
+using DigitalBrain.Capabilities.Identity;
 using DigitalBrain.Capabilities.Secrets;
 using DigitalBrain.Identity.Local.Custody;
+using DigitalBrain.Identity.Local.Directory;
 using DigitalBrain.Identity.Local.Vault;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -53,6 +55,11 @@ public static class LocalIdentityHosting
             sp.GetRequiredService<IMasterKeyCustody>(),
             sp.GetService<IConfiguration>()));
         services.TryAddSingleton<ISecretVaultPort>(sp => sp.GetRequiredService<LocalVaultPort>());
+        services.TryAddSingleton(sp => new LocalDirectoryPort(
+            neuronResolver,
+            sp.GetService<TimeProvider>()));
+        services.TryAddSingleton<IIdentityDirectoryPort>(sp => sp.GetRequiredService<LocalDirectoryPort>());
+        services.TryAddSingleton<IIdentitySessionPort>(sp => sp.GetRequiredService<LocalDirectoryPort>());
         return services;
     }
 }

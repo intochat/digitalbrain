@@ -13,6 +13,183 @@ DigitalBrain.Identity.Local.Custody.MasterKeyCustodyKind.Tpm = 1 -> DigitalBrain
 DigitalBrain.Identity.Local.Custody.SegmentSeal
 static DigitalBrain.Identity.Local.Custody.SegmentSeal.Close(byte[]! key, string! context, byte[]! plaintext) -> byte[]!
 static DigitalBrain.Identity.Local.Custody.SegmentSeal.Open(byte[]! key, string! context, byte[]! sealedBytes) -> byte[]!
+DigitalBrain.Identity.Local.Directory.BrainOperation
+DigitalBrain.Identity.Local.Directory.BrainOperation.<Clone>$() -> DigitalBrain.Identity.Local.Directory.BrainOperation!
+DigitalBrain.Identity.Local.Directory.BrainOperation.AccountId.get -> string!
+DigitalBrain.Identity.Local.Directory.BrainOperation.AccountId.init -> void
+DigitalBrain.Identity.Local.Directory.BrainOperation.BrainOperation() -> void
+DigitalBrain.Identity.Local.Directory.BrainOperation.Equals(DigitalBrain.Identity.Local.Directory.BrainOperation? other) -> bool
+DigitalBrain.Identity.Local.Directory.BrainOperation.Member.get -> DigitalBrain.Capabilities.Identity.Member!
+DigitalBrain.Identity.Local.Directory.BrainOperation.Member.init -> void
+DigitalBrain.Identity.Local.Directory.BrainOperation.OperationId.get -> string!
+DigitalBrain.Identity.Local.Directory.BrainOperation.OperationId.init -> void
+override DigitalBrain.Identity.Local.Directory.BrainOperation.Equals(object? obj) -> bool
+override DigitalBrain.Identity.Local.Directory.BrainOperation.GetHashCode() -> int
+override DigitalBrain.Identity.Local.Directory.BrainOperation.ToString() -> string!
+static DigitalBrain.Identity.Local.Directory.BrainOperation.operator !=(DigitalBrain.Identity.Local.Directory.BrainOperation? left, DigitalBrain.Identity.Local.Directory.BrainOperation? right) -> bool
+static DigitalBrain.Identity.Local.Directory.BrainOperation.operator ==(DigitalBrain.Identity.Local.Directory.BrainOperation? left, DigitalBrain.Identity.Local.Directory.BrainOperation? right) -> bool
+DigitalBrain.Identity.Local.Directory.BrainRow
+DigitalBrain.Identity.Local.Directory.BrainRow.<Clone>$() -> DigitalBrain.Identity.Local.Directory.BrainRow!
+DigitalBrain.Identity.Local.Directory.BrainRow.AccountId.get -> string!
+DigitalBrain.Identity.Local.Directory.BrainRow.AccountId.init -> void
+DigitalBrain.Identity.Local.Directory.BrainRow.BrainId.get -> string!
+DigitalBrain.Identity.Local.Directory.BrainRow.BrainId.init -> void
+DigitalBrain.Identity.Local.Directory.BrainRow.BrainRow() -> void
+DigitalBrain.Identity.Local.Directory.BrainRow.Equals(DigitalBrain.Identity.Local.Directory.BrainRow? other) -> bool
+DigitalBrain.Identity.Local.Directory.BrainRow.Kind.get -> DigitalBrain.Capabilities.Identity.BrainKind
+DigitalBrain.Identity.Local.Directory.BrainRow.Kind.init -> void
+override DigitalBrain.Identity.Local.Directory.BrainRow.Equals(object? obj) -> bool
+override DigitalBrain.Identity.Local.Directory.BrainRow.GetHashCode() -> int
+override DigitalBrain.Identity.Local.Directory.BrainRow.ToString() -> string!
+static DigitalBrain.Identity.Local.Directory.BrainRow.operator !=(DigitalBrain.Identity.Local.Directory.BrainRow? left, DigitalBrain.Identity.Local.Directory.BrainRow? right) -> bool
+static DigitalBrain.Identity.Local.Directory.BrainRow.operator ==(DigitalBrain.Identity.Local.Directory.BrainRow? left, DigitalBrain.Identity.Local.Directory.BrainRow? right) -> bool
+DigitalBrain.Identity.Local.Directory.DirectoryChanged
+DigitalBrain.Identity.Local.Directory.DirectoryChanged.Deconstruct(out string! Scope) -> void
+DigitalBrain.Identity.Local.Directory.DirectoryChanged.DirectoryChanged(string! Scope) -> void
+DigitalBrain.Identity.Local.Directory.DirectoryChanged.Equals(DigitalBrain.Identity.Local.Directory.DirectoryChanged? other) -> bool
+DigitalBrain.Identity.Local.Directory.DirectoryChanged.Scope.get -> string!
+DigitalBrain.Identity.Local.Directory.DirectoryChanged.Scope.init -> void
+override DigitalBrain.Identity.Local.Directory.DirectoryChanged.<Clone>$() -> DigitalBrain.Identity.Local.Directory.DirectoryChanged!
+override DigitalBrain.Identity.Local.Directory.DirectoryChanged.Equals(object? obj) -> bool
+override DigitalBrain.Identity.Local.Directory.DirectoryChanged.GetHashCode() -> int
+override DigitalBrain.Identity.Local.Directory.DirectoryChanged.ToString() -> string!
+override sealed DigitalBrain.Identity.Local.Directory.DirectoryChanged.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.Identity.Local.Directory.DirectoryChanged.operator !=(DigitalBrain.Identity.Local.Directory.DirectoryChanged? left, DigitalBrain.Identity.Local.Directory.DirectoryChanged? right) -> bool
+static DigitalBrain.Identity.Local.Directory.DirectoryChanged.operator ==(DigitalBrain.Identity.Local.Directory.DirectoryChanged? left, DigitalBrain.Identity.Local.Directory.DirectoryChanged? right) -> bool
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.Authorize(DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.Capabilities.Identity.CallRequest! request) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.CallDecision?>!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.BrainExists(string! brainScopeId) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.BrainsOf(string! principalId) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainEntry![]!>!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.CompleteRegistration(string! principalId) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision?>!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.CreateBrain(string! accountId, string! principalId, string! operationId, string! displayName, DigitalBrain.Capabilities.Identity.BrainKind kind) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.DirectoryNeuron(System.TimeProvider? clock = null) -> void
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.End(string! sessionId) -> System.Threading.Tasks.Task!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.EnsureAccount(DigitalBrain.Capabilities.Identity.Account! account) -> System.Threading.Tasks.Task!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.EnsureBrain(DigitalBrain.Capabilities.Identity.Member! owner) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.EnsureMember(DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.Capabilities.Identity.Member! member) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member?>!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.GrantAsOwner(DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.Capabilities.Identity.Grant! grant) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Grant?>!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.IsRegistered(string! principalId) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.Issue(DigitalBrain.Capabilities.Identity.SessionRequest! request) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.SessionIssued!>!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.KindOf(string! brainScopeId) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainKind>!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.ListGrants(string! brainScopeId) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Grant![]!>!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.Membership(string! brainScopeId, string! principalId) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member?>!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.OwnerOfBrain(string! brainId) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Account?>!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.ProvisionOwner(DigitalBrain.Capabilities.Identity.Member! owner) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.ReadAccount(string! accountId) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Account?>!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.RegisterPrincipal(string! principalId, string! displayName) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.RemoveMember(DigitalBrain.Capabilities.CapabilityCaller! caller, string! brainScopeId, string! accountId) -> System.Threading.Tasks.Task!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.RemovePrincipalMember(DigitalBrain.Capabilities.CapabilityCaller! caller, string! brainScopeId, string! principalId) -> System.Threading.Tasks.Task!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.RevokeAsOwner(DigitalBrain.Capabilities.CapabilityCaller! caller, string! appId, string! semanticTypeId, DigitalBrain.Capabilities.Identity.GrantMode mode) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Identity.Local.Directory.DirectoryNeuron.Validate(string! sessionId) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member?>!
+DigitalBrain.Identity.Local.Directory.DirectoryState
+DigitalBrain.Identity.Local.Directory.DirectoryState.<Clone>$() -> DigitalBrain.Identity.Local.Directory.DirectoryState!
+DigitalBrain.Identity.Local.Directory.DirectoryState.Accounts.get -> DigitalBrain.Capabilities.Identity.Account![]!
+DigitalBrain.Identity.Local.Directory.DirectoryState.Accounts.init -> void
+DigitalBrain.Identity.Local.Directory.DirectoryState.Brains.get -> DigitalBrain.Identity.Local.Directory.BrainRow![]!
+DigitalBrain.Identity.Local.Directory.DirectoryState.Brains.init -> void
+DigitalBrain.Identity.Local.Directory.DirectoryState.DirectoryState() -> void
+DigitalBrain.Identity.Local.Directory.DirectoryState.Equals(DigitalBrain.Identity.Local.Directory.DirectoryState? other) -> bool
+DigitalBrain.Identity.Local.Directory.DirectoryState.Grants.get -> DigitalBrain.Capabilities.Identity.Grant![]!
+DigitalBrain.Identity.Local.Directory.DirectoryState.Grants.init -> void
+DigitalBrain.Identity.Local.Directory.DirectoryState.Members.get -> DigitalBrain.Capabilities.Identity.Member![]!
+DigitalBrain.Identity.Local.Directory.DirectoryState.Members.init -> void
+DigitalBrain.Identity.Local.Directory.DirectoryState.Operations.get -> DigitalBrain.Identity.Local.Directory.BrainOperation![]!
+DigitalBrain.Identity.Local.Directory.DirectoryState.Operations.init -> void
+DigitalBrain.Identity.Local.Directory.DirectoryState.Principals.get -> DigitalBrain.Identity.Local.Directory.PrincipalRow![]!
+DigitalBrain.Identity.Local.Directory.DirectoryState.Principals.init -> void
+DigitalBrain.Identity.Local.Directory.DirectoryState.Sessions.get -> DigitalBrain.Identity.Local.Directory.SessionRow![]!
+DigitalBrain.Identity.Local.Directory.DirectoryState.Sessions.init -> void
+override DigitalBrain.Identity.Local.Directory.DirectoryState.Equals(object? obj) -> bool
+override DigitalBrain.Identity.Local.Directory.DirectoryState.GetHashCode() -> int
+override DigitalBrain.Identity.Local.Directory.DirectoryState.ToString() -> string!
+static DigitalBrain.Identity.Local.Directory.DirectoryState.operator !=(DigitalBrain.Identity.Local.Directory.DirectoryState? left, DigitalBrain.Identity.Local.Directory.DirectoryState? right) -> bool
+static DigitalBrain.Identity.Local.Directory.DirectoryState.operator ==(DigitalBrain.Identity.Local.Directory.DirectoryState? left, DigitalBrain.Identity.Local.Directory.DirectoryState? right) -> bool
+DigitalBrain.Identity.Local.Directory.IDirectory
+const DigitalBrain.Identity.Local.Directory.IDirectory.Key = "system/main" -> string!
+const DigitalBrain.Identity.Local.Directory.IDirectory.Type = "identity.directory" -> string!
+DigitalBrain.Identity.Local.Directory.IDirectory.Authorize(DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.Capabilities.Identity.CallRequest! request) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.CallDecision?>!
+DigitalBrain.Identity.Local.Directory.IDirectory.BrainExists(string! brainScopeId) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Identity.Local.Directory.IDirectory.BrainsOf(string! principalId) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainEntry![]!>!
+DigitalBrain.Identity.Local.Directory.IDirectory.CompleteRegistration(string! principalId) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision?>!
+DigitalBrain.Identity.Local.Directory.IDirectory.CreateBrain(string! accountId, string! principalId, string! operationId, string! displayName, DigitalBrain.Capabilities.Identity.BrainKind kind) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Identity.Local.Directory.IDirectory.End(string! sessionId) -> System.Threading.Tasks.Task!
+DigitalBrain.Identity.Local.Directory.IDirectory.EnsureAccount(DigitalBrain.Capabilities.Identity.Account! account) -> System.Threading.Tasks.Task!
+DigitalBrain.Identity.Local.Directory.IDirectory.EnsureBrain(DigitalBrain.Capabilities.Identity.Member! owner) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Identity.Local.Directory.IDirectory.EnsureMember(DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.Capabilities.Identity.Member! member) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member?>!
+DigitalBrain.Identity.Local.Directory.IDirectory.GrantAsOwner(DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.Capabilities.Identity.Grant! grant) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Grant?>!
+DigitalBrain.Identity.Local.Directory.IDirectory.IsRegistered(string! principalId) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Identity.Local.Directory.IDirectory.Issue(DigitalBrain.Capabilities.Identity.SessionRequest! request) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.SessionIssued!>!
+DigitalBrain.Identity.Local.Directory.IDirectory.KindOf(string! brainScopeId) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainKind>!
+DigitalBrain.Identity.Local.Directory.IDirectory.ListGrants(string! brainScopeId) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Grant![]!>!
+DigitalBrain.Identity.Local.Directory.IDirectory.Membership(string! brainScopeId, string! principalId) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member?>!
+DigitalBrain.Identity.Local.Directory.IDirectory.OwnerOfBrain(string! brainId) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Account?>!
+DigitalBrain.Identity.Local.Directory.IDirectory.ProvisionOwner(DigitalBrain.Capabilities.Identity.Member! owner) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Identity.Local.Directory.IDirectory.ReadAccount(string! accountId) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Account?>!
+DigitalBrain.Identity.Local.Directory.IDirectory.RegisterPrincipal(string! principalId, string! displayName) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Identity.Local.Directory.IDirectory.RemoveMember(DigitalBrain.Capabilities.CapabilityCaller! caller, string! brainScopeId, string! accountId) -> System.Threading.Tasks.Task!
+DigitalBrain.Identity.Local.Directory.IDirectory.RemovePrincipalMember(DigitalBrain.Capabilities.CapabilityCaller! caller, string! brainScopeId, string! principalId) -> System.Threading.Tasks.Task!
+DigitalBrain.Identity.Local.Directory.IDirectory.RevokeAsOwner(DigitalBrain.Capabilities.CapabilityCaller! caller, string! appId, string! semanticTypeId, DigitalBrain.Capabilities.Identity.GrantMode mode) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Identity.Local.Directory.IDirectory.Validate(string! sessionId) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member?>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.Authorize(DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.Capabilities.Identity.CallRequest! request, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.CallDecision?>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.BrainExists(string! brainScopeId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.BrainsOf(string! principalId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Identity.BrainEntry!>!>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.CompleteRegistration(string! principalId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision?>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.CreateBrain(string! accountId, string! principalId, string! operationId, string! displayName, DigitalBrain.Capabilities.Identity.BrainKind kind, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.Describe() -> DigitalBrain.Capabilities.Identity.IdentityProviderDescriptor!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.End(DigitalBrain.Capabilities.CapabilityCaller! caller, string! sessionId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.EnsureAccount(DigitalBrain.Capabilities.Identity.Account! account, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.EnsureBrain(DigitalBrain.Capabilities.Identity.Member! owner, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.EnsureMember(DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.Capabilities.Identity.Member! member, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member?>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.GrantAsOwner(DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.Capabilities.Identity.Grant! grant, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Grant?>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.IsRegistered(string! principalId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.Issue(DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.Capabilities.Identity.SessionRequest! request, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.SessionIssued!>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.KindOf(string! brainScopeId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainKind>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.ListGrants(string! brainScopeId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Identity.Grant!>!>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.LocalDirectoryPort(System.Func<System.Type!, string!, object!>! neuronResolver, System.TimeProvider? time = null) -> void
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.Membership(string! brainScopeId, string! principalId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member?>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.OwnerOfBrain(string! brainId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Account?>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.ProvisionOwner(DigitalBrain.Capabilities.Identity.Member! owner, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.ReadAccount(string! accountId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Account?>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.RegisterPrincipal(string! principalId, string! displayName, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.RemoveMember(DigitalBrain.Capabilities.CapabilityCaller! caller, string! brainScopeId, string! accountId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.RemovePrincipalMember(DigitalBrain.Capabilities.CapabilityCaller! caller, string! brainScopeId, string! principalId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.RevokeAsOwner(DigitalBrain.Capabilities.CapabilityCaller! caller, string! appId, string! semanticTypeId, DigitalBrain.Capabilities.Identity.GrantMode mode, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Identity.Local.Directory.LocalDirectoryPort.Validate(string! sessionId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member?>!
+DigitalBrain.Identity.Local.Directory.LocalOwner
+const DigitalBrain.Identity.Local.Directory.LocalOwner.AccountId = "local" -> string!
+const DigitalBrain.Identity.Local.Directory.LocalOwner.PrincipalId = "owner" -> string!
+static DigitalBrain.Identity.Local.Directory.LocalOwner.Ensure(DigitalBrain.Capabilities.Identity.IIdentity! identity, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member!>!
+DigitalBrain.Identity.Local.Directory.PrincipalRow
+DigitalBrain.Identity.Local.Directory.PrincipalRow.<Clone>$() -> DigitalBrain.Identity.Local.Directory.PrincipalRow!
+DigitalBrain.Identity.Local.Directory.PrincipalRow.DefaultMembership.get -> DigitalBrain.Capabilities.Identity.Member?
+DigitalBrain.Identity.Local.Directory.PrincipalRow.DefaultMembership.init -> void
+DigitalBrain.Identity.Local.Directory.PrincipalRow.Equals(DigitalBrain.Identity.Local.Directory.PrincipalRow? other) -> bool
+DigitalBrain.Identity.Local.Directory.PrincipalRow.PrincipalId.get -> string!
+DigitalBrain.Identity.Local.Directory.PrincipalRow.PrincipalId.init -> void
+DigitalBrain.Identity.Local.Directory.PrincipalRow.PrincipalRow() -> void
+DigitalBrain.Identity.Local.Directory.PrincipalRow.RegistrationComplete.get -> bool
+DigitalBrain.Identity.Local.Directory.PrincipalRow.RegistrationComplete.init -> void
+override DigitalBrain.Identity.Local.Directory.PrincipalRow.Equals(object? obj) -> bool
+override DigitalBrain.Identity.Local.Directory.PrincipalRow.GetHashCode() -> int
+override DigitalBrain.Identity.Local.Directory.PrincipalRow.ToString() -> string!
+static DigitalBrain.Identity.Local.Directory.PrincipalRow.operator !=(DigitalBrain.Identity.Local.Directory.PrincipalRow? left, DigitalBrain.Identity.Local.Directory.PrincipalRow? right) -> bool
+static DigitalBrain.Identity.Local.Directory.PrincipalRow.operator ==(DigitalBrain.Identity.Local.Directory.PrincipalRow? left, DigitalBrain.Identity.Local.Directory.PrincipalRow? right) -> bool
+DigitalBrain.Identity.Local.Directory.SessionRow
+DigitalBrain.Identity.Local.Directory.SessionRow.<Clone>$() -> DigitalBrain.Identity.Local.Directory.SessionRow!
+DigitalBrain.Identity.Local.Directory.SessionRow.Equals(DigitalBrain.Identity.Local.Directory.SessionRow? other) -> bool
+DigitalBrain.Identity.Local.Directory.SessionRow.ExpiresAt.get -> System.DateTimeOffset
+DigitalBrain.Identity.Local.Directory.SessionRow.ExpiresAt.init -> void
+DigitalBrain.Identity.Local.Directory.SessionRow.Member.get -> DigitalBrain.Capabilities.Identity.Member!
+DigitalBrain.Identity.Local.Directory.SessionRow.Member.init -> void
+DigitalBrain.Identity.Local.Directory.SessionRow.SessionId.get -> string!
+DigitalBrain.Identity.Local.Directory.SessionRow.SessionId.init -> void
+DigitalBrain.Identity.Local.Directory.SessionRow.SessionRow() -> void
+override DigitalBrain.Identity.Local.Directory.SessionRow.Equals(object? obj) -> bool
+override DigitalBrain.Identity.Local.Directory.SessionRow.GetHashCode() -> int
+override DigitalBrain.Identity.Local.Directory.SessionRow.ToString() -> string!
+static DigitalBrain.Identity.Local.Directory.SessionRow.operator !=(DigitalBrain.Identity.Local.Directory.SessionRow? left, DigitalBrain.Identity.Local.Directory.SessionRow? right) -> bool
+static DigitalBrain.Identity.Local.Directory.SessionRow.operator ==(DigitalBrain.Identity.Local.Directory.SessionRow? left, DigitalBrain.Identity.Local.Directory.SessionRow? right) -> bool
 DigitalBrain.Identity.Local.LocalIdentityHosting
 static DigitalBrain.Identity.Local.LocalIdentityHosting.AddLocalIdentity(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Func<System.Type!, string!, object!>! neuronResolver) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static DigitalBrain.Identity.Local.LocalIdentityHosting.AddLocalIdentity(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Func<System.Type!, string!, object!>! neuronResolver, string! homeDirectory) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
