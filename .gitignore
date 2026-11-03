@@ -5,3 +5,4 @@ artifacts/
 .vs/
 *.user
 TestResults/
+Directory.Build.local.props

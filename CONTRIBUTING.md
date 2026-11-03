@@ -23,15 +23,16 @@ bash scripts/ci/template-smoke.sh local /tmp/db-smoke artifacts/packages
 ## Local-feed inner loop
 
 To try a change in a consuming repository before it is published, pack into a flat folder outside every repository
-and point the consumer at it with a NuGet config that also lives outside the repositories:
+and point the consumer at it through its optional, git-ignored `Directory.Build.local.props`:
 
 ```bash
 dotnet pack DigitalBrain.slnx -c Release -o <feed> -p:VersionSuffix=preview.local.$(date +%y%m%d%H%M%S)
 dotnet pack templates/DigitalBrain.Templates/DigitalBrain.Templates.csproj -c Release -o <feed> -p:VersionSuffix=preview.local.<same stamp>
 ```
 
-In the consumer, restore with `dotnet restore --configfile <outside-config>`, where the config maps `DigitalBrain*`
-to `<feed>` and everything else to nuget.org. Never commit a local feed path into any repository.
+Each consumer's `Directory.Build.props` imports `Directory.Build.local.props` when present. In the consumer, create
+`Directory.Build.local.props` (git-ignored) setting `<RestoreAdditionalProjectSources>` to `<feed>` and, when needed,
+overriding a `PackageVersion` with `Update`. Never commit a local feed path into any repository.
 `scripts/pack-local.ps1` and `scripts/pack-local.sh` pack a fixed `preview.N` into a feed folder the same way.
 
 ## Pull requests
