@@ -1,5 +1,38 @@
 #nullable enable
 
+~DigitalBrain.Capabilities.CapabilityConnection<TCapability>.<Clone>$() -> DigitalBrain.Capabilities.CapabilityConnection<TCapability>!
+~DigitalBrain.Capabilities.CapabilityConnection<TCapability>.Equals(DigitalBrain.Capabilities.CapabilityConnection<TCapability>? other) -> bool
+~override DigitalBrain.AppAddress.Equals(object obj) -> bool
+~override DigitalBrain.AppAddress.ToString() -> string
+~override DigitalBrain.AppKey.Equals(object obj) -> bool
+~override DigitalBrain.BrainId.Equals(object obj) -> bool
+~override DigitalBrain.Capabilities.CapabilityId.Equals(object obj) -> bool
+~override DigitalBrain.NeuronAddress.Equals(object obj) -> bool
+~override DigitalBrain.NeuronId.Equals(object obj) -> bool
+~override DigitalBrain.Operations.OperationId.Equals(object obj) -> bool
+~static DigitalBrain.Capabilities.CapabilityConnection<TCapability>.operator !=(DigitalBrain.Capabilities.CapabilityConnection<TCapability>? left, DigitalBrain.Capabilities.CapabilityConnection<TCapability>? right) -> bool
+~static DigitalBrain.Capabilities.CapabilityConnection<TCapability>.operator ==(DigitalBrain.Capabilities.CapabilityConnection<TCapability>? left, DigitalBrain.Capabilities.CapabilityConnection<TCapability>? right) -> bool
+abstract DigitalBrain.Operations.OperationPlan.<Clone>$() -> DigitalBrain.Operations.OperationPlan!
+abstract DigitalBrain.Operations.OperationResult.<Clone>$() -> DigitalBrain.Operations.OperationResult!
+abstract DigitalBrain.Rules.Rule.<Clone>$() -> DigitalBrain.Rules.Rule!
+abstract DigitalBrain.Rules.Rule.Broken.get -> bool
+abstract DigitalBrain.Rules.Rule.Message.get -> string!
+abstract DigitalBrain.Signal.<Clone>$() -> DigitalBrain.Signal!
+const DigitalBrain.App.SwallowedKept = 64 -> int
+const DigitalBrain.Apps.SpecComment.MaxLength = 65536 -> int
+const DigitalBrain.Capabilities.AppPrincipal.Prefix = "app:" -> string!
+const DigitalBrain.Capabilities.Capability.Identity.V1Id = "identity@1" -> string!
+const DigitalBrain.Capabilities.Capability.Secrets.V1Id = "secrets@1" -> string!
+const DigitalBrain.Capabilities.Capability.Storage.V1Id = "storage@1" -> string!
+const DigitalBrain.Capabilities.CapabilityCallers.AssistantApp = "assistant" -> string!
+const DigitalBrain.Capabilities.CapabilityCallers.PlatformApp = "platform" -> string!
+const DigitalBrain.Capabilities.CapabilityCallers.SchedulerApp = "scheduler" -> string!
+const DigitalBrain.Confirmation.IConfirmations.ConfirmationsNeuronKey = "confirmations" -> string!
+const DigitalBrain.Confirmation.IConfirmations.ResolveOperation = "Resolve" -> string!
+const DigitalBrain.Invocation.NeuronBinder.DefaultMaximumArgumentBytes = 1048576 -> int
+const DigitalBrain.RequestLedger.DefaultCapacity = 256 -> int
+const DigitalBrain.RevisionConflictException.Code = "RevisionConflict" -> string!
+const DigitalBrain.SignalPage.MaxLimit = 1000 -> int
 DigitalBrain.Access.AccessAttribute
 DigitalBrain.Access.AccessAttribute.AccessAttribute() -> void
 DigitalBrain.Access.InternalAttribute
@@ -17,15 +50,16 @@ DigitalBrain.App.App() -> void
 DigitalBrain.App.AppId.get -> string!
 DigitalBrain.App.AttachCapabilityResolver(System.Func<System.Type!, object!>! resolver) -> void
 DigitalBrain.App.AttachNeuronResolver(System.Func<System.Type!, string!, object!>! resolver) -> void
+DigitalBrain.App.Check(string! operation, params DigitalBrain.Rules.Rule![]! rules) -> void
 DigitalBrain.App.ClearError() -> void
+DigitalBrain.App.DeclaredWatches() -> System.Collections.Generic.IReadOnlyList<DigitalBrain.AppWatch!>!
 DigitalBrain.App.Get<T>(string! key) -> T!
 DigitalBrain.App.GetCapability<T>() -> T!
 DigitalBrain.App.Key(DigitalBrain.BrainId brain) -> DigitalBrain.AppKey
 DigitalBrain.App.Present<TView>(System.Action<TView?, TView?>! publish, System.Func<TView?>! side, System.Func<TView?>! main, string! operation = "") -> bool
-DigitalBrain.App.Check(string! operation, params DigitalBrain.Rules.Rule![]! rules) -> void
+DigitalBrain.App.RecordedError.get -> DigitalBrain.AppError?
 DigitalBrain.App.RecordError(DigitalBrain.AppError! error) -> void
 DigitalBrain.App.RecordError(System.Exception! error, string! operation = "") -> void
-DigitalBrain.App.RecordedError.get -> DigitalBrain.AppError?
 DigitalBrain.App.Requests.get -> DigitalBrain.RequestLedger!
 DigitalBrain.App.Swallow(System.Exception! error, string! reason, string! operation = "") -> void
 DigitalBrain.App.SwallowedErrors.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.AppError!>!
@@ -33,6 +67,15 @@ DigitalBrain.App<TState>
 DigitalBrain.App<TState>.App() -> void
 DigitalBrain.App<TState>.Set(TState next) -> TState
 DigitalBrain.App<TState>.State.get -> TState
+DigitalBrain.AppAddress
+DigitalBrain.AppAddress.App.get -> string!
+DigitalBrain.AppAddress.App.init -> void
+DigitalBrain.AppAddress.AppAddress() -> void
+DigitalBrain.AppAddress.AppAddress(string! Brain, string! App) -> void
+DigitalBrain.AppAddress.Brain.get -> string!
+DigitalBrain.AppAddress.Brain.init -> void
+DigitalBrain.AppAddress.Deconstruct(out string! Brain, out string! App) -> void
+DigitalBrain.AppAddress.Equals(DigitalBrain.AppAddress other) -> bool
 DigitalBrain.AppAttribute
 DigitalBrain.AppAttribute.Accent.get -> string?
 DigitalBrain.AppAttribute.Accent.init -> void
@@ -86,26 +129,71 @@ DigitalBrain.AppRequirements.Capabilities.get -> System.Collections.Generic.IRea
 DigitalBrain.AppRequirements.Capabilities.init -> void
 DigitalBrain.AppRequirements.Deconstruct(out System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.CapabilityId>! Capabilities) -> void
 DigitalBrain.AppRequirements.Equals(DigitalBrain.AppRequirements? other) -> bool
-DigitalBrain.AppSignalSubscription
-DigitalBrain.AppSignalSubscription.<Clone>$() -> DigitalBrain.AppSignalSubscription!
-DigitalBrain.AppSignalSubscription.AppSignalSubscription(string! OperationName, System.Reflection.MethodInfo! Method, System.Type! SignalType, string! SourceKey, System.Type? ContractType = null) -> void
-DigitalBrain.AppSignalSubscription.ContractType.get -> System.Type?
-DigitalBrain.AppSignalSubscription.ContractType.init -> void
-DigitalBrain.AppSignalSubscription.Deconstruct(out string! OperationName, out System.Reflection.MethodInfo! Method, out System.Type! SignalType, out string! SourceKey, out System.Type? ContractType) -> void
-DigitalBrain.AppSignalSubscription.Equals(DigitalBrain.AppSignalSubscription? other) -> bool
-DigitalBrain.AppSignalSubscription.Method.get -> System.Reflection.MethodInfo!
-DigitalBrain.AppSignalSubscription.Method.init -> void
-DigitalBrain.AppSignalSubscription.OperationName.get -> string!
-DigitalBrain.AppSignalSubscription.OperationName.init -> void
-DigitalBrain.AppSignalSubscription.SignalType.get -> System.Type!
-DigitalBrain.AppSignalSubscription.SignalType.init -> void
-DigitalBrain.AppSignalSubscription.SourceKey.get -> string!
-DigitalBrain.AppSignalSubscription.SourceKey.init -> void
 DigitalBrain.Apps.AppRole
 DigitalBrain.Apps.AppRole.Default = 1 -> DigitalBrain.Apps.AppRole
 DigitalBrain.Apps.AppRole.Example = 3 -> DigitalBrain.Apps.AppRole
 DigitalBrain.Apps.AppRole.Optional = 2 -> DigitalBrain.Apps.AppRole
 DigitalBrain.Apps.AppRole.Shell = 0 -> DigitalBrain.Apps.AppRole
+DigitalBrain.Apps.Hosting.BehaviorIds
+DigitalBrain.Apps.Hosting.BehaviorView
+DigitalBrain.Apps.Hosting.BehaviorView.<Clone>$() -> DigitalBrain.Apps.Hosting.BehaviorView!
+DigitalBrain.Apps.Hosting.BehaviorView.BehaviorView(string! Id, string! Hash, string! Status, string? Error) -> void
+DigitalBrain.Apps.Hosting.BehaviorView.Deconstruct(out string! Id, out string! Hash, out string! Status, out string? Error) -> void
+DigitalBrain.Apps.Hosting.BehaviorView.Equals(DigitalBrain.Apps.Hosting.BehaviorView? other) -> bool
+DigitalBrain.Apps.Hosting.BehaviorView.Error.get -> string?
+DigitalBrain.Apps.Hosting.BehaviorView.Error.init -> void
+DigitalBrain.Apps.Hosting.BehaviorView.Hash.get -> string!
+DigitalBrain.Apps.Hosting.BehaviorView.Hash.init -> void
+DigitalBrain.Apps.Hosting.BehaviorView.Id.get -> string!
+DigitalBrain.Apps.Hosting.BehaviorView.Id.init -> void
+DigitalBrain.Apps.Hosting.BehaviorView.Status.get -> string!
+DigitalBrain.Apps.Hosting.BehaviorView.Status.init -> void
+DigitalBrain.Apps.Hosting.IAppHost
+DigitalBrain.Apps.Hosting.IAppHost.Assign(DigitalBrain.Apps.Hosting.ProgramAssignment! assignment, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Apps.Hosting.IAppHost.Describe(string! owner, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Apps.Hosting.BehaviorView![]!>!
+DigitalBrain.Apps.Hosting.IAppHost.Retire(string! owner, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Apps.Hosting.IPrograms
+DigitalBrain.Apps.Hosting.IPrograms.Assign(string! owner, System.Collections.Generic.Dictionary<string!, string!>! sources, System.Collections.Generic.Dictionary<string!, string!>! settings) -> System.Threading.Tasks.Task<DigitalBrain.Apps.Hosting.ProgramView!>!
+DigitalBrain.Apps.Hosting.IPrograms.AssignPrebuilt(string! owner, System.Collections.Generic.Dictionary<string!, DigitalBrain.Apps.Hosting.PrebuiltBehavior!>! behaviors, System.Collections.Generic.Dictionary<string!, string!>! settings) -> System.Threading.Tasks.Task<DigitalBrain.Apps.Hosting.ProgramView!>!
+DigitalBrain.Apps.Hosting.IPrograms.Describe(string! owner) -> System.Threading.Tasks.Task<DigitalBrain.Apps.Hosting.ProgramView?>!
+DigitalBrain.Apps.Hosting.IPrograms.Retire(string! owner) -> System.Threading.Tasks.Task!
+DigitalBrain.Apps.Hosting.IPrograms.Settled(string! owner, System.TimeSpan timeout) -> System.Threading.Tasks.Task<DigitalBrain.Apps.Hosting.ProgramView?>!
+DigitalBrain.Apps.Hosting.IPrograms.Stage(string! hash, int offset, byte[]! chunk, bool last) -> System.Threading.Tasks.Task!
+DigitalBrain.Apps.Hosting.PrebuiltBehavior
+DigitalBrain.Apps.Hosting.PrebuiltBehavior.<Clone>$() -> DigitalBrain.Apps.Hosting.PrebuiltBehavior!
+DigitalBrain.Apps.Hosting.PrebuiltBehavior.Assembly.get -> byte[]!
+DigitalBrain.Apps.Hosting.PrebuiltBehavior.Assembly.init -> void
+DigitalBrain.Apps.Hosting.PrebuiltBehavior.Deconstruct(out byte[]! Assembly, out byte[]! Symbols, out string! Hash) -> void
+DigitalBrain.Apps.Hosting.PrebuiltBehavior.Equals(DigitalBrain.Apps.Hosting.PrebuiltBehavior? other) -> bool
+DigitalBrain.Apps.Hosting.PrebuiltBehavior.Hash.get -> string!
+DigitalBrain.Apps.Hosting.PrebuiltBehavior.Hash.init -> void
+DigitalBrain.Apps.Hosting.PrebuiltBehavior.PrebuiltBehavior(byte[]! Assembly, byte[]! Symbols, string! Hash) -> void
+DigitalBrain.Apps.Hosting.PrebuiltBehavior.Symbols.get -> byte[]!
+DigitalBrain.Apps.Hosting.PrebuiltBehavior.Symbols.init -> void
+DigitalBrain.Apps.Hosting.ProgramAssignment
+DigitalBrain.Apps.Hosting.ProgramAssignment.<Clone>$() -> DigitalBrain.Apps.Hosting.ProgramAssignment!
+DigitalBrain.Apps.Hosting.ProgramAssignment.Behaviors.get -> System.Collections.Generic.IReadOnlyDictionary<string!, DigitalBrain.Apps.Hosting.PrebuiltBehavior!>!
+DigitalBrain.Apps.Hosting.ProgramAssignment.Behaviors.init -> void
+DigitalBrain.Apps.Hosting.ProgramAssignment.Deconstruct(out string! Owner, out string! Hash, out System.Collections.Generic.IReadOnlyDictionary<string!, DigitalBrain.Apps.Hosting.PrebuiltBehavior!>! Behaviors, out System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Settings) -> void
+DigitalBrain.Apps.Hosting.ProgramAssignment.Equals(DigitalBrain.Apps.Hosting.ProgramAssignment? other) -> bool
+DigitalBrain.Apps.Hosting.ProgramAssignment.Hash.get -> string!
+DigitalBrain.Apps.Hosting.ProgramAssignment.Hash.init -> void
+DigitalBrain.Apps.Hosting.ProgramAssignment.Owner.get -> string!
+DigitalBrain.Apps.Hosting.ProgramAssignment.Owner.init -> void
+DigitalBrain.Apps.Hosting.ProgramAssignment.ProgramAssignment(string! Owner, string! Hash, System.Collections.Generic.IReadOnlyDictionary<string!, DigitalBrain.Apps.Hosting.PrebuiltBehavior!>! Behaviors, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Settings) -> void
+DigitalBrain.Apps.Hosting.ProgramAssignment.Settings.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+DigitalBrain.Apps.Hosting.ProgramAssignment.Settings.init -> void
+DigitalBrain.Apps.Hosting.ProgramView
+DigitalBrain.Apps.Hosting.ProgramView.<Clone>$() -> DigitalBrain.Apps.Hosting.ProgramView!
+DigitalBrain.Apps.Hosting.ProgramView.Behaviors.get -> DigitalBrain.Apps.Hosting.BehaviorView![]!
+DigitalBrain.Apps.Hosting.ProgramView.Behaviors.init -> void
+DigitalBrain.Apps.Hosting.ProgramView.Deconstruct(out string! Owner, out string! Hash, out DigitalBrain.Apps.Hosting.BehaviorView![]! Behaviors) -> void
+DigitalBrain.Apps.Hosting.ProgramView.Equals(DigitalBrain.Apps.Hosting.ProgramView? other) -> bool
+DigitalBrain.Apps.Hosting.ProgramView.Hash.get -> string!
+DigitalBrain.Apps.Hosting.ProgramView.Hash.init -> void
+DigitalBrain.Apps.Hosting.ProgramView.Owner.get -> string!
+DigitalBrain.Apps.Hosting.ProgramView.Owner.init -> void
+DigitalBrain.Apps.Hosting.ProgramView.ProgramView(string! Owner, string! Hash, DigitalBrain.Apps.Hosting.BehaviorView![]! Behaviors) -> void
 DigitalBrain.Apps.SpecComment
 DigitalBrain.Apps.SpecComment.Describes(string! operation) -> bool
 DigitalBrain.Apps.SpecComment.Description.get -> string!
@@ -121,6 +209,31 @@ DigitalBrain.Apps.SpecCommentError
 DigitalBrain.Apps.SpecCommentError.Line.get -> int
 DigitalBrain.Apps.SpecCommentError.Message.get -> string!
 DigitalBrain.Apps.SpecCommentError.SpecCommentError(int line, string! message) -> void
+DigitalBrain.AppSignalSubscription
+DigitalBrain.AppSignalSubscription.<Clone>$() -> DigitalBrain.AppSignalSubscription!
+DigitalBrain.AppSignalSubscription.AppSignalSubscription(string! OperationName, System.Reflection.MethodInfo! Method, System.Type! SignalType, string! SourceKey, System.Type? ContractType = null) -> void
+DigitalBrain.AppSignalSubscription.ContractType.get -> System.Type?
+DigitalBrain.AppSignalSubscription.ContractType.init -> void
+DigitalBrain.AppSignalSubscription.Deconstruct(out string! OperationName, out System.Reflection.MethodInfo! Method, out System.Type! SignalType, out string! SourceKey, out System.Type? ContractType) -> void
+DigitalBrain.AppSignalSubscription.Equals(DigitalBrain.AppSignalSubscription? other) -> bool
+DigitalBrain.AppSignalSubscription.Method.get -> System.Reflection.MethodInfo!
+DigitalBrain.AppSignalSubscription.Method.init -> void
+DigitalBrain.AppSignalSubscription.OperationName.get -> string!
+DigitalBrain.AppSignalSubscription.OperationName.init -> void
+DigitalBrain.AppSignalSubscription.SignalType.get -> System.Type!
+DigitalBrain.AppSignalSubscription.SignalType.init -> void
+DigitalBrain.AppSignalSubscription.SourceKey.get -> string!
+DigitalBrain.AppSignalSubscription.SourceKey.init -> void
+DigitalBrain.AppWatch
+DigitalBrain.AppWatch.ChangeType.get -> System.Type?
+DigitalBrain.AppWatch.Handle.get -> System.Func<DigitalBrain.Signal!, System.Threading.Tasks.Task!>!
+DigitalBrain.AppWatch.IsSet.get -> bool
+DigitalBrain.AppWatch.Key.get -> System.Func<DigitalBrain.AppAddress, string!>!
+DigitalBrain.AppWatch.MemberType.get -> System.Type?
+DigitalBrain.AppWatch.Name.get -> string!
+DigitalBrain.AppWatch.Select.get -> System.Func<object!, DigitalBrain.AppAddress, System.Threading.CancellationToken, System.Threading.Tasks.Task<string![]!>!>?
+DigitalBrain.AppWatch.SignalType.get -> System.Type!
+DigitalBrain.AppWatch.SourceType.get -> System.Type!
 DigitalBrain.BddNeuron
 DigitalBrain.BddNeuron.BddNeuron() -> void
 DigitalBrain.BddNeuron.Read(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.BddReport?>!
@@ -195,18 +308,18 @@ DigitalBrain.BrainType.Origin.get -> string!
 DigitalBrain.BrainType.Origin.init -> void
 DigitalBrain.BrainType.Shape.get -> string![]!
 DigitalBrain.BrainType.Shape.init -> void
-DigitalBrain.CallTimeoutAttribute
-DigitalBrain.CallTimeoutAttribute.CallTimeoutAttribute(int milliseconds) -> void
-DigitalBrain.CallTimeoutAttribute.Milliseconds.get -> int
-DigitalBrain.CallTimeoutAttribute.Timeout.get -> System.TimeSpan
 DigitalBrain.CallsAttribute
 DigitalBrain.CallsAttribute.CallsAttribute(string! from, string! to) -> void
 DigitalBrain.CallsAttribute.From.get -> string!
 DigitalBrain.CallsAttribute.To.get -> string!
+DigitalBrain.CallTimeoutAttribute
+DigitalBrain.CallTimeoutAttribute.CallTimeoutAttribute(int milliseconds) -> void
+DigitalBrain.CallTimeoutAttribute.Milliseconds.get -> int
+DigitalBrain.CallTimeoutAttribute.Timeout.get -> System.TimeSpan
 DigitalBrain.Capabilities.AppPrincipal
 DigitalBrain.Capabilities.CallerKind
-DigitalBrain.Capabilities.CallerKind.App = 2 -> DigitalBrain.Capabilities.CallerKind
 DigitalBrain.Capabilities.CallerKind.Agent = 1 -> DigitalBrain.Capabilities.CallerKind
+DigitalBrain.Capabilities.CallerKind.App = 2 -> DigitalBrain.Capabilities.CallerKind
 DigitalBrain.Capabilities.CallerKind.Assistant = 1 -> DigitalBrain.Capabilities.CallerKind
 DigitalBrain.Capabilities.CallerKind.Platform = 4 -> DigitalBrain.Capabilities.CallerKind
 DigitalBrain.Capabilities.CallerKind.Scheduler = 3 -> DigitalBrain.Capabilities.CallerKind
@@ -221,10 +334,10 @@ DigitalBrain.Capabilities.CapabilityCaller.AccountId.get -> string!
 DigitalBrain.Capabilities.CapabilityCaller.AccountId.init -> void
 DigitalBrain.Capabilities.CapabilityCaller.AppId.get -> string?
 DigitalBrain.Capabilities.CapabilityCaller.AppId.init -> void
+DigitalBrain.Capabilities.CapabilityCaller.AppKey.get -> string?
 DigitalBrain.Capabilities.CapabilityCaller.BrainId.get -> string!
 DigitalBrain.Capabilities.CapabilityCaller.BrainId.init -> void
 DigitalBrain.Capabilities.CapabilityCaller.CapabilityCaller(string! PrincipalId, string! AccountId, string! BrainId, string? AppId = null, string? ConversationId = null) -> void
-DigitalBrain.Capabilities.CapabilityCaller.AppKey.get -> string?
 DigitalBrain.Capabilities.CapabilityCaller.ConversationId.get -> string?
 DigitalBrain.Capabilities.CapabilityCaller.ConversationId.init -> void
 DigitalBrain.Capabilities.CapabilityCaller.Deconstruct(out string! PrincipalId, out string! AccountId, out string! BrainId, out string? AppId, out string? ConversationId) -> void
@@ -438,10 +551,9 @@ DigitalBrain.IBrainSignalLog.EnsureCaughtUpAsync<TState>(DigitalBrain.NeuronId s
 DigitalBrain.IBrainSignalLog.GetLatestPositionAsync(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<long>!
 DigitalBrain.IBrainSignalLog.IsQuarantined(System.DateTimeOffset lastActiveAt, System.DateTimeOffset? now = null) -> bool
 DigitalBrain.IBrainSignalLog.NotifySubscribersAsync(System.Collections.Generic.IEnumerable<string!>! subscribers, long position) -> System.Threading.Tasks.Task!
-DigitalBrain.IRevisioned<TState>
-DigitalBrain.IRevisioned<TState>.Advanced(string! operationId) -> TState
-DigitalBrain.IRevisioned<TState>.Operations.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
-DigitalBrain.IRevisioned<TState>.Revision.get -> long
+DigitalBrain.INeuronResolver
+DigitalBrain.INeuronResolver.Resolve<T>(DigitalBrain.BrainId brain, string! relative) -> T!
+DigitalBrain.INeuronResolver.ResolveKey<T>(string! fullKey) -> T!
 DigitalBrain.InProcessHostOptions
 DigitalBrain.InProcessHostOptions.Configuration.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string?>!
 DigitalBrain.InProcessHostOptions.Configuration.set -> void
@@ -474,6 +586,9 @@ DigitalBrain.Invocation.InvocationResultKind
 DigitalBrain.Invocation.InvocationResultKind.None = 0 -> DigitalBrain.Invocation.InvocationResultKind
 DigitalBrain.Invocation.InvocationResultKind.Stream = 2 -> DigitalBrain.Invocation.InvocationResultKind
 DigitalBrain.Invocation.InvocationResultKind.Value = 1 -> DigitalBrain.Invocation.InvocationResultKind
+DigitalBrain.Invocation.IWorkContinuation
+DigitalBrain.Invocation.IWorkContinuation.Acquire(string! brainScope, string! token) -> System.Threading.Tasks.Task!
+DigitalBrain.Invocation.IWorkContinuation.Release(string! brainScope, string! token) -> System.Threading.Tasks.Task!
 DigitalBrain.Invocation.NeuronBinder
 DigitalBrain.Invocation.NeuronBinder.Bind(System.Type! contract, DigitalBrain.Invocation.RuntimeInvocation! call) -> DigitalBrain.Invocation.BoundCall!
 DigitalBrain.Invocation.NeuronBinder.InvokeAsync(object! target, DigitalBrain.Invocation.BoundCall! call, System.Text.Json.JsonElement[]! arguments, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Text.Json.JsonElement?>!
@@ -500,6 +615,10 @@ DigitalBrain.Invocation.RuntimeInvocation.Method.get -> string!
 DigitalBrain.Invocation.RuntimeInvocation.Method.init -> void
 DigitalBrain.Invocation.RuntimeInvocation.RuntimeInvocation(string! Behavior, string! Contract, string! Key, string! Method, System.Text.Json.JsonElement[]! Arguments) -> void
 DigitalBrain.Invocation.RuntimeProtocol
+DigitalBrain.IRevisioned<TState>
+DigitalBrain.IRevisioned<TState>.Advanced(string! operationId) -> TState
+DigitalBrain.IRevisioned<TState>.Operations.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+DigitalBrain.IRevisioned<TState>.Revision.get -> long
 DigitalBrain.JournaledSignal
 DigitalBrain.JournaledSignal.<Clone>$() -> DigitalBrain.JournaledSignal!
 DigitalBrain.JournaledSignal.At.get -> System.DateTimeOffset
@@ -553,6 +672,86 @@ DigitalBrain.ModuleManifest.Secrets.get -> System.Collections.Generic.IReadOnlyL
 DigitalBrain.ModuleManifest.Secrets.init -> void
 DigitalBrain.ModuleManifest.Settings.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Setting!>!
 DigitalBrain.ModuleManifest.Settings.init -> void
+DigitalBrain.Modules.Validation.ArrayLength<T>
+DigitalBrain.Modules.Validation.ArrayLength<T>.ArrayLength(string! Path, T[]? Value, int Minimum, int Maximum) -> void
+DigitalBrain.Modules.Validation.ArrayLength<T>.Deconstruct(out string! Path, out T[]? Value, out int Minimum, out int Maximum) -> void
+DigitalBrain.Modules.Validation.ArrayLength<T>.Equals(DigitalBrain.Modules.Validation.ArrayLength<T>? other) -> bool
+DigitalBrain.Modules.Validation.ArrayLength<T>.Maximum.get -> int
+DigitalBrain.Modules.Validation.ArrayLength<T>.Maximum.init -> void
+DigitalBrain.Modules.Validation.ArrayLength<T>.Minimum.get -> int
+DigitalBrain.Modules.Validation.ArrayLength<T>.Minimum.init -> void
+DigitalBrain.Modules.Validation.ArrayLength<T>.Path.get -> string!
+DigitalBrain.Modules.Validation.ArrayLength<T>.Path.init -> void
+DigitalBrain.Modules.Validation.ArrayLength<T>.Value.get -> T[]?
+DigitalBrain.Modules.Validation.ArrayLength<T>.Value.init -> void
+DigitalBrain.Modules.Validation.HttpUri
+DigitalBrain.Modules.Validation.HttpUri.Deconstruct(out string! Path, out System.Uri? Value) -> void
+DigitalBrain.Modules.Validation.HttpUri.Equals(DigitalBrain.Modules.Validation.HttpUri? other) -> bool
+DigitalBrain.Modules.Validation.HttpUri.HttpUri(string! Path, System.Uri? Value) -> void
+DigitalBrain.Modules.Validation.HttpUri.Path.get -> string!
+DigitalBrain.Modules.Validation.HttpUri.Path.init -> void
+DigitalBrain.Modules.Validation.HttpUri.Value.get -> System.Uri?
+DigitalBrain.Modules.Validation.HttpUri.Value.init -> void
+DigitalBrain.Modules.Validation.IModuleValidator<T>
+DigitalBrain.Modules.Validation.IModuleValidator<T>.Validate(T value) -> DigitalBrain.Modules.Validation.ValidationIssue![]!
+DigitalBrain.Modules.Validation.ModuleValidation
+DigitalBrain.Modules.Validation.ModuleValidationException
+DigitalBrain.Modules.Validation.ModuleValidationException.Issues.get -> DigitalBrain.Modules.Validation.ValidationIssue![]!
+DigitalBrain.Modules.Validation.ModuleValidationException.ModuleValidationException(DigitalBrain.Modules.Validation.ValidationIssue![]! issues) -> void
+DigitalBrain.Modules.Validation.ModuleValidationException.ModuleValidationException(DigitalBrain.Rules.Rejected! rejected) -> void
+DigitalBrain.Modules.Validation.NumberRange
+DigitalBrain.Modules.Validation.NumberRange.Deconstruct(out string! Path, out decimal Value, out decimal Minimum, out decimal Maximum) -> void
+DigitalBrain.Modules.Validation.NumberRange.Equals(DigitalBrain.Modules.Validation.NumberRange? other) -> bool
+DigitalBrain.Modules.Validation.NumberRange.Maximum.get -> decimal
+DigitalBrain.Modules.Validation.NumberRange.Maximum.init -> void
+DigitalBrain.Modules.Validation.NumberRange.Minimum.get -> decimal
+DigitalBrain.Modules.Validation.NumberRange.Minimum.init -> void
+DigitalBrain.Modules.Validation.NumberRange.NumberRange(string! Path, decimal Value, decimal Minimum, decimal Maximum) -> void
+DigitalBrain.Modules.Validation.NumberRange.Path.get -> string!
+DigitalBrain.Modules.Validation.NumberRange.Path.init -> void
+DigitalBrain.Modules.Validation.NumberRange.Value.get -> decimal
+DigitalBrain.Modules.Validation.NumberRange.Value.init -> void
+DigitalBrain.Modules.Validation.Required
+DigitalBrain.Modules.Validation.Required.Deconstruct(out string! Path, out object? Value) -> void
+DigitalBrain.Modules.Validation.Required.Equals(DigitalBrain.Modules.Validation.Required? other) -> bool
+DigitalBrain.Modules.Validation.Required.Path.get -> string!
+DigitalBrain.Modules.Validation.Required.Path.init -> void
+DigitalBrain.Modules.Validation.Required.Required(string! Path, object? Value) -> void
+DigitalBrain.Modules.Validation.Required.Value.get -> object?
+DigitalBrain.Modules.Validation.Required.Value.init -> void
+DigitalBrain.Modules.Validation.StringLength
+DigitalBrain.Modules.Validation.StringLength.Deconstruct(out string! Path, out string? Value, out int Minimum, out int Maximum) -> void
+DigitalBrain.Modules.Validation.StringLength.Equals(DigitalBrain.Modules.Validation.StringLength? other) -> bool
+DigitalBrain.Modules.Validation.StringLength.Maximum.get -> int
+DigitalBrain.Modules.Validation.StringLength.Maximum.init -> void
+DigitalBrain.Modules.Validation.StringLength.Minimum.get -> int
+DigitalBrain.Modules.Validation.StringLength.Minimum.init -> void
+DigitalBrain.Modules.Validation.StringLength.Path.get -> string!
+DigitalBrain.Modules.Validation.StringLength.Path.init -> void
+DigitalBrain.Modules.Validation.StringLength.StringLength(string! Path, string? Value, int Minimum, int Maximum) -> void
+DigitalBrain.Modules.Validation.StringLength.Value.get -> string?
+DigitalBrain.Modules.Validation.StringLength.Value.init -> void
+DigitalBrain.Modules.Validation.Utf8Length
+DigitalBrain.Modules.Validation.Utf8Length.Deconstruct(out string! Path, out string? Value, out int MaximumBytes) -> void
+DigitalBrain.Modules.Validation.Utf8Length.Equals(DigitalBrain.Modules.Validation.Utf8Length? other) -> bool
+DigitalBrain.Modules.Validation.Utf8Length.MaximumBytes.get -> int
+DigitalBrain.Modules.Validation.Utf8Length.MaximumBytes.init -> void
+DigitalBrain.Modules.Validation.Utf8Length.Path.get -> string!
+DigitalBrain.Modules.Validation.Utf8Length.Path.init -> void
+DigitalBrain.Modules.Validation.Utf8Length.Utf8Length(string! Path, string? Value, int MaximumBytes) -> void
+DigitalBrain.Modules.Validation.Utf8Length.Value.get -> string?
+DigitalBrain.Modules.Validation.Utf8Length.Value.init -> void
+DigitalBrain.Modules.Validation.ValidationIssue
+DigitalBrain.Modules.Validation.ValidationIssue.<Clone>$() -> DigitalBrain.Modules.Validation.ValidationIssue!
+DigitalBrain.Modules.Validation.ValidationIssue.Code.get -> string!
+DigitalBrain.Modules.Validation.ValidationIssue.Code.init -> void
+DigitalBrain.Modules.Validation.ValidationIssue.Deconstruct(out string! Path, out string! Code, out string! Message) -> void
+DigitalBrain.Modules.Validation.ValidationIssue.Equals(DigitalBrain.Modules.Validation.ValidationIssue? other) -> bool
+DigitalBrain.Modules.Validation.ValidationIssue.Message.get -> string!
+DigitalBrain.Modules.Validation.ValidationIssue.Message.init -> void
+DigitalBrain.Modules.Validation.ValidationIssue.Path.get -> string!
+DigitalBrain.Modules.Validation.ValidationIssue.Path.init -> void
+DigitalBrain.Modules.Validation.ValidationIssue.ValidationIssue(string! Path, string! Code, string! Message) -> void
 DigitalBrain.Need
 DigitalBrain.Need.<Clone>$() -> DigitalBrain.Need!
 DigitalBrain.Need.BaseAddressSetting.get -> string?
@@ -575,6 +774,7 @@ DigitalBrain.NeedKind.Secrets = 3 -> DigitalBrain.NeedKind
 DigitalBrain.NeedKind.State = 0 -> DigitalBrain.NeedKind
 DigitalBrain.NeedKind.Streams = 1 -> DigitalBrain.NeedKind
 DigitalBrain.Neuron
+DigitalBrain.Neuron.Check(string! operation, params DigitalBrain.Rules.Rule![]! rules) -> System.Threading.Tasks.Task!
 DigitalBrain.Neuron.Context.get -> DigitalBrain.Spi.INeuronContext!
 DigitalBrain.Neuron.Defer(System.Func<System.Threading.Tasks.Task!>! work) -> void
 DigitalBrain.Neuron.Get<T>(DigitalBrain.NeuronId id) -> T!
@@ -582,12 +782,22 @@ DigitalBrain.Neuron.Id.get -> DigitalBrain.NeuronId
 DigitalBrain.Neuron.Neuron() -> void
 DigitalBrain.Neuron.Publish(DigitalBrain.Signal! signal) -> System.Threading.Tasks.Task!
 DigitalBrain.Neuron.PublishEphemeral(DigitalBrain.Signal! signal) -> System.Threading.Tasks.Task!
-DigitalBrain.Neuron.Check(string! operation, params DigitalBrain.Rules.Rule![]! rules) -> System.Threading.Tasks.Task!
 DigitalBrain.Neuron<TState>
 DigitalBrain.Neuron<TState>.Neuron() -> void
 DigitalBrain.Neuron<TState>.Save(TState! next, DigitalBrain.Signal! changed, DigitalBrain.Signal? acted = null) -> System.Threading.Tasks.Task!
 DigitalBrain.Neuron<TState>.Save(TState! next, System.Collections.Generic.IReadOnlyList<DigitalBrain.Signal!>! signals) -> System.Threading.Tasks.Task!
 DigitalBrain.Neuron<TState>.State.get -> TState!
+DigitalBrain.NeuronAddress
+DigitalBrain.NeuronAddress.Brain.get -> DigitalBrain.BrainId?
+DigitalBrain.NeuronAddress.Deconstruct(out string! NeuronType, out string! Key) -> void
+DigitalBrain.NeuronAddress.Equals(DigitalBrain.NeuronAddress other) -> bool
+DigitalBrain.NeuronAddress.Key.get -> string!
+DigitalBrain.NeuronAddress.Key.init -> void
+DigitalBrain.NeuronAddress.NeuronAddress() -> void
+DigitalBrain.NeuronAddress.NeuronAddress(string! NeuronType, string! Key) -> void
+DigitalBrain.NeuronAddress.NeuronType.get -> string!
+DigitalBrain.NeuronAddress.NeuronType.init -> void
+DigitalBrain.NeuronAddress.StorageKey.get -> string!
 DigitalBrain.NeuronAttribute
 DigitalBrain.NeuronAttribute.NeuronAttribute(string! type) -> void
 DigitalBrain.NeuronAttribute.State.get -> string?
@@ -639,8 +849,8 @@ DigitalBrain.Operations.OperationPlan
 DigitalBrain.Operations.OperationPlan.Deconstruct(out bool DryRun) -> void
 DigitalBrain.Operations.OperationPlan.DryRun.get -> bool
 DigitalBrain.Operations.OperationPlan.DryRun.init -> void
-DigitalBrain.Operations.OperationPlan.OperationPlan(DigitalBrain.Operations.OperationPlan! original) -> void
 DigitalBrain.Operations.OperationPlan.OperationPlan(bool DryRun) -> void
+DigitalBrain.Operations.OperationPlan.OperationPlan(DigitalBrain.Operations.OperationPlan! original) -> void
 DigitalBrain.Operations.OperationResult
 DigitalBrain.Operations.OperationResult.Cancelled
 DigitalBrain.Operations.OperationResult.Cancelled.Cancelled() -> void
@@ -692,12 +902,32 @@ DigitalBrain.RevisionConflictException
 DigitalBrain.RevisionConflictException.CurrentRevision.get -> long
 DigitalBrain.RevisionConflictException.RevisionConflictException() -> void
 DigitalBrain.RevisionConflictException.RevisionConflictException(string! message) -> void
-DigitalBrain.RevisionConflictException.RevisionConflictException(string! message, System.Exception! innerException) -> void
 DigitalBrain.RevisionConflictException.RevisionConflictException(string! message, long currentRevision) -> void
+DigitalBrain.RevisionConflictException.RevisionConflictException(string! message, System.Exception! innerException) -> void
 DigitalBrain.RevisionedNeuron<TState>
 DigitalBrain.RevisionedNeuron<TState>.Commit(string! operationId, long expectedRevision, System.Func<TState!, TState!>! change, System.Func<TState!, DigitalBrain.Signal!>! changed) -> System.Threading.Tasks.Task<bool>!
 DigitalBrain.RevisionedNeuron<TState>.Revision.get -> long
 DigitalBrain.RevisionedNeuron<TState>.RevisionedNeuron() -> void
+DigitalBrain.Rules.Rejected
+DigitalBrain.Rules.Rejected.Deconstruct(out string! Operation, out string![]! Rules, out string![]! Messages) -> void
+DigitalBrain.Rules.Rejected.Equals(DigitalBrain.Rules.Rejected? other) -> bool
+DigitalBrain.Rules.Rejected.Messages.get -> string![]!
+DigitalBrain.Rules.Rejected.Messages.init -> void
+DigitalBrain.Rules.Rejected.Operation.get -> string!
+DigitalBrain.Rules.Rejected.Operation.init -> void
+DigitalBrain.Rules.Rejected.Rejected(string! Operation, string![]! Rules, string![]! Messages) -> void
+DigitalBrain.Rules.Rejected.Rules.get -> string![]!
+DigitalBrain.Rules.Rejected.Rules.init -> void
+DigitalBrain.Rules.Rule
+DigitalBrain.Rules.Rule.Deconstruct(out string! Name) -> void
+DigitalBrain.Rules.Rule.Name.get -> string!
+DigitalBrain.Rules.Rule.Name.init -> void
+DigitalBrain.Rules.Rule.Rule(DigitalBrain.Rules.Rule! original) -> void
+DigitalBrain.Rules.Rule.Rule(string! Name) -> void
+DigitalBrain.Rules.Rules
+DigitalBrain.Rules.RuleViolationException
+DigitalBrain.Rules.RuleViolationException.Rejected.get -> DigitalBrain.Rules.Rejected!
+DigitalBrain.Rules.RuleViolationException.RuleViolationException(DigitalBrain.Rules.Rejected! rejected) -> void
 DigitalBrain.ScenarioAttribute
 DigitalBrain.ScenarioAttribute.Language.get -> string!
 DigitalBrain.ScenarioAttribute.Language.init -> void
@@ -778,6 +1008,21 @@ DigitalBrain.SignalPage.Last.init -> void
 DigitalBrain.SignalPage.SignalPage(long Floor, long Last, System.Collections.Generic.IReadOnlyList<DigitalBrain.JournaledSignal!>! Signals) -> void
 DigitalBrain.SignalPage.Signals.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.JournaledSignal!>!
 DigitalBrain.SignalPage.Signals.init -> void
+DigitalBrain.Signals.Watch.IInitialSignalWait
+DigitalBrain.Signals.Watch.IInitialSignalWait.ReachedInitialWaitAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+DigitalBrain.Signals.Watch.IInitialSignalWait.SuppressInitialWait() -> System.IDisposable!
+DigitalBrain.Signals.Watch.ISelectiveWatch
+DigitalBrain.Signals.Watch.ISelectiveWatch.On<T>(object! neuron, string! selector, System.Func<System.Threading.Tasks.Task!>! onSubscribed, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<T!>!
+DigitalBrain.Signals.Watch.ISignalDelivery
+DigitalBrain.Signals.Watch.ISignalDelivery.DeliveredAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+DigitalBrain.Signals.Watch.ISignalWatch
+DigitalBrain.Signals.Watch.ISignalWatch.On<T>(object! neuron, System.Func<System.Threading.Tasks.Task!>! onSubscribed, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<T!>!
+DigitalBrain.Signals.Watch.ISignalWatch.On<T>(object! neuron, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<T!>!
+DigitalBrain.Signals.Watch.SignalDeliveries
+DigitalBrain.Signals.Watch.Sources
+DigitalBrain.Signals.Watch.WatchStream<T>
+DigitalBrain.Signals.Watch.WatchStream<T>.GetAsyncEnumerator(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerator<T>!
+DigitalBrain.Signals.Watch.WatchStream<T>.WatchStream(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<(System.Collections.Generic.IAsyncEnumerable<T>! Signals, System.IAsyncDisposable! Handle)>!>! open, System.Threading.CancellationToken subscriptionCancellation, System.Threading.CancellationToken behaviorCancellation, System.Func<System.Threading.Tasks.Task!>! onSubscribed) -> void
 DigitalBrain.Spi.IBrainObserver
 DigitalBrain.Spi.IBrainObserver.Brains(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string![]!>!
 DigitalBrain.Spi.IBrainObserver.Deliveries(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<DigitalBrain.SignalDelivery!>!
@@ -851,18 +1096,18 @@ DigitalBrain.State.IStateCodec.Serialize<T>(T value) -> byte[]!
 DigitalBrain.State.StoredRecord
 DigitalBrain.State.StoredRecord.<Clone>$() -> DigitalBrain.State.StoredRecord!
 DigitalBrain.State.StoredRecord.Deconstruct(out System.ReadOnlyMemory<byte> Record, out long ETag) -> void
+DigitalBrain.State.StoredRecord.Equals(DigitalBrain.State.StoredRecord? other) -> bool
 DigitalBrain.State.StoredRecord.ETag.get -> long
 DigitalBrain.State.StoredRecord.ETag.init -> void
-DigitalBrain.State.StoredRecord.Equals(DigitalBrain.State.StoredRecord? other) -> bool
 DigitalBrain.State.StoredRecord.Record.get -> System.ReadOnlyMemory<byte>
 DigitalBrain.State.StoredRecord.Record.init -> void
 DigitalBrain.State.StoredRecord.StoredRecord(System.ReadOnlyMemory<byte> Record, long ETag) -> void
 DigitalBrain.State.WriteResult
 DigitalBrain.State.WriteResult.<Clone>$() -> DigitalBrain.State.WriteResult!
 DigitalBrain.State.WriteResult.Deconstruct(out long ETag, out long? Sequence) -> void
+DigitalBrain.State.WriteResult.Equals(DigitalBrain.State.WriteResult? other) -> bool
 DigitalBrain.State.WriteResult.ETag.get -> long
 DigitalBrain.State.WriteResult.ETag.init -> void
-DigitalBrain.State.WriteResult.Equals(DigitalBrain.State.WriteResult? other) -> bool
 DigitalBrain.State.WriteResult.Sequence.get -> long?
 DigitalBrain.State.WriteResult.Sequence.init -> void
 DigitalBrain.State.WriteResult.WriteResult(long ETag, long? Sequence) -> void
@@ -894,24 +1139,11 @@ DigitalBrain.TypeKind
 DigitalBrain.TypeKind.Connector = 2 -> DigitalBrain.TypeKind
 DigitalBrain.TypeKind.Neuron = 0 -> DigitalBrain.TypeKind
 DigitalBrain.TypeKind.Signal = 1 -> DigitalBrain.TypeKind
-abstract DigitalBrain.Operations.OperationPlan.<Clone>$() -> DigitalBrain.Operations.OperationPlan!
-abstract DigitalBrain.Operations.OperationResult.<Clone>$() -> DigitalBrain.Operations.OperationResult!
-abstract DigitalBrain.Signal.<Clone>$() -> DigitalBrain.Signal!
-const DigitalBrain.App.SwallowedKept = 64 -> int
-const DigitalBrain.Apps.SpecComment.MaxLength = 65536 -> int
-const DigitalBrain.Capabilities.AppPrincipal.Prefix = "app:" -> string!
-const DigitalBrain.Capabilities.Capability.Identity.V1Id = "identity@1" -> string!
-const DigitalBrain.Capabilities.Capability.Secrets.V1Id = "secrets@1" -> string!
-const DigitalBrain.Capabilities.Capability.Storage.V1Id = "storage@1" -> string!
-const DigitalBrain.Capabilities.CapabilityCallers.AssistantApp = "assistant" -> string!
-const DigitalBrain.Capabilities.CapabilityCallers.PlatformApp = "platform" -> string!
-const DigitalBrain.Capabilities.CapabilityCallers.SchedulerApp = "scheduler" -> string!
-const DigitalBrain.Confirmation.IConfirmations.ConfirmationsNeuronKey = "confirmations" -> string!
-const DigitalBrain.Confirmation.IConfirmations.ResolveOperation = "Resolve" -> string!
-const DigitalBrain.Invocation.NeuronBinder.DefaultMaximumArgumentBytes = 1048576 -> int
-const DigitalBrain.RequestLedger.DefaultCapacity = 256 -> int
-const DigitalBrain.RevisionConflictException.Code = "RevisionConflict" -> string!
-const DigitalBrain.SignalPage.MaxLimit = 1000 -> int
+DigitalBrain.WatchBuilder
+DigitalBrain.WatchBuilder.On<TSource, TSignal>(string! name, System.Func<DigitalBrain.AppAddress, string!>! key, System.Func<TSignal!, System.Threading.Tasks.Task!>! handle) -> void
+DigitalBrain.WatchBuilder.OnEach<TRegistry, TChange, TMember, TSignal>(string! name, System.Func<DigitalBrain.AppAddress, string!>! registry, System.Func<TRegistry!, DigitalBrain.AppAddress, System.Threading.CancellationToken, System.Threading.Tasks.Task<string![]!>!>! select, System.Func<TSignal!, System.Threading.Tasks.Task!>! handle) -> void
+DigitalBrain.WatchBuilder.WatchBuilder() -> void
+override DigitalBrain.AppAddress.GetHashCode() -> int
 override DigitalBrain.AppError.Equals(object? obj) -> bool
 override DigitalBrain.AppError.GetHashCode() -> int
 override DigitalBrain.AppError.ToString() -> string!
@@ -920,10 +1152,22 @@ override DigitalBrain.AppKey.ToString() -> string!
 override DigitalBrain.AppRequirements.Equals(object? obj) -> bool
 override DigitalBrain.AppRequirements.GetHashCode() -> int
 override DigitalBrain.AppRequirements.ToString() -> string!
+override DigitalBrain.Apps.Hosting.BehaviorView.Equals(object? obj) -> bool
+override DigitalBrain.Apps.Hosting.BehaviorView.GetHashCode() -> int
+override DigitalBrain.Apps.Hosting.BehaviorView.ToString() -> string!
+override DigitalBrain.Apps.Hosting.PrebuiltBehavior.Equals(object? obj) -> bool
+override DigitalBrain.Apps.Hosting.PrebuiltBehavior.GetHashCode() -> int
+override DigitalBrain.Apps.Hosting.PrebuiltBehavior.ToString() -> string!
+override DigitalBrain.Apps.Hosting.ProgramAssignment.Equals(object? obj) -> bool
+override DigitalBrain.Apps.Hosting.ProgramAssignment.GetHashCode() -> int
+override DigitalBrain.Apps.Hosting.ProgramAssignment.ToString() -> string!
+override DigitalBrain.Apps.Hosting.ProgramView.Equals(object? obj) -> bool
+override DigitalBrain.Apps.Hosting.ProgramView.GetHashCode() -> int
+override DigitalBrain.Apps.Hosting.ProgramView.ToString() -> string!
+override DigitalBrain.Apps.SpecCommentError.ToString() -> string!
 override DigitalBrain.AppSignalSubscription.Equals(object? obj) -> bool
 override DigitalBrain.AppSignalSubscription.GetHashCode() -> int
 override DigitalBrain.AppSignalSubscription.ToString() -> string!
-override DigitalBrain.Apps.SpecCommentError.ToString() -> string!
 override DigitalBrain.BddReport.Equals(object? obj) -> bool
 override DigitalBrain.BddReport.GetHashCode() -> int
 override DigitalBrain.BddReport.ToString() -> string!
@@ -992,9 +1236,50 @@ override DigitalBrain.ModuleAuth.ToString() -> string!
 override DigitalBrain.ModuleManifest.Equals(object? obj) -> bool
 override DigitalBrain.ModuleManifest.GetHashCode() -> int
 override DigitalBrain.ModuleManifest.ToString() -> string!
+override DigitalBrain.Modules.Validation.ArrayLength<T>.<Clone>$() -> DigitalBrain.Modules.Validation.ArrayLength<T>!
+override DigitalBrain.Modules.Validation.ArrayLength<T>.Broken.get -> bool
+override DigitalBrain.Modules.Validation.ArrayLength<T>.Equals(object? obj) -> bool
+override DigitalBrain.Modules.Validation.ArrayLength<T>.GetHashCode() -> int
+override DigitalBrain.Modules.Validation.ArrayLength<T>.Message.get -> string!
+override DigitalBrain.Modules.Validation.ArrayLength<T>.ToString() -> string!
+override DigitalBrain.Modules.Validation.HttpUri.<Clone>$() -> DigitalBrain.Modules.Validation.HttpUri!
+override DigitalBrain.Modules.Validation.HttpUri.Broken.get -> bool
+override DigitalBrain.Modules.Validation.HttpUri.Equals(object? obj) -> bool
+override DigitalBrain.Modules.Validation.HttpUri.GetHashCode() -> int
+override DigitalBrain.Modules.Validation.HttpUri.Message.get -> string!
+override DigitalBrain.Modules.Validation.HttpUri.ToString() -> string!
+override DigitalBrain.Modules.Validation.NumberRange.<Clone>$() -> DigitalBrain.Modules.Validation.NumberRange!
+override DigitalBrain.Modules.Validation.NumberRange.Broken.get -> bool
+override DigitalBrain.Modules.Validation.NumberRange.Equals(object? obj) -> bool
+override DigitalBrain.Modules.Validation.NumberRange.GetHashCode() -> int
+override DigitalBrain.Modules.Validation.NumberRange.Message.get -> string!
+override DigitalBrain.Modules.Validation.NumberRange.ToString() -> string!
+override DigitalBrain.Modules.Validation.Required.<Clone>$() -> DigitalBrain.Modules.Validation.Required!
+override DigitalBrain.Modules.Validation.Required.Broken.get -> bool
+override DigitalBrain.Modules.Validation.Required.Equals(object? obj) -> bool
+override DigitalBrain.Modules.Validation.Required.GetHashCode() -> int
+override DigitalBrain.Modules.Validation.Required.Message.get -> string!
+override DigitalBrain.Modules.Validation.Required.ToString() -> string!
+override DigitalBrain.Modules.Validation.StringLength.<Clone>$() -> DigitalBrain.Modules.Validation.StringLength!
+override DigitalBrain.Modules.Validation.StringLength.Broken.get -> bool
+override DigitalBrain.Modules.Validation.StringLength.Equals(object? obj) -> bool
+override DigitalBrain.Modules.Validation.StringLength.GetHashCode() -> int
+override DigitalBrain.Modules.Validation.StringLength.Message.get -> string!
+override DigitalBrain.Modules.Validation.StringLength.ToString() -> string!
+override DigitalBrain.Modules.Validation.Utf8Length.<Clone>$() -> DigitalBrain.Modules.Validation.Utf8Length!
+override DigitalBrain.Modules.Validation.Utf8Length.Broken.get -> bool
+override DigitalBrain.Modules.Validation.Utf8Length.Equals(object? obj) -> bool
+override DigitalBrain.Modules.Validation.Utf8Length.GetHashCode() -> int
+override DigitalBrain.Modules.Validation.Utf8Length.Message.get -> string!
+override DigitalBrain.Modules.Validation.Utf8Length.ToString() -> string!
+override DigitalBrain.Modules.Validation.ValidationIssue.Equals(object? obj) -> bool
+override DigitalBrain.Modules.Validation.ValidationIssue.GetHashCode() -> int
+override DigitalBrain.Modules.Validation.ValidationIssue.ToString() -> string!
 override DigitalBrain.Need.Equals(object? obj) -> bool
 override DigitalBrain.Need.GetHashCode() -> int
 override DigitalBrain.Need.ToString() -> string!
+override DigitalBrain.NeuronAddress.GetHashCode() -> int
+override DigitalBrain.NeuronAddress.ToString() -> string!
 override DigitalBrain.NeuronId.GetHashCode() -> int
 override DigitalBrain.NeuronId.ToString() -> string!
 override DigitalBrain.NeuronState.Equals(object? obj) -> bool
@@ -1030,6 +1315,13 @@ override DigitalBrain.Operations.OperationResult.ToString() -> string!
 override DigitalBrain.PrivilegedGrant.Equals(object? obj) -> bool
 override DigitalBrain.PrivilegedGrant.GetHashCode() -> int
 override DigitalBrain.PrivilegedGrant.ToString() -> string!
+override DigitalBrain.Rules.Rejected.<Clone>$() -> DigitalBrain.Rules.Rejected!
+override DigitalBrain.Rules.Rejected.Equals(object? obj) -> bool
+override DigitalBrain.Rules.Rejected.GetHashCode() -> int
+override DigitalBrain.Rules.Rejected.ToString() -> string!
+override DigitalBrain.Rules.Rule.Equals(object? obj) -> bool
+override DigitalBrain.Rules.Rule.GetHashCode() -> int
+override DigitalBrain.Rules.Rule.ToString() -> string!
 override DigitalBrain.ScenarioStepVerdict.Equals(object? obj) -> bool
 override DigitalBrain.ScenarioStepVerdict.GetHashCode() -> int
 override DigitalBrain.ScenarioStepVerdict.ToString() -> string!
@@ -1067,28 +1359,46 @@ override sealed DigitalBrain.BddVerified.Equals(DigitalBrain.Signal? other) -> b
 override sealed DigitalBrain.Confirmation.ConfirmationRequested.Equals(DigitalBrain.Signal? other) -> bool
 override sealed DigitalBrain.Confirmation.ConfirmationResolved.Equals(DigitalBrain.Signal? other) -> bool
 override sealed DigitalBrain.Gap.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Modules.Validation.ArrayLength<T>.Equals(DigitalBrain.Rules.Rule? other) -> bool
+override sealed DigitalBrain.Modules.Validation.HttpUri.Equals(DigitalBrain.Rules.Rule? other) -> bool
+override sealed DigitalBrain.Modules.Validation.NumberRange.Equals(DigitalBrain.Rules.Rule? other) -> bool
+override sealed DigitalBrain.Modules.Validation.Required.Equals(DigitalBrain.Rules.Rule? other) -> bool
+override sealed DigitalBrain.Modules.Validation.StringLength.Equals(DigitalBrain.Rules.Rule? other) -> bool
+override sealed DigitalBrain.Modules.Validation.Utf8Length.Equals(DigitalBrain.Rules.Rule? other) -> bool
 override sealed DigitalBrain.Operations.OperationResult.Cancelled.Equals(DigitalBrain.Operations.OperationResult? other) -> bool
 override sealed DigitalBrain.Operations.OperationResult.Failed.Equals(DigitalBrain.Operations.OperationResult? other) -> bool
 override sealed DigitalBrain.Operations.OperationResult.Planned.Equals(DigitalBrain.Operations.OperationResult? other) -> bool
 override sealed DigitalBrain.Operations.OperationResult.Succeeded.Equals(DigitalBrain.Operations.OperationResult? other) -> bool
+override sealed DigitalBrain.Rules.Rejected.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.AppAddress.operator !=(DigitalBrain.AppAddress left, DigitalBrain.AppAddress right) -> bool
+static DigitalBrain.AppAddress.operator ==(DigitalBrain.AppAddress left, DigitalBrain.AppAddress right) -> bool
 static DigitalBrain.AppError.From(System.Exception! error, string! operation, string? reason = null) -> DigitalBrain.AppError!
 static DigitalBrain.AppError.operator !=(DigitalBrain.AppError? left, DigitalBrain.AppError? right) -> bool
 static DigitalBrain.AppError.operator ==(DigitalBrain.AppError? left, DigitalBrain.AppError? right) -> bool
 static DigitalBrain.AppKey.Divide(DigitalBrain.AppKey key, string! part) -> DigitalBrain.AppKey
-static DigitalBrain.AppKey.Parse(DigitalBrain.BrainId brain, string! path) -> DigitalBrain.AppKey
-static DigitalBrain.AppKey.Parse(string! path) -> DigitalBrain.AppKey
 static DigitalBrain.AppKey.implicit operator string!(DigitalBrain.AppKey key) -> string!
 static DigitalBrain.AppKey.operator !=(DigitalBrain.AppKey left, DigitalBrain.AppKey right) -> bool
 static DigitalBrain.AppKey.operator /(DigitalBrain.AppKey key, long part) -> DigitalBrain.AppKey
 static DigitalBrain.AppKey.operator /(DigitalBrain.AppKey key, string! part) -> DigitalBrain.AppKey
 static DigitalBrain.AppKey.operator ==(DigitalBrain.AppKey left, DigitalBrain.AppKey right) -> bool
+static DigitalBrain.AppKey.Parse(DigitalBrain.BrainId brain, string! path) -> DigitalBrain.AppKey
+static DigitalBrain.AppKey.Parse(string! path) -> DigitalBrain.AppKey
 static DigitalBrain.AppRequirements.operator !=(DigitalBrain.AppRequirements? left, DigitalBrain.AppRequirements? right) -> bool
 static DigitalBrain.AppRequirements.operator ==(DigitalBrain.AppRequirements? left, DigitalBrain.AppRequirements? right) -> bool
-static DigitalBrain.AppSignalSubscription.operator !=(DigitalBrain.AppSignalSubscription? left, DigitalBrain.AppSignalSubscription? right) -> bool
-static DigitalBrain.AppSignalSubscription.operator ==(DigitalBrain.AppSignalSubscription? left, DigitalBrain.AppSignalSubscription? right) -> bool
+static DigitalBrain.Apps.Hosting.BehaviorIds.For(string! owner, string! path) -> string!
+static DigitalBrain.Apps.Hosting.BehaviorView.operator !=(DigitalBrain.Apps.Hosting.BehaviorView? left, DigitalBrain.Apps.Hosting.BehaviorView? right) -> bool
+static DigitalBrain.Apps.Hosting.BehaviorView.operator ==(DigitalBrain.Apps.Hosting.BehaviorView? left, DigitalBrain.Apps.Hosting.BehaviorView? right) -> bool
+static DigitalBrain.Apps.Hosting.PrebuiltBehavior.operator !=(DigitalBrain.Apps.Hosting.PrebuiltBehavior? left, DigitalBrain.Apps.Hosting.PrebuiltBehavior? right) -> bool
+static DigitalBrain.Apps.Hosting.PrebuiltBehavior.operator ==(DigitalBrain.Apps.Hosting.PrebuiltBehavior? left, DigitalBrain.Apps.Hosting.PrebuiltBehavior? right) -> bool
+static DigitalBrain.Apps.Hosting.ProgramAssignment.operator !=(DigitalBrain.Apps.Hosting.ProgramAssignment? left, DigitalBrain.Apps.Hosting.ProgramAssignment? right) -> bool
+static DigitalBrain.Apps.Hosting.ProgramAssignment.operator ==(DigitalBrain.Apps.Hosting.ProgramAssignment? left, DigitalBrain.Apps.Hosting.ProgramAssignment? right) -> bool
+static DigitalBrain.Apps.Hosting.ProgramView.operator !=(DigitalBrain.Apps.Hosting.ProgramView? left, DigitalBrain.Apps.Hosting.ProgramView? right) -> bool
+static DigitalBrain.Apps.Hosting.ProgramView.operator ==(DigitalBrain.Apps.Hosting.ProgramView? left, DigitalBrain.Apps.Hosting.ProgramView? right) -> bool
 static DigitalBrain.Apps.SpecComment.Extract(string! source) -> string?
 static DigitalBrain.Apps.SpecComment.NormalizeOperation(string! name) -> string!
 static DigitalBrain.Apps.SpecComment.Parse(string! text) -> DigitalBrain.Apps.SpecComment!
+static DigitalBrain.AppSignalSubscription.operator !=(DigitalBrain.AppSignalSubscription? left, DigitalBrain.AppSignalSubscription? right) -> bool
+static DigitalBrain.AppSignalSubscription.operator ==(DigitalBrain.AppSignalSubscription? left, DigitalBrain.AppSignalSubscription? right) -> bool
 static DigitalBrain.BddReport.operator !=(DigitalBrain.BddReport? left, DigitalBrain.BddReport? right) -> bool
 static DigitalBrain.BddReport.operator ==(DigitalBrain.BddReport? left, DigitalBrain.BddReport? right) -> bool
 static DigitalBrain.BddState.operator !=(DigitalBrain.BddState? left, DigitalBrain.BddState? right) -> bool
@@ -1097,9 +1407,9 @@ static DigitalBrain.BddVerified.operator !=(DigitalBrain.BddVerified? left, Digi
 static DigitalBrain.BddVerified.operator ==(DigitalBrain.BddVerified? left, DigitalBrain.BddVerified? right) -> bool
 static DigitalBrain.BrainId.IsValid(string? value) -> bool
 static DigitalBrain.BrainId.Kernel.get -> DigitalBrain.BrainId
-static DigitalBrain.BrainId.System(string! name) -> DigitalBrain.BrainId
 static DigitalBrain.BrainId.operator !=(DigitalBrain.BrainId left, DigitalBrain.BrainId right) -> bool
 static DigitalBrain.BrainId.operator ==(DigitalBrain.BrainId left, DigitalBrain.BrainId right) -> bool
+static DigitalBrain.BrainId.System(string! name) -> DigitalBrain.BrainId
 static DigitalBrain.BrainInstance.operator !=(DigitalBrain.BrainInstance? left, DigitalBrain.BrainInstance? right) -> bool
 static DigitalBrain.BrainInstance.operator ==(DigitalBrain.BrainInstance? left, DigitalBrain.BrainInstance? right) -> bool
 static DigitalBrain.BrainType.operator !=(DigitalBrain.BrainType? left, DigitalBrain.BrainType? right) -> bool
@@ -1110,22 +1420,22 @@ static DigitalBrain.Capabilities.AppPrincipal.IsApp(string? principalId) -> bool
 static DigitalBrain.Capabilities.Capability.Identity.V1.get -> DigitalBrain.Capabilities.CapabilityId
 static DigitalBrain.Capabilities.Capability.Secrets.V1.get -> DigitalBrain.Capabilities.CapabilityId
 static DigitalBrain.Capabilities.Capability.Storage.V1.get -> DigitalBrain.Capabilities.CapabilityId
+static DigitalBrain.Capabilities.CapabilityCaller.App(string! appKey) -> DigitalBrain.Capabilities.CapabilityCaller!
 static DigitalBrain.Capabilities.CapabilityCaller.operator !=(DigitalBrain.Capabilities.CapabilityCaller? left, DigitalBrain.Capabilities.CapabilityCaller? right) -> bool
 static DigitalBrain.Capabilities.CapabilityCaller.operator ==(DigitalBrain.Capabilities.CapabilityCaller? left, DigitalBrain.Capabilities.CapabilityCaller? right) -> bool
-static DigitalBrain.Capabilities.CapabilityCaller.App(string! appKey) -> DigitalBrain.Capabilities.CapabilityCaller!
 static DigitalBrain.Capabilities.CapabilityCallers.Of(string! principalId, string! accountId, string! brainId, DigitalBrain.Capabilities.CallerKind kind = DigitalBrain.Capabilities.CallerKind.User, string? appId = null, string? conversationId = null) -> DigitalBrain.Capabilities.CapabilityCaller!
 static DigitalBrain.Capabilities.CapabilityCallers.Platform(string! principalId, string! accountId, string! brainId, string? conversationId = null) -> DigitalBrain.Capabilities.CapabilityCaller!
-static DigitalBrain.Capabilities.CapabilityId.Parse(string! text) -> DigitalBrain.Capabilities.CapabilityId
-static DigitalBrain.Capabilities.CapabilityId.TryParse(string? text, out DigitalBrain.Capabilities.CapabilityId id) -> bool
 static DigitalBrain.Capabilities.CapabilityId.operator !=(DigitalBrain.Capabilities.CapabilityId left, DigitalBrain.Capabilities.CapabilityId right) -> bool
 static DigitalBrain.Capabilities.CapabilityId.operator ==(DigitalBrain.Capabilities.CapabilityId left, DigitalBrain.Capabilities.CapabilityId right) -> bool
+static DigitalBrain.Capabilities.CapabilityId.Parse(string! text) -> DigitalBrain.Capabilities.CapabilityId
+static DigitalBrain.Capabilities.CapabilityId.TryParse(string? text, out DigitalBrain.Capabilities.CapabilityId id) -> bool
 static DigitalBrain.Confirmation.ConfirmationPlan.operator !=(DigitalBrain.Confirmation.ConfirmationPlan? left, DigitalBrain.Confirmation.ConfirmationPlan? right) -> bool
 static DigitalBrain.Confirmation.ConfirmationPlan.operator ==(DigitalBrain.Confirmation.ConfirmationPlan? left, DigitalBrain.Confirmation.ConfirmationPlan? right) -> bool
 static DigitalBrain.Confirmation.ConfirmationPrincipal.Agent(string! id) -> DigitalBrain.Confirmation.ConfirmationPrincipal!
 static DigitalBrain.Confirmation.ConfirmationPrincipal.App(string! id) -> DigitalBrain.Confirmation.ConfirmationPrincipal!
-static DigitalBrain.Confirmation.ConfirmationPrincipal.Person(string! id) -> DigitalBrain.Confirmation.ConfirmationPrincipal!
 static DigitalBrain.Confirmation.ConfirmationPrincipal.operator !=(DigitalBrain.Confirmation.ConfirmationPrincipal? left, DigitalBrain.Confirmation.ConfirmationPrincipal? right) -> bool
 static DigitalBrain.Confirmation.ConfirmationPrincipal.operator ==(DigitalBrain.Confirmation.ConfirmationPrincipal? left, DigitalBrain.Confirmation.ConfirmationPrincipal? right) -> bool
+static DigitalBrain.Confirmation.ConfirmationPrincipal.Person(string! id) -> DigitalBrain.Confirmation.ConfirmationPrincipal!
 static DigitalBrain.Confirmation.ConfirmationRequested.operator !=(DigitalBrain.Confirmation.ConfirmationRequested? left, DigitalBrain.Confirmation.ConfirmationRequested? right) -> bool
 static DigitalBrain.Confirmation.ConfirmationRequested.operator ==(DigitalBrain.Confirmation.ConfirmationRequested? left, DigitalBrain.Confirmation.ConfirmationRequested? right) -> bool
 static DigitalBrain.Confirmation.ConfirmationResolved.operator !=(DigitalBrain.Confirmation.ConfirmationResolved? left, DigitalBrain.Confirmation.ConfirmationResolved? right) -> bool
@@ -1153,22 +1463,43 @@ static DigitalBrain.ModuleDeclarations.None.get -> DigitalBrain.ModuleDeclaratio
 static DigitalBrain.ModuleManifest.Of(System.Type! moduleType) -> DigitalBrain.ModuleManifest!
 static DigitalBrain.ModuleManifest.operator !=(DigitalBrain.ModuleManifest? left, DigitalBrain.ModuleManifest? right) -> bool
 static DigitalBrain.ModuleManifest.operator ==(DigitalBrain.ModuleManifest? left, DigitalBrain.ModuleManifest? right) -> bool
+static DigitalBrain.Modules.Validation.ArrayLength<T>.operator !=(DigitalBrain.Modules.Validation.ArrayLength<T>? left, DigitalBrain.Modules.Validation.ArrayLength<T>? right) -> bool
+static DigitalBrain.Modules.Validation.ArrayLength<T>.operator ==(DigitalBrain.Modules.Validation.ArrayLength<T>? left, DigitalBrain.Modules.Validation.ArrayLength<T>? right) -> bool
+static DigitalBrain.Modules.Validation.HttpUri.operator !=(DigitalBrain.Modules.Validation.HttpUri? left, DigitalBrain.Modules.Validation.HttpUri? right) -> bool
+static DigitalBrain.Modules.Validation.HttpUri.operator ==(DigitalBrain.Modules.Validation.HttpUri? left, DigitalBrain.Modules.Validation.HttpUri? right) -> bool
+static DigitalBrain.Modules.Validation.ModuleValidation.Check(string! moduleId, params DigitalBrain.Rules.Rule![]! rules) -> void
+static DigitalBrain.Modules.Validation.ModuleValidation.ThrowIfInvalid<T>(T value, DigitalBrain.Modules.Validation.IModuleValidator<T>! validator) -> void
+static DigitalBrain.Modules.Validation.ModuleValidation.Validate<T>(T value, DigitalBrain.Modules.Validation.IModuleValidator<T>! validator) -> DigitalBrain.Modules.Validation.ValidationIssue![]!
+static DigitalBrain.Modules.Validation.NumberRange.operator !=(DigitalBrain.Modules.Validation.NumberRange? left, DigitalBrain.Modules.Validation.NumberRange? right) -> bool
+static DigitalBrain.Modules.Validation.NumberRange.operator ==(DigitalBrain.Modules.Validation.NumberRange? left, DigitalBrain.Modules.Validation.NumberRange? right) -> bool
+static DigitalBrain.Modules.Validation.Required.operator !=(DigitalBrain.Modules.Validation.Required? left, DigitalBrain.Modules.Validation.Required? right) -> bool
+static DigitalBrain.Modules.Validation.Required.operator ==(DigitalBrain.Modules.Validation.Required? left, DigitalBrain.Modules.Validation.Required? right) -> bool
+static DigitalBrain.Modules.Validation.StringLength.operator !=(DigitalBrain.Modules.Validation.StringLength? left, DigitalBrain.Modules.Validation.StringLength? right) -> bool
+static DigitalBrain.Modules.Validation.StringLength.operator ==(DigitalBrain.Modules.Validation.StringLength? left, DigitalBrain.Modules.Validation.StringLength? right) -> bool
+static DigitalBrain.Modules.Validation.Utf8Length.operator !=(DigitalBrain.Modules.Validation.Utf8Length? left, DigitalBrain.Modules.Validation.Utf8Length? right) -> bool
+static DigitalBrain.Modules.Validation.Utf8Length.operator ==(DigitalBrain.Modules.Validation.Utf8Length? left, DigitalBrain.Modules.Validation.Utf8Length? right) -> bool
+static DigitalBrain.Modules.Validation.ValidationIssue.operator !=(DigitalBrain.Modules.Validation.ValidationIssue? left, DigitalBrain.Modules.Validation.ValidationIssue? right) -> bool
+static DigitalBrain.Modules.Validation.ValidationIssue.operator ==(DigitalBrain.Modules.Validation.ValidationIssue? left, DigitalBrain.Modules.Validation.ValidationIssue? right) -> bool
 static DigitalBrain.Need.Container(string! name, string! image) -> DigitalBrain.Need!
 static DigitalBrain.Need.Http.get -> DigitalBrain.Need!
 static DigitalBrain.Need.HttpClient(string! name, string? baseAddressSetting = null, int requestsPerMinute = 120) -> DigitalBrain.Need!
 static DigitalBrain.Need.Model.get -> DigitalBrain.Need!
+static DigitalBrain.Need.operator !=(DigitalBrain.Need? left, DigitalBrain.Need? right) -> bool
+static DigitalBrain.Need.operator ==(DigitalBrain.Need? left, DigitalBrain.Need? right) -> bool
 static DigitalBrain.Need.Reminders.get -> DigitalBrain.Need!
 static DigitalBrain.Need.Sandbox.get -> DigitalBrain.Need!
 static DigitalBrain.Need.Secrets.get -> DigitalBrain.Need!
 static DigitalBrain.Need.State(string! name) -> DigitalBrain.Need!
 static DigitalBrain.Need.Streams.get -> DigitalBrain.Need!
 static DigitalBrain.Need.Webhook(string! path, string! targetNeuronType) -> DigitalBrain.Need!
-static DigitalBrain.Need.operator !=(DigitalBrain.Need? left, DigitalBrain.Need? right) -> bool
-static DigitalBrain.Need.operator ==(DigitalBrain.Need? left, DigitalBrain.Need? right) -> bool
-static DigitalBrain.NeuronId.Parse(string! text) -> DigitalBrain.NeuronId
-static DigitalBrain.NeuronId.TryParse(string? text, out DigitalBrain.NeuronId id) -> bool
+static DigitalBrain.NeuronAddress.IsBrainId(string? value) -> bool
+static DigitalBrain.NeuronAddress.operator !=(DigitalBrain.NeuronAddress left, DigitalBrain.NeuronAddress right) -> bool
+static DigitalBrain.NeuronAddress.operator ==(DigitalBrain.NeuronAddress left, DigitalBrain.NeuronAddress right) -> bool
+static DigitalBrain.NeuronAddress.ScopeOf(string! key) -> string?
 static DigitalBrain.NeuronId.operator !=(DigitalBrain.NeuronId left, DigitalBrain.NeuronId right) -> bool
 static DigitalBrain.NeuronId.operator ==(DigitalBrain.NeuronId left, DigitalBrain.NeuronId right) -> bool
+static DigitalBrain.NeuronId.Parse(string! text) -> DigitalBrain.NeuronId
+static DigitalBrain.NeuronId.TryParse(string? text, out DigitalBrain.NeuronId id) -> bool
 static DigitalBrain.NeuronState.operator !=(DigitalBrain.NeuronState? left, DigitalBrain.NeuronState? right) -> bool
 static DigitalBrain.NeuronState.operator ==(DigitalBrain.NeuronState? left, DigitalBrain.NeuronState? right) -> bool
 static DigitalBrain.ObservedSynapse.operator !=(DigitalBrain.ObservedSynapse? left, DigitalBrain.ObservedSynapse? right) -> bool
@@ -1181,15 +1512,20 @@ static DigitalBrain.Operations.OperationResult.Cancelled.operator !=(DigitalBrai
 static DigitalBrain.Operations.OperationResult.Cancelled.operator ==(DigitalBrain.Operations.OperationResult.Cancelled? left, DigitalBrain.Operations.OperationResult.Cancelled? right) -> bool
 static DigitalBrain.Operations.OperationResult.Failed.operator !=(DigitalBrain.Operations.OperationResult.Failed? left, DigitalBrain.Operations.OperationResult.Failed? right) -> bool
 static DigitalBrain.Operations.OperationResult.Failed.operator ==(DigitalBrain.Operations.OperationResult.Failed? left, DigitalBrain.Operations.OperationResult.Failed? right) -> bool
+static DigitalBrain.Operations.OperationResult.operator !=(DigitalBrain.Operations.OperationResult? left, DigitalBrain.Operations.OperationResult? right) -> bool
+static DigitalBrain.Operations.OperationResult.operator ==(DigitalBrain.Operations.OperationResult? left, DigitalBrain.Operations.OperationResult? right) -> bool
 static DigitalBrain.Operations.OperationResult.Planned.operator !=(DigitalBrain.Operations.OperationResult.Planned? left, DigitalBrain.Operations.OperationResult.Planned? right) -> bool
 static DigitalBrain.Operations.OperationResult.Planned.operator ==(DigitalBrain.Operations.OperationResult.Planned? left, DigitalBrain.Operations.OperationResult.Planned? right) -> bool
 static DigitalBrain.Operations.OperationResult.Succeeded.operator !=(DigitalBrain.Operations.OperationResult.Succeeded? left, DigitalBrain.Operations.OperationResult.Succeeded? right) -> bool
 static DigitalBrain.Operations.OperationResult.Succeeded.operator ==(DigitalBrain.Operations.OperationResult.Succeeded? left, DigitalBrain.Operations.OperationResult.Succeeded? right) -> bool
-static DigitalBrain.Operations.OperationResult.operator !=(DigitalBrain.Operations.OperationResult? left, DigitalBrain.Operations.OperationResult? right) -> bool
-static DigitalBrain.Operations.OperationResult.operator ==(DigitalBrain.Operations.OperationResult? left, DigitalBrain.Operations.OperationResult? right) -> bool
 static DigitalBrain.PrivilegedGrant.operator !=(DigitalBrain.PrivilegedGrant? left, DigitalBrain.PrivilegedGrant? right) -> bool
 static DigitalBrain.PrivilegedGrant.operator ==(DigitalBrain.PrivilegedGrant? left, DigitalBrain.PrivilegedGrant? right) -> bool
 static DigitalBrain.RevisionedNeuron<TState>.RequireRevision(long expectedRevision, long currentRevision) -> void
+static DigitalBrain.Rules.Rejected.operator !=(DigitalBrain.Rules.Rejected? left, DigitalBrain.Rules.Rejected? right) -> bool
+static DigitalBrain.Rules.Rejected.operator ==(DigitalBrain.Rules.Rejected? left, DigitalBrain.Rules.Rejected? right) -> bool
+static DigitalBrain.Rules.Rule.operator !=(DigitalBrain.Rules.Rule? left, DigitalBrain.Rules.Rule? right) -> bool
+static DigitalBrain.Rules.Rule.operator ==(DigitalBrain.Rules.Rule? left, DigitalBrain.Rules.Rule? right) -> bool
+static DigitalBrain.Rules.Rules.Judge(string! operation, params System.ReadOnlySpan<DigitalBrain.Rules.Rule!> rules) -> DigitalBrain.Rules.Rejected?
 static DigitalBrain.ScenarioStepVerdict.operator !=(DigitalBrain.ScenarioStepVerdict? left, DigitalBrain.ScenarioStepVerdict? right) -> bool
 static DigitalBrain.ScenarioStepVerdict.operator ==(DigitalBrain.ScenarioStepVerdict? left, DigitalBrain.ScenarioStepVerdict? right) -> bool
 static DigitalBrain.ScenarioVerdict.operator !=(DigitalBrain.ScenarioVerdict? left, DigitalBrain.ScenarioVerdict? right) -> bool
@@ -1207,6 +1543,13 @@ static DigitalBrain.SignalDelivery.operator ==(DigitalBrain.SignalDelivery? left
 static DigitalBrain.SignalPage.CheckLimit(int limit) -> int
 static DigitalBrain.SignalPage.operator !=(DigitalBrain.SignalPage? left, DigitalBrain.SignalPage? right) -> bool
 static DigitalBrain.SignalPage.operator ==(DigitalBrain.SignalPage? left, DigitalBrain.SignalPage? right) -> bool
+static DigitalBrain.Signals.Watch.SignalDeliveries.Skip(object! signal) -> void
+static DigitalBrain.Signals.Watch.SignalDeliveries.WasSkipped(object! signal) -> bool
+static DigitalBrain.Signals.Watch.Sources.Named<TRegistry, TChange, TMember>(TRegistry! registry, System.Func<TRegistry!, System.Threading.CancellationToken, System.Threading.Tasks.Task<TMember![]!>!>! select) -> DigitalBrain.Signals.Watch.Sources!
+static DigitalBrain.Signals.Watch.Sources.Of(params object![]! neurons) -> DigitalBrain.Signals.Watch.Sources!
+static DigitalBrain.Signals.Watch.Sources.React<T>(DigitalBrain.Signals.Watch.ISignalWatch! brain, DigitalBrain.Signals.Watch.Sources! sources, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! rebuild, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+static DigitalBrain.Signals.Watch.Sources.Stream<T>(DigitalBrain.Signals.Watch.ISignalWatch! brain, DigitalBrain.Signals.Watch.Sources! sources, System.Func<System.Threading.Tasks.Task!>? subscribed, System.Action? reselected, System.Threading.CancellationToken cancellationToken) -> System.Collections.Generic.IAsyncEnumerable<T!>!
+static DigitalBrain.Signals.Watch.Sources.Stream<T>(DigitalBrain.Signals.Watch.ISignalWatch! brain, DigitalBrain.Signals.Watch.Sources! sources, System.Threading.CancellationToken cancellationToken) -> System.Collections.Generic.IAsyncEnumerable<T!>!
 static DigitalBrain.Spi.NeuronAttachment.Activate(DigitalBrain.Neuron! neuron, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 static DigitalBrain.Spi.NeuronAttachment.Admit(DigitalBrain.Neuron! source, DigitalBrain.NeuronId subscriber, System.Collections.Generic.IReadOnlyList<System.Type!>! signals) -> System.Threading.Tasks.Task!
 static DigitalBrain.Spi.NeuronAttachment.Admit(DigitalBrain.Neuron! source, DigitalBrain.SynapseRequest! request) -> System.Threading.Tasks.Task!
@@ -1222,6 +1565,7 @@ static DigitalBrain.Synapse.operator ==(DigitalBrain.Synapse? left, DigitalBrain
 static DigitalBrain.SynapseRequest.operator !=(DigitalBrain.SynapseRequest? left, DigitalBrain.SynapseRequest? right) -> bool
 static DigitalBrain.SynapseRequest.operator ==(DigitalBrain.SynapseRequest? left, DigitalBrain.SynapseRequest? right) -> bool
 static readonly DigitalBrain.Invocation.RuntimeProtocol.Json -> System.Text.Json.JsonSerializerOptions!
+virtual DigitalBrain.App.Watches(DigitalBrain.WatchBuilder! watch) -> void
 virtual DigitalBrain.Neuron.AdmitSynapse(DigitalBrain.NeuronId subscriber, System.Collections.Generic.IReadOnlyList<System.Type!>! signals) -> System.Threading.Tasks.Task!
 virtual DigitalBrain.Neuron.AdmitSynapse(DigitalBrain.SynapseRequest! request) -> System.Threading.Tasks.Task!
 virtual DigitalBrain.Neuron.OnActivate(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
@@ -1238,272 +1582,9 @@ virtual DigitalBrain.Operations.OperationPlan.PrintMembers(System.Text.StringBui
 virtual DigitalBrain.Operations.OperationResult.EqualityContract.get -> System.Type!
 virtual DigitalBrain.Operations.OperationResult.Equals(DigitalBrain.Operations.OperationResult? other) -> bool
 virtual DigitalBrain.Operations.OperationResult.PrintMembers(System.Text.StringBuilder! builder) -> bool
-virtual DigitalBrain.Signal.EqualityContract.get -> System.Type!
-virtual DigitalBrain.Signal.Equals(DigitalBrain.Signal? other) -> bool
-virtual DigitalBrain.Signal.PrintMembers(System.Text.StringBuilder! builder) -> bool
-~DigitalBrain.Capabilities.CapabilityConnection<TCapability>.<Clone>$() -> DigitalBrain.Capabilities.CapabilityConnection<TCapability>!
-~DigitalBrain.Capabilities.CapabilityConnection<TCapability>.Equals(DigitalBrain.Capabilities.CapabilityConnection<TCapability>? other) -> bool
-~override DigitalBrain.AppKey.Equals(object obj) -> bool
-~override DigitalBrain.BrainId.Equals(object obj) -> bool
-~override DigitalBrain.Capabilities.CapabilityId.Equals(object obj) -> bool
-~override DigitalBrain.NeuronId.Equals(object obj) -> bool
-~override DigitalBrain.Operations.OperationId.Equals(object obj) -> bool
-~static DigitalBrain.Capabilities.CapabilityConnection<TCapability>.operator !=(DigitalBrain.Capabilities.CapabilityConnection<TCapability>? left, DigitalBrain.Capabilities.CapabilityConnection<TCapability>? right) -> bool
-~static DigitalBrain.Capabilities.CapabilityConnection<TCapability>.operator ==(DigitalBrain.Capabilities.CapabilityConnection<TCapability>? left, DigitalBrain.Capabilities.CapabilityConnection<TCapability>? right) -> bool
-DigitalBrain.App.DeclaredWatches() -> System.Collections.Generic.IReadOnlyList<DigitalBrain.AppWatch!>!
-DigitalBrain.AppAddress
-DigitalBrain.AppAddress.App.get -> string!
-DigitalBrain.AppAddress.App.init -> void
-DigitalBrain.AppAddress.AppAddress() -> void
-DigitalBrain.AppAddress.AppAddress(string! Brain, string! App) -> void
-DigitalBrain.AppAddress.Brain.get -> string!
-DigitalBrain.AppAddress.Brain.init -> void
-DigitalBrain.AppAddress.Deconstruct(out string! Brain, out string! App) -> void
-DigitalBrain.AppAddress.Equals(DigitalBrain.AppAddress other) -> bool
-DigitalBrain.AppWatch
-DigitalBrain.AppWatch.ChangeType.get -> System.Type?
-DigitalBrain.AppWatch.Handle.get -> System.Func<DigitalBrain.Signal!, System.Threading.Tasks.Task!>!
-DigitalBrain.AppWatch.IsSet.get -> bool
-DigitalBrain.AppWatch.Key.get -> System.Func<DigitalBrain.AppAddress, string!>!
-DigitalBrain.AppWatch.MemberType.get -> System.Type?
-DigitalBrain.AppWatch.Name.get -> string!
-DigitalBrain.AppWatch.Select.get -> System.Func<object!, DigitalBrain.AppAddress, System.Threading.CancellationToken, System.Threading.Tasks.Task<string![]!>!>?
-DigitalBrain.AppWatch.SignalType.get -> System.Type!
-DigitalBrain.AppWatch.SourceType.get -> System.Type!
-DigitalBrain.WatchBuilder
-DigitalBrain.WatchBuilder.On<TSource, TSignal>(string! name, System.Func<DigitalBrain.AppAddress, string!>! key, System.Func<TSignal!, System.Threading.Tasks.Task!>! handle) -> void
-DigitalBrain.WatchBuilder.OnEach<TRegistry, TChange, TMember, TSignal>(string! name, System.Func<DigitalBrain.AppAddress, string!>! registry, System.Func<TRegistry!, DigitalBrain.AppAddress, System.Threading.CancellationToken, System.Threading.Tasks.Task<string![]!>!>! select, System.Func<TSignal!, System.Threading.Tasks.Task!>! handle) -> void
-DigitalBrain.WatchBuilder.WatchBuilder() -> void
-override DigitalBrain.AppAddress.GetHashCode() -> int
-static DigitalBrain.AppAddress.operator !=(DigitalBrain.AppAddress left, DigitalBrain.AppAddress right) -> bool
-static DigitalBrain.AppAddress.operator ==(DigitalBrain.AppAddress left, DigitalBrain.AppAddress right) -> bool
-virtual DigitalBrain.App.Watches(DigitalBrain.WatchBuilder! watch) -> void
-~override DigitalBrain.AppAddress.Equals(object obj) -> bool
-~override DigitalBrain.AppAddress.ToString() -> string
-DigitalBrain.INeuronResolver
-DigitalBrain.INeuronResolver.Resolve<T>(DigitalBrain.BrainId brain, string! relative) -> T!
-DigitalBrain.INeuronResolver.ResolveKey<T>(string! fullKey) -> T!
-DigitalBrain.Invocation.IWorkContinuation
-DigitalBrain.Invocation.IWorkContinuation.Acquire(string! brainScope, string! token) -> System.Threading.Tasks.Task!
-DigitalBrain.Invocation.IWorkContinuation.Release(string! brainScope, string! token) -> System.Threading.Tasks.Task!
-DigitalBrain.NeuronAddress
-DigitalBrain.NeuronAddress.Brain.get -> DigitalBrain.BrainId?
-DigitalBrain.NeuronAddress.Deconstruct(out string! NeuronType, out string! Key) -> void
-DigitalBrain.NeuronAddress.Equals(DigitalBrain.NeuronAddress other) -> bool
-DigitalBrain.NeuronAddress.Key.get -> string!
-DigitalBrain.NeuronAddress.Key.init -> void
-DigitalBrain.NeuronAddress.NeuronAddress() -> void
-DigitalBrain.NeuronAddress.NeuronAddress(string! NeuronType, string! Key) -> void
-DigitalBrain.NeuronAddress.NeuronType.get -> string!
-DigitalBrain.NeuronAddress.NeuronType.init -> void
-DigitalBrain.NeuronAddress.StorageKey.get -> string!
-DigitalBrain.Signals.Watch.IInitialSignalWait
-DigitalBrain.Signals.Watch.IInitialSignalWait.ReachedInitialWaitAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
-DigitalBrain.Signals.Watch.IInitialSignalWait.SuppressInitialWait() -> System.IDisposable!
-DigitalBrain.Signals.Watch.ISelectiveWatch
-DigitalBrain.Signals.Watch.ISelectiveWatch.On<T>(object! neuron, string! selector, System.Func<System.Threading.Tasks.Task!>! onSubscribed, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<T!>!
-DigitalBrain.Signals.Watch.ISignalDelivery
-DigitalBrain.Signals.Watch.ISignalDelivery.DeliveredAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
-DigitalBrain.Signals.Watch.ISignalWatch
-DigitalBrain.Signals.Watch.ISignalWatch.On<T>(object! neuron, System.Func<System.Threading.Tasks.Task!>! onSubscribed, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<T!>!
-DigitalBrain.Signals.Watch.ISignalWatch.On<T>(object! neuron, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<T!>!
-DigitalBrain.Signals.Watch.SignalDeliveries
-DigitalBrain.Signals.Watch.Sources
-DigitalBrain.Signals.Watch.WatchStream<T>
-DigitalBrain.Signals.Watch.WatchStream<T>.GetAsyncEnumerator(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerator<T>!
-DigitalBrain.Signals.Watch.WatchStream<T>.WatchStream(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<(System.Collections.Generic.IAsyncEnumerable<T>! Signals, System.IAsyncDisposable! Handle)>!>! open, System.Threading.CancellationToken subscriptionCancellation, System.Threading.CancellationToken behaviorCancellation, System.Func<System.Threading.Tasks.Task!>! onSubscribed) -> void
-override DigitalBrain.NeuronAddress.GetHashCode() -> int
-override DigitalBrain.NeuronAddress.ToString() -> string!
-static DigitalBrain.NeuronAddress.IsBrainId(string? value) -> bool
-static DigitalBrain.NeuronAddress.ScopeOf(string! key) -> string?
-static DigitalBrain.NeuronAddress.operator !=(DigitalBrain.NeuronAddress left, DigitalBrain.NeuronAddress right) -> bool
-static DigitalBrain.NeuronAddress.operator ==(DigitalBrain.NeuronAddress left, DigitalBrain.NeuronAddress right) -> bool
-static DigitalBrain.Signals.Watch.SignalDeliveries.Skip(object! signal) -> void
-static DigitalBrain.Signals.Watch.SignalDeliveries.WasSkipped(object! signal) -> bool
-static DigitalBrain.Signals.Watch.Sources.Named<TRegistry, TChange, TMember>(TRegistry! registry, System.Func<TRegistry!, System.Threading.CancellationToken, System.Threading.Tasks.Task<TMember![]!>!>! select) -> DigitalBrain.Signals.Watch.Sources!
-static DigitalBrain.Signals.Watch.Sources.Of(params object![]! neurons) -> DigitalBrain.Signals.Watch.Sources!
-static DigitalBrain.Signals.Watch.Sources.React<T>(DigitalBrain.Signals.Watch.ISignalWatch! brain, DigitalBrain.Signals.Watch.Sources! sources, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! rebuild, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
-static DigitalBrain.Signals.Watch.Sources.Stream<T>(DigitalBrain.Signals.Watch.ISignalWatch! brain, DigitalBrain.Signals.Watch.Sources! sources, System.Func<System.Threading.Tasks.Task!>? subscribed, System.Action? reselected, System.Threading.CancellationToken cancellationToken) -> System.Collections.Generic.IAsyncEnumerable<T!>!
-static DigitalBrain.Signals.Watch.Sources.Stream<T>(DigitalBrain.Signals.Watch.ISignalWatch! brain, DigitalBrain.Signals.Watch.Sources! sources, System.Threading.CancellationToken cancellationToken) -> System.Collections.Generic.IAsyncEnumerable<T!>!
-~override DigitalBrain.NeuronAddress.Equals(object obj) -> bool
-DigitalBrain.Modules.Validation.IModuleValidator<T>
-DigitalBrain.Modules.Validation.IModuleValidator<T>.Validate(T value) -> DigitalBrain.Modules.Validation.ValidationIssue![]!
-DigitalBrain.Modules.Validation.ModuleValidation
-DigitalBrain.Modules.Validation.ModuleValidationException
-DigitalBrain.Modules.Validation.ModuleValidationException.Issues.get -> DigitalBrain.Modules.Validation.ValidationIssue![]!
-DigitalBrain.Modules.Validation.ModuleValidationException.ModuleValidationException(DigitalBrain.Modules.Validation.ValidationIssue![]! issues) -> void
-DigitalBrain.Modules.Validation.ValidationIssue
-DigitalBrain.Modules.Validation.ValidationIssue.<Clone>$() -> DigitalBrain.Modules.Validation.ValidationIssue!
-DigitalBrain.Modules.Validation.ValidationIssue.Code.get -> string!
-DigitalBrain.Modules.Validation.ValidationIssue.Code.init -> void
-DigitalBrain.Modules.Validation.ValidationIssue.Deconstruct(out string! Path, out string! Code, out string! Message) -> void
-DigitalBrain.Modules.Validation.ValidationIssue.Equals(DigitalBrain.Modules.Validation.ValidationIssue? other) -> bool
-DigitalBrain.Modules.Validation.ValidationIssue.Message.get -> string!
-DigitalBrain.Modules.Validation.ValidationIssue.Message.init -> void
-DigitalBrain.Modules.Validation.ValidationIssue.Path.get -> string!
-DigitalBrain.Modules.Validation.ValidationIssue.Path.init -> void
-DigitalBrain.Modules.Validation.ValidationIssue.ValidationIssue(string! Path, string! Code, string! Message) -> void
-override DigitalBrain.Modules.Validation.ValidationIssue.Equals(object? obj) -> bool
-override DigitalBrain.Modules.Validation.ValidationIssue.GetHashCode() -> int
-override DigitalBrain.Modules.Validation.ValidationIssue.ToString() -> string!
-static DigitalBrain.Modules.Validation.ModuleValidation.ThrowIfInvalid<T>(T value, DigitalBrain.Modules.Validation.IModuleValidator<T>! validator) -> void
-static DigitalBrain.Modules.Validation.ModuleValidation.Validate<T>(T value, DigitalBrain.Modules.Validation.IModuleValidator<T>! validator) -> DigitalBrain.Modules.Validation.ValidationIssue![]!
-static DigitalBrain.Modules.Validation.ValidationIssue.operator !=(DigitalBrain.Modules.Validation.ValidationIssue? left, DigitalBrain.Modules.Validation.ValidationIssue? right) -> bool
-static DigitalBrain.Modules.Validation.ValidationIssue.operator ==(DigitalBrain.Modules.Validation.ValidationIssue? left, DigitalBrain.Modules.Validation.ValidationIssue? right) -> bool
-DigitalBrain.Rules.Rejected
-DigitalBrain.Rules.Rejected.Deconstruct(out string! Operation, out string![]! Rules, out string![]! Messages) -> void
-DigitalBrain.Rules.Rejected.Equals(DigitalBrain.Rules.Rejected? other) -> bool
-DigitalBrain.Rules.Rejected.Messages.get -> string![]!
-DigitalBrain.Rules.Rejected.Messages.init -> void
-DigitalBrain.Rules.Rejected.Operation.get -> string!
-DigitalBrain.Rules.Rejected.Operation.init -> void
-DigitalBrain.Rules.Rejected.Rejected(string! Operation, string![]! Rules, string![]! Messages) -> void
-DigitalBrain.Rules.Rejected.Rules.get -> string![]!
-DigitalBrain.Rules.Rejected.Rules.init -> void
-DigitalBrain.Rules.Rule
-DigitalBrain.Rules.Rule.Deconstruct(out string! Name) -> void
-DigitalBrain.Rules.Rule.Name.get -> string!
-DigitalBrain.Rules.Rule.Name.init -> void
-DigitalBrain.Rules.Rule.Rule(DigitalBrain.Rules.Rule! original) -> void
-DigitalBrain.Rules.Rule.Rule(string! Name) -> void
-DigitalBrain.Rules.RuleViolationException
-DigitalBrain.Rules.RuleViolationException.Rejected.get -> DigitalBrain.Rules.Rejected!
-DigitalBrain.Rules.RuleViolationException.RuleViolationException(DigitalBrain.Rules.Rejected! rejected) -> void
-DigitalBrain.Rules.Rules
-abstract DigitalBrain.Rules.Rule.<Clone>$() -> DigitalBrain.Rules.Rule!
-abstract DigitalBrain.Rules.Rule.Broken.get -> bool
-abstract DigitalBrain.Rules.Rule.Message.get -> string!
-override DigitalBrain.Rules.Rejected.<Clone>$() -> DigitalBrain.Rules.Rejected!
-override DigitalBrain.Rules.Rejected.Equals(object? obj) -> bool
-override DigitalBrain.Rules.Rejected.GetHashCode() -> int
-override DigitalBrain.Rules.Rejected.ToString() -> string!
-override DigitalBrain.Rules.Rule.Equals(object? obj) -> bool
-override DigitalBrain.Rules.Rule.GetHashCode() -> int
-override DigitalBrain.Rules.Rule.ToString() -> string!
-override sealed DigitalBrain.Rules.Rejected.Equals(DigitalBrain.Signal? other) -> bool
-static DigitalBrain.Rules.Rejected.operator !=(DigitalBrain.Rules.Rejected? left, DigitalBrain.Rules.Rejected? right) -> bool
-static DigitalBrain.Rules.Rejected.operator ==(DigitalBrain.Rules.Rejected? left, DigitalBrain.Rules.Rejected? right) -> bool
-static DigitalBrain.Rules.Rule.operator !=(DigitalBrain.Rules.Rule? left, DigitalBrain.Rules.Rule? right) -> bool
-static DigitalBrain.Rules.Rule.operator ==(DigitalBrain.Rules.Rule? left, DigitalBrain.Rules.Rule? right) -> bool
-static DigitalBrain.Rules.Rules.Judge(string! operation, params System.ReadOnlySpan<DigitalBrain.Rules.Rule!> rules) -> DigitalBrain.Rules.Rejected?
 virtual DigitalBrain.Rules.Rule.EqualityContract.get -> System.Type!
 virtual DigitalBrain.Rules.Rule.Equals(DigitalBrain.Rules.Rule? other) -> bool
 virtual DigitalBrain.Rules.Rule.PrintMembers(System.Text.StringBuilder! builder) -> bool
-DigitalBrain.Modules.Validation.ArrayLength<T>
-DigitalBrain.Modules.Validation.ArrayLength<T>.ArrayLength(string! Path, T[]? Value, int Minimum, int Maximum) -> void
-DigitalBrain.Modules.Validation.ArrayLength<T>.Deconstruct(out string! Path, out T[]? Value, out int Minimum, out int Maximum) -> void
-DigitalBrain.Modules.Validation.ArrayLength<T>.Equals(DigitalBrain.Modules.Validation.ArrayLength<T>? other) -> bool
-DigitalBrain.Modules.Validation.ArrayLength<T>.Maximum.get -> int
-DigitalBrain.Modules.Validation.ArrayLength<T>.Maximum.init -> void
-DigitalBrain.Modules.Validation.ArrayLength<T>.Minimum.get -> int
-DigitalBrain.Modules.Validation.ArrayLength<T>.Minimum.init -> void
-DigitalBrain.Modules.Validation.ArrayLength<T>.Path.get -> string!
-DigitalBrain.Modules.Validation.ArrayLength<T>.Path.init -> void
-DigitalBrain.Modules.Validation.ArrayLength<T>.Value.get -> T[]?
-DigitalBrain.Modules.Validation.ArrayLength<T>.Value.init -> void
-DigitalBrain.Modules.Validation.HttpUri
-DigitalBrain.Modules.Validation.HttpUri.Deconstruct(out string! Path, out System.Uri? Value) -> void
-DigitalBrain.Modules.Validation.HttpUri.Equals(DigitalBrain.Modules.Validation.HttpUri? other) -> bool
-DigitalBrain.Modules.Validation.HttpUri.HttpUri(string! Path, System.Uri? Value) -> void
-DigitalBrain.Modules.Validation.HttpUri.Path.get -> string!
-DigitalBrain.Modules.Validation.HttpUri.Path.init -> void
-DigitalBrain.Modules.Validation.HttpUri.Value.get -> System.Uri?
-DigitalBrain.Modules.Validation.HttpUri.Value.init -> void
-DigitalBrain.Modules.Validation.ModuleValidationException.ModuleValidationException(DigitalBrain.Rules.Rejected! rejected) -> void
-DigitalBrain.Modules.Validation.NumberRange
-DigitalBrain.Modules.Validation.NumberRange.Deconstruct(out string! Path, out decimal Value, out decimal Minimum, out decimal Maximum) -> void
-DigitalBrain.Modules.Validation.NumberRange.Equals(DigitalBrain.Modules.Validation.NumberRange? other) -> bool
-DigitalBrain.Modules.Validation.NumberRange.Maximum.get -> decimal
-DigitalBrain.Modules.Validation.NumberRange.Maximum.init -> void
-DigitalBrain.Modules.Validation.NumberRange.Minimum.get -> decimal
-DigitalBrain.Modules.Validation.NumberRange.Minimum.init -> void
-DigitalBrain.Modules.Validation.NumberRange.Path.get -> string!
-DigitalBrain.Modules.Validation.NumberRange.Path.init -> void
-DigitalBrain.Modules.Validation.NumberRange.NumberRange(string! Path, decimal Value, decimal Minimum, decimal Maximum) -> void
-DigitalBrain.Modules.Validation.NumberRange.Value.get -> decimal
-DigitalBrain.Modules.Validation.NumberRange.Value.init -> void
-DigitalBrain.Modules.Validation.Required
-DigitalBrain.Modules.Validation.Required.Deconstruct(out string! Path, out object? Value) -> void
-DigitalBrain.Modules.Validation.Required.Equals(DigitalBrain.Modules.Validation.Required? other) -> bool
-DigitalBrain.Modules.Validation.Required.Path.get -> string!
-DigitalBrain.Modules.Validation.Required.Path.init -> void
-DigitalBrain.Modules.Validation.Required.Required(string! Path, object? Value) -> void
-DigitalBrain.Modules.Validation.Required.Value.get -> object?
-DigitalBrain.Modules.Validation.Required.Value.init -> void
-DigitalBrain.Modules.Validation.StringLength
-DigitalBrain.Modules.Validation.StringLength.Deconstruct(out string! Path, out string? Value, out int Minimum, out int Maximum) -> void
-DigitalBrain.Modules.Validation.StringLength.Equals(DigitalBrain.Modules.Validation.StringLength? other) -> bool
-DigitalBrain.Modules.Validation.StringLength.Maximum.get -> int
-DigitalBrain.Modules.Validation.StringLength.Maximum.init -> void
-DigitalBrain.Modules.Validation.StringLength.Minimum.get -> int
-DigitalBrain.Modules.Validation.StringLength.Minimum.init -> void
-DigitalBrain.Modules.Validation.StringLength.Path.get -> string!
-DigitalBrain.Modules.Validation.StringLength.Path.init -> void
-DigitalBrain.Modules.Validation.StringLength.StringLength(string! Path, string? Value, int Minimum, int Maximum) -> void
-DigitalBrain.Modules.Validation.StringLength.Value.get -> string?
-DigitalBrain.Modules.Validation.StringLength.Value.init -> void
-DigitalBrain.Modules.Validation.Utf8Length
-DigitalBrain.Modules.Validation.Utf8Length.Deconstruct(out string! Path, out string? Value, out int MaximumBytes) -> void
-DigitalBrain.Modules.Validation.Utf8Length.Equals(DigitalBrain.Modules.Validation.Utf8Length? other) -> bool
-DigitalBrain.Modules.Validation.Utf8Length.MaximumBytes.get -> int
-DigitalBrain.Modules.Validation.Utf8Length.MaximumBytes.init -> void
-DigitalBrain.Modules.Validation.Utf8Length.Path.get -> string!
-DigitalBrain.Modules.Validation.Utf8Length.Path.init -> void
-DigitalBrain.Modules.Validation.Utf8Length.Utf8Length(string! Path, string? Value, int MaximumBytes) -> void
-DigitalBrain.Modules.Validation.Utf8Length.Value.get -> string?
-DigitalBrain.Modules.Validation.Utf8Length.Value.init -> void
-override DigitalBrain.Modules.Validation.ArrayLength<T>.<Clone>$() -> DigitalBrain.Modules.Validation.ArrayLength<T>!
-override DigitalBrain.Modules.Validation.ArrayLength<T>.Broken.get -> bool
-override DigitalBrain.Modules.Validation.ArrayLength<T>.Equals(object? obj) -> bool
-override DigitalBrain.Modules.Validation.ArrayLength<T>.GetHashCode() -> int
-override DigitalBrain.Modules.Validation.ArrayLength<T>.Message.get -> string!
-override DigitalBrain.Modules.Validation.ArrayLength<T>.ToString() -> string!
-override DigitalBrain.Modules.Validation.HttpUri.<Clone>$() -> DigitalBrain.Modules.Validation.HttpUri!
-override DigitalBrain.Modules.Validation.HttpUri.Broken.get -> bool
-override DigitalBrain.Modules.Validation.HttpUri.Equals(object? obj) -> bool
-override DigitalBrain.Modules.Validation.HttpUri.GetHashCode() -> int
-override DigitalBrain.Modules.Validation.HttpUri.Message.get -> string!
-override DigitalBrain.Modules.Validation.HttpUri.ToString() -> string!
-override DigitalBrain.Modules.Validation.NumberRange.<Clone>$() -> DigitalBrain.Modules.Validation.NumberRange!
-override DigitalBrain.Modules.Validation.NumberRange.Broken.get -> bool
-override DigitalBrain.Modules.Validation.NumberRange.Equals(object? obj) -> bool
-override DigitalBrain.Modules.Validation.NumberRange.GetHashCode() -> int
-override DigitalBrain.Modules.Validation.NumberRange.Message.get -> string!
-override DigitalBrain.Modules.Validation.NumberRange.ToString() -> string!
-override DigitalBrain.Modules.Validation.Required.<Clone>$() -> DigitalBrain.Modules.Validation.Required!
-override DigitalBrain.Modules.Validation.Required.Broken.get -> bool
-override DigitalBrain.Modules.Validation.Required.Equals(object? obj) -> bool
-override DigitalBrain.Modules.Validation.Required.GetHashCode() -> int
-override DigitalBrain.Modules.Validation.Required.Message.get -> string!
-override DigitalBrain.Modules.Validation.Required.ToString() -> string!
-override DigitalBrain.Modules.Validation.StringLength.<Clone>$() -> DigitalBrain.Modules.Validation.StringLength!
-override DigitalBrain.Modules.Validation.StringLength.Broken.get -> bool
-override DigitalBrain.Modules.Validation.StringLength.Equals(object? obj) -> bool
-override DigitalBrain.Modules.Validation.StringLength.GetHashCode() -> int
-override DigitalBrain.Modules.Validation.StringLength.Message.get -> string!
-override DigitalBrain.Modules.Validation.StringLength.ToString() -> string!
-override DigitalBrain.Modules.Validation.Utf8Length.<Clone>$() -> DigitalBrain.Modules.Validation.Utf8Length!
-override DigitalBrain.Modules.Validation.Utf8Length.Broken.get -> bool
-override DigitalBrain.Modules.Validation.Utf8Length.Equals(object? obj) -> bool
-override DigitalBrain.Modules.Validation.Utf8Length.GetHashCode() -> int
-override DigitalBrain.Modules.Validation.Utf8Length.Message.get -> string!
-override DigitalBrain.Modules.Validation.Utf8Length.ToString() -> string!
-override sealed DigitalBrain.Modules.Validation.ArrayLength<T>.Equals(DigitalBrain.Rules.Rule? other) -> bool
-override sealed DigitalBrain.Modules.Validation.HttpUri.Equals(DigitalBrain.Rules.Rule? other) -> bool
-override sealed DigitalBrain.Modules.Validation.NumberRange.Equals(DigitalBrain.Rules.Rule? other) -> bool
-override sealed DigitalBrain.Modules.Validation.Required.Equals(DigitalBrain.Rules.Rule? other) -> bool
-override sealed DigitalBrain.Modules.Validation.StringLength.Equals(DigitalBrain.Rules.Rule? other) -> bool
-override sealed DigitalBrain.Modules.Validation.Utf8Length.Equals(DigitalBrain.Rules.Rule? other) -> bool
-static DigitalBrain.Modules.Validation.ArrayLength<T>.operator !=(DigitalBrain.Modules.Validation.ArrayLength<T>? left, DigitalBrain.Modules.Validation.ArrayLength<T>? right) -> bool
-static DigitalBrain.Modules.Validation.ArrayLength<T>.operator ==(DigitalBrain.Modules.Validation.ArrayLength<T>? left, DigitalBrain.Modules.Validation.ArrayLength<T>? right) -> bool
-static DigitalBrain.Modules.Validation.HttpUri.operator !=(DigitalBrain.Modules.Validation.HttpUri? left, DigitalBrain.Modules.Validation.HttpUri? right) -> bool
-static DigitalBrain.Modules.Validation.HttpUri.operator ==(DigitalBrain.Modules.Validation.HttpUri? left, DigitalBrain.Modules.Validation.HttpUri? right) -> bool
-static DigitalBrain.Modules.Validation.ModuleValidation.Check(string! moduleId, params DigitalBrain.Rules.Rule![]! rules) -> void
-static DigitalBrain.Modules.Validation.NumberRange.operator !=(DigitalBrain.Modules.Validation.NumberRange? left, DigitalBrain.Modules.Validation.NumberRange? right) -> bool
-static DigitalBrain.Modules.Validation.NumberRange.operator ==(DigitalBrain.Modules.Validation.NumberRange? left, DigitalBrain.Modules.Validation.NumberRange? right) -> bool
-static DigitalBrain.Modules.Validation.Required.operator !=(DigitalBrain.Modules.Validation.Required? left, DigitalBrain.Modules.Validation.Required? right) -> bool
-static DigitalBrain.Modules.Validation.Required.operator ==(DigitalBrain.Modules.Validation.Required? left, DigitalBrain.Modules.Validation.Required? right) -> bool
-static DigitalBrain.Modules.Validation.StringLength.operator !=(DigitalBrain.Modules.Validation.StringLength? left, DigitalBrain.Modules.Validation.StringLength? right) -> bool
-static DigitalBrain.Modules.Validation.StringLength.operator ==(DigitalBrain.Modules.Validation.StringLength? left, DigitalBrain.Modules.Validation.StringLength? right) -> bool
-static DigitalBrain.Modules.Validation.Utf8Length.operator !=(DigitalBrain.Modules.Validation.Utf8Length? left, DigitalBrain.Modules.Validation.Utf8Length? right) -> bool
-static DigitalBrain.Modules.Validation.Utf8Length.operator ==(DigitalBrain.Modules.Validation.Utf8Length? left, DigitalBrain.Modules.Validation.Utf8Length? right) -> bool
+virtual DigitalBrain.Signal.EqualityContract.get -> System.Type!
+virtual DigitalBrain.Signal.Equals(DigitalBrain.Signal? other) -> bool
+virtual DigitalBrain.Signal.PrintMembers(System.Text.StringBuilder! builder) -> bool
