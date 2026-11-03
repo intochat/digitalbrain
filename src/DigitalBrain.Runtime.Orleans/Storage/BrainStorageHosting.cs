@@ -38,7 +38,11 @@ public static class BrainStorageHosting
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(assemblies);
         services.AddSingleton(new SignalAssemblies(assemblies));
-        services.TryAddSingleton(sp => new SignalTypeMap(sp.GetServices<SignalAssemblies>().SelectMany(item => item.Assemblies)));
+        services.TryAddSingleton(sp => new SignalTypeMap(
+            sp.GetServices<SignalAssemblies>()
+                .SelectMany(item => item.Assemblies)
+                .Concat(Capabilities.CapabilityHosting.RegisteredPortAssemblies(sp))
+                .Distinct()));
         services.TryAddSingleton<JournalPayloads>();
         services.TryAddSingleton<BrainSignalHistories>();
         return services;

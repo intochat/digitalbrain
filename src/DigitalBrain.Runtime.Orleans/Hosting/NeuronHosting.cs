@@ -17,7 +17,11 @@ internal static class NeuronHosting
         ArgumentNullException.ThrowIfNull(assemblies);
         RuntimeProtocol.Register(Signalling.RuntimeOrleansJsonContext.Default);
         foreach (var assembly in assemblies) { silo.Services.AddSingleton(new HostedAssembly(assembly)); }
-        silo.Services.TryAddSingleton(sp => new NeuronTypeRegistry(sp.GetServices<HostedAssembly>().Select(hosted => hosted.Assembly)));
+        silo.Services.TryAddSingleton(sp => new NeuronTypeRegistry(
+            sp.GetServices<HostedAssembly>()
+                .Select(hosted => hosted.Assembly)
+                .Concat(Capabilities.CapabilityHosting.RegisteredPortAssemblies(sp))
+                .Distinct()));
         return silo;
     }
 

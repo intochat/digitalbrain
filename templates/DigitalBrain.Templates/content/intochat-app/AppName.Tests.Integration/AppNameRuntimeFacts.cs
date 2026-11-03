@@ -1,11 +1,19 @@
 using DigitalBrain;
+using DigitalBrain.Identity.Local;
+using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Testing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace APP_NAMESPACE.Tests.Integration;
 
 public sealed class APP_CLASSRuntimeFixture : BothRuntimesFixture
 {
+    private readonly string _home = Path.Combine(Path.GetTempPath(), "db-app-" + Guid.NewGuid().ToString("N"));
+
     protected override IReadOnlyList<Type> Modules => [typeof(APP_CLASS)];
+
+    protected override void ConfigureSilo(IServiceCollection services)
+        => services.AddLocalIdentity(SiloNeurons.Get, _home);
 }
 
 public sealed class APP_CLASSRuntimeFacts(APP_CLASSRuntimeFixture fixture) : IClassFixture<APP_CLASSRuntimeFixture>

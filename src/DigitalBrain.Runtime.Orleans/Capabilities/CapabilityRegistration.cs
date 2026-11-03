@@ -22,6 +22,7 @@ public static class CapabilityRegistration
     public static IServiceCollection AddSecretsCapability<TPort>(this IServiceCollection services) where TPort : class, ISecretVaultPort
     {
         ArgumentNullException.ThrowIfNull(services);
+        CapabilityHosting.RemoveDeniedSecretsFallbacks(services);
         services.TryAddSingleton<TPort>();
         services.AddKeyedSingleton<ISecrets>(Capability.Secrets.V1Id, (sp, _) => new SecretsCapability(sp.GetRequiredService<TPort>(), sp.GetService<ILogger<SecretsCapability>>()) { Declarations = TopologyHosting.ComposedDeclarations(sp) });
         return services;
@@ -48,6 +49,7 @@ public static class CapabilityRegistration
     public static IServiceCollection AddIdentitySessions<TPort>(this IServiceCollection services) where TPort : class, IIdentitySessionPort
     {
         ArgumentNullException.ThrowIfNull(services);
+        CapabilityHosting.RemoveDeniedSessionsFallbacks(services);
         services.TryAddSingleton<TPort>();
         services.TryAddSingleton(TopologyHosting.ComposedDeclarations);
         services.AddKeyedSingleton<SessionsCapability>(Capability.Identity.V1Id, (sp, _) => new SessionsCapability(sp.GetRequiredService<TPort>(), sp.GetRequiredService<ModuleDeclarations>()));

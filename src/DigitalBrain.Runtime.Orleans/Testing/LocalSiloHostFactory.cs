@@ -77,6 +77,10 @@ public sealed class LocalSiloHostFactory : IInProcessHostFactory
         {
             silo.ConfigureTopologySilo();
             _configureServices?.Invoke(silo.Services);
+            if (_clusterStore is Unregistered && silo.Services.Any(d => d.ServiceType == typeof(DigitalBrain.Capabilities.Identity.IIdentityDirectoryPort)))
+            {
+                silo.AddBrainStorage([.. options.Modules.Select(module => module.Assembly).Append(typeof(Signal).Assembly).Distinct()]);
+            }
         });
         return builder.Build();
     }

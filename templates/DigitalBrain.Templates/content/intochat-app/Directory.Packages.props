@@ -4,6 +4,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="DigitalBrain" Version="DIGITALBRAIN_VERSION_VALUE" />
+    <PackageVersion Include="DigitalBrain.Identity.Local" Version="DIGITALBRAIN_VERSION_VALUE" />
+    <PackageVersion Include="DigitalBrain.Runtime.Orleans" Version="DIGITALBRAIN_VERSION_VALUE" />
     <PackageVersion Include="DigitalBrain.UI" Version="DIGITALBRAIN_VERSION_VALUE" />
     <PackageVersion Include="DigitalBrain.Testing" Version="DIGITALBRAIN_VERSION_VALUE" />
     <PackageVersion Include="DigitalBrain.Testing.Silo" Version="DIGITALBRAIN_VERSION_VALUE" />

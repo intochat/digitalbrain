@@ -1,9 +1,12 @@
+using System.Reflection;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Capabilities.Connections.Broker;
 using DigitalBrain.Capabilities.Identity;
+using DigitalBrain.Capabilities.Secrets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 
@@ -13,10 +16,29 @@ namespace DigitalBrain.Runtime.Orleans.Capabilities;
 public static class CapabilityHosting
 {
     internal static readonly Func<IServiceProvider, object?, IIdentity> DeniedIdentityFactory =
-        static (_, _) => new IdentityCapability(DeniedIdentityDirectoryPort.Instance);
+        static (sp, _) => new IdentityCapability(sp.GetService<IIdentityDirectoryPort>() ?? DeniedIdentityDirectoryPort.Instance);
 
     internal static readonly Func<IServiceProvider, object?, IGrants> DeniedGrantsFactory =
-        static (_, _) => new GrantsCapability(DeniedIdentityDirectoryPort.Instance);
+        static (sp, _) => new GrantsCapability(sp.GetService<IIdentityDirectoryPort>() ?? DeniedIdentityDirectoryPort.Instance);
+
+    internal static readonly Func<IServiceProvider, object?, ISecrets> DeniedSecretsFactory =
+        static (sp, _) => new SecretsCapability(
+            sp.GetService<ISecretVaultPort>() ?? DeniedSecretVaultPort.Instance,
+            sp.GetService<ILogger<SecretsCapability>>())
+        {
+            Declarations = TopologyHosting.ComposedDeclarations(sp),
+        };
+
+    internal static readonly Func<IServiceProvider, object?, SessionsCapability> DeniedSessionsCapabilityFactory =
+        static (sp, _) => new SessionsCapability(
+            sp.GetService<IIdentitySessionPort>() ?? DeniedIdentitySessionPort.Instance,
+            TopologyHosting.ComposedDeclarations(sp));
+
+    internal static readonly Func<IServiceProvider, object?, ISessions> DeniedSessionsFactory =
+        static (sp, key) => sp.GetRequiredKeyedService<SessionsCapability>(key);
+
+    internal static readonly Func<IServiceProvider, object?, IIdentityProvider> DeniedIdentityDescriptorFactory =
+        static (sp, key) => sp.GetRequiredKeyedService<SessionsCapability>(key);
 
     /// <summary>
     /// Configures the one <see cref="CapabilityRegistry"/> of this host (for example <c>AcceptBinding(storage@1, typeof(IStorage))</c>).
@@ -46,16 +68,67 @@ public static class CapabilityHosting
     internal static bool IsDeniedIdentityFallback(ServiceDescriptor descriptor)
         => descriptor.IsKeyedService
             && (ReferenceEquals(descriptor.KeyedImplementationFactory, DeniedIdentityFactory)
-                || ReferenceEquals(descriptor.KeyedImplementationFactory, DeniedGrantsFactory));
+                || ReferenceEquals(descriptor.KeyedImplementationFactory, DeniedGrantsFactory)
+                || ReferenceEquals(descriptor.KeyedImplementationFactory, DeniedSecretsFactory)
+                || ReferenceEquals(descriptor.KeyedImplementationFactory, DeniedSessionsCapabilityFactory)
+                || ReferenceEquals(descriptor.KeyedImplementationFactory, DeniedSessionsFactory)
+                || ReferenceEquals(descriptor.KeyedImplementationFactory, DeniedIdentityDescriptorFactory));
 
     internal static void RemoveDeniedIdentityFallbacks(IServiceCollection services)
     {
         for (var index = services.Count - 1; index >= 0; index--)
         {
-            if (IsDeniedIdentityFallback(services[index]))
+            var descriptor = services[index];
+            if (descriptor.IsKeyedService
+                && (ReferenceEquals(descriptor.KeyedImplementationFactory, DeniedIdentityFactory)
+                    || ReferenceEquals(descriptor.KeyedImplementationFactory, DeniedGrantsFactory)))
             {
                 services.RemoveAt(index);
             }
+        }
+    }
+
+    internal static void RemoveDeniedSecretsFallbacks(IServiceCollection services)
+    {
+        for (var index = services.Count - 1; index >= 0; index--)
+        {
+            var descriptor = services[index];
+            if (descriptor.IsKeyedService && ReferenceEquals(descriptor.KeyedImplementationFactory, DeniedSecretsFactory))
+            {
+                services.RemoveAt(index);
+            }
+        }
+    }
+
+    internal static void RemoveDeniedSessionsFallbacks(IServiceCollection services)
+    {
+        for (var index = services.Count - 1; index >= 0; index--)
+        {
+            var descriptor = services[index];
+            if (descriptor.IsKeyedService
+                && (ReferenceEquals(descriptor.KeyedImplementationFactory, DeniedSessionsCapabilityFactory)
+                    || ReferenceEquals(descriptor.KeyedImplementationFactory, DeniedSessionsFactory)
+                    || ReferenceEquals(descriptor.KeyedImplementationFactory, DeniedIdentityDescriptorFactory)))
+            {
+                services.RemoveAt(index);
+            }
+        }
+    }
+
+    internal static IEnumerable<Assembly> RegisteredPortAssemblies(IServiceProvider services)
+    {
+        if (services.GetService<IIdentityDirectoryPort>() is { } directory && !ReferenceEquals(directory, DeniedIdentityDirectoryPort.Instance))
+        {
+            yield return directory.GetType().Assembly;
+        }
+        if (services.GetService<ISecretVaultPort>() is { } vault && !ReferenceEquals(vault, DeniedSecretVaultPort.Instance))
+        {
+            yield return vault.GetType().Assembly;
+        }
+        if (services.GetService<ICapabilityConnections>() is { } connections && !ReferenceEquals(connections, DeniedCapabilityConnections.Instance))
+        {
+            yield return connections.GetType().Assembly;
+            yield return typeof(ICapabilityConnections).Assembly;
         }
     }
 
@@ -72,8 +145,27 @@ public static class CapabilityHosting
         {
             services.AddKeyedSingleton(Capability.Identity.V1Id, DeniedGrantsFactory);
         }
+        if (!services.Any(descriptor => descriptor.IsKeyedService && descriptor.ServiceType == typeof(ISecrets) && Capability.Secrets.V1Id.Equals(descriptor.ServiceKey as string, StringComparison.Ordinal)))
+        {
+            services.AddKeyedSingleton(Capability.Secrets.V1Id, DeniedSecretsFactory);
+        }
+        if (!services.Any(descriptor => descriptor.IsKeyedService && descriptor.ServiceType == typeof(SessionsCapability) && Capability.Identity.V1Id.Equals(descriptor.ServiceKey as string, StringComparison.Ordinal)))
+        {
+            services.AddKeyedSingleton(Capability.Identity.V1Id, DeniedSessionsCapabilityFactory);
+        }
+        if (!services.Any(descriptor => descriptor.IsKeyedService && descriptor.ServiceType == typeof(ISessions) && Capability.Identity.V1Id.Equals(descriptor.ServiceKey as string, StringComparison.Ordinal)))
+        {
+            services.AddKeyedSingleton(Capability.Identity.V1Id, DeniedSessionsFactory);
+        }
+        if (!services.Any(descriptor => descriptor.IsKeyedService && descriptor.ServiceType == typeof(IIdentityProvider) && Capability.Identity.V1Id.Equals(descriptor.ServiceKey as string, StringComparison.Ordinal)))
+        {
+            services.AddKeyedSingleton(Capability.Identity.V1Id, DeniedIdentityDescriptorFactory);
+        }
         services.TryAddSingleton<IIdentity>(sp => sp.GetRequiredKeyedService<IIdentity>(Capability.Identity.V1Id));
         services.TryAddSingleton<IGrants>(sp => sp.GetRequiredKeyedService<IGrants>(Capability.Identity.V1Id));
+        services.TryAddSingleton<ISecrets>(sp => sp.GetRequiredKeyedService<ISecrets>(Capability.Secrets.V1Id));
+        services.TryAddSingleton<ISessions>(sp => sp.GetRequiredKeyedService<ISessions>(Capability.Identity.V1Id));
+        services.TryAddSingleton<IIdentityProvider>(sp => sp.GetRequiredKeyedService<IIdentityProvider>(Capability.Identity.V1Id));
         services.TryAddSingleton(sp => new CapabilityBroker(
             registry,
             sp.GetService<ICapabilityConnections>() ?? DeniedCapabilityConnections.Instance,
@@ -136,5 +228,32 @@ public static class CapabilityHosting
         public Task<IReadOnlyList<Grant>> ListGrants(string brainScopeId, CancellationToken cancellationToken) => throw Denied();
         public Task<Grant?> GrantAsOwner(CapabilityCaller caller, Grant grant, CancellationToken cancellationToken) => throw Denied();
         public Task<bool> RevokeAsOwner(CapabilityCaller caller, string appId, string semanticTypeId, GrantMode mode, CancellationToken cancellationToken) => throw Denied();
+    }
+
+    private sealed class DeniedSecretVaultPort : ISecretVaultPort
+    {
+        public static readonly DeniedSecretVaultPort Instance = new();
+
+        public Task<SecretVaultResult> Set(CapabilityCaller caller, string name, string label, string value, CancellationToken cancellationToken)
+            => Task.FromResult(SecretVaultResult.Denied);
+
+        public Task<SecretVaultStatus> Remove(CapabilityCaller caller, string name, CancellationToken cancellationToken)
+            => Task.FromResult(SecretVaultStatus.Denied);
+
+        public Task<SecretVaultResult> Resolve(CapabilityCaller caller, SecretRef secret, CancellationToken cancellationToken)
+            => Task.FromResult(SecretVaultResult.Denied);
+    }
+
+    private sealed class DeniedIdentitySessionPort : IIdentitySessionPort
+    {
+        public static readonly DeniedIdentitySessionPort Instance = new();
+
+        private static UnauthorizedAccessException Denied()
+            => new("identity@1: no identity session port is registered on this host.");
+
+        public Task<SessionIssued> Issue(CapabilityCaller caller, SessionRequest request, CancellationToken cancellationToken) => throw Denied();
+        public Task End(CapabilityCaller caller, string sessionId, CancellationToken cancellationToken) => throw Denied();
+        public Task<Member?> Validate(string sessionId, CancellationToken cancellationToken) => throw Denied();
+        public IdentityProviderDescriptor Describe() => throw Denied();
     }
 }

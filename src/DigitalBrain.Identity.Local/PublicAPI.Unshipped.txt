@@ -191,6 +191,8 @@ override DigitalBrain.Identity.Local.Directory.SessionRow.ToString() -> string!
 static DigitalBrain.Identity.Local.Directory.SessionRow.operator !=(DigitalBrain.Identity.Local.Directory.SessionRow? left, DigitalBrain.Identity.Local.Directory.SessionRow? right) -> bool
 static DigitalBrain.Identity.Local.Directory.SessionRow.operator ==(DigitalBrain.Identity.Local.Directory.SessionRow? left, DigitalBrain.Identity.Local.Directory.SessionRow? right) -> bool
 DigitalBrain.Identity.Local.LocalIdentityHosting
+static DigitalBrain.Identity.Local.LocalIdentityHosting.AddLocalIdentity(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Func<System.IServiceProvider!, System.Type!, string!, object!>! neuronResolver) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static DigitalBrain.Identity.Local.LocalIdentityHosting.AddLocalIdentity(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Func<System.IServiceProvider!, System.Type!, string!, object!>! neuronResolver, string! homeDirectory) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static DigitalBrain.Identity.Local.LocalIdentityHosting.AddLocalIdentity(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Func<System.Type!, string!, object!>! neuronResolver) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static DigitalBrain.Identity.Local.LocalIdentityHosting.AddLocalIdentity(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Func<System.Type!, string!, object!>! neuronResolver, string! homeDirectory) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 DigitalBrain.Identity.Local.Vault.IVault

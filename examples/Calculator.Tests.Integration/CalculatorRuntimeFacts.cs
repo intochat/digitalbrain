@@ -1,12 +1,20 @@
 using DigitalBrain;
 using DigitalBrain.Examples.Calculator;
+using DigitalBrain.Identity.Local;
+using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Testing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Calculator.Tests.Integration;
 
 public sealed class CalculatorRuntimeFixture : BothRuntimesFixture
 {
+    private readonly string _home = Path.Combine(Path.GetTempPath(), "db-calc-" + Guid.NewGuid().ToString("N"));
+
     protected override IReadOnlyList<Type> Modules => [typeof(CalculatorApp)];
+
+    protected override void ConfigureSilo(IServiceCollection services)
+        => services.AddLocalIdentity(SiloNeurons.Get, _home);
 }
 
 public sealed class CalculatorRuntimeFacts(CalculatorRuntimeFixture fixture) : IClassFixture<CalculatorRuntimeFixture>
