@@ -1599,3 +1599,22 @@ DigitalBrain.ScenarioVerdict.Main.get -> object?
 DigitalBrain.ScenarioVerdict.Main.init -> void
 DigitalBrain.ScenarioVerdict.Side.get -> object?
 DigitalBrain.ScenarioVerdict.Side.init -> void
+DigitalBrain.AppNavigated
+DigitalBrain.AppNavigated.App.get -> string!
+DigitalBrain.AppNavigated.App.init -> void
+DigitalBrain.AppNavigated.AppNavigated(string! App, string? FromView, string! ToView, string! Cause) -> void
+DigitalBrain.AppNavigated.Cause.get -> string!
+DigitalBrain.AppNavigated.Cause.init -> void
+DigitalBrain.AppNavigated.Deconstruct(out string! App, out string? FromView, out string! ToView, out string! Cause) -> void
+DigitalBrain.AppNavigated.Equals(DigitalBrain.AppNavigated? other) -> bool
+DigitalBrain.AppNavigated.FromView.get -> string?
+DigitalBrain.AppNavigated.FromView.init -> void
+DigitalBrain.AppNavigated.ToView.get -> string!
+DigitalBrain.AppNavigated.ToView.init -> void
+override DigitalBrain.AppNavigated.<Clone>$() -> DigitalBrain.AppNavigated!
+override DigitalBrain.AppNavigated.Equals(object? obj) -> bool
+override DigitalBrain.AppNavigated.GetHashCode() -> int
+override DigitalBrain.AppNavigated.ToString() -> string!
+override sealed DigitalBrain.AppNavigated.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.AppNavigated.operator !=(DigitalBrain.AppNavigated? left, DigitalBrain.AppNavigated? right) -> bool
+static DigitalBrain.AppNavigated.operator ==(DigitalBrain.AppNavigated? left, DigitalBrain.AppNavigated? right) -> bool

@@ -152,4 +152,36 @@ public sealed class AlgorithmFacts
         Assert.Contains(findings, f => f.Rule == "dead" && f.Nodes.Single() == g.Ids[dead]);
         Assert.Contains(findings, f => f.Rule == "hub" && f.Nodes.Single() == g.Ids[hub]);
     }
+
+    [Fact]
+    public void Rules_flag_orphan_task_steps_and_stuck_runs()
+    {
+        var sink = new GraphSink();
+        var task = sink.Node("b/tasks.task/t1", GraphNodeKind.Task, "Deploy");
+        var stepOk = sink.Node("b/tasks.task/t1#step/0", GraphNodeKind.Step, "Build");
+        var stepOrphan = sink.Node("b/tasks.task/t1#step/1", GraphNodeKind.Step, "Deploy cluster");
+        var contractOk = sink.Node("contract:builder.build", GraphNodeKind.Contract, "builder.build");
+        var contractMissing = sink.Node("contract:cluster.rollout", GraphNodeKind.Contract, "cluster.rollout");
+        var app = sink.Node("b/apps/creator", GraphNodeKind.App, "Creator");
+
+        sink.Edge(task, stepOk, GraphEdgeKind.Owns);
+        sink.Edge(task, stepOrphan, GraphEdgeKind.Owns);
+        sink.Edge(stepOk, stepOrphan, GraphEdgeKind.Blocks);
+        sink.Edge(stepOk, contractOk, GraphEdgeKind.Executes);
+        sink.Edge(app, contractOk, GraphEdgeKind.Implements);
+        sink.Edge(stepOrphan, contractMissing, GraphEdgeKind.Executes);
+
+        var runHealthy = sink.Node("b/agent.run/r1", GraphNodeKind.Run, "r1");
+        var runStuck = sink.Node("b/agent.run/r2", GraphNodeKind.Run, "r2");
+        sink.Edge(runHealthy, task, GraphEdgeKind.WorksOn, 1f);
+        sink.Edge(runStuck, task, GraphEdgeKind.WorksOn, Rules.StuckRunMinutes);
+
+        var g = Csr.Build(1, sink, [], new int[sink.Nodes.Count].Select(_ => -1).ToArray());
+        var findings = Rules.Run(g, PageRank.Compute(g));
+
+        Assert.Contains(findings, f => f.Rule == "orphan-task" && f.Nodes.Single() == g.Ids[stepOrphan]);
+        Assert.DoesNotContain(findings, f => f.Rule == "orphan-task" && f.Nodes.Contains(g.Ids[stepOk]));
+        Assert.Contains(findings, f => f.Rule == "stuck-run" && f.Nodes.Single() == g.Ids[runStuck]);
+        Assert.DoesNotContain(findings, f => f.Rule == "stuck-run" && f.Nodes.Contains(g.Ids[runHealthy]));
+    }
 }

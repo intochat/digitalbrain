@@ -18,7 +18,14 @@ internal static class Grouping
             {
                 g = groups.Count;
                 index[key] = g;
-                groups.Add(new GraphGroup(key, key, kind == GraphNodeKind.External ? GraphNodeKind.External : kind is GraphNodeKind.Fact or GraphNodeKind.Entity ? GraphNodeKind.Fact : GraphNodeKind.Neuron, 0, false));
+                var groupKind = kind == GraphNodeKind.External
+                    ? GraphNodeKind.External
+                    : kind is GraphNodeKind.Fact or GraphNodeKind.Entity
+                        ? GraphNodeKind.Fact
+                        : kind is GraphNodeKind.Task or GraphNodeKind.Step or GraphNodeKind.Run
+                            ? GraphNodeKind.Task
+                            : GraphNodeKind.Neuron;
+                groups.Add(new GraphGroup(key, key, groupKind, 0, false));
             }
             group[i] = g;
             groups[g] = groups[g] with { Size = groups[g].Size + 1 };
@@ -39,6 +46,10 @@ internal static class Grouping
             case GraphNodeKind.Fact:
             case GraphNodeKind.Entity:
                 return "memory";
+            case GraphNodeKind.Task:
+            case GraphNodeKind.Step:
+            case GraphNodeKind.Run:
+                return "tasks";
             default:
                 var owner = id;
                 var hash = id.IndexOf('#', StringComparison.Ordinal);
@@ -86,6 +97,20 @@ internal static class Grouping
         var groupIndex = focus is null ? -1 : Array.FindIndex(g.Groups, group => group.Id == focus || "group:" + group.Id == focus);
         var member = new bool[g.NodeCount];
         for (var i = 0; i < g.NodeCount; i++) { member[i] = groupIndex < 0 ? g.Group[i] >= 0 : g.Group[i] == groupIndex; }
+        if (groupIndex >= 0 && g.Groups[groupIndex].Id == "tasks")
+        {
+            for (var from = 0; from < g.NodeCount; from++)
+            {
+                if (!member[from]) { continue; }
+                for (var e = g.RowStart[from]; e < g.RowStart[from + 1]; e++)
+                {
+                    if (g.EdgeKinds[e] is GraphEdgeKind.WorksOn or GraphEdgeKind.Executes or GraphEdgeKind.Produced)
+                    {
+                        member[g.Col[e]] = true;
+                    }
+                }
+            }
+        }
 
         var sccSize = new Dictionary<int, int>();
         for (var i = 0; i < g.NodeCount; i++)

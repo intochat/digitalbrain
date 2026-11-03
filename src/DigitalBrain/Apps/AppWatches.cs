@@ -3,6 +3,14 @@ namespace DigitalBrain;
 /// <summary>Where an app runs: its brain and its own app key (<c>{brain}/apps/{name}</c>), from which watch sources are keyed.</summary>
 public readonly record struct AppAddress(string Brain, string App);
 
+/// <summary>Published when an app switches its active root view.</summary>
+/// <param name="App">The app key or id.</param>
+/// <param name="FromView">The previous root view identifier, or null on initial render.</param>
+/// <param name="ToView">The new root view identifier.</param>
+/// <param name="Cause">The operation or reaction that caused the navigation.</param>
+[Signal("app.navigated")]
+public sealed record AppNavigated(string App, string? FromView, string ToView, string Cause) : Signal;
+
 /// <summary>
 /// One signal source an app declares in <see cref="App.Watches"/>. A fixed watch listens to one neuron; a set watch listens to
 /// the members its <see cref="Select"/> returns and selects again whenever its registry emits <see cref="ChangeType"/>.

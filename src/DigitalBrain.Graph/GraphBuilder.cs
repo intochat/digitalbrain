@@ -73,10 +73,15 @@ internal static class GraphBuilder
             if (!byType.TryGetValue(from, out var callers)) { continue; }
             var contract = sink.Node("contract:" + to, GraphNodeKind.Contract, to);
             foreach (var caller in callers) { sink.Edge(caller, contract, GraphEdgeKind.Calls); }
-            // A plain contract resolves to the neuron type of the same name (DefaultNeuronType), so its instances implement it.
-            if (byType.TryGetValue(to, out var implementors))
+        }
+        // A plain contract resolves to the neuron type of the same name (DefaultNeuronType), so its instances implement it.
+        for (var i = 0; i < sink.Nodes.Count; i++)
+        {
+            if (sink.Nodes[i].Kind == GraphNodeKind.Contract
+                && sink.Nodes[i].Id.StartsWith("contract:", StringComparison.Ordinal)
+                && byType.TryGetValue(sink.Nodes[i].Id["contract:".Length..], out var implementors))
             {
-                foreach (var implementor in implementors) { sink.Edge(implementor, contract, GraphEdgeKind.Implements); }
+                foreach (var implementor in implementors) { sink.Edge(implementor, i, GraphEdgeKind.Implements); }
             }
         }
 
@@ -125,6 +130,8 @@ internal static class GraphBuilder
 
     internal static GraphNodeKind KindOf(string type)
         => type == "app" || type.StartsWith("app.", StringComparison.Ordinal) ? GraphNodeKind.App
+         : type == "tasks.task" ? GraphNodeKind.Task
+         : type == "agent.run" ? GraphNodeKind.Run
          : type.StartsWith("connection", StringComparison.Ordinal) ? GraphNodeKind.Connection
          : GraphNodeKind.Neuron;
 

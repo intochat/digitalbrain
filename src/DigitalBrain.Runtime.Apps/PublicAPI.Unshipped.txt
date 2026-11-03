@@ -6,6 +6,7 @@ DigitalBrain.Runtime.Apps.InProcessAppHost.Assign(DigitalBrain.Apps.Hosting.Prog
 DigitalBrain.Runtime.Apps.InProcessAppHost.AssignType(string! owner, System.Type! appType, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! settings, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 DigitalBrain.Runtime.Apps.InProcessAppHost.Describe(string! owner, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Apps.Hosting.BehaviorView![]!>!
 DigitalBrain.Runtime.Apps.InProcessAppHost.InProcessAppHost(System.Func<System.Type!, string!, object!>! neuronResolver, System.Func<System.Type!, object!>! capabilityResolver, DigitalBrain.Runtime.Apps.IPresentationSink! sink, object? logger = null, System.Func<System.Type!, object?>? services = null) -> void
+DigitalBrain.Runtime.Apps.InProcessAppHost.Navigated -> System.Action<DigitalBrain.AppNavigated!>?
 DigitalBrain.Runtime.Apps.InProcessAppHost.Request(string! owner, string! operation, object? argument = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 DigitalBrain.Runtime.Apps.InProcessAppHost.Retire(string! owner, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 DigitalBrain.Runtime.Apps.InProcessAppHost.TryGetTurns(string! owner) -> DigitalBrain.Apps.Hosting.AppTurns?

@@ -25,6 +25,12 @@ public enum GraphNodeKind : byte
     Entity,
     /// <summary>A node of another brain: only its key prefix is known.</summary>
     External,
+    /// <summary>A durable task in the work graph.</summary>
+    Task,
+    /// <summary>One step in a task's pipeline.</summary>
+    Step,
+    /// <summary>An active or completed agent or job run.</summary>
+    Run,
 }
 
 /// <summary>What an edge of the brain graph means, from its source to its target.</summary>
@@ -46,6 +52,16 @@ public enum GraphEdgeKind : byte
     Relates,
     /// <summary>Fact mentions neuron, app or connection.</summary>
     Mentions,
+    /// <summary>Parent task owns a child subtask.</summary>
+    Subtask,
+    /// <summary>Source task or step must complete before target can run.</summary>
+    Blocks,
+    /// <summary>Run is actively working on target task, step or app.</summary>
+    WorksOn,
+    /// <summary>Task step executes a capability contract.</summary>
+    Executes,
+    /// <summary>Task or run produced a target app, file or fact.</summary>
+    Produced,
 }
 
 /// <summary>How much of the graph a view shows.</summary>

@@ -40,11 +40,21 @@ public sealed class GraphSink
 
     internal List<(int From, int To, GraphEdgeKind Kind, float Weight)> Edges { get; } = [];
 
-    /// <summary>Adds or finds the node <paramref name="id"/> and returns its index. The first kind and label win.</summary>
+    /// <summary>Adds or finds the node <paramref name="id"/> and returns its index. The first kind and label win unless a source refines a generic neuron node.</summary>
     public int Node(string id, GraphNodeKind kind, string label)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
-        if (_index.TryGetValue(id, out var index)) { return index; }
+        if (_index.TryGetValue(id, out var index))
+        {
+            var current = Nodes[index];
+            var nextKind = current.Kind == GraphNodeKind.Neuron && kind != GraphNodeKind.Neuron ? kind : current.Kind;
+            var nextLabel = !string.IsNullOrWhiteSpace(label) && label != id && current.Label == GraphBuilder.LabelOf(id) ? label : current.Label;
+            if (nextKind != current.Kind || nextLabel != current.Label)
+            {
+                Nodes[index] = (id, nextKind, nextLabel);
+            }
+            return index;
+        }
         index = Nodes.Count;
         _index[id] = index;
         Nodes.Add((id, kind, label ?? id));

@@ -27,6 +27,10 @@ internal sealed class HostedProgram(
 
     public BehaviorView[] Behaviors { get; } = behaviors;
 
+    public string? LastRootView { get; set; }
+
+    public string? LastCause { get; set; }
+
     public void Present(View? side, View? main)
     {
         _presentedSide = side ?? _presentedSide;

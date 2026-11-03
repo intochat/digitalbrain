@@ -14,6 +14,8 @@ public sealed class InProcessAppHost : IAppHost
     private readonly Func<Type, object?>? _services;
     private readonly ConcurrentDictionary<string, HostedProgram> _programs = new(StringComparer.Ordinal);
 
+    public event Action<AppNavigated>? Navigated;
+
     public InProcessAppHost(
         Func<Type, string, object> neuronResolver,
         Func<Type, object> capabilityResolver,
@@ -112,6 +114,7 @@ public sealed class InProcessAppHost : IAppHost
         {
             throw new InvalidOperationException($"No program is hosted for owner '{owner}'.");
         }
+        hosted.LastCause = operation;
         return hosted.Turns.Request(operation, argument, ct);
     }
 
@@ -195,9 +198,64 @@ public sealed class InProcessAppHost : IAppHost
         var main = ReadProperty(type, hosted.Turns.App, "Main")
             ?? InvokeRender(type, hosted.Turns.App, "Render", hosted.Turns.Definition.Name)
             ?? presentedMain;
+        if (main is not null)
+        {
+            var toView = RootViewOf(main);
+            if (!string.Equals(hosted.LastRootView, toView, StringComparison.Ordinal))
+            {
+                var fromView = hosted.LastRootView;
+                hosted.LastRootView = toView;
+                Navigated?.Invoke(new AppNavigated(hosted.Owner, fromView, toView, hosted.LastCause ?? "open"));
+            }
+        }
         return side is not null || main is not null
             ? _sink.Present(hosted.Owner, side, main, ct)
             : Task.CompletedTask;
+    }
+
+    private static string RootViewOf(View view)
+    {
+        var title = string.IsNullOrWhiteSpace(view.Title) ? "main" : view.Title;
+        var active = FindActiveTag(view.Root, depth: 0);
+        return string.IsNullOrWhiteSpace(active) ? title : $"{title}:{active}";
+    }
+
+    private static string? FindActiveTag(Node? node, int depth)
+    {
+        if (node is null || depth > 4) { return null; }
+        switch (node)
+        {
+            case Tabs { SelectedId: { Length: > 0 } tab }:
+                return tab;
+            case NavItemNode { Selected: true } nav:
+                return !string.IsNullOrWhiteSpace(nav.Key) ? nav.Key : nav.Label;
+            case AppShellNode shell:
+                return FindActiveTag(shell.Toolbar, depth + 1)
+                    ?? FindActiveTag(shell.Sidebar, depth + 1)
+                    ?? FindActiveTag(shell.Body, depth + 1);
+            case Column col:
+                foreach (var child in col.Children)
+                {
+                    if (FindActiveTag(child, depth + 1) is { } found) { return found; }
+                }
+                return null;
+            case Row row:
+                foreach (var child in row.Children)
+                {
+                    if (FindActiveTag(child, depth + 1) is { } found) { return found; }
+                }
+                return null;
+            case Surface surface:
+                foreach (var child in surface.Children)
+                {
+                    if (FindActiveTag(child, depth + 1) is { } found) { return found; }
+                }
+                return null;
+            case SplitPane split:
+                return FindActiveTag(split.Leading, depth + 1) ?? FindActiveTag(split.Trailing, depth + 1);
+            default:
+                return null;
+        }
     }
 
     private static View? ReadProperty(Type type, App instance, string name)
