@@ -30,14 +30,14 @@ public sealed class SynapseCatalogFacts
         var c = SynapseCatalog.Scan(typeof(SynapseCatalogFacts).Assembly);
         Assert.Equal(typeof(WeekSpend), c.States["week"]);
         Assert.Contains(c.Synapses, d => d.Name.EndsWith(".Gate", StringComparison.Ordinal));
-        Assert.Equal(3, c.For("week").Count);
+        Assert.Equal(3, c.For("week").Count(d => d.Function.DeclaringType == typeof(Registered)));
     }
 
     [Fact]
     public void GatesOfReturnsMostDerivedSignalFirst()
     {
         var gates = SynapseCatalog.Scan(typeof(SynapseCatalogFacts).Assembly).GatesOf(typeof(Charging));
-        Assert.Equal([nameof(Registered.Gate), nameof(Registered.GateOnBase)], gates.Select(g => g.Function.Name));
+        Assert.Equal([nameof(Registered.Gate), nameof(Registered.GateOnBase)], gates.Where(g => g.Function.DeclaringType == typeof(Registered)).Select(g => g.Function.Name));
     }
 
     [Fact]

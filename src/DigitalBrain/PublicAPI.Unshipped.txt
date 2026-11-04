@@ -1986,3 +1986,17 @@ static DigitalBrain.SynapseCatalog.Scan(params System.Reflection.Assembly![]! as
 static DigitalBrain.SynapseDescriptor.operator !=(DigitalBrain.SynapseDescriptor? left, DigitalBrain.SynapseDescriptor? right) -> bool
 static DigitalBrain.SynapseDescriptor.operator ==(DigitalBrain.SynapseDescriptor? left, DigitalBrain.SynapseDescriptor? right) -> bool
 static DigitalBrain.SynapseShape.Of(System.Reflection.MethodInfo! function, System.Collections.Generic.IReadOnlyDictionary<string!, System.Type!>! states) -> DigitalBrain.SynapseDescriptor!
+DigitalBrain.StateNeuron<TState>
+DigitalBrain.StateNeuron<TState>.Committed(DigitalBrain.Signal! signal, DigitalBrain.Rules.Check.Allowed! allowed) -> System.Threading.Tasks.Task!
+DigitalBrain.StateNeuron<TState>.Gate(DigitalBrain.Signal! signal, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Rules.Check!>!
+DigitalBrain.StateNeuron<TState>.Receive(DigitalBrain.Signal! signal, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.StateNeuron<TState>.StateNeuron(DigitalBrain.SynapseCatalog! catalog) -> void
+DigitalBrain.CatalogGateIndex
+DigitalBrain.CatalogGateIndex.CatalogGateIndex(DigitalBrain.SynapseCatalog! catalog) -> void
+DigitalBrain.CatalogGateIndex.GatesFor(DigitalBrain.BrainId brain, System.Type! signal) -> System.Collections.Generic.IReadOnlyList<(DigitalBrain.NeuronId Gate, DigitalBrain.SynapseDescriptor! Synapse)>!
+DigitalBrain.Spi.IGateIndex
+DigitalBrain.Spi.IGateIndex.GatesFor(DigitalBrain.BrainId brain, System.Type! signal) -> System.Collections.Generic.IReadOnlyList<(DigitalBrain.NeuronId Gate, DigitalBrain.SynapseDescriptor! Synapse)>!
+DigitalBrain.Spi.ISynapseReceiver
+DigitalBrain.Spi.ISynapseReceiver.Committed(DigitalBrain.Signal! signal, DigitalBrain.Rules.Check.Allowed! allowed) -> System.Threading.Tasks.Task!
+DigitalBrain.Spi.ISynapseReceiver.Gate(DigitalBrain.Signal! signal, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Rules.Check!>!
+DigitalBrain.Spi.ISynapseReceiver.Receive(DigitalBrain.Signal! signal, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
