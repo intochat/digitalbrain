@@ -52,6 +52,7 @@ public sealed class WeeklyCapFacts
         await pay.Charge(250m);
         await os.Idle();
         var auditedBefore = os.Journal(Pay.Brain).Signals(Audit).Count(s => s.Signal is StateChanged);
+        Assert.Equal(1, auditedBefore);
 
         await Assert.ThrowsAsync<RuleViolationException>(() => pay.Charge(100m));
         await os.Idle();
@@ -60,6 +61,10 @@ public sealed class WeeklyCapFacts
         var audited = os.Journal(Pay.Brain).Signals(Audit).Where(s => s.Signal is StateChanged).ToList();
         Assert.Equal(auditedBefore, audited.Count);
         Assert.Equal(250m, await Spent(os));
+
+        await pay.Charge(10m);
+        await os.Idle();
+        Assert.Equal(auditedBefore + 1, os.Journal(Pay.Brain).Signals(Audit).Count(s => s.Signal is StateChanged));
     }
 
     [Fact]
@@ -69,13 +74,13 @@ public sealed class WeeklyCapFacts
         var pay = os.Get<IPayments>(Pay);
         await pay.Charge(10m);
         await os.Idle();
-        var before = os.Journal(Pay.Brain).Signals(Week).Count;
 
         var e = await Assert.ThrowsAsync<RuleViolationException>(() => pay.ChargeRisky(5m));
         await os.Idle();
 
         Assert.EndsWith(".Broken", e.Rejected.Rules[0]);
-        Assert.Equal(before, os.Journal(Pay.Brain).Signals(Week).Count);
+        Assert.DoesNotContain(os.Journal(Pay.Brain).Signals(NeuronId.Parse("b/broken/default")), s => s.Signal is StateChanged);
+        Assert.DoesNotContain(os.Journal(Pay.Brain).Signals(Pay), s => s.Signal is ChargingRisky);
         Assert.Equal(10m, await Spent(os));
     }
 

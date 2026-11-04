@@ -9,18 +9,6 @@ public sealed record WeekSpend(DateOnly Week = default, decimal Spent = 0)
     public WeekSpend() : this(default, 0) { }
 }
 
-[State("audit")]
-public sealed record AuditState(int Calls = 0)
-{
-    public AuditState() : this(0) { }
-}
-
-[State("broken")]
-public sealed record BrokenState(int Seen = 0)
-{
-    public BrokenState() : this(0) { }
-}
-
 public static class Budget
 {
     [Synapse(typeof(Charging), "week")]
@@ -35,10 +23,4 @@ public static class Budget
     [Synapse("week")]
     public static View Show(WeekSpend t) =>
         new("This week", new Column([new StatCardNode("spent", "Spent", $"{t.Spent} of 300")]));
-
-    [Synapse(typeof(Charging), "audit")]
-    public static Check Audit(Charging s, AuditState a) => Check.Allow(a with { Calls = a.Calls + 1 });
-
-    [Synapse(typeof(ChargingRisky), "broken")]
-    public static Check Broken(ChargingRisky s, BrokenState b) => throw new InvalidOperationException("boom");
 }
