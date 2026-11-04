@@ -15,7 +15,8 @@ internal static class TestGates
         ArgumentNullException.ThrowIfNull(os);
         ArgumentNullException.ThrowIfNull(signals);
         var allowed = new List<(TestNeuronHost, Signal, Check.Allowed)>();
-        foreach (var signal in signals.Where(s => !s.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false)))
+        // Gates never run on StateChanged: a gate's Committed saves it while the publisher still awaits Commit (as the Orleans GateRunner).
+        foreach (var signal in signals.Where(s => s is not StateChanged && !s.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false)))
         {
             foreach (var (gate, descriptor) in os.Gates.GatesFor(publisher.Brain, signal.GetType()))
             {

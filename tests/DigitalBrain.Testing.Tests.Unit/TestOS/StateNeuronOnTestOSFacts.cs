@@ -87,21 +87,15 @@ public sealed record Brittle(int Seen)
     public Brittle() : this(0) { }
 }
 
-[State("breaker")]
-public sealed record Breaker(int Seen)
-{
-    public Breaker() : this(0) { }
-}
-
-// Brittle allows Fragile; its Committed save of StateChanged then meets Breaker's gate, which throws for that cause only.
+// Brittle allows Fragile; its Committed save then runs Brittle's view, which throws, so Committed fails after the publisher's append.
+// (Gates never run on StateChanged, so a gate on it can no longer be the failure.)
 public static class Fragility
 {
     [Synapse(typeof(Fragile), "brittle")]
     public static Check Allow(Fragile s, Brittle state) => Check.Allow(state with { Seen = state.Seen + 1 });
 
-    [Synapse(typeof(StateChanged), "breaker")]
-    public static Check Break(StateChanged s, Breaker state) =>
-        s.Cause == "test.synapse.fragile" ? throw new InvalidOperationException("breaker") : Check.Allow(state);
+    [Synapse("brittle")]
+    public static string Break(Brittle state) => state.Seen > 0 ? throw new InvalidOperationException("breaker") : "untouched";
 }
 
 public interface IPayments
@@ -204,8 +198,7 @@ public sealed class StateNeuronOnTestOSFacts
         await os.Idle();
 
         Assert.Single(os.Journal(Pay.Brain).Signals(Pay), s => s.Signal is Fragile);
-        Assert.Contains(os.Failures, e => e is RuleViolationException { Rejected.Messages: ["the gate did not answer"] });
-        Assert.DoesNotContain(os.Journal(Pay.Brain).Signals(NeuronId.Parse("b/brittle/default")), s => s.Signal is StateChanged);
+        Assert.Contains(os.Failures, e => e is InvalidOperationException { Message: "breaker" });
     }
 
     [Fact]

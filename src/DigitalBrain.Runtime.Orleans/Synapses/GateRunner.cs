@@ -21,6 +21,11 @@ namespace DigitalBrain.Runtime.Orleans.Synapses;
 /// synapse <c>publisher → {brain}/{StateAlias}/{Key}</c> is ensured on the subscriber through the ordinary admission path, once per
 /// (publisher, subscriber, signal) per publisher activation. Install-time edges replace this rule in a later plan.
 /// </para>
+/// <para>
+/// Gates never run on <see cref="StateChanged"/>: a gate's <c>Committed</c> saves <see cref="StateChanged"/> while the original publisher
+/// is still in its turn awaiting <see cref="Commit"/>, so a gate on it that resolved to that publisher would deadlock. Reaction synapses
+/// on <see cref="StateChanged"/> are still ensured.
+/// </para>
 /// </summary>
 internal static partial class GateRunner
 {
@@ -41,6 +46,7 @@ internal static partial class GateRunner
         ArgumentNullException.ThrowIfNull(signals);
         ArgumentNullException.ThrowIfNull(ensured);
         var durable = signals.Where(signal => !signal.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false)).ToArray();
+        var gated = durable.Where(signal => signal is not StateChanged).ToArray();
         if (durable.Length == 0 || services.GetService<IGateIndex>() is not { } index || services.GetService<SynapseCatalog>() is not { } catalog) { return []; }
         var payloads = services.GetRequiredService<JournalPayloads>();
         var grains = services.GetRequiredService<IGrainFactory>();
@@ -48,7 +54,7 @@ internal static partial class GateRunner
         await EnsureReactions(catalog, payloads, grains, types, publisher, durable, ensured).ConfigureAwait(true);
         var timeout = RuntimeOptions.From(services).GateTimeout;
         var allowed = new List<(INeuronHost, Signal, JsonElement)>();
-        foreach (var signal in durable)
+        foreach (var signal in gated)
         {
             foreach (var (gate, descriptor) in index.GatesFor(publisher.Brain, signal.GetType()))
             {
@@ -57,7 +63,9 @@ internal static partial class GateRunner
                 var (alias, json) = Encode(payloads, signal);
                 var verdict = await Ask(host, alias, json, descriptor, timeout, ct).ConfigureAwait(true);
                 if (!verdict.Allowed) { throw new RuleViolationException(new Rejected(descriptor.Name, verdict.Rules, verdict.Messages)); }
-                allowed.Add((host, signal, verdict.Next ?? default));
+                // An allowance without a next state cannot be committed: it fails closed like a gate that did not answer.
+                if (verdict.Next is not { } next) { throw new RuleViolationException(new Rejected(descriptor.Name, [descriptor.Name], [NoAnswer])); }
+                allowed.Add((host, signal, next));
             }
         }
         return allowed;
@@ -148,7 +156,7 @@ internal static partial class GateRunner
         return (payload.Type, JsonElement.Parse(payload.Json));
     }
 
-    [LoggerMessage(EventId = 4130, EventName = "GateCommitFailed", Level = LogLevel.Warning,
+    [LoggerMessage(EventId = 4124, EventName = "GateCommitFailed", Level = LogLevel.Warning,
         Message = "The gate {Gate} could not save its next state for {Signal} after the publisher's append; the gate lags one signal behind.")]
     private static partial void LogGateCommitFailed(ILogger logger, Exception error, string gate, string signal);
 }
