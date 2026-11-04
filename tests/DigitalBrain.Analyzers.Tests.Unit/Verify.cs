@@ -44,12 +44,24 @@ internal static class Verify<TAnalyzer> where TAnalyzer : DiagnosticAnalyzer, ne
             public abstract class Neuron { protected System.Threading.Tasks.Task Check(string operation, params DigitalBrain.Rules.Rule[] rules) => System.Threading.Tasks.Task.CompletedTask; }
             public sealed class ModuleManifest { }
             public abstract record Signal;
+            [System.AttributeUsage(System.AttributeTargets.Class)] public sealed class StateAttribute(string alias) : System.Attribute { public string Alias { get; } = alias; }
+            [System.AttributeUsage(System.AttributeTargets.Method)]
+            public sealed class SynapseAttribute : System.Attribute
+            {
+                public SynapseAttribute(System.Type from, string into) { Signal = from; State = into; }
+                public SynapseAttribute(string from) { State = from; }
+                public System.Type? Signal { get; }
+                public string State { get; }
+                public string Key { get; } = "default";
+            }
+            public sealed class Reaction<T> { }
             [System.AttributeUsage(System.AttributeTargets.Method)] public sealed class OnAttribute : System.Attribute;
             [System.AttributeUsage(System.AttributeTargets.Method)] public sealed class ScenarioAttribute(string title) : System.Attribute;
         }
         namespace DigitalBrain.Rules
         {
             public abstract record Rule(string Name) { public abstract bool Broken { get; } public abstract string Message { get; } }
+            public sealed class Check { }
         }
         namespace DigitalBrain.Access
         {

@@ -35,6 +35,11 @@ internal static class Rules
         "'{0}' throws {1} with a message; express the invariant as a Rule and call Check",
         Category, DiagnosticSeverity.Warning, isEnabledByDefault: false);
 
+    public static readonly DiagnosticDescriptor SynapseShape = new(
+        "DB0041", "Synapse signature outside gate, reaction, view",
+        "'{0}' is not a gate, reaction or view synapse: {1}",
+        Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
+
     public static readonly DiagnosticDescriptor ShareableContract = new(
         "DB0031", "Cross-brain contract interface requires [Shareable]",
         "Contract interface or member '{0}' violates [Shareable] contract rules",
@@ -59,6 +64,20 @@ internal static class Rules
     public const string ModuleType = "DigitalBrain.Module";
     public const string AppType = "DigitalBrain.App";
     public const string ManifestType = "DigitalBrain.ModuleManifest";
+    public const string SynapseAttribute = "DigitalBrain.SynapseAttribute";
+    public const string StateAttribute = "DigitalBrain.StateAttribute";
+    public const string CheckType = "DigitalBrain.Rules.Check";
+
+    // Deliberate copy of DigitalBrain.SynapseReasons (the analyzer package cannot reference the core); the facts on both sides assert the same strings.
+    public static class SynapseReasons
+    {
+        public const string GateNeedsSignal = "gate needs a signal";
+        public const string AtMostOneSignal = "at most one signal";
+        public const string StateRecord = "state record";
+        public const string ViewTakesOnlyState = "view takes only the state";
+        public const string PublicStatic = "public static";
+        public const string UnknownParameter = "not a signal, the state or CancellationToken";
+    }
 
     public static readonly ImmutableHashSet<string> IdentityAttributes = ImmutableHashSet.Create(
         "DigitalBrain.NeuronAttribute", "DigitalBrain.SignalAttribute", AppAttribute, ModuleAttribute);

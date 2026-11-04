@@ -22,3 +22,4 @@ DB0031 | DigitalBrain | Error | Cross-brain contract interface requires [Shareab
 DB0032 | DigitalBrain | Error | Neuron reentrancy requires explicit justification comment
 DB0033 | DigitalBrain | Error | Synchronous contract call cycle detected
 DB0040 | DigitalBrain | Disabled | Bare exception for an invariant inside a neuron or app
+DB0041 | DigitalBrain | Error | Synapse signature outside gate, reaction, view
