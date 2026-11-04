@@ -1,7 +1,6 @@
 #nullable enable
 DigitalBrain.Runtime.Synapses.ReferenceSet
 DigitalBrain.Runtime.Synapses.ReferenceSet.Fingerprint.get -> string!
-DigitalBrain.Runtime.Synapses.ReferenceSet.ReferenceSet(System.Collections.Generic.IReadOnlyList<Microsoft.CodeAnalysis.MetadataReference!>! references) -> void
 DigitalBrain.Runtime.Synapses.ReferenceSet.References.get -> System.Collections.Generic.IReadOnlyList<Microsoft.CodeAnalysis.MetadataReference!>!
 DigitalBrain.Runtime.Synapses.SynapseBuild
 DigitalBrain.Runtime.Synapses.SynapseBuild.<Clone>$() -> DigitalBrain.Runtime.Synapses.SynapseBuild!
@@ -22,7 +21,6 @@ DigitalBrain.Runtime.Synapses.SynapseBuild.Symbols.init -> void
 DigitalBrain.Runtime.Synapses.SynapseBuild.SynapseBuild(bool Success, System.Collections.Generic.IReadOnlyList<DigitalBrain.Runtime.Synapses.SynapseDiagnostic!>! Diagnostics, byte[]! Assembly, byte[]! Symbols, string! Hash, string! AssemblyName) -> void
 DigitalBrain.Runtime.Synapses.SynapseCompiler
 DigitalBrain.Runtime.Synapses.SynapseCompiler.Compile(DigitalBrain.Runtime.Synapses.SynapseSource! source) -> DigitalBrain.Runtime.Synapses.SynapseBuild!
-DigitalBrain.Runtime.Synapses.SynapseCompiler.Emits.get -> int
 DigitalBrain.Runtime.Synapses.SynapseCompiler.SynapseCompiler(DigitalBrain.Runtime.Synapses.ReferenceSet! references) -> void
 DigitalBrain.Runtime.Synapses.SynapseDiagnostic
 DigitalBrain.Runtime.Synapses.SynapseDiagnostic.<Clone>$() -> DigitalBrain.Runtime.Synapses.SynapseDiagnostic!

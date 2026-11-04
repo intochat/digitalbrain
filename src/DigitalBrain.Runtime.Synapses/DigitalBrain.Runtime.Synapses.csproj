@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <IsPackable>true</IsPackable>
+    <!-- Not packable yet: DigitalBrain.Analyzers packs analyzer-only (no lib/), so a package dependency on it would not resolve; packaging is a follow-up. -->
+    <IsPackable>false</IsPackable>
     <RootNamespace>DigitalBrain.Runtime.Synapses</RootNamespace>
     <PackageId>DigitalBrain.Runtime.Synapses</PackageId>
     <Description>Compiles synapse source to assemblies with the shipped DigitalBrain analyzers. No Orleans.</Description>

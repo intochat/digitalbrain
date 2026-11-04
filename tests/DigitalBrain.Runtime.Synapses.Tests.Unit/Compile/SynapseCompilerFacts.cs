@@ -1,4 +1,7 @@
+using System.Collections.Immutable;
 using DigitalBrain.Runtime.Synapses;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace DigitalBrain.Runtime.Synapses.Tests.Unit.Compile;
 
@@ -131,5 +134,56 @@ public sealed class SynapseCompilerFacts
         var a = new SynapseCompiler(full).Compile(Source(Budget));
         var b = new SynapseCompiler(smaller).Compile(Source(Budget));
         Assert.NotEqual(a.Hash, b.Hash);
+    }
+    [Fact]
+    public void TheSourceKeyIsPartOfTheHash()
+    {
+        var compiler = new SynapseCompiler(ReferenceSet.FromDefaultContext());
+
+        var a = compiler.Compile(Source(Budget, "A"));
+        var b = compiler.Compile(Source(Budget, "B"));
+
+        Assert.NotEqual(a.Hash, b.Hash);
+        Assert.StartsWith("synapse.A.", a.AssemblyName, StringComparison.Ordinal);
+        Assert.StartsWith("synapse.B.", b.AssemblyName, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ACrashingAnalyzerRefusesTheBuild()
+    {
+        var compiler = new SynapseCompiler(ReferenceSet.FromDefaultContext(), [new ThrowingAnalyzer()]);
+
+        var build = compiler.Compile(Source(Budget));
+
+        Assert.False(build.Success);
+        Assert.Empty(build.Assembly);
+        Assert.Contains(build.Diagnostics, d => d.Id == "AD0001");
+    }
+
+    [Fact]
+    public void TwoCompilersEmitTheSameBytes()
+    {
+        var first = new SynapseCompiler(ReferenceSet.FromDefaultContext()).Compile(Source(Budget));
+        var second = new SynapseCompiler(ReferenceSet.FromDefaultContext()).Compile(Source(Budget));
+
+        Assert.True(first.Success);
+        Assert.NotSame(first, second);
+        Assert.Equal(first.Assembly, second.Assembly);
+        Assert.Equal(first.Symbols, second.Symbols);
+    }
+
+    [DiagnosticAnalyzer(LanguageNames.CSharp)]
+    private sealed class ThrowingAnalyzer : DiagnosticAnalyzer
+    {
+        private static readonly DiagnosticDescriptor Rule = new("TEST0001", "t", "t", "t", DiagnosticSeverity.Warning, true);
+
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => [Rule];
+
+        public override void Initialize(AnalysisContext context)
+        {
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.EnableConcurrentExecution();
+            context.RegisterSyntaxTreeAction(_ => throw new InvalidOperationException("boom"));
+        }
     }
 }

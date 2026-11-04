@@ -15,7 +15,7 @@ public sealed class ReferenceSet
 
     /// <summary>Creates a set over the given file-backed references.</summary>
     /// <param name="references">The references; each must be a <see cref="PortableExecutableReference"/> with a file path.</param>
-    public ReferenceSet(IReadOnlyList<MetadataReference> references)
+    internal ReferenceSet(IReadOnlyList<MetadataReference> references)
     {
         ArgumentNullException.ThrowIfNull(references);
         References = references;
@@ -70,22 +70,32 @@ public sealed class ReferenceSet
                 continue;
             }
 
-            using var image = new PEReader(File.OpenRead(available[name]));
-            if (!image.HasMetadata)
+            List<string> dependencies;
+            try
             {
-                continue;
-            }
+                using var image = new PEReader(File.OpenRead(available[name]));
+                if (!image.HasMetadata)
+                {
+                    continue;
+                }
 
-            var metadata = image.GetMetadataReader();
-            if (!metadata.IsAssembly)
+                var metadata = image.GetMetadataReader();
+                if (!metadata.IsAssembly)
+                {
+                    continue;
+                }
+
+                dependencies = [.. metadata.AssemblyReferences.Select(handle => metadata.GetString(metadata.GetAssemblyReference(handle).Name))];
+            }
+            catch (BadImageFormatException)
             {
+                // A non-PE file on the trusted list is not a reference.
                 continue;
             }
 
             carried.Add(name);
-            foreach (var handle in metadata.AssemblyReferences)
+            foreach (var dependency in dependencies)
             {
-                var dependency = metadata.GetString(metadata.GetAssemblyReference(handle).Name);
                 if (available.ContainsKey(dependency) && !visited.Contains(dependency))
                 {
                     pending.Push(dependency);

@@ -12,8 +12,7 @@ using Microsoft.CodeAnalysis.Emit;
 namespace DigitalBrain.Runtime.Synapses;
 
 /// <summary>Compiles synapse source with every shipped DigitalBrain analyzer plus DB0041; caches successful builds by hash.</summary>
-/// <param name="references">The references the source compiles against.</param>
-public sealed class SynapseCompiler(ReferenceSet references)
+public sealed class SynapseCompiler
 {
     private const int Capacity = 256;
     private const string GlobalUsingsPath = "GlobalUsings.cs";
@@ -33,13 +32,29 @@ public sealed class SynapseCompiler(ReferenceSet references)
 
     private static readonly ImmutableArray<DiagnosticAnalyzer> Analyzers = ImmutableArray.Create<DiagnosticAnalyzer>([.. AnalyzerSet.All, new SynapseShapeAnalyzer()]);
 
+    private readonly ReferenceSet references;
+    private readonly ImmutableArray<DiagnosticAnalyzer> analyzers;
     private readonly Lock gate = new();
     private readonly Dictionary<string, LinkedListNode<SynapseBuild>> cache = new(StringComparer.Ordinal);
     private readonly LinkedList<SynapseBuild> recency = new();
     private int emits;
 
+    /// <summary>Creates a compiler over the given references.</summary>
+    /// <param name="references">The references the source compiles against.</param>
+    public SynapseCompiler(ReferenceSet references)
+        : this(references, [])
+    {
+    }
+
+    internal SynapseCompiler(ReferenceSet references, IEnumerable<DiagnosticAnalyzer> extraAnalyzers)
+    {
+        ArgumentNullException.ThrowIfNull(references);
+        this.references = references;
+        analyzers = [.. Analyzers, .. extraAnalyzers];
+    }
+
     /// <summary>How many builds this compiler has emitted (cache hits do not count).</summary>
-    public int Emits => Volatile.Read(ref emits);
+    internal int Emits => Volatile.Read(ref emits);
 
     /// <summary>Compiles the source, or returns the cached build for the same hash.</summary>
     /// <param name="source">The synapse source.</param>
@@ -48,7 +63,7 @@ public sealed class SynapseCompiler(ReferenceSet references)
     {
         ArgumentNullException.ThrowIfNull(source);
         var files = source.Files.OrderBy(file => file.Key, StringComparer.Ordinal).ToList();
-        var hash = Hash(files);
+        var hash = Hash(source.SourceKey, files);
         var assemblyName = $"synapse.{source.SourceKey}.{hash[..8]}";
 
         lock (gate)
@@ -70,7 +85,7 @@ public sealed class SynapseCompiler(ReferenceSet references)
             references.References,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable, deterministic: true));
 
-        var analyzed = compilation.WithAnalyzers(Analyzers).GetAllDiagnosticsAsync().GetAwaiter().GetResult();
+        var analyzed = compilation.WithAnalyzers(analyzers).GetAllDiagnosticsAsync().GetAwaiter().GetResult();
         if (analyzed.Any(IsError))
         {
             return new SynapseBuild(false, Map(analyzed), [], [], hash, assemblyName);
@@ -105,9 +120,10 @@ public sealed class SynapseCompiler(ReferenceSet references)
         return build;
     }
 
-    private string Hash(List<KeyValuePair<string, string>> files)
+    private string Hash(string sourceKey, List<KeyValuePair<string, string>> files)
     {
-        var text = new StringBuilder(references.Fingerprint);
+        // The key names the assembly, so it is part of the identity: same files under another key are another build.
+        var text = new StringBuilder(references.Fingerprint).Append('\0').Append(sourceKey);
         foreach (var (path, content) in files)
         {
             text.Append('\0').Append(path).Append('\0').Append(content);
@@ -116,7 +132,8 @@ public sealed class SynapseCompiler(ReferenceSet references)
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text.ToString())));
     }
 
-    private static bool IsError(Diagnostic diagnostic) => diagnostic.Severity == DiagnosticSeverity.Error;
+    // AD0001 is a crashed analyzer: the source was not vetted, so it is refused like an error.
+    private static bool IsError(Diagnostic diagnostic) => diagnostic.Severity == DiagnosticSeverity.Error || diagnostic.Id == "AD0001";
 
     private static List<SynapseDiagnostic> Map(IEnumerable<Diagnostic> diagnostics) =>
     [
