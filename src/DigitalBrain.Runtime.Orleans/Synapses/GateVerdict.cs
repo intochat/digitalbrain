@@ -13,4 +13,9 @@ public sealed record GateVerdict(
     [property: Id(0)] bool Allowed,
     [property: Id(1)] string[] Rules,
     [property: Id(2)] string[] Messages,
-    [property: Id(3)] JsonElement? Next);
+    [property: Id(3)] JsonElement? Next)
+{
+    /// <summary>The ticket of the gate's provisional entry when allowed, handed back to <c>Committed</c> or <c>Aborted</c>; empty when refused.</summary>
+    [Id(4)]
+    public Guid Ticket { get; init; }
+}

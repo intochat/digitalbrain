@@ -45,9 +45,9 @@ internal static partial class GateRunner
     /// <param name="signals">The signals about to be appended; ephemeral ones pass no gate.</param>
     /// <param name="ensured">The publisher activation's cache of ensured reaction edges.</param>
     /// <param name="ct">Cancels the wait.</param>
-    /// <returns>Each allowing gate with the signal and its proposed next state.</returns>
+    /// <returns>Each allowing gate with the signal, its proposed next state and the ticket of its provisional entry.</returns>
     /// <exception cref="RuleViolationException">A gate refused, did not answer or failed.</exception>
-    public static async Task<IReadOnlyList<(INeuronHost Gate, Signal Signal, JsonElement Next)>> Run(IServiceProvider services, NeuronId publisher,
+    public static async Task<IReadOnlyList<(INeuronHost Gate, Signal Signal, JsonElement Next, Guid Ticket)>> Run(IServiceProvider services, NeuronId publisher,
         IReadOnlyList<Signal> signals, ISet<string> ensured, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(services);
@@ -62,7 +62,7 @@ internal static partial class GateRunner
         var timeout = RuntimeOptions.From(services).GateTimeout;
         var log = services.GetService<ILoggerFactory>()?.CreateLogger(typeof(GateRunner)) ?? NullLogger.Instance;
         await EnsureReactions(catalog, payloads, grains, types, publisher, durable, ensured, timeout, log).ConfigureAwait(true);
-        var allowed = new List<(INeuronHost Gate, Signal Signal, JsonElement Next)>();
+        var allowed = new List<(INeuronHost Gate, Signal Signal, JsonElement Next, Guid Ticket)>();
         var chain = EnterChain(publisher);
         try
         {
@@ -78,10 +78,10 @@ internal static partial class GateRunner
                     // An allowance without a next state cannot be committed: it fails closed like a gate that did not answer.
                     if (verdict.Next is not { } next)
                     {
-                        allowed.Add((host, signal, default));
+                        allowed.Add((host, signal, default, verdict.Ticket));
                         throw new RuleViolationException(new Rejected(descriptor.Name, [descriptor.Name], [NoAnswer]));
                     }
-                    allowed.Add((host, signal, next));
+                    allowed.Add((host, signal, next, verdict.Ticket));
                 }
             }
         }
@@ -101,19 +101,19 @@ internal static partial class GateRunner
     /// <param name="services">The silo services.</param>
     /// <param name="allowed">What <see cref="Run"/> returned, or the gates that allowed before a stop.</param>
     /// <returns>A task that completes when every gate was told.</returns>
-    public static async Task Abort(IServiceProvider services, IReadOnlyList<(INeuronHost Gate, Signal Signal, JsonElement Next)> allowed)
+    public static async Task Abort(IServiceProvider services, IReadOnlyList<(INeuronHost Gate, Signal Signal, JsonElement Next, Guid Ticket)> allowed)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(allowed);
         if (allowed.Count == 0) { return; }
         var payloads = services.GetRequiredService<JournalPayloads>();
         var log = services.GetService<ILoggerFactory>()?.CreateLogger(typeof(GateRunner)) ?? NullLogger.Instance;
-        foreach (var (gate, signal, _) in allowed)
+        foreach (var (gate, signal, _, ticket) in allowed)
         {
             try
             {
                 var (alias, json) = Encode(payloads, signal);
-                await gate.Aborted(alias, json).ConfigureAwait(true);
+                await gate.Aborted(alias, json, ticket).ConfigureAwait(true);
             }
             catch (Exception error) when (error is not OutOfMemoryException)
             {
@@ -130,7 +130,7 @@ internal static partial class GateRunner
     /// <param name="publisher">The publishing neuron, blocked on this call until every gate answered or timed out.</param>
     /// <param name="allowed">What <see cref="Run"/> returned.</param>
     /// <returns>A task that completes when every gate was asked.</returns>
-    public static async Task Commit(IServiceProvider services, NeuronId publisher, IReadOnlyList<(INeuronHost Gate, Signal Signal, JsonElement Next)> allowed)
+    public static async Task Commit(IServiceProvider services, NeuronId publisher, IReadOnlyList<(INeuronHost Gate, Signal Signal, JsonElement Next, Guid Ticket)> allowed)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(allowed);
@@ -141,13 +141,13 @@ internal static partial class GateRunner
         var chain = EnterChain(publisher);
         try
         {
-            foreach (var (gate, signal, next) in allowed)
+            foreach (var (gate, signal, next, ticket) in allowed)
             {
                 try
                 {
                     var (alias, json) = Encode(payloads, signal);
                     // Bounded: a gate whose save stalls must not hold the publisher's turn; a timeout is logged like a failure.
-                    await gate.Committed(alias, json, next).WaitAsync(timeout).ConfigureAwait(true);
+                    await gate.Committed(alias, json, next, ticket).WaitAsync(timeout).ConfigureAwait(true);
                 }
                 catch (Exception error) when (error is not OutOfMemoryException)
                 {

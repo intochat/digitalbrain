@@ -27,7 +27,15 @@ public abstract record Check
 
     /// <summary>The signal is allowed.</summary>
     /// <param name="Next">The proposed state.</param>
-    public sealed record Allowed(object Next) : Check;
+    public sealed record Allowed(object Next) : Check
+    {
+        /// <summary>
+        /// The correlation ticket of the provisional entry this allowance holds: the host hands it back to
+        /// <see cref="Spi.ISynapseReceiver.Committed"/> or <see cref="Spi.ISynapseReceiver.Aborted"/> so the entry is found by ticket, not by
+        /// signal value. <see cref="Guid.Empty"/> (the default for an allowance a caller constructs directly) means no ticket.
+        /// </summary>
+        public Guid Ticket { get; init; }
+    }
 
     /// <summary>The signal is refused.</summary>
     /// <param name="Broken">The broken rules.</param>

@@ -225,10 +225,10 @@ public sealed class StateNeuronFacts
     public async Task AbortedDropsTheEntryWithoutSavingAndKeepsTheLaterEntries()
     {
         var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
-        Assert.IsType<Check.Allowed>(await n.Gate(new Charging(60m), TestContext.Current.CancellationToken));
+        var sixty = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(60m), TestContext.Current.CancellationToken));
         Assert.IsType<Check.Allowed>(await n.Gate(new Charging(30m), TestContext.Current.CancellationToken));
 
-        await n.Aborted(new Charging(60m));
+        await n.Aborted(new Charging(60m), sixty.Ticket);
 
         Assert.Empty(Context.Writes);
         var again = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(60m), TestContext.Current.CancellationToken));
@@ -255,32 +255,32 @@ public sealed class StateNeuronFacts
     {
         var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
         var a = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), TestContext.Current.CancellationToken));
-        var b = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(41m), TestContext.Current.CancellationToken));
-        Assert.Equal(81m, ((WeekSpend)b.Next).Spent);
+        var b = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), TestContext.Current.CancellationToken));
+        Assert.Equal(80m, ((WeekSpend)b.Next).Spent);
 
-        await n.Committed(new Charging(41m), b);
+        await n.Committed(new Charging(40m), b);
         Assert.Empty(Context.Writes);
 
         await n.Committed(new Charging(40m), a);
-        Assert.Equal(81m, ((WeekSpend)Assert.Single(Context.Writes).State).Spent);
-        var after = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(19m), TestContext.Current.CancellationToken));
-        Assert.Equal(19m, ((WeekSpend)after.Next).Spent - 81m);
+        Assert.Equal(80m, ((WeekSpend)Assert.Single(Context.Writes).State).Spent);
+        var after = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(20m), TestContext.Current.CancellationToken));
+        Assert.Equal(100m, ((WeekSpend)after.Next).Spent);
     }
 
     [Fact]
     public async Task AbortedReGatesTheLaterEntriesOnTheNewBase()
     {
         var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
-        Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), TestContext.Current.CancellationToken));
-        var b = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(41m), TestContext.Current.CancellationToken));
-        Assert.IsType<Check.Refused>(await n.Gate(new Charging(42m), TestContext.Current.CancellationToken));
+        var a = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), TestContext.Current.CancellationToken));
+        var b = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), TestContext.Current.CancellationToken));
+        Assert.IsType<Check.Refused>(await n.Gate(new Charging(40m), TestContext.Current.CancellationToken));
         var writes = Context.Writes.Count;
 
-        await n.Aborted(new Charging(40m));
+        await n.Aborted(new Charging(40m), a.Ticket);
         Assert.Equal(writes, Context.Writes.Count);
 
-        await n.Committed(new Charging(41m), b);
-        Assert.Equal(41m, ((WeekSpend)Context.Writes[^1].State).Spent);
+        await n.Committed(new Charging(40m), b);
+        Assert.Equal(40m, ((WeekSpend)Context.Writes[^1].State).Spent);
     }
 
     [Fact]
@@ -289,11 +289,11 @@ public sealed class StateNeuronFacts
         Context.Store(new Balance(100m));
         var n = Attach(new StateNeuron<Balance>(Catalog(typeof(Balance), typeof(Account))));
         await NeuronAttachment.Activate(n, TestContext.Current.CancellationToken);
-        Assert.IsType<Check.Allowed>(await n.Gate(new Deposit(50m), TestContext.Current.CancellationToken));
+        var deposit = Assert.IsType<Check.Allowed>(await n.Gate(new Deposit(50m), TestContext.Current.CancellationToken));
         var b = Assert.IsType<Check.Allowed>(await n.Gate(new Withdraw(120m), TestContext.Current.CancellationToken));
         Assert.Equal(30m, ((Balance)b.Next).Amount);
 
-        await n.Aborted(new Deposit(50m));
+        await n.Aborted(new Deposit(50m), deposit.Ticket);
 
         Assert.Empty(Context.Writes);
         var late = Assert.IsType<Rejected>(Assert.Single(Context.Published, p => p is Rejected));
@@ -309,9 +309,9 @@ public sealed class StateNeuronFacts
         var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
         var head = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(10m), TestContext.Current.CancellationToken));
         var twin = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), TestContext.Current.CancellationToken));
-        Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), TestContext.Current.CancellationToken));
+        var third = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), TestContext.Current.CancellationToken));
 
-        await n.Committed(new Charging(40m), twin);
+        await n.Committed(new Charging(40m), third);
         await n.Committed(new Charging(40m), twin);
         Assert.Empty(Context.Writes);
         await n.Committed(new Charging(10m), head);
@@ -341,16 +341,47 @@ public sealed class StateNeuronFacts
     public async Task AReGateThatThrowsIsALateRefusalAndAbortedCompletes()
     {
         var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred), typeof(Fragile))));
-        Assert.IsType<Check.Allowed>(await n.Gate(new Charging(10m), TestContext.Current.CancellationToken));
+        var ten = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(10m), TestContext.Current.CancellationToken));
         var probe = Assert.IsType<Check.Allowed>(await n.Gate(new Probe(), TestContext.Current.CancellationToken));
 
-        await n.Aborted(new Charging(10m));
+        await n.Aborted(new Charging(10m), ten.Ticket);
 
         var late = Assert.IsType<Rejected>(Assert.Single(Context.Published, p => p is Rejected));
         Assert.EndsWith(".Fragile.OnlyAboveZero (late)", late.Operation, StringComparison.Ordinal);
         Assert.Equal("zero base", late.Messages[0]);
         await n.Committed(new Probe(), probe);
         Assert.Equal(0m, ((WeekSpend)Assert.Single(Context.Writes).State).Spent);
+    }
+
+    [Fact]
+    public async Task EqualSignalsAreMatchedByTicketNotByValue()
+    {
+        var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
+        var a = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), TestContext.Current.CancellationToken));
+        var b = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), TestContext.Current.CancellationToken));
+        Assert.NotEqual(Guid.Empty, a.Ticket);
+        Assert.NotEqual(a.Ticket, b.Ticket);
+
+        await n.Committed(new Charging(40m), b);
+        Assert.Empty(Context.Writes);
+
+        await n.Committed(new Charging(40m), a);
+        Assert.Equal(80m, ((WeekSpend)Assert.Single(Context.Writes).State).Spent);
+    }
+
+    [Fact]
+    public async Task AbortedWithATicketRemovesThatEntryNotItsEqualTwin()
+    {
+        var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
+        var a = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), TestContext.Current.CancellationToken));
+        var b = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), TestContext.Current.CancellationToken));
+
+        await n.Aborted(new Charging(40m), a.Ticket);
+        Assert.Empty(Context.Writes);
+
+        // B's entry survived and was re-gated on the base (40); had it been removed, Committed would save B's stale 80.
+        await n.Committed(new Charging(40m), b);
+        Assert.Equal(40m, ((WeekSpend)Assert.Single(Context.Writes).State).Spent);
     }
 
     private sealed class SteppedClock : TimeProvider

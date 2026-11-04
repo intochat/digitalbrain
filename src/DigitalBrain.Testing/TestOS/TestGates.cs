@@ -49,13 +49,13 @@ internal static class TestGates
     {
         ArgumentNullException.ThrowIfNull(os);
         ArgumentNullException.ThrowIfNull(allowed);
-        foreach (var (gate, signal, _) in allowed)
+        foreach (var (gate, signal, verdict) in allowed)
         {
             try
             {
                 await os.Track(gate.Turn(interleave: false, async neuron =>
                 {
-                    await ((ISynapseReceiver)neuron).Aborted(signal).ConfigureAwait(false);
+                    await ((ISynapseReceiver)neuron).Aborted(signal, verdict.Ticket).ConfigureAwait(false);
                     return 0;
                 })).ConfigureAwait(false);
             }

@@ -29,7 +29,8 @@ public static class StateNeuron
 /// entry, in order, on the new base; a re-gate that refuses keeps the entry (its publisher appended or will) with the base unchanged as
 /// its next state and publishes an ephemeral <see cref="Rejected"/> whose operation ends in <c> (late)</c>, so the late refusal is
 /// visible and never counted. Provisional entries older than <see cref="StateNeuron.ProvisionalLease"/> are discarded on the next gate
-/// call. Entries match by signal equality; equal signals match the oldest entry first.
+/// call. Entries are matched by the <see cref="Verdict.Allowed.Ticket"/> <see cref="Gate"/> assigned, so value-equal signals of two
+/// publishers never take each other's entry; a ticket of <see cref="Guid.Empty"/> (legacy) falls back to matching by signal value.
 /// </remarks>
 public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where TState : class, new()
 {
@@ -87,7 +88,13 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
         }
         var current = _provisional.Count > 0 ? _provisional[^1].Next : State;
         var verdict = await Evaluate(signal, current, late: false, ct).ConfigureAwait(true);
-        if (verdict is Verdict.Allowed { Next: TState provisional }) { _provisional.Add(new Entry(signal, provisional, now)); }
+        if (verdict is Verdict.Allowed { Next: TState provisional } allowance)
+        {
+            var ticket = Guid.NewGuid();
+            _provisional.Add(new Entry(signal, provisional, now, ticket));
+            return allowance with { Ticket = ticket };
+        }
+
         return verdict;
     }
 
@@ -123,21 +130,21 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     }
 
     /// <summary>
-    /// Marks the provisional entry of <paramref name="signal"/> committed; when the oldest entry is committed, saves the next state of
+    /// Marks the provisional entry of the ticket of <paramref name="allowed"/> committed; when the oldest entry is committed, saves the next state of
     /// the longest committed run from the head once and removes that run (a commit behind an uncommitted head saves nothing yet).
-    /// Matches the oldest uncommitted entry of an equal signal. Committed entries never expire; an uncommitted head that outlives
+    /// Without a ticket (<see cref="Guid.Empty"/>, legacy) matches the oldest uncommitted entry of an equal signal. Committed entries never expire; an uncommitted head that outlives
     /// <see cref="StateNeuron.ProvisionalLease"/> is pruned on the next gate call, which then flushes the committed run behind it.
     /// Without an uncommitted provisional entry, which is only reachable after the entry outlived the lease, saves the next state of
     /// <paramref name="allowed"/>.
     /// </summary>
     /// <param name="signal">The published signal.</param>
-    /// <param name="allowed">The verdict <see cref="Gate"/> returned.</param>
+    /// <param name="allowed">The verdict <see cref="Gate"/> returned, carrying its ticket.</param>
     /// <returns>A task that completes when the state is saved or the entry marked.</returns>
     public async Task Committed(Signal signal, Verdict.Allowed allowed)
     {
         ArgumentNullException.ThrowIfNull(signal);
         ArgumentNullException.ThrowIfNull(allowed);
-        var index = Provisional(signal);
+        var index = Provisional(signal, allowed.Ticket);
         if (index < 0)
         {
             await Save((TState)allowed.Next, [Changed(signal)]).ConfigureAwait(true);
@@ -163,18 +170,19 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     }
 
     /// <summary>
-    /// Removes the provisional entry of <paramref name="signal"/> without saving, then re-runs the gate functions of every later entry,
+    /// Removes the provisional entry of <paramref name="ticket"/> without saving, then re-runs the gate functions of every later entry,
     /// in order, on the new base; a re-gate that refuses keeps its entry with the base unchanged as its next state and publishes an
     /// ephemeral <see cref="Rejected"/> whose operation ends in <c> (late)</c>; a re-gate that throws is treated the same way, with the
-    /// exception message, and never escapes. Matches the oldest uncommitted entry of an equal signal; an abort with only committed
-    /// equal entries is ignored. Durable state is not touched.
+    /// exception message, and never escapes. An abort whose entry is committed or gone is ignored. Without a ticket
+    /// (<see cref="Guid.Empty"/>, legacy) matches the oldest uncommitted entry of an equal signal. Durable state is not touched.
     /// </summary>
     /// <param name="signal">The signal whose publish was abandoned.</param>
+    /// <param name="ticket">The <see cref="Verdict.Allowed.Ticket"/> of the entry to drop.</param>
     /// <returns>A task that completes when the later entries are re-gated.</returns>
-    public async Task Aborted(Signal signal)
+    public async Task Aborted(Signal signal, Guid ticket)
     {
         ArgumentNullException.ThrowIfNull(signal);
-        var index = Provisional(signal);
+        var index = Provisional(signal, ticket);
         if (index < 0) { return; }
         _provisional.RemoveAt(index);
         var current = index > 0 ? _provisional[index - 1].Next : State;
@@ -208,14 +216,19 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
 
     private static string AliasOf(Signal signal) => signal.GetType().GetCustomAttribute<SignalAttribute>()?.Alias ?? signal.GetType().Name;
 
-    // The oldest uncommitted provisional entry for an equal signal (records compare by value, so a host's decoded copy finds its entry).
-    private int Provisional(Signal signal) => _provisional.FindIndex(entry => !entry.Committed && entry.Signal.Equals(signal));
+    // The uncommitted provisional entry of the ticket; without a ticket (legacy), the oldest uncommitted entry for an equal signal
+    // (records compare by value, so a host's decoded copy finds its entry).
+    private int Provisional(Signal signal, Guid ticket) => ticket != Guid.Empty
+        ? _provisional.FindIndex(entry => !entry.Committed && entry.Ticket == ticket)
+        : _provisional.FindIndex(entry => !entry.Committed && entry.Signal.Equals(signal));
 
     private StateChanged Changed(Signal cause) => new(Id.ToString(), AliasOf(cause));
 
     // A provisional allowance: its next state is rewritten when an earlier entry aborts.
-    private sealed class Entry(Signal signal, TState next, DateTimeOffset at)
+    private sealed class Entry(Signal signal, TState next, DateTimeOffset at, Guid ticket)
     {
+        public Guid Ticket { get; } = ticket;
+
         public Signal Signal { get; } = signal;
 
         public TState Next { get; set; } = next;

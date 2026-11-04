@@ -145,8 +145,8 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
             {
                 Check.Refused refused => new GateVerdict(false, [.. refused.Broken.Select(rule => rule.Name)], [.. refused.Broken.Select(rule => rule.Message)], null),
                 // A null next state travels as null: the publisher's GateRunner fails it closed.
-                Check.Allowed { Next: null } => new GateVerdict(true, [], [], null),
-                Check.Allowed allowed => new GateVerdict(true, [], [], JsonSerializer.SerializeToElement(allowed.Next, allowed.Next.GetType(), RuntimeProtocol.Json)),
+                Check.Allowed { Next: null } allowed => new GateVerdict(true, [], [], null) { Ticket = allowed.Ticket },
+                Check.Allowed allowed => new GateVerdict(true, [], [], JsonSerializer.SerializeToElement(allowed.Next, allowed.Next.GetType(), RuntimeProtocol.Json)) { Ticket = allowed.Ticket },
                 _ => throw new InvalidOperationException($"{_key} returned an unknown verdict."),
             };
         }
@@ -154,20 +154,20 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
     }
 
     /// <inheritdoc />
-    public async Task Committed(string signalAlias, JsonElement signal, JsonElement next, CancellationToken cancellationToken = default)
+    public async Task Committed(string signalAlias, JsonElement signal, JsonElement next, Guid ticket, CancellationToken cancellationToken = default)
     {
         var receiver = Receiver();
         var stateType = _class!.GetGenericArguments()[0];
         var state = next.Deserialize(stateType, RuntimeProtocol.Json) ?? throw new JournalPayloadException($"The next state for {_key} is null.");
-        try { await receiver.Committed(Decode(signalAlias, signal), new Check.Allowed(state)).ConfigureAwait(true); }
+        try { await receiver.Committed(Decode(signalAlias, signal), new Check.Allowed(state) { Ticket = ticket }).ConfigureAwait(true); }
         finally { await Drain().ConfigureAwait(true); }
     }
 
     /// <inheritdoc />
-    public async Task Aborted(string signalAlias, JsonElement signal, CancellationToken cancellationToken = default)
+    public async Task Aborted(string signalAlias, JsonElement signal, Guid ticket, CancellationToken cancellationToken = default)
     {
         var receiver = Receiver();
-        try { await receiver.Aborted(Decode(signalAlias, signal)).ConfigureAwait(true); }
+        try { await receiver.Aborted(Decode(signalAlias, signal), ticket).ConfigureAwait(true); }
         finally { await Drain().ConfigureAwait(true); }
     }
 

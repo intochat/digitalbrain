@@ -17,9 +17,13 @@ public interface ISynapseReceiver
     /// <returns>The verdict.</returns>
     Task<Check> Gate(Signal signal, CancellationToken ct);
 
-    /// <summary>Called after the append of the publisher is durable: saves the next state of <paramref name="allowed"/> with <paramref name="signal"/>.</summary>
+    /// <summary>
+    /// Called after the append of the publisher is durable: saves the next state of <paramref name="allowed"/> with <paramref name="signal"/>.
+    /// The provisional entry is matched by <see cref="Check.Allowed.Ticket"/>; only an allowance without a ticket (<see cref="Guid.Empty"/>,
+    /// legacy) falls back to the oldest uncommitted entry of an equal signal.
+    /// </summary>
     /// <param name="signal">The published signal.</param>
-    /// <param name="allowed">The verdict <see cref="Gate"/> returned.</param>
+    /// <param name="allowed">The verdict <see cref="Gate"/> returned, carrying its ticket.</param>
     /// <returns>A task that completes when the state is saved.</returns>
     Task Committed(Signal signal, Check.Allowed allowed);
 
@@ -28,6 +32,7 @@ public interface ISynapseReceiver
     /// append threw): drops the provisional state of <paramref name="signal"/> without saving; later provisional states are re-gated on the new base.
     /// </summary>
     /// <param name="signal">The signal whose publish was abandoned.</param>
+    /// <param name="ticket">The <see cref="Check.Allowed.Ticket"/> of the entry to drop; <see cref="Guid.Empty"/> (legacy) falls back to matching by signal value.</param>
     /// <returns>A task that completes when the provisional state is dropped.</returns>
-    Task Aborted(Signal signal);
+    Task Aborted(Signal signal, Guid ticket);
 }
