@@ -72,6 +72,16 @@ public static class Account
         b.Amount - s.Amount < 0m ? Check.Reject("no overdraft") : Check.Allow(b with { Amount = b.Amount - s.Amount });
 }
 
+[Signal("test.probe")]
+public sealed record Probe : Signal;
+
+public static class Fragile
+{
+    [Synapse(typeof(Probe), "week")]
+    public static Check OnlyAboveZero(Probe s, WeekSpend w) =>
+        w.Spent == 0m ? throw new InvalidOperationException("zero base") : Check.Allow(w);
+}
+
 public sealed class StateNeuronFacts
 {
     private static readonly NeuronId Id = new(new BrainId("alice"), "week", "default");
@@ -291,6 +301,56 @@ public sealed class StateNeuronFacts
         Assert.Equal("no overdraft", late.Messages[0]);
         await n.Committed(new Withdraw(120m), b);
         Assert.Equal(100m, ((Balance)Assert.Single(Context.Writes).State).Amount);
+    }
+
+    [Fact]
+    public async Task EqualSignalsCommitDistinctEntriesAndTheHeadFlushesAllThree()
+    {
+        var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
+        var head = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(10m), TestContext.Current.CancellationToken));
+        var twin = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), TestContext.Current.CancellationToken));
+        Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), TestContext.Current.CancellationToken));
+
+        await n.Committed(new Charging(40m), twin);
+        await n.Committed(new Charging(40m), twin);
+        Assert.Empty(Context.Writes);
+        await n.Committed(new Charging(10m), head);
+
+        Assert.Equal(90m, ((WeekSpend)Assert.Single(Context.Writes).State).Spent);
+    }
+
+    [Fact]
+    public async Task AnExpiredUncommittedHeadIsPrunedAndTheCommittedEntryBehindItIsSavedOnce()
+    {
+        var clock = new SteppedClock();
+        Context.Time = clock;
+        var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
+        Assert.IsType<Check.Allowed>(await n.Gate(new Charging(10m), TestContext.Current.CancellationToken));
+        clock.Now += TimeSpan.FromSeconds(20);
+        var b = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(20m), TestContext.Current.CancellationToken));
+        await n.Committed(new Charging(20m), b);
+        Assert.Empty(Context.Writes);
+
+        clock.Now += TimeSpan.FromSeconds(15);
+        await n.Gate(new Charging(1m), TestContext.Current.CancellationToken);
+
+        Assert.Equal(30m, ((WeekSpend)Assert.Single(Context.Writes).State).Spent);
+    }
+
+    [Fact]
+    public async Task AReGateThatThrowsIsALateRefusalAndAbortedCompletes()
+    {
+        var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred), typeof(Fragile))));
+        Assert.IsType<Check.Allowed>(await n.Gate(new Charging(10m), TestContext.Current.CancellationToken));
+        var probe = Assert.IsType<Check.Allowed>(await n.Gate(new Probe(), TestContext.Current.CancellationToken));
+
+        await n.Aborted(new Charging(10m));
+
+        var late = Assert.IsType<Rejected>(Assert.Single(Context.Published, p => p is Rejected));
+        Assert.EndsWith(".Fragile.OnlyAboveZero (late)", late.Operation, StringComparison.Ordinal);
+        Assert.Equal("zero base", late.Messages[0]);
+        await n.Committed(new Probe(), probe);
+        Assert.Equal(0m, ((WeekSpend)Assert.Single(Context.Writes).State).Spent);
     }
 
     private sealed class SteppedClock : TimeProvider

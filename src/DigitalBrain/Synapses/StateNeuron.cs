@@ -80,7 +80,11 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     {
         ArgumentNullException.ThrowIfNull(signal);
         var now = Context.Time.GetUtcNow();
-        _provisional.RemoveAll(entry => now - entry.At > StateNeuron.ProvisionalLease);
+        // Only uncommitted entries expire; a committed entry's append is durable, so it is flushed once nothing uncommitted is ahead of it.
+        if (_provisional.RemoveAll(entry => !entry.Committed && now - entry.At > StateNeuron.ProvisionalLease) > 0)
+        {
+            await FlushHead(null).ConfigureAwait(true);
+        }
         var current = _provisional.Count > 0 ? _provisional[^1].Next : State;
         var verdict = await Evaluate(signal, current, late: false, ct).ConfigureAwait(true);
         if (verdict is Verdict.Allowed { Next: TState provisional }) { _provisional.Add(new Entry(signal, provisional, now)); }
@@ -121,8 +125,10 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     /// <summary>
     /// Marks the provisional entry of <paramref name="signal"/> committed; when the oldest entry is committed, saves the next state of
     /// the longest committed run from the head once and removes that run (a commit behind an uncommitted head saves nothing yet).
-    /// Without a provisional entry, which is only reachable after the entry outlived <see cref="StateNeuron.ProvisionalLease"/>, saves
-    /// the next state of <paramref name="allowed"/>.
+    /// Matches the oldest uncommitted entry of an equal signal. Committed entries never expire; an uncommitted head that outlives
+    /// <see cref="StateNeuron.ProvisionalLease"/> is pruned on the next gate call, which then flushes the committed run behind it.
+    /// Without an uncommitted provisional entry, which is only reachable after the entry outlived the lease, saves the next state of
+    /// <paramref name="allowed"/>.
     /// </summary>
     /// <param name="signal">The published signal.</param>
     /// <param name="allowed">The verdict <see cref="Gate"/> returned.</param>
@@ -140,19 +146,28 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
         }
 
         _provisional[index].Committed = true;
+        await FlushHead(signal).ConfigureAwait(true);
+    }
+
+    // Saves the next state of the longest committed run from the head once, removes the run and runs the views; nothing when the head is uncommitted.
+    private async Task FlushHead(Signal? cause)
+    {
         var run = 0;
         while (run < _provisional.Count && _provisional[run].Committed) { run++; }
         if (run == 0) { return; }
         var next = _provisional[run - 1].Next;
+        cause ??= _provisional[run - 1].Signal;
         _provisional.RemoveRange(0, run);
-        await Save(next, [Changed(signal)]).ConfigureAwait(true);
+        await Save(next, [Changed(cause)]).ConfigureAwait(true);
         await PendingViews().ConfigureAwait(true);
     }
 
     /// <summary>
     /// Removes the provisional entry of <paramref name="signal"/> without saving, then re-runs the gate functions of every later entry,
     /// in order, on the new base; a re-gate that refuses keeps its entry with the base unchanged as its next state and publishes an
-    /// ephemeral <see cref="Rejected"/> whose operation ends in <c> (late)</c>. Durable state is not touched.
+    /// ephemeral <see cref="Rejected"/> whose operation ends in <c> (late)</c>; a re-gate that throws is treated the same way, with the
+    /// exception message, and never escapes. Matches the oldest uncommitted entry of an equal signal; an abort with only committed
+    /// equal entries is ignored. Durable state is not touched.
     /// </summary>
     /// <param name="signal">The signal whose publish was abandoned.</param>
     /// <returns>A task that completes when the later entries are re-gated.</returns>
@@ -166,8 +181,21 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
         for (var i = index; i < _provisional.Count; i++)
         {
             var entry = _provisional[i];
-            var verdict = await Evaluate(entry.Signal, current, late: true, CancellationToken.None).ConfigureAwait(true);
-            entry.Next = verdict is Verdict.Allowed { Next: TState next } ? next : current;
+            try
+            {
+                var verdict = await Evaluate(entry.Signal, current, late: true, CancellationToken.None).ConfigureAwait(true);
+                entry.Next = verdict is Verdict.Allowed { Next: TState next } ? next : current;
+            }
+#pragma warning disable CA1031 // A re-gate failure is a late refusal: the host is already handling a failed publish.
+            catch (Exception error)
+            {
+                entry.Next = current;
+                var name = (Matching(SynapseKind.Gate, entry.Signal).FirstOrDefault()?.Name ?? GatePlaceholder) + " (late)";
+                try { await PublishEphemeral(new Rejected(name, [name], [error.Message])).ConfigureAwait(true); }
+                catch (Exception) { /* the late refusal is advisory */ }
+            }
+#pragma warning restore CA1031
+
             current = entry.Next;
         }
     }
@@ -180,8 +208,8 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
 
     private static string AliasOf(Signal signal) => signal.GetType().GetCustomAttribute<SignalAttribute>()?.Alias ?? signal.GetType().Name;
 
-    // The oldest provisional entry for an equal signal (records compare by value, so a host's decoded copy finds its entry).
-    private int Provisional(Signal signal) => _provisional.FindIndex(entry => entry.Signal.Equals(signal));
+    // The oldest uncommitted provisional entry for an equal signal (records compare by value, so a host's decoded copy finds its entry).
+    private int Provisional(Signal signal) => _provisional.FindIndex(entry => !entry.Committed && entry.Signal.Equals(signal));
 
     private StateChanged Changed(Signal cause) => new(Id.ToString(), AliasOf(cause));
 
