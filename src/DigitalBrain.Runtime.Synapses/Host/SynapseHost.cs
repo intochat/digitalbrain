@@ -30,6 +30,9 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly Dictionary<(BrainId Brain, string SourceKey), Entry> entries = [];
     private readonly List<(string SourceKey, string Hash)> leaked = [];
+
+    // One live load per source key and hash, shared by every brain (the registrar is process-wide): who references it, live or staged.
+    private readonly Dictionary<(string SourceKey, string Hash), Shared> loads = [];
     private readonly List<IAsyncDisposable> registrations = [];
     private readonly Channel<(BrainId Brain, Signal Signal, TaskCompletionSource Done)> resolutions =
         Channel.CreateUnbounded<(BrainId Brain, Signal Signal, TaskCompletionSource Done)>(new UnboundedChannelOptions { SingleReader = true });
@@ -69,6 +72,9 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         this.track = track;
     }
 
+    /// <summary>The compiler the host builds with (facts read its emit count).</summary>
+    internal SynapseCompiler Compiler => compiler;
+
     /// <summary>The source key and hash of every context an unload or retire could not collect.</summary>
     public IReadOnlyList<(string SourceKey, string Hash)> Leaked
     {
@@ -97,7 +103,13 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         await gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            return entries.TryAdd((brain, loaded.SourceKey), new Entry(loaded, record.DeployedAt));
+            if (!entries.TryAdd((brain, loaded.SourceKey), new Entry(loaded, record.DeployedAt)))
+            {
+                return false;
+            }
+
+            Reference(brain, loaded, staged: false).Activated = true;
+            return true;
         }
         finally
         {
@@ -192,10 +204,14 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
                 await brainInstalls.Retire(alias, ct).ConfigureAwait(false);
             }
 
-            await registrar.Deactivate(brain, sourceKey, aliases, ct).ConfigureAwait(false);
+            if (!LiveElsewhere(brain, entry.Live))
+            {
+                await registrar.Deactivate(brain, sourceKey, aliases, ct).ConfigureAwait(false);
+            }
+
             await store.Remove(brain, sourceKey, ct).ConfigureAwait(false);
             entries.Remove((brain, sourceKey));
-            await ReleaseLive(entry).ConfigureAwait(false);
+            await ReleaseLive(brain, entry).ConfigureAwait(false);
             return new DeployOutcome(DeployStatus.Retired, hash, [], Empty(), null);
         }
         finally
@@ -278,7 +294,7 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         unload = Task.CompletedTask;
         try
         {
-            loaded = loader.Load(build);
+            loaded = loads.TryGetValue((sourceKey, build.Hash), out var shared) ? shared.Loaded : loader.Load(build);
         }
         catch (Exception error) when (error is InvalidOperationException or BadImageFormatException or System.Reflection.ReflectionTypeLoadException or SynapseShapeException)
         {
@@ -288,7 +304,7 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
 
         if (Owner(brain, sourceKey, AliasesOf(loaded)) is { } conflict)
         {
-            unload = Release(loaded);
+            unload = loads.ContainsKey((sourceKey, build.Hash)) ? Task.CompletedTask : Unload(loaded);
             loaded = null;
             return (DeployStatus.Refused, $"alias '{conflict.Alias}' is owned by source '{conflict.Owner}'");
         }
@@ -318,7 +334,8 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
     private async Task<DeployOutcome> GoLive(BrainId brain, Entry? entry, Pending next, IReadOnlyList<SynapseDiagnostic> diagnostics, CancellationToken ct)
     {
         var hash = next.Loaded.Hash;
-        await registrar.Activate(brain, next.Loaded, ct).ConfigureAwait(false);
+        await ActivateOnce(brain, next.Loaded, ct).ConfigureAwait(false);
+        _ = Reference(brain, next.Loaded, staged: false);
         var outcomes = await InstallAll(brain, next, ct).ConfigureAwait(false);
         if (entry is null)
         {
@@ -339,6 +356,7 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         var hash = next.Loaded.Hash;
         catalog.Stage(next.Source.SourceKey, next.Loaded.Catalog);
         entry.Staged = next;
+        _ = Reference(brain, next.Loaded, staged: true);
         var outcomes = await InstallAll(brain, next, ct).ConfigureAwait(false);
         if (changed.FirstOrDefault(a => outcomes[a].Status is InstallStatus.Refused or InstallStatus.Denied) is { } refused)
         {
@@ -378,7 +396,9 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
     {
         var next = entry.Staged!;
         entry.Staged = null;
-        await registrar.Activate(brain, next.Loaded, ct).ConfigureAwait(false);
+        await ActivateOnce(brain, next.Loaded, ct).ConfigureAwait(false);
+        _ = Reference(brain, next.Loaded, staged: false);
+        Dereference(brain, next.Loaded, staged: true);
         catalog.Unstage(next.Source.SourceKey);
         _ = await InstallAll(brain, next, ct).ConfigureAwait(false);
         await Swap(brain, entry, next, ct).ConfigureAwait(false);
@@ -396,11 +416,14 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
                 await brainInstalls.Retire(alias, ct).ConfigureAwait(false);
             }
 
-            await registrar.Deactivate(brain, next.Source.SourceKey, dropped, ct).ConfigureAwait(false);
+            if (!LiveElsewhere(brain, entry.Live))
+            {
+                await registrar.Deactivate(brain, next.Source.SourceKey, dropped, ct).ConfigureAwait(false);
+            }
         }
 
         await Store(brain, next, ct).ConfigureAwait(false);
-        await ReleaseLive(entry, next.Loaded).ConfigureAwait(false);
+        await ReleaseLive(brain, entry, next.Loaded).ConfigureAwait(false);
         entry.At = DateTimeOffset.UtcNow;
     }
 
@@ -423,28 +446,70 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         }
 
         catalog.Unstage(key);
-        await ReleaseStaged(entry).ConfigureAwait(false);
+        await ReleaseStaged(brain, entry).ConfigureAwait(false);
     }
 
     // The release helpers take the record out of the entry in their own frame, so no async frame of the host names it while the loader collects.
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private Task ReleaseLive(Entry entry, LoadedSource? replacement = null)
+    private Task ReleaseLive(BrainId brain, Entry entry, LoadedSource? replacement = null)
     {
         var old = entry.Live;
         entry.Live = replacement!;
-        return Release(old);
+        return Release(brain, old, staged: false);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private Task ReleaseStaged(Entry entry)
+    private Task ReleaseStaged(BrainId brain, Entry entry)
     {
         var staged = entry.Staged!.Loaded;
         entry.Staged = null;
-        return Release(staged);
+        return Release(brain, staged, staged: true);
+    }
+
+    // Drops the brain's reference; the shared load unloads only when no brain references it, live or staged.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private Task Release(BrainId brain, LoadedSource loaded, bool staged)
+    {
+        Dereference(brain, loaded, staged);
+        return loads.ContainsKey((loaded.SourceKey, loaded.Hash)) ? Task.CompletedTask : Unload(loaded);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private Task Release(LoadedSource loaded) => Collected(loaded.SourceKey, loaded.Hash, loader.Unload(loaded));
+    private Task Unload(LoadedSource loaded) => Collected(loaded.SourceKey, loaded.Hash, loader.Unload(loaded));
+
+    private Shared Reference(BrainId brain, LoadedSource loaded, bool staged)
+    {
+        if (!loads.TryGetValue((loaded.SourceKey, loaded.Hash), out var shared))
+        {
+            loads[(loaded.SourceKey, loaded.Hash)] = shared = new Shared(loaded);
+        }
+
+        shared.Brains.Add((brain, staged));
+        return shared;
+    }
+
+    private void Dereference(BrainId brain, LoadedSource loaded, bool staged)
+    {
+        if (loads.TryGetValue((loaded.SourceKey, loaded.Hash), out var shared) && shared.Brains.Remove((brain, staged)) && shared.Brains.Count == 0)
+        {
+            loads.Remove((loaded.SourceKey, loaded.Hash));
+        }
+    }
+
+    private bool LiveElsewhere(BrainId brain, LoadedSource loaded) =>
+        loads.TryGetValue((loaded.SourceKey, loaded.Hash), out var shared) && shared.Brains.Any(b => !b.Staged && b.Brain != brain);
+
+    // The registrar is process-wide: a load another brain already made live is not activated again.
+    private async Task ActivateOnce(BrainId brain, LoadedSource loaded, CancellationToken ct)
+    {
+        if (loads.TryGetValue((loaded.SourceKey, loaded.Hash), out var shared) && shared.Activated)
+        {
+            return;
+        }
+
+        await registrar.Activate(brain, loaded, ct).ConfigureAwait(false);
+        Reference(brain, loaded, staged: false).Activated = true;
+    }
 
     private async Task Collected(string sourceKey, string hash, Task<bool> unload)
     {
@@ -553,6 +618,15 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The context of synapse source {SourceKey} ({Hash}) did not unload.")]
     private partial void LogLeaked(string sourceKey, string hash);
+
+    private sealed class Shared(LoadedSource loaded)
+    {
+        public LoadedSource Loaded { get; } = loaded;
+
+        public HashSet<(BrainId Brain, bool Staged)> Brains { get; } = [];
+
+        public bool Activated { get; set; }
+    }
 
     private sealed class Entry(LoadedSource live, DateTimeOffset at)
     {

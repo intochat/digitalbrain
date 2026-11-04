@@ -68,6 +68,7 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
 
     // ActivatorUtilities caches constructors per type in a process-wide map, which would pin the load context of a generated
     // (collectible) neuron class for good; a collectible class is built from its widest public constructor with services instead.
+    // Generated neuron classes are StateNeuron<TRecord>, whose single public constructor takes only services, so the choice is unambiguous.
     private static Neuron Construct(IServiceProvider services, Type neuronClass)
     {
         if (!neuronClass.IsCollectible) { return (Neuron)ActivatorUtilities.CreateInstance(services, neuronClass); }

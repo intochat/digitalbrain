@@ -22,6 +22,13 @@ internal sealed class InstalledGates(InstalledGateIndex index, IServiceProvider 
     private readonly ConcurrentDictionary<BrainId, long> _generation = new();
     private readonly ConcurrentDictionary<BrainId, long> _loaded = new();
     private int _listening;
+    private int _restores;
+
+    /// <summary>How many publishes found an installed alias missing from the catalog and restored it on the gate path.</summary>
+    public int GateRestores => Volatile.Read(ref _restores);
+
+    /// <summary>Counts one gate-path restore.</summary>
+    public void CountGateRestore() => Interlocked.Increment(ref _restores);
 
     /// <summary>Reads the installs of <paramref name="brain"/> into the index unless they are current.</summary>
     /// <param name="brain">The brain about to look up gates.</param>

@@ -319,4 +319,52 @@ public sealed class SynapseHostFacts
         Assert.Empty(os.Synapses.Leaked);
         Assert.Empty(os.Failures);
     }
+
+    [Fact]
+    public async Task TwoBrainsShareOneLoad()
+    {
+        await using var os = Start();
+        os.Confirmations.ApproveAll();
+
+        var one = await os.Synapses.Deploy(Brain("b1"), HsSource.Of(HsSource.Budget), None, Ct);
+        var emits = os.Synapses.Compiler.Emits;
+        var two = await os.Synapses.Deploy(Brain("b2"), HsSource.Of(HsSource.Budget), None, Ct);
+        await os.Idle();
+
+        Assert.Equal((DeployStatus.Deployed, DeployStatus.Deployed), (one.Status, two.Status));
+        Assert.Equal(one.Hash, two.Hash);
+        Assert.Equal(emits, os.Synapses.Compiler.Emits);
+        await Pay(os, "b1").Charge(250m);
+        await Pay(os, "b2").Charge(100m);
+        Assert.Equal("weekly cap of $300", (await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "b1").Charge(100m))).Rejected.Messages[0]);
+        await Pay(os, "b2").Charge(150m);
+        await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "b2").Charge(100m));
+        Assert.Equal(one.Hash, Assert.Single(await os.Synapses.List(Brain("b2"), Ct)).Hash);
+        Assert.Empty(os.Failures);
+    }
+
+    [Fact]
+    public async Task RetireInOneBrainKeepsTheOtherRunning()
+    {
+        await using var os = Start();
+        os.Confirmations.ApproveAll();
+        await os.Synapses.Deploy(Brain("b1"), HsSource.Of(HsSource.Budget), None, Ct);
+        await os.Synapses.Deploy(Brain("b2"), HsSource.Of(HsSource.Budget), None, Ct);
+        await os.Idle();
+
+        Assert.Equal(DeployStatus.Retired, (await os.Synapses.Retire(Brain("b1"), HsSource.Key, Ct)).Status);
+        await os.Idle();
+
+        Assert.Empty(await os.Synapses.List(Brain("b1"), Ct));
+        Assert.Single(await os.Synapses.List(Brain("b2"), Ct));
+        Assert.Equal("weekly cap of $300", (await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "b2").Charge(350m))).Rejected.Messages[0]);
+        Assert.Empty(os.Synapses.Leaked);
+
+        Assert.Equal(DeployStatus.Retired, (await os.Synapses.Retire(Brain("b2"), HsSource.Key, Ct)).Status);
+        await os.Idle();
+
+        Assert.False(os.Catalog.States.ContainsKey("hs.week"));
+        Assert.Empty(os.Synapses.Leaked);
+        Assert.Empty(os.Failures);
+    }
 }

@@ -1,5 +1,6 @@
 using DigitalBrain.Rules;
 using DigitalBrain.Runtime.Orleans.Tests.Integration.Hosting;
+using DigitalBrain.Runtime.Orleans.Synapses;
 using DigitalBrain.Runtime.Synapses;
 using DigitalBrain.Spi;
 using Microsoft.Extensions.DependencyInjection;
@@ -165,7 +166,11 @@ public sealed class SynapseHostSiloFacts(StatefulSilo silo) : IClassFixture<Stat
         await Pay("sh3").Charge(250m);
 
         await silo.Restart(Ct);
+        Assert.DoesNotContain(ShSource.Week("sh3"), silo.Services.GetRequiredService<ISynapseCatalogSource>().Current.States.Keys);
         var e = await Assert.ThrowsAsync<RuleViolationException>(() => Pay("sh3").Charge(100m));
+
+        // The gate path restored the alias before the first gated publish, not the gate grain's registration miss.
+        Assert.Equal(1, silo.Services.GetRequiredService<InstalledGates>().GateRestores);
 
         Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
         var listed = Assert.Single(await Host.List(ShSource.Brain("sh3"), Ct));

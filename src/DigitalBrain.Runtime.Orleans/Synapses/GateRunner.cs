@@ -114,8 +114,9 @@ internal static partial class GateRunner
         {
             return;
         }
+        services.GetService<InstalledGates>()?.CountGateRestore();
         try { await InstallRestore.EnsureInstalledAliases(catalog, aliases, restorer, brain, ct).WaitAsync(timeout, ct).ConfigureAwait(true); }
-        catch (Exception error) when (error is not OutOfMemoryException)
+        catch (Exception error) when (error is not OutOfMemoryException && !(error is OperationCanceledException && ct.IsCancellationRequested))
         {
             LogInstalledRestoreFailed(log, error, brain.ToString());
             throw new RuleViolationException(new Rejected(OrleansInstallHooks.InstallsType, [OrleansInstallHooks.InstallsType], [NoAnswer]));

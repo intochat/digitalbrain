@@ -23,5 +23,6 @@
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Runtime.Synapses.Tests.Unit" />
     <InternalsVisibleTo Include="DigitalBrain.Testing.Tests.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Testing.Tests.Unit" />
   </ItemGroup>
 </Project>
