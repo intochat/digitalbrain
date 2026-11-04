@@ -72,26 +72,25 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         Options = options;
         Clock = new TestClock(options.Start);
         Capabilities = new CapabilityFakes();
-        Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance);
+        Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance, new TestInstallHooks(this));
         Synapses = new SynapseRegistry(this);
         Confirmations = new TestConfirmations(Clock);
         Listeners = new TestClusterListeners(this);
-        Gates = new CatalogGateIndex(_catalog);
-        InstalledGates = new InstalledGateIndex(_catalog);
-        _ = Listeners.Listen<GateChanged>("testos.installed-gates", RefreshInstalledGates);
+        Gates = new InstalledGateIndex(_catalog);
+        Register<InstallsNeuron>();
+        Register<TimeNeuron>();
+        _ = Listeners.Listen<GateChanged>("testos.installed-gates", RefreshGates);
     }
 
     /// <summary>The <c>[State]</c> records and synapse functions of every assembly registered with <see cref="Register(Assembly)"/>.</summary>
     public SynapseCatalog Catalog => Volatile.Read(ref _catalog);
 
-    /// <summary>The gate index over <see cref="Catalog"/>: the gate neurons a durable signal passes before it is appended.</summary>
-    public IGateIndex Gates { get; private set; }
-
     /// <summary>
-    /// The gate index over the installs of each brain: <see cref="Catalog"/> gates of the aliases its <see cref="IInstalls"/> neuron
-    /// records, refreshed on every <see cref="GateChanged"/>.
+    /// The gate index a durable signal passes before it is appended: the <see cref="Catalog"/> gates of the aliases the brain's
+    /// <see cref="IInstalls"/> neuron records, refreshed on every <see cref="GateChanged"/>. A brain with no install has no gates.
+    /// <see cref="Register(Assembly)"/> starts a new index, so register every assembly before installing.
     /// </summary>
-    public InstalledGateIndex InstalledGates { get; private set; }
+    public InstalledGateIndex Gates { get; private set; }
 
     /// <summary>Host-level listeners on the signals of every brain of this TestOS (04-19); they survive <see cref="Restart"/>.</summary>
     public DigitalBrain.Spi.IClusterListeners ClusterListeners => Listeners;
@@ -155,11 +154,8 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         lock (_gate)
         {
             _catalog = _catalog.Merge(scanned);
-            Gates = new CatalogGateIndex(_catalog);
-            InstalledGates = new InstalledGateIndex(_catalog);
+            Gates = new InstalledGateIndex(_catalog);
         }
-        Register<InstallsNeuron>();
-        Register<TimeNeuron>();
         foreach (var (alias, record) in scanned.States)
         {
             var neuron = typeof(StateNeuron<>).MakeGenericType(record);
@@ -347,57 +343,17 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         }
         var created = new TestNeuronHost(this, id, type);
         var added = _hosts.GetOrAdd(id, created);
-        if (ReferenceEquals(added, created)) { EnsureEdgesTo(added); }
-        else { created.Dispose(); }
+        if (!ReferenceEquals(added, created)) { created.Dispose(); }
         return added;
     }
 
-    // Reaction edges of this slice: an activated state neuron subscribes to every other host of its brain for the signals of its
-    // reaction synapses (here), and every active state neuron of the brain to a host created later (EnsureEdgesTo).
-    internal void EnsureReactionEdges(TestNeuronHost state)
-    {
-        foreach (var source in _hosts.Values.Where(host => host.Id.Brain == state.Id.Brain && host.Id != state.Id).ToList())
-        {
-            EnsureReactions(state, source.Id);
-        }
-    }
-
-    private void EnsureEdgesTo(TestNeuronHost source)
-    {
-        foreach (var state in _hosts.Values.Where(host => host.IsActive && host.Id.Brain == source.Id.Brain && host.Id != source.Id).ToList())
-        {
-            EnsureReactions(state, source.Id);
-        }
-    }
-
-    private void EnsureReactions(TestNeuronHost state, NeuronId source)
-    {
-        if (ReactionSignals(state.Class) is not { Length: > 0 } signals) { return; }
-        _ = Track(ObserveEdge(Synapses.Ensure(state, source, signals)));
-    }
-
-    private Type[]? ReactionSignals(Type neuronClass)
-    {
-        if (!neuronClass.IsGenericType || neuronClass.GetGenericTypeDefinition() != typeof(StateNeuron<>)) { return null; }
-        var record = neuronClass.GetGenericArguments()[0];
-        var catalog = Catalog;
-        var alias = catalog.States.FirstOrDefault(pair => pair.Value == record).Key;
-        return alias is null ? null : [.. catalog.For(alias).Where(d => d.Kind == SynapseKind.Reaction).Select(d => d.Signal!).Distinct()];
-    }
-
-    private async Task RefreshInstalledGates(NeuronId publisher, GateChanged changed, CancellationToken ct)
+    private async Task RefreshGates(NeuronId publisher, GateChanged changed, CancellationToken ct)
     {
         var records = await Get<IInstalls>(new NeuronId(publisher.Brain, InstallsType, "default")).List(ct).ConfigureAwait(false);
-        InstalledGates.Refresh(publisher.Brain, records);
+        Gates.Refresh(publisher.Brain, records);
     }
 
     private const string InstallsType = "synapse.installs";
-
-    private async Task ObserveEdge(Task work)
-    {
-        try { await work.ConfigureAwait(false); }
-        catch (Exception error) when (error is not OutOfMemoryException) { Fail(error); }
-    }
 
     internal bool TryHost(NeuronId id, out TestNeuronHost host)
     {

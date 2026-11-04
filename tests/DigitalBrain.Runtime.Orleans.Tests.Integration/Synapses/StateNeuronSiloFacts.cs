@@ -246,6 +246,7 @@ public sealed class ShortGateSilo : IAsyncLifetime
         {
             silo.AddBrainStorage(typeof(HostingModule).Assembly);
             silo.Services.AddSingleton(RuntimeOptions.Default with { GateTimeout = TimeSpan.FromSeconds(1) });
+            silo.Services.AddSingleton<DigitalBrain.Confirmation.IConfirmations, ApprovingConfirmations>();
         }
     }
 }
@@ -256,6 +257,7 @@ public sealed class StateNeuronSiloFacts(StatefulSilo silo) : IClassFixture<Stat
     [Fact]
     public async Task ASecondChargeOverTheCapIsRejectedBeforeItCommits()
     {
+        await Install(silo.Services, "sb", "sb.week");
         var ct = TestContext.Current.CancellationToken;
         var pay = NeuronId.Parse("sb/sb.payments/cap");
         var week = NeuronId.Parse("sb/sb.week/default");
@@ -274,6 +276,7 @@ public sealed class StateNeuronSiloFacts(StatefulSilo silo) : IClassFixture<Stat
     [Fact]
     public async Task TwoConcurrentChargesAgainstTheCapAllowExactlyOne()
     {
+        await Install(silo.Services, "sb", "sb.cap");
         var first = silo.Get<ISbPayments>("sb/sb.payments/one");
         var second = silo.Get<ISbPayments>("sb/sb.payments/two");
 
@@ -290,6 +293,7 @@ public sealed class StateNeuronSiloFacts(StatefulSilo silo) : IClassFixture<Stat
         for (var i = 0; i < 5; i++)
         {
             var brain = $"sbo{i}";
+            await Install(silo.Services, brain, "sb.cap");
             var first = silo.Get<ISbPayments>($"{brain}/sb.payments/one");
             var second = silo.Get<ISbPayments>($"{brain}/sb.payments/two");
 
@@ -314,6 +318,7 @@ public sealed class StateNeuronSiloFacts(StatefulSilo silo) : IClassFixture<Stat
         });
         try
         {
+            await Install(silo.Services, "sbhold", "sb.cap");
             var first = silo.Get<ISbPayments>("sbhold/sb.payments/one");
             var second = silo.Get<ISbPayments>("sbhold/sb.payments/two");
 
@@ -337,6 +342,7 @@ public sealed class StateNeuronSiloFacts(StatefulSilo silo) : IClassFixture<Stat
     [Fact]
     public async Task AStateNeuronThatPublishesThroughAGateCompletesWithoutStalling()
     {
+        await Install(silo.Services, "sb", "sb.relay", "sb.tally");
         var ct = TestContext.Current.CancellationToken;
         var tally = NeuronId.Parse("sb/sb.tally/default");
         var clock = System.Diagnostics.Stopwatch.StartNew();
@@ -359,6 +365,7 @@ public sealed class StateNeuronSiloFacts(StatefulSilo silo) : IClassFixture<Stat
     [Fact]
     public async Task AGateOnStateChangedIsNeverCalled()
     {
+        await Install(silo.Services, "sb", "sb.week", "sb.skip");
         var ct = TestContext.Current.CancellationToken;
         var started = new ConcurrentQueue<SynapseStarted>();
         await using var listener = await silo.Services.GetRequiredService<IClusterListeners>().Listen<SynapseStarted>("started", (_, s, _) =>
@@ -380,6 +387,7 @@ public sealed class StateNeuronSiloFacts(StatefulSilo silo) : IClassFixture<Stat
     [Fact]
     public async Task AnAllowanceWithoutANextStateFailsClosed()
     {
+        await Install(silo.Services, "sb", "sb.void");
         var ct = TestContext.Current.CancellationToken;
         var pay = NeuronId.Parse("sb/sb.payments/void");
 
@@ -401,6 +409,7 @@ public sealed class StateNeuronSiloFacts(StatefulSilo silo) : IClassFixture<Stat
     [Fact]
     public async Task ViewChangedIsHeardAfterAnAllowedCharge()
     {
+        await Install(silo.Services, "sb", "sb.week");
         var ct = TestContext.Current.CancellationToken;
         var heard = new ConcurrentQueue<string>();
         await using var listener = await silo.Services.GetRequiredService<IClusterListeners>().Listen<ViewChanged>("views", (_, changed, _) =>
@@ -413,6 +422,17 @@ public sealed class StateNeuronSiloFacts(StatefulSilo silo) : IClassFixture<Stat
         await Until(() => Task.FromResult(heard.Contains("sb/sb.week/default")), ct);
 
         Assert.Contains("sb/sb.week/default", heard);
+    }
+
+    // Reaction edges and gates come from the install: each fact installs the aliases it charges in its brain (approved by the fixture).
+    internal static async Task Install(IServiceProvider services, string brain, params string[] aliases)
+    {
+        var installs = NeuronHosting.Get<IInstalls>(services, NeuronId.Parse($"{brain}/synapse.installs/default"));
+        foreach (var alias in aliases)
+        {
+            var outcome = await installs.Install(new(alias, new Dictionary<string, string>()), TestContext.Current.CancellationToken);
+            Assert.True(outcome.Reason is null, outcome.Reason);
+        }
     }
 
     internal static async Task Until(Func<Task<bool>> condition, CancellationToken ct)
@@ -428,6 +448,7 @@ public sealed class StateNeuronGateTimeoutFacts(ShortGateSilo silo) : IClassFixt
     [Fact]
     public async Task AReactionSynapseIsEnsuredAndDeliversOnceAcrossADeactivation()
     {
+        await StateNeuronSiloFacts.Install(silo.Services, "sb", "sb.ledger");
         var ct = TestContext.Current.CancellationToken;
         var pay = NeuronId.Parse("sb/sb.payments/books");
         var books = NeuronId.Parse("sb/sb.ledger/default");
@@ -446,6 +467,7 @@ public sealed class StateNeuronGateTimeoutFacts(ShortGateSilo silo) : IClassFixt
     [Fact]
     public async Task AGateThatNeverAnswersFailsClosed()
     {
+        await StateNeuronSiloFacts.Install(silo.Services, "sb", "sb.hold");
         var ct = TestContext.Current.CancellationToken;
         var pay = NeuronId.Parse("sb/sb.payments/stall");
 
@@ -459,6 +481,7 @@ public sealed class StateNeuronGateTimeoutFacts(ShortGateSilo silo) : IClassFixt
     [Fact]
     public async Task AGateThatAllowsAfterItsPublisherFailedClosedLeavesNoProvisionalEntry()
     {
+        await StateNeuronSiloFacts.Install(silo.Services, "sb", "sb.lag");
         var ct = TestContext.Current.CancellationToken;
         SbLate.Reset();
         var pay = silo.Get<ISbPayments>("sb/sb.payments/late");

@@ -18,6 +18,13 @@ internal sealed class SignalTypeMap
         Add(typeof(Gap));
         Add(typeof(DigitalBrain.Rules.Rejected));
         Add(typeof(StateChanged));
+        // The installs and time neurons every silo hosts (NeuronTypeRegistry) publish these.
+        Add(typeof(Installed));
+        Add(typeof(Retired));
+        Add(typeof(GateChanged));
+        Add(typeof(DigitalBrain.Time.Tick));
+        Add(typeof(DigitalBrain.Time.Registered));
+        Add(typeof(DigitalBrain.Time.Unregistered));
         foreach (var assembly in assemblies.Distinct())
         {
             foreach (var type in Loadable(assembly))

@@ -162,6 +162,7 @@ public sealed class ManualReminders : IReminders
 public sealed class RecordingSynapses : ISynapses
 {
     private readonly List<Synapse> _synapses = [];
+    private readonly HashSet<Type> _brainWide = [];
 
     /// <summary>Synapses held by <paramref name="subscriber"/>.</summary>
     public RecordingSynapses(NeuronId subscriber) => Subscriber = subscriber;
@@ -193,6 +194,29 @@ public sealed class RecordingSynapses : ISynapses
     public Task Remove(NeuronId from)
     {
         _synapses.RemoveAll(synapse => synapse.From == from);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>The signal types of the brain-wide synapse; empty when there is none.</summary>
+    public IReadOnlyCollection<Type> BrainWide => _brainWide;
+
+    /// <inheritdoc />
+    public Task EnsureBrainWide(params Type[] signals)
+    {
+        ArgumentNullException.ThrowIfNull(signals);
+        if (signals.Length == 0) { throw new ArgumentException("A synapse names at least one signal type.", nameof(signals)); }
+        foreach (var signal in signals)
+        {
+            if (signal is null || !typeof(Signal).IsAssignableFrom(signal)) { throw new ArgumentException($"{signal} is not a signal type.", nameof(signals)); }
+            _brainWide.Add(signal);
+        }
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task RemoveBrainWide()
+    {
+        _brainWide.Clear();
         return Task.CompletedTask;
     }
 }

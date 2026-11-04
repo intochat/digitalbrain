@@ -690,7 +690,10 @@ override DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.ToStrin
 static DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.operator !=(DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject? left, DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject? right) -> bool
 static DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.operator ==(DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject? left, DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject? right) -> bool
 DigitalBrain.Testing.TestOS.Catalog.get -> DigitalBrain.SynapseCatalog!
-DigitalBrain.Testing.TestOS.Gates.get -> DigitalBrain.Spi.IGateIndex!
+DigitalBrain.Testing.TestOS.Gates.get -> DigitalBrain.InstalledGateIndex!
 DigitalBrain.Testing.TestOSOptions.GateTimeout.get -> System.TimeSpan
 DigitalBrain.Testing.TestOSOptions.GateTimeout.set -> void
-DigitalBrain.Testing.TestOS.InstalledGates.get -> DigitalBrain.InstalledGateIndex!
+DigitalBrain.Testing.TestConfirmations.ApproveAll() -> void
+DigitalBrain.Testing.RecordingSynapses.BrainWide.get -> System.Collections.Generic.IReadOnlyCollection<System.Type!>!
+DigitalBrain.Testing.RecordingSynapses.EnsureBrainWide(params System.Type![]! signals) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.RecordingSynapses.RemoveBrainWide() -> System.Threading.Tasks.Task!

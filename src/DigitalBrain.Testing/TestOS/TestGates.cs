@@ -18,9 +18,7 @@ internal static class TestGates
         var allowed = new List<(TestNeuronHost Gate, Signal Signal, Check.Allowed Allowed)>();
         try
         {
-            // Gates never run on StateChanged: a gate's Committed saves it while the publisher still awaits Commit (as the Orleans GateRunner).
-            // Nor on Rejected: the refusing gate journals it inside its own gate turn, so a gate on it would run nested in that turn.
-            foreach (var signal in signals.Where(s => s is not StateChanged and not Rejected && !s.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false)))
+            foreach (var signal in signals.Where(s => !Ungated(s) && !s.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false)))
             {
                 foreach (var (gate, descriptor) in os.Gates.GatesFor(publisher.Brain, signal.GetType()))
                 {
@@ -43,6 +41,12 @@ internal static class TestGates
         }
         return allowed;
     }
+
+    // Gates never run on StateChanged: a gate's Committed saves it while the publisher still awaits Commit (as the Orleans GateRunner).
+    // Nor on Rejected: the refusing gate journals it inside its own gate turn, so a gate on it would run nested in that turn. Nor on
+    // the runtime's own Tick, Installed, Retired and time registrations: their publishers (time, installs) serve the gate path itself.
+    private static bool Ungated(Signal signal)
+        => signal is StateChanged or Rejected or DigitalBrain.Time.Tick or Installed or Retired or DigitalBrain.Time.Registered or DigitalBrain.Time.Unregistered;
 
     // The publish did not happen (a later gate stopped it, or the append threw): each allowing gate drops its provisional state, as a turn.
     // A failing Aborted goes to TestOS.Failures; the gate's lease then discards the entry.

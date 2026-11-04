@@ -20,6 +20,7 @@ public sealed class TestConfirmations
     private readonly HashSet<string> _known = new(StringComparer.Ordinal);
     private readonly List<ConfirmationRequested> _requested = [];
     private readonly List<ConfirmationResolved> _audit = [];
+    private bool _approveAll;
 
     /// <summary>Confirmations on <paramref name="clock"/>.</summary>
     public TestConfirmations(TimeProvider clock)
@@ -58,6 +59,12 @@ public sealed class TestConfirmations
         ArgumentNullException.ThrowIfNull(requester);
         return new Requester(this, requester, publish);
     }
+
+    /// <summary>
+    /// From now on approves every plan put to a person as <see cref="Current"/> as soon as it is asked; the plan is still
+    /// <see cref="Requested"/> and audited. Plans the <see cref="Policy"/> skips stay skipped.
+    /// </summary>
+    public void ApproveAll() => Volatile.Write(ref _approveAll, true);
 
     /// <summary>Approves <paramref name="planId"/> as <see cref="Current"/>.</summary>
     public Task Approve(string planId) => Resolve(planId, approve: true, Current);
@@ -117,6 +124,7 @@ public sealed class TestConfirmations
         pending.Expiry = _clock.CreateTimer(_ => _ = End(plan.Id, null, ConfirmationOutcome.Expired, ConfirmationDenyReason.Expired),
             null, plan.Expiry, Timeout.InfiniteTimeSpan);
         if (publish is not null) { await publish(request).ConfigureAwait(false); }
+        if (Volatile.Read(ref _approveAll)) { await Resolve(plan.Id, approve: true, Current).ConfigureAwait(false); }
         return await pending.Done.Task.WaitAsync(ct).ConfigureAwait(false);
     }
 

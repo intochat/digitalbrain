@@ -2350,3 +2350,5 @@ static DigitalBrain.Time.TimeState.operator !=(DigitalBrain.Time.TimeState? left
 static DigitalBrain.Time.TimeState.operator ==(DigitalBrain.Time.TimeState? left, DigitalBrain.Time.TimeState? right) -> bool
 static DigitalBrain.Time.Unregistered.operator !=(DigitalBrain.Time.Unregistered? left, DigitalBrain.Time.Unregistered? right) -> bool
 static DigitalBrain.Time.Unregistered.operator ==(DigitalBrain.Time.Unregistered? left, DigitalBrain.Time.Unregistered? right) -> bool
+DigitalBrain.Spi.ISynapses.EnsureBrainWide(params System.Type![]! signals) -> System.Threading.Tasks.Task!
+DigitalBrain.Spi.ISynapses.RemoveBrainWide() -> System.Threading.Tasks.Task!

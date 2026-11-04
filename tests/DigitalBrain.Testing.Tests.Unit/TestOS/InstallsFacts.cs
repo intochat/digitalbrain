@@ -155,7 +155,7 @@ public sealed class InstallsFacts
         Assert.Equal("hooks failed: edges down", outcome.Reason);
         Assert.NotNull(await os.Get<IInstalls>(Installs).Describe("week", Ct));
         await os.Idle();
-        Assert.Single(os.InstalledGates.GatesFor(Installs.Brain, typeof(Charging)));
+        Assert.Single(os.Gates.GatesFor(Installs.Brain, typeof(Charging)));
     }
 
     [Fact]
@@ -179,11 +179,11 @@ public sealed class InstallsFacts
     public async Task GateIndexServesOnlyInstalledGates()
     {
         await using var os = Start(new RecordingHooks());
-        Assert.Empty(os.InstalledGates.GatesFor(Installs.Brain, typeof(Charging)));
+        Assert.Empty(os.Gates.GatesFor(Installs.Brain, typeof(Charging)));
         await Answer(os, "week", approve: true);
         await os.Idle();
-        var gate = Assert.Single(os.InstalledGates.GatesFor(Installs.Brain, typeof(Charging)));
+        var gate = Assert.Single(os.Gates.GatesFor(Installs.Brain, typeof(Charging)));
         Assert.Equal(NeuronId.Parse("b/week/default"), gate.Gate);
-        Assert.Empty(os.InstalledGates.GatesFor(new BrainId("other"), typeof(Charging)));
+        Assert.Empty(os.Gates.GatesFor(new BrainId("other"), typeof(Charging)));
     }
 }

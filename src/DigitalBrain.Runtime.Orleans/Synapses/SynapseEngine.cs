@@ -423,6 +423,17 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
         }
     }
 
+    /// <summary>Ensures the brain-wide synapse holds the aliases of <paramref name="signals"/>.</summary>
+    /// <exception cref="ArgumentException">No signal, or a type without a registered <c>[Signal]</c> alias.</exception>
+    public Task EnsureBrain(IReadOnlyList<Type> signals)
+    {
+        ArgumentNullException.ThrowIfNull(signals);
+        var map = _services.GetRequiredService<JournalPayloads>().Types;
+        return EnsureBrain([.. signals.Select(signal => signal is not null && typeof(Signal).IsAssignableFrom(signal) && map.TryAliasOf(signal, out var alias)
+            ? alias
+            : throw new ArgumentException($"{signal?.Name} is not a registered [Signal] type.", nameof(signals)))]);
+    }
+
     /// <summary>Removes the brain-wide synapse and the subscriptions only it needed.</summary>
     public async Task RemoveBrain()
     {
@@ -445,7 +456,7 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
         return [.. aliases.Distinct(StringComparer.Ordinal)];
     }
 
-    // Pages the whole brain from the brain cursor; Gap when the brain floor passed it; wanted signals in brain position order.
+    // Pages the whole brain from the brain cursor; Gap when the brain floor passed it; wanted signals of other publishers in brain position order.
     private async Task PullBrain(SynapseSource entry)
     {
         if (Neuron is not { } neuron) { return; }
@@ -471,7 +482,8 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
                 if (due.Count == 0) { return; }
                 foreach (var item in due)
                 {
-                    if (wanted.Any(type => type.IsInstanceOfType(item.Signal)))
+                    // A neuron never reacts to its own signals: a state neuron on StateChanged would otherwise hear its own saves.
+                    if (item.Publisher != _id && wanted.Any(type => type.IsInstanceOfType(item.Signal)))
                     {
                         if (!await React(neuron, item, entry).ConfigureAwait(true)) { return; }
                     }

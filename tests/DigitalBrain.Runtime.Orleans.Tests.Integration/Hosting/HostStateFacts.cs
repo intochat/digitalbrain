@@ -63,6 +63,7 @@ public sealed class StatefulSilo : IAsyncLifetime
         {
             silo.AddBrainStorage(typeof(HostingModule).Assembly);
             silo.Configure<ReminderOptions>(options => options.MinimumReminderPeriod = TimeSpan.FromSeconds(1));
+            silo.Services.AddSingleton<DigitalBrain.Confirmation.IConfirmations, ApprovingConfirmations>();
         }
     }
 }

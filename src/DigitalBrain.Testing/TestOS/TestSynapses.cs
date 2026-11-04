@@ -17,11 +17,24 @@ internal sealed class TestSynapses(TestNeuronHost host) : ISynapses
         host.OS.Synapses.Remove(host.Id, from);
         return Task.CompletedTask;
     }
+
+    public Task EnsureBrainWide(params Type[] signals) => host.OS.Synapses.EnsureBrainWide(host, signals);
+
+    public Task RemoveBrainWide()
+    {
+        host.OS.Synapses.Remove(host.Id, SynapseRegistry.BrainWideOf(host.Id.Brain));
+        return Task.CompletedTask;
+    }
 }
 
 // Durable synapses of a TestOS: per subscriber, per source, the signal types and the cursor. They survive deactivation.
+// A brain-wide synapse is the entry under the sentinel source {brain}/*/*: its cursor is a position of the brain's journal order, and
+// every append in the brain (other than the subscriber's own) reaches it and wakes the subscriber, as the Orleans brain-wide entry "*".
 internal sealed class SynapseRegistry(TestOS os)
 {
+    // The source written for a brain-wide entry when synapses are listed.
+    internal const string BrainWide = "*";
+
     private readonly Lock _gate = new();
     private readonly Dictionary<NeuronId, Dictionary<NeuronId, Entry>> _bySubscriber = [];
     private static readonly ConcurrentDictionary<(Type Class, Type Signal), MethodInfo?> Reactions = new();
@@ -68,6 +81,35 @@ internal sealed class SynapseRegistry(TestOS os)
         }
     }
 
+    // The sentinel source a brain-wide entry is held under.
+    internal static NeuronId BrainWideOf(BrainId brain) => new(brain, BrainWide, BrainWide);
+
+    // No admission: a brain-wide synapse names no source to ask. It starts at the brain's last journal position.
+    public async Task EnsureBrainWide(TestNeuronHost subscriber, Type[] signals)
+    {
+        ArgumentNullException.ThrowIfNull(signals);
+        if (subscriber.Class.IsDefined(typeof(StatelessNeuronAttribute), false))
+        {
+            throw new InvalidOperationException($"{subscriber.Class.FullName} is a [StatelessNeuron] and holds no synapses.");
+        }
+        if (signals.Length == 0) { throw new ArgumentException("A synapse names at least one signal type.", nameof(signals)); }
+        foreach (var signal in signals)
+        {
+            if (signal is null || !typeof(Signal).IsAssignableFrom(signal)) { throw new ArgumentException($"{signal} is not a signal type.", nameof(signals)); }
+        }
+        var last = (await os.Journal(subscriber.Id.Brain).Read(0, 1, CancellationToken.None).ConfigureAwait(false)).Last;
+        var key = BrainWideOf(subscriber.Id.Brain);
+        lock (_gate)
+        {
+            if (!_bySubscriber.TryGetValue(subscriber.Id, out var sources)) { _bySubscriber[subscriber.Id] = sources = []; }
+            if (!sources.TryGetValue(key, out var entry))
+            {
+                sources[key] = entry = new Entry(key, subscriber.Id) { BrainWide = true, Cursor = last, CursorAt = os.Clock.GetUtcNow() };
+            }
+            entry.Signals.UnionWith(signals);
+        }
+    }
+
     public void Remove(NeuronId subscriber, NeuronId from)
     {
         lock (_gate)
@@ -81,7 +123,7 @@ internal sealed class SynapseRegistry(TestOS os)
         lock (_gate)
         {
             return [.. _bySubscriber.SelectMany(pair => pair.Value.Values.SelectMany(entry => entry.Signals.Select(signal =>
-                new ObservedSynapse(entry.Source.ToString(), pair.Key.ToString(), AliasOf(signal)))))
+                new ObservedSynapse(entry.BrainWide ? BrainWide : entry.Source.ToString(), pair.Key.ToString(), AliasOf(signal)))))
                 .OrderBy(row => row.From, StringComparer.Ordinal).ThenBy(row => row.To, StringComparer.Ordinal).ThenBy(row => row.Signal, StringComparer.Ordinal)];
         }
     }
@@ -119,9 +161,15 @@ internal sealed class SynapseRegistry(TestOS os)
     {
         lock (_gate)
         {
-            return [.. _bySubscriber.Where(pair => pair.Value.Values.Any(entry => entry.Cursor < os.Journal(entry.Source.Brain).Last(entry.Source))).Select(pair => pair.Key)];
+            return [.. _bySubscriber.Where(pair => pair.Value.Values.Any(entry => entry.Cursor < LastOf(entry))).Select(pair => pair.Key)];
         }
     }
+
+    // The last sequence of the entry's source: the publisher's own, or the brain's journal position for a brain-wide entry.
+    private long LastOf(Entry entry)
+        => entry.BrainWide
+            ? os.Journal(entry.Source.Brain).Read(0, 1, CancellationToken.None).GetAwaiter().GetResult().Last
+            : os.Journal(entry.Source.Brain).Last(entry.Source);
 
     // On every activation the subscriber catches up on each source from its cursor.
     public void Activated(TestNeuronHost subscriber)
@@ -142,8 +190,20 @@ internal sealed class SynapseRegistry(TestOS os)
         }
         os.Listeners.Appended(publisher, written);
         List<NeuronId> subscribers;
-        lock (_gate) { subscribers = [.. _bySubscriber.Where(pair => pair.Value.ContainsKey(publisher)).Select(pair => pair.Key)]; }
+        List<NeuronId> brainWide;
+        var key = BrainWideOf(publisher.Brain);
+        lock (_gate)
+        {
+            subscribers = [.. _bySubscriber.Where(pair => pair.Value.ContainsKey(publisher)).Select(pair => pair.Key)];
+            brainWide = [.. _bySubscriber.Where(pair => pair.Key != publisher && pair.Value.ContainsKey(key)).Select(pair => pair.Key)];
+        }
         var copies = os.Options.DuplicateDelivery ? 2 : 1;
+        // A brain-wide subscriber is woken, active or not, and reads the brain from its cursor; the read dedupes the copies.
+        foreach (var subscriber in brainWide)
+        {
+            if (!os.TryHost(subscriber, out var host)) { continue; }
+            for (var copy = 0; copy < copies; copy++) { _ = os.Track(Deliver(host, key, long.MaxValue, reference: false)); }
+        }
         foreach (var subscriber in subscribers)
         {
             if (!os.TryHost(subscriber, out var host) || !host.IsActive) { continue; }
@@ -171,7 +231,8 @@ internal sealed class SynapseRegistry(TestOS os)
                 Interlocked.Increment(ref _duplicates);
                 return;
             }
-            await CatchUp(subscriber, entry, through).ConfigureAwait(false);
+            if (entry.BrainWide) { await CatchUpBrain(subscriber, entry).ConfigureAwait(false); }
+            else { await CatchUp(subscriber, entry, through).ConfigureAwait(false); }
         }
         catch (Exception error) when (error is not OutOfMemoryException) { os.Fail(error); }
         finally { pump.Release(); }
@@ -185,7 +246,7 @@ internal sealed class SynapseRegistry(TestOS os)
             var page = await journal.Read(entry.Source, entry.Cursor, SignalPage.MaxLimit, CancellationToken.None).ConfigureAwait(false);
             if (page.Floor > entry.Cursor)
             {
-                await React(subscriber, new Gap(entry.Source, entry.Cursor, page.Floor), entry, page.Floor).ConfigureAwait(false);
+                await React(subscriber, new Gap(entry.Source, entry.Cursor, page.Floor), entry, page.Floor, entry.Source).ConfigureAwait(false);
                 Advance(entry, page.Floor);
                 continue;
             }
@@ -195,7 +256,32 @@ internal sealed class SynapseRegistry(TestOS os)
             {
                 bool wanted;
                 lock (_gate) { wanted = entry.Signals.Any(type => type.IsInstanceOfType(item.Signal)); }
-                if (wanted) { await React(subscriber, item.Signal, entry, item.Sequence).ConfigureAwait(false); }
+                if (wanted) { await React(subscriber, item.Signal, entry, item.Sequence, entry.Source).ConfigureAwait(false); }
+                Advance(entry, item.Sequence);
+            }
+        }
+    }
+
+    // A brain-wide entry pages the brain's journal from its position: Gap (from the subscriber) when the floor passed it, then the
+    // wanted signals of every other publisher in brain order; the subscriber's own signals and unwanted ones only move the cursor.
+    private async Task CatchUpBrain(TestNeuronHost subscriber, Entry entry)
+    {
+        var journal = os.Journal(entry.Source.Brain);
+        while (true)
+        {
+            var page = await journal.Read(entry.Cursor, SignalPage.MaxLimit, CancellationToken.None).ConfigureAwait(false);
+            if (page.Floor > entry.Cursor)
+            {
+                await React(subscriber, new Gap(subscriber.Id, entry.Cursor, page.Floor), entry, page.Floor, subscriber.Id).ConfigureAwait(false);
+                Advance(entry, page.Floor);
+                continue;
+            }
+            if (page.Signals.Count == 0) { return; }
+            foreach (var item in page.Signals)
+            {
+                bool wanted;
+                lock (_gate) { wanted = item.Publisher != subscriber.Id && entry.Signals.Any(type => type.IsInstanceOfType(item.Signal)); }
+                if (wanted) { await React(subscriber, item.Signal, entry, item.Sequence, item.Publisher).ConfigureAwait(false); }
                 Advance(entry, item.Sequence);
             }
         }
@@ -218,11 +304,11 @@ internal sealed class SynapseRegistry(TestOS os)
     }
 
     // A reaction is a turn: a synapse receiver's Receive, else the most specific [On] method whose parameter accepts the signal; none means the signal is ignored.
-    private Task React(TestNeuronHost subscriber, Signal signal, Entry entry, long cursor)
+    private Task React(TestNeuronHost subscriber, Signal signal, Entry entry, long cursor, NeuronId from)
     {
         if (signal is not Gap)
         {
-            os.NoteDelivery(new SignalDelivery(entry.Source.ToString(), subscriber.Id.ToString(), AliasOf(signal.GetType()), cursor));
+            os.NoteDelivery(new SignalDelivery(from.ToString(), subscriber.Id.ToString(), AliasOf(signal.GetType()), cursor));
         }
         if (typeof(ISynapseReceiver).IsAssignableFrom(subscriber.Class))
         {
@@ -278,6 +364,8 @@ internal sealed class SynapseRegistry(TestOS os)
         public NeuronId Subscriber { get; } = subscriber;
 
         public HashSet<Type> Signals { get; } = [];
+
+        public bool BrainWide { get; init; }
 
         public long Cursor { get; set; }
 

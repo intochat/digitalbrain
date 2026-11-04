@@ -49,7 +49,10 @@ public static class RuntimeSiloBuilderExtensions
         else { silo.Services.TryAddSingleton(RuntimeOptions.Default); }
         silo.AddNeuronHosting(modules);
         silo.Services.TryAddSingleton(sp => sp.GetRequiredService<NeuronTypeRegistry>().Catalog);
-        silo.Services.TryAddSingleton<DigitalBrain.Spi.IGateIndex>(sp => new CatalogGateIndex(sp.GetRequiredService<SynapseCatalog>()));
+        silo.Services.TryAddSingleton(sp => new InstalledGateIndex(sp.GetRequiredService<SynapseCatalog>()));
+        silo.Services.TryAddSingleton<DigitalBrain.Spi.IGateIndex>(sp => sp.GetRequiredService<InstalledGateIndex>());
+        silo.Services.TryAddSingleton<InstalledGates>();
+        silo.Services.TryAddSingleton<DigitalBrain.Spi.IInstallHooks, OrleansInstallHooks>();
         silo.Services.AddJournalPayloads(modules);
         silo.Services.AddSignalPublisher();
         silo.Services.TryAddSingleton<DigitalBrain.Spi.ISlotResolver, UnboundSlotResolver>();

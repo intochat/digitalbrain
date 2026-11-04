@@ -16,52 +16,47 @@ namespace DigitalBrain.Runtime.Orleans.Synapses;
 /// a gate that does not answer within <see cref="RuntimeOptions.GateTimeout"/>, or a failing gate stops the write with
 /// <see cref="RuleViolationException"/>. After the append, <see cref="Commit"/> asks each allowing gate to save its next state.
 /// <para>
-/// Interim rule of this slice for reaction edges: the Orleans runtime cannot list the live neurons of a brain, so the publisher side
-/// ensures them. Before the append, for each durable signal whose type a <c>[State]</c> reaction synapse of the catalog takes, the
-/// synapse <c>publisher → {brain}/{StateAlias}/{Key}</c> is ensured on the subscriber through the ordinary admission path, once per
-/// (publisher, subscriber, signal) per publisher activation. Install-time edges replace this rule in a later plan.
+/// The index serves only installed gates (<see cref="InstalledGateIndex"/>): before the first gated signal of a brain the
+/// <see cref="InstalledGates"/> cache reads the brain's installs. Reaction edges are not this path's concern: the install wires them
+/// (<see cref="OrleansInstallHooks"/>).
 /// </para>
 /// <para>
 /// Gates never run on <see cref="StateChanged"/>: a gate's <c>Committed</c> saves <see cref="StateChanged"/> while the original publisher
-/// is still in its turn awaiting <see cref="Commit"/>, so a gate on it that resolved to that publisher would deadlock. Reaction synapses
-/// on <see cref="StateChanged"/> are still ensured. Nor on <see cref="Rejected"/>: the refusing gate journals it inside its own gate
-/// turn, so a gate on it (say, one on base <see cref="Signal"/>) would run nested in that turn.
+/// is still in its turn awaiting <see cref="Commit"/>, so a gate on it that resolved to that publisher would deadlock. Nor on
+/// <see cref="Rejected"/>: the refusing gate journals it inside its own gate turn, so a gate on it (say, one on base
+/// <see cref="Signal"/>) would run nested in that turn. Nor on <see cref="DigitalBrain.Time.Tick"/>, <see cref="Installed"/>,
+/// <see cref="Retired"/> and the time registrations: their publishers (the time and installs neurons) serve the gate path itself.
 /// </para>
 /// <para>
-/// No call of the gate path can stall a publisher: <see cref="Commit"/> and each reaction-edge ensure are bounded by
-/// <see cref="RuntimeOptions.GateTimeout"/> (logged and skipped on timeout), and no edge is ensured on a subscriber that is itself a
-/// publisher awaiting its gates or <see cref="Commit"/> along the current call chain (tracked in <see cref="RequestContext"/> under
-/// <c>HostNeuronContext.GateChainKey</c>): that subscriber's turn is blocked on this very chain, so the ensure would deadlock.
-/// Such an edge is ensured on a later publish.
+/// No call of the gate path can stall a publisher: <see cref="Commit"/> is bounded by <see cref="RuntimeOptions.GateTimeout"/> (logged
+/// and skipped on timeout). The publishers along the current call chain blocked in <see cref="Run"/> or <see cref="Commit"/> are
+/// tracked in <see cref="RequestContext"/> under <c>HostNeuronContext.GateChainKey</c>.
 /// </para>
 /// </summary>
 internal static partial class GateRunner
 {
     private const string NoAnswer = "the gate did not answer";
 
-    /// <summary>Ensures the reaction edges, then runs the gates of every durable signal in order.</summary>
+    /// <summary>Runs the installed gates of every durable signal in order.</summary>
     /// <param name="services">The silo services.</param>
     /// <param name="publisher">The publishing neuron.</param>
     /// <param name="signals">The signals about to be appended; ephemeral ones pass no gate.</param>
-    /// <param name="ensured">The publisher activation's cache of ensured reaction edges.</param>
     /// <param name="ct">Cancels the wait.</param>
     /// <returns>Each allowing gate with the signal, its proposed next state and the ticket of its provisional entry.</returns>
     /// <exception cref="RuleViolationException">A gate refused, did not answer or failed.</exception>
     public static async Task<IReadOnlyList<(INeuronHost Gate, Signal Signal, JsonElement Next, Guid Ticket)>> Run(IServiceProvider services, NeuronId publisher,
-        IReadOnlyList<Signal> signals, ISet<string> ensured, CancellationToken ct)
+        IReadOnlyList<Signal> signals, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(signals);
-        ArgumentNullException.ThrowIfNull(ensured);
-        var durable = signals.Where(signal => !signal.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false)).ToArray();
-        var gated = durable.Where(signal => signal is not StateChanged and not Rejected).ToArray();
-        if (durable.Length == 0 || services.GetService<IGateIndex>() is not { } index || services.GetService<SynapseCatalog>() is not { } catalog) { return []; }
+        var gated = signals.Where(signal => !signal.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false) && !Ungated(signal)).ToArray();
+        if (gated.Length == 0 || services.GetService<IGateIndex>() is not { } index) { return []; }
+        if (services.GetService<InstalledGates>() is { } installed) { await installed.Load(publisher.Brain).ConfigureAwait(true); }
         var payloads = services.GetRequiredService<JournalPayloads>();
         var grains = services.GetRequiredService<IGrainFactory>();
         var types = services.GetRequiredService<NeuronTypeRegistry>();
         var timeout = RuntimeOptions.From(services).GateTimeout;
         var log = services.GetService<ILoggerFactory>()?.CreateLogger(typeof(GateRunner)) ?? NullLogger.Instance;
-        await EnsureReactions(catalog, payloads, grains, types, publisher, durable, ensured, timeout, log).ConfigureAwait(true);
         var allowed = new List<(INeuronHost Gate, Signal Signal, JsonElement Next, Guid Ticket)>();
         var chain = EnterChain(publisher);
         try
@@ -163,6 +158,10 @@ internal static partial class GateRunner
         finally { LeaveChain(chain); }
     }
 
+    // The signals no gate runs on (see the type summary).
+    private static bool Ungated(Signal signal)
+        => signal is StateChanged or Rejected or DigitalBrain.Time.Tick or Installed or Retired or DigitalBrain.Time.Registered or DigitalBrain.Time.Unregistered;
+
     // The publishers along the current call chain that are blocked in Run or Commit.
     private static string[] Chain()
         => RequestContext.Get(HostNeuronContext.GateChainKey) is string chain ? chain.Split(',', StringSplitOptions.RemoveEmptyEntries) : [];
@@ -202,48 +201,6 @@ internal static partial class GateRunner
         }
     }
 
-    // The interim reaction-edge rule (see the type summary): each (subscriber, signal) is ensured once per publisher activation.
-    private static async Task EnsureReactions(SynapseCatalog catalog, JournalPayloads payloads, IGrainFactory grains, NeuronTypeRegistry types,
-        NeuronId publisher, Signal[] signals, ISet<string> ensured, TimeSpan timeout, ILogger log)
-    {
-        // A subscriber blocked further up this call chain cannot take the ensure call; its edge waits for a later publish.
-        var blocked = Chain();
-        foreach (var signal in signals)
-        {
-            if (!payloads.Types.TryAliasOf(signal.GetType(), out var alias)) { continue; }
-            var subscribers = catalog.Synapses
-                .Where(d => d.Kind == SynapseKind.Reaction && d.Signal!.IsInstanceOfType(signal))
-                .Select(d => new NeuronId(publisher.Brain, d.StateAlias, d.Key))
-                .Where(subscriber => subscriber != publisher && !blocked.Contains(subscriber.ToString(), StringComparer.Ordinal))
-                .Distinct();
-            foreach (var subscriber in subscribers)
-            {
-                var edge = $"{subscriber}|{alias}";
-                if (!ensured.Add(edge)) { continue; }
-                var host = grains.GetGrain<ISynapseHost>(GrainId.Create(NeuronTypeRegistry.GrainTypeOf(types.Require(subscriber.Type).Policy), subscriber.ToString()));
-                var previous = RequestContext.Get(HostNeuronContext.CallerKey);
-                RequestContext.Set(HostNeuronContext.CallerKey, publisher.ToString());
-                try { await host.EnsureFrom(publisher, [alias]).WaitAsync(timeout).ConfigureAwait(true); }
-                catch (TimeoutException)
-                {
-                    // Bounded like a gate: log, forget the edge so a later publish ensures it again, and go on with the publish.
-                    ensured.Remove(edge);
-                    LogReactionEnsureTimedOut(log, subscriber.ToString(), alias);
-                }
-                catch
-                {
-                    ensured.Remove(edge);
-                    throw;
-                }
-                finally
-                {
-                    if (previous is null) { RequestContext.Remove(HostNeuronContext.CallerKey); }
-                    else { RequestContext.Set(HostNeuronContext.CallerKey, previous); }
-                }
-            }
-        }
-    }
-
     private static INeuronHost Host(IGrainFactory grains, NeuronTypeRegistry types, NeuronId id)
         => grains.GetGrain<INeuronHost>(GrainId.Create(NeuronTypeRegistry.GrainTypeOf(types.Require(id.Type).Policy), id.ToString()));
 
@@ -264,8 +221,4 @@ internal static partial class GateRunner
     [LoggerMessage(EventId = 4127, EventName = "TimedOutGateAbortFailed", Level = LogLevel.Debug,
         Message = "The gate {Gate} that did not answer could not drop a late provisional state for {Signal}; its lease discards it.")]
     private static partial void LogTimedOutGateAbortFailed(ILogger logger, Exception error, string gate, string signal);
-
-    [LoggerMessage(EventId = 4126, EventName = "ReactionEnsureTimedOut", Level = LogLevel.Warning,
-        Message = "The reaction edge to {Subscriber} for {Signal} was not ensured within the gate timeout; a later publish ensures it.")]
-    private static partial void LogReactionEnsureTimedOut(ILogger logger, string subscriber, string signal);
 }

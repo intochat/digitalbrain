@@ -12,7 +12,19 @@ public sealed class WeeklyCapFacts
     private static readonly NeuronId Week = NeuronId.Parse("b/week/default");
     private static readonly NeuronId Audit = NeuronId.Parse("b/audit/default");
 
-    private static OS Start() => OS.Local().Register(typeof(WeeklyCapFacts).Assembly);
+    // Gates and reactions come from the install: every fact starts with the week, the audit and the broken gate installed.
+    private static async Task<OS> Start()
+    {
+        var os = OS.Local().Register(typeof(WeeklyCapFacts).Assembly);
+        os.Confirmations.ApproveAll();
+        var installs = os.Get<IInstalls>(NeuronId.Parse("b/synapse.installs/default"));
+        foreach (var alias in new[] { "week", "audit", "broken" })
+        {
+            await installs.Install(new(alias, new Dictionary<string, string>()), TestContext.Current.CancellationToken);
+        }
+        await os.Idle();
+        return os;
+    }
 
     private static async Task<decimal> Spent(OS os)
     {
@@ -23,7 +35,7 @@ public sealed class WeeklyCapFacts
     [Fact]
     public async Task ThePromiseHoldsAcrossAWeekOfCharges()
     {
-        await using var os = Start();
+        await using var os = await Start();
         var pay = os.Get<IPayments>(Pay);
 
         await pay.Charge(120m);
@@ -47,7 +59,7 @@ public sealed class WeeklyCapFacts
     [Fact]
     public async Task TwoGatesOnOneSignalStopAtTheFirstRefusal()
     {
-        await using var os = Start();
+        await using var os = await Start();
         var pay = os.Get<IPayments>(Pay);
         await pay.Charge(250m);
         await os.Idle();
@@ -70,7 +82,7 @@ public sealed class WeeklyCapFacts
     [Fact]
     public async Task AThrowingGateFailsClosedWithItsName()
     {
-        await using var os = Start();
+        await using var os = await Start();
         var pay = os.Get<IPayments>(Pay);
         await pay.Charge(10m);
         await os.Idle();
@@ -87,7 +99,7 @@ public sealed class WeeklyCapFacts
     [Fact]
     public async Task TheInspectorHearsStartedAndFinishedAroundEachGate()
     {
-        await using var os = Start();
+        await using var os = await Start();
         var started = new ConcurrentQueue<SynapseStarted>();
         var finished = new ConcurrentQueue<SynapseFinished>();
         await using var startedListener = await os.ClusterListeners.Listen<SynapseStarted>("inspector-started", (_, s, _) =>

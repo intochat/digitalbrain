@@ -53,6 +53,8 @@ public interface IInstalls
     /// <param name="request">The alias and its slot bindings.</param>
     /// <param name="ct">Cancellation.</param>
     /// <returns>How it ended.</returns>
+    /// <remarks>The call waits for the person, so it may take up to ten minutes.</remarks>
+    [CallTimeout(600_000)]
     Task<InstallOutcome> Install(InstallRequest request, CancellationToken ct);
 
     /// <summary>Retires an installed app; an alias that is not installed is ignored.</summary>

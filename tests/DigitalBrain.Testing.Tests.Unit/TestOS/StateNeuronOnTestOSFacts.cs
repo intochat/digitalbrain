@@ -189,12 +189,25 @@ public sealed class StateNeuronOnTestOSFacts
     private static readonly NeuronId Week = NeuronId.Parse("b/week/default");
     private static readonly NeuronId Books = NeuronId.Parse("b/ledger/default");
 
-    private static OS Start(Action<TestOSOptions>? configure = null) => OS.Local(configure).Register(typeof(StateNeuronOnTestOSFacts).Assembly);
+    private static OS Start(Action<TestOSOptions>? configure = null)
+    {
+        var os = OS.Local(configure).Register(typeof(StateNeuronOnTestOSFacts).Assembly);
+        os.Confirmations.ApproveAll();
+        return os;
+    }
+
+    // Reaction edges and gates come from the install: each fact installs the aliases it charges.
+    internal static async Task Install(OS os, string alias)
+    {
+        await os.Get<IInstalls>(NeuronId.Parse("b/synapse.installs/default")).Install(new(alias, new Dictionary<string, string>()), TestContext.Current.CancellationToken);
+        await os.Idle();
+    }
 
     [Fact]
     public async Task ASecondChargeOverTheCapIsRejectedBeforeItCommits()
     {
         await using var os = Start();
+        await Install(os, "week");
         var pay = os.Get<IPayments>(Pay);
         await pay.Charge(250m);
         await os.Idle();
@@ -213,6 +226,7 @@ public sealed class StateNeuronOnTestOSFacts
     public async Task TwoConcurrentChargesAgainstTheCapAllowExactlyOne()
     {
         await using var os = Start();
+        await Install(os, "cap");
         var first = os.Get<IPayments>(NeuronId.Parse("b/payments/one"));
         var second = os.Get<IPayments>(NeuronId.Parse("b/payments/two"));
 
@@ -231,6 +245,7 @@ public sealed class StateNeuronOnTestOSFacts
         for (var i = 0; i < 20; i++)
         {
             await using var os = Start();
+            await Install(os, "cap");
             var first = os.Get<IPayments>(NeuronId.Parse("b/payments/one"));
             var second = os.Get<IPayments>(NeuronId.Parse("b/payments/two"));
 
@@ -254,6 +269,7 @@ public sealed class StateNeuronOnTestOSFacts
             entered.TrySetResult();
             await release.Task;
         });
+        await Install(os, "cap");
         var first = os.Get<IPayments>(NeuronId.Parse("b/payments/one"));
         var second = os.Get<IPayments>(NeuronId.Parse("b/payments/two"));
 
@@ -275,6 +291,7 @@ public sealed class StateNeuronOnTestOSFacts
     public async Task AReactionSynapseIsEnsuredAndDeliversOnce()
     {
         await using var os = Start();
+        await Install(os, "ledger");
         var pay = os.Get<IPayments>(Pay);
         await os.Activate(Books);
         await os.Idle();
@@ -283,7 +300,7 @@ public sealed class StateNeuronOnTestOSFacts
         await os.Idle();
 
         Assert.Equal(5m, await Spent(os));
-        Assert.Contains(os.SynapsesOf(Books), s => s.From == Pay && s.Signal == typeof(Charging));
+        Assert.Contains(os.SynapsesOf(Books), s => s.From == new NeuronId(Pay.Brain, "*", "*") && s.Signal == typeof(Charging));
 
         await os.Restart();
         await os.Activate(Books);
@@ -299,6 +316,7 @@ public sealed class StateNeuronOnTestOSFacts
     {
         Stuck.Reset();
         await using var os = Start();
+        await Install(os, "hold");
         var pay = os.Get<IPayments>(Pay);
 
         var call = pay.Stall();
@@ -322,6 +340,7 @@ public sealed class StateNeuronOnTestOSFacts
     {
         Late.Reset();
         await using var os = Start();
+        await Install(os, "lag");
         var pay = os.Get<IPayments>(Pay);
 
         var call = pay.Lag(60m);
@@ -349,6 +368,7 @@ public sealed class StateNeuronOnTestOSFacts
     public async Task AFailingCommittedOnAGateIsReportedAndDoesNotFailThePublisher()
     {
         await using var os = Start();
+        await Install(os, "brittle");
 
         await os.Get<IPayments>(Pay).Break();
         await os.Idle();
@@ -361,6 +381,7 @@ public sealed class StateNeuronOnTestOSFacts
     public async Task ViewChangedIsOfferedAfterAnAllowedCharge()
     {
         await using var os = Start();
+        await Install(os, "week");
         var heard = new ConcurrentQueue<string>();
         await using var listener = await os.ClusterListeners.Listen<ViewChanged>("views", (_, changed, _) =>
         {

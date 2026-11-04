@@ -42,13 +42,14 @@ internal sealed class NeuronTypeRegistry
     private readonly Dictionary<Type, NeuronRegistration> _byContract = [];
 
     /// <summary>
-    /// Registers the <c>[Neuron]</c> classes of <paramref name="assemblies"/> and, under each <c>[State]</c> alias of their
-    /// <see cref="SynapseCatalog"/>, the closed <see cref="StateNeuron{TState}"/> with <see cref="HostPolicy.Affine"/>.
+    /// Registers the <c>[Neuron]</c> classes of <paramref name="assemblies"/>, the installs neuron (<c>synapse.installs</c>) and the time
+    /// neuron (<c>time</c>) of every brain, and, under each <c>[State]</c> alias of their <see cref="SynapseCatalog"/>, the closed
+    /// <see cref="StateNeuron{TState}"/> with <see cref="HostPolicy.Affine"/>.
     /// </summary>
     /// <exception cref="InvalidOperationException">Two classes claim one type name, or a <c>[Neuron]</c> class is an app.</exception>
     /// <exception cref="SynapseShapeException">A state alias is declared twice, or a synapse function has an unsupported shape.</exception>
     public NeuronTypeRegistry(IEnumerable<Assembly> assemblies)
-        : this(Listed(assemblies).SelectMany(Loadable))
+        : this(Listed(assemblies).SelectMany(Loadable).Concat([typeof(InstallsNeuron), typeof(DigitalBrain.Time.TimeNeuron)]))
     {
         Catalog = SynapseCatalog.Scan(Listed(assemblies));
         foreach (var (alias, record) in Catalog.States)

@@ -33,6 +33,9 @@ public abstract class WeeklyCapSiloBase(StatefulSilo silo)
     protected async Task<int> AuditCount()
         => (await Silo.History("wc").Read(Audit, 0, 100, TestContext.Current.CancellationToken)).Signals.Count(s => s.Signal is StateChanged);
 
+    // Gates and reactions come from the install: every fact starts with the week, the audit and the broken gate installed.
+    protected Task Install() => StateNeuronSiloFacts.Install(Silo.Services, "wc", "week", "audit", "broken");
+
     protected Task SpentReaches(decimal expected)
         => StateNeuronSiloFacts.Until(async () => await Spent() == expected, TestContext.Current.CancellationToken);
 }
@@ -42,6 +45,7 @@ public sealed class WeeklyCapSiloFacts(StatefulSilo silo) : WeeklyCapSiloBase(si
     [Fact]
     public async Task ThePromiseHoldsAcrossAWeekOfCharges()
     {
+        await Install();
         await Payments.Charge(120m);
         await Payments.Charge(100m);
         await Payments.Charge(70m);
@@ -66,6 +70,7 @@ public sealed class WeeklyCapSiloTwoGateFacts(StatefulSilo silo) : WeeklyCapSilo
     [Fact]
     public async Task TwoGatesOnOneSignalStopAtTheFirstRefusal()
     {
+        await Install();
         await Payments.Charge(250m);
         await SpentReaches(250m);
         var auditedBefore = await AuditCount();
@@ -89,6 +94,7 @@ public sealed class WeeklyCapSiloThrowingGateFacts(StatefulSilo silo) : WeeklyCa
     [Fact]
     public async Task AThrowingGateFailsClosedWithItsName()
     {
+        await Install();
         var ct = TestContext.Current.CancellationToken;
         await Payments.Charge(10m);
         await SpentReaches(10m);
@@ -107,6 +113,7 @@ public sealed class WeeklyCapSiloInspectorFacts(StatefulSilo silo) : WeeklyCapSi
     [Fact]
     public async Task TheInspectorHearsStartedAndFinishedAroundEachGate()
     {
+        await Install();
         var started = new ConcurrentQueue<SynapseStarted>();
         var finished = new ConcurrentQueue<SynapseFinished>();
         var listeners = Silo.Services.GetRequiredService<IClusterListeners>();

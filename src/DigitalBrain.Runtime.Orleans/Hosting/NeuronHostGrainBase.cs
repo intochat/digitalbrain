@@ -203,16 +203,22 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
     }
 
     /// <inheritdoc />
-    public Task EnsureFrom(NeuronId source, string[] signalAliases)
+    public Task EnsureBrainWide(string[] signalAliases) => InstallsOnly().EnsureBrain(signalAliases);
+
+    /// <inheritdoc />
+    public Task RemoveBrainWide() => InstallsOnly().RemoveBrain();
+
+    // Reaction edges are wired at install time: only the installs neuron of this brain asks (OrleansInstallHooks).
+    private SynapseEngine InstallsOnly()
     {
         if (_synapses is not { } synapses) { throw new InvalidOperationException($"The neuron {_key} is not active."); }
-        // Only the source itself asks for its edge; the source's own admission still decides (the interim rule of GateRunner).
+        var installs = new NeuronId(NeuronId.Parse(_key).Brain, OrleansInstallHooks.InstallsType, "default").ToString();
         var caller = RequestContext.Get(HostNeuronContext.CallerKey) as string ?? string.Empty;
-        if (!string.Equals(caller, source.ToString(), StringComparison.Ordinal))
+        if (!string.Equals(caller, installs, StringComparison.Ordinal))
         {
-            throw new UnauthorizedAccessException($"An edge from {source} was asked by '{caller}', not by the source.");
+            throw new UnauthorizedAccessException($"The brain-wide synapse of {_key} was asked by '{caller}', not by {installs}.");
         }
-        return synapses.EnsureAliases(source, signalAliases);
+        return synapses;
     }
 
     /// <inheritdoc />

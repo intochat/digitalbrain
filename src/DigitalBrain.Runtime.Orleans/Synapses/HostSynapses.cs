@@ -21,10 +21,15 @@ internal interface ISynapseHost : IGrainWithStringKey
     [OrleansSdk.Concurrency.OneWay, Alias("catch-up")]
     Task CatchUp();
 
-    /// <summary>Ensures signals of <paramref name="signalAliases"/> from <paramref name="source"/> reach this subscriber, through admission on the source.</summary>
-    /// <exception cref="UnauthorizedAccessException">The caller is not <paramref name="source"/>, or the source refuses.</exception>
-    [Alias("ensure-from")]
-    Task EnsureFrom(NeuronId source, string[] signalAliases);
+    /// <summary>Ensures signals of <paramref name="signalAliases"/> from every other neuron of the brain reach this subscriber (its brain-wide synapse).</summary>
+    /// <exception cref="UnauthorizedAccessException">The caller is not the installs neuron of this brain.</exception>
+    [Alias("ensure-brain-wide")]
+    Task EnsureBrainWide(string[] signalAliases);
+
+    /// <summary>Removes the brain-wide synapse of this subscriber.</summary>
+    /// <exception cref="UnauthorizedAccessException">The caller is not the installs neuron of this brain.</exception>
+    [Alias("remove-brain-wide")]
+    Task RemoveBrainWide();
 }
 
 /// <summary><see cref="ISynapses"/> of a hosted neuron, over its activation's <see cref="SynapseEngine"/>.</summary>
@@ -35,4 +40,8 @@ internal sealed class HostSynapses(SynapseEngine engine) : ISynapses
     public Task Ensure(NeuronId from, params Type[] signals) => engine.Ensure(from, signals);
 
     public Task Remove(NeuronId from) => engine.Remove(from);
+
+    public Task EnsureBrainWide(params Type[] signals) => engine.EnsureBrain(signals);
+
+    public Task RemoveBrainWide() => engine.RemoveBrain();
 }

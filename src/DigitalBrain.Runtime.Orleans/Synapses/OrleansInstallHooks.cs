@@ -1,0 +1,75 @@
+using DigitalBrain.Runtime.Orleans.Hosting;
+using DigitalBrain.Spi;
+using DigitalBrain.Time;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans;
+using Orleans.Runtime;
+
+namespace DigitalBrain.Runtime.Orleans.Synapses;
+
+/// <summary>
+/// The install hooks of the silo: a state neuron's reaction edges are its one brain-wide synapse, set on its host grain through
+/// <see cref="ISynapseHost.EnsureBrainWide"/> under the installs neuron's identity; its schedules are registrations with
+/// <c>{brain}/time/default</c> owned by its alias. Each edge change also marks the brain's <see cref="InstalledGates"/> stale.
+/// </summary>
+internal sealed class OrleansInstallHooks(IServiceProvider services, InstalledGates gates) : IInstallHooks
+{
+    /// <summary>The neuron type of the installs neuron, <c>{brain}/synapse.installs/default</c>.</summary>
+    internal const string InstallsType = "synapse.installs";
+
+    private const string TimeType = "time";
+
+    /// <inheritdoc />
+    public async Task EnsureReactionEdges(NeuronId state, IReadOnlyList<Type> signals, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(signals);
+        gates.Invalidate(state.Brain);
+        if (signals.Count == 0) { return; }
+        var map = services.GetRequiredService<JournalPayloads>().Types;
+        string[] aliases = [.. signals.Select(signal => map.TryAliasOf(signal, out var alias)
+            ? alias
+            : throw new ArgumentException($"{signal.Name} is not a registered [Signal] type.", nameof(signals))).Distinct(StringComparer.Ordinal)];
+        await AsInstalls(state, host => host.EnsureBrainWide(aliases)).ConfigureAwait(true);
+    }
+
+    /// <inheritdoc />
+    public Task RemoveReactionEdges(NeuronId state, CancellationToken ct)
+    {
+        gates.Invalidate(state.Brain);
+        return AsInstalls(state, host => host.RemoveBrainWide());
+    }
+
+    /// <inheritdoc />
+    /// <remarks>The alias's registrations are replaced only when they differ, so an unchanged install leaves its reminders running.</remarks>
+    public async Task RegisterSchedules(NeuronId state, IReadOnlyList<Schedule> schedules, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(schedules);
+        var time = Time(state.Brain);
+        var held = (await time.Registered(ct).ConfigureAwait(true)).Where(r => r.Owner == state.Type).Select(r => r.Schedule).ToHashSet(StringComparer.Ordinal);
+        var wanted = schedules.Select(s => s.Text).ToHashSet(StringComparer.Ordinal);
+        if (held.SetEquals(wanted)) { return; }
+        if (held.Count > 0) { await time.Unregister(state.Type, ct).ConfigureAwait(true); }
+        foreach (var text in wanted) { await time.Register(state.Type, text, ct).ConfigureAwait(true); }
+    }
+
+    /// <inheritdoc />
+    public Task UnregisterSchedules(NeuronId state, CancellationToken ct) => Time(state.Brain).Unregister(state.Type, ct);
+
+    private ITime Time(BrainId brain) => NeuronHosting.Get<ITime>(services, new NeuronId(brain, TimeType, "default"));
+
+    // The state host admits a brain-wide edge only from the installs neuron of its brain.
+    private async Task AsInstalls(NeuronId state, Func<ISynapseHost, Task> call)
+    {
+        var types = services.GetRequiredService<NeuronTypeRegistry>();
+        var host = services.GetRequiredService<IGrainFactory>().GetGrain<ISynapseHost>(
+            GrainId.Create(NeuronTypeRegistry.GrainTypeOf(types.Require(state.Type).Policy), state.ToString()));
+        var previous = RequestContext.Get(HostNeuronContext.CallerKey);
+        RequestContext.Set(HostNeuronContext.CallerKey, new NeuronId(state.Brain, InstallsType, "default").ToString());
+        try { await call(host).ConfigureAwait(true); }
+        finally
+        {
+            if (previous is null) { RequestContext.Remove(HostNeuronContext.CallerKey); }
+            else { RequestContext.Set(HostNeuronContext.CallerKey, previous); }
+        }
+    }
+}

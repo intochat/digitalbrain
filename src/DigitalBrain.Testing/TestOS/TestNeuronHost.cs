@@ -201,7 +201,6 @@ internal sealed class TestNeuronHost : IDisposable
             await NeuronAttachment.Activate(neuron, CancellationToken.None).ConfigureAwait(false);
             _neuron = neuron;
             _os.Synapses.Activated(this);
-            _os.EnsureReactionEdges(this);
             return neuron;
         }
         finally { _activating.Release(); }
