@@ -9,6 +9,13 @@ public sealed class SynapseAttribute : Attribute
     private const string DefaultKey = "default";
 
     /// <summary>Declares a gate or reaction fed by signals of type <paramref name="from"/> into state <paramref name="into"/>.</summary>
+    /// <remarks>
+    /// A gate's state can lag one signal behind: the publisher's journal entry and the gate's state entry are not one transaction.
+    /// The host appends the publisher's signal first and only then saves the gate's allowed next state (<c>Committed</c>); if the
+    /// process dies between the two, the signal is published but the gate never counted it. For a cap this means at most one charge
+    /// under-counted after a crash. A gate that cannot accept this must not rely on its own state alone (for example, recount from
+    /// the publisher's journal).
+    /// </remarks>
     /// <param name="from">The <see cref="DigitalBrain.Signal"/> type that arrives.</param>
     /// <param name="into">The target state: <c>{alias}</c> or <c>{alias}/{key}</c>.</param>
     public SynapseAttribute(Type from, string into)

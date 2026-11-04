@@ -1,6 +1,10 @@
 namespace DigitalBrain.Rules;
 
-/// <summary>The verdict of a gate synapse: allow with the next state, or refuse with the broken rules.</summary>
+/// <summary>
+/// The verdict of a gate synapse: allow with the next state, or refuse with the broken rules. The allowed next state is saved only
+/// after the publisher's append, so after a process death between the two the gate's state lags one signal behind (see
+/// <see cref="SynapseAttribute(Type, string)"/>).
+/// </summary>
 public abstract record Check
 {
     private protected Check() { }
