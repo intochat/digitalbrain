@@ -8,7 +8,7 @@ namespace DigitalBrain.Runtime.Synapses.Tests.Unit.Compile;
 public sealed class SynapseCompilerFacts
 {
     // Plan 1's weekly-cap file (tests/DigitalBrain.Framework.Tests.E2E/WeeklyCap), as a synapse author writes it.
-    private const string Budget = """
+    internal const string Budget = """
         namespace Me.Budget;
 
         [Signal("payments.charging")]

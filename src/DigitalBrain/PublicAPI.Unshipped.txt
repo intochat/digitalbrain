@@ -2430,3 +2430,25 @@ DigitalBrain.SynapseCatalogSource.Stage(string! sourceKey, DigitalBrain.SynapseC
 DigitalBrain.SynapseCatalogSource.SynapseCatalogSource(DigitalBrain.SynapseCatalog! initial) -> void
 DigitalBrain.SynapseCatalogSource.Unstage(string! sourceKey) -> void
 DigitalBrain.SynapseCatalogSource.Version.get -> long
+DigitalBrain.LoadedSource
+DigitalBrain.LoadedSource.<Clone>$() -> DigitalBrain.LoadedSource!
+DigitalBrain.LoadedSource.Assembly.get -> System.Reflection.Assembly!
+DigitalBrain.LoadedSource.Assembly.init -> void
+DigitalBrain.LoadedSource.Catalog.get -> DigitalBrain.SynapseCatalog!
+DigitalBrain.LoadedSource.Catalog.init -> void
+DigitalBrain.LoadedSource.Deconstruct(out string! SourceKey, out string! Hash, out System.Reflection.Assembly! Assembly, out DigitalBrain.SynapseCatalog! Catalog, out System.Collections.Generic.IReadOnlyList<System.Type!>! Signals, out System.Collections.Generic.IReadOnlyList<System.Type!>! States) -> void
+DigitalBrain.LoadedSource.Equals(DigitalBrain.LoadedSource? other) -> bool
+DigitalBrain.LoadedSource.Hash.get -> string!
+DigitalBrain.LoadedSource.Hash.init -> void
+DigitalBrain.LoadedSource.LoadedSource(string! SourceKey, string! Hash, System.Reflection.Assembly! Assembly, DigitalBrain.SynapseCatalog! Catalog, System.Collections.Generic.IReadOnlyList<System.Type!>! Signals, System.Collections.Generic.IReadOnlyList<System.Type!>! States) -> void
+DigitalBrain.LoadedSource.Signals.get -> System.Collections.Generic.IReadOnlyList<System.Type!>!
+DigitalBrain.LoadedSource.Signals.init -> void
+DigitalBrain.LoadedSource.SourceKey.get -> string!
+DigitalBrain.LoadedSource.SourceKey.init -> void
+DigitalBrain.LoadedSource.States.get -> System.Collections.Generic.IReadOnlyList<System.Type!>!
+DigitalBrain.LoadedSource.States.init -> void
+override DigitalBrain.LoadedSource.Equals(object? obj) -> bool
+override DigitalBrain.LoadedSource.GetHashCode() -> int
+override DigitalBrain.LoadedSource.ToString() -> string!
+static DigitalBrain.LoadedSource.operator !=(DigitalBrain.LoadedSource? left, DigitalBrain.LoadedSource? right) -> bool
+static DigitalBrain.LoadedSource.operator ==(DigitalBrain.LoadedSource? left, DigitalBrain.LoadedSource? right) -> bool

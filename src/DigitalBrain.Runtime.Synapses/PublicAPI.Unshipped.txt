@@ -62,3 +62,8 @@ static DigitalBrain.Runtime.Synapses.SynapseDiagnostic.operator !=(DigitalBrain.
 static DigitalBrain.Runtime.Synapses.SynapseDiagnostic.operator ==(DigitalBrain.Runtime.Synapses.SynapseDiagnostic? left, DigitalBrain.Runtime.Synapses.SynapseDiagnostic? right) -> bool
 static DigitalBrain.Runtime.Synapses.SynapseSource.operator !=(DigitalBrain.Runtime.Synapses.SynapseSource? left, DigitalBrain.Runtime.Synapses.SynapseSource? right) -> bool
 static DigitalBrain.Runtime.Synapses.SynapseSource.operator ==(DigitalBrain.Runtime.Synapses.SynapseSource? left, DigitalBrain.Runtime.Synapses.SynapseSource? right) -> bool
+DigitalBrain.Runtime.Synapses.SynapseLoader
+DigitalBrain.Runtime.Synapses.SynapseLoader.Load(DigitalBrain.Runtime.Synapses.SynapseBuild! build) -> DigitalBrain.LoadedSource!
+DigitalBrain.Runtime.Synapses.SynapseLoader.SynapseLoader() -> void
+DigitalBrain.Runtime.Synapses.SynapseLoader.Unload(DigitalBrain.LoadedSource! loaded, int gcRounds = 10) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Runtime.Synapses.SynapseLoader.RetryUnload(string! sourceKey, string! hash, int gcRounds = 10) -> System.Threading.Tasks.Task<bool>!
