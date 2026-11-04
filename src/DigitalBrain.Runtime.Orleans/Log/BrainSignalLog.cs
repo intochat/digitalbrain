@@ -54,8 +54,8 @@ internal sealed class BrainSignalLog(
         }
 
         var log = await GetUnderlyingLogAsync(ct).ConfigureAwait(false);
-        await log.AppendEntry(publisher.ToString(), "state", null, BrainRecordChange.None, [], publisher.ToString(), signals, null, ct).ConfigureAwait(false);
-        return log.LastPosition;
+        var (_, _, lastPosition) = await log.AppendEntryWithPosition(publisher.ToString(), "state", null, BrainRecordChange.None, [], publisher.ToString(), signals, null, ct).ConfigureAwait(false);
+        return lastPosition;
     }
 
     /// <summary>Emits fire-and-forget [OneWay] position notification to registered subscribers in constant time.</summary>

@@ -151,10 +151,17 @@ internal sealed class BrainLog : IAsyncDisposable
     public async Task<(long Sequence, long LastSignal)> AppendEntry(string grainId, string stateName, long? expectedETag, BrainRecordChange change,
         byte[] record, string publisher, IReadOnlyList<Signal> emitted, BrainSideWrite? side, CancellationToken ct)
     {
+        var (sequence, lastSignal, _) = await AppendEntryWithPosition(grainId, stateName, expectedETag, change, record, publisher, emitted, side, ct).ConfigureAwait(false);
+        return (sequence, lastSignal);
+    }
+
+    internal async Task<(long Sequence, long LastSignal, long LastPosition)> AppendEntryWithPosition(string grainId, string stateName, long? expectedETag, BrainRecordChange change,
+        byte[] record, string publisher, IReadOnlyList<Signal> emitted, BrainSideWrite? side, CancellationToken ct)
+    {
         ArgumentNullException.ThrowIfNull(emitted);
         // Encoding runs before the gate: a payload that cannot be journaled never reaches the disk.
         JournaledSignalPayload[] encoded = [.. emitted.Select(payloads.EncodeSignal)];
-        return await AppendEncoded(grainId, stateName, expectedETag, change, record, null, publisher, encoded, side, ct);
+        return await AppendEncodedWithPosition(grainId, stateName, expectedETag, change, record, null, publisher, encoded, side, ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -162,6 +169,13 @@ internal sealed class BrainLog : IAsyncDisposable
     /// type: the write path of <see cref="IBrainJournalWriter"/> (04-17), in the same format as every other entry.
     /// </summary>
     internal async Task<(long Sequence, long LastSignal)> AppendEncoded(string grainId, string stateName, long? expectedETag, BrainRecordChange change,
+        byte[] record, string? recordType, string publisher, JournaledSignalPayload[] encoded, BrainSideWrite? side, CancellationToken ct)
+    {
+        var (sequence, lastSignal, _) = await AppendEncodedWithPosition(grainId, stateName, expectedETag, change, record, recordType, publisher, encoded, side, ct).ConfigureAwait(false);
+        return (sequence, lastSignal);
+    }
+
+    private async Task<(long Sequence, long LastSignal, long LastPosition)> AppendEncodedWithPosition(string grainId, string stateName, long? expectedETag, BrainRecordChange change,
         byte[] record, string? recordType, string publisher, JournaledSignalPayload[] encoded, BrainSideWrite? side, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(encoded);
@@ -234,7 +248,7 @@ internal sealed class BrainLog : IAsyncDisposable
             catch (Exception error) { failure = error; throw; }
             lock (stateLock)
             {
-                return (sequence, encoded.Length > 0 ? marks[publisher].Last : marks.GetValueOrDefault(publisher).Last);
+                return (sequence, encoded.Length > 0 ? marks[publisher].Last : marks.GetValueOrDefault(publisher).Last, position);
             }
         }
         finally
