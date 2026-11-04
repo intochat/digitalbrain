@@ -7,6 +7,11 @@ namespace DigitalBrain;
 /// The installs neuron of a brain: derives an app's needs from the catalog, asks a person once per distinct needs, records the
 /// approval with its bindings and schedules, wires the host through <see cref="IInstallHooks"/>, and announces <see cref="GateChanged"/>.
 /// </summary>
+/// <remarks>
+/// An install is two-phase: <see cref="Install"/> records a <see cref="PendingInstall"/>, asks without awaiting the answer and returns
+/// <see cref="InstallStatus.Pending"/>; the neuron's brain-wide synapse on <see cref="ConfirmationResolved"/> completes it. A plan id
+/// that is not pending is ignored.
+/// </remarks>
 /// <param name="catalog">The synapse catalog.</param>
 /// <param name="hooks">The host's install hooks.</param>
 [Neuron("synapse.installs")]
@@ -41,18 +46,37 @@ public sealed class InstallsNeuron(SynapseCatalog catalog, IInstallHooks hooks) 
 
         var plan = new ConfirmationPlan($"install:{alias}:{Guid.NewGuid():N}", ConfirmationAction.Other, Destructive: false, Title: alias, Body: sentence,
             ApproveLabel: "Allow", DenyLabel: "Deny", TargetLabel: alias) { RequiresPerson = true };
-        var result = await Context.Confirm(plan, ct).ConfigureAwait(true);
-        if (!result.Approved)
+        var pending = new PendingInstall(plan.Id, alias, new Dictionary<string, string>(bindings, StringComparer.Ordinal), hash, sentence);
+        // A newer ask of an alias replaces the older one; the older plan's answer is then ignored.
+        await Save(State with { Pending = [.. State.Pending.Where(p => p.Alias != alias), pending] }, [new InstallRequested(alias, plan.Id)]).ConfigureAwait(true);
+        _ = Ask(plan);
+        return new InstallOutcome(InstallStatus.Pending, sentence, plan.Id);
+    }
+
+    /// <summary>Completes a pending install when its plan is resolved.</summary>
+    /// <param name="resolved">The resolution.</param>
+    /// <param name="ct">Cancellation.</param>
+    [On]
+    public async Task OnResolved(ConfirmationResolved resolved, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(resolved);
+        ArgumentNullException.ThrowIfNull(catalog);
+        if (State.Pending.FirstOrDefault(p => p.PlanId == resolved.PlanId) is not { } pending) { return; }
+        var rest = State.Pending.Where(p => p.PlanId != pending.PlanId).ToList();
+        var alias = pending.Alias;
+        if (resolved.Outcome != ConfirmationOutcome.Approved)
         {
-            return new InstallOutcome(InstallStatus.Denied, sentence, result.Reason.ToString());
+            var reason = resolved.Outcome == ConfirmationOutcome.Expired ? ConfirmationDenyReason.Expired.ToString() : resolved.Reason.ToString();
+            await Save(State with { Pending = rest }, [new InstallDenied(alias, pending.PlanId, reason)]).ConfigureAwait(true);
+            return;
         }
 
-        var record = new InstallRecord(alias, hash, new Dictionary<string, string>(bindings, StringComparer.Ordinal),
-            [.. needs.Schedules.Select(s => s.Text)], Context.Time.GetUtcNow());
-        await Save(new InstallsState([.. State.Records.Where(r => r.Alias != alias), record]), [new Installed(alias, hash)]).ConfigureAwait(true);
+        var needs = catalog.NeedsOf(alias);
+        var record = new InstallRecord(alias, pending.NeedsHash, pending.Bindings, [.. needs.Schedules.Select(s => s.Text)], Context.Time.GetUtcNow());
+        await Save(new InstallsState([.. State.Records.Where(r => r.Alias != alias), record], rest), [new Installed(alias, pending.NeedsHash)]).ConfigureAwait(true);
         await GateChanged().ConfigureAwait(true);
-        var failed = await Wire(alias, needs, ct).ConfigureAwait(true);
-        return new InstallOutcome(existing is null ? InstallStatus.Installed : InstallStatus.Updated, sentence, failed);
+        // A failing hook leaves the record standing; the next Install of the alias (Unchanged) runs the hooks again and reports it.
+        _ = await Wire(alias, needs, ct).ConfigureAwait(true);
     }
 
     /// <inheritdoc />
@@ -64,7 +88,7 @@ public sealed class InstallsNeuron(SynapseCatalog catalog, IInstallHooks hooks) 
     {
         ArgumentNullException.ThrowIfNull(hooks);
         if (Find(alias) is null) { return; }
-        await Save(new InstallsState([.. State.Records.Where(r => r.Alias != alias)]), [new Retired(alias)]).ConfigureAwait(true);
+        await Save(State with { Records = [.. State.Records.Where(r => r.Alias != alias)] }, [new Retired(alias)]).ConfigureAwait(true);
         await GateChanged().ConfigureAwait(true);
         var state = StateOf(alias);
         try
@@ -81,13 +105,26 @@ public sealed class InstallsNeuron(SynapseCatalog catalog, IInstallHooks hooks) 
     /// <inheritdoc />
     public Task<IReadOnlyList<InstallRecord>> List(CancellationToken ct) => Task.FromResult(State.Records);
 
+    /// <inheritdoc />
+    public Task<IReadOnlyList<PendingInstall>> Pending(CancellationToken ct) => Task.FromResult(State.Pending);
+
+    /// <inheritdoc />
+    protected override Task OnActivate(CancellationToken cancellationToken) => Context.Synapses.EnsureBrainWide(typeof(ConfirmationResolved));
+
+    // The answer arrives as ConfirmationResolved; the awaited result is not used, and a failing ask leaves the install pending.
+    private async Task Ask(ConfirmationPlan plan)
+    {
+        try { _ = await Context.Confirm(plan, CancellationToken.None).ConfigureAwait(true); }
+        catch (Exception error) when (error is not OutOfMemoryException) { _ = error; }
+    }
+
     private InstallRecord? Find(string alias) => State.Records.FirstOrDefault(r => r.Alias == alias);
 
     private NeuronId StateOf(string alias) => new(Id.Brain, alias, "default");
 
     private Task GateChanged() => PublishEphemeral(new GateChanged(Id.Brain.Value!));
 
-    // Runs the hooks; a failure leaves the record standing and comes back as the outcome's reason. The next Install of the alias retries.
+    // Runs the hooks; a failure comes back as a reason. The next Install of the alias retries.
     private async Task<string?> Wire(string alias, SynapseNeeds needs, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(hooks);

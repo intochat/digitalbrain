@@ -21,6 +21,11 @@ internal sealed class SignalTypeMap
         // The installs and time neurons every silo hosts (NeuronTypeRegistry) publish these.
         Add(typeof(Installed));
         Add(typeof(Retired));
+        Add(typeof(InstallRequested));
+        Add(typeof(InstallDenied));
+        // The installs neuron completes an install on the resolution of its plan.
+        Add(typeof(DigitalBrain.Confirmation.ConfirmationRequested));
+        Add(typeof(DigitalBrain.Confirmation.ConfirmationResolved));
         Add(typeof(GateChanged));
         Add(typeof(DigitalBrain.Time.Tick));
         Add(typeof(DigitalBrain.Time.Registered));

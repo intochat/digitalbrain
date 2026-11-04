@@ -2247,10 +2247,8 @@ DigitalBrain.InstallsNeuron.List(System.Threading.CancellationToken ct) -> Syste
 DigitalBrain.InstallsNeuron.Retire(string! alias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 DigitalBrain.InstallsState
 DigitalBrain.InstallsState.<Clone>$() -> DigitalBrain.InstallsState!
-DigitalBrain.InstallsState.Deconstruct(out System.Collections.Generic.IReadOnlyList<DigitalBrain.InstallRecord!>! Records) -> void
 DigitalBrain.InstallsState.Equals(DigitalBrain.InstallsState? other) -> bool
 DigitalBrain.InstallsState.InstallsState() -> void
-DigitalBrain.InstallsState.InstallsState(System.Collections.Generic.IReadOnlyList<DigitalBrain.InstallRecord!>! Records) -> void
 DigitalBrain.InstallsState.Records.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.InstallRecord!>!
 DigitalBrain.InstallsState.Records.init -> void
 DigitalBrain.Spi.IInstallHooks
@@ -2352,3 +2350,63 @@ static DigitalBrain.Time.Unregistered.operator !=(DigitalBrain.Time.Unregistered
 static DigitalBrain.Time.Unregistered.operator ==(DigitalBrain.Time.Unregistered? left, DigitalBrain.Time.Unregistered? right) -> bool
 DigitalBrain.Spi.ISynapses.EnsureBrainWide(params System.Type![]! signals) -> System.Threading.Tasks.Task!
 DigitalBrain.Spi.ISynapses.RemoveBrainWide() -> System.Threading.Tasks.Task!
+DigitalBrain.IInstalls.Pending(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.PendingInstall!>!>!
+DigitalBrain.InstallDenied
+DigitalBrain.InstallDenied.Alias.get -> string!
+DigitalBrain.InstallDenied.Alias.init -> void
+DigitalBrain.InstallDenied.Deconstruct(out string! Alias, out string! PlanId, out string! Reason) -> void
+DigitalBrain.InstallDenied.Equals(DigitalBrain.InstallDenied? other) -> bool
+DigitalBrain.InstallDenied.InstallDenied(string! Alias, string! PlanId, string! Reason) -> void
+DigitalBrain.InstallDenied.PlanId.get -> string!
+DigitalBrain.InstallDenied.PlanId.init -> void
+DigitalBrain.InstallDenied.Reason.get -> string!
+DigitalBrain.InstallDenied.Reason.init -> void
+DigitalBrain.InstallRequested
+DigitalBrain.InstallRequested.Alias.get -> string!
+DigitalBrain.InstallRequested.Alias.init -> void
+DigitalBrain.InstallRequested.Deconstruct(out string! Alias, out string! PlanId) -> void
+DigitalBrain.InstallRequested.Equals(DigitalBrain.InstallRequested? other) -> bool
+DigitalBrain.InstallRequested.InstallRequested(string! Alias, string! PlanId) -> void
+DigitalBrain.InstallRequested.PlanId.get -> string!
+DigitalBrain.InstallRequested.PlanId.init -> void
+DigitalBrain.InstallStatus.Pending = 5 -> DigitalBrain.InstallStatus
+DigitalBrain.InstallsNeuron.OnResolved(DigitalBrain.Confirmation.ConfirmationResolved! resolved, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.InstallsNeuron.Pending(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.PendingInstall!>!>!
+DigitalBrain.InstallsState.Deconstruct(out System.Collections.Generic.IReadOnlyList<DigitalBrain.InstallRecord!>! Records, out System.Collections.Generic.IReadOnlyList<DigitalBrain.PendingInstall!>! Pending) -> void
+DigitalBrain.InstallsState.InstallsState(System.Collections.Generic.IReadOnlyList<DigitalBrain.InstallRecord!>! Records, System.Collections.Generic.IReadOnlyList<DigitalBrain.PendingInstall!>! Pending) -> void
+DigitalBrain.InstallsState.Pending.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.PendingInstall!>!
+DigitalBrain.InstallsState.Pending.init -> void
+DigitalBrain.PendingInstall
+DigitalBrain.PendingInstall.<Clone>$() -> DigitalBrain.PendingInstall!
+DigitalBrain.PendingInstall.Alias.get -> string!
+DigitalBrain.PendingInstall.Alias.init -> void
+DigitalBrain.PendingInstall.Bindings.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+DigitalBrain.PendingInstall.Bindings.init -> void
+DigitalBrain.PendingInstall.Deconstruct(out string! PlanId, out string! Alias, out System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Bindings, out string! NeedsHash, out string! Sentence) -> void
+DigitalBrain.PendingInstall.Equals(DigitalBrain.PendingInstall? other) -> bool
+DigitalBrain.PendingInstall.NeedsHash.get -> string!
+DigitalBrain.PendingInstall.NeedsHash.init -> void
+DigitalBrain.PendingInstall.PendingInstall(string! PlanId, string! Alias, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Bindings, string! NeedsHash, string! Sentence) -> void
+DigitalBrain.PendingInstall.PlanId.get -> string!
+DigitalBrain.PendingInstall.PlanId.init -> void
+DigitalBrain.PendingInstall.Sentence.get -> string!
+DigitalBrain.PendingInstall.Sentence.init -> void
+override DigitalBrain.InstallDenied.<Clone>$() -> DigitalBrain.InstallDenied!
+override DigitalBrain.InstallDenied.Equals(object? obj) -> bool
+override DigitalBrain.InstallDenied.GetHashCode() -> int
+override DigitalBrain.InstallDenied.ToString() -> string!
+override DigitalBrain.InstallRequested.<Clone>$() -> DigitalBrain.InstallRequested!
+override DigitalBrain.InstallRequested.Equals(object? obj) -> bool
+override DigitalBrain.InstallRequested.GetHashCode() -> int
+override DigitalBrain.InstallRequested.ToString() -> string!
+override DigitalBrain.PendingInstall.Equals(object? obj) -> bool
+override DigitalBrain.PendingInstall.GetHashCode() -> int
+override DigitalBrain.PendingInstall.ToString() -> string!
+override sealed DigitalBrain.InstallDenied.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.InstallRequested.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.InstallDenied.operator !=(DigitalBrain.InstallDenied? left, DigitalBrain.InstallDenied? right) -> bool
+static DigitalBrain.InstallDenied.operator ==(DigitalBrain.InstallDenied? left, DigitalBrain.InstallDenied? right) -> bool
+static DigitalBrain.InstallRequested.operator !=(DigitalBrain.InstallRequested? left, DigitalBrain.InstallRequested? right) -> bool
+static DigitalBrain.InstallRequested.operator ==(DigitalBrain.InstallRequested? left, DigitalBrain.InstallRequested? right) -> bool
+static DigitalBrain.PendingInstall.operator !=(DigitalBrain.PendingInstall? left, DigitalBrain.PendingInstall? right) -> bool
+static DigitalBrain.PendingInstall.operator ==(DigitalBrain.PendingInstall? left, DigitalBrain.PendingInstall? right) -> bool

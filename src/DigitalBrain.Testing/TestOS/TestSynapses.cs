@@ -29,7 +29,7 @@ internal sealed class TestSynapses(TestNeuronHost host) : ISynapses
 
 // Durable synapses of a TestOS: per subscriber, per source, the signal types and the cursor. They survive deactivation.
 // A brain-wide synapse is the entry under the sentinel source {brain}/*/*: its cursor is a position of the brain's journal order, and
-// every append in the brain (other than the subscriber's own) reaches it and wakes the subscriber, as the Orleans brain-wide entry "*".
+// every append in the brain reaches it and wakes the subscriber, as the Orleans brain-wide entry "*".
 internal sealed class SynapseRegistry(TestOS os)
 {
     // The source written for a brain-wide entry when synapses are listed.
@@ -85,7 +85,7 @@ internal sealed class SynapseRegistry(TestOS os)
     internal static NeuronId BrainWideOf(BrainId brain) => new(brain, BrainWide, BrainWide);
 
     // No admission: a brain-wide synapse names no source to ask. It starts at the brain's last journal position.
-    public async Task EnsureBrainWide(TestNeuronHost subscriber, Type[] signals)
+    public Task EnsureBrainWide(TestNeuronHost subscriber, Type[] signals)
     {
         ArgumentNullException.ThrowIfNull(signals);
         if (subscriber.Class.IsDefined(typeof(StatelessNeuronAttribute), false))
@@ -97,7 +97,7 @@ internal sealed class SynapseRegistry(TestOS os)
         {
             if (signal is null || !typeof(Signal).IsAssignableFrom(signal)) { throw new ArgumentException($"{signal} is not a signal type.", nameof(signals)); }
         }
-        var last = (await os.Journal(subscriber.Id.Brain).Read(0, 1, CancellationToken.None).ConfigureAwait(false)).Last;
+        var last = os.Journal(subscriber.Id.Brain).Position;
         var key = BrainWideOf(subscriber.Id.Brain);
         lock (_gate)
         {
@@ -108,6 +108,7 @@ internal sealed class SynapseRegistry(TestOS os)
             }
             entry.Signals.UnionWith(signals);
         }
+        return Task.CompletedTask;
     }
 
     public void Remove(NeuronId subscriber, NeuronId from)
@@ -168,7 +169,7 @@ internal sealed class SynapseRegistry(TestOS os)
     // The last sequence of the entry's source: the publisher's own, or the brain's journal position for a brain-wide entry.
     private long LastOf(Entry entry)
         => entry.BrainWide
-            ? os.Journal(entry.Source.Brain).Read(0, 1, CancellationToken.None).GetAwaiter().GetResult().Last
+            ? os.Journal(entry.Source.Brain).Position
             : os.Journal(entry.Source.Brain).Last(entry.Source);
 
     // On every activation the subscriber catches up on each source from its cursor.
@@ -195,7 +196,7 @@ internal sealed class SynapseRegistry(TestOS os)
         lock (_gate)
         {
             subscribers = [.. _bySubscriber.Where(pair => pair.Value.ContainsKey(publisher)).Select(pair => pair.Key)];
-            brainWide = [.. _bySubscriber.Where(pair => pair.Key != publisher && pair.Value.ContainsKey(key)).Select(pair => pair.Key)];
+            brainWide = [.. _bySubscriber.Where(pair => pair.Value.ContainsKey(key)).Select(pair => pair.Key)];
         }
         var copies = os.Options.DuplicateDelivery ? 2 : 1;
         // A brain-wide subscriber is woken, active or not, and reads the brain from its cursor; the read dedupes the copies.
@@ -263,10 +264,11 @@ internal sealed class SynapseRegistry(TestOS os)
     }
 
     // A brain-wide entry pages the brain's journal from its position: Gap (from the subscriber) when the floor passed it, then the
-    // wanted signals of every other publisher in brain order; the subscriber's own signals and unwanted ones only move the cursor.
+    // wanted signals in brain order; unwanted ones, and a state neuron's own signals (its StateChanged), only move the cursor.
     private async Task CatchUpBrain(TestNeuronHost subscriber, Entry entry)
     {
         var journal = os.Journal(entry.Source.Brain);
+        var deaf = typeof(ISynapseReceiver).IsAssignableFrom(subscriber.Class);
         while (true)
         {
             var page = await journal.Read(entry.Cursor, SignalPage.MaxLimit, CancellationToken.None).ConfigureAwait(false);
@@ -280,7 +282,7 @@ internal sealed class SynapseRegistry(TestOS os)
             foreach (var item in page.Signals)
             {
                 bool wanted;
-                lock (_gate) { wanted = item.Publisher != subscriber.Id && entry.Signals.Any(type => type.IsInstanceOfType(item.Signal)); }
+                lock (_gate) { wanted = !(deaf && item.Publisher == subscriber.Id) && entry.Signals.Any(type => type.IsInstanceOfType(item.Signal)); }
                 if (wanted) { await React(subscriber, item.Signal, entry, item.Sequence, item.Publisher).ConfigureAwait(false); }
                 Advance(entry, item.Sequence);
             }

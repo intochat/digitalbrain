@@ -41,23 +41,16 @@ public sealed class InstallsFacts
 
     private static OS Start(RecordingHooks hooks) => OS.Local(o => o.Services = hooks).Register(typeof(StateNeuronOnTestOSFacts).Assembly);
 
-    private static async Task<ConfirmationRequested> Asked(OS os, int count)
+    // Install returns Pending with the plan id at once; the person answers; the resolution completes the install.
+    private static async Task<InstallRecord?> Answer(OS os, string alias, bool approve)
     {
-        for (var i = 0; i < 500; i++)
-        {
-            if (os.Confirmations.Requested.Count >= count && os.Confirmations.Waiting.Count > 0) { return os.Confirmations.Waiting[0]; }
-            await Task.Delay(10, Ct);
-        }
-        throw new TimeoutException("No install was asked.");
-    }
-
-    private static async Task<InstallOutcome> Answer(OS os, string alias, bool approve, int asked = 1)
-    {
-        var install = os.Get<IInstalls>(Installs).Install(new InstallRequest(alias, None), Ct);
-        var request = await Asked(os, asked);
+        var outcome = await os.Get<IInstalls>(Installs).Install(new InstallRequest(alias, None), Ct);
+        Assert.Equal(InstallStatus.Pending, outcome.Status);
+        var request = Assert.Single(os.Confirmations.Waiting, w => w.PlanId == outcome.Reason);
         if (approve) { await os.Confirmations.Approve(request.PlanId); }
         else { await os.Confirmations.Deny(request.PlanId); }
-        return await install;
+        await os.Idle();
+        return await os.Get<IInstalls>(Installs).Describe(alias, Ct);
     }
 
     [Fact]
@@ -65,14 +58,13 @@ public sealed class InstallsFacts
     {
         var hooks = new RecordingHooks();
         await using var os = Start(hooks);
-        var outcome = await Answer(os, "week", approve: true);
+        var record = await Answer(os, "week", approve: true);
         var needs = os.Catalog.NeedsOf("week");
-        Assert.Equal(InstallStatus.Installed, outcome.Status);
         var plan = Assert.Single(os.Confirmations.Requested).Plan;
         Assert.Equal(needs.Sentence(), plan.Body);
         Assert.True(plan.RequiresPerson);
-        var record = await os.Get<IInstalls>(Installs).Describe("week", Ct);
         Assert.NotNull(record);
+        Assert.Empty(await os.Get<IInstalls>(Installs).Pending(Ct));
         Assert.Equal(needs.Hash(), record.NeedsHash);
         Assert.Equal(["edges b/week/default", "schedules b/week/default"], hooks.Calls);
         Assert.Contains(os.Journal(Installs.Brain).Signals(Installs), item => item.Signal is Installed { Alias: "week" });
@@ -83,22 +75,21 @@ public sealed class InstallsFacts
     {
         var hooks = new RecordingHooks();
         await using var os = Start(hooks);
-        var outcome = await Answer(os, "week", approve: false);
-        Assert.Equal(InstallStatus.Denied, outcome.Status);
-        Assert.Null(await os.Get<IInstalls>(Installs).Describe("week", Ct));
+        Assert.Null(await Answer(os, "week", approve: false));
         Assert.Empty(await os.Get<IInstalls>(Installs).List(Ct));
+        Assert.Empty(await os.Get<IInstalls>(Installs).Pending(Ct));
         Assert.Empty(hooks.Calls);
         Assert.DoesNotContain(os.Journal(Installs.Brain).Signals(Installs), item => item.Signal is Installed);
+        Assert.Contains(os.Journal(Installs.Brain).Signals(Installs), item => item.Signal is InstallDenied { Alias: "week", Reason: "ByPerson" });
     }
 
     [Fact]
     public async Task ADeniedInstallCanBeAskedAgain()
     {
         await using var os = Start(new RecordingHooks());
-        Assert.Equal(InstallStatus.Denied, (await Answer(os, "week", approve: false)).Status);
-        Assert.Equal(InstallStatus.Installed, (await Answer(os, "week", approve: true, asked: 2)).Status);
+        Assert.Null(await Answer(os, "week", approve: false));
+        Assert.NotNull(await Answer(os, "week", approve: true));
         Assert.Equal(2, os.Confirmations.Requested.Count);
-        Assert.NotNull(await os.Get<IInstalls>(Installs).Describe("week", Ct));
     }
 
     [Fact]
@@ -118,8 +109,8 @@ public sealed class InstallsFacts
     {
         var hooks = new RecordingHooks();
         await using var os = Start(hooks);
-        Assert.Equal(InstallStatus.Installed, (await Answer(os, "week", approve: true)).Status);
-        Assert.Equal(InstallStatus.Installed, (await Answer(os, "ledger", approve: true, asked: 2)).Status);
+        Assert.NotNull(await Answer(os, "week", approve: true));
+        Assert.NotNull(await Answer(os, "ledger", approve: true));
         Assert.Equal(["week", "ledger"], os.Confirmations.Requested.Select(r => r.Plan.TargetLabel));
         Assert.NotEqual(os.Confirmations.Requested[0].PlanId, os.Confirmations.Requested[1].PlanId);
     }
@@ -150,12 +141,12 @@ public sealed class InstallsFacts
     public async Task AFailingHookStillRecordsAndPublishesGateChanged()
     {
         await using var os = Start(new RecordingHooks { FailEdges = true });
-        var outcome = await Answer(os, "week", approve: true);
-        Assert.Equal(InstallStatus.Installed, outcome.Status);
-        Assert.Equal("hooks failed: edges down", outcome.Reason);
-        Assert.NotNull(await os.Get<IInstalls>(Installs).Describe("week", Ct));
-        await os.Idle();
+        Assert.NotNull(await Answer(os, "week", approve: true));
         Assert.Single(os.Gates.GatesFor(Installs.Brain, typeof(Charging)));
+        // The next install of the same needs runs the hooks again and reports their failure.
+        var again = await os.Get<IInstalls>(Installs).Install(new InstallRequest("week", None), Ct);
+        Assert.Equal(InstallStatus.Unchanged, again.Status);
+        Assert.Equal("hooks failed: edges down", again.Reason);
     }
 
     [Fact]

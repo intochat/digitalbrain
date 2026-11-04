@@ -72,6 +72,8 @@
       "synapse.finished",
       "synapse.gap",
       "synapse.gate-changed",
+      "synapse.install-denied",
+      "synapse.install-requested",
       "synapse.installed",
       "synapse.retired",
       "synapse.started",

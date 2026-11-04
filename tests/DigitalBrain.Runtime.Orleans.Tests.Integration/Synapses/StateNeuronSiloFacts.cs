@@ -246,7 +246,7 @@ public sealed class ShortGateSilo : IAsyncLifetime
         {
             silo.AddBrainStorage(typeof(HostingModule).Assembly);
             silo.Services.AddSingleton(RuntimeOptions.Default with { GateTimeout = TimeSpan.FromSeconds(1) });
-            silo.Services.AddSingleton<DigitalBrain.Confirmation.IConfirmations, ApprovingConfirmations>();
+            silo.Services.AddSingleton<DigitalBrain.Runtime.Orleans.Operations.IConfirmationContexts>(sp => new ApprovingConfirmations(sp));
         }
     }
 }
@@ -431,7 +431,10 @@ public sealed class StateNeuronSiloFacts(StatefulSilo silo) : IClassFixture<Stat
         foreach (var alias in aliases)
         {
             var outcome = await installs.Install(new(alias, new Dictionary<string, string>()), TestContext.Current.CancellationToken);
-            Assert.True(outcome.Reason is null, outcome.Reason);
+            Assert.True(outcome.Status is InstallStatus.Pending or InstallStatus.Unchanged, outcome.Reason);
+            // The fixture approves at once; the installs neuron records on the resolution's reaction.
+            await Until(async () => await installs.Describe(alias, TestContext.Current.CancellationToken) is not null, TestContext.Current.CancellationToken);
+            Assert.NotNull(await installs.Describe(alias, TestContext.Current.CancellationToken));
         }
     }
 

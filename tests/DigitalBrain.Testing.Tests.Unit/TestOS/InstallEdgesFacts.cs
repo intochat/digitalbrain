@@ -25,8 +25,9 @@ public sealed class InstallEdgesFacts
     private static async Task Install(OS os, string alias)
     {
         var outcome = await os.Get<IInstalls>(Installs).Install(new InstallRequest(alias, new Dictionary<string, string>()), Ct);
-        Assert.Null(outcome.Reason);
+        Assert.Equal(InstallStatus.Pending, outcome.Status);
         await os.Idle();
+        Assert.NotNull(await os.Get<IInstalls>(Installs).Describe(alias, Ct));
     }
 
     private static async Task<decimal?> Spent(OS os)

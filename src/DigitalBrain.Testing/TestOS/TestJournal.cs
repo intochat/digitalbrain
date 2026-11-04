@@ -37,6 +37,12 @@ public sealed class TestJournal : ISignalHistory
         lock (_gate) { return _logs.TryGetValue(publisher, out var log) ? log.Last : 0; }
     }
 
+    /// <summary>The brain's last append position (the brain-wide sequence), or 0.</summary>
+    internal long Position
+    {
+        get { lock (_gate) { return _position; } }
+    }
+
     /// <summary>The floor of <paramref name="publisher"/>: every sequence at or below it is trimmed.</summary>
     public long Floor(NeuronId publisher)
     {

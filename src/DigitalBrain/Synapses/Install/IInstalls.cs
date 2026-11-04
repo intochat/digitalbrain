@@ -19,6 +19,9 @@ public enum InstallStatus
 
     /// <summary>The request cannot be installed (unknown alias, unbound slot).</summary>
     Refused,
+
+    /// <summary>The person was asked; the install completes when the plan is resolved (<see cref="InstallOutcome.Reason"/> is the plan id).</summary>
+    Pending,
 }
 
 /// <summary>A request to install a synapse app.</summary>
@@ -29,7 +32,10 @@ public sealed record InstallRequest(string Alias, IReadOnlyDictionary<string, st
 /// <summary>The result of <see cref="IInstalls.Install"/>.</summary>
 /// <param name="Status">How it ended.</param>
 /// <param name="Sentence">The needs sentence; empty when the alias is unknown.</param>
-/// <param name="Reason">Why it was refused or denied, or <c>hooks failed: ...</c> when recorded but the host hooks failed; null otherwise.</param>
+/// <param name="Reason">
+/// Why it was refused, the plan id when <see cref="InstallStatus.Pending"/>, or <c>hooks failed: ...</c> when an unchanged install's
+/// host hooks failed; null otherwise.
+/// </param>
 public sealed record InstallOutcome(InstallStatus Status, string Sentence, string? Reason);
 
 /// <summary>An installed synapse app, as the person approved it.</summary>
@@ -45,16 +51,25 @@ public sealed record InstallRecord(
     IReadOnlyList<string> Schedules,
     DateTimeOffset ConsentedAt);
 
+/// <summary>An install waiting for the person's answer.</summary>
+/// <param name="PlanId">The confirmation plan id.</param>
+/// <param name="Alias">The state alias.</param>
+/// <param name="Bindings">Slot name to connection key text.</param>
+/// <param name="NeedsHash">The <see cref="SynapseNeeds.Hash"/> put to the person.</param>
+/// <param name="Sentence">The needs sentence put to the person.</param>
+public sealed record PendingInstall(string PlanId, string Alias, IReadOnlyDictionary<string, string> Bindings, string NeedsHash, string Sentence);
+
 /// <summary>The installs of one brain, at <c>{brain}/synapse.installs/default</c>.</summary>
 [NeuronAlias("synapse.installs")]
 public interface IInstalls
 {
-    /// <summary>Installs a synapse app, asking the person when its needs are new or changed.</summary>
+    /// <summary>
+    /// Installs a synapse app. When its needs are new or changed the person is asked and the call returns
+    /// <see cref="InstallStatus.Pending"/> at once; the install is recorded when the plan's <c>ConfirmationResolved</c> approves it.
+    /// </summary>
     /// <param name="request">The alias and its slot bindings.</param>
     /// <param name="ct">Cancellation.</param>
-    /// <returns>How it ended.</returns>
-    /// <remarks>The call waits for the person, so it may take up to ten minutes.</remarks>
-    [CallTimeout(600_000)]
+    /// <returns>How it ended, or that it waits for the person.</returns>
     Task<InstallOutcome> Install(InstallRequest request, CancellationToken ct);
 
     /// <summary>Retires an installed app; an alias that is not installed is ignored.</summary>
@@ -72,4 +87,9 @@ public interface IInstalls
     /// <param name="ct">Cancellation.</param>
     [ReadOnlyCall]
     Task<IReadOnlyList<InstallRecord>> List(CancellationToken ct);
+
+    /// <summary>The installs waiting for the person.</summary>
+    /// <param name="ct">Cancellation.</param>
+    [ReadOnlyCall]
+    Task<IReadOnlyList<PendingInstall>> Pending(CancellationToken ct);
 }
