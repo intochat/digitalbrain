@@ -36,6 +36,7 @@ namespace DigitalBrain.Runtime.Orleans.Synapses;
 internal static partial class GateRunner
 {
     private const string NoAnswer = "the gate did not answer";
+    private const string NoGates = "the installed gates did not load";
 
     /// <summary>Runs the installed gates of every durable signal in order.</summary>
     /// <param name="services">The silo services.</param>
@@ -43,7 +44,7 @@ internal static partial class GateRunner
     /// <param name="signals">The signals about to be appended; ephemeral ones pass no gate.</param>
     /// <param name="ct">Cancels the wait.</param>
     /// <returns>Each allowing gate with the signal, its proposed next state and the ticket of its provisional entry.</returns>
-    /// <exception cref="RuleViolationException">A gate refused, did not answer or failed.</exception>
+    /// <exception cref="RuleViolationException">A gate refused, did not answer or failed, or the installed gates did not load within <c>GateTimeout</c>.</exception>
     public static async Task<IReadOnlyList<(INeuronHost Gate, Signal Signal, JsonElement Next, Guid Ticket)>> Run(IServiceProvider services, NeuronId publisher,
         IReadOnlyList<Signal> signals, CancellationToken ct)
     {
@@ -51,12 +52,21 @@ internal static partial class GateRunner
         ArgumentNullException.ThrowIfNull(signals);
         var gated = signals.Where(signal => !signal.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false) && !Ungated(signal)).ToArray();
         if (gated.Length == 0 || services.GetService<IGateIndex>() is not { } index) { return []; }
-        if (services.GetService<InstalledGates>() is { } installed) { await installed.Load(publisher.Brain).ConfigureAwait(true); }
+        var timeout = RuntimeOptions.From(services).GateTimeout;
+        var log = services.GetService<ILoggerFactory>()?.CreateLogger(typeof(GateRunner)) ?? NullLogger.Instance;
+        if (services.GetService<InstalledGates>() is { } installed)
+        {
+            // The installs neuron that serves the index may be slow or wedged: the publish waits no longer than for a gate, and fails closed.
+            try { await installed.Load(publisher.Brain).WaitAsync(timeout, ct).ConfigureAwait(true); }
+            catch (TimeoutException)
+            {
+                LogInstalledGatesTimedOut(log, publisher.ToString(), timeout);
+                throw new RuleViolationException(new Rejected(OrleansInstallHooks.InstallsType, [OrleansInstallHooks.InstallsType], [NoGates]));
+            }
+        }
         var payloads = services.GetRequiredService<JournalPayloads>();
         var grains = services.GetRequiredService<IGrainFactory>();
         var types = services.GetRequiredService<NeuronTypeRegistry>();
-        var timeout = RuntimeOptions.From(services).GateTimeout;
-        var log = services.GetService<ILoggerFactory>()?.CreateLogger(typeof(GateRunner)) ?? NullLogger.Instance;
         var allowed = new List<(INeuronHost Gate, Signal Signal, JsonElement Next, Guid Ticket)>();
         var chain = EnterChain(publisher);
         try
@@ -217,6 +227,10 @@ internal static partial class GateRunner
     [LoggerMessage(EventId = 4125, EventName = "GateAbortFailed", Level = LogLevel.Warning,
         Message = "The gate {Gate} could not drop its provisional state for {Signal}; its lease discards it.")]
     private static partial void LogGateAbortFailed(ILogger logger, Exception error, string gate, string signal);
+
+    [LoggerMessage(EventId = 4126, EventName = "InstalledGatesTimedOut", Level = LogLevel.Warning,
+        Message = "The installed gates of the brain of {Publisher} did not load within {Timeout}; the publish is refused.")]
+    private static partial void LogInstalledGatesTimedOut(ILogger logger, string publisher, TimeSpan timeout);
 
     [LoggerMessage(EventId = 4127, EventName = "TimedOutGateAbortFailed", Level = LogLevel.Debug,
         Message = "The gate {Gate} that did not answer could not drop a late provisional state for {Signal}; its lease discards it.")]
