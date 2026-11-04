@@ -26,7 +26,8 @@ internal static class TestGates
                 {
                     if (gate == publisher) { continue; }
                     var host = os.Host(gate);
-                    var verdict = await Ask(os, host, signal, descriptor, ct).ConfigureAwait(false);
+                    // One attempt id per gate call of this publish: the gate's entry and its ticket carry it.
+                    var verdict = await Ask(os, host, signal, Guid.NewGuid(), descriptor, ct).ConfigureAwait(false);
                     if (verdict is Check.Refused refused)
                     {
                         throw new RuleViolationException(new Rejected(descriptor.Name, [.. refused.Broken.Select(r => r.Name)], [.. refused.Broken.Select(r => r.Message)]));
@@ -84,13 +85,13 @@ internal static class TestGates
         }
     }
 
-    // A gate that does not answer within GateTimeout, or fails, refuses; its call is cancelled, and an Aborted without a ticket
-    // (the verdict never arrived) is queued as a tracked turn behind it, so a gate that ignores the cancellation and allows late
-    // leaves no provisional entry.
-    private static async Task<Check> Ask(TestOS os, TestNeuronHost host, Signal signal, SynapseDescriptor descriptor, CancellationToken ct)
+    // A gate that does not answer within GateTimeout, or fails, refuses; its call is cancelled, and an Aborted with the attempt id is
+    // queued as a tracked turn behind it, so a gate that ignores the cancellation and allows late leaves no provisional entry (and a
+    // gate that never added one is untouched).
+    private static async Task<Check> Ask(TestOS os, TestNeuronHost host, Signal signal, Guid attempt, SynapseDescriptor descriptor, CancellationToken ct)
     {
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var turn = os.Track(host.Turn(interleave: false, neuron => ((ISynapseReceiver)neuron).Gate(signal, cancel.Token)));
+        var turn = os.Track(host.Turn(interleave: false, neuron => ((ISynapseReceiver)neuron).Gate(signal, attempt, cancel.Token)));
         try
         {
             return await turn.WaitAsync(os.Options.GateTimeout, os.Clock, ct).ConfigureAwait(false);
@@ -102,7 +103,7 @@ internal static class TestGates
             var refused = new RuleViolationException(new Rejected(descriptor.Name, [descriptor.Name], [NoAnswer]));
             _ = os.Track(host.Turn(interleave: false, async neuron =>
             {
-                await ((ISynapseReceiver)neuron).Aborted(signal, Guid.Empty).ConfigureAwait(false);
+                await ((ISynapseReceiver)neuron).Aborted(signal, attempt).ConfigureAwait(false);
                 return 0;
             }));
             throw refused;

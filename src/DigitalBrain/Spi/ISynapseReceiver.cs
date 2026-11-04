@@ -13,18 +13,23 @@ public interface ISynapseReceiver
 
     /// <summary>Runs the gate synapses for <paramref name="signal"/> in order; returns the first refusal (journaled) or the last allowance. Saves nothing on allow; holds the allowed next state as provisional until <see cref="Committed"/> or <see cref="Aborted"/>, and later gate calls evaluate against it.</summary>
     /// <param name="signal">The signal about to be published.</param>
+    /// <param name="attempt">
+    /// The host's correlation id for this gate call of this publish (never <see cref="Guid.Empty"/>): the provisional entry stores it and an
+    /// allowance returns it as <see cref="Check.Allowed.Ticket"/>, so the host can abort its own entry even when the verdict never arrived.
+    /// </param>
     /// <param name="ct">Cancels the call.</param>
     /// <returns>The verdict.</returns>
-    Task<Check> Gate(Signal signal, CancellationToken ct);
+    /// <exception cref="ArgumentException"><paramref name="attempt"/> is <see cref="Guid.Empty"/>.</exception>
+    Task<Check> Gate(Signal signal, Guid attempt, CancellationToken ct);
 
     /// <summary>
     /// Called after the append of the publisher is durable: saves the next state of <paramref name="allowed"/> with <paramref name="signal"/>.
-    /// The provisional entry is matched by <see cref="Check.Allowed.Ticket"/>; only an allowance without a ticket (<see cref="Guid.Empty"/>,
-    /// legacy) falls back to the oldest uncommitted entry of an equal signal.
+    /// The provisional entry is matched by <see cref="Check.Allowed.Ticket"/> only, never by signal value.
     /// </summary>
     /// <param name="signal">The published signal.</param>
     /// <param name="allowed">The verdict <see cref="Gate"/> returned, carrying its ticket.</param>
     /// <returns>A task that completes when the state is saved.</returns>
+    /// <exception cref="ArgumentException">The ticket of <paramref name="allowed"/> is <see cref="Guid.Empty"/>.</exception>
     Task Committed(Signal signal, Check.Allowed allowed);
 
     /// <summary>
@@ -33,9 +38,10 @@ public interface ISynapseReceiver
     /// </summary>
     /// <param name="signal">The signal whose publish was abandoned.</param>
     /// <param name="ticket">
-    /// The <see cref="Check.Allowed.Ticket"/> of the entry to drop. <see cref="Guid.Empty"/> means the newest uncommitted entry for
-    /// <paramref name="signal"/>: a host sends it for a gate that timed out or failed, whose verdict (and ticket) never arrived.
+    /// The attempt id passed to <see cref="Gate"/> (equal to <see cref="Check.Allowed.Ticket"/>): only that entry is dropped, and nothing
+    /// when the gate never added one (it refused, threw, or timed out before allowing).
     /// </param>
     /// <returns>A task that completes when the provisional state is dropped.</returns>
+    /// <exception cref="ArgumentException"><paramref name="ticket"/> is <see cref="Guid.Empty"/>.</exception>
     Task Aborted(Signal signal, Guid ticket);
 }

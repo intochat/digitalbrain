@@ -135,12 +135,12 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
     }
 
     /// <inheritdoc />
-    public async Task<GateVerdict> Gate(string signalAlias, JsonElement signal, CancellationToken cancellationToken = default)
+    public async Task<GateVerdict> Gate(string signalAlias, JsonElement signal, Guid attempt, CancellationToken cancellationToken = default)
     {
         var receiver = Receiver();
         try
         {
-            var verdict = await receiver.Gate(Decode(signalAlias, signal), cancellationToken).ConfigureAwait(true);
+            var verdict = await receiver.Gate(Decode(signalAlias, signal), attempt, cancellationToken).ConfigureAwait(true);
             return verdict switch
             {
                 Check.Refused refused => new GateVerdict(false, [.. refused.Broken.Select(rule => rule.Name)], [.. refused.Broken.Select(rule => rule.Message)], null),

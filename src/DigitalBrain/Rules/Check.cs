@@ -32,7 +32,8 @@ public abstract record Check
         /// <summary>
         /// The correlation ticket of the provisional entry this allowance holds: the host hands it back to
         /// <see cref="Spi.ISynapseReceiver.Committed"/> or <see cref="Spi.ISynapseReceiver.Aborted"/> so the entry is found by ticket, not by
-        /// signal value. <see cref="Guid.Empty"/> (the default for an allowance a caller constructs directly) means no ticket.
+        /// signal value. It is the attempt id the host passed to <see cref="Spi.ISynapseReceiver.Gate"/>. <see cref="Guid.Empty"/> (the
+        /// default for an allowance a caller constructs directly) is no ticket, and a state neuron refuses it.
         /// </summary>
         public Guid Ticket { get; init; }
     }

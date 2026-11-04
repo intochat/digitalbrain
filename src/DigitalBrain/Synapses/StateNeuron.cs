@@ -30,7 +30,7 @@ public static class StateNeuron
 /// its next state and publishes an ephemeral <see cref="Rejected"/> whose operation ends in <c> (late)</c>, so the late refusal is
 /// visible and never counted. Provisional entries older than <see cref="StateNeuron.ProvisionalLease"/> are discarded on the next gate
 /// call. Entries are matched by the <see cref="Verdict.Allowed.Ticket"/> <see cref="Gate"/> assigned, so value-equal signals of two
-/// publishers never take each other's entry; a ticket of <see cref="Guid.Empty"/> (legacy) falls back to matching by signal value.
+/// publishers never take each other's entry; the ticket is the host's attempt id for the gate call, and an empty one is refused.
 /// </remarks>
 public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where TState : class, new()
 {
@@ -77,9 +77,10 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     }
 
     /// <inheritdoc />
-    public async Task<Verdict> Gate(Signal signal, CancellationToken ct)
+    public async Task<Verdict> Gate(Signal signal, Guid attempt, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(signal);
+        RequireTicket(attempt, nameof(attempt));
         var now = Context.Time.GetUtcNow();
         // Only uncommitted entries expire; a committed entry's append is durable, so it is flushed once nothing uncommitted is ahead of it.
         if (_provisional.RemoveAll(entry => !entry.Committed && now - entry.At > StateNeuron.ProvisionalLease) > 0)
@@ -90,9 +91,8 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
         var verdict = await Evaluate(signal, current, late: false, ct).ConfigureAwait(true);
         if (verdict is Verdict.Allowed { Next: TState provisional } allowance)
         {
-            var ticket = Guid.NewGuid();
-            _provisional.Add(new Entry(signal, provisional, now, ticket));
-            return allowance with { Ticket = ticket };
+            _provisional.Add(new Entry(signal, provisional, now, attempt));
+            return allowance with { Ticket = attempt };
         }
 
         return verdict;
@@ -132,7 +132,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     /// <summary>
     /// Marks the provisional entry of the ticket of <paramref name="allowed"/> committed; when the oldest entry is committed, saves the next state of
     /// the longest committed run from the head once and removes that run (a commit behind an uncommitted head saves nothing yet).
-    /// Without a ticket (<see cref="Guid.Empty"/>, legacy) matches the oldest uncommitted entry of an equal signal. Committed entries never expire; an uncommitted head that outlives
+    /// Matches by ticket only; an empty ticket is refused. Committed entries never expire; an uncommitted head that outlives
     /// <see cref="StateNeuron.ProvisionalLease"/> is pruned on the next gate call, which then flushes the committed run behind it.
     /// Without an uncommitted provisional entry, which is only reachable after the entry outlived the lease, saves the next state of
     /// <paramref name="allowed"/>.
@@ -140,11 +140,13 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     /// <param name="signal">The published signal.</param>
     /// <param name="allowed">The verdict <see cref="Gate"/> returned, carrying its ticket.</param>
     /// <returns>A task that completes when the state is saved or the entry marked.</returns>
+    /// <exception cref="ArgumentException">The ticket of <paramref name="allowed"/> is <see cref="Guid.Empty"/>.</exception>
     public async Task Committed(Signal signal, Verdict.Allowed allowed)
     {
         ArgumentNullException.ThrowIfNull(signal);
         ArgumentNullException.ThrowIfNull(allowed);
-        var index = Provisional(signal, allowed.Ticket);
+        RequireTicket(allowed.Ticket, nameof(allowed));
+        var index = Provisional(allowed.Ticket);
         if (index < 0)
         {
             await Save((TState)allowed.Next, [Changed(signal)]).ConfigureAwait(true);
@@ -173,20 +175,19 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     /// Removes the provisional entry of <paramref name="ticket"/> without saving, then re-runs the gate functions of every later entry,
     /// in order, on the new base; a re-gate that refuses keeps its entry with the base unchanged as its next state and publishes an
     /// ephemeral <see cref="Rejected"/> whose operation ends in <c> (late)</c>; a re-gate that throws is treated the same way, with the
-    /// exception message, and never escapes. An abort whose entry is committed or gone is ignored. Without a ticket
-    /// (<see cref="Guid.Empty"/>) matches the newest uncommitted entry of an equal signal: the one legitimate use of the value fallback,
-    /// for a host aborting a gate that timed out before its verdict (and ticket) arrived, whose late entry is the newest one.
-    /// Durable state is not touched.
+    /// exception message, and never escapes. If the head run is then committed, it is saved once and the views run. An abort whose
+    /// entry is committed or was never added (the gate refused, threw or timed out before allowing) is ignored, so a host may abort a gate
+    /// whose verdict never arrived with its attempt id. Matches by ticket only; an empty ticket is refused.
     /// </summary>
     /// <param name="signal">The signal whose publish was abandoned.</param>
-    /// <param name="ticket">The <see cref="Verdict.Allowed.Ticket"/> of the entry to drop.</param>
-    /// <returns>A task that completes when the later entries are re-gated.</returns>
+    /// <param name="ticket">The attempt id of the gate call (the <see cref="Verdict.Allowed.Ticket"/>) whose entry to drop.</param>
+    /// <returns>A task that completes when the later entries are re-gated and a committed head is saved.</returns>
+    /// <exception cref="ArgumentException"><paramref name="ticket"/> is <see cref="Guid.Empty"/>.</exception>
     public async Task Aborted(Signal signal, Guid ticket)
     {
         ArgumentNullException.ThrowIfNull(signal);
-        var index = ticket != Guid.Empty
-            ? Provisional(signal, ticket)
-            : _provisional.FindLastIndex(entry => !entry.Committed && entry.Signal.Equals(signal));
+        RequireTicket(ticket, nameof(ticket));
+        var index = Provisional(ticket);
         if (index < 0) { return; }
         _provisional.RemoveAt(index);
         var current = index > 0 ? _provisional[index - 1].Next : State;
@@ -210,6 +211,9 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
 
             current = entry.Next;
         }
+
+        // The aborted entry may have been the uncommitted head of a committed run: save that run once now.
+        await FlushHead(null).ConfigureAwait(true);
     }
 
     /// <summary>Marks the views to run over the new state once the saving synapse has reported its outcome; a journaled refusal leaves the state as it was and runs none.</summary>
@@ -220,11 +224,13 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
 
     private static string AliasOf(Signal signal) => signal.GetType().GetCustomAttribute<SignalAttribute>()?.Alias ?? signal.GetType().Name;
 
-    // The uncommitted provisional entry of the ticket; without a ticket (legacy), the oldest uncommitted entry for an equal signal
-    // (records compare by value, so a host's decoded copy finds its entry).
-    private int Provisional(Signal signal, Guid ticket) => ticket != Guid.Empty
-        ? _provisional.FindIndex(entry => !entry.Committed && entry.Ticket == ticket)
-        : _provisional.FindIndex(entry => !entry.Committed && entry.Signal.Equals(signal));
+    // The uncommitted provisional entry of the ticket.
+    private int Provisional(Guid ticket) => _provisional.FindIndex(entry => !entry.Committed && entry.Ticket == ticket);
+
+    private static void RequireTicket(Guid ticket, string name)
+    {
+        if (ticket == Guid.Empty) { throw new ArgumentException("A gate entry is matched by a non-empty ticket (the host's attempt id).", name); }
+    }
 
     private StateChanged Changed(Signal cause) => new(Id.ToString(), AliasOf(cause));
 

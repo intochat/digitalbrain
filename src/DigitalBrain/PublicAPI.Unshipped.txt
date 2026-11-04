@@ -1993,7 +1993,7 @@ static DigitalBrain.SynapseShape.Of(System.Reflection.MethodInfo! function, Syst
 DigitalBrain.StateNeuron<TState>
 DigitalBrain.StateNeuron<TState>.Committed(DigitalBrain.Signal! signal, DigitalBrain.Rules.Check.Allowed! allowed) -> System.Threading.Tasks.Task!
 DigitalBrain.StateNeuron<TState>.Aborted(DigitalBrain.Signal! signal, System.Guid ticket) -> System.Threading.Tasks.Task!
-DigitalBrain.StateNeuron<TState>.Gate(DigitalBrain.Signal! signal, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Rules.Check!>!
+DigitalBrain.StateNeuron<TState>.Gate(DigitalBrain.Signal! signal, System.Guid attempt, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Rules.Check!>!
 DigitalBrain.StateNeuron<TState>.Receive(DigitalBrain.Signal! signal, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 static readonly DigitalBrain.StateNeuron.ProvisionalLease -> System.TimeSpan
 DigitalBrain.StateNeuron
@@ -2006,7 +2006,7 @@ DigitalBrain.Spi.IGateIndex.GatesFor(DigitalBrain.BrainId brain, System.Type! si
 DigitalBrain.Spi.ISynapseReceiver
 DigitalBrain.Spi.ISynapseReceiver.Committed(DigitalBrain.Signal! signal, DigitalBrain.Rules.Check.Allowed! allowed) -> System.Threading.Tasks.Task!
 DigitalBrain.Spi.ISynapseReceiver.Aborted(DigitalBrain.Signal! signal, System.Guid ticket) -> System.Threading.Tasks.Task!
-DigitalBrain.Spi.ISynapseReceiver.Gate(DigitalBrain.Signal! signal, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Rules.Check!>!
+DigitalBrain.Spi.ISynapseReceiver.Gate(DigitalBrain.Signal! signal, System.Guid attempt, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Rules.Check!>!
 DigitalBrain.Spi.ISynapseReceiver.Receive(DigitalBrain.Signal! signal, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 DigitalBrain.StateChanged
 DigitalBrain.StateChanged.Cause.get -> string!

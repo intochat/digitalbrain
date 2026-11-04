@@ -73,15 +73,17 @@ internal static partial class GateRunner
                     if (gate == publisher) { continue; }
                     var host = Host(grains, types, gate);
                     var (alias, json) = Encode(payloads, signal);
-                    var verdict = await Ask(host, alias, json, descriptor, timeout, log, ct).ConfigureAwait(true);
+                    // One attempt id per gate call of this publish: the gate's entry and its ticket carry it.
+                    var attempt = Guid.NewGuid();
+                    var verdict = await Ask(host, alias, json, attempt, descriptor, timeout, log, ct).ConfigureAwait(true);
                     if (!verdict.Allowed) { throw new RuleViolationException(new Rejected(descriptor.Name, verdict.Rules, verdict.Messages)); }
                     // An allowance without a next state cannot be committed: it fails closed like a gate that did not answer.
                     if (verdict.Next is not { } next)
                     {
-                        allowed.Add((host, signal, default, verdict.Ticket));
+                        allowed.Add((host, signal, default, attempt));
                         throw new RuleViolationException(new Rejected(descriptor.Name, [descriptor.Name], [NoAnswer]));
                     }
-                    allowed.Add((host, signal, next, verdict.Ticket));
+                    allowed.Add((host, signal, next, attempt));
                 }
             }
         }
@@ -181,12 +183,12 @@ internal static partial class GateRunner
         else { RequestContext.Set(HostNeuronContext.GateChainKey, previous); }
     }
 
-    // A gate that does not answer within the timeout, or fails, refuses; its call is cancelled, and an Aborted without a ticket (the
-    // verdict never arrived) is sent behind it, not awaited, so a gate that ignores the cancellation and allows late leaves no entry.
-    private static async Task<GateVerdict> Ask(INeuronHost host, string alias, JsonElement json, SynapseDescriptor descriptor, TimeSpan timeout, ILogger log, CancellationToken ct)
+    // A gate that does not answer within the timeout, or fails, refuses; its call is cancelled, and an Aborted with the attempt id is
+    // sent behind it, not awaited, so a gate that ignores the cancellation and allows late leaves no entry (one that never added an entry is untouched).
+    private static async Task<GateVerdict> Ask(INeuronHost host, string alias, JsonElement json, Guid attempt, SynapseDescriptor descriptor, TimeSpan timeout, ILogger log, CancellationToken ct)
     {
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var call = host.Gate(alias, json, cancel.Token);
+        var call = host.Gate(alias, json, attempt, cancel.Token);
         try { return await call.WaitAsync(timeout, ct).ConfigureAwait(true); }
         catch (Exception error) when (error is not OutOfMemoryException)
         {
@@ -194,7 +196,7 @@ internal static partial class GateRunner
             _ = call.ContinueWith(static t => t.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
             var refused = new RuleViolationException(new Rejected(descriptor.Name, [descriptor.Name], [NoAnswer]));
             var gate = host.GetPrimaryKeyString();
-            _ = host.Aborted(alias, json, Guid.Empty, CancellationToken.None).ContinueWith(t => LogTimedOutGateAbortFailed(log, t.Exception!, gate, alias),
+            _ = host.Aborted(alias, json, attempt, CancellationToken.None).ContinueWith(t => LogTimedOutGateAbortFailed(log, t.Exception!, gate, alias),
                 CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
             throw refused;
         }
