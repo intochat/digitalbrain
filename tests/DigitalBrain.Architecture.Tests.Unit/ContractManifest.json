@@ -19,12 +19,15 @@
       "brain.state",
       "brain.trace",
       "catch-up",
+      "committed",
       "connection.oauth-grant",
       "connection.probe-result",
       "connection.view",
       "db.json-element",
       "db.runtime-invocation",
       "enforcement.untrusted-caller",
+      "ensure-from",
+      "gate",
       "inspect-state",
       "integration.registration.configure",
       "integration.registration.released",
@@ -50,6 +53,7 @@
       "storage.journaled-signal",
       "storage.publisher-mark",
       "stream",
+      "synapse.gate-verdict",
       "synapse.ref"
     ],
     "neurons": [
@@ -63,7 +67,11 @@
       "kernel.instance-created",
       "kernel.instance-retired",
       "kernel.type-added",
-      "synapse.gap"
+      "synapse.finished",
+      "synapse.gap",
+      "synapse.started",
+      "synapse.state-changed",
+      "synapse.view-changed"
     ]
   }
 }
