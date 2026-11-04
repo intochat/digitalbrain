@@ -202,8 +202,8 @@ public sealed class AppBaselineFacts
         var rows = AppBaseline.Cases(definition, ["Open", "add"], async os => await os.Install<BaselineSample>(), fakes: null).ToList();
         Assert.Equal(["sample/add", "sample/open"], rows.Select(row => row.TestDisplayName));
         foreach (var row in rows) { await AppBaseline.RunAsync(row.Data!); }
-        Action act = () => AppBaseline.Cases(definition, [], async os => await os.Install<BaselineSample>(), fakes: null);
-        Assert.Throws<InvalidOperationException>(act);
+        void Act() => AppBaseline.Cases(definition, [], async os => await os.Install<BaselineSample>(), fakes: null);
+        Assert.Throws<InvalidOperationException>(Act);
     }
 
     private static AppOperationCase Single(Type app) => Assert.Single(AppBaseline.Cases(app)).Data!;

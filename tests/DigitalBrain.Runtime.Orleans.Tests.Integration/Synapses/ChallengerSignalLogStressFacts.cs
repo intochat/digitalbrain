@@ -82,7 +82,7 @@ public sealed class ChallengerSignalLogStressFacts
         while (cursor < totalSignalsWritten)
         {
             var slice = await log.BrainSignals(cursor, PageLimit, ct);
-            if (slice.Held.Length == 0) break;
+            if (slice.Held.Length == 0) { break; }
             foreach (var s in slice.Held)
             {
                 retrievedPositions.Add(s.Position);
@@ -130,7 +130,7 @@ public sealed class ChallengerSignalLogStressFacts
             {
                 var slice = await log.BrainSignals(cursor, limit, ct);
                 Assert.True(slice.Held.Length <= limit);
-                if (slice.Held.Length == 0) break;
+                if (slice.Held.Length == 0) { break; }
                 foreach (var s in slice.Held)
                 {
                     readPositions.Add(s.Position);

@@ -219,11 +219,11 @@ jobs:
           echo "$RESULTS"
           exit 1
 
-  # Prerelease packages to nuget.org via Trusted Publishing, only after the gate on a push to main.
+  # Prerelease packages to nuget.org via Trusted Publishing, only after the gate on a push to main/master.
   publish:
     name: publish
     needs: [ci]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: nuget-preview
@@ -236,6 +236,7 @@ jobs:
       cancel-in-progress: false
     outputs:
       version: ${{ steps.version.outputs.version }}
+      nuget_org: ${{ steps.push-nuget.outputs.published }}
     steps:
       - uses: actions/checkout@v7
 
@@ -270,33 +271,47 @@ jobs:
 
       - name: NuGet login (Trusted Publishing)
         id: login
+        if: env.NUGET_USER != ''
+        env:
+          NUGET_USER: ${{ secrets.NUGET_USER }}
         uses: NuGet/login@v1
         with:
           user: ${{ secrets.NUGET_USER }}
 
       # Separate from pack so --skip-duplicate cannot mask a pack failure.
       - name: Push to nuget.org
+        id: push-nuget
+        if: env.NUGET_USER != ''
         env:
+          NUGET_USER: ${{ secrets.NUGET_USER }}
           NUGET_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
-        run: dotnet nuget push "artifacts/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "${NUGET_KEY}" --skip-duplicate
+        run: |
+          dotnet nuget push "artifacts/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "${NUGET_KEY}" --skip-duplicate
+          echo "published=true" >> "$GITHUB_OUTPUT"
 
       - name: Push to GitHub Packages
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: dotnet nuget push "artifacts/*.nupkg" --source https://nuget.pkg.github.com/intochat/index.json --api-key "${GITHUB_TOKEN}" --skip-duplicate
+          GITHUB_TOKEN: ${{ secrets.PACKAGE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          for pkg in artifacts/*.nupkg; do
+            dotnet nuget push "$pkg" --source https://nuget.pkg.github.com/intochat/index.json --api-key "${GITHUB_TOKEN}" --skip-duplicate || echo "::warning::Could not push $pkg to GitHub Packages (check repository package ownership)"
+          done
 
       - name: Notify consumers
         env:
           GH_TOKEN: ${{ secrets.OS_DOWNSTREAM_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          gh api repos/intochat/modules/dispatches -f event_type=digitalbrain-published -F client_payload[version]="${VERSION}"
-          gh api repos/intochat/os/dispatches -f event_type=digitalbrain-published -F client_payload[version]="${VERSION}"
+          if [ -n "${GH_TOKEN}" ]; then
+            gh api repos/intochat/modules/dispatches -f event_type=digitalbrain-published -F client_payload[version]="${VERSION}"
+            gh api repos/intochat/os/dispatches -f event_type=digitalbrain-published -F client_payload[version]="${VERSION}"
+          fi
 
   # The external-author path: the template from nuget.org with the just-published preview.
   template-feed:
     name: template-feed
     needs: [publish]
+    if: needs.publish.outputs.nuget_org == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:

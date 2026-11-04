@@ -97,7 +97,7 @@ public sealed class SignalLogAdversarialFacts
         while (cursor < log.LastPosition)
         {
             var slice = await log.BrainSignals(cursor, 100, ct);
-            if (slice.Held.Length == 0) break;
+            if (slice.Held.Length == 0) { break; }
             retrievedSignals.AddRange(slice.Held);
             cursor = slice.Held[^1].Position;
         }

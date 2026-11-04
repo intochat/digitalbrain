@@ -54,8 +54,9 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
         _neuron = neuron;
         _synapses = synapses;
         synapses.Neuron = neuron;
-        // Load persisted synapse subscription state; catch-up is lazy (O(1) activation).
+        // Load persisted synapse subscription state and catch up any sources on activation (04 D-12).
         await synapses.Load().ConfigureAwait(true);
+        await synapses.CatchUp().ConfigureAwait(true);
     }
 
     /// <inheritdoc />

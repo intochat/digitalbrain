@@ -53,7 +53,9 @@ public sealed class MovedTypesFacts
     {
         // State, Trace and BrainAffinePlacement reach storage or the journal under an alias; moving them would orphan stored data.
         foreach (var name in new[] { "State", "Trace", "BrainAffinePlacement" })
+        {
             Assert.DoesNotContain(Core, t => t.Name == name);
+        }
 
         var persisted = Load().Where(e => e.Persisted).ToArray();
         Assert.NotEmpty(persisted);

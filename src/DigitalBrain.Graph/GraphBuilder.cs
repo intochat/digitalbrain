@@ -129,7 +129,7 @@ internal static class GraphBuilder
     }
 
     internal static GraphNodeKind KindOf(string type)
-        => type == "app" || type.StartsWith("app.", StringComparison.Ordinal) ? GraphNodeKind.App
+        => type == "app" || type == "apps" || type.StartsWith("app.", StringComparison.Ordinal) || type.StartsWith("apps.", StringComparison.Ordinal) ? GraphNodeKind.App
          : type == "tasks.task" ? GraphNodeKind.Task
          : type == "agent.run" ? GraphNodeKind.Run
          : type.StartsWith("connection", StringComparison.Ordinal) ? GraphNodeKind.Connection
