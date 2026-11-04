@@ -46,6 +46,8 @@ public sealed class SynapseShapeAnalyzerFacts
     [InlineData("[Synapse(typeof(Charging), \"week\")] public static Check {|#0:TokenFirst|}(CancellationToken ct, Charging s, WeekSpend w) => default!;", "TokenFirst", UnknownParameter)]
     [InlineData("[Synapse(typeof(Charging), \"week\")] public static Check {|#0:TwoTokens|}(Charging s, WeekSpend w, CancellationToken a, CancellationToken b) => default!;", "TwoTokens", UnknownParameter)]
     [InlineData("[Synapse(typeof(Charging), \"week\")] public static Check {|#0:WithServices|}(Charging s, WeekSpend w, IServiceProvider sp) => default!;", "WithServices", UnknownParameter)]
+    [InlineData("[Synapse(typeof(Signal), \"week\")] public static Check {|#0:NarrowParameter|}(Charging s, WeekSpend w) => default!;", "NarrowParameter",
+        "the declared signal type must be assignable to the signal parameter.")]
     public Task Refused_shapes_report_DB0041_with_the_reason(string method, string name, string reason) => Run(method, ("Shapes." + name, reason));
 
     [Fact]
@@ -77,6 +79,7 @@ public sealed class SynapseShapeAnalyzerFacts
         Assert.Equal("view takes only the state", Rules.SynapseReasons.ViewTakesOnlyState);
         Assert.Equal("public static", Rules.SynapseReasons.PublicStatic);
         Assert.Equal("not a signal, the state or CancellationToken", Rules.SynapseReasons.UnknownParameter);
+        Assert.Equal("declared signal type must be assignable to the signal parameter", Rules.SynapseReasons.SignalFitsParameter);
     }
 
     private static DiagnosticResult Expect(string name, string reason) =>

@@ -77,6 +77,7 @@ internal static class Rules
         public const string ViewTakesOnlyState = "view takes only the state";
         public const string PublicStatic = "public static";
         public const string UnknownParameter = "not a signal, the state or CancellationToken";
+        public const string SignalFitsParameter = "declared signal type must be assignable to the signal parameter";
     }
 
     public static readonly ImmutableHashSet<string> IdentityAttributes = ImmutableHashSet.Create(

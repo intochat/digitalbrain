@@ -18,10 +18,16 @@ public sealed class SynapseAttribute : Attribute
     /// </remarks>
     /// <param name="from">The <see cref="DigitalBrain.Signal"/> type that arrives.</param>
     /// <param name="into">The target state: <c>{alias}</c> or <c>{alias}/{key}</c>.</param>
+    /// <exception cref="ArgumentException"><paramref name="from"/> is not a <see cref="DigitalBrain.Signal"/> type, or the alias or the key after the slash is empty.</exception>
     public SynapseAttribute(Type from, string into)
     {
         ArgumentNullException.ThrowIfNull(from);
         ArgumentNullException.ThrowIfNull(into);
+        if (!typeof(DigitalBrain.Signal).IsAssignableFrom(from))
+        {
+            throw new ArgumentException($"{from.FullName} is not a Signal type.", nameof(from));
+        }
+
         Signal = from;
         var slash = into.IndexOf('/', StringComparison.Ordinal);
         State = slash < 0 ? into : into[..slash];
@@ -29,6 +35,11 @@ public sealed class SynapseAttribute : Attribute
         if (State.Length == 0)
         {
             throw new ArgumentException("The state alias must not be empty.", nameof(into));
+        }
+
+        if (Key.Length == 0)
+        {
+            throw new ArgumentException("The state key after the slash must not be empty.", nameof(into));
         }
     }
 

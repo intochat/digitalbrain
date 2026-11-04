@@ -73,6 +73,7 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
         var unknown = false;
         var misplacedToken = false;
         var hasSignalParameter = false;
+        ITypeSymbol? signalParameter = null;
         for (var i = 0; i < method.Parameters.Length; i++)
         {
             var type = method.Parameters[i].Type;
@@ -80,6 +81,7 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
             {
                 signals++;
                 hasSignalParameter = true;
+                signalParameter = type;
             }
             else if (Rules.FullName(type as INamedTypeSymbol) == CancellationTokenType)
             {
@@ -125,9 +127,15 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
                 : null;
         }
 
-        return hasSignalParameter && hasSignal
-            ? null
-            : $"a {Rules.SynapseReasons.GateNeedsSignal} (a reaction as well), declared by [Synapse] and taken as a parameter.";
+        if (!hasSignalParameter || !hasSignal)
+        {
+            return $"a {Rules.SynapseReasons.GateNeedsSignal} (a reaction as well), declared by [Synapse] and taken as a parameter.";
+        }
+
+        return args[0].Value is INamedTypeSymbol declared && signalParameter is INamedTypeSymbol parameter
+            && !Rules.IsOrDerivesFrom(declared, Rules.FullName(parameter))
+            ? $"the {Rules.SynapseReasons.SignalFitsParameter}."
+            : null;
     }
 
     private static ITypeSymbol Unwrap(ITypeSymbol returned) =>

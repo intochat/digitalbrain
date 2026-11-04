@@ -1976,6 +1976,7 @@ DigitalBrain.SynapseShapeException.SynapseShapeException(string! message) -> voi
 const DigitalBrain.SynapseReasons.AtMostOneSignal = "at most one signal" -> string!
 const DigitalBrain.SynapseReasons.GateNeedsSignal = "gate needs a signal" -> string!
 const DigitalBrain.SynapseReasons.PublicStatic = "public static" -> string!
+const DigitalBrain.SynapseReasons.SignalFitsParameter = "declared signal type must be assignable to the signal parameter" -> string!
 const DigitalBrain.SynapseReasons.StateRecord = "state record" -> string!
 const DigitalBrain.SynapseReasons.UnknownParameter = "not a signal, the state or CancellationToken" -> string!
 const DigitalBrain.SynapseReasons.ViewTakesOnlyState = "view takes only the state" -> string!

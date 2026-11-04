@@ -49,6 +49,9 @@ public static class SynapseReasons
 
     /// <summary>A parameter of an unsupported type.</summary>
     public const string UnknownParameter = "not a signal, the state or CancellationToken";
+
+    /// <summary>The signal type declared by <c>[Synapse]</c> is not assignable to the signal parameter.</summary>
+    public const string SignalFitsParameter = "declared signal type must be assignable to the signal parameter";
 }
 
 /// <summary>Reads the shape of a synapse function.</summary>
@@ -146,6 +149,11 @@ public static class SynapseShape
         else if (signal is null || attribute.Signal is null)
         {
             throw new SynapseShapeException($"{name}: a {SynapseReasons.GateNeedsSignal} (a reaction as well), declared by [Synapse] and taken as a parameter.");
+        }
+
+        if (kind != SynapseKind.View && !signal!.IsAssignableFrom(attribute.Signal))
+        {
+            throw new SynapseShapeException($"{name}: the {SynapseReasons.SignalFitsParameter}.");
         }
 
         return new SynapseDescriptor(kind, function, signal, state, alias, attribute.Key, tokens == 1);

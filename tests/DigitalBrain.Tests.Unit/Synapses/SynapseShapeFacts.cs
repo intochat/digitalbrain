@@ -108,10 +108,27 @@ public sealed class SynapseShapeFacts
     {
         Assert.Equal("gate needs a signal", SynapseReasons.GateNeedsSignal);
         Assert.Equal("at most one signal", SynapseReasons.AtMostOneSignal);
+        Assert.Equal("state record", SynapseReasons.StateRecord);
         Assert.Equal("view takes only the state", SynapseReasons.ViewTakesOnlyState);
         Assert.Equal("public static", SynapseReasons.PublicStatic);
         Assert.Equal("not a signal, the state or CancellationToken", SynapseReasons.UnknownParameter);
+        Assert.Equal("declared signal type must be assignable to the signal parameter", SynapseReasons.SignalFitsParameter);
     }
+
+    [Fact]
+    public void ADeclaredSignalThatDoesNotFitTheParameterIsRefused()
+    {
+        var e = Assert.Throws<SynapseShapeException>(() => SynapseShape.Of(typeof(Shapes).GetMethod(nameof(Shapes.Gate))!, States, new SynapseAttribute(typeof(Signal), "week")));
+        Assert.Contains(SynapseReasons.SignalFitsParameter, e.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AnEmptyKeyIsRefused() =>
+        Assert.Equal("into", Assert.Throws<ArgumentException>(() => new SynapseAttribute(typeof(Charging), "week/")).ParamName);
+
+    [Fact]
+    public void AFromTypeThatIsNotASignalIsRefused() =>
+        Assert.Equal("from", Assert.Throws<ArgumentException>(() => new SynapseAttribute(typeof(string), "week")).ParamName);
 
     [Fact]
     public void AnAliasOutsideTheStatesIsRefusedAsStateRecord()
