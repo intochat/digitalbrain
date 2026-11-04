@@ -52,7 +52,7 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
         var expected = NeuronTypeRegistry.GrainTypeOf(registration.Policy);
         if (expected != GrainTypeName) { throw new BindingException($"{neuronClass.FullName} is hosted by {expected}, not {GrainTypeName}."); }
         _class = neuronClass;
-        var neuron = (Neuron)ActivatorUtilities.CreateInstance(ServiceProvider, neuronClass);
+        var neuron = Construct(ServiceProvider, neuronClass);
         var synapses = new SynapseEngine(id, this.GetGrainId(), registration, ServiceProvider, grains, types, Drain);
         var context = new HostNeuronContext(id, this.GetGrainId(), registration, ServiceProvider, grains, types,
             ServiceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress.ToString(), this, _deferred.Enqueue, synapses);
@@ -64,6 +64,15 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
         // Load persisted synapse subscription state and catch up any sources on activation (04 D-12).
         await synapses.Load().ConfigureAwait(true);
         await synapses.CatchUp().ConfigureAwait(true);
+    }
+
+    // ActivatorUtilities caches constructors per type in a process-wide map, which would pin the load context of a generated
+    // (collectible) neuron class for good; a collectible class is built from its widest public constructor with services instead.
+    private static Neuron Construct(IServiceProvider services, Type neuronClass)
+    {
+        if (!neuronClass.IsCollectible) { return (Neuron)ActivatorUtilities.CreateInstance(services, neuronClass); }
+        var constructor = neuronClass.GetConstructors().OrderByDescending(candidate => candidate.GetParameters().Length).First();
+        return (Neuron)constructor.Invoke([.. constructor.GetParameters().Select(parameter => services.GetRequiredService(parameter.ParameterType))]);
     }
 
     // On a registration miss the host's ISynapseRestorer (none restores by default) may restore the alias once.

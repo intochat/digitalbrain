@@ -4,8 +4,10 @@ using DigitalBrain.Runtime.Orleans.Compute;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Signalling;
 using DigitalBrain.Runtime.Orleans.Synapses;
+using DigitalBrain.Runtime.Synapses;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -56,7 +58,28 @@ public static class RuntimeSiloBuilderExtensions
         silo.Services.TryAddSingleton<InstalledGates>();
         silo.Services.TryAddSingleton<DigitalBrain.Spi.IInstallHooks, OrleansInstallHooks>();
         silo.Services.TryAddSingleton<DigitalBrain.Spi.ISynapseRegistrar, OrleansSynapseRegistrar>();
-        silo.Services.TryAddSingleton<DigitalBrain.Spi.ISynapseRestorer>(NoSynapseRestorer.Instance);
+        // The synapse host: compiles, loads and deploys generated sources; each brain's sources neuron keeps them, and the restorer
+        // brings one back when an activation or the gate path misses its alias (as after a restart).
+        silo.Services.TryAddSingleton(_ => new SynapseCompiler(ReferenceSet.FromDefaultContext()));
+        silo.Services.TryAddSingleton<SynapseLoader>();
+        silo.Services.TryAddSingleton<ISourceStore>(sp => new NeuronSourceStore(
+            brain => NeuronHosting.Get<ISources>(sp, new NeuronId(brain, SourcesType, "default"))));
+        silo.Services.TryAddSingleton(sp => new SynapseHost(
+            sp.GetRequiredService<SynapseCompiler>(),
+            sp.GetRequiredService<SynapseLoader>(),
+            sp.GetRequiredService<DigitalBrain.Spi.ISynapseRegistrar>(),
+            sp.GetRequiredService<ISynapseCatalogSource>(),
+            brain => NeuronHosting.Get<IInstalls>(sp, new NeuronId(brain, OrleansInstallHooks.InstallsType, "default")),
+            sp.GetRequiredService<ISourceStore>(),
+            sp.GetRequiredService<DigitalBrain.Spi.IClusterListeners>(),
+            sp.GetService<ILogger<SynapseHost>>()));
+        silo.Services.TryAddSingleton<ISynapseHost>(sp => sp.GetRequiredService<SynapseHost>());
+        silo.Services.TryAddSingleton<DigitalBrain.Spi.ISynapseRestorer>(sp => new SynapseRestorer(
+            sp.GetRequiredService<SynapseLoader>(),
+            sp.GetRequiredService<DigitalBrain.Spi.ISynapseRegistrar>(),
+            sp.GetRequiredService<ISourceStore>(),
+            sp.GetRequiredService<ISynapseCatalogSource>(),
+            sp.GetRequiredService<SynapseHost>()));
         silo.Services.AddJournalPayloads(modules);
         silo.Services.AddSignalPublisher();
         silo.Services.TryAddSingleton<DigitalBrain.Spi.ISlotResolver, BrokerSlotResolver>();
@@ -67,6 +90,9 @@ public static class RuntimeSiloBuilderExtensions
         silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IOutgoingGrainCallFilter, TraceOutgoingFilter>());
         return silo;
     }
+
+    // The alias of the sources neuron NeuronTypeRegistry hosts on every silo.
+    private const string SourcesType = "synapse.sources";
 
     private sealed class RuntimeAdded;
 }

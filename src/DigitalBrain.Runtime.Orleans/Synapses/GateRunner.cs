@@ -54,7 +54,9 @@ internal static partial class GateRunner
         if (gated.Length == 0 || services.GetService<IGateIndex>() is not { } index) { return []; }
         var timeout = RuntimeOptions.From(services).GateTimeout;
         var log = services.GetService<ILoggerFactory>()?.CreateLogger(typeof(GateRunner)) ?? NullLogger.Instance;
-        if (services.GetService<InstalledGates>() is { } installed)
+        // The installs neuron's own publishes neither load its brain's installs nor restore: it serves both.
+        var installsNeuron = publisher.Type == OrleansInstallHooks.InstallsType;
+        if (!installsNeuron && services.GetService<InstalledGates>() is { } installed)
         {
             // The installs neuron that serves the index may be slow or wedged: the publish waits no longer than for a gate, and fails closed.
             try { await installed.Load(publisher.Brain).WaitAsync(timeout, ct).ConfigureAwait(true); }
@@ -64,6 +66,7 @@ internal static partial class GateRunner
                 throw new RuleViolationException(new Rejected(OrleansInstallHooks.InstallsType, [OrleansInstallHooks.InstallsType], [NoGates]));
             }
         }
+        if (!installsNeuron) { await RestoreInstalled(services, index, publisher.Brain, timeout, log, ct).ConfigureAwait(true); }
         var payloads = services.GetRequiredService<JournalPayloads>();
         var grains = services.GetRequiredService<IGrainFactory>();
         var types = services.GetRequiredService<NeuronTypeRegistry>();
@@ -99,6 +102,24 @@ internal static partial class GateRunner
         }
         finally { LeaveChain(chain); }
         return allowed;
+    }
+
+    // An installed alias missing from the live catalog (as after a restart) is restored before its gates are looked up, bounded by
+    // GateTimeout; a restore that fails or does not finish fails the publish closed. With every installed alias live this awaits nothing.
+    private static async Task RestoreInstalled(IServiceProvider services, IGateIndex index, BrainId brain, TimeSpan timeout, ILogger log, CancellationToken ct)
+    {
+        if (index is not InstalledGateIndex gates || !gates.TryGetInstalled(brain, out var aliases)
+            || services.GetService<ISynapseCatalogSource>() is not { } catalog || services.GetService<ISynapseRestorer>() is not { } restorer
+            || aliases.All(catalog.Current.States.ContainsKey))
+        {
+            return;
+        }
+        try { await InstallRestore.EnsureInstalledAliases(catalog, aliases, restorer, brain, ct).WaitAsync(timeout, ct).ConfigureAwait(true); }
+        catch (Exception error) when (error is not OutOfMemoryException)
+        {
+            LogInstalledRestoreFailed(log, error, brain.ToString());
+            throw new RuleViolationException(new Rejected(OrleansInstallHooks.InstallsType, [OrleansInstallHooks.InstallsType], [NoAnswer]));
+        }
     }
 
     /// <summary>
@@ -231,6 +252,10 @@ internal static partial class GateRunner
     [LoggerMessage(EventId = 4126, EventName = "InstalledGatesTimedOut", Level = LogLevel.Warning,
         Message = "The installed gates of the brain of {Publisher} did not load within {Timeout}; the publish is refused.")]
     private static partial void LogInstalledGatesTimedOut(ILogger logger, string publisher, TimeSpan timeout);
+
+    [LoggerMessage(EventId = 4128, EventName = "InstalledRestoreFailed", Level = LogLevel.Warning,
+        Message = "An installed synapse source of brain {Brain} could not be restored; the publish is refused.")]
+    private static partial void LogInstalledRestoreFailed(ILogger logger, Exception error, string brain);
 
     [LoggerMessage(EventId = 4127, EventName = "TimedOutGateAbortFailed", Level = LogLevel.Debug,
         Message = "The gate {Gate} that did not answer could not drop a late provisional state for {Signal}; its lease discards it.")]

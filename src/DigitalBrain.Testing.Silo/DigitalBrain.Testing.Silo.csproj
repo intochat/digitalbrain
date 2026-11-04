@@ -11,8 +11,4 @@
     <PackageReference Include="xunit.v3.extensibility.core" />
     <PackageReference Include="xunit.v3.assert" />
   </ItemGroup>
-  <ItemGroup>
-    <!-- Orleans brings Microsoft.CodeAnalysis.Common 5.0.0; the synapse compiler's CSharp (through DigitalBrain.Testing) must match it in one process. -->
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.0.0" />
-  </ItemGroup>
 </Project>

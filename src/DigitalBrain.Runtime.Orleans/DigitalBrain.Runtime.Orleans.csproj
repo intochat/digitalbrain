@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
+    <ProjectReference Include="../DigitalBrain.Runtime.Synapses/DigitalBrain.Runtime.Synapses.csproj" />
     <ProjectReference Include="../DigitalBrain.Capabilities.Storage/DigitalBrain.Capabilities.Storage.csproj" />
     <ProjectReference Include="../DigitalBrain.Capabilities.Secrets/DigitalBrain.Capabilities.Secrets.csproj" />
     <ProjectReference Include="../DigitalBrain.Capabilities.Identity/DigitalBrain.Capabilities.Identity.csproj" />
