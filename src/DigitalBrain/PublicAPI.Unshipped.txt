@@ -2660,3 +2660,5 @@ static DigitalBrain.Staged.operator !=(DigitalBrain.Staged? left, DigitalBrain.S
 static DigitalBrain.Staged.operator ==(DigitalBrain.Staged? left, DigitalBrain.Staged? right) -> bool
 static DigitalBrain.Undeployed.operator !=(DigitalBrain.Undeployed? left, DigitalBrain.Undeployed? right) -> bool
 static DigitalBrain.Undeployed.operator ==(DigitalBrain.Undeployed? left, DigitalBrain.Undeployed? right) -> bool
+DigitalBrain.InstallRestore
+static DigitalBrain.InstallRestore.EnsureInstalledAliases(DigitalBrain.ISynapseCatalogSource! catalog, DigitalBrain.IInstalls! installs, DigitalBrain.Spi.ISynapseRestorer! restorer, DigitalBrain.BrainId brain, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!

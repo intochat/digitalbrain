@@ -16,6 +16,10 @@ internal static class TestGates
         ArgumentNullException.ThrowIfNull(os);
         ArgumentNullException.ThrowIfNull(signals);
         var allowed = new List<(TestNeuronHost Gate, Signal Signal, Check.Allowed Allowed)>();
+        if (signals.Any(s => !Ungated(s) && !s.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false)))
+        {
+            await RestoreInstalled(os, publisher.Brain, ct).ConfigureAwait(false);
+        }
         try
         {
             foreach (var signal in signals.Where(s => !Ungated(s) && !s.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false)))
@@ -86,6 +90,24 @@ internal static class TestGates
                 })).ConfigureAwait(false);
             }
             catch (Exception error) when (error is not OutOfMemoryException) { os.Fail(error); }
+        }
+    }
+
+    // Installed aliases missing from the catalog (after a restart) are restored before the index is read; a brain that never hosted its
+    // installs neuron has nothing installed, and before any restart forgot a generated alias there is nothing to restore (the path stays
+    // synchronous). A restore that does not finish within GateTimeout, or fails, refuses the publish.
+    private static async Task RestoreInstalled(TestOS os, BrainId brain, CancellationToken ct)
+    {
+        var installs = new NeuronId(brain, "synapse.installs", "default");
+        if (!os.Forgotten || !os.HasHost(installs)) { return; }
+        try
+        {
+            await InstallRestore.EnsureInstalledAliases(os.Source, os.Get<IInstalls>(installs), os.Restorer, brain, ct)
+                .WaitAsync(os.Options.GateTimeout, os.Clock, ct).ConfigureAwait(false);
+        }
+        catch (Exception error) when (error is not OutOfMemoryException)
+        {
+            throw new RuleViolationException(new Rejected("synapse.installs", ["synapse.installs"], [NoAnswer]));
         }
     }
 

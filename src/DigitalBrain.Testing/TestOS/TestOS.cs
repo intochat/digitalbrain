@@ -69,6 +69,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         new(() => new DigitalBrain.Runtime.Synapses.SynapseCompiler(DigitalBrain.Runtime.Synapses.ReferenceSet.FromDefaultContext()));
     private (DigitalBrain.Runtime.Synapses.SynapseHost Host, ISynapseRestorer Restorer)? _runtime;
     private readonly ConcurrentDictionary<string, byte> _generated = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, byte> _forgotten = new(StringComparer.Ordinal);
 
     private TestOS(TestOSOptions options)
     {
@@ -435,6 +436,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         foreach (var alias in _generated.Keys.ToList())
         {
             _ = Unregister(alias);
+            _forgotten[alias] = 0;
             foreach (var host in _hosts.Values.Where(host => host.Id.Type == alias).ToList())
             {
                 if (_hosts.TryRemove(new KeyValuePair<NeuronId, TestNeuronHost>(host.Id, host))) { host.Dispose(); }
@@ -472,6 +474,11 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     private const string InstallsType = "synapse.installs";
 
     private const string SourcesType = "synapse.sources";
+
+    internal bool HasHost(NeuronId id) => _hosts.ContainsKey(id);
+
+    // A generated alias a restart forgot is not in the catalog yet: the gate path may have to restore it.
+    internal bool Forgotten => _forgotten.Keys.Any(alias => !Source.Current.States.ContainsKey(alias));
 
     internal bool TryHost(NeuronId id, out TestNeuronHost host)
     {

@@ -10,11 +10,13 @@ public sealed class SourceRestoreFacts
 
     private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> None => new Dictionary<string, IReadOnlyDictionary<string, string>>();
 
-    private static OS Start() => OS.Local().Register<HsPayments>().With<ISqlRead>("analytics", new FakeSqlRead(1));
+    private static OS Start() => OS.Local().Register<HsPayments>().Register<SrPayments>().With<ISqlRead>("analytics", new FakeSqlRead(1));
 
     private static BrainId Brain(string name) => NeuronId.Parse($"{name}/x/y").Brain;
 
     private static IHsPayments Pay(OS os, string brain) => os.Get<IHsPayments>(NeuronId.Parse($"{brain}/hs.payments/p"));
+
+    private static IHsPayments Ask(OS os, string brain) => os.Get<IHsPayments>(NeuronId.Parse($"{brain}/sr.payments/p"));
 
     private static ISources Sources(OS os, string brain) => os.Get<ISources>(NeuronId.Parse($"{brain}/synapse.sources/default"));
 
@@ -54,11 +56,11 @@ public sealed class SourceRestoreFacts
     {
         await using var os = Start();
         var outcome = await DeployApproved(os, "sr2");
-        await Pay(os, "sr2").Charge(250m);
+        await Ask(os, "sr2").Charge(250m);
         await os.Idle();
 
-        await RestartAndTouch(os, "sr2");
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "sr2").Charge(100m));
+        await os.Restart();
+        var e = await Assert.ThrowsAsync<RuleViolationException>(() => Ask(os, "sr2").Charge(100m));
         await os.Idle();
 
         Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
@@ -101,5 +103,23 @@ public sealed class SourceRestoreFacts
 
         Assert.False(await os.Restorer.TryRestore(Brain("sr5"), "hs.nothing", Ct));
         Assert.False(await os.Restorer.TryRestore(Brain("sr-other"), "hs.week", Ct));
+    }
+}
+
+[Signal("sr.charge-asked")]
+public sealed record ChargeAsked(decimal Amount) : Signal;
+
+// As HsPayments, but it first journals that a charge was asked: that publish passes the gate path, which restores the installed
+// alias missing after a restart, so the generated Charging type is in the catalog when the charge is made.
+[Neuron("sr.payments")]
+public sealed class SrPayments : Neuron<HsPayments.Count>, IHsPayments
+{
+    public async Task Charge(decimal amount)
+    {
+        await Save(State, new ChargeAsked(amount));
+        var type = Context.Services.GetService(typeof(ISynapseCatalogSource)) is ISynapseCatalogSource source
+            ? source.Current.For("hs.week").First(d => d.Kind == SynapseKind.Gate).Signal!
+            : throw new InvalidOperationException("no catalog");
+        await Save(State with { N = State.N + 1 }, (Signal)Activator.CreateInstance(type, amount)!);
     }
 }
