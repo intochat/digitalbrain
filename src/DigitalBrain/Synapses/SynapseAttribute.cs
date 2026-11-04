@@ -59,4 +59,7 @@ public sealed class SynapseAttribute : Attribute
 
     /// <summary>The state key; <c>default</c> unless the target names one.</summary>
     public string Key { get; } = DefaultKey;
+
+    /// <summary>A schedule that fires the reaction; valid only on a reaction from <see cref="DigitalBrain.Time.Tick"/>. Its text is validated by the shape reader.</summary>
+    public string? Every { get; init; }
 }

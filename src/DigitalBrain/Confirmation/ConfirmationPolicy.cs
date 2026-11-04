@@ -92,11 +92,7 @@ public static class ConfirmationRules
     public static bool Asks(ConfirmationPolicy policy, ConfirmationPlan plan)
     {
         ArgumentNullException.ThrowIfNull(plan);
-        return policy switch
-        {
-            ConfirmationPolicy.Always => true,
-            ConfirmationPolicy.Never => false,
-            _ => plan.Destructive,
-        };
+        return policy != ConfirmationPolicy.Never
+            && (plan.RequiresPerson || plan.Destructive || policy == ConfirmationPolicy.Always);
     }
 }

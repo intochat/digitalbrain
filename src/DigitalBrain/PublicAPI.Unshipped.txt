@@ -2023,3 +2023,133 @@ override DigitalBrain.StateChanged.ToString() -> string!
 override sealed DigitalBrain.StateChanged.Equals(DigitalBrain.Signal? other) -> bool
 static DigitalBrain.StateChanged.operator !=(DigitalBrain.StateChanged? left, DigitalBrain.StateChanged? right) -> bool
 static DigitalBrain.StateChanged.operator ==(DigitalBrain.StateChanged? left, DigitalBrain.StateChanged? right) -> bool
+DigitalBrain.Confirmation.ConfirmationPlan.RequiresPerson.get -> bool
+DigitalBrain.Confirmation.ConfirmationPlan.RequiresPerson.init -> void
+DigitalBrain.GateChanged
+DigitalBrain.GateChanged.Brain.get -> string!
+DigitalBrain.GateChanged.Brain.init -> void
+DigitalBrain.GateChanged.Deconstruct(out string! Brain) -> void
+DigitalBrain.GateChanged.Equals(DigitalBrain.GateChanged? other) -> bool
+DigitalBrain.GateChanged.GateChanged(string! Brain) -> void
+DigitalBrain.Installed
+DigitalBrain.Installed.Alias.get -> string!
+DigitalBrain.Installed.Alias.init -> void
+DigitalBrain.Installed.Deconstruct(out string! Alias, out string! NeedsHash) -> void
+DigitalBrain.Installed.Equals(DigitalBrain.Installed? other) -> bool
+DigitalBrain.Installed.Installed(string! Alias, string! NeedsHash) -> void
+DigitalBrain.Installed.NeedsHash.get -> string!
+DigitalBrain.Installed.NeedsHash.init -> void
+DigitalBrain.Retired
+DigitalBrain.Retired.Alias.get -> string!
+DigitalBrain.Retired.Alias.init -> void
+DigitalBrain.Retired.Deconstruct(out string! Alias) -> void
+DigitalBrain.Retired.Equals(DigitalBrain.Retired? other) -> bool
+DigitalBrain.Retired.Retired(string! Alias) -> void
+DigitalBrain.SlotAttribute
+DigitalBrain.SlotAttribute.Name.get -> string?
+DigitalBrain.SlotAttribute.Name.init -> void
+DigitalBrain.SlotAttribute.SlotAttribute() -> void
+DigitalBrain.SlotNeed
+DigitalBrain.SlotNeed.<Clone>$() -> DigitalBrain.SlotNeed!
+DigitalBrain.SlotNeed.Capability.get -> DigitalBrain.Capabilities.CapabilityId
+DigitalBrain.SlotNeed.Capability.init -> void
+DigitalBrain.SlotNeed.ContractDisplayName.get -> string!
+DigitalBrain.SlotNeed.ContractDisplayName.init -> void
+DigitalBrain.SlotNeed.Deconstruct(out string! Name, out DigitalBrain.Capabilities.CapabilityId Capability, out string! ContractDisplayName) -> void
+DigitalBrain.SlotNeed.Equals(DigitalBrain.SlotNeed? other) -> bool
+DigitalBrain.SlotNeed.Name.get -> string!
+DigitalBrain.SlotNeed.Name.init -> void
+DigitalBrain.SlotNeed.SlotNeed(string! Name, DigitalBrain.Capabilities.CapabilityId Capability, string! ContractDisplayName) -> void
+DigitalBrain.SynapseAttribute.Every.get -> string?
+DigitalBrain.SynapseAttribute.Every.init -> void
+DigitalBrain.SynapseNeeds
+DigitalBrain.SynapseNeeds.<Clone>$() -> DigitalBrain.SynapseNeeds!
+DigitalBrain.SynapseNeeds.Alias.get -> string!
+DigitalBrain.SynapseNeeds.Alias.init -> void
+DigitalBrain.SynapseNeeds.Deconstruct(out string! Alias, out System.Collections.Generic.IReadOnlyList<DigitalBrain.SlotNeed!>! Slots, out System.Collections.Generic.IReadOnlyList<DigitalBrain.Time.Schedule!>! Schedules, out System.Collections.Generic.IReadOnlyList<string!>! Gates, out System.Collections.Generic.IReadOnlyList<string!>! Reactions, out bool HasView) -> void
+DigitalBrain.SynapseNeeds.Equals(DigitalBrain.SynapseNeeds? other) -> bool
+DigitalBrain.SynapseNeeds.Gates.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.SynapseNeeds.Gates.init -> void
+DigitalBrain.SynapseNeeds.HasView.get -> bool
+DigitalBrain.SynapseNeeds.HasView.init -> void
+DigitalBrain.SynapseNeeds.Hash() -> string!
+DigitalBrain.SynapseNeeds.Reactions.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.SynapseNeeds.Reactions.init -> void
+DigitalBrain.SynapseNeeds.Schedules.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Time.Schedule!>!
+DigitalBrain.SynapseNeeds.Schedules.init -> void
+DigitalBrain.SynapseNeeds.Sentence() -> string!
+DigitalBrain.SynapseNeeds.Slots.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.SlotNeed!>!
+DigitalBrain.SynapseNeeds.Slots.init -> void
+DigitalBrain.SynapseNeeds.SynapseNeeds(string! Alias, System.Collections.Generic.IReadOnlyList<DigitalBrain.SlotNeed!>! Slots, System.Collections.Generic.IReadOnlyList<DigitalBrain.Time.Schedule!>! Schedules, System.Collections.Generic.IReadOnlyList<string!>! Gates, System.Collections.Generic.IReadOnlyList<string!>! Reactions, bool HasView) -> void
+DigitalBrain.Time.Schedule
+DigitalBrain.Time.Schedule.<Clone>$() -> DigitalBrain.Time.Schedule!
+DigitalBrain.Time.Schedule.At.get -> System.TimeOnly?
+DigitalBrain.Time.Schedule.At.init -> void
+DigitalBrain.Time.Schedule.Day.get -> System.DayOfWeek?
+DigitalBrain.Time.Schedule.Day.init -> void
+DigitalBrain.Time.Schedule.Deconstruct(out string! Text, out DigitalBrain.Time.ScheduleKind Kind, out System.TimeSpan Period, out System.DayOfWeek? Day, out System.TimeOnly? At) -> void
+DigitalBrain.Time.Schedule.Equals(DigitalBrain.Time.Schedule? other) -> bool
+DigitalBrain.Time.Schedule.Kind.get -> DigitalBrain.Time.ScheduleKind
+DigitalBrain.Time.Schedule.Kind.init -> void
+DigitalBrain.Time.Schedule.NextAfter(System.DateTimeOffset now) -> System.DateTimeOffset
+DigitalBrain.Time.Schedule.Period.get -> System.TimeSpan
+DigitalBrain.Time.Schedule.Period.init -> void
+DigitalBrain.Time.Schedule.Schedule(string! Text, DigitalBrain.Time.ScheduleKind Kind, System.TimeSpan Period, System.DayOfWeek? Day, System.TimeOnly? At) -> void
+DigitalBrain.Time.Schedule.Text.get -> string!
+DigitalBrain.Time.Schedule.Text.init -> void
+DigitalBrain.Time.ScheduleKind
+DigitalBrain.Time.ScheduleKind.Daily = 0 -> DigitalBrain.Time.ScheduleKind
+DigitalBrain.Time.ScheduleKind.Interval = 2 -> DigitalBrain.Time.ScheduleKind
+DigitalBrain.Time.ScheduleKind.Weekly = 1 -> DigitalBrain.Time.ScheduleKind
+DigitalBrain.Time.Tick
+DigitalBrain.Time.Tick.At.get -> System.DateTimeOffset
+DigitalBrain.Time.Tick.At.init -> void
+DigitalBrain.Time.Tick.Deconstruct(out string! Schedule, out System.DateTimeOffset At) -> void
+DigitalBrain.Time.Tick.Equals(DigitalBrain.Time.Tick? other) -> bool
+DigitalBrain.Time.Tick.Schedule.get -> string!
+DigitalBrain.Time.Tick.Schedule.init -> void
+DigitalBrain.Time.Tick.Tick(string! Schedule, System.DateTimeOffset At) -> void
+override DigitalBrain.GateChanged.<Clone>$() -> DigitalBrain.GateChanged!
+override DigitalBrain.GateChanged.Equals(object? obj) -> bool
+override DigitalBrain.GateChanged.GetHashCode() -> int
+override DigitalBrain.GateChanged.ToString() -> string!
+override DigitalBrain.Installed.<Clone>$() -> DigitalBrain.Installed!
+override DigitalBrain.Installed.Equals(object? obj) -> bool
+override DigitalBrain.Installed.GetHashCode() -> int
+override DigitalBrain.Installed.ToString() -> string!
+override DigitalBrain.Retired.<Clone>$() -> DigitalBrain.Retired!
+override DigitalBrain.Retired.Equals(object? obj) -> bool
+override DigitalBrain.Retired.GetHashCode() -> int
+override DigitalBrain.Retired.ToString() -> string!
+override DigitalBrain.SlotNeed.Equals(object? obj) -> bool
+override DigitalBrain.SlotNeed.GetHashCode() -> int
+override DigitalBrain.SlotNeed.ToString() -> string!
+override DigitalBrain.SynapseNeeds.Equals(object? obj) -> bool
+override DigitalBrain.SynapseNeeds.GetHashCode() -> int
+override DigitalBrain.SynapseNeeds.ToString() -> string!
+override DigitalBrain.Time.Schedule.Equals(object? obj) -> bool
+override DigitalBrain.Time.Schedule.GetHashCode() -> int
+override DigitalBrain.Time.Schedule.ToString() -> string!
+override DigitalBrain.Time.Tick.<Clone>$() -> DigitalBrain.Time.Tick!
+override DigitalBrain.Time.Tick.Equals(object? obj) -> bool
+override DigitalBrain.Time.Tick.GetHashCode() -> int
+override DigitalBrain.Time.Tick.ToString() -> string!
+override sealed DigitalBrain.GateChanged.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Installed.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Retired.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Time.Tick.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.GateChanged.operator !=(DigitalBrain.GateChanged? left, DigitalBrain.GateChanged? right) -> bool
+static DigitalBrain.GateChanged.operator ==(DigitalBrain.GateChanged? left, DigitalBrain.GateChanged? right) -> bool
+static DigitalBrain.Installed.operator !=(DigitalBrain.Installed? left, DigitalBrain.Installed? right) -> bool
+static DigitalBrain.Installed.operator ==(DigitalBrain.Installed? left, DigitalBrain.Installed? right) -> bool
+static DigitalBrain.Retired.operator !=(DigitalBrain.Retired? left, DigitalBrain.Retired? right) -> bool
+static DigitalBrain.Retired.operator ==(DigitalBrain.Retired? left, DigitalBrain.Retired? right) -> bool
+static DigitalBrain.SlotNeed.operator !=(DigitalBrain.SlotNeed? left, DigitalBrain.SlotNeed? right) -> bool
+static DigitalBrain.SlotNeed.operator ==(DigitalBrain.SlotNeed? left, DigitalBrain.SlotNeed? right) -> bool
+static DigitalBrain.SynapseNeeds.operator !=(DigitalBrain.SynapseNeeds? left, DigitalBrain.SynapseNeeds? right) -> bool
+static DigitalBrain.SynapseNeeds.operator ==(DigitalBrain.SynapseNeeds? left, DigitalBrain.SynapseNeeds? right) -> bool
+static DigitalBrain.Time.Schedule.Parse(string! text) -> DigitalBrain.Time.Schedule!
+static DigitalBrain.Time.Schedule.operator !=(DigitalBrain.Time.Schedule? left, DigitalBrain.Time.Schedule? right) -> bool
+static DigitalBrain.Time.Schedule.operator ==(DigitalBrain.Time.Schedule? left, DigitalBrain.Time.Schedule? right) -> bool
+static DigitalBrain.Time.Tick.operator !=(DigitalBrain.Time.Tick? left, DigitalBrain.Time.Tick? right) -> bool
+static DigitalBrain.Time.Tick.operator ==(DigitalBrain.Time.Tick? left, DigitalBrain.Time.Tick? right) -> bool

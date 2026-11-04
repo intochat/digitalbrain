@@ -46,6 +46,9 @@ public sealed record ConfirmationPlan(
 {
     /// <summary>How long the question stays open; 5 minutes unless set (07 D-16).</summary>
     public TimeSpan Expiry { get; init; } = ConfirmationRules.DefaultExpiry;
+
+    /// <summary>True when only a person can decide: the question is asked under every policy except <see cref="ConfirmationPolicy.Never"/>.</summary>
+    public bool RequiresPerson { get; init; }
 }
 
 /// <summary>How <see cref="IConfirmations.Confirm"/> ended.</summary>
