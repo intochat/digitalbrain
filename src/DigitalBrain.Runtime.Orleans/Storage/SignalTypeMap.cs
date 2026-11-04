@@ -82,7 +82,7 @@ internal sealed class SignalTypeMap
     }
 
     private static string AliasOf(Type type)
-        => type.GetCustomAttribute<SignalAttribute>()?.Alias ?? throw new InvalidOperationException($"{type.FullName} has no [Signal(alias)] attribute.");
+        => type.GetCustomAttribute<SignalAttribute>()?.Alias ?? throw new InvalidOperationException($"{type.FullName} has no SignalAttribute.");
 
     private void Add(Type type)
     {
