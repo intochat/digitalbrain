@@ -68,8 +68,20 @@ public sealed class StateNeuronFacts
         await n.Committed(new Charging(100m), allowed);
 
         Assert.Equal(100m, ((WeekSpend)Context.Writes[0].State).Spent);
-        Assert.Equal([new Charging(100m)], Context.Writes[0].Signals);
+        Assert.Equal([new StateChanged(Id.ToString(), "test.charging")], Context.Writes[0].Signals);
         Assert.Contains(Context.Published, p => p is ViewChanged { View: "100 of 300" });
+    }
+
+    [Fact]
+    public async Task CommittedJournalsStateChangedNotTheTriggeringSignal()
+    {
+        var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Budget))));
+        var allowed = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(10m), TestContext.Current.CancellationToken));
+
+        await n.Committed(new Charging(10m), allowed);
+
+        var changed = Assert.IsType<StateChanged>(Assert.Single(Assert.Single(Context.Writes).Signals));
+        Assert.Equal(("alice/week/default", "test.charging"), (changed.Neuron, changed.Cause));
     }
 
     [Fact]
@@ -99,6 +111,7 @@ public sealed class StateNeuronFacts
         await n.Receive(new Charging(5m), TestContext.Current.CancellationToken);
 
         Assert.Equal(5m, ((Ledger)Context.Writes[0].State).Spent);
+        Assert.Equal([new StateChanged(Id.ToString(), "test.charging")], Context.Writes[0].Signals);
         var e = Context.Published;
         var started = e.FindIndex(p => p is SynapseStarted s && s.Function.EndsWith(".Add", StringComparison.Ordinal));
         var finished = e.FindIndex(p => p is SynapseFinished { Outcome: "saved" } f && f.Function.EndsWith(".Add", StringComparison.Ordinal));

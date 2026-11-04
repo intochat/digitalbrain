@@ -39,11 +39,11 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
                 if (ReferenceEquals(result, State)) { return "unchanged"; }
                 if (result is Reaction<TState> r)
                 {
-                    await Save(r.Next, r.Signals.Count == 0 ? [signal] : r.Signals).ConfigureAwait(true);
+                    await Save(r.Next, r.Signals.Count == 0 ? [Changed(signal)] : r.Signals).ConfigureAwait(true);
                 }
                 else
                 {
-                    await Save((TState)result!, [signal]).ConfigureAwait(true);
+                    await Save((TState)result!, [Changed(signal)]).ConfigureAwait(true);
                 }
 
                 return "saved";
@@ -81,7 +81,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     {
         ArgumentNullException.ThrowIfNull(signal);
         ArgumentNullException.ThrowIfNull(allowed);
-        await Save((TState)allowed.Next, [signal]).ConfigureAwait(true);
+        await Save((TState)allowed.Next, [Changed(signal)]).ConfigureAwait(true);
         await PendingViews().ConfigureAwait(true);
     }
 
@@ -90,6 +90,10 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     {
         _viewsPending |= !_journalingRefusal;
     }
+
+    private static string AliasOf(Signal signal) => signal.GetType().GetCustomAttribute<SignalAttribute>()?.Alias ?? signal.GetType().Name;
+
+    private StateChanged Changed(Signal cause) => new(Id.ToString(), AliasOf(cause));
 
     private Task PendingViews()
     {
@@ -116,7 +120,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     private async Task Run(SynapseDescriptor synapse, Signal? signal, Func<object?, Task<string>> settle, CancellationToken ct)
     {
         var neuron = Id.ToString();
-        var arriving = signal is null ? _alias : signal.GetType().GetCustomAttribute<SignalAttribute>()?.Alias ?? signal.GetType().Name;
+        var arriving = signal is null ? _alias : AliasOf(signal);
         await PublishEphemeral(new SynapseStarted(neuron, synapse.Name, arriving)).ConfigureAwait(true);
         var clock = Stopwatch.StartNew();
         string outcome;

@@ -23,3 +23,9 @@ public sealed record SynapseStarted(string Neuron, string Function, string Signa
 [Signal("synapse.finished")]
 [EphemeralSignal]
 public sealed record SynapseFinished(string Neuron, string Function, string Outcome, double ElapsedMs) : Signal;
+
+/// <summary>A state neuron saved a new state; durable, because a state neuron publishes what it did, not what it heard.</summary>
+/// <param name="Neuron">The neuron key.</param>
+/// <param name="Cause">The <c>[Signal]</c> alias (or type name) of the signal that caused the change.</param>
+[Signal("synapse.state-changed")]
+public sealed record StateChanged(string Neuron, string Cause) : Signal;

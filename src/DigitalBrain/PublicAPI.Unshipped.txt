@@ -2001,3 +2001,18 @@ DigitalBrain.Spi.ISynapseReceiver
 DigitalBrain.Spi.ISynapseReceiver.Committed(DigitalBrain.Signal! signal, DigitalBrain.Rules.Check.Allowed! allowed) -> System.Threading.Tasks.Task!
 DigitalBrain.Spi.ISynapseReceiver.Gate(DigitalBrain.Signal! signal, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Rules.Check!>!
 DigitalBrain.Spi.ISynapseReceiver.Receive(DigitalBrain.Signal! signal, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.StateChanged
+DigitalBrain.StateChanged.Cause.get -> string!
+DigitalBrain.StateChanged.Cause.init -> void
+DigitalBrain.StateChanged.Deconstruct(out string! Neuron, out string! Cause) -> void
+DigitalBrain.StateChanged.Equals(DigitalBrain.StateChanged? other) -> bool
+DigitalBrain.StateChanged.Neuron.get -> string!
+DigitalBrain.StateChanged.Neuron.init -> void
+DigitalBrain.StateChanged.StateChanged(string! Neuron, string! Cause) -> void
+override DigitalBrain.StateChanged.<Clone>$() -> DigitalBrain.StateChanged!
+override DigitalBrain.StateChanged.Equals(object? obj) -> bool
+override DigitalBrain.StateChanged.GetHashCode() -> int
+override DigitalBrain.StateChanged.ToString() -> string!
+override sealed DigitalBrain.StateChanged.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.StateChanged.operator !=(DigitalBrain.StateChanged? left, DigitalBrain.StateChanged? right) -> bool
+static DigitalBrain.StateChanged.operator ==(DigitalBrain.StateChanged? left, DigitalBrain.StateChanged? right) -> bool
