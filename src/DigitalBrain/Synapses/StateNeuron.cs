@@ -14,7 +14,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     private const string GatePlaceholder = "gate";
     private readonly string _alias;
     private readonly IReadOnlyList<SynapseDescriptor> _synapses;
-    private Task _views = Task.CompletedTask;
+    private bool _viewsPending;
     private bool _journalingRefusal;
 
     /// <summary>Creates the neuron for <typeparamref name="TState"/> from <paramref name="catalog"/>.</summary>
@@ -39,15 +39,16 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
                 if (ReferenceEquals(result, State)) { return "unchanged"; }
                 if (result is Reaction<TState> r)
                 {
-                    await SaveAndView(r.Next, r.Signals.Count == 0 ? [signal] : r.Signals).ConfigureAwait(true);
+                    await Save(r.Next, r.Signals.Count == 0 ? [signal] : r.Signals).ConfigureAwait(true);
                 }
                 else
                 {
-                    await SaveAndView((TState)result!, [signal]).ConfigureAwait(true);
+                    await Save((TState)result!, [signal]).ConfigureAwait(true);
                 }
 
                 return "saved";
             }, ct).ConfigureAwait(true);
+            await PendingViews().ConfigureAwait(true);
         }
     }
 
@@ -76,25 +77,25 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     }
 
     /// <inheritdoc />
-    public Task Committed(Signal signal, Verdict.Allowed allowed)
+    public async Task Committed(Signal signal, Verdict.Allowed allowed)
     {
         ArgumentNullException.ThrowIfNull(signal);
         ArgumentNullException.ThrowIfNull(allowed);
-        return SaveAndView((TState)allowed.Next, [signal]);
+        await Save((TState)allowed.Next, [signal]).ConfigureAwait(true);
+        await PendingViews().ConfigureAwait(true);
     }
 
-    /// <summary>Runs every view synapse over the new state and publishes each value as <see cref="ViewChanged"/>; a journaled refusal leaves the state as it was and runs none.</summary>
+    /// <summary>Marks the views to run over the new state once the saving synapse has reported its outcome; a journaled refusal leaves the state as it was and runs none.</summary>
     protected override void OnCommitted()
     {
-        if (!_journalingRefusal) { _views = RunViews(); }
+        _viewsPending |= !_journalingRefusal;
     }
 
-    private async Task SaveAndView(TState next, IReadOnlyList<Signal> signals)
+    private Task PendingViews()
     {
-        await Save(next, signals).ConfigureAwait(true);
-        var views = _views;
-        _views = Task.CompletedTask;
-        await views.ConfigureAwait(true);
+        if (!_viewsPending) { return Task.CompletedTask; }
+        _viewsPending = false;
+        return RunViews();
     }
 
     private async Task RunViews()

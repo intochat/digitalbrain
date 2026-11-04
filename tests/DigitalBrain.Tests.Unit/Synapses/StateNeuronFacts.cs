@@ -103,7 +103,7 @@ public sealed class StateNeuronFacts
         var started = e.FindIndex(p => p is SynapseStarted s && s.Function.EndsWith(".Add", StringComparison.Ordinal));
         var finished = e.FindIndex(p => p is SynapseFinished { Outcome: "saved" } f && f.Function.EndsWith(".Add", StringComparison.Ordinal));
         var viewed = e.FindIndex(p => p is ViewChanged { View: "5 of 300" });
-        Assert.True(started >= 0 && finished > started && viewed > started, string.Join(", ", e));
+        Assert.True(started >= 0 && finished > started && viewed > finished, string.Join(", ", e));
         Assert.Contains(e, p => p is SynapseFinished { Outcome: "viewed" });
     }
 

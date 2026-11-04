@@ -1986,6 +1986,7 @@ static DigitalBrain.SynapseCatalog.Scan(params System.Reflection.Assembly![]! as
 static DigitalBrain.SynapseDescriptor.operator !=(DigitalBrain.SynapseDescriptor? left, DigitalBrain.SynapseDescriptor? right) -> bool
 static DigitalBrain.SynapseDescriptor.operator ==(DigitalBrain.SynapseDescriptor? left, DigitalBrain.SynapseDescriptor? right) -> bool
 static DigitalBrain.SynapseShape.Of(System.Reflection.MethodInfo! function, System.Collections.Generic.IReadOnlyDictionary<string!, System.Type!>! states) -> DigitalBrain.SynapseDescriptor!
+
 DigitalBrain.StateNeuron<TState>
 DigitalBrain.StateNeuron<TState>.Committed(DigitalBrain.Signal! signal, DigitalBrain.Rules.Check.Allowed! allowed) -> System.Threading.Tasks.Task!
 DigitalBrain.StateNeuron<TState>.Gate(DigitalBrain.Signal! signal, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Rules.Check!>!
