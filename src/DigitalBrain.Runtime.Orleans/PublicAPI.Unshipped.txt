@@ -859,6 +859,7 @@ static DigitalBrain.Runtime.Orleans.RuntimeOptions.Resolve(Microsoft.Extensions.
 DigitalBrain.Runtime.Orleans.RuntimeOptions.GateTimeout.get -> System.TimeSpan
 DigitalBrain.Runtime.Orleans.RuntimeOptions.GateTimeout.init -> void
 DigitalBrain.Runtime.Orleans.Hosting.INeuronHost.Committed(string! signalAlias, System.Text.Json.JsonElement signal, System.Text.Json.JsonElement next, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Hosting.INeuronHost.Aborted(string! signalAlias, System.Text.Json.JsonElement signal, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 DigitalBrain.Runtime.Orleans.Hosting.INeuronHost.Gate(string! signalAlias, System.Text.Json.JsonElement signal, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Runtime.Orleans.Synapses.GateVerdict!>!
 DigitalBrain.Runtime.Orleans.Synapses.GateVerdict
 DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.<Clone>$() -> DigitalBrain.Runtime.Orleans.Synapses.GateVerdict!

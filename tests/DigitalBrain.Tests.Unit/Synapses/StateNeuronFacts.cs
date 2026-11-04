@@ -37,6 +37,13 @@ public static class Idle
     public static Ledger Keep(Charging s, Ledger w) => w;
 }
 
+public static class Hundred
+{
+    [Synapse(typeof(Charging), "week")]
+    public static Check Cap(Charging s, WeekSpend state) =>
+        state.Spent + s.Amount > 100m ? Check.Reject("cap of $100") : Check.Allow(state with { Spent = state.Spent + s.Amount });
+}
+
 public static class Faulty
 {
     [Synapse(typeof(Charging), "week")]
@@ -151,5 +158,70 @@ public sealed class StateNeuronFacts
 
         Assert.Equal(NeuronId.Parse("alice/week/default"), gate);
         Assert.Equal(nameof(Budget.WeeklyCap), synapse.Function.Name);
+    }
+
+    [Fact]
+    public async Task ASecondGateSeesTheProvisionalStateOfTheFirstAndRefuses()
+    {
+        var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
+
+        var first = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(60m), TestContext.Current.CancellationToken));
+        var second = await n.Gate(new Charging(60m), TestContext.Current.CancellationToken);
+
+        Assert.IsType<Check.Refused>(second);
+        Assert.Equal(0m, Assert.IsType<WeekSpend>(Assert.Single(Context.Writes).State).Spent);
+        await n.Committed(new Charging(60m), first);
+        Assert.Equal(60m, ((WeekSpend)Context.Writes[^1].State).Spent);
+    }
+
+    [Fact]
+    public async Task CommittedSavesTheEntryAndKeepsTheLaterProvisionalEntries()
+    {
+        var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
+        var ten = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(10m), TestContext.Current.CancellationToken));
+        Assert.IsType<Check.Allowed>(await n.Gate(new Charging(20m), TestContext.Current.CancellationToken));
+
+        await n.Committed(new Charging(10m), ten);
+
+        Assert.Equal(10m, ((WeekSpend)Assert.Single(Context.Writes).State).Spent);
+        var seventy = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(70m), TestContext.Current.CancellationToken));
+        Assert.Equal(100m, ((WeekSpend)seventy.Next).Spent);
+        Assert.IsType<Check.Refused>(await n.Gate(new Charging(1m), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task AbortedDropsTheEntryAndTheEntriesGatedAfterItWithoutSaving()
+    {
+        var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
+        Assert.IsType<Check.Allowed>(await n.Gate(new Charging(60m), TestContext.Current.CancellationToken));
+        Assert.IsType<Check.Allowed>(await n.Gate(new Charging(30m), TestContext.Current.CancellationToken));
+
+        await n.Aborted(new Charging(60m));
+
+        Assert.Empty(Context.Writes);
+        var again = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(60m), TestContext.Current.CancellationToken));
+        Assert.Equal(60m, ((WeekSpend)again.Next).Spent);
+    }
+
+    [Fact]
+    public async Task AProvisionalEntryOlderThanTheLeaseIsDiscardedOnTheNextGate()
+    {
+        var clock = new SteppedClock();
+        Context.Time = clock;
+        var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
+        Assert.IsType<Check.Allowed>(await n.Gate(new Charging(60m), TestContext.Current.CancellationToken));
+
+        clock.Now += StateNeuron.ProvisionalLease + TimeSpan.FromSeconds(1);
+
+        var later = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(60m), TestContext.Current.CancellationToken));
+        Assert.Equal(60m, ((WeekSpend)later.Next).Spent);
+        Assert.Equal(TimeSpan.FromSeconds(30), StateNeuron.ProvisionalLease);
+    }
+
+    private sealed class SteppedClock : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = new(2026, 11, 4, 0, 0, 0, TimeSpan.Zero);
+
+        public override DateTimeOffset GetUtcNow() => Now;
     }
 }

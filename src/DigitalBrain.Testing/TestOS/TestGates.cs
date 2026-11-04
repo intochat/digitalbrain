@@ -9,28 +9,57 @@ internal static class TestGates
 {
     private const string NoAnswer = "the gate did not answer";
 
-    // Runs the gates of every durable signal in order; the first refusal, timeout or failure stops with RuleViolationException.
+    // Runs the gates of every durable signal in order; the first refusal, timeout or failure stops with RuleViolationException,
+    // after the gates of the same publish that already allowed are told Aborted (they drop their provisional state).
     public static async Task<IReadOnlyList<(TestNeuronHost Gate, Signal Signal, Check.Allowed Allowed)>> Run(TestOS os, NeuronId publisher, IReadOnlyList<Signal> signals, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(os);
         ArgumentNullException.ThrowIfNull(signals);
-        var allowed = new List<(TestNeuronHost, Signal, Check.Allowed)>();
-        // Gates never run on StateChanged: a gate's Committed saves it while the publisher still awaits Commit (as the Orleans GateRunner).
-        foreach (var signal in signals.Where(s => s is not StateChanged && !s.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false)))
+        var allowed = new List<(TestNeuronHost Gate, Signal Signal, Check.Allowed Allowed)>();
+        try
         {
-            foreach (var (gate, descriptor) in os.Gates.GatesFor(publisher.Brain, signal.GetType()))
+            // Gates never run on StateChanged: a gate's Committed saves it while the publisher still awaits Commit (as the Orleans GateRunner).
+            foreach (var signal in signals.Where(s => s is not StateChanged && !s.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false)))
             {
-                if (gate == publisher) { continue; }
-                var host = os.Host(gate);
-                var verdict = await Ask(os, host, signal, descriptor, ct).ConfigureAwait(false);
-                if (verdict is Check.Refused refused)
+                foreach (var (gate, descriptor) in os.Gates.GatesFor(publisher.Brain, signal.GetType()))
                 {
-                    throw new RuleViolationException(new Rejected(descriptor.Name, [.. refused.Broken.Select(r => r.Name)], [.. refused.Broken.Select(r => r.Message)]));
+                    if (gate == publisher) { continue; }
+                    var host = os.Host(gate);
+                    var verdict = await Ask(os, host, signal, descriptor, ct).ConfigureAwait(false);
+                    if (verdict is Check.Refused refused)
+                    {
+                        throw new RuleViolationException(new Rejected(descriptor.Name, [.. refused.Broken.Select(r => r.Name)], [.. refused.Broken.Select(r => r.Message)]));
+                    }
+                    allowed.Add((host, signal, (Check.Allowed)verdict));
                 }
-                allowed.Add((host, signal, (Check.Allowed)verdict));
             }
         }
+        catch
+        {
+            await Abort(os, allowed).ConfigureAwait(false);
+            throw;
+        }
         return allowed;
+    }
+
+    // The publish did not happen (a later gate stopped it, or the append threw): each allowing gate drops its provisional state, as a turn.
+    // A failing Aborted goes to TestOS.Failures; the gate's lease then discards the entry.
+    public static async Task Abort(TestOS os, IReadOnlyList<(TestNeuronHost Gate, Signal Signal, Check.Allowed Allowed)> allowed)
+    {
+        ArgumentNullException.ThrowIfNull(os);
+        ArgumentNullException.ThrowIfNull(allowed);
+        foreach (var (gate, signal, _) in allowed)
+        {
+            try
+            {
+                await os.Track(gate.Turn(interleave: false, async neuron =>
+                {
+                    await ((ISynapseReceiver)neuron).Aborted(signal).ConfigureAwait(false);
+                    return 0;
+                })).ConfigureAwait(false);
+            }
+            catch (Exception error) when (error is not OutOfMemoryException) { os.Fail(error); }
+        }
     }
 
     // Once the publisher's append is durable, saves the next state of each allowing gate, each as a turn of its gate neuron.

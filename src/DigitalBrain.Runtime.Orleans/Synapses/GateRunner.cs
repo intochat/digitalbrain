@@ -53,22 +53,62 @@ internal static partial class GateRunner
         var types = services.GetRequiredService<NeuronTypeRegistry>();
         await EnsureReactions(catalog, payloads, grains, types, publisher, durable, ensured).ConfigureAwait(true);
         var timeout = RuntimeOptions.From(services).GateTimeout;
-        var allowed = new List<(INeuronHost, Signal, JsonElement)>();
-        foreach (var signal in gated)
+        var allowed = new List<(INeuronHost Gate, Signal Signal, JsonElement Next)>();
+        try
         {
-            foreach (var (gate, descriptor) in index.GatesFor(publisher.Brain, signal.GetType()))
+            foreach (var signal in gated)
             {
-                if (gate == publisher) { continue; }
-                var host = Host(grains, types, gate);
-                var (alias, json) = Encode(payloads, signal);
-                var verdict = await Ask(host, alias, json, descriptor, timeout, ct).ConfigureAwait(true);
-                if (!verdict.Allowed) { throw new RuleViolationException(new Rejected(descriptor.Name, verdict.Rules, verdict.Messages)); }
-                // An allowance without a next state cannot be committed: it fails closed like a gate that did not answer.
-                if (verdict.Next is not { } next) { throw new RuleViolationException(new Rejected(descriptor.Name, [descriptor.Name], [NoAnswer])); }
-                allowed.Add((host, signal, next));
+                foreach (var (gate, descriptor) in index.GatesFor(publisher.Brain, signal.GetType()))
+                {
+                    if (gate == publisher) { continue; }
+                    var host = Host(grains, types, gate);
+                    var (alias, json) = Encode(payloads, signal);
+                    var verdict = await Ask(host, alias, json, descriptor, timeout, ct).ConfigureAwait(true);
+                    if (!verdict.Allowed) { throw new RuleViolationException(new Rejected(descriptor.Name, verdict.Rules, verdict.Messages)); }
+                    // An allowance without a next state cannot be committed: it fails closed like a gate that did not answer.
+                    if (verdict.Next is not { } next)
+                    {
+                        allowed.Add((host, signal, default));
+                        throw new RuleViolationException(new Rejected(descriptor.Name, [descriptor.Name], [NoAnswer]));
+                    }
+                    allowed.Add((host, signal, next));
+                }
             }
         }
+        catch
+        {
+            await Abort(services, allowed).ConfigureAwait(true);
+            throw;
+        }
         return allowed;
+    }
+
+    /// <summary>
+    /// The publish did not happen (a later gate stopped it, or the append threw): each allowing gate drops its provisional state. A
+    /// failing <c>Aborted</c> is logged, never thrown; the gate's <see cref="StateNeuron.ProvisionalLease"/> then discards the entry.
+    /// </summary>
+    /// <param name="services">The silo services.</param>
+    /// <param name="allowed">What <see cref="Run"/> returned, or the gates that allowed before a stop.</param>
+    /// <returns>A task that completes when every gate was told.</returns>
+    public static async Task Abort(IServiceProvider services, IReadOnlyList<(INeuronHost Gate, Signal Signal, JsonElement Next)> allowed)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(allowed);
+        if (allowed.Count == 0) { return; }
+        var payloads = services.GetRequiredService<JournalPayloads>();
+        var log = services.GetService<ILoggerFactory>()?.CreateLogger(typeof(GateRunner)) ?? NullLogger.Instance;
+        foreach (var (gate, signal, _) in allowed)
+        {
+            try
+            {
+                var (alias, json) = Encode(payloads, signal);
+                await gate.Aborted(alias, json).ConfigureAwait(true);
+            }
+            catch (Exception error) when (error is not OutOfMemoryException)
+            {
+                LogGateAbortFailed(log, error, gate.GetPrimaryKeyString(), signal.GetType().Name);
+            }
+        }
     }
 
     /// <summary>
@@ -159,4 +199,8 @@ internal static partial class GateRunner
     [LoggerMessage(EventId = 4124, EventName = "GateCommitFailed", Level = LogLevel.Warning,
         Message = "The gate {Gate} could not save its next state for {Signal} after the publisher's append; the gate lags one signal behind.")]
     private static partial void LogGateCommitFailed(ILogger logger, Exception error, string gate, string signal);
+
+    [LoggerMessage(EventId = 4125, EventName = "GateAbortFailed", Level = LogLevel.Warning,
+        Message = "The gate {Gate} could not drop its provisional state for {Signal}; its lease discards it.")]
+    private static partial void LogGateAbortFailed(ILogger logger, Exception error, string gate, string signal);
 }

@@ -51,7 +51,13 @@ internal sealed class TestNeuronContext : INeuronContext
             return;
         }
         var allowed = await TestGates.Run(_host.OS, Id, [signal], CancellationToken.None).ConfigureAwait(false);
-        var written = _host.OS.Journal(Id.Brain).Append(Id, [signal]);
+        IReadOnlyList<JournaledSignal> written;
+        try { written = _host.OS.Journal(Id.Brain).Append(Id, [signal]); }
+        catch
+        {
+            await TestGates.Abort(_host.OS, allowed).ConfigureAwait(false);
+            throw;
+        }
         _host.OS.Synapses.Committed(Id);
         await TestGates.Commit(_host.OS, allowed).ConfigureAwait(false);
         _host.OS.Synapses.Appended(Id, written);
@@ -84,7 +90,13 @@ internal sealed class TestNeuronContext : INeuronContext
         {
             ArgumentNullException.ThrowIfNull(signals);
             var allowed = await TestGates.Run(host.OS, host.Id, signals, CancellationToken.None).ConfigureAwait(false);
-            var written = host.OS.Journal(host.Id.Brain).Save(host.Id, next, signals);
+            IReadOnlyList<JournaledSignal> written;
+            try { written = host.OS.Journal(host.Id.Brain).Save(host.Id, next, signals); }
+            catch
+            {
+                await TestGates.Abort(host.OS, allowed).ConfigureAwait(false);
+                throw;
+            }
             host.OS.Synapses.Committed(host.Id);
             await TestGates.Commit(host.OS, allowed).ConfigureAwait(false);
             host.OS.Synapses.Appended(host.Id, written);

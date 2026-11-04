@@ -161,6 +161,14 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
         finally { await Drain().ConfigureAwait(true); }
     }
 
+    /// <inheritdoc />
+    public async Task Aborted(string signalAlias, JsonElement signal, CancellationToken cancellationToken = default)
+    {
+        var receiver = Receiver();
+        try { await receiver.Aborted(Decode(signalAlias, signal)).ConfigureAwait(true); }
+        finally { await Drain().ConfigureAwait(true); }
+    }
+
     private ISynapseReceiver Receiver()
         => _neuron as ISynapseReceiver ?? throw new InvalidOperationException($"The neuron {_key} is not a state neuron: it runs no gate.");
 

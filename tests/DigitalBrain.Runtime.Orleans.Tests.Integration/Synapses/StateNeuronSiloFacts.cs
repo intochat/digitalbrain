@@ -71,9 +71,27 @@ public static class SbStuck
     }
 }
 
+[Signal("test.sb.capped-charging")]
+public sealed record SbCappedCharging(decimal Amount) : Signal;
+
+[State("sb.cap")]
+public sealed record SbCapSpend(decimal Spent)
+{
+    public SbCapSpend() : this(0m) { }
+}
+
+public static class SbCapping
+{
+    [Synapse(typeof(SbCappedCharging), "sb.cap")]
+    public static Check Hundred(SbCappedCharging s, SbCapSpend state) =>
+        state.Spent + s.Amount > 100m ? Check.Reject("cap of $100") : Check.Allow(state with { Spent = state.Spent + s.Amount });
+}
+
 public interface ISbPayments
 {
     Task Charge(decimal amount);
+
+    Task ChargeCapped(decimal amount);
 
     Task Stall();
 }
@@ -82,6 +100,8 @@ public interface ISbPayments
 public sealed class SbPayments : Neuron<SbPayState>, ISbPayments
 {
     public Task Charge(decimal amount) => Save(State with { Count = State.Count + 1 }, new SbCharging(amount));
+
+    public Task ChargeCapped(decimal amount) => Save(State with { Count = State.Count + 1 }, new SbCappedCharging(amount));
 
     public Task Stall() => Save(State with { Count = State.Count + 1 }, new SbStalling());
 }
@@ -136,6 +156,26 @@ public sealed class StateNeuronSiloFacts(StatefulSilo silo) : IClassFixture<Stat
         var journal = (await silo.History("sb").Read(week, 0, 10, ct)).Signals;
         Assert.Contains(journal, s => s.Signal is StateChanged);
         Assert.Contains(journal, s => s.Signal is Rejected);
+    }
+
+    [Fact]
+    public async Task TwoConcurrentChargesAgainstTheCapAllowExactlyOne()
+    {
+        var first = silo.Get<ISbPayments>("sb/sb.payments/one");
+        var second = silo.Get<ISbPayments>("sb/sb.payments/two");
+
+        var charges = new[] { first.ChargeCapped(60m), second.ChargeCapped(60m) };
+        await Assert.ThrowsAsync<RuleViolationException>(() => Task.WhenAll(charges));
+
+        Assert.Equal(1, charges.Count(c => c.IsCompletedSuccessfully));
+        Assert.Equal(60m, await SpentOf(silo.Services, NeuronId.Parse("sb/sb.cap/default")));
+    }
+
+    internal static async Task<decimal> SpentOf(IServiceProvider services, NeuronId id)
+    {
+        var host = services.GetRequiredService<IGrainFactory>().GetGrain<INeuronHost>(GrainId.Create(NeuronTypeRegistry.AffineGrainType, id.ToString()));
+        var state = await host.InspectState(TestContext.Current.CancellationToken);
+        return state!.Value.GetProperty("spent").GetDecimal();
     }
 
     [Fact]

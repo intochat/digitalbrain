@@ -21,7 +21,7 @@ internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronSta
 
     public IServiceProvider Services => throw new NotSupportedException();
 
-    public TimeProvider Time => TimeProvider.System;
+    public TimeProvider Time { get; set; } = TimeProvider.System;
 
     public INeuronState State => this;
 

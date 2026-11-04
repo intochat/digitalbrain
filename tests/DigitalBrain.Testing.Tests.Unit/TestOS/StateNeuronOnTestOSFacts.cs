@@ -98,9 +98,27 @@ public static class Fragility
     public static string Break(Brittle state) => state.Seen > 0 ? throw new InvalidOperationException("breaker") : "untouched";
 }
 
+[Signal("test.synapse.capped-charging")]
+public sealed record CappedCharging(decimal Amount) : Signal;
+
+[State("cap")]
+public sealed record CapSpend(decimal Spent)
+{
+    public CapSpend() : this(0m) { }
+}
+
+public static class Capping
+{
+    [Synapse(typeof(CappedCharging), "cap")]
+    public static Check Hundred(CappedCharging s, CapSpend state) =>
+        state.Spent + s.Amount > 100m ? Check.Reject("cap of $100") : Check.Allow(state with { Spent = state.Spent + s.Amount });
+}
+
 public interface IPayments
 {
     Task Charge(decimal amount);
+
+    Task ChargeCapped(decimal amount);
 
     Task Stall();
 
@@ -111,6 +129,8 @@ public interface IPayments
 public sealed class Payments : Neuron<PayState>, IPayments
 {
     public Task Charge(decimal amount) => Save(State with { Count = State.Count + 1 }, new Charging(amount));
+
+    public Task ChargeCapped(decimal amount) => Save(State with { Count = State.Count + 1 }, new CappedCharging(amount));
 
     public Task Stall() => Save(State with { Count = State.Count + 1 }, new Stalling());
 
@@ -141,6 +161,22 @@ public sealed class StateNeuronOnTestOSFacts
         var week = os.Journal(Pay.Brain).Signals(Week);
         Assert.Contains(week, s => s.Signal is StateChanged);
         Assert.Contains(week, s => s.Signal is Rejected);
+    }
+
+    [Fact]
+    public async Task TwoConcurrentChargesAgainstTheCapAllowExactlyOne()
+    {
+        await using var os = Start();
+        var first = os.Get<IPayments>(NeuronId.Parse("b/payments/one"));
+        var second = os.Get<IPayments>(NeuronId.Parse("b/payments/two"));
+
+        var charges = new[] { first.ChargeCapped(60m), second.ChargeCapped(60m) };
+        await Assert.ThrowsAsync<RuleViolationException>(() => Task.WhenAll(charges));
+        await os.Idle();
+
+        Assert.Equal(1, charges.Count(c => c.IsCompletedSuccessfully));
+        var state = await ((IBrainObserver)os).State(NeuronId.Parse("b/cap/default"), TestContext.Current.CancellationToken);
+        Assert.Equal(60m, state!.Value.GetProperty("spent").GetDecimal());
     }
 
     [Fact]

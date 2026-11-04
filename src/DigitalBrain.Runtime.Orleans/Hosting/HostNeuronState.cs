@@ -45,7 +45,13 @@ internal sealed class HostNeuronState(NeuronId id, GrainId grainId, NeuronRegist
         // Gates run first, as nested turns of the gate neurons; a refusal throws before anything is written.
         var allowed = await GateRunner.Run(services, id, signals, _ensured, CancellationToken.None).ConfigureAwait(true);
         // A save inside a synapse reaction carries the subscriber's advanced cursor in the same entry (R4-09).
-        var last = await journal.WriteStateAsync(registration.StateName, grainId, state, id.ToString(), signals, ReactionCursor.For(grainId)).ConfigureAwait(true);
+        long last;
+        try { last = await journal.WriteStateAsync(registration.StateName, grainId, state, id.ToString(), signals, ReactionCursor.For(grainId)).ConfigureAwait(true); }
+        catch
+        {
+            await GateRunner.Abort(services, allowed).ConfigureAwait(true);
+            throw;
+        }
         _etag = state.ETag;
         await Announce(last, signals).ConfigureAwait(true);
         await GateRunner.Commit(services, allowed).ConfigureAwait(true);
@@ -84,7 +90,13 @@ internal sealed class HostNeuronState(NeuronId id, GrainId grainId, NeuronRegist
         if (Store is not BrainGrainStorage journal) { throw new InvalidOperationException($"{id} publishes, which needs BrainLog as the cluster store (BrainStorageRegistration)."); }
         IReadOnlyList<Signal> signals = [signal];
         var allowed = await GateRunner.Run(services, id, signals, _ensured, CancellationToken.None).ConfigureAwait(true);
-        var last = await journal.AppendSignalsAsync(registration.StateName, grainId, id.ToString(), signals, ReactionCursor.For(grainId)).ConfigureAwait(true);
+        long last;
+        try { last = await journal.AppendSignalsAsync(registration.StateName, grainId, id.ToString(), signals, ReactionCursor.For(grainId)).ConfigureAwait(true); }
+        catch
+        {
+            await GateRunner.Abort(services, allowed).ConfigureAwait(true);
+            throw;
+        }
         await Announce(last, signals).ConfigureAwait(true);
         await GateRunner.Commit(services, allowed).ConfigureAwait(true);
     }

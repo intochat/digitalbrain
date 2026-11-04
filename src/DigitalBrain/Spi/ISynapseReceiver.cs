@@ -11,7 +11,7 @@ public interface ISynapseReceiver
     /// <returns>A task that completes when every reaction has run.</returns>
     Task Receive(Signal signal, CancellationToken ct);
 
-    /// <summary>Runs the gate synapses for <paramref name="signal"/> in order; returns the first refusal (journaled) or the last allowance. Saves nothing on allow.</summary>
+    /// <summary>Runs the gate synapses for <paramref name="signal"/> in order; returns the first refusal (journaled) or the last allowance. Saves nothing on allow; holds the allowed next state as provisional until <see cref="Committed"/> or <see cref="Aborted"/>, and later gate calls evaluate against it.</summary>
     /// <param name="signal">The signal about to be published.</param>
     /// <param name="ct">Cancels the call.</param>
     /// <returns>The verdict.</returns>
@@ -22,4 +22,12 @@ public interface ISynapseReceiver
     /// <param name="allowed">The verdict <see cref="Gate"/> returned.</param>
     /// <returns>A task that completes when the state is saved.</returns>
     Task Committed(Signal signal, Check.Allowed allowed);
+
+    /// <summary>
+    /// Called when the publish <paramref name="signal"/> was gated for did not happen (a later gate refused, timed out or failed, or the
+    /// append threw): drops the provisional state of <paramref name="signal"/> without saving, and every provisional state gated after it.
+    /// </summary>
+    /// <param name="signal">The signal whose publish was abandoned.</param>
+    /// <returns>A task that completes when the provisional state is dropped.</returns>
+    Task Aborted(Signal signal);
 }

@@ -1989,8 +1989,11 @@ static DigitalBrain.SynapseShape.Of(System.Reflection.MethodInfo! function, Syst
 
 DigitalBrain.StateNeuron<TState>
 DigitalBrain.StateNeuron<TState>.Committed(DigitalBrain.Signal! signal, DigitalBrain.Rules.Check.Allowed! allowed) -> System.Threading.Tasks.Task!
+DigitalBrain.StateNeuron<TState>.Aborted(DigitalBrain.Signal! signal) -> System.Threading.Tasks.Task!
 DigitalBrain.StateNeuron<TState>.Gate(DigitalBrain.Signal! signal, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Rules.Check!>!
 DigitalBrain.StateNeuron<TState>.Receive(DigitalBrain.Signal! signal, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+static readonly DigitalBrain.StateNeuron.ProvisionalLease -> System.TimeSpan
+DigitalBrain.StateNeuron
 DigitalBrain.StateNeuron<TState>.StateNeuron(DigitalBrain.SynapseCatalog! catalog) -> void
 DigitalBrain.CatalogGateIndex
 DigitalBrain.CatalogGateIndex.CatalogGateIndex(DigitalBrain.SynapseCatalog! catalog) -> void
@@ -1999,6 +2002,7 @@ DigitalBrain.Spi.IGateIndex
 DigitalBrain.Spi.IGateIndex.GatesFor(DigitalBrain.BrainId brain, System.Type! signal) -> System.Collections.Generic.IReadOnlyList<(DigitalBrain.NeuronId Gate, DigitalBrain.SynapseDescriptor! Synapse)>!
 DigitalBrain.Spi.ISynapseReceiver
 DigitalBrain.Spi.ISynapseReceiver.Committed(DigitalBrain.Signal! signal, DigitalBrain.Rules.Check.Allowed! allowed) -> System.Threading.Tasks.Task!
+DigitalBrain.Spi.ISynapseReceiver.Aborted(DigitalBrain.Signal! signal) -> System.Threading.Tasks.Task!
 DigitalBrain.Spi.ISynapseReceiver.Gate(DigitalBrain.Signal! signal, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Rules.Check!>!
 DigitalBrain.Spi.ISynapseReceiver.Receive(DigitalBrain.Signal! signal, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 DigitalBrain.StateChanged

@@ -46,6 +46,11 @@ public interface INeuronHost : IGrainWithStringKey
     [Alias("committed")]
     Task Committed(string signalAlias, JsonElement signal, JsonElement next, CancellationToken cancellationToken = default);
 
+    /// <summary>The publish the signal was gated for did not happen: the hosted state neuron drops its provisional state, as a turn.</summary>
+    /// <exception cref="InvalidOperationException">The hosted neuron is not a state neuron.</exception>
+    [Alias("aborted")]
+    Task Aborted(string signalAlias, JsonElement signal, CancellationToken cancellationToken = default);
+
     /// <summary>Inspects the live state of the hosted neuron.</summary>
     [AlwaysInterleave, Alias("inspect-state")]
     Task<JsonElement?> InspectState(CancellationToken cancellationToken = default);

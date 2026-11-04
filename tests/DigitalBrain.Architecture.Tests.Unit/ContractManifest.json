@@ -13,6 +13,7 @@
       "runtime.storage-write-grants"
     ],
     "aliases": [
+      "aborted",
       "admit",
       "brain.affine-placement",
       "brain.owner",
