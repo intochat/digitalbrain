@@ -2284,3 +2284,69 @@ static DigitalBrain.InstallRequest.operator !=(DigitalBrain.InstallRequest? left
 static DigitalBrain.InstallRequest.operator ==(DigitalBrain.InstallRequest? left, DigitalBrain.InstallRequest? right) -> bool
 static DigitalBrain.InstallsState.operator !=(DigitalBrain.InstallsState? left, DigitalBrain.InstallsState? right) -> bool
 static DigitalBrain.InstallsState.operator ==(DigitalBrain.InstallsState? left, DigitalBrain.InstallsState? right) -> bool
+DigitalBrain.Time.ITime
+DigitalBrain.Time.ITime.Register(string! owner, string! schedule, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Time.ITime.Registered(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Time.ScheduleRegistration!>!>!
+DigitalBrain.Time.ITime.Unregister(string! owner, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Time.Registered
+DigitalBrain.Time.Registered.Deconstruct(out string! Owner, out string! Schedule) -> void
+DigitalBrain.Time.Registered.Equals(DigitalBrain.Time.Registered? other) -> bool
+DigitalBrain.Time.Registered.Owner.get -> string!
+DigitalBrain.Time.Registered.Owner.init -> void
+DigitalBrain.Time.Registered.Registered(string! Owner, string! Schedule) -> void
+DigitalBrain.Time.Registered.Schedule.get -> string!
+DigitalBrain.Time.Registered.Schedule.init -> void
+DigitalBrain.Time.ScheduleRegistration
+DigitalBrain.Time.ScheduleRegistration.<Clone>$() -> DigitalBrain.Time.ScheduleRegistration!
+DigitalBrain.Time.ScheduleRegistration.Deconstruct(out string! Owner, out string! Schedule) -> void
+DigitalBrain.Time.ScheduleRegistration.Equals(DigitalBrain.Time.ScheduleRegistration? other) -> bool
+DigitalBrain.Time.ScheduleRegistration.Owner.get -> string!
+DigitalBrain.Time.ScheduleRegistration.Owner.init -> void
+DigitalBrain.Time.ScheduleRegistration.Schedule.get -> string!
+DigitalBrain.Time.ScheduleRegistration.Schedule.init -> void
+DigitalBrain.Time.ScheduleRegistration.ScheduleRegistration(string! Owner, string! Schedule) -> void
+DigitalBrain.Time.TimeNeuron
+DigitalBrain.Time.TimeNeuron.Register(string! owner, string! schedule, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Time.TimeNeuron.Registered(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Time.ScheduleRegistration!>!>!
+DigitalBrain.Time.TimeNeuron.TimeNeuron() -> void
+DigitalBrain.Time.TimeNeuron.Unregister(string! owner, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Time.TimeState
+DigitalBrain.Time.TimeState.<Clone>$() -> DigitalBrain.Time.TimeState!
+DigitalBrain.Time.TimeState.Deconstruct(out System.Collections.Generic.IReadOnlyList<DigitalBrain.Time.ScheduleRegistration!>! Registrations) -> void
+DigitalBrain.Time.TimeState.Equals(DigitalBrain.Time.TimeState? other) -> bool
+DigitalBrain.Time.TimeState.Registrations.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Time.ScheduleRegistration!>!
+DigitalBrain.Time.TimeState.Registrations.init -> void
+DigitalBrain.Time.TimeState.TimeState() -> void
+DigitalBrain.Time.TimeState.TimeState(System.Collections.Generic.IReadOnlyList<DigitalBrain.Time.ScheduleRegistration!>! Registrations) -> void
+DigitalBrain.Time.Unregistered
+DigitalBrain.Time.Unregistered.Deconstruct(out string! Owner, out string! Schedule) -> void
+DigitalBrain.Time.Unregistered.Equals(DigitalBrain.Time.Unregistered? other) -> bool
+DigitalBrain.Time.Unregistered.Owner.get -> string!
+DigitalBrain.Time.Unregistered.Owner.init -> void
+DigitalBrain.Time.Unregistered.Schedule.get -> string!
+DigitalBrain.Time.Unregistered.Schedule.init -> void
+DigitalBrain.Time.Unregistered.Unregistered(string! Owner, string! Schedule) -> void
+override DigitalBrain.Time.Registered.<Clone>$() -> DigitalBrain.Time.Registered!
+override DigitalBrain.Time.Registered.Equals(object? obj) -> bool
+override DigitalBrain.Time.Registered.GetHashCode() -> int
+override DigitalBrain.Time.Registered.ToString() -> string!
+override DigitalBrain.Time.ScheduleRegistration.Equals(object? obj) -> bool
+override DigitalBrain.Time.ScheduleRegistration.GetHashCode() -> int
+override DigitalBrain.Time.ScheduleRegistration.ToString() -> string!
+override DigitalBrain.Time.TimeState.Equals(object? obj) -> bool
+override DigitalBrain.Time.TimeState.GetHashCode() -> int
+override DigitalBrain.Time.TimeState.ToString() -> string!
+override DigitalBrain.Time.Unregistered.<Clone>$() -> DigitalBrain.Time.Unregistered!
+override DigitalBrain.Time.Unregistered.Equals(object? obj) -> bool
+override DigitalBrain.Time.Unregistered.GetHashCode() -> int
+override DigitalBrain.Time.Unregistered.ToString() -> string!
+override sealed DigitalBrain.Time.Registered.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Time.Unregistered.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.Time.Registered.operator !=(DigitalBrain.Time.Registered? left, DigitalBrain.Time.Registered? right) -> bool
+static DigitalBrain.Time.Registered.operator ==(DigitalBrain.Time.Registered? left, DigitalBrain.Time.Registered? right) -> bool
+static DigitalBrain.Time.ScheduleRegistration.operator !=(DigitalBrain.Time.ScheduleRegistration? left, DigitalBrain.Time.ScheduleRegistration? right) -> bool
+static DigitalBrain.Time.ScheduleRegistration.operator ==(DigitalBrain.Time.ScheduleRegistration? left, DigitalBrain.Time.ScheduleRegistration? right) -> bool
+static DigitalBrain.Time.TimeState.operator !=(DigitalBrain.Time.TimeState? left, DigitalBrain.Time.TimeState? right) -> bool
+static DigitalBrain.Time.TimeState.operator ==(DigitalBrain.Time.TimeState? left, DigitalBrain.Time.TimeState? right) -> bool
+static DigitalBrain.Time.Unregistered.operator !=(DigitalBrain.Time.Unregistered? left, DigitalBrain.Time.Unregistered? right) -> bool
+static DigitalBrain.Time.Unregistered.operator ==(DigitalBrain.Time.Unregistered? left, DigitalBrain.Time.Unregistered? right) -> bool

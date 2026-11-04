@@ -5,6 +5,7 @@ using System.Text.Json;
 using DigitalBrain.Contracts;
 using DigitalBrain.Invocation;
 using DigitalBrain.Spi;
+using DigitalBrain.Time;
 
 namespace DigitalBrain.Testing;
 
@@ -158,6 +159,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
             InstalledGates = new InstalledGateIndex(_catalog);
         }
         Register<InstallsNeuron>();
+        Register<TimeNeuron>();
         foreach (var (alias, record) in scanned.States)
         {
             var neuron = typeof(StateNeuron<>).MakeGenericType(record);
