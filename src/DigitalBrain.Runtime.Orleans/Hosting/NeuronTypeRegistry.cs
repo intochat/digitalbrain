@@ -52,7 +52,7 @@ internal sealed class NeuronTypeRegistry
     /// <exception cref="InvalidOperationException">Two classes claim one type name, or a <c>[Neuron]</c> class is an app.</exception>
     /// <exception cref="SynapseShapeException">A state alias is declared twice, or a synapse function has an unsupported shape.</exception>
     public NeuronTypeRegistry(IEnumerable<Assembly> assemblies)
-        : this(Listed(assemblies).SelectMany(Loadable).Concat([typeof(InstallsNeuron), typeof(DigitalBrain.Time.TimeNeuron)]))
+        : this(Listed(assemblies).SelectMany(Loadable).Concat([typeof(InstallsNeuron), typeof(SourcesNeuron), typeof(DigitalBrain.Time.TimeNeuron)]))
     {
         Catalog = SynapseCatalog.Scan(Listed(assemblies));
         foreach (var (alias, record) in Catalog.States)

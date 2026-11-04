@@ -26,6 +26,10 @@ internal sealed class SignalTypeMap
         Add(typeof(Retired));
         Add(typeof(InstallRequested));
         Add(typeof(InstallDenied));
+        // The sources neuron every silo hosts journals the deploys of generated sources.
+        Add(typeof(Deployed));
+        Add(typeof(Staged));
+        Add(typeof(Undeployed));
         // The installs neuron completes an install on the resolution of its plan.
         Add(typeof(DigitalBrain.Confirmation.ConfirmationRequested));
         Add(typeof(DigitalBrain.Confirmation.ConfirmationResolved));

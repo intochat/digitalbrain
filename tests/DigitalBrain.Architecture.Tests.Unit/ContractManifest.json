@@ -70,6 +70,7 @@
       "kernel.instance-created",
       "kernel.instance-retired",
       "kernel.type-added",
+      "synapse.deployed",
       "synapse.finished",
       "synapse.gap",
       "synapse.gate-changed",
@@ -77,8 +78,10 @@
       "synapse.install-requested",
       "synapse.installed",
       "synapse.retired",
+      "synapse.staged",
       "synapse.started",
       "synapse.state-changed",
+      "synapse.undeployed",
       "synapse.view-changed"
     ]
   }

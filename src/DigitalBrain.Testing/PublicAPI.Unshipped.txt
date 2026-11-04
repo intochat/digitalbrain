@@ -707,5 +707,7 @@ DigitalBrain.Testing.InMemorySourceStore.InMemorySourceStore() -> void
 DigitalBrain.Testing.InMemorySourceStore.List(DigitalBrain.BrainId brain, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.SourceRecord!>!>!
 DigitalBrain.Testing.InMemorySourceStore.Put(DigitalBrain.BrainId brain, DigitalBrain.SourceRecord! record, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.InMemorySourceStore.Remove(DigitalBrain.BrainId brain, string! sourceKey, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
-DigitalBrain.Testing.TestOS.Store.get -> DigitalBrain.Testing.InMemorySourceStore!
 DigitalBrain.Testing.TestOS.Synapses.get -> DigitalBrain.Runtime.Synapses.SynapseHost!
+DigitalBrain.Testing.InMemorySourceStore.Stage(DigitalBrain.BrainId brain, string! sourceKey, string! hash, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.TestOS.Restorer.get -> DigitalBrain.Spi.ISynapseRestorer!
+DigitalBrain.Testing.TestOS.Store.get -> DigitalBrain.ISourceStore!

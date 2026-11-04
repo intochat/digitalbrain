@@ -23,6 +23,9 @@ public sealed class InMemorySourceStore : ISourceStore
     }
 
     /// <inheritdoc />
+    public Task Stage(BrainId brain, string sourceKey, string hash, CancellationToken ct) => Task.CompletedTask;
+
+    /// <inheritdoc />
     public Task Remove(BrainId brain, string sourceKey, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(sourceKey);

@@ -15,6 +15,7 @@ internal sealed class TestSynapseRegistrar(TestOS os) : ISynapseRegistrar
         foreach (var (alias, record) in source.Catalog.States)
         {
             os.ReplaceStateType(alias, record);
+            os.MarkGenerated(alias);
             await os.DropHosts(alias).ConfigureAwait(false);
         }
     }
@@ -26,6 +27,7 @@ internal sealed class TestSynapseRegistrar(TestOS os) : ISynapseRegistrar
         foreach (var alias in aliases)
         {
             _ = os.Unregister(alias);
+            os.UnmarkGenerated(alias);
             await os.DropHosts(alias).ConfigureAwait(false);
         }
     }

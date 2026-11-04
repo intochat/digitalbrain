@@ -78,6 +78,33 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         }
     }
 
+    // How many builds the compiler has emitted.
+    internal int Compiles => compiler.Emits;
+
+    /// <summary>
+    /// Takes <paramref name="loaded"/>, restored from <paramref name="record"/> and already made live, as the live version of its source,
+    /// so it can be updated and retired; a source the host already holds is left as it is.
+    /// </summary>
+    /// <param name="brain">The brain.</param>
+    /// <param name="loaded">The restored source.</param>
+    /// <param name="record">The record it was restored from.</param>
+    /// <param name="ct">Cancellation.</param>
+    /// <returns>True when the host took it.</returns>
+    public async Task<bool> Adopt(BrainId brain, LoadedSource loaded, SourceRecord record, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(loaded);
+        ArgumentNullException.ThrowIfNull(record);
+        await gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            return entries.TryAdd((brain, loaded.SourceKey), new Entry(loaded, record.DeployedAt));
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
     /// <inheritdoc />
     public async Task<DeployOutcome> Deploy(BrainId brain, SynapseSource source, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> bindingsPerAlias, CancellationToken ct)
     {
@@ -311,6 +338,7 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
             return new DeployOutcome(DeployStatus.Deployed, hash, diagnostics, outcomes, null);
         }
 
+        await store.Stage(brain, next.Source.SourceKey, hash, ct).ConfigureAwait(false);
         return new DeployOutcome(DeployStatus.Staged, hash, diagnostics, outcomes, null);
     }
 

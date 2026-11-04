@@ -36,6 +36,13 @@ public interface ISourceStore
     /// <param name="ct">Cancellation.</param>
     Task Put(BrainId brain, SourceRecord record, CancellationToken ct);
 
+    /// <summary>Records that a build of <paramref name="sourceKey"/> is staged; the stored record stays the live one.</summary>
+    /// <param name="brain">The brain.</param>
+    /// <param name="sourceKey">The source key.</param>
+    /// <param name="hash">The staged build hash.</param>
+    /// <param name="ct">Cancellation.</param>
+    Task Stage(BrainId brain, string sourceKey, string hash, CancellationToken ct);
+
     /// <summary>Removes the record of <paramref name="sourceKey"/>; an unknown key is ignored.</summary>
     /// <param name="brain">The brain.</param>
     /// <param name="sourceKey">The source key.</param>

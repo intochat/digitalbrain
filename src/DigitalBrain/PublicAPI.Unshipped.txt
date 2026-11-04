@@ -2587,3 +2587,76 @@ static DigitalBrain.Invocation.RuntimeProtocol.OptionsFor(System.Type! type) -> 
 static DigitalBrain.Invocation.RuntimeProtocol.Forget(System.Runtime.Loader.AssemblyLoadContext! context) -> void
 DigitalBrain.IInstalls.CancelPending(string! alias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 DigitalBrain.InstallsNeuron.CancelPending(string! alias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+
+DigitalBrain.Deployed
+DigitalBrain.Deployed.Aliases.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Deployed.Aliases.init -> void
+DigitalBrain.Deployed.Deconstruct(out string! SourceKey, out string! Hash, out System.Collections.Generic.IReadOnlyList<string!>! Aliases) -> void
+DigitalBrain.Deployed.Deployed(string! SourceKey, string! Hash, System.Collections.Generic.IReadOnlyList<string!>! Aliases) -> void
+DigitalBrain.Deployed.Equals(DigitalBrain.Deployed? other) -> bool
+DigitalBrain.Deployed.Hash.get -> string!
+DigitalBrain.Deployed.Hash.init -> void
+DigitalBrain.Deployed.SourceKey.get -> string!
+DigitalBrain.Deployed.SourceKey.init -> void
+DigitalBrain.ISourceStore.Stage(DigitalBrain.BrainId brain, string! sourceKey, string! hash, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.ISources
+DigitalBrain.ISources.Get(string! sourceKey, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.SourceRecord?>!
+DigitalBrain.ISources.List(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.SourceRecord!>!>!
+DigitalBrain.ISources.Put(DigitalBrain.SourceRecord! record, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.ISources.Remove(string! sourceKey, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.ISources.Stage(string! sourceKey, string! hash, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.SourcesNeuron
+DigitalBrain.SourcesNeuron.Get(string! sourceKey, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.SourceRecord?>!
+DigitalBrain.SourcesNeuron.List(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.SourceRecord!>!>!
+DigitalBrain.SourcesNeuron.Put(DigitalBrain.SourceRecord! record, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.SourcesNeuron.Remove(string! sourceKey, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.SourcesNeuron.SourcesNeuron() -> void
+DigitalBrain.SourcesNeuron.Stage(string! sourceKey, string! hash, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.SourcesState
+DigitalBrain.SourcesState.<Clone>$() -> DigitalBrain.SourcesState!
+DigitalBrain.SourcesState.Deconstruct(out System.Collections.Generic.IReadOnlyList<DigitalBrain.SourceRecord!>! Records) -> void
+DigitalBrain.SourcesState.Equals(DigitalBrain.SourcesState? other) -> bool
+DigitalBrain.SourcesState.Records.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.SourceRecord!>!
+DigitalBrain.SourcesState.Records.init -> void
+DigitalBrain.SourcesState.SourcesState() -> void
+DigitalBrain.SourcesState.SourcesState(System.Collections.Generic.IReadOnlyList<DigitalBrain.SourceRecord!>! Records) -> void
+DigitalBrain.Staged
+DigitalBrain.Staged.Deconstruct(out string! SourceKey, out string! Hash) -> void
+DigitalBrain.Staged.Equals(DigitalBrain.Staged? other) -> bool
+DigitalBrain.Staged.Hash.get -> string!
+DigitalBrain.Staged.Hash.init -> void
+DigitalBrain.Staged.SourceKey.get -> string!
+DigitalBrain.Staged.SourceKey.init -> void
+DigitalBrain.Staged.Staged(string! SourceKey, string! Hash) -> void
+DigitalBrain.Undeployed
+DigitalBrain.Undeployed.Deconstruct(out string! SourceKey) -> void
+DigitalBrain.Undeployed.Equals(DigitalBrain.Undeployed? other) -> bool
+DigitalBrain.Undeployed.SourceKey.get -> string!
+DigitalBrain.Undeployed.SourceKey.init -> void
+DigitalBrain.Undeployed.Undeployed(string! SourceKey) -> void
+override DigitalBrain.Deployed.<Clone>$() -> DigitalBrain.Deployed!
+override DigitalBrain.Deployed.Equals(object? obj) -> bool
+override DigitalBrain.Deployed.GetHashCode() -> int
+override DigitalBrain.Deployed.ToString() -> string!
+override DigitalBrain.SourcesState.Equals(object? obj) -> bool
+override DigitalBrain.SourcesState.GetHashCode() -> int
+override DigitalBrain.SourcesState.ToString() -> string!
+override DigitalBrain.Staged.<Clone>$() -> DigitalBrain.Staged!
+override DigitalBrain.Staged.Equals(object? obj) -> bool
+override DigitalBrain.Staged.GetHashCode() -> int
+override DigitalBrain.Staged.ToString() -> string!
+override DigitalBrain.Undeployed.<Clone>$() -> DigitalBrain.Undeployed!
+override DigitalBrain.Undeployed.Equals(object? obj) -> bool
+override DigitalBrain.Undeployed.GetHashCode() -> int
+override DigitalBrain.Undeployed.ToString() -> string!
+override sealed DigitalBrain.Deployed.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Staged.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Undeployed.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.Deployed.operator !=(DigitalBrain.Deployed? left, DigitalBrain.Deployed? right) -> bool
+static DigitalBrain.Deployed.operator ==(DigitalBrain.Deployed? left, DigitalBrain.Deployed? right) -> bool
+static DigitalBrain.SourcesState.operator !=(DigitalBrain.SourcesState? left, DigitalBrain.SourcesState? right) -> bool
+static DigitalBrain.SourcesState.operator ==(DigitalBrain.SourcesState? left, DigitalBrain.SourcesState? right) -> bool
+static DigitalBrain.Staged.operator !=(DigitalBrain.Staged? left, DigitalBrain.Staged? right) -> bool
+static DigitalBrain.Staged.operator ==(DigitalBrain.Staged? left, DigitalBrain.Staged? right) -> bool
+static DigitalBrain.Undeployed.operator !=(DigitalBrain.Undeployed? left, DigitalBrain.Undeployed? right) -> bool
+static DigitalBrain.Undeployed.operator ==(DigitalBrain.Undeployed? left, DigitalBrain.Undeployed? right) -> bool
