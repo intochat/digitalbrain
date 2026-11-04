@@ -13,13 +13,23 @@ public sealed class SynapseLoader
     /// <summary>Loads a successful build into a new collectible context and scans it.</summary>
     /// <param name="build">The build; <see cref="SynapseBuild.Success"/> must be true.</param>
     /// <returns>The loaded source.</returns>
-    /// <exception cref="InvalidOperationException">The build failed.</exception>
+    /// <exception cref="InvalidOperationException">The build failed, or a live context for the same source key and hash is already registered (the loader never loads one pair twice).</exception>
     public LoadedSource Load(SynapseBuild build)
     {
         ArgumentNullException.ThrowIfNull(build);
         if (!build.Success)
         {
             throw new InvalidOperationException("Cannot load a failed build.");
+        }
+
+        var sourceKey = SourceKeyOf(build.AssemblyName);
+        lock (_gate)
+        {
+            Prune();
+            if (_contexts.ContainsKey((sourceKey, build.Hash)))
+            {
+                throw new InvalidOperationException($"A context for '{sourceKey}' with hash {build.Hash} is already loaded; unload it first.");
+            }
         }
 
         var context = new SynapseLoadContext(build.AssemblyName);
@@ -34,17 +44,12 @@ public sealed class SynapseLoader
                 .. assembly.GetTypes().Where(t => !t.IsAbstract && typeof(Signal).IsAssignableFrom(t) && t.GetCustomAttribute<SignalAttribute>() is not null),
             ];
             IReadOnlyList<Type> states = [.. catalog.States.Values];
-            var sourceKey = SourceKeyOf(build.AssemblyName);
-
             lock (_gate)
             {
-                var key = (sourceKey, build.Hash);
-                if (!_contexts.TryGetValue(key, out var list))
+                if (!_contexts.TryAdd((sourceKey, build.Hash), [new WeakReference<SynapseLoadContext>(context)]))
                 {
-                    _contexts[key] = list = [];
+                    throw new InvalidOperationException($"A context for '{sourceKey}' with hash {build.Hash} is already loaded; unload it first.");
                 }
-
-                list.Add(new WeakReference<SynapseLoadContext>(context));
             }
 
             return new LoadedSource(sourceKey, build.Hash, assembly, catalog, signals, states);
@@ -70,7 +75,7 @@ public sealed class SynapseLoader
         return CollectOne(weak, gcRounds);
     }
 
-    /// <summary>Retries the collection of a source whose earlier <see cref="Unload(LoadedSource, int)"/> reported a leak, without needing the record.</summary>
+    /// <summary>Retries the collection of a source (the loader holds at most one live context per key and hash) whose earlier <see cref="Unload(LoadedSource, int)"/> reported a leak, without needing the record.</summary>
     /// <param name="sourceKey">The source key.</param>
     /// <param name="hash">The build hash.</param>
     /// <param name="gcRounds">The most collections to try.</param>
@@ -142,14 +147,18 @@ public sealed class SynapseLoader
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
-            if (!weak.TryGetTarget(out _))
+            if (IsDead(weak))
             {
                 return true;
             }
         }
 
-        return !weak.TryGetTarget(out _);
+        return IsDead(weak);
     }
+
+    // Its own frame: an unoptimised JIT keeps the hidden out-local alive for the whole method, which would pin the context for every later round.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static bool IsDead(WeakReference<SynapseLoadContext> weak) => !weak.TryGetTarget(out _);
 
     private void Prune()
     {
@@ -157,7 +166,7 @@ public sealed class SynapseLoader
         {
             foreach (var key in _contexts.Keys.ToArray())
             {
-                _contexts[key].RemoveAll(w => !w.TryGetTarget(out _));
+                _contexts[key].RemoveAll(IsDead);
                 if (_contexts[key].Count == 0)
                 {
                     _contexts.Remove(key);

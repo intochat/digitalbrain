@@ -68,9 +68,45 @@ public sealed class SynapseLoaderFacts
         Assert.True(await loader.RetryUnload("Me.Budget", build.Hash));
     }
 
+    [Fact]
+    public async Task ALeakSurvivesEveryRoundAndTheRetryStillCollects()
+    {
+        var loader = new SynapseLoader();
+        var build = Build();
+
+        Assert.False(await LoadAndUnload(loader, hold: true, build, gcRounds: 3));
+
+        s_held = null;
+        Assert.True(await loader.RetryUnload("Me.Budget", build.Hash));
+    }
+
+    [Fact]
+    public void LoadRefusesTheSameSourceAndHashTwice()
+    {
+        var loader = new SynapseLoader();
+        var build = Build();
+        var first = loader.Load(build);
+
+        Assert.Throws<InvalidOperationException>(() => loader.Load(build));
+        GC.KeepAlive(first);
+    }
+
+    [Fact]
+    public async Task CorruptBytesFailToLoadAndRegisterNothing()
+    {
+        var loader = new SynapseLoader();
+        var good = Build();
+        var corrupt = good with { Assembly = [1, 2, 3, 4], Symbols = [] };
+
+        Assert.ThrowsAny<BadImageFormatException>(() => loader.Load(corrupt));
+
+        Assert.True(await loader.RetryUnload("Me.Budget", good.Hash));
+        GC.KeepAlive(loader.Load(good));
+    }
+
     // Loads and unloads in a frame of its own; it returns the pending task, never the record.
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static Task<bool> LoadAndUnload(SynapseLoader loader, bool hold, SynapseBuild? build = null)
+    private static Task<bool> LoadAndUnload(SynapseLoader loader, bool hold, SynapseBuild? build = null, int gcRounds = 10)
     {
         var loaded = loader.Load(build ?? Build());
         if (hold)
@@ -78,6 +114,6 @@ public sealed class SynapseLoaderFacts
             s_held = loaded.Signals[0];
         }
 
-        return loader.Unload(loaded);
+        return loader.Unload(loaded, gcRounds);
     }
 }
