@@ -89,6 +89,13 @@ public sealed class InstallsNeuron(SynapseCatalog catalog, IInstallHooks hooks) 
             return;
         }
 
+        // The catalog may have changed since the ask (a new build without the app): the ask is dropped, not left pending.
+        if (!catalog.States.ContainsKey(alias))
+        {
+            await Save(State with { Pending = rest }, [new InstallDenied(alias, pending.PlanId, "unknown alias")]).ConfigureAwait(true);
+            return;
+        }
+
         var needs = catalog.NeedsOf(alias);
         var record = new InstallRecord(alias, pending.NeedsHash, pending.Bindings, [.. needs.Schedules.Select(s => s.Text)], Context.Time.GetUtcNow());
         await Save(new InstallsState([.. State.Records.Where(r => r.Alias != alias), record], rest), [new Installed(alias, pending.NeedsHash)]).ConfigureAwait(true);
