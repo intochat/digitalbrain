@@ -365,8 +365,8 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         catch
         {
             // Nothing went live: the activation is undone here; Deploy then releases the load once its own frame no longer names the record.
-            await UndoActivation(brain, entry, key, hash, aliases).ConfigureAwait(false);
             next.Abandoned = true;
+            await UndoActivation(brain, entry, key, hash, aliases).ConfigureAwait(false);
             throw;
         }
 
@@ -405,7 +405,7 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
 
     /// <summary>
     /// Undoes the activation of a source whose adoption failed, so its aliases do not stay registered over an unloaded context: they are
-    /// deactivated unless another brain still holds the source (a disposed host holds none).
+    /// deactivated unless another brain still holds the source. A disposed host keeps its in-memory loads, so the guard still applies to it.
     /// </summary>
     /// <param name="brain">The brain.</param>
     /// <param name="sourceKey">The source key.</param>
@@ -421,12 +421,12 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         }
         catch (ObjectDisposedException)
         {
-            // A host that has shut down holds nothing.
+            // The gate is gone with the host; its dictionaries are not, and nothing runs on a disposed host to change them.
         }
 
         try
         {
-            if (!held || !SourceUsedElsewhere(brain, sourceKey))
+            if (!SourceUsedElsewhere(brain, sourceKey))
             {
                 await registrar.Deactivate(brain, sourceKey, aliases, CancellationToken.None).ConfigureAwait(false);
             }

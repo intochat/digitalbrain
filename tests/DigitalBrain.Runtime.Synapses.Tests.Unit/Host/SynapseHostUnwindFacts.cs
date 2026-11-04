@@ -50,6 +50,7 @@ public sealed class SynapseHostUnwindFacts
         store.Records.Add(record);
         var host = Host(loader, registrar, store, installThrows: false);
         await host.DisposeAsync();
+        registrar.StillLoaded = () => loader.TryGetLive(Key, build.Hash, out _);
         var restorer = new SynapseRestorer(loader, registrar, store, new SynapseCatalogSource(SynapseCatalog.Scan()), host);
 
         await Assert.ThrowsAsync<ObjectDisposedException>(() => restorer.TryRestore(Brain, "week", Ct));
@@ -61,6 +62,9 @@ public sealed class SynapseHostUnwindFacts
 
     private sealed class Registrar : ISynapseRegistrar
     {
+        // Set by a fact: Deactivate must see the context still loaded.
+        public Func<bool>? StillLoaded { get; set; }
+
         public List<string> Calls { get; } = [];
 
         public Task Activate(BrainId brain, LoadedSource source, CancellationToken ct)
@@ -71,6 +75,7 @@ public sealed class SynapseHostUnwindFacts
 
         public Task Deactivate(BrainId brain, string sourceKey, IReadOnlyList<string> aliases, CancellationToken ct)
         {
+            Assert.True(StillLoaded?.Invoke() ?? true, "Deactivate ran after the unload");
             Calls.Add("deactivate");
             return Task.CompletedTask;
         }
