@@ -61,6 +61,13 @@ internal static class RuntimeTestHooks
         services.GetRequiredService<PublishFaults>().FailNextAfterAppend(publisher);
     }
 
+    /// <summary>Awaits <paramref name="hook"/> before each gate's Committed call from now on (null removes it), to force out-of-order gate commits.</summary>
+    public static void BeforeGateCommit(IServiceProvider services, Func<NeuronId, Signal, Task>? hook)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.GetRequiredService<PublishFaults>().BeforeGateCommit = hook;
+    }
+
     /// <summary>Sends every signal reference twice from now on.</summary>
     public static void DuplicateEach(IServiceProvider services, bool on)
     {

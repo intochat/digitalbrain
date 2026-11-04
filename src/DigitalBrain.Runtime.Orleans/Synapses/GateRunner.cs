@@ -138,6 +138,7 @@ internal static partial class GateRunner
         var payloads = services.GetRequiredService<JournalPayloads>();
         var log = services.GetService<ILoggerFactory>()?.CreateLogger(typeof(GateRunner)) ?? NullLogger.Instance;
         var timeout = RuntimeOptions.From(services).GateTimeout;
+        var hook = services.GetService<PublishFaults>()?.BeforeGateCommit;
         var chain = EnterChain(publisher);
         try
         {
@@ -145,6 +146,8 @@ internal static partial class GateRunner
             {
                 try
                 {
+                    // Test-only (RuntimeTestHooks.BeforeGateCommit): a delay that forces gate commits out of order.
+                    if (hook is not null) { await hook(NeuronId.Parse(gate.GetPrimaryKeyString()), signal).ConfigureAwait(true); }
                     var (alias, json) = Encode(payloads, signal);
                     // Bounded: a gate whose save stalls must not hold the publisher's turn; a timeout is logged like a failure.
                     await gate.Committed(alias, json, next, ticket).WaitAsync(timeout).ConfigureAwait(true);

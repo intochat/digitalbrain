@@ -17,6 +17,9 @@ internal sealed class PublishFaults
     /// <summary>Sends every reference twice, as an at-least-once stream may.</summary>
     public bool DuplicateEach { get; set; }
 
+    /// <summary>A test-only delay awaited with the gate neuron and the signal before each gate's <c>Committed</c> call; null by default.</summary>
+    public Func<NeuronId, Signal, Task>? BeforeGateCommit { get; set; }
+
     internal bool ShouldFail(NeuronId publisher)
     {
         if (FailAfterAppend) { return true; }

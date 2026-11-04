@@ -40,6 +40,12 @@ public sealed class TestOSOptions
 
     /// <summary>The services neuron constructors and <c>Context.Services</c> resolve from.</summary>
     public IServiceProvider? Services { get; set; }
+
+    /// <summary>
+    /// A test-only delay before a gate's <c>Committed</c> turn: awaited with the gate neuron and the published signal before each
+    /// allowing gate is told the publisher's append is durable, so a fact can force gate commits out of order. Default null (no delay).
+    /// </summary>
+    public Func<NeuronId, Signal, Task>? BeforeGateCommit { get; set; }
 }
 
 /// <summary>

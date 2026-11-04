@@ -73,6 +73,7 @@ internal static class TestGates
         {
             try
             {
+                if (os.Options.BeforeGateCommit is { } hook) { await hook(gate.Id, signal).ConfigureAwait(false); }
                 await os.Track(gate.Turn(interleave: false, async neuron =>
                 {
                     await ((ISynapseReceiver)neuron).Committed(signal, verdict).ConfigureAwait(false);

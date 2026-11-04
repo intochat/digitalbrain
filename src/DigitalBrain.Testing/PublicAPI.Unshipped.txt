@@ -397,6 +397,8 @@ DigitalBrain.Testing.TestOSOptions.HistoryWindowSignals.get -> int
 DigitalBrain.Testing.TestOSOptions.HistoryWindowSignals.set -> void
 DigitalBrain.Testing.TestOSOptions.Services.get -> System.IServiceProvider?
 DigitalBrain.Testing.TestOSOptions.Services.set -> void
+DigitalBrain.Testing.TestOSOptions.BeforeGateCommit.get -> System.Func<DigitalBrain.NeuronId, DigitalBrain.Signal!, System.Threading.Tasks.Task!>?
+DigitalBrain.Testing.TestOSOptions.BeforeGateCommit.set -> void
 DigitalBrain.Testing.TestOSOptions.StaleCursorAfter.get -> System.TimeSpan
 DigitalBrain.Testing.TestOSOptions.StaleCursorAfter.set -> void
 DigitalBrain.Testing.TestOSOptions.Start.get -> System.DateTimeOffset?

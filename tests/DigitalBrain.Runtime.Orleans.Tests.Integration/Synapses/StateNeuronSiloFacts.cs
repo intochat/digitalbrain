@@ -254,6 +254,41 @@ public sealed class StateNeuronSiloFacts(StatefulSilo silo) : IClassFixture<Stat
     }
 
     [Fact]
+    public async Task AFirstCommitHeldUntilTheSecondCommittedFlushesBothOnce()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        RuntimeTestHooks.BeforeGateCommit(silo.Services, async (gate, _) =>
+        {
+            if (gate.Brain.Value != "sbhold" || Interlocked.Increment(ref calls) != 1) { return; }
+            entered.TrySetResult();
+            await release.Task;
+        });
+        try
+        {
+            var first = silo.Get<ISbPayments>("sbhold/sb.payments/one");
+            var second = silo.Get<ISbPayments>("sbhold/sb.payments/two");
+
+            var held = first.ChargeCapped(40m);
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), ct);
+            await second.ChargeCapped(40m);
+            release.TrySetResult();
+            await held;
+
+            var cap = NeuronId.Parse("sbhold/sb.cap/default");
+            Assert.Equal(80m, await SpentOf(silo.Services, cap));
+            Assert.Single((await silo.History("sbhold").Read(cap, 0, 10, ct)).Signals, s => s.Signal is StateChanged);
+        }
+        finally
+        {
+            release.TrySetResult();
+            RuntimeTestHooks.BeforeGateCommit(silo.Services, null);
+        }
+    }
+
+    [Fact]
     public async Task AStateNeuronThatPublishesThroughAGateCompletesWithoutStalling()
     {
         var ct = TestContext.Current.CancellationToken;

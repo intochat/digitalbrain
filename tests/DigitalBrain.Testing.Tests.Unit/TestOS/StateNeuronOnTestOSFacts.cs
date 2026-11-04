@@ -243,6 +243,35 @@ public sealed class StateNeuronOnTestOSFacts
     }
 
     [Fact]
+    public async Task AFirstCommitHeldUntilTheSecondCommittedFlushesBothOnce()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+        await using var os = Start(o => o.BeforeGateCommit = async (gate, _) =>
+        {
+            if (Interlocked.Increment(ref calls) != 1) { return; }
+            entered.TrySetResult();
+            await release.Task;
+        });
+        var first = os.Get<IPayments>(NeuronId.Parse("b/payments/one"));
+        var second = os.Get<IPayments>(NeuronId.Parse("b/payments/two"));
+
+        // The first publisher is gated first (the head) and its commit is held; the second is gated behind it and commits first.
+        var held = first.ChargeCapped(40m);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
+        await second.ChargeCapped(40m);
+        release.TrySetResult();
+        await held;
+        await os.Idle();
+
+        var cap = NeuronId.Parse("b/cap/default");
+        var state = await ((IBrainObserver)os).State(cap, TestContext.Current.CancellationToken);
+        Assert.Equal(80m, state!.Value.GetProperty("spent").GetDecimal());
+        Assert.Single(os.Journal(cap.Brain).Signals(cap), s => s.Signal is StateChanged);
+    }
+
+    [Fact]
     public async Task AReactionSynapseIsEnsuredAndDeliversOnce()
     {
         await using var os = Start();
