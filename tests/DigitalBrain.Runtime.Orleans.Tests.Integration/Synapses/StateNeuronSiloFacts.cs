@@ -71,6 +71,48 @@ public static class SbStuck
     }
 }
 
+[Signal("test.sb.lagging")]
+public sealed record SbLagging(decimal Amount) : Signal;
+
+[State("sb.lag")]
+public sealed record SbLagSpend(decimal Spent)
+{
+    public SbLagSpend() : this(0m) { }
+}
+
+// A capped gate whose first call ignores cancellation: it answers Allowed only once released, after its publisher failed closed.
+public static class SbLate
+{
+    private static TaskCompletionSource _release = New();
+    private static TaskCompletionSource _waiting = New();
+    private static int _calls;
+
+    public static Task Waiting => _waiting.Task;
+
+    public static void Reset()
+    {
+        _release = New();
+        _waiting = New();
+        _calls = 0;
+    }
+
+    public static void Release() => _release.TrySetResult();
+
+    [Synapse(typeof(SbLagging), "sb.lag")]
+    public static async Task<Check> Cap(SbLagging s, SbLagSpend state, CancellationToken ct)
+    {
+        if (Interlocked.Increment(ref _calls) == 1)
+        {
+            _waiting.TrySetResult();
+            await _release.Task;
+        }
+
+        return state.Spent + s.Amount > 100m ? Check.Reject("cap of $100") : Check.Allow(state with { Spent = state.Spent + s.Amount });
+    }
+
+    private static TaskCompletionSource New() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+}
+
 [Signal("test.sb.capped-charging")]
 public sealed record SbCappedCharging(decimal Amount) : Signal;
 
@@ -157,6 +199,8 @@ public interface ISbPayments
     Task ChargeCapped(decimal amount);
 
     Task Stall();
+
+    Task Lag(decimal amount);
 }
 
 [Neuron("sb.payments")]
@@ -171,6 +215,8 @@ public sealed class SbPayments : Neuron<SbPayState>, ISbPayments
     public Task Void() => Save(State with { Count = State.Count + 1 }, new SbVoiding());
 
     public Task Stall() => Save(State with { Count = State.Count + 1 }, new SbStalling());
+
+    public Task Lag(decimal amount) => Save(State with { Count = State.Count + 1 }, new SbLagging(amount));
 }
 
 /// <summary><see cref="StatefulSilo"/> with a one-second gate timeout, for the gate that never answers and the ledger reaction.</summary>
@@ -408,6 +454,28 @@ public sealed class StateNeuronGateTimeoutFacts(ShortGateSilo silo) : IClassFixt
         Assert.Equal("the gate did not answer", e.Rejected.Messages[0]);
         Assert.Empty((await silo.History("sb").Read(pay, 0, 10, ct)).Signals);
         Assert.Empty((await silo.History("sb").Read(NeuronId.Parse("sb/sb.hold/default"), 0, 10, ct)).Signals);
+    }
+
+    [Fact]
+    public async Task AGateThatAllowsAfterItsPublisherFailedClosedLeavesNoProvisionalEntry()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        SbLate.Reset();
+        var pay = silo.Get<ISbPayments>("sb/sb.payments/late");
+        var lag = NeuronId.Parse("sb/sb.lag/default");
+
+        // The gate ignores the cancellation and answers Allowed(60) only once released, after the publisher gave up on the timeout.
+        var e = await Assert.ThrowsAsync<RuleViolationException>(() => pay.Lag(60m));
+        Assert.Equal("the gate did not answer", e.Rejected.Messages[0]);
+        Assert.True(SbLate.Waiting.IsCompleted);
+        SbLate.Release();
+        await Task.Delay(500, ct);
+
+        // Against an inflated provisional 60 this second 60 would break the cap of 100.
+        await pay.Lag(60m);
+        await StateNeuronSiloFacts.Until(async () => await Spent(lag) == 60m, ct);
+
+        Assert.Equal(60m, await Spent(lag));
     }
 
     private async Task<decimal> Spent(NeuronId id)
