@@ -76,6 +76,8 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         Confirmations = new TestConfirmations(Clock);
         Listeners = new TestClusterListeners(this);
         Gates = new CatalogGateIndex(_catalog);
+        InstalledGates = new InstalledGateIndex(_catalog);
+        _ = Listeners.Listen<GateChanged>("testos.installed-gates", RefreshInstalledGates);
     }
 
     /// <summary>The <c>[State]</c> records and synapse functions of every assembly registered with <see cref="Register(Assembly)"/>.</summary>
@@ -83,6 +85,12 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
 
     /// <summary>The gate index over <see cref="Catalog"/>: the gate neurons a durable signal passes before it is appended.</summary>
     public IGateIndex Gates { get; private set; }
+
+    /// <summary>
+    /// The gate index over the installs of each brain: <see cref="Catalog"/> gates of the aliases its <see cref="IInstalls"/> neuron
+    /// records, refreshed on every <see cref="GateChanged"/>.
+    /// </summary>
+    public InstalledGateIndex InstalledGates { get; private set; }
 
     /// <summary>Host-level listeners on the signals of every brain of this TestOS (04-19); they survive <see cref="Restart"/>.</summary>
     public DigitalBrain.Spi.IClusterListeners ClusterListeners => Listeners;
@@ -147,7 +155,9 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         {
             _catalog = _catalog.Merge(scanned);
             Gates = new CatalogGateIndex(_catalog);
+            InstalledGates = new InstalledGateIndex(_catalog);
         }
+        Register<InstallsNeuron>();
         foreach (var (alias, record) in scanned.States)
         {
             var neuron = typeof(StateNeuron<>).MakeGenericType(record);
@@ -372,6 +382,14 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         var alias = catalog.States.FirstOrDefault(pair => pair.Value == record).Key;
         return alias is null ? null : [.. catalog.For(alias).Where(d => d.Kind == SynapseKind.Reaction).Select(d => d.Signal!).Distinct()];
     }
+
+    private async Task RefreshInstalledGates(NeuronId publisher, GateChanged changed, CancellationToken ct)
+    {
+        var records = await Get<IInstalls>(new NeuronId(publisher.Brain, InstallsType, "default")).List(ct).ConfigureAwait(false);
+        InstalledGates.Refresh(publisher.Brain, records);
+    }
+
+    private const string InstallsType = "synapse.installs";
 
     private async Task ObserveEdge(Task work)
     {

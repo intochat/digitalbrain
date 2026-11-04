@@ -2189,3 +2189,98 @@ DigitalBrain.SlotUnboundException.SlotUnboundException(string! alias, string! sl
 DigitalBrain.UnboundSlotResolver
 DigitalBrain.UnboundSlotResolver.Resolve(DigitalBrain.NeuronId state, DigitalBrain.SlotDescriptor! slot, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<object!>!
 DigitalBrain.UnboundSlotResolver.UnboundSlotResolver() -> void
+DigitalBrain.IInstalls
+DigitalBrain.IInstalls.Describe(string! alias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.InstallRecord?>!
+DigitalBrain.IInstalls.Install(DigitalBrain.InstallRequest! request, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.InstallOutcome!>!
+DigitalBrain.IInstalls.List(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.InstallRecord!>!>!
+DigitalBrain.IInstalls.Retire(string! alias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.InstallOutcome
+DigitalBrain.InstallOutcome.<Clone>$() -> DigitalBrain.InstallOutcome!
+DigitalBrain.InstallOutcome.Deconstruct(out DigitalBrain.InstallStatus Status, out string! Sentence, out string? Reason) -> void
+DigitalBrain.InstallOutcome.Equals(DigitalBrain.InstallOutcome? other) -> bool
+DigitalBrain.InstallOutcome.InstallOutcome(DigitalBrain.InstallStatus Status, string! Sentence, string? Reason) -> void
+DigitalBrain.InstallOutcome.Reason.get -> string?
+DigitalBrain.InstallOutcome.Reason.init -> void
+DigitalBrain.InstallOutcome.Sentence.get -> string!
+DigitalBrain.InstallOutcome.Sentence.init -> void
+DigitalBrain.InstallOutcome.Status.get -> DigitalBrain.InstallStatus
+DigitalBrain.InstallOutcome.Status.init -> void
+DigitalBrain.InstallRecord
+DigitalBrain.InstallRecord.<Clone>$() -> DigitalBrain.InstallRecord!
+DigitalBrain.InstallRecord.Alias.get -> string!
+DigitalBrain.InstallRecord.Alias.init -> void
+DigitalBrain.InstallRecord.Bindings.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+DigitalBrain.InstallRecord.Bindings.init -> void
+DigitalBrain.InstallRecord.ConsentedAt.get -> System.DateTimeOffset
+DigitalBrain.InstallRecord.ConsentedAt.init -> void
+DigitalBrain.InstallRecord.Deconstruct(out string! Alias, out string! NeedsHash, out System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Bindings, out System.Collections.Generic.IReadOnlyList<string!>! Schedules, out System.DateTimeOffset ConsentedAt) -> void
+DigitalBrain.InstallRecord.Equals(DigitalBrain.InstallRecord? other) -> bool
+DigitalBrain.InstallRecord.InstallRecord(string! Alias, string! NeedsHash, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Bindings, System.Collections.Generic.IReadOnlyList<string!>! Schedules, System.DateTimeOffset ConsentedAt) -> void
+DigitalBrain.InstallRecord.NeedsHash.get -> string!
+DigitalBrain.InstallRecord.NeedsHash.init -> void
+DigitalBrain.InstallRecord.Schedules.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.InstallRecord.Schedules.init -> void
+DigitalBrain.InstallRequest
+DigitalBrain.InstallRequest.<Clone>$() -> DigitalBrain.InstallRequest!
+DigitalBrain.InstallRequest.Alias.get -> string!
+DigitalBrain.InstallRequest.Alias.init -> void
+DigitalBrain.InstallRequest.Bindings.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+DigitalBrain.InstallRequest.Bindings.init -> void
+DigitalBrain.InstallRequest.Deconstruct(out string! Alias, out System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Bindings) -> void
+DigitalBrain.InstallRequest.Equals(DigitalBrain.InstallRequest? other) -> bool
+DigitalBrain.InstallRequest.InstallRequest(string! Alias, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Bindings) -> void
+DigitalBrain.InstallStatus
+DigitalBrain.InstallStatus.Denied = 3 -> DigitalBrain.InstallStatus
+DigitalBrain.InstallStatus.Installed = 0 -> DigitalBrain.InstallStatus
+DigitalBrain.InstallStatus.Refused = 4 -> DigitalBrain.InstallStatus
+DigitalBrain.InstallStatus.Unchanged = 2 -> DigitalBrain.InstallStatus
+DigitalBrain.InstallStatus.Updated = 1 -> DigitalBrain.InstallStatus
+DigitalBrain.InstalledGateIndex
+DigitalBrain.InstalledGateIndex.GatesFor(DigitalBrain.BrainId brain, System.Type! signal) -> System.Collections.Generic.IReadOnlyList<(DigitalBrain.NeuronId Gate, DigitalBrain.SynapseDescriptor! Synapse)>!
+DigitalBrain.InstalledGateIndex.InstalledGateIndex(DigitalBrain.SynapseCatalog! catalog) -> void
+DigitalBrain.InstalledGateIndex.Refresh(DigitalBrain.BrainId brain, System.Collections.Generic.IReadOnlyList<DigitalBrain.InstallRecord!>! records) -> void
+DigitalBrain.InstallsNeuron
+DigitalBrain.InstallsNeuron.Describe(string! alias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.InstallRecord?>!
+DigitalBrain.InstallsNeuron.Install(DigitalBrain.InstallRequest! request, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.InstallOutcome!>!
+DigitalBrain.InstallsNeuron.InstallsNeuron(DigitalBrain.SynapseCatalog! catalog, DigitalBrain.Spi.IInstallHooks! hooks) -> void
+DigitalBrain.InstallsNeuron.List(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.InstallRecord!>!>!
+DigitalBrain.InstallsNeuron.Retire(string! alias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.InstallsState
+DigitalBrain.InstallsState.<Clone>$() -> DigitalBrain.InstallsState!
+DigitalBrain.InstallsState.Deconstruct(out System.Collections.Generic.IReadOnlyList<DigitalBrain.InstallRecord!>! Records) -> void
+DigitalBrain.InstallsState.Equals(DigitalBrain.InstallsState? other) -> bool
+DigitalBrain.InstallsState.InstallsState() -> void
+DigitalBrain.InstallsState.InstallsState(System.Collections.Generic.IReadOnlyList<DigitalBrain.InstallRecord!>! Records) -> void
+DigitalBrain.InstallsState.Records.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.InstallRecord!>!
+DigitalBrain.InstallsState.Records.init -> void
+DigitalBrain.Spi.IInstallHooks
+DigitalBrain.Spi.IInstallHooks.EnsureReactionEdges(DigitalBrain.NeuronId state, System.Collections.Generic.IReadOnlyList<System.Type!>! signals, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Spi.IInstallHooks.RegisterSchedules(DigitalBrain.NeuronId state, System.Collections.Generic.IReadOnlyList<DigitalBrain.Time.Schedule!>! schedules, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Spi.IInstallHooks.RemoveReactionEdges(DigitalBrain.NeuronId state, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Spi.IInstallHooks.UnregisterSchedules(DigitalBrain.NeuronId state, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.NoInstallHooks
+DigitalBrain.NoInstallHooks.EnsureReactionEdges(DigitalBrain.NeuronId state, System.Collections.Generic.IReadOnlyList<System.Type!>! signals, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.NoInstallHooks.NoInstallHooks() -> void
+DigitalBrain.NoInstallHooks.RegisterSchedules(DigitalBrain.NeuronId state, System.Collections.Generic.IReadOnlyList<DigitalBrain.Time.Schedule!>! schedules, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.NoInstallHooks.RemoveReactionEdges(DigitalBrain.NeuronId state, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.NoInstallHooks.UnregisterSchedules(DigitalBrain.NeuronId state, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+override DigitalBrain.InstallOutcome.Equals(object? obj) -> bool
+override DigitalBrain.InstallOutcome.GetHashCode() -> int
+override DigitalBrain.InstallOutcome.ToString() -> string!
+override DigitalBrain.InstallRecord.Equals(object? obj) -> bool
+override DigitalBrain.InstallRecord.GetHashCode() -> int
+override DigitalBrain.InstallRecord.ToString() -> string!
+override DigitalBrain.InstallRequest.Equals(object? obj) -> bool
+override DigitalBrain.InstallRequest.GetHashCode() -> int
+override DigitalBrain.InstallRequest.ToString() -> string!
+override DigitalBrain.InstallsState.Equals(object? obj) -> bool
+override DigitalBrain.InstallsState.GetHashCode() -> int
+override DigitalBrain.InstallsState.ToString() -> string!
+static DigitalBrain.InstallOutcome.operator !=(DigitalBrain.InstallOutcome? left, DigitalBrain.InstallOutcome? right) -> bool
+static DigitalBrain.InstallOutcome.operator ==(DigitalBrain.InstallOutcome? left, DigitalBrain.InstallOutcome? right) -> bool
+static DigitalBrain.InstallRecord.operator !=(DigitalBrain.InstallRecord? left, DigitalBrain.InstallRecord? right) -> bool
+static DigitalBrain.InstallRecord.operator ==(DigitalBrain.InstallRecord? left, DigitalBrain.InstallRecord? right) -> bool
+static DigitalBrain.InstallRequest.operator !=(DigitalBrain.InstallRequest? left, DigitalBrain.InstallRequest? right) -> bool
+static DigitalBrain.InstallRequest.operator ==(DigitalBrain.InstallRequest? left, DigitalBrain.InstallRequest? right) -> bool
+static DigitalBrain.InstallsState.operator !=(DigitalBrain.InstallsState? left, DigitalBrain.InstallsState? right) -> bool
+static DigitalBrain.InstallsState.operator ==(DigitalBrain.InstallsState? left, DigitalBrain.InstallsState? right) -> bool

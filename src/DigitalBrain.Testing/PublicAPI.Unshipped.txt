@@ -693,3 +693,4 @@ DigitalBrain.Testing.TestOS.Catalog.get -> DigitalBrain.SynapseCatalog!
 DigitalBrain.Testing.TestOS.Gates.get -> DigitalBrain.Spi.IGateIndex!
 DigitalBrain.Testing.TestOSOptions.GateTimeout.get -> System.TimeSpan
 DigitalBrain.Testing.TestOSOptions.GateTimeout.set -> void
+DigitalBrain.Testing.TestOS.InstalledGates.get -> DigitalBrain.InstalledGateIndex!

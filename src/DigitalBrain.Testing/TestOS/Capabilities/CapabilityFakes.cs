@@ -132,6 +132,7 @@ internal sealed class TestOSServices(CapabilityFakes fakes, IServiceProvider inn
         if (serviceType == typeof(ICapabilityBroker)) { return this; }
         if (serviceType == typeof(CapabilityFakes)) { return fakes; }
         if (serviceType == typeof(DigitalBrain.Spi.ISlotResolver)) { return inner.GetService(serviceType) ?? new UnboundSlotResolver(); }
+        if (serviceType == typeof(DigitalBrain.Spi.IInstallHooks)) { return inner.GetService(serviceType) ?? new NoInstallHooks(); }
         if (CapabilityFakes.IsContract(serviceType)) { return fakes.Resolve(serviceType); }
         return CapabilityFakes.ListedContract(serviceType) is { } contract ? fakes.All(contract) : inner.GetService(serviceType);
     }
