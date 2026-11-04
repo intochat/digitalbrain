@@ -34,6 +34,10 @@ internal sealed class SignalTypeMap
         Add(typeof(DigitalBrain.Confirmation.ConfirmationRequested));
         Add(typeof(DigitalBrain.Confirmation.ConfirmationResolved));
         Add(typeof(GateChanged));
+        Add(typeof(PolicyProposed));
+        Add(typeof(PolicyAdopted));
+        Add(typeof(PolicyRefused));
+        Add(typeof(PolicyRetired));
         Add(typeof(DigitalBrain.Time.Tick));
         Add(typeof(DigitalBrain.Time.Registered));
         Add(typeof(DigitalBrain.Time.Unregistered));

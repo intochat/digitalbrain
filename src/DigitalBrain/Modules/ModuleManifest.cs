@@ -33,6 +33,9 @@ public sealed record ModuleManifest(
     /// <summary>Optional OAuth / auth metadata when the module connects to an external account service.</summary>
     public ModuleAuth? Auth { get; init; }
 
+    /// <summary>The promise-able actions the module declares for the brain's policies neuron. Empty by default.</summary>
+    public IReadOnlyList<ActionDescriptor> Actions { get; init; } = [];
+
     /// <summary>Reads the <c>[Module]</c> id and the public static <c>Manifest</c> property of a module class.</summary>
     /// <exception cref="InvalidDataException">Provides or Requires lists a capability twice.</exception>
     /// <exception cref="InvalidOperationException">The type is not a module, has no <c>[Module]</c> or no static <c>Manifest</c>.</exception>

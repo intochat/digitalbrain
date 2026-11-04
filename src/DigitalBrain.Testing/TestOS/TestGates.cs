@@ -50,7 +50,7 @@ internal static class TestGates
     // Nor on Rejected: the refusing gate journals it inside its own gate turn, so a gate on it would run nested in that turn. Nor on
     // the runtime's own Tick, Installed, Retired, InstallRequested, InstallDenied, Deployed, Staged, Undeployed and time registrations: their publishers (time, installs, sources) serve the gate path itself.
     private static bool Ungated(Signal signal)
-        => signal is StateChanged or Rejected or DigitalBrain.Time.Tick or Installed or Retired or InstallRequested or InstallDenied or Deployed or Staged or Undeployed or DigitalBrain.Time.Registered or DigitalBrain.Time.Unregistered;
+        => signal is StateChanged or Rejected or DigitalBrain.Time.Tick or Installed or Retired or InstallRequested or InstallDenied or Deployed or Staged or Undeployed or DigitalBrain.Time.Registered or DigitalBrain.Time.Unregistered or PolicyProposed or PolicyAdopted or PolicyRefused or PolicyRetired;
 
     // The publish did not happen (a later gate stopped it, or the append threw): each allowing gate drops its provisional state, as a turn.
     // A failing Aborted goes to TestOS.Failures; the gate's lease then discards the entry.

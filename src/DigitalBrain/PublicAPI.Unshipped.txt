@@ -2664,3 +2664,272 @@ DigitalBrain.InstallRestore
 DigitalBrain.InstalledGateIndex.Reset() -> void
 DigitalBrain.InstalledGateIndex.TryGetInstalled(DigitalBrain.BrainId brain, out System.Collections.Generic.IReadOnlyCollection<string!>! aliases) -> bool
 static DigitalBrain.InstallRestore.EnsureInstalledAliases(DigitalBrain.ISynapseCatalogSource! catalog, System.Collections.Generic.IEnumerable<string!>! installed, DigitalBrain.Spi.ISynapseRestorer! restorer, DigitalBrain.BrainId brain, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.ActionDescriptor
+DigitalBrain.ActionDescriptor.<Clone>$() -> DigitalBrain.ActionDescriptor!
+DigitalBrain.ActionDescriptor.ActionDescriptor(string! Name, string! Description, string? AmountUnit) -> void
+DigitalBrain.ActionDescriptor.AmountUnit.get -> string?
+DigitalBrain.ActionDescriptor.AmountUnit.init -> void
+DigitalBrain.ActionDescriptor.Deconstruct(out string! Name, out string! Description, out string? AmountUnit) -> void
+DigitalBrain.ActionDescriptor.Description.get -> string!
+DigitalBrain.ActionDescriptor.Description.init -> void
+DigitalBrain.ActionDescriptor.Equals(DigitalBrain.ActionDescriptor? other) -> bool
+DigitalBrain.ActionDescriptor.Name.get -> string!
+DigitalBrain.ActionDescriptor.Name.init -> void
+DigitalBrain.IPolicies
+DigitalBrain.IPolicies.Actions(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.ActionDescriptor!>!>!
+DigitalBrain.IPolicies.Allow(string! action, decimal amount, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? facts, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.PolicyDecision!>!
+DigitalBrain.IPolicies.Key(string! brainId) -> string!
+DigitalBrain.IPolicies.List(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.PolicyRule!>!>!
+DigitalBrain.IPolicies.Propose(DigitalBrain.PolicyRule! rule, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.ProposalOutcome!>!
+DigitalBrain.IPolicies.Release(string! decisionId, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.IPolicies.Retire(string! ruleId, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.ModuleManifest.Actions.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.ActionDescriptor!>!
+DigitalBrain.ModuleManifest.Actions.init -> void
+DigitalBrain.PendingProposal
+DigitalBrain.PendingProposal.<Clone>$() -> DigitalBrain.PendingProposal!
+DigitalBrain.PendingProposal.Deconstruct(out string! PlanId, out DigitalBrain.PolicyRule! Rule) -> void
+DigitalBrain.PendingProposal.Equals(DigitalBrain.PendingProposal? other) -> bool
+DigitalBrain.PendingProposal.PendingProposal(string! PlanId, DigitalBrain.PolicyRule! Rule) -> void
+DigitalBrain.PendingProposal.PlanId.get -> string!
+DigitalBrain.PendingProposal.PlanId.init -> void
+DigitalBrain.PendingProposal.Rule.get -> DigitalBrain.PolicyRule!
+DigitalBrain.PendingProposal.Rule.init -> void
+DigitalBrain.PoliciesNeuron
+DigitalBrain.PoliciesNeuron.Actions(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.ActionDescriptor!>!>!
+DigitalBrain.PoliciesNeuron.Allow(string! action, decimal amount, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? facts, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.PolicyDecision!>!
+DigitalBrain.PoliciesNeuron.List(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.PolicyRule!>!>!
+DigitalBrain.PoliciesNeuron.OnResolved(DigitalBrain.Confirmation.ConfirmationResolved! resolved, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.PoliciesNeuron.PoliciesNeuron() -> void
+DigitalBrain.PoliciesNeuron.Propose(DigitalBrain.PolicyRule! rule, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.ProposalOutcome!>!
+DigitalBrain.PoliciesNeuron.Release(string! decisionId, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.PoliciesNeuron.Retire(string! ruleId, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.PoliciesState
+DigitalBrain.PoliciesState.<Clone>$() -> DigitalBrain.PoliciesState!
+DigitalBrain.PoliciesState.Deconstruct(out System.Collections.Generic.IReadOnlyList<DigitalBrain.PolicyRule!>! Rules, out System.Collections.Generic.IReadOnlyList<DigitalBrain.Reservation!>! Reservations, out System.Collections.Generic.IReadOnlyList<DigitalBrain.PendingProposal!>! Pending) -> void
+DigitalBrain.PoliciesState.Equals(DigitalBrain.PoliciesState? other) -> bool
+DigitalBrain.PoliciesState.Pending.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.PendingProposal!>!
+DigitalBrain.PoliciesState.Pending.init -> void
+DigitalBrain.PoliciesState.PoliciesState() -> void
+DigitalBrain.PoliciesState.PoliciesState(System.Collections.Generic.IReadOnlyList<DigitalBrain.PolicyRule!>! Rules, System.Collections.Generic.IReadOnlyList<DigitalBrain.Reservation!>! Reservations, System.Collections.Generic.IReadOnlyList<DigitalBrain.PendingProposal!>! Pending) -> void
+DigitalBrain.PoliciesState.Reservations.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Reservation!>!
+DigitalBrain.PoliciesState.Reservations.init -> void
+DigitalBrain.PoliciesState.Rules.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.PolicyRule!>!
+DigitalBrain.PoliciesState.Rules.init -> void
+DigitalBrain.PolicyAdopted
+DigitalBrain.PolicyAdopted.Action.get -> string!
+DigitalBrain.PolicyAdopted.Action.init -> void
+DigitalBrain.PolicyAdopted.Deconstruct(out string! RuleId, out string! Action, out string! Text) -> void
+DigitalBrain.PolicyAdopted.Equals(DigitalBrain.PolicyAdopted? other) -> bool
+DigitalBrain.PolicyAdopted.PolicyAdopted(string! RuleId, string! Action, string! Text) -> void
+DigitalBrain.PolicyAdopted.RuleId.get -> string!
+DigitalBrain.PolicyAdopted.RuleId.init -> void
+DigitalBrain.PolicyAdopted.Text.get -> string!
+DigitalBrain.PolicyAdopted.Text.init -> void
+DigitalBrain.PolicyCondition
+DigitalBrain.PolicyCondition.<Clone>$() -> DigitalBrain.PolicyCondition!
+DigitalBrain.PolicyCondition.Deconstruct(out string! Fact, out DigitalBrain.PolicyOp Op, out string! Value) -> void
+DigitalBrain.PolicyCondition.Equals(DigitalBrain.PolicyCondition? other) -> bool
+DigitalBrain.PolicyCondition.Fact.get -> string!
+DigitalBrain.PolicyCondition.Fact.init -> void
+DigitalBrain.PolicyCondition.Op.get -> DigitalBrain.PolicyOp
+DigitalBrain.PolicyCondition.Op.init -> void
+DigitalBrain.PolicyCondition.PolicyCondition(string! Fact, DigitalBrain.PolicyOp Op, string! Value) -> void
+DigitalBrain.PolicyCondition.Value.get -> string!
+DigitalBrain.PolicyCondition.Value.init -> void
+DigitalBrain.PolicyDecision
+DigitalBrain.PolicyDecision.<Clone>$() -> DigitalBrain.PolicyDecision!
+DigitalBrain.PolicyDecision.Allowed.get -> bool
+DigitalBrain.PolicyDecision.Allowed.init -> void
+DigitalBrain.PolicyDecision.DecisionId.get -> string!
+DigitalBrain.PolicyDecision.DecisionId.init -> void
+DigitalBrain.PolicyDecision.Deconstruct(out bool Allowed, out string! DecisionId, out string? RuleId, out string? Reason) -> void
+DigitalBrain.PolicyDecision.Equals(DigitalBrain.PolicyDecision? other) -> bool
+DigitalBrain.PolicyDecision.PolicyDecision(bool Allowed, string! DecisionId, string? RuleId, string? Reason) -> void
+DigitalBrain.PolicyDecision.Reason.get -> string?
+DigitalBrain.PolicyDecision.Reason.init -> void
+DigitalBrain.PolicyDecision.RuleId.get -> string?
+DigitalBrain.PolicyDecision.RuleId.init -> void
+DigitalBrain.PolicyGrammar
+DigitalBrain.PolicyGrammarException
+DigitalBrain.PolicyGrammarException.PolicyGrammarException(string! message) -> void
+DigitalBrain.PolicyGrammarException.PolicyGrammarException(string! message, System.Exception! innerException) -> void
+DigitalBrain.PolicyGuard
+DigitalBrain.PolicyMeasure
+DigitalBrain.PolicyMeasure.Count = 0 -> DigitalBrain.PolicyMeasure
+DigitalBrain.PolicyMeasure.Sum = 1 -> DigitalBrain.PolicyMeasure
+DigitalBrain.PolicyOp
+DigitalBrain.PolicyOp.Contains = 1 -> DigitalBrain.PolicyOp
+DigitalBrain.PolicyOp.EndsWith = 3 -> DigitalBrain.PolicyOp
+DigitalBrain.PolicyOp.Equals = 0 -> DigitalBrain.PolicyOp
+DigitalBrain.PolicyOp.StartsWith = 2 -> DigitalBrain.PolicyOp
+DigitalBrain.PolicyProposed
+DigitalBrain.PolicyProposed.Deconstruct(out string! RuleId, out string! PlanId, out string! Text) -> void
+DigitalBrain.PolicyProposed.Equals(DigitalBrain.PolicyProposed? other) -> bool
+DigitalBrain.PolicyProposed.PlanId.get -> string!
+DigitalBrain.PolicyProposed.PlanId.init -> void
+DigitalBrain.PolicyProposed.PolicyProposed(string! RuleId, string! PlanId, string! Text) -> void
+DigitalBrain.PolicyProposed.RuleId.get -> string!
+DigitalBrain.PolicyProposed.RuleId.init -> void
+DigitalBrain.PolicyProposed.Text.get -> string!
+DigitalBrain.PolicyProposed.Text.init -> void
+DigitalBrain.PolicyRefused
+DigitalBrain.PolicyRefused.Action.get -> string!
+DigitalBrain.PolicyRefused.Action.init -> void
+DigitalBrain.PolicyRefused.Amount.get -> decimal
+DigitalBrain.PolicyRefused.Amount.init -> void
+DigitalBrain.PolicyRefused.Deconstruct(out string! Action, out decimal Amount, out string! RuleId) -> void
+DigitalBrain.PolicyRefused.Equals(DigitalBrain.PolicyRefused? other) -> bool
+DigitalBrain.PolicyRefused.PolicyRefused(string! Action, decimal Amount, string! RuleId) -> void
+DigitalBrain.PolicyRefused.RuleId.get -> string!
+DigitalBrain.PolicyRefused.RuleId.init -> void
+DigitalBrain.PolicyRetired
+DigitalBrain.PolicyRetired.Deconstruct(out string! RuleId) -> void
+DigitalBrain.PolicyRetired.Equals(DigitalBrain.PolicyRetired? other) -> bool
+DigitalBrain.PolicyRetired.PolicyRetired(string! RuleId) -> void
+DigitalBrain.PolicyRetired.RuleId.get -> string!
+DigitalBrain.PolicyRetired.RuleId.init -> void
+DigitalBrain.PolicyRule
+DigitalBrain.PolicyRule.<Clone>$() -> DigitalBrain.PolicyRule!
+DigitalBrain.PolicyRule.Action.get -> string!
+DigitalBrain.PolicyRule.Action.init -> void
+DigitalBrain.PolicyRule.AdoptedAt.get -> System.DateTimeOffset
+DigitalBrain.PolicyRule.AdoptedAt.init -> void
+DigitalBrain.PolicyRule.Condition.get -> DigitalBrain.PolicyCondition?
+DigitalBrain.PolicyRule.Condition.init -> void
+DigitalBrain.PolicyRule.Deconstruct(out string! Id, out string! Action, out DigitalBrain.PolicyMeasure Measure, out DigitalBrain.PolicyWindow! Window, out decimal Limit, out DigitalBrain.PolicyCondition? Condition, out string! Text, out System.DateTimeOffset AdoptedAt) -> void
+DigitalBrain.PolicyRule.Equals(DigitalBrain.PolicyRule? other) -> bool
+DigitalBrain.PolicyRule.Id.get -> string!
+DigitalBrain.PolicyRule.Id.init -> void
+DigitalBrain.PolicyRule.Limit.get -> decimal
+DigitalBrain.PolicyRule.Limit.init -> void
+DigitalBrain.PolicyRule.Measure.get -> DigitalBrain.PolicyMeasure
+DigitalBrain.PolicyRule.Measure.init -> void
+DigitalBrain.PolicyRule.PolicyRule(string! Id, string! Action, DigitalBrain.PolicyMeasure Measure, DigitalBrain.PolicyWindow! Window, decimal Limit, DigitalBrain.PolicyCondition? Condition, string! Text, System.DateTimeOffset AdoptedAt) -> void
+DigitalBrain.PolicyRule.Text.get -> string!
+DigitalBrain.PolicyRule.Text.init -> void
+DigitalBrain.PolicyRule.Window.get -> DigitalBrain.PolicyWindow!
+DigitalBrain.PolicyRule.Window.init -> void
+DigitalBrain.PolicyWindow
+DigitalBrain.PolicyWindow.<Clone>$() -> DigitalBrain.PolicyWindow!
+DigitalBrain.PolicyWindow.Deconstruct(out DigitalBrain.PolicyWindowKind Kind, out System.TimeSpan? Span) -> void
+DigitalBrain.PolicyWindow.Equals(DigitalBrain.PolicyWindow? other) -> bool
+DigitalBrain.PolicyWindow.Kind.get -> DigitalBrain.PolicyWindowKind
+DigitalBrain.PolicyWindow.Kind.init -> void
+DigitalBrain.PolicyWindow.PolicyWindow(DigitalBrain.PolicyWindowKind Kind, System.TimeSpan? Span) -> void
+DigitalBrain.PolicyWindow.Span.get -> System.TimeSpan?
+DigitalBrain.PolicyWindow.Span.init -> void
+DigitalBrain.PolicyWindowKind
+DigitalBrain.PolicyWindowKind.Day = 1 -> DigitalBrain.PolicyWindowKind
+DigitalBrain.PolicyWindowKind.Month = 3 -> DigitalBrain.PolicyWindowKind
+DigitalBrain.PolicyWindowKind.None = 0 -> DigitalBrain.PolicyWindowKind
+DigitalBrain.PolicyWindowKind.Rolling = 4 -> DigitalBrain.PolicyWindowKind
+DigitalBrain.PolicyWindowKind.Week = 2 -> DigitalBrain.PolicyWindowKind
+DigitalBrain.ProposalOutcome
+DigitalBrain.ProposalOutcome.<Clone>$() -> DigitalBrain.ProposalOutcome!
+DigitalBrain.ProposalOutcome.Deconstruct(out DigitalBrain.ProposalStatus Status, out string? RuleId, out string! Text, out string? PlanId, out string? Reason) -> void
+DigitalBrain.ProposalOutcome.Equals(DigitalBrain.ProposalOutcome? other) -> bool
+DigitalBrain.ProposalOutcome.PlanId.get -> string?
+DigitalBrain.ProposalOutcome.PlanId.init -> void
+DigitalBrain.ProposalOutcome.ProposalOutcome(DigitalBrain.ProposalStatus Status, string? RuleId, string! Text, string? PlanId, string? Reason) -> void
+DigitalBrain.ProposalOutcome.Reason.get -> string?
+DigitalBrain.ProposalOutcome.Reason.init -> void
+DigitalBrain.ProposalOutcome.RuleId.get -> string?
+DigitalBrain.ProposalOutcome.RuleId.init -> void
+DigitalBrain.ProposalOutcome.Status.get -> DigitalBrain.ProposalStatus
+DigitalBrain.ProposalOutcome.Status.init -> void
+DigitalBrain.ProposalOutcome.Text.get -> string!
+DigitalBrain.ProposalOutcome.Text.init -> void
+DigitalBrain.ProposalStatus
+DigitalBrain.ProposalStatus.Adopted = 1 -> DigitalBrain.ProposalStatus
+DigitalBrain.ProposalStatus.Denied = 2 -> DigitalBrain.ProposalStatus
+DigitalBrain.ProposalStatus.Pending = 0 -> DigitalBrain.ProposalStatus
+DigitalBrain.ProposalStatus.Refused = 3 -> DigitalBrain.ProposalStatus
+DigitalBrain.Reservation
+DigitalBrain.Reservation.<Clone>$() -> DigitalBrain.Reservation!
+DigitalBrain.Reservation.Amount.get -> decimal
+DigitalBrain.Reservation.Amount.init -> void
+DigitalBrain.Reservation.At.get -> System.DateTimeOffset
+DigitalBrain.Reservation.At.init -> void
+DigitalBrain.Reservation.DecisionId.get -> string!
+DigitalBrain.Reservation.DecisionId.init -> void
+DigitalBrain.Reservation.Deconstruct(out string! DecisionId, out string! RuleId, out decimal Amount, out System.DateTimeOffset At) -> void
+DigitalBrain.Reservation.Equals(DigitalBrain.Reservation? other) -> bool
+DigitalBrain.Reservation.Reservation(string! DecisionId, string! RuleId, decimal Amount, System.DateTimeOffset At) -> void
+DigitalBrain.Reservation.RuleId.get -> string!
+DigitalBrain.Reservation.RuleId.init -> void
+override DigitalBrain.ActionDescriptor.Equals(object? obj) -> bool
+override DigitalBrain.ActionDescriptor.GetHashCode() -> int
+override DigitalBrain.ActionDescriptor.ToString() -> string!
+override DigitalBrain.PendingProposal.Equals(object? obj) -> bool
+override DigitalBrain.PendingProposal.GetHashCode() -> int
+override DigitalBrain.PendingProposal.ToString() -> string!
+override DigitalBrain.PoliciesState.Equals(object? obj) -> bool
+override DigitalBrain.PoliciesState.GetHashCode() -> int
+override DigitalBrain.PoliciesState.ToString() -> string!
+override DigitalBrain.PolicyAdopted.<Clone>$() -> DigitalBrain.PolicyAdopted!
+override DigitalBrain.PolicyAdopted.Equals(object? obj) -> bool
+override DigitalBrain.PolicyAdopted.GetHashCode() -> int
+override DigitalBrain.PolicyAdopted.ToString() -> string!
+override DigitalBrain.PolicyCondition.Equals(object? obj) -> bool
+override DigitalBrain.PolicyCondition.GetHashCode() -> int
+override DigitalBrain.PolicyCondition.ToString() -> string!
+override DigitalBrain.PolicyDecision.Equals(object? obj) -> bool
+override DigitalBrain.PolicyDecision.GetHashCode() -> int
+override DigitalBrain.PolicyDecision.ToString() -> string!
+override DigitalBrain.PolicyProposed.<Clone>$() -> DigitalBrain.PolicyProposed!
+override DigitalBrain.PolicyProposed.Equals(object? obj) -> bool
+override DigitalBrain.PolicyProposed.GetHashCode() -> int
+override DigitalBrain.PolicyProposed.ToString() -> string!
+override DigitalBrain.PolicyRefused.<Clone>$() -> DigitalBrain.PolicyRefused!
+override DigitalBrain.PolicyRefused.Equals(object? obj) -> bool
+override DigitalBrain.PolicyRefused.GetHashCode() -> int
+override DigitalBrain.PolicyRefused.ToString() -> string!
+override DigitalBrain.PolicyRetired.<Clone>$() -> DigitalBrain.PolicyRetired!
+override DigitalBrain.PolicyRetired.Equals(object? obj) -> bool
+override DigitalBrain.PolicyRetired.GetHashCode() -> int
+override DigitalBrain.PolicyRetired.ToString() -> string!
+override DigitalBrain.PolicyRule.Equals(object? obj) -> bool
+override DigitalBrain.PolicyRule.GetHashCode() -> int
+override DigitalBrain.PolicyRule.ToString() -> string!
+override DigitalBrain.PolicyWindow.Equals(object? obj) -> bool
+override DigitalBrain.PolicyWindow.GetHashCode() -> int
+override DigitalBrain.PolicyWindow.ToString() -> string!
+override DigitalBrain.ProposalOutcome.Equals(object? obj) -> bool
+override DigitalBrain.ProposalOutcome.GetHashCode() -> int
+override DigitalBrain.ProposalOutcome.ToString() -> string!
+override DigitalBrain.Reservation.Equals(object? obj) -> bool
+override DigitalBrain.Reservation.GetHashCode() -> int
+override DigitalBrain.Reservation.ToString() -> string!
+override sealed DigitalBrain.PolicyAdopted.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.PolicyProposed.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.PolicyRefused.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.PolicyRetired.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.ActionDescriptor.operator !=(DigitalBrain.ActionDescriptor? left, DigitalBrain.ActionDescriptor? right) -> bool
+static DigitalBrain.ActionDescriptor.operator ==(DigitalBrain.ActionDescriptor? left, DigitalBrain.ActionDescriptor? right) -> bool
+static DigitalBrain.PendingProposal.operator !=(DigitalBrain.PendingProposal? left, DigitalBrain.PendingProposal? right) -> bool
+static DigitalBrain.PendingProposal.operator ==(DigitalBrain.PendingProposal? left, DigitalBrain.PendingProposal? right) -> bool
+static DigitalBrain.PoliciesState.operator !=(DigitalBrain.PoliciesState? left, DigitalBrain.PoliciesState? right) -> bool
+static DigitalBrain.PoliciesState.operator ==(DigitalBrain.PoliciesState? left, DigitalBrain.PoliciesState? right) -> bool
+static DigitalBrain.PolicyAdopted.operator !=(DigitalBrain.PolicyAdopted? left, DigitalBrain.PolicyAdopted? right) -> bool
+static DigitalBrain.PolicyAdopted.operator ==(DigitalBrain.PolicyAdopted? left, DigitalBrain.PolicyAdopted? right) -> bool
+static DigitalBrain.PolicyCondition.operator !=(DigitalBrain.PolicyCondition? left, DigitalBrain.PolicyCondition? right) -> bool
+static DigitalBrain.PolicyCondition.operator ==(DigitalBrain.PolicyCondition? left, DigitalBrain.PolicyCondition? right) -> bool
+static DigitalBrain.PolicyDecision.operator !=(DigitalBrain.PolicyDecision? left, DigitalBrain.PolicyDecision? right) -> bool
+static DigitalBrain.PolicyDecision.operator ==(DigitalBrain.PolicyDecision? left, DigitalBrain.PolicyDecision? right) -> bool
+static DigitalBrain.PolicyGrammar.Parse(string! id, string! action, string! measure, string! window, decimal limit, string? conditionFact, string? conditionOp, string? conditionValue, DigitalBrain.ActionDescriptor! declared, System.TimeProvider! clock) -> DigitalBrain.PolicyRule!
+static DigitalBrain.PolicyGrammar.Render(DigitalBrain.PolicyRule! rule, DigitalBrain.ActionDescriptor! declared) -> string!
+static DigitalBrain.PolicyGuard.Require(DigitalBrain.PolicyDecision! decision) -> void
+static DigitalBrain.PolicyProposed.operator !=(DigitalBrain.PolicyProposed? left, DigitalBrain.PolicyProposed? right) -> bool
+static DigitalBrain.PolicyProposed.operator ==(DigitalBrain.PolicyProposed? left, DigitalBrain.PolicyProposed? right) -> bool
+static DigitalBrain.PolicyRefused.operator !=(DigitalBrain.PolicyRefused? left, DigitalBrain.PolicyRefused? right) -> bool
+static DigitalBrain.PolicyRefused.operator ==(DigitalBrain.PolicyRefused? left, DigitalBrain.PolicyRefused? right) -> bool
+static DigitalBrain.PolicyRetired.operator !=(DigitalBrain.PolicyRetired? left, DigitalBrain.PolicyRetired? right) -> bool
+static DigitalBrain.PolicyRetired.operator ==(DigitalBrain.PolicyRetired? left, DigitalBrain.PolicyRetired? right) -> bool
+static DigitalBrain.PolicyRule.operator !=(DigitalBrain.PolicyRule? left, DigitalBrain.PolicyRule? right) -> bool
+static DigitalBrain.PolicyRule.operator ==(DigitalBrain.PolicyRule? left, DigitalBrain.PolicyRule? right) -> bool
+static DigitalBrain.PolicyWindow.operator !=(DigitalBrain.PolicyWindow? left, DigitalBrain.PolicyWindow? right) -> bool
+static DigitalBrain.PolicyWindow.operator ==(DigitalBrain.PolicyWindow? left, DigitalBrain.PolicyWindow? right) -> bool
+static DigitalBrain.ProposalOutcome.operator !=(DigitalBrain.ProposalOutcome? left, DigitalBrain.ProposalOutcome? right) -> bool
+static DigitalBrain.ProposalOutcome.operator ==(DigitalBrain.ProposalOutcome? left, DigitalBrain.ProposalOutcome? right) -> bool
+static DigitalBrain.Reservation.operator !=(DigitalBrain.Reservation? left, DigitalBrain.Reservation? right) -> bool
+static DigitalBrain.Reservation.operator ==(DigitalBrain.Reservation? left, DigitalBrain.Reservation? right) -> bool

@@ -1,5 +1,5 @@
 #!/usr/bin/env -S dotnet --
-// Packs the eighteen DigitalBrain packages as <VERSION>-preview.local.<yyyyMMddHHmmss> into a flat local feed:
+// Packs the nineteen DigitalBrain packages as <VERSION>-preview.local.<yyyyMMddHHmmss> into a flat local feed:
 // `dotnet run scripts/pack-local.cs -- --feed <folder>`
 using System.Diagnostics;
 using System.Globalization;
@@ -52,6 +52,7 @@ string[] projects =
     "src/DigitalBrain.Apps.Packaging/DigitalBrain.Apps.Packaging.csproj",
     "src/DigitalBrain.Runtime.Http/DigitalBrain.Runtime.Http.csproj",
     "src/DigitalBrain.Runtime.Apps/DigitalBrain.Runtime.Apps.csproj",
+    "src/DigitalBrain.Runtime.Synapses/DigitalBrain.Runtime.Synapses.csproj",
     "src/DigitalBrain.Testing/DigitalBrain.Testing.csproj",
     "src/DigitalBrain.Runtime.Orleans/DigitalBrain.Runtime.Orleans.csproj",
     "src/DigitalBrain.Runtime.Orleans.Azure/DigitalBrain.Runtime.Orleans.Azure.csproj",

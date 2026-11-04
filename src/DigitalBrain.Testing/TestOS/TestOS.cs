@@ -69,6 +69,8 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         new(() => new DigitalBrain.Runtime.Synapses.SynapseCompiler(DigitalBrain.Runtime.Synapses.ReferenceSet.FromDefaultContext()));
     private (DigitalBrain.Runtime.Synapses.SynapseHost Host, ISynapseRestorer Restorer)? _runtime;
     private readonly ConcurrentDictionary<string, byte> _generated = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ActionDescriptor> _actions = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<Assembly, byte> _scannedModules = new();
 
     private TestOS(TestOSOptions options)
     {
@@ -76,7 +78,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         Clock = new TestClock(options.Start);
         Capabilities = new CapabilityFakes();
         Source = new SynapseCatalogSource(SynapseCatalog.Scan());
-        Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance, new TestInstallHooks(this), new TestSlotResolver(this), Source);
+        Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance, new TestInstallHooks(this), new TestSlotResolver(this), Source, () => [.. _actions.Values]);
         Delivery = new SynapseRegistry(this);
         Confirmations = new TestConfirmations(Clock);
         Listeners = new TestClusterListeners(this);
@@ -85,6 +87,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         Store = new DigitalBrain.Runtime.Synapses.NeuronSourceStore(brain => Get<ISources>(new NeuronId(brain, SourcesType, "default")));
         Register<InstallsNeuron>();
         Register<SourcesNeuron>();
+        Register<PoliciesNeuron>();
         Register<TimeNeuron>();
         _ = Listeners.Listen<GateChanged>("testos.installed-gates", RefreshGates);
     }
@@ -184,6 +187,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     public TestOS Register(Assembly assembly)
     {
         ArgumentNullException.ThrowIfNull(assembly);
+        ScanModuleActions(assembly);
         var scanned = SynapseCatalog.Scan(assembly);
         Source.Merge(scanned);
         foreach (var (alias, record) in scanned.States)
@@ -532,7 +536,24 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         var registered = _types.GetOrAdd(name, type);
         if (registered != type) { throw new ArgumentException($"Neuron type '{name}' is already registered for {registered.FullName}.", nameof(type)); }
         _ = CallMarkers.Predicate(type);
+        if (type.Assembly != typeof(Neuron).Assembly) { ScanModuleActions(type.Assembly); }
         return this;
+    }
+
+    private void ScanModuleActions(Assembly assembly)
+    {
+        if (!_scannedModules.TryAdd(assembly, 0)) { return; }
+        foreach (var moduleType in assembly.GetTypes().Where(type => type is { IsAbstract: false, IsClass: true } && typeof(Module).IsAssignableFrom(type) && type.IsDefined(typeof(ModuleAttribute), false)))
+        {
+            try
+            {
+                foreach (var action in ModuleManifest.Of(moduleType).Actions)
+                {
+                    _ = _actions.TryAdd(action.Name, action);
+                }
+            }
+            catch (Exception error) when (error is InvalidOperationException or InvalidDataException) { _ = error; }
+        }
     }
 
     private static TaskCompletionSource Quiet()

@@ -60,6 +60,7 @@
       "synapse.ref"
     ],
     "neurons": [
+      "policies",
       "runtime.listener",
       "runtime.operation",
       "runtime.session"
@@ -70,6 +71,10 @@
       "kernel.instance-created",
       "kernel.instance-retired",
       "kernel.type-added",
+      "policy.adopted",
+      "policy.proposed",
+      "policy.refused",
+      "policy.retired",
       "synapse.deployed",
       "synapse.finished",
       "synapse.gap",

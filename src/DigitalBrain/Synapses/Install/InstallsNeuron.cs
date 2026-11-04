@@ -67,7 +67,8 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
         }
 
         var plan = new ConfirmationPlan($"install:{alias}:{Guid.NewGuid():N}", ConfirmationAction.Other, Destructive: false, Title: alias, Body: sentence,
-            ApproveLabel: "Allow", DenyLabel: "Deny", TargetLabel: alias) { RequiresPerson = true };
+            ApproveLabel: "Allow", DenyLabel: "Deny", TargetLabel: alias)
+        { RequiresPerson = true };
         var pending = new PendingInstall(plan.Id, alias, new Dictionary<string, string>(bindings, StringComparer.Ordinal), hash, sentence);
         // A newer ask of an alias replaces the older one; the older plan's answer is then ignored.
         await Save(State with { Pending = [.. State.Pending.Where(p => p.Alias != alias), pending] }, [new InstallRequested(alias, plan.Id)]).ConfigureAwait(true);

@@ -52,9 +52,11 @@ internal sealed class NeuronTypeRegistry
     /// <exception cref="InvalidOperationException">Two classes claim one type name, or a <c>[Neuron]</c> class is an app.</exception>
     /// <exception cref="SynapseShapeException">A state alias is declared twice, or a synapse function has an unsupported shape.</exception>
     public NeuronTypeRegistry(IEnumerable<Assembly> assemblies)
-        : this(Listed(assemblies).SelectMany(Loadable).Concat([typeof(InstallsNeuron), typeof(SourcesNeuron), typeof(DigitalBrain.Time.TimeNeuron)]))
+        : this(Listed(assemblies).SelectMany(Loadable).Concat([typeof(InstallsNeuron), typeof(SourcesNeuron), typeof(PoliciesNeuron), typeof(DigitalBrain.Time.TimeNeuron)]))
     {
-        Catalog = SynapseCatalog.Scan(Listed(assemblies));
+        var listed = Listed(assemblies);
+        Catalog = SynapseCatalog.Scan(listed);
+        Actions = ScanActions(listed);
         foreach (var (alias, record) in Catalog.States)
         {
             var neuronClass = typeof(StateNeuron<>).MakeGenericType(record);
@@ -94,6 +96,9 @@ internal sealed class NeuronTypeRegistry
     /// catalog is the <see cref="ISynapseCatalogSource"/> seeded from it.
     /// </summary>
     public SynapseCatalog Catalog { get; } = SynapseCatalog.Scan();
+
+    /// <summary>The promise-able actions declared by the <see cref="ModuleManifest"/> of every module in the hosted assemblies.</summary>
+    public IReadOnlyList<ActionDescriptor> Actions { get; } = [];
 
     /// <summary>Bumped on every <see cref="RegisterState"/> and <see cref="UnregisterState"/> that changes the map.</summary>
     public long Version => Interlocked.Read(ref _version);
@@ -178,5 +183,22 @@ internal sealed class NeuronTypeRegistry
     {
         try { return assembly.GetTypes(); }
         catch (ReflectionTypeLoadException error) { return error.Types.OfType<Type>(); }
+    }
+
+    private static IReadOnlyList<ActionDescriptor> ScanActions(IEnumerable<Assembly> assemblies)
+    {
+        var actions = new Dictionary<string, ActionDescriptor>(StringComparer.Ordinal);
+        foreach (var type in assemblies.SelectMany(Loadable).Where(t => t is { IsAbstract: false, IsClass: true } && typeof(Module).IsAssignableFrom(t) && t.IsDefined(typeof(ModuleAttribute), false)))
+        {
+            try
+            {
+                foreach (var action in ModuleManifest.Of(type).Actions)
+                {
+                    _ = actions.TryAdd(action.Name, action);
+                }
+            }
+            catch (Exception error) when (error is InvalidOperationException or InvalidDataException) { _ = error; }
+        }
+        return [.. actions.Values];
     }
 }
