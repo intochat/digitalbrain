@@ -35,8 +35,7 @@ public static class StateNeuron
 public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where TState : class, new()
 {
     private const string GatePlaceholder = "gate";
-    private readonly string _alias;
-    private readonly IReadOnlyList<SynapseDescriptor> _synapses;
+    private readonly ISynapseCatalogSource _catalog;
     private readonly ISlotResolver _slots;
     private const int FlushedMemory = 256;
     private readonly List<Entry> _provisional = [];
@@ -45,18 +44,28 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     private bool _viewsPending;
     private bool _journalingRefusal;
 
-    /// <summary>Creates the neuron for <typeparamref name="TState"/> from <paramref name="catalog"/>.</summary>
-    /// <param name="catalog">The synapse catalog.</param>
+    /// <summary>Creates the neuron for <typeparamref name="TState"/> over the live <paramref name="catalog"/>, read again on every turn.</summary>
+    /// <param name="catalog">The live synapse catalog.</param>
     /// <param name="slots">Resolves the <c>[Slot]</c> parameters of the synapse functions, once per call.</param>
-    /// <exception cref="ArgumentException">The catalog has no <c>[State]</c> alias for <typeparamref name="TState"/>.</exception>
-    public StateNeuron(SynapseCatalog catalog, ISlotResolver slots)
+    /// <exception cref="ArgumentException">The current catalog has no <c>[State]</c> alias for <typeparamref name="TState"/>.</exception>
+    public StateNeuron(ISynapseCatalogSource catalog, ISlotResolver slots)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(slots);
         _slots = slots;
-        _alias = catalog.States.FirstOrDefault(s => s.Value == typeof(TState)).Key
+        _catalog = catalog;
+        _ = AliasIn(catalog.Current)
             ?? throw new ArgumentException($"{typeof(TState).FullName} is not a [State] record of the catalog.", nameof(catalog));
-        _synapses = catalog.For(_alias);
+    }
+
+    // The alias of the record in the current catalog; null once it was removed.
+    private static string? AliasIn(SynapseCatalog catalog) => catalog.States.FirstOrDefault(s => s.Value == typeof(TState)).Key;
+
+    // The synapses of the record in the current catalog: a catalog change reaches an active neuron on its next turn.
+    private IReadOnlyList<SynapseDescriptor> Synapses()
+    {
+        var current = _catalog.Current;
+        return AliasIn(current) is { } alias ? current.For(alias) : [];
     }
 
     /// <inheritdoc />
@@ -275,7 +284,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
 
     private async Task RunViews()
     {
-        foreach (var view in _synapses.Where(d => d.Kind == SynapseKind.View))
+        foreach (var view in Synapses().Where(d => d.Kind == SynapseKind.View))
         {
             await Run(view, null, State, async result =>
             {
@@ -286,12 +295,12 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     }
 
     private IEnumerable<SynapseDescriptor> Matching(SynapseKind kind, Signal signal) =>
-        _synapses.Where(d => d.Kind == kind && d.Signal!.IsInstanceOfType(signal));
+        Synapses().Where(d => d.Kind == kind && d.Signal!.IsInstanceOfType(signal));
 
     private async Task Run(SynapseDescriptor synapse, Signal? signal, TState state, Func<object?, Task<string>> settle, CancellationToken ct)
     {
         var neuron = Id.ToString();
-        var arriving = signal is null ? _alias : AliasOf(signal);
+        var arriving = signal is null ? AliasIn(_catalog.Current) ?? Id.Type : AliasOf(signal);
         await PublishEphemeral(new SynapseStarted(neuron, synapse.Name, arriving)).ConfigureAwait(true);
         var clock = Stopwatch.StartNew();
         string outcome;

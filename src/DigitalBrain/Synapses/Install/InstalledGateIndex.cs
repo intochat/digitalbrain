@@ -7,8 +7,8 @@ namespace DigitalBrain;
 /// An <see cref="IGateIndex"/> that serves only the gates of installed apps: <see cref="SynapseCatalog.GatesOf"/> filtered to the aliases
 /// last given to <see cref="Refresh"/> for the brain. A brain never refreshed has no gates. Hosts refresh on <see cref="GateChanged"/>.
 /// </summary>
-/// <param name="catalog">The synapse catalog.</param>
-public sealed class InstalledGateIndex(SynapseCatalog catalog) : IGateIndex
+/// <param name="catalog">The live synapse catalog, read on every call.</param>
+public sealed class InstalledGateIndex(ISynapseCatalogSource catalog) : IGateIndex
 {
     private readonly ConcurrentDictionary<BrainId, HashSet<string>> _installed = new();
 
@@ -26,6 +26,6 @@ public sealed class InstalledGateIndex(SynapseCatalog catalog) : IGateIndex
     {
         ArgumentNullException.ThrowIfNull(catalog);
         if (!_installed.TryGetValue(brain, out var aliases)) { return []; }
-        return [.. catalog.GatesOf(signal).Where(d => aliases.Contains(d.StateAlias)).Select(d => (new NeuronId(brain, d.StateAlias, d.Key), d))];
+        return [.. catalog.Current.GatesOf(signal).Where(d => aliases.Contains(d.StateAlias)).Select(d => (new NeuronId(brain, d.StateAlias, d.Key), d))];
     }
 }

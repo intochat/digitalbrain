@@ -65,32 +65,37 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     private int _outstanding;
     private string? _failNextPublish;
     private TaskCompletionSource _quiet = Quiet();
-    private SynapseCatalog _catalog = SynapseCatalog.Scan();
 
     private TestOS(TestOSOptions options)
     {
         Options = options;
         Clock = new TestClock(options.Start);
         Capabilities = new CapabilityFakes();
-        Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance, new TestInstallHooks(this), new TestSlotResolver(this));
+        Source = new SynapseCatalogSource(SynapseCatalog.Scan());
+        Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance, new TestInstallHooks(this), new TestSlotResolver(this), Source);
         Synapses = new SynapseRegistry(this);
         Confirmations = new TestConfirmations(Clock);
         Listeners = new TestClusterListeners(this);
-        Gates = new InstalledGateIndex(_catalog);
+        Gates = new InstalledGateIndex(Source);
         Register<InstallsNeuron>();
         Register<TimeNeuron>();
         _ = Listeners.Listen<GateChanged>("testos.installed-gates", RefreshGates);
     }
 
-    /// <summary>The <c>[State]</c> records and synapse functions of every assembly registered with <see cref="Register(Assembly)"/>.</summary>
-    public SynapseCatalog Catalog => Volatile.Read(ref _catalog);
+    /// <summary>The <c>[State]</c> records and synapse functions in force now: <see cref="Source"/>'s current catalog.</summary>
+    public SynapseCatalog Catalog => Source.Current;
+
+    /// <summary>
+    /// The live catalog every state neuron, the installs neuron and <see cref="Gates"/> read on each turn or call, so a change reaches
+    /// neurons activated before it. <see cref="Register(Assembly)"/> merges into it and <see cref="Unregister(string)"/> removes from it.
+    /// </summary>
+    public SynapseCatalogSource Source { get; }
 
     /// <summary>
     /// The gate index a durable signal passes before it is appended: the <see cref="Catalog"/> gates of the aliases the brain's
     /// <see cref="IInstalls"/> neuron records, refreshed on every <see cref="GateChanged"/>. A brain with no install has no gates.
-    /// <see cref="Register(Assembly)"/> starts a new index, so register every assembly before installing.
     /// </summary>
-    public InstalledGateIndex Gates { get; private set; }
+    public InstalledGateIndex Gates { get; }
 
     /// <summary>Host-level listeners on the signals of every brain of this TestOS (04-19); they survive <see cref="Restart"/>.</summary>
     public DigitalBrain.Spi.IClusterListeners ClusterListeners => Listeners;
@@ -151,11 +156,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     {
         ArgumentNullException.ThrowIfNull(assembly);
         var scanned = SynapseCatalog.Scan(assembly);
-        lock (_gate)
-        {
-            _catalog = _catalog.Merge(scanned);
-            Gates = new InstalledGateIndex(_catalog);
-        }
+        Source.Merge(scanned);
         foreach (var (alias, record) in scanned.States)
         {
             var neuron = typeof(StateNeuron<>).MakeGenericType(record);
@@ -165,6 +166,23 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         foreach (var type in assembly.GetTypes().Where(type => type is { IsAbstract: false, IsClass: true } && typeof(Neuron).IsAssignableFrom(type) && type.IsDefined(typeof(NeuronAttribute), false)))
         {
             Register(type);
+        }
+        return this;
+    }
+
+    /// <summary>
+    /// Removes the state alias <paramref name="alias"/> from <see cref="Source"/> and its state neuron class, so its gates and synapses stop
+    /// at once; activations already hosted stay until they end. A plain <c>[Neuron]</c> type name or an unknown alias only leaves the catalog.
+    /// </summary>
+    /// <param name="alias">The state alias.</param>
+    /// <returns>This TestOS.</returns>
+    public TestOS Unregister(string alias)
+    {
+        ArgumentNullException.ThrowIfNull(alias);
+        Source.Remove(alias);
+        if (_types.TryGetValue(alias, out var type) && type.IsGenericType && type.GetGenericTypeDefinition() == typeof(StateNeuron<>))
+        {
+            _ = _types.TryRemove(new KeyValuePair<string, Type>(alias, type));
         }
         return this;
     }

@@ -1995,7 +1995,7 @@ DigitalBrain.StateNeuron<TState>.Gate(DigitalBrain.Signal! signal, System.Guid a
 DigitalBrain.StateNeuron<TState>.Receive(DigitalBrain.Signal! signal, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 static readonly DigitalBrain.StateNeuron.ProvisionalLease -> System.TimeSpan
 DigitalBrain.StateNeuron
-DigitalBrain.StateNeuron<TState>.StateNeuron(DigitalBrain.SynapseCatalog! catalog, DigitalBrain.Spi.ISlotResolver! slots) -> void
+DigitalBrain.StateNeuron<TState>.StateNeuron(DigitalBrain.ISynapseCatalogSource! catalog, DigitalBrain.Spi.ISlotResolver! slots) -> void
 DigitalBrain.CatalogGateIndex
 DigitalBrain.CatalogGateIndex.CatalogGateIndex(DigitalBrain.SynapseCatalog! catalog) -> void
 DigitalBrain.CatalogGateIndex.GatesFor(DigitalBrain.BrainId brain, System.Type! signal) -> System.Collections.Generic.IReadOnlyList<(DigitalBrain.NeuronId Gate, DigitalBrain.SynapseDescriptor! Synapse)>!
@@ -2237,12 +2237,12 @@ DigitalBrain.InstallStatus.Unchanged = 2 -> DigitalBrain.InstallStatus
 DigitalBrain.InstallStatus.Updated = 1 -> DigitalBrain.InstallStatus
 DigitalBrain.InstalledGateIndex
 DigitalBrain.InstalledGateIndex.GatesFor(DigitalBrain.BrainId brain, System.Type! signal) -> System.Collections.Generic.IReadOnlyList<(DigitalBrain.NeuronId Gate, DigitalBrain.SynapseDescriptor! Synapse)>!
-DigitalBrain.InstalledGateIndex.InstalledGateIndex(DigitalBrain.SynapseCatalog! catalog) -> void
+DigitalBrain.InstalledGateIndex.InstalledGateIndex(DigitalBrain.ISynapseCatalogSource! catalog) -> void
 DigitalBrain.InstalledGateIndex.Refresh(DigitalBrain.BrainId brain, System.Collections.Generic.IReadOnlyList<DigitalBrain.InstallRecord!>! records) -> void
 DigitalBrain.InstallsNeuron
 DigitalBrain.InstallsNeuron.Describe(string! alias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.InstallRecord?>!
 DigitalBrain.InstallsNeuron.Install(DigitalBrain.InstallRequest! request, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.InstallOutcome!>!
-DigitalBrain.InstallsNeuron.InstallsNeuron(DigitalBrain.SynapseCatalog! catalog, DigitalBrain.Spi.IInstallHooks! hooks) -> void
+DigitalBrain.InstallsNeuron.InstallsNeuron(DigitalBrain.ISynapseCatalogSource! catalog, DigitalBrain.Spi.IInstallHooks! hooks) -> void
 DigitalBrain.InstallsNeuron.List(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.InstallRecord!>!>!
 DigitalBrain.InstallsNeuron.Retire(string! alias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 DigitalBrain.InstallsState
@@ -2412,3 +2412,21 @@ static DigitalBrain.PendingInstall.operator !=(DigitalBrain.PendingInstall? left
 static DigitalBrain.PendingInstall.operator ==(DigitalBrain.PendingInstall? left, DigitalBrain.PendingInstall? right) -> bool
 DigitalBrain.Spi.IInstallHooks.ValidateBinding(DigitalBrain.NeuronId state, DigitalBrain.SlotDescriptor! slot, string! binding, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<string?>!
 DigitalBrain.NoInstallHooks.ValidateBinding(DigitalBrain.NeuronId state, DigitalBrain.SlotDescriptor! slot, string! binding, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<string?>!
+DigitalBrain.ISynapseCatalogSource
+DigitalBrain.ISynapseCatalogSource.Changed -> System.Action<DigitalBrain.SynapseCatalog!>?
+DigitalBrain.ISynapseCatalogSource.Current.get -> DigitalBrain.SynapseCatalog!
+DigitalBrain.ISynapseCatalogSource.ForNeeds(string! alias) -> DigitalBrain.SynapseCatalog!
+DigitalBrain.ISynapseCatalogSource.Version.get -> long
+DigitalBrain.SynapseCatalog.Replace(DigitalBrain.SynapseCatalog! other) -> DigitalBrain.SynapseCatalog!
+DigitalBrain.SynapseCatalog.Without(string! alias) -> DigitalBrain.SynapseCatalog!
+DigitalBrain.SynapseCatalogSource
+DigitalBrain.SynapseCatalogSource.Changed -> System.Action<DigitalBrain.SynapseCatalog!>?
+DigitalBrain.SynapseCatalogSource.Current.get -> DigitalBrain.SynapseCatalog!
+DigitalBrain.SynapseCatalogSource.ForNeeds(string! alias) -> DigitalBrain.SynapseCatalog!
+DigitalBrain.SynapseCatalogSource.Merge(DigitalBrain.SynapseCatalog! catalog) -> void
+DigitalBrain.SynapseCatalogSource.Remove(string! alias) -> void
+DigitalBrain.SynapseCatalogSource.Replace(string! alias, DigitalBrain.SynapseCatalog! catalog) -> void
+DigitalBrain.SynapseCatalogSource.Stage(string! sourceKey, DigitalBrain.SynapseCatalog! staged) -> void
+DigitalBrain.SynapseCatalogSource.SynapseCatalogSource(DigitalBrain.SynapseCatalog! initial) -> void
+DigitalBrain.SynapseCatalogSource.Unstage(string! sourceKey) -> void
+DigitalBrain.SynapseCatalogSource.Version.get -> long

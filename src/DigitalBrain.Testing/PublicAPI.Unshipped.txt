@@ -698,3 +698,5 @@ DigitalBrain.Testing.RecordingSynapses.BrainWide.get -> System.Collections.Gener
 DigitalBrain.Testing.RecordingSynapses.EnsureBrainWide(params System.Type![]! signals) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.RecordingSynapses.RemoveBrainWide() -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.TestOS.Without<TCapability>(string! name) -> DigitalBrain.Testing.TestOS!
+DigitalBrain.Testing.TestOS.Source.get -> DigitalBrain.SynapseCatalogSource!
+DigitalBrain.Testing.TestOS.Unregister(string! alias) -> DigitalBrain.Testing.TestOS!

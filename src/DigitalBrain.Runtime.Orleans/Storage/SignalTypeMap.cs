@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Reflection;
 
 namespace DigitalBrain.Runtime.Orleans;
@@ -5,11 +6,13 @@ namespace DigitalBrain.Runtime.Orleans;
 /// <summary>
 /// The closed set of signal types the journal decodes: <c>[Signal(alias)]</c> records from the composed assemblies plus the framework signals
 /// <see cref="Gap"/>, <see cref="DigitalBrain.Rules.Rejected"/> and <see cref="StateChanged"/>. A type name read from disk never reaches <see cref="Type.GetType(string)"/> (T-04-12).
+/// Thread-safe: <see cref="Register"/>, <see cref="Replace"/> and <see cref="Unregister"/> change the set while the silo runs.
 /// </summary>
 internal sealed class SignalTypeMap
 {
-    private readonly Dictionary<string, Type> byAlias = new(StringComparer.Ordinal);
-    private readonly Dictionary<Type, string> byType = [];
+    private readonly Lock gate = new();
+    private readonly ConcurrentDictionary<string, Type> byAlias = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<Type, string> byType = new();
 
     /// <exception cref="InvalidOperationException">Two types share one alias.</exception>
     public SignalTypeMap(IEnumerable<Assembly> assemblies)
@@ -40,15 +43,50 @@ internal sealed class SignalTypeMap
         }
     }
 
-    public IReadOnlyCollection<string> Aliases => byAlias.Keys;
+    public IReadOnlyCollection<string> Aliases => [.. byAlias.Keys];
 
     public bool TryResolve(string alias, out Type type) => byAlias.TryGetValue(alias, out type!);
 
     public bool TryAliasOf(Type type, out string alias) => byType.TryGetValue(type, out alias!);
 
+    /// <summary>Adds the <c>[Signal]</c> type <paramref name="type"/>; adding it again is a no-op.</summary>
+    /// <exception cref="InvalidOperationException">Another type holds the alias (only <see cref="Replace"/> swaps it), or the type has no <c>[Signal]</c>.</exception>
+    public void Register(Type type)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        lock (gate) { Add(type); }
+    }
+
+    /// <summary>Puts <paramref name="type"/> behind its alias, dropping the type that held it; adds it when the alias is new.</summary>
+    /// <exception cref="InvalidOperationException">The type has no <c>[Signal]</c>.</exception>
+    public void Replace(Type type)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        lock (gate)
+        {
+            var alias = AliasOf(type);
+            if (byAlias.TryGetValue(alias, out var existing)) { byType.TryRemove(existing, out _); }
+            byAlias[alias] = type;
+            byType[type] = alias;
+        }
+    }
+
+    /// <summary>Drops <paramref name="alias"/> and its type; an unknown alias is ignored.</summary>
+    public void Unregister(string alias)
+    {
+        ArgumentNullException.ThrowIfNull(alias);
+        lock (gate)
+        {
+            if (byAlias.TryRemove(alias, out var type)) { byType.TryRemove(type, out _); }
+        }
+    }
+
+    private static string AliasOf(Type type)
+        => type.GetCustomAttribute<SignalAttribute>()?.Alias ?? throw new InvalidOperationException($"{type.FullName} has no [Signal(alias)] attribute.");
+
     private void Add(Type type)
     {
-        var alias = type.GetCustomAttribute<SignalAttribute>()!.Alias;
+        var alias = AliasOf(type);
         if (byAlias.TryGetValue(alias, out var existing))
         {
             if (existing == type) { return; }

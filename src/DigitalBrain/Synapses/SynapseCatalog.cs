@@ -100,6 +100,32 @@ public sealed class SynapseCatalog
         return new SynapseCatalog(states, [.. Synapses, .. other.Synapses]);
     }
 
+    /// <summary>A new catalog without the state <paramref name="alias"/> and every synapse addressing it.</summary>
+    /// <param name="alias">The state alias to drop; an alias not in the catalog drops nothing.</param>
+    /// <returns>The catalog without the alias.</returns>
+    public SynapseCatalog Without(string alias)
+    {
+        ArgumentNullException.ThrowIfNull(alias);
+        var states = new Dictionary<string, Type>(States, StringComparer.Ordinal);
+        states.Remove(alias);
+        return new SynapseCatalog(states, [.. Synapses.Where(d => !string.Equals(d.StateAlias, alias, StringComparison.Ordinal))]);
+    }
+
+    /// <summary>A new catalog where every state of <paramref name="other"/> replaces the state of the same alias: <see cref="Without"/> each, then <see cref="Merge"/>.</summary>
+    /// <param name="other">The catalog whose states and synapses replace those of the same aliases.</param>
+    /// <returns>The catalog.</returns>
+    public SynapseCatalog Replace(SynapseCatalog other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        var kept = this;
+        foreach (var alias in other.States.Keys)
+        {
+            kept = kept.Without(alias);
+        }
+
+        return kept.Merge(other);
+    }
+
     private static SynapseCatalog Build(IEnumerable<Type> types, bool strictStates)
     {
         var all = types.ToList();

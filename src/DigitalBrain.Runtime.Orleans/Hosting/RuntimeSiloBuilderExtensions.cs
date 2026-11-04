@@ -48,8 +48,10 @@ public static class RuntimeSiloBuilderExtensions
         }
         else { silo.Services.TryAddSingleton(RuntimeOptions.Default); }
         silo.AddNeuronHosting(modules);
-        silo.Services.TryAddSingleton(sp => sp.GetRequiredService<NeuronTypeRegistry>().Catalog);
-        silo.Services.TryAddSingleton(sp => new InstalledGateIndex(sp.GetRequiredService<SynapseCatalog>()));
+        // The live catalog, seeded from the startup scan; state neurons, the installs neuron and the gate index read it per call.
+        silo.Services.TryAddSingleton(sp => new SynapseCatalogSource(sp.GetRequiredService<NeuronTypeRegistry>().Catalog));
+        silo.Services.TryAddSingleton<ISynapseCatalogSource>(sp => sp.GetRequiredService<SynapseCatalogSource>());
+        silo.Services.TryAddSingleton(sp => new InstalledGateIndex(sp.GetRequiredService<ISynapseCatalogSource>()));
         silo.Services.TryAddSingleton<DigitalBrain.Spi.IGateIndex>(sp => sp.GetRequiredService<InstalledGateIndex>());
         silo.Services.TryAddSingleton<InstalledGates>();
         silo.Services.TryAddSingleton<DigitalBrain.Spi.IInstallHooks, OrleansInstallHooks>();

@@ -12,10 +12,13 @@ namespace DigitalBrain;
 /// <see cref="InstallStatus.Pending"/>; the neuron's brain-wide synapse on <see cref="ConfirmationResolved"/> completes it. A plan id
 /// that is not pending is ignored.
 /// </remarks>
-/// <param name="catalog">The synapse catalog.</param>
+/// <param name="catalog">
+/// The live synapse catalog: needs and bindings come from <see cref="ISynapseCatalogSource.ForNeeds"/> (a staged build of the alias, else
+/// the current catalog); reaction edges from <see cref="ISynapseCatalogSource.Current"/>.
+/// </param>
 /// <param name="hooks">The host's install hooks.</param>
 [Neuron("synapse.installs")]
-public sealed class InstallsNeuron(SynapseCatalog catalog, IInstallHooks hooks) : Neuron<InstallsState>, IInstalls
+public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks hooks) : Neuron<InstallsState>, IInstalls
 {
     /// <inheritdoc />
     public async Task<InstallOutcome> Install(InstallRequest request, CancellationToken ct)
@@ -23,12 +26,13 @@ public sealed class InstallsNeuron(SynapseCatalog catalog, IInstallHooks hooks) 
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(catalog);
         var alias = request.Alias;
-        if (alias is null || !catalog.States.ContainsKey(alias))
+        var source = alias is null ? null : catalog.ForNeeds(alias);
+        if (alias is null || source is null || !source.States.ContainsKey(alias))
         {
             return new InstallOutcome(InstallStatus.Refused, string.Empty, $"no synapse app '{alias}'");
         }
 
-        var needs = catalog.NeedsOf(alias);
+        var needs = source.NeedsOf(alias);
         var sentence = needs.Sentence();
         var bindings = request.Bindings ?? new Dictionary<string, string>();
         if (needs.Slots.FirstOrDefault(slot => !bindings.ContainsKey(slot.Name)) is { } unbound)
@@ -37,7 +41,7 @@ public sealed class InstallsNeuron(SynapseCatalog catalog, IInstallHooks hooks) 
         }
 
         ArgumentNullException.ThrowIfNull(hooks);
-        foreach (var slot in catalog.For(alias).SelectMany(d => d.Slots).DistinctBy(s => (s.Name, s.Contract)))
+        foreach (var slot in source.For(alias).SelectMany(d => d.Slots).DistinctBy(s => (s.Name, s.Contract)))
         {
             if (await hooks.ValidateBinding(StateOf(alias), slot, bindings[slot.Name], ct).ConfigureAwait(true) is { } problem)
             {
@@ -90,13 +94,14 @@ public sealed class InstallsNeuron(SynapseCatalog catalog, IInstallHooks hooks) 
         }
 
         // The catalog may have changed since the ask (a new build without the app): the ask is dropped, not left pending.
-        if (!catalog.States.ContainsKey(alias))
+        var source = catalog.ForNeeds(alias);
+        if (!source.States.ContainsKey(alias))
         {
             await Save(State with { Pending = rest }, [new InstallDenied(alias, pending.PlanId, "unknown alias")]).ConfigureAwait(true);
             return;
         }
 
-        var needs = catalog.NeedsOf(alias);
+        var needs = source.NeedsOf(alias);
         var record = new InstallRecord(alias, pending.NeedsHash, pending.Bindings, [.. needs.Schedules.Select(s => s.Text)], Context.Time.GetUtcNow());
         await Save(new InstallsState([.. State.Records.Where(r => r.Alias != alias), record], rest), [new Installed(alias, pending.NeedsHash)]).ConfigureAwait(true);
         await GateChanged().ConfigureAwait(true);
@@ -165,7 +170,7 @@ public sealed class InstallsNeuron(SynapseCatalog catalog, IInstallHooks hooks) 
     {
         ArgumentNullException.ThrowIfNull(hooks);
         var state = StateOf(alias);
-        var signals = catalog.For(alias).Where(d => d.Kind == SynapseKind.Reaction).Select(d => d.Signal!).Distinct().ToList();
+        var signals = catalog.Current.For(alias).Where(d => d.Kind == SynapseKind.Reaction).Select(d => d.Signal!).Distinct().ToList();
         try
         {
             await hooks.EnsureReactionEdges(state, signals, ct).ConfigureAwait(true);

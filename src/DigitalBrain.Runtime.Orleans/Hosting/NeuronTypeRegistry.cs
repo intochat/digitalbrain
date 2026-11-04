@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 
@@ -27,7 +28,8 @@ internal sealed record NeuronRegistration(string Type, Type Class, string StateN
 /// <summary>
 /// The module-wide registry of hosted plain neuron classes (06 D-01, D-13): frozen <see cref="NeuronAttribute"/> type name to
 /// class, state name, policy and contracts, built from the composed module assemblies. Duplicate type names and
-/// <see cref="App"/> classes fail startup.
+/// <see cref="App"/> classes fail startup. The maps are thread-safe: <see cref="RegisterState"/> and <see cref="UnregisterState"/>
+/// change them while the silo runs, and every lookup reads the live map.
 /// </summary>
 internal sealed class NeuronTypeRegistry
 {
@@ -38,8 +40,9 @@ internal sealed class NeuronTypeRegistry
     /// <summary>The state name when the class sets none.</summary>
     internal const string DefaultStateName = "state";
 
-    private readonly Dictionary<string, NeuronRegistration> _types = new(StringComparer.Ordinal);
-    private readonly Dictionary<Type, NeuronRegistration> _byContract = [];
+    private readonly ConcurrentDictionary<string, NeuronRegistration> _types = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<Type, NeuronRegistration> _byContract = new();
+    private long _version;
 
     /// <summary>
     /// Registers the <c>[Neuron]</c> classes of <paramref name="assemblies"/>, the installs neuron (<c>synapse.installs</c>) and the time
@@ -86,14 +89,46 @@ internal sealed class NeuronTypeRegistry
         }
     }
 
-    /// <summary>The state records and synapse functions of the hosted assemblies; empty for a registry built from types.</summary>
+    /// <summary>
+    /// The state records and synapse functions of the hosted assemblies at startup, empty for a registry built from types; the live
+    /// catalog is the <see cref="ISynapseCatalogSource"/> seeded from it.
+    /// </summary>
     public SynapseCatalog Catalog { get; } = SynapseCatalog.Scan();
 
+    /// <summary>Bumped on every <see cref="RegisterState"/> and <see cref="UnregisterState"/> that changes the map.</summary>
+    public long Version => Interlocked.Read(ref _version);
+
+    /// <summary>Adds or replaces the closed <see cref="StateNeuron{TState}"/> of <paramref name="record"/> under <paramref name="alias"/>.</summary>
+    /// <param name="alias">The state alias.</param>
+    /// <param name="record">The <c>[State]</c> record.</param>
+    /// <exception cref="InvalidOperationException">A plain <c>[Neuron]</c> class already claims the alias.</exception>
+    public void RegisterState(string alias, Type record)
+    {
+        ArgumentNullException.ThrowIfNull(alias);
+        ArgumentNullException.ThrowIfNull(record);
+        var registration = new NeuronRegistration(alias, typeof(StateNeuron<>).MakeGenericType(record), DefaultStateName, HostPolicy.Affine, []);
+        _ = _types.AddOrUpdate(alias, registration, (_, existing) => IsState(existing)
+            ? registration
+            : throw new InvalidOperationException($"Neuron type '{alias}' is claimed by {existing.Class.FullName} and the [State] record {record.FullName}."));
+        Interlocked.Increment(ref _version);
+    }
+
+    /// <summary>Removes the state neuron registered under <paramref name="alias"/>; a plain <c>[Neuron]</c> class or an unknown alias is left alone.</summary>
+    /// <param name="alias">The state alias.</param>
+    public void UnregisterState(string alias)
+    {
+        ArgumentNullException.ThrowIfNull(alias);
+        if (_types.TryGetValue(alias, out var existing) && IsState(existing) && _types.TryRemove(new KeyValuePair<string, NeuronRegistration>(alias, existing)))
+        {
+            Interlocked.Increment(ref _version);
+        }
+    }
+
     /// <summary>The hosted type names.</summary>
-    public IReadOnlyCollection<string> Names => _types.Keys;
+    public IReadOnlyCollection<string> Names => [.. _types.Keys];
 
     /// <summary>The registrations.</summary>
-    public IReadOnlyCollection<NeuronRegistration> Registrations => _types.Values;
+    public IReadOnlyCollection<NeuronRegistration> Registrations => [.. _types.Values];
 
     /// <summary>The class registered for <paramref name="type"/>.</summary>
     public bool TryGet(string type, [NotNullWhen(true)] out Type? neuronClass)
@@ -129,6 +164,9 @@ internal sealed class NeuronTypeRegistry
         HostPolicy.Stateless => StatelessGrainType,
         _ => AffineGrainType,
     };
+
+    private static bool IsState(NeuronRegistration registration)
+        => registration.Class.IsGenericType && registration.Class.GetGenericTypeDefinition() == typeof(StateNeuron<>);
 
     private static Type[] ContractsOf(Type neuronClass)
         => [.. neuronClass.GetInterfaces().Where(face => face.Assembly != typeof(Neuron).Assembly && face.Assembly != typeof(object).Assembly)];

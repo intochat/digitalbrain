@@ -47,7 +47,7 @@ public sealed class StateNeuronSlotFacts
 
     private StateNeuron<Slotted> Attach(Type function, ISlotResolver resolver)
     {
-        var neuron = new StateNeuron<Slotted>(SynapseCatalog.Scan([typeof(Slotted), function]), resolver);
+        var neuron = new StateNeuron<Slotted>(new SynapseCatalogSource(SynapseCatalog.Scan([typeof(Slotted), function])), resolver);
         NeuronAttachment.Attach(neuron, Context);
         return neuron;
     }
