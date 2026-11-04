@@ -1,4 +1,6 @@
 using System.Reflection;
+using DigitalBrain.Capabilities;
+using DigitalBrain.Time;
 
 namespace DigitalBrain;
 
@@ -23,11 +25,29 @@ public enum SynapseKind
 /// <param name="StateAlias">The state alias from the attribute.</param>
 /// <param name="Key">The state key from the attribute.</param>
 /// <param name="TakesCancellation">Whether the function ends with a <see cref="CancellationToken"/>.</param>
-public sealed record SynapseDescriptor(SynapseKind Kind, MethodInfo Function, Type? Signal, Type State, string StateAlias, string Key, bool TakesCancellation)
+/// <param name="Slots">The capability slots the function takes, in parameter order.</param>
+/// <param name="Every">The schedule of a <see cref="Time.Tick"/> reaction; null otherwise.</param>
+public sealed record SynapseDescriptor(
+    SynapseKind Kind,
+    MethodInfo Function,
+    Type? Signal,
+    Type State,
+    string StateAlias,
+    string Key,
+    bool TakesCancellation,
+    IReadOnlyList<SlotDescriptor> Slots,
+    Schedule? Every)
 {
     /// <summary>The qualified function name.</summary>
     public string Name => Function.DeclaringType!.FullName + "." + Function.Name;
 }
+
+/// <summary>A capability slot parameter of a synapse function.</summary>
+/// <param name="Name">The slot name: the <c>[Slot]</c> name or the parameter name.</param>
+/// <param name="Contract">The capability interface type.</param>
+/// <param name="Capability">The capability the contract declares.</param>
+/// <param name="ParameterIndex">The zero-based parameter position.</param>
+public sealed record SlotDescriptor(string Name, Type Contract, CapabilityId Capability, int ParameterIndex);
 
 /// <summary>The refusal fragments <see cref="SynapseShape"/> puts in its messages, shared so analyzers can mirror them.</summary>
 public static class SynapseReasons
@@ -52,6 +72,18 @@ public static class SynapseReasons
 
     /// <summary>The signal type declared by <c>[Synapse]</c> is not assignable to the signal parameter.</summary>
     public const string SignalFitsParameter = "declared signal type must be assignable to the signal parameter";
+
+    /// <summary>A <c>[Slot]</c> parameter whose type is not an interface carrying <c>[Capability]</c>.</summary>
+    public const string SlotContractNeedsCapability = "slot contract needs [Capability]";
+
+    /// <summary>The <c>Every</c> text is not a schedule; followed by <c>: </c> and the text.</summary>
+    public const string Schedule = "schedule";
+
+    /// <summary><c>Every</c> on anything but a reaction to <c>Tick</c>.</summary>
+    public const string EveryNeedsTick = "every needs a Tick reaction";
+
+    /// <summary>The catalog found one slot name bound to two contracts.</summary>
+    public const string SlotBoundTwice = "slot";
 }
 
 /// <summary>Reads the shape of a synapse function.</summary>
@@ -96,10 +128,21 @@ public static class SynapseShape
         var unknown = false;
         var parameters = function.GetParameters();
         var misplacedToken = false;
+        var slots = new List<SlotDescriptor>();
         for (var i = 0; i < parameters.Length; i++)
         {
             var type = parameters[i].ParameterType;
-            if (typeof(Signal).IsAssignableFrom(type))
+            if (parameters[i].GetCustomAttribute<SlotAttribute>() is { } slot)
+            {
+                var capability = type.IsInterface ? type.GetCustomAttribute<CapabilityAttribute>() : null;
+                if (capability is null)
+                {
+                    throw new SynapseShapeException($"{name}: a {SynapseReasons.SlotContractNeedsCapability} (parameter '{parameters[i].Name}').");
+                }
+
+                slots.Add(new SlotDescriptor(slot.Name ?? parameters[i].Name!, type, capability.Id, i));
+            }
+            else if (typeof(Signal).IsAssignableFrom(type))
             {
                 signals++;
                 signal = type;
@@ -156,7 +199,25 @@ public static class SynapseShape
             throw new SynapseShapeException($"{name}: the {SynapseReasons.SignalFitsParameter}.");
         }
 
-        return new SynapseDescriptor(kind, function, signal, state, alias, attribute.Key, tokens == 1);
+        Schedule? every = null;
+        if (attribute.Every is { } text)
+        {
+            if (kind != SynapseKind.Reaction || attribute.Signal != typeof(Tick))
+            {
+                throw new SynapseShapeException($"{name}: {SynapseReasons.EveryNeedsTick}.");
+            }
+
+            try
+            {
+                every = Schedule.Parse(text);
+            }
+            catch (FormatException)
+            {
+                throw new SynapseShapeException($"{name}: a {SynapseReasons.Schedule}: {text} is not HH:mm, Mon HH:mm, every 5m or every 2h.");
+            }
+        }
+
+        return new SynapseDescriptor(kind, function, signal, state, alias, attribute.Key, tokens == 1, slots, every);
     }
 
     private static Type Unwrap(Type returned) =>

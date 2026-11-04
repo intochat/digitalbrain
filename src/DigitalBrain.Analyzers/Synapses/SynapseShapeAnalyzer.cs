@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 
@@ -12,6 +13,11 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
     private const string CancellationTokenType = "System.Threading.CancellationToken";
     private const string TaskType = "System.Threading.Tasks.Task`1";
     private const string ReactionType = "DigitalBrain.Reaction`1";
+
+    // Mirrors DigitalBrain.Time.Schedule: HH:mm, Day HH:mm, every Nm / every Nh (N from 1 to 999999).
+    private static readonly Regex ScheduleRule = new Regex(
+        @"^(?:(?:[01][0-9]|2[0-3]):[0-5][0-9]|(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) (?:[01][0-9]|2[0-3]):[0-5][0-9]|every (?<n>[0-9]{1,6})[mh])\z",
+        RegexOptions.CultureInvariant);
 
     /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rules.SynapseShape);
@@ -77,7 +83,14 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
         for (var i = 0; i < method.Parameters.Length; i++)
         {
             var type = method.Parameters[i].Type;
-            if (Rules.IsOrDerivesFrom(type, Rules.SignalType))
+            if (Rules.Has(method.Parameters[i], Rules.SlotAttribute))
+            {
+                if (type.TypeKind != TypeKind.Interface || !Rules.Has(type, Rules.CapabilityAttribute))
+                {
+                    return $"a {Rules.SynapseReasons.SlotContractNeedsCapability}.";
+                }
+            }
+            else if (Rules.IsOrDerivesFrom(type, Rules.SignalType))
             {
                 signals++;
                 hasSignalParameter = true;
@@ -122,9 +135,12 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
 
         if (!isGate && !isReaction)
         {
-            return hasSignalParameter || tokens > 0 || hasSignal
-                ? $"a {Rules.SynapseReasons.ViewTakesOnlyState}; a function with a signal must return Check or the state."
-                : null;
+            if (hasSignalParameter || tokens > 0 || hasSignal)
+            {
+                return $"a {Rules.SynapseReasons.ViewTakesOnlyState}; a function with a signal must return Check or the state.";
+            }
+
+            return EveryRefusal(attribute, isReaction: false, declared: null);
         }
 
         if (!hasSignalParameter || !hasSignal)
@@ -132,10 +148,35 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
             return $"a {Rules.SynapseReasons.GateNeedsSignal} (a reaction as well), declared by [Synapse] and taken as a parameter.";
         }
 
-        return args[0].Value is INamedTypeSymbol declared && signalParameter is INamedTypeSymbol parameter
-            && !Rules.IsOrDerivesFrom(declared, Rules.FullName(parameter))
-            ? $"the {Rules.SynapseReasons.SignalFitsParameter}."
-            : null;
+        var declared = args[0].Value as INamedTypeSymbol;
+        if (declared is not null && signalParameter is INamedTypeSymbol parameter
+            && !Rules.IsOrDerivesFrom(declared, Rules.FullName(parameter)))
+        {
+            return $"the {Rules.SynapseReasons.SignalFitsParameter}.";
+        }
+
+        return EveryRefusal(attribute, isReaction, declared);
+    }
+
+    private static string? EveryRefusal(AttributeData attribute, bool isReaction, INamedTypeSymbol? declared)
+    {
+        foreach (var named in attribute.NamedArguments)
+        {
+            if (named.Key != "Every") { continue; }
+            if (named.Value.Value is not string text) { return null; }
+
+            if (!isReaction || Rules.FullName(declared) != Rules.TickType)
+            {
+                return $"an {Rules.SynapseReasons.EveryNeedsTick}.";
+            }
+
+            var match = ScheduleRule.Match(text);
+            var valid = match.Success
+                && (!match.Groups["n"].Success || int.Parse(match.Groups["n"].Value, System.Globalization.CultureInfo.InvariantCulture) >= 1);
+            return valid ? null : $"a {Rules.SynapseReasons.Schedule}: {text} is not HH:mm, Mon HH:mm, every 5m or every 2h.";
+        }
+
+        return null;
     }
 
     private static ITypeSymbol Unwrap(ITypeSymbol returned) =>

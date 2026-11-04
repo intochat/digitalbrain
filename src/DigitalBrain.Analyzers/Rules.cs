@@ -67,6 +67,9 @@ internal static class Rules
     public const string SynapseAttribute = "DigitalBrain.SynapseAttribute";
     public const string StateAttribute = "DigitalBrain.StateAttribute";
     public const string CheckType = "DigitalBrain.Rules.Check";
+    public const string SlotAttribute = "DigitalBrain.SlotAttribute";
+    public const string CapabilityAttribute = "DigitalBrain.CapabilityAttribute";
+    public const string TickType = "DigitalBrain.Time.Tick";
 
     // Deliberate copy of DigitalBrain.SynapseReasons (the analyzer package cannot reference the core); the facts on both sides assert the same strings.
     public static class SynapseReasons
@@ -78,6 +81,9 @@ internal static class Rules
         public const string PublicStatic = "public static";
         public const string UnknownParameter = "not a signal, the state or CancellationToken";
         public const string SignalFitsParameter = "declared signal type must be assignable to the signal parameter";
+        public const string SlotContractNeedsCapability = "slot contract needs [Capability]";
+        public const string Schedule = "schedule";
+        public const string EveryNeedsTick = "every needs a Tick reaction";
     }
 
     public static readonly ImmutableHashSet<string> IdentityAttributes = ImmutableHashSet.Create(

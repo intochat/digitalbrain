@@ -11,9 +11,11 @@ public sealed class SynapseShapeAnalyzerFacts
         using System.Threading;
         using System.Threading.Tasks;
         using DigitalBrain;
+        using DigitalBrain.Time;
         using DigitalBrain.Rules;
         [State("week")] public sealed record WeekSpend(decimal Spent = 0);
         [Signal("test.charging")] public sealed record Charging(decimal Amount) : Signal;
+        [Capability("sql-read", 1)] public interface ISqlRead { }
         """;
 
     private const string NotPublicStatic = "a synapse function must be public static.";
@@ -29,6 +31,11 @@ public sealed class SynapseShapeAnalyzerFacts
     [InlineData("[Synapse(typeof(Charging), \"week\")] public static Task<Reaction<WeekSpend>> {|#0:AsyncReact|}(Charging s, WeekSpend w) => default!;")]
     [InlineData("[Synapse(\"week\")] public static string {|#0:View|}(WeekSpend w) => string.Empty;")]
     [InlineData("[Synapse(typeof(Signal), \"week/2026-45\")] public static Check {|#0:KeyedGate|}(Signal s, WeekSpend w) => default!;")]
+    [InlineData("[Synapse(typeof(Charging), \"week\")] public static Task<WeekSpend> {|#0:WithSlot|}(Charging s, WeekSpend w, [Slot] ISqlRead db) => default!;")]
+    [InlineData("[Synapse(typeof(Charging), \"week\")] public static Task<WeekSpend> {|#0:SlotFirst|}(Charging s, [Slot(Name = \"Ledger\")] ISqlRead db, WeekSpend w, CancellationToken ct) => default!;")]
+    [InlineData("[Synapse(typeof(Tick), \"week\", Every = \"07:00\")] public static WeekSpend {|#0:Daily|}(Tick t, WeekSpend w) => w;")]
+    [InlineData("[Synapse(typeof(Tick), \"week\", Every = \"Mon 07:00\")] public static WeekSpend {|#0:Weekly|}(Tick t, WeekSpend w) => w;")]
+    [InlineData("[Synapse(typeof(Tick), \"week\", Every = \"every 5m\")] public static WeekSpend {|#0:Interval|}(Tick t, WeekSpend w) => w;")]
     public Task Recognised_shapes_report_nothing(string method) => Run(method, null);
 
     [Theory]
@@ -48,6 +55,18 @@ public sealed class SynapseShapeAnalyzerFacts
     [InlineData("[Synapse(typeof(Charging), \"week\")] public static Check {|#0:WithServices|}(Charging s, WeekSpend w, IServiceProvider sp) => default!;", "WithServices", UnknownParameter)]
     [InlineData("[Synapse(typeof(Signal), \"week\")] public static Check {|#0:NarrowParameter|}(Charging s, WeekSpend w) => default!;", "NarrowParameter",
         "the declared signal type must be assignable to the signal parameter.")]
+    [InlineData("[Synapse(typeof(Charging), \"week\")] public static WeekSpend {|#0:NotAContract|}(Charging s, WeekSpend w, [Slot] string notAContract) => w;", "NotAContract",
+        "a slot contract needs [Capability].")]
+    [InlineData("[Synapse(typeof(Tick), \"week\", Every = \"7pm\")] public static WeekSpend {|#0:BadSchedule|}(Tick t, WeekSpend w) => w;", "BadSchedule",
+        "a schedule: 7pm is not HH:mm, Mon HH:mm, every 5m or every 2h.")]
+    [InlineData("[Synapse(typeof(Tick), \"week\", Every = \"every 0m\")] public static WeekSpend {|#0:ZeroInterval|}(Tick t, WeekSpend w) => w;", "ZeroInterval",
+        "a schedule: every 0m is not HH:mm, Mon HH:mm, every 5m or every 2h.")]
+    [InlineData("[Synapse(typeof(Charging), \"week\", Every = \"07:00\")] public static WeekSpend {|#0:EveryOnCharging|}(Charging s, WeekSpend w) => w;", "EveryOnCharging",
+        "an every needs a Tick reaction.")]
+    [InlineData("[Synapse(typeof(Tick), \"week\", Every = \"07:00\")] public static Check {|#0:EveryOnGate|}(Tick t, WeekSpend w) => default!;", "EveryOnGate",
+        "an every needs a Tick reaction.")]
+    [InlineData("[Synapse(\"week\", Every = \"07:00\")] public static string {|#0:EveryOnView|}(WeekSpend w) => string.Empty;", "EveryOnView",
+        "an every needs a Tick reaction.")]
     public Task Refused_shapes_report_DB0041_with_the_reason(string method, string name, string reason) => Run(method, ("Shapes." + name, reason));
 
     [Fact]
@@ -80,6 +99,9 @@ public sealed class SynapseShapeAnalyzerFacts
         Assert.Equal("public static", Rules.SynapseReasons.PublicStatic);
         Assert.Equal("not a signal, the state or CancellationToken", Rules.SynapseReasons.UnknownParameter);
         Assert.Equal("declared signal type must be assignable to the signal parameter", Rules.SynapseReasons.SignalFitsParameter);
+        Assert.Equal("slot contract needs [Capability]", Rules.SynapseReasons.SlotContractNeedsCapability);
+        Assert.Equal("schedule", Rules.SynapseReasons.Schedule);
+        Assert.Equal("every needs a Tick reaction", Rules.SynapseReasons.EveryNeedsTick);
     }
 
     private static DiagnosticResult Expect(string name, string reason) =>

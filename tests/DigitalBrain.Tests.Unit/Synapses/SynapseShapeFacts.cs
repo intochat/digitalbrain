@@ -1,5 +1,7 @@
 using System.Reflection;
+using DigitalBrain.Capabilities;
 using DigitalBrain.Rules;
+using DigitalBrain.Time;
 
 namespace DigitalBrain.Tests.Unit.Synapses;
 
@@ -57,6 +59,18 @@ public sealed class Shapes
     public static Check TwoTokens(Charging s, WeekSpend w, CancellationToken a, CancellationToken b) => Check.Allow(w);
 
     public static Check WithServices(Charging s, WeekSpend w, IServiceProvider sp) => Check.Allow(w);
+
+    public static Task<WeekSpend> WithSlot(Charging s, WeekSpend w, [Slot] ISqlRead db) => Task.FromResult(w);
+
+    public static Task<WeekSpend> NamedSlot(Charging s, [Slot(Name = "Ledger")] ISqlRead db, WeekSpend w, CancellationToken ct) => Task.FromResult(w);
+
+    public static WeekSpend NotAContract(Charging s, WeekSpend w, [Slot] string notAContract) => w;
+
+    public static WeekSpend UnmarkedContract(Charging s, WeekSpend w, [Slot] IUnmarked db) => w;
+
+    public static WeekSpend Daily(Tick t, WeekSpend w) => w;
+
+    public static Check TickGate(Tick t, WeekSpend w) => Check.Allow(w);
 }
 
 public sealed class SynapseShapeFacts
@@ -104,6 +118,67 @@ public sealed class SynapseShapeFacts
     }
 
     [Fact]
+    public void ASlotParameterIsReadWithItsCapability()
+    {
+        var d = Read(nameof(Shapes.WithSlot));
+        var slot = Assert.Single(d.Slots);
+        Assert.Equal("db", slot.Name);
+        Assert.Equal(typeof(ISqlRead), slot.Contract);
+        Assert.Equal(new CapabilityId("sql-read", 1), slot.Capability);
+        Assert.Equal(2, slot.ParameterIndex);
+        Assert.Null(d.Every);
+    }
+
+    [Fact]
+    public void ASlotNameComesFromTheAttributeAndMayPrecedeTheState()
+    {
+        var d = Read(nameof(Shapes.NamedSlot));
+        Assert.Equal("Ledger", Assert.Single(d.Slots).Name);
+        Assert.Equal(1, d.Slots[0].ParameterIndex);
+        Assert.True(d.TakesCancellation);
+    }
+
+    [Theory]
+    [InlineData(nameof(Shapes.NotAContract))]
+    [InlineData(nameof(Shapes.UnmarkedContract))]
+    public void ASlotWithoutACapabilityContractIsRefused(string name)
+    {
+        var e = Assert.Throws<SynapseShapeException>(() => Read(name));
+        Assert.Contains("slot contract needs [Capability]", e.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EveryOnATickReactionYieldsTheSchedule()
+    {
+        var d = SynapseShape.Of(typeof(Shapes).GetMethod(nameof(Shapes.Daily))!, States, new SynapseAttribute(typeof(Tick), "week") { Every = "07:00" });
+        Assert.Equal(ScheduleKind.Daily, d.Every!.Kind);
+        Assert.Empty(d.Slots);
+    }
+
+    [Fact]
+    public void ABadScheduleIsRefusedWithItsText()
+    {
+        var e = Assert.Throws<SynapseShapeException>(() => SynapseShape.Of(typeof(Shapes).GetMethod(nameof(Shapes.Daily))!, States, new SynapseAttribute(typeof(Tick), "week") { Every = "7pm" }));
+        Assert.Contains("schedule: 7pm", e.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EveryOnAReactionFromAnotherSignalIsRefused()
+    {
+        var e = Assert.Throws<SynapseShapeException>(() => SynapseShape.Of(typeof(Shapes).GetMethod(nameof(Shapes.React))!, States, new SynapseAttribute(typeof(Charging), "week") { Every = "07:00" }));
+        Assert.Contains("every needs a Tick reaction", e.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EveryOnAGateOrAViewIsRefused()
+    {
+        var gate = Assert.Throws<SynapseShapeException>(() => SynapseShape.Of(typeof(Shapes).GetMethod(nameof(Shapes.TickGate))!, States, new SynapseAttribute(typeof(Tick), "week") { Every = "07:00" }));
+        Assert.Contains("every needs a Tick reaction", gate.Message, StringComparison.Ordinal);
+        var view = Assert.Throws<SynapseShapeException>(() => SynapseShape.Of(typeof(Shapes).GetMethod(nameof(Shapes.View))!, States, new SynapseAttribute("week") { Every = "07:00" }));
+        Assert.Contains("every needs a Tick reaction", view.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ReasonFragmentsAreTheSpecifiedText()
     {
         Assert.Equal("gate needs a signal", SynapseReasons.GateNeedsSignal);
@@ -113,6 +188,10 @@ public sealed class SynapseShapeFacts
         Assert.Equal("public static", SynapseReasons.PublicStatic);
         Assert.Equal("not a signal, the state or CancellationToken", SynapseReasons.UnknownParameter);
         Assert.Equal("declared signal type must be assignable to the signal parameter", SynapseReasons.SignalFitsParameter);
+        Assert.Equal("slot contract needs [Capability]", SynapseReasons.SlotContractNeedsCapability);
+        Assert.Equal("schedule", SynapseReasons.Schedule);
+        Assert.Equal("every needs a Tick reaction", SynapseReasons.EveryNeedsTick);
+        Assert.Equal("slot", SynapseReasons.SlotBoundTwice);
     }
 
     [Fact]

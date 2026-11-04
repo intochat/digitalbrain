@@ -1949,7 +1949,6 @@ DigitalBrain.SynapseCatalog.States.get -> System.Collections.Generic.IReadOnlyDi
 DigitalBrain.SynapseCatalog.Synapses.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseDescriptor!>!
 DigitalBrain.SynapseDescriptor
 DigitalBrain.SynapseDescriptor.<Clone>$() -> DigitalBrain.SynapseDescriptor!
-DigitalBrain.SynapseDescriptor.Deconstruct(out DigitalBrain.SynapseKind Kind, out System.Reflection.MethodInfo! Function, out System.Type? Signal, out System.Type! State, out string! StateAlias, out string! Key, out bool TakesCancellation) -> void
 DigitalBrain.SynapseDescriptor.Equals(DigitalBrain.SynapseDescriptor? other) -> bool
 DigitalBrain.SynapseDescriptor.Function.get -> System.Reflection.MethodInfo!
 DigitalBrain.SynapseDescriptor.Function.init -> void
@@ -1964,7 +1963,6 @@ DigitalBrain.SynapseDescriptor.State.get -> System.Type!
 DigitalBrain.SynapseDescriptor.State.init -> void
 DigitalBrain.SynapseDescriptor.StateAlias.get -> string!
 DigitalBrain.SynapseDescriptor.StateAlias.init -> void
-DigitalBrain.SynapseDescriptor.SynapseDescriptor(DigitalBrain.SynapseKind Kind, System.Reflection.MethodInfo! Function, System.Type? Signal, System.Type! State, string! StateAlias, string! Key, bool TakesCancellation) -> void
 DigitalBrain.SynapseDescriptor.TakesCancellation.get -> bool
 DigitalBrain.SynapseDescriptor.TakesCancellation.init -> void
 DigitalBrain.SynapseKind
@@ -2153,3 +2151,32 @@ static DigitalBrain.Time.Schedule.operator !=(DigitalBrain.Time.Schedule? left, 
 static DigitalBrain.Time.Schedule.operator ==(DigitalBrain.Time.Schedule? left, DigitalBrain.Time.Schedule? right) -> bool
 static DigitalBrain.Time.Tick.operator !=(DigitalBrain.Time.Tick? left, DigitalBrain.Time.Tick? right) -> bool
 static DigitalBrain.Time.Tick.operator ==(DigitalBrain.Time.Tick? left, DigitalBrain.Time.Tick? right) -> bool
+DigitalBrain.SlotDescriptor
+DigitalBrain.SlotDescriptor.<Clone>$() -> DigitalBrain.SlotDescriptor!
+DigitalBrain.SlotDescriptor.Capability.get -> DigitalBrain.Capabilities.CapabilityId
+DigitalBrain.SlotDescriptor.Capability.init -> void
+DigitalBrain.SlotDescriptor.Contract.get -> System.Type!
+DigitalBrain.SlotDescriptor.Contract.init -> void
+DigitalBrain.SlotDescriptor.Deconstruct(out string! Name, out System.Type! Contract, out DigitalBrain.Capabilities.CapabilityId Capability, out int ParameterIndex) -> void
+DigitalBrain.SlotDescriptor.Equals(DigitalBrain.SlotDescriptor? other) -> bool
+DigitalBrain.SlotDescriptor.Name.get -> string!
+DigitalBrain.SlotDescriptor.Name.init -> void
+DigitalBrain.SlotDescriptor.ParameterIndex.get -> int
+DigitalBrain.SlotDescriptor.ParameterIndex.init -> void
+DigitalBrain.SlotDescriptor.SlotDescriptor(string! Name, System.Type! Contract, DigitalBrain.Capabilities.CapabilityId Capability, int ParameterIndex) -> void
+DigitalBrain.SynapseCatalog.NeedsOf(string! alias) -> DigitalBrain.SynapseNeeds!
+DigitalBrain.SynapseDescriptor.Deconstruct(out DigitalBrain.SynapseKind Kind, out System.Reflection.MethodInfo! Function, out System.Type? Signal, out System.Type! State, out string! StateAlias, out string! Key, out bool TakesCancellation, out System.Collections.Generic.IReadOnlyList<DigitalBrain.SlotDescriptor!>! Slots, out DigitalBrain.Time.Schedule? Every) -> void
+DigitalBrain.SynapseDescriptor.Every.get -> DigitalBrain.Time.Schedule?
+DigitalBrain.SynapseDescriptor.Every.init -> void
+DigitalBrain.SynapseDescriptor.Slots.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.SlotDescriptor!>!
+DigitalBrain.SynapseDescriptor.Slots.init -> void
+DigitalBrain.SynapseDescriptor.SynapseDescriptor(DigitalBrain.SynapseKind Kind, System.Reflection.MethodInfo! Function, System.Type? Signal, System.Type! State, string! StateAlias, string! Key, bool TakesCancellation, System.Collections.Generic.IReadOnlyList<DigitalBrain.SlotDescriptor!>! Slots, DigitalBrain.Time.Schedule? Every) -> void
+const DigitalBrain.SynapseReasons.EveryNeedsTick = "every needs a Tick reaction" -> string!
+const DigitalBrain.SynapseReasons.Schedule = "schedule" -> string!
+const DigitalBrain.SynapseReasons.SlotBoundTwice = "slot" -> string!
+const DigitalBrain.SynapseReasons.SlotContractNeedsCapability = "slot contract needs [Capability]" -> string!
+override DigitalBrain.SlotDescriptor.Equals(object? obj) -> bool
+override DigitalBrain.SlotDescriptor.GetHashCode() -> int
+override DigitalBrain.SlotDescriptor.ToString() -> string!
+static DigitalBrain.SlotDescriptor.operator !=(DigitalBrain.SlotDescriptor? left, DigitalBrain.SlotDescriptor? right) -> bool
+static DigitalBrain.SlotDescriptor.operator ==(DigitalBrain.SlotDescriptor? left, DigitalBrain.SlotDescriptor? right) -> bool

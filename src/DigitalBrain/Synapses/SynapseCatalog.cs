@@ -1,4 +1,6 @@
+using System.ComponentModel;
 using System.Reflection;
+using System.Text;
 
 namespace DigitalBrain;
 
@@ -51,6 +53,34 @@ public sealed class SynapseCatalog
             .OrderByDescending(d => Depth(d.Signal!))];
     }
 
+    /// <summary>What the app with state alias <paramref name="alias"/> asks for at install time.</summary>
+    /// <param name="alias">The state alias.</param>
+    /// <returns>The needs, derived from every synapse of the alias.</returns>
+    /// <exception cref="SynapseShapeException">The alias is not a state of this catalog.</exception>
+    public SynapseNeeds NeedsOf(string alias)
+    {
+        ArgumentNullException.ThrowIfNull(alias);
+        if (!States.ContainsKey(alias))
+        {
+            throw new SynapseShapeException($"No state '{alias}' in this catalog.");
+        }
+
+        var own = For(alias);
+        var slots = own
+            .SelectMany(d => d.Slots)
+            .DistinctBy(s => s.Name, StringComparer.Ordinal)
+            .Select(s => new SlotNeed(s.Name, s.Capability, DisplayName(s.Contract)))
+            .ToList();
+        var schedules = own.Where(d => d.Every is not null).Select(d => d.Every!).DistinctBy(s => s.Text, StringComparer.Ordinal).ToList();
+        var gates = own
+            .Where(d => d.Kind == SynapseKind.Gate)
+            .Select(d => d.Signal!.GetCustomAttribute<SignalAttribute>()?.Alias ?? d.Signal!.Name)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var reactions = own.Where(d => d.Kind == SynapseKind.Reaction).Select(d => d.Function.Name).ToList();
+        return new SynapseNeeds(alias, slots, schedules, gates, reactions, own.Any(d => d.Kind == SynapseKind.View));
+    }
+
     /// <summary>A new catalog holding both sets.</summary>
     /// <param name="other">The catalog to add.</param>
     /// <returns>The merged catalog.</returns>
@@ -95,7 +125,47 @@ public sealed class SynapseCatalog
             }
         }
 
-        return new SynapseCatalog(states, [.. methods.Select(m => SynapseShape.Of(m, states))]);
+        var synapses = methods.Select(m => SynapseShape.Of(m, states)).ToList();
+        foreach (var group in synapses.GroupBy(d => d.StateAlias, StringComparer.Ordinal))
+        {
+            var bound = new Dictionary<string, Type>(StringComparer.Ordinal);
+            foreach (var slot in group.SelectMany(d => d.Slots))
+            {
+                if (!bound.TryAdd(slot.Name, slot.Contract) && bound[slot.Name] != slot.Contract)
+                {
+                    throw new SynapseShapeException($"{group.Key}: {SynapseReasons.SlotBoundTwice} '{slot.Name}' is bound to two contracts ({bound[slot.Name].FullName} and {slot.Contract.FullName}).");
+                }
+            }
+        }
+
+        return new SynapseCatalog(states, synapses);
+    }
+
+    private static string DisplayName(Type contract)
+    {
+        if (contract.GetCustomAttribute<DescriptionAttribute>() is { } description)
+        {
+            return description.Description;
+        }
+
+        var name = contract.Name;
+        if (name.Length > 1 && name[0] == 'I' && char.IsUpper(name[1]))
+        {
+            name = name[1..];
+        }
+
+        var words = new StringBuilder();
+        foreach (var c in name)
+        {
+            if (char.IsUpper(c) && words.Length > 0)
+            {
+                words.Append(' ');
+            }
+
+            words.Append(char.ToLowerInvariant(c));
+        }
+
+        return words.ToString();
     }
 
     private static bool CreatableEmpty(Type type) =>

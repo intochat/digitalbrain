@@ -53,10 +53,19 @@ internal static class Verify<TAnalyzer> where TAnalyzer : DiagnosticAnalyzer, ne
                 public System.Type? Signal { get; }
                 public string State { get; }
                 public string Key { get; } = "default";
+                public string? Every { get; init; }
             }
+            [System.AttributeUsage(System.AttributeTargets.Parameter)]
+            public sealed class SlotAttribute : System.Attribute { public string? Name { get; init; } }
+            [System.AttributeUsage(System.AttributeTargets.Interface)]
+            public sealed class CapabilityAttribute(string name, int version) : System.Attribute { public string Name { get; } = name; public int Version { get; } = version; }
             public sealed class Reaction<T> { }
             [System.AttributeUsage(System.AttributeTargets.Method)] public sealed class OnAttribute : System.Attribute;
             [System.AttributeUsage(System.AttributeTargets.Method)] public sealed class ScenarioAttribute(string title) : System.Attribute;
+        }
+        namespace DigitalBrain.Time
+        {
+            public sealed record Tick(string Schedule, System.DateTimeOffset At) : DigitalBrain.Signal;
         }
         namespace DigitalBrain.Rules
         {
