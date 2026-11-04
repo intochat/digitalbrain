@@ -1995,7 +1995,7 @@ DigitalBrain.StateNeuron<TState>.Gate(DigitalBrain.Signal! signal, System.Guid a
 DigitalBrain.StateNeuron<TState>.Receive(DigitalBrain.Signal! signal, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 static readonly DigitalBrain.StateNeuron.ProvisionalLease -> System.TimeSpan
 DigitalBrain.StateNeuron
-DigitalBrain.StateNeuron<TState>.StateNeuron(DigitalBrain.SynapseCatalog! catalog) -> void
+DigitalBrain.StateNeuron<TState>.StateNeuron(DigitalBrain.SynapseCatalog! catalog, DigitalBrain.Spi.ISlotResolver! slots) -> void
 DigitalBrain.CatalogGateIndex
 DigitalBrain.CatalogGateIndex.CatalogGateIndex(DigitalBrain.SynapseCatalog! catalog) -> void
 DigitalBrain.CatalogGateIndex.GatesFor(DigitalBrain.BrainId brain, System.Type! signal) -> System.Collections.Generic.IReadOnlyList<(DigitalBrain.NeuronId Gate, DigitalBrain.SynapseDescriptor! Synapse)>!
@@ -2180,3 +2180,12 @@ override DigitalBrain.SlotDescriptor.GetHashCode() -> int
 override DigitalBrain.SlotDescriptor.ToString() -> string!
 static DigitalBrain.SlotDescriptor.operator !=(DigitalBrain.SlotDescriptor? left, DigitalBrain.SlotDescriptor? right) -> bool
 static DigitalBrain.SlotDescriptor.operator ==(DigitalBrain.SlotDescriptor? left, DigitalBrain.SlotDescriptor? right) -> bool
+DigitalBrain.Spi.ISlotResolver
+DigitalBrain.Spi.ISlotResolver.Resolve(DigitalBrain.NeuronId state, DigitalBrain.SlotDescriptor! slot, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<object!>!
+DigitalBrain.SlotUnboundException
+DigitalBrain.SlotUnboundException.Alias.get -> string!
+DigitalBrain.SlotUnboundException.Slot.get -> string!
+DigitalBrain.SlotUnboundException.SlotUnboundException(string! alias, string! slot) -> void
+DigitalBrain.UnboundSlotResolver
+DigitalBrain.UnboundSlotResolver.Resolve(DigitalBrain.NeuronId state, DigitalBrain.SlotDescriptor! slot, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<object!>!
+DigitalBrain.UnboundSlotResolver.UnboundSlotResolver() -> void

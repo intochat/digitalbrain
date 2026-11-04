@@ -37,6 +37,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     private const string GatePlaceholder = "gate";
     private readonly string _alias;
     private readonly IReadOnlyList<SynapseDescriptor> _synapses;
+    private readonly ISlotResolver _slots;
     private const int FlushedMemory = 256;
     private readonly List<Entry> _provisional = [];
     private readonly HashSet<Guid> _flushed = [];
@@ -46,10 +47,13 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
 
     /// <summary>Creates the neuron for <typeparamref name="TState"/> from <paramref name="catalog"/>.</summary>
     /// <param name="catalog">The synapse catalog.</param>
+    /// <param name="slots">Resolves the <c>[Slot]</c> parameters of the synapse functions, once per call.</param>
     /// <exception cref="ArgumentException">The catalog has no <c>[State]</c> alias for <typeparamref name="TState"/>.</exception>
-    public StateNeuron(SynapseCatalog catalog)
+    public StateNeuron(SynapseCatalog catalog, ISlotResolver slots)
     {
         ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(slots);
+        _slots = slots;
         _alias = catalog.States.FirstOrDefault(s => s.Value == typeof(TState)).Key
             ?? throw new ArgumentException($"{typeof(TState).FullName} is not a [State] record of the catalog.", nameof(catalog));
         _synapses = catalog.For(_alias);
@@ -304,11 +308,25 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
         await PublishEphemeral(new SynapseFinished(neuron, synapse.Name, outcome, clock.Elapsed.TotalMilliseconds)).ConfigureAwait(true);
     }
 
-    private static async Task<object?> Invoke(SynapseDescriptor synapse, Signal? signal, TState state, CancellationToken ct)
+    // Slots are resolved sequentially in parameter order, once per call. An unbound slot refuses a gate by name; any other synapse fails.
+    private async Task<object?> Invoke(SynapseDescriptor synapse, Signal? signal, TState state, CancellationToken ct)
     {
-        var arguments = synapse.Function.GetParameters()
-            .Select(p => p.ParameterType == typeof(CancellationToken) ? ct : typeof(Signal).IsAssignableFrom(p.ParameterType) ? signal : (object)state)
-            .ToArray();
+        var parameters = synapse.Function.GetParameters();
+        var arguments = new object?[parameters.Length];
+        for (var i = 0; i < parameters.Length; i++)
+        {
+            arguments[i] = parameters[i].ParameterType == typeof(CancellationToken) ? ct : typeof(Signal).IsAssignableFrom(parameters[i].ParameterType) ? signal : state;
+        }
+
+        foreach (var slot in synapse.Slots.OrderBy(slot => slot.ParameterIndex))
+        {
+            try { arguments[slot.ParameterIndex] = await _slots.Resolve(Id, slot, ct).ConfigureAwait(true); }
+            catch (SlotUnboundException) when (synapse.Kind == SynapseKind.Gate)
+            {
+                return Verdict.Reject($"slot '{slot.Name}' is not bound");
+            }
+        }
+
         object? returned;
         try { returned = synapse.Function.Invoke(null, arguments); }
         catch (TargetInvocationException error) when (error.InnerException is not null)

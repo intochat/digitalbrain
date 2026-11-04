@@ -52,6 +52,7 @@ public static class RuntimeSiloBuilderExtensions
         silo.Services.TryAddSingleton<DigitalBrain.Spi.IGateIndex>(sp => new CatalogGateIndex(sp.GetRequiredService<SynapseCatalog>()));
         silo.Services.AddJournalPayloads(modules);
         silo.Services.AddSignalPublisher();
+        silo.Services.TryAddSingleton<DigitalBrain.Spi.ISlotResolver, UnboundSlotResolver>();
         silo.Services.AddSingleton<SynapseCounters>();
         silo.AddSynapseRetention();
         silo.AddRuntimeServices();
