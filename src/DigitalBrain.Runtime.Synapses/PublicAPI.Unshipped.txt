@@ -1,0 +1,66 @@
+#nullable enable
+DigitalBrain.Runtime.Synapses.ReferenceSet
+DigitalBrain.Runtime.Synapses.ReferenceSet.Fingerprint.get -> string!
+DigitalBrain.Runtime.Synapses.ReferenceSet.ReferenceSet(System.Collections.Generic.IReadOnlyList<Microsoft.CodeAnalysis.MetadataReference!>! references) -> void
+DigitalBrain.Runtime.Synapses.ReferenceSet.References.get -> System.Collections.Generic.IReadOnlyList<Microsoft.CodeAnalysis.MetadataReference!>!
+DigitalBrain.Runtime.Synapses.SynapseBuild
+DigitalBrain.Runtime.Synapses.SynapseBuild.<Clone>$() -> DigitalBrain.Runtime.Synapses.SynapseBuild!
+DigitalBrain.Runtime.Synapses.SynapseBuild.Assembly.get -> byte[]!
+DigitalBrain.Runtime.Synapses.SynapseBuild.Assembly.init -> void
+DigitalBrain.Runtime.Synapses.SynapseBuild.AssemblyName.get -> string!
+DigitalBrain.Runtime.Synapses.SynapseBuild.AssemblyName.init -> void
+DigitalBrain.Runtime.Synapses.SynapseBuild.Deconstruct(out bool Success, out System.Collections.Generic.IReadOnlyList<DigitalBrain.Runtime.Synapses.SynapseDiagnostic!>! Diagnostics, out byte[]! Assembly, out byte[]! Symbols, out string! Hash, out string! AssemblyName) -> void
+DigitalBrain.Runtime.Synapses.SynapseBuild.Diagnostics.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Runtime.Synapses.SynapseDiagnostic!>!
+DigitalBrain.Runtime.Synapses.SynapseBuild.Diagnostics.init -> void
+DigitalBrain.Runtime.Synapses.SynapseBuild.Equals(DigitalBrain.Runtime.Synapses.SynapseBuild? other) -> bool
+DigitalBrain.Runtime.Synapses.SynapseBuild.Hash.get -> string!
+DigitalBrain.Runtime.Synapses.SynapseBuild.Hash.init -> void
+DigitalBrain.Runtime.Synapses.SynapseBuild.Success.get -> bool
+DigitalBrain.Runtime.Synapses.SynapseBuild.Success.init -> void
+DigitalBrain.Runtime.Synapses.SynapseBuild.Symbols.get -> byte[]!
+DigitalBrain.Runtime.Synapses.SynapseBuild.Symbols.init -> void
+DigitalBrain.Runtime.Synapses.SynapseBuild.SynapseBuild(bool Success, System.Collections.Generic.IReadOnlyList<DigitalBrain.Runtime.Synapses.SynapseDiagnostic!>! Diagnostics, byte[]! Assembly, byte[]! Symbols, string! Hash, string! AssemblyName) -> void
+DigitalBrain.Runtime.Synapses.SynapseCompiler
+DigitalBrain.Runtime.Synapses.SynapseCompiler.Compile(DigitalBrain.Runtime.Synapses.SynapseSource! source) -> DigitalBrain.Runtime.Synapses.SynapseBuild!
+DigitalBrain.Runtime.Synapses.SynapseCompiler.Emits.get -> int
+DigitalBrain.Runtime.Synapses.SynapseCompiler.SynapseCompiler(DigitalBrain.Runtime.Synapses.ReferenceSet! references) -> void
+DigitalBrain.Runtime.Synapses.SynapseDiagnostic
+DigitalBrain.Runtime.Synapses.SynapseDiagnostic.<Clone>$() -> DigitalBrain.Runtime.Synapses.SynapseDiagnostic!
+DigitalBrain.Runtime.Synapses.SynapseDiagnostic.Deconstruct(out string! File, out string! Id, out int Line, out string! Message) -> void
+DigitalBrain.Runtime.Synapses.SynapseDiagnostic.Equals(DigitalBrain.Runtime.Synapses.SynapseDiagnostic? other) -> bool
+DigitalBrain.Runtime.Synapses.SynapseDiagnostic.File.get -> string!
+DigitalBrain.Runtime.Synapses.SynapseDiagnostic.File.init -> void
+DigitalBrain.Runtime.Synapses.SynapseDiagnostic.Id.get -> string!
+DigitalBrain.Runtime.Synapses.SynapseDiagnostic.Id.init -> void
+DigitalBrain.Runtime.Synapses.SynapseDiagnostic.Line.get -> int
+DigitalBrain.Runtime.Synapses.SynapseDiagnostic.Line.init -> void
+DigitalBrain.Runtime.Synapses.SynapseDiagnostic.Message.get -> string!
+DigitalBrain.Runtime.Synapses.SynapseDiagnostic.Message.init -> void
+DigitalBrain.Runtime.Synapses.SynapseDiagnostic.SynapseDiagnostic(string! File, string! Id, int Line, string! Message) -> void
+DigitalBrain.Runtime.Synapses.SynapseSource
+DigitalBrain.Runtime.Synapses.SynapseSource.<Clone>$() -> DigitalBrain.Runtime.Synapses.SynapseSource!
+DigitalBrain.Runtime.Synapses.SynapseSource.Deconstruct(out string! SourceKey, out System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Files, out byte[]? Icon) -> void
+DigitalBrain.Runtime.Synapses.SynapseSource.Equals(DigitalBrain.Runtime.Synapses.SynapseSource? other) -> bool
+DigitalBrain.Runtime.Synapses.SynapseSource.Files.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+DigitalBrain.Runtime.Synapses.SynapseSource.Files.init -> void
+DigitalBrain.Runtime.Synapses.SynapseSource.Icon.get -> byte[]?
+DigitalBrain.Runtime.Synapses.SynapseSource.Icon.init -> void
+DigitalBrain.Runtime.Synapses.SynapseSource.SourceKey.get -> string!
+DigitalBrain.Runtime.Synapses.SynapseSource.SourceKey.init -> void
+DigitalBrain.Runtime.Synapses.SynapseSource.SynapseSource(string! SourceKey, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Files, byte[]? Icon) -> void
+override DigitalBrain.Runtime.Synapses.SynapseBuild.Equals(object? obj) -> bool
+override DigitalBrain.Runtime.Synapses.SynapseBuild.GetHashCode() -> int
+override DigitalBrain.Runtime.Synapses.SynapseBuild.ToString() -> string!
+override DigitalBrain.Runtime.Synapses.SynapseDiagnostic.Equals(object? obj) -> bool
+override DigitalBrain.Runtime.Synapses.SynapseDiagnostic.GetHashCode() -> int
+override DigitalBrain.Runtime.Synapses.SynapseDiagnostic.ToString() -> string!
+override DigitalBrain.Runtime.Synapses.SynapseSource.Equals(object? obj) -> bool
+override DigitalBrain.Runtime.Synapses.SynapseSource.GetHashCode() -> int
+override DigitalBrain.Runtime.Synapses.SynapseSource.ToString() -> string!
+static DigitalBrain.Runtime.Synapses.ReferenceSet.FromDefaultContext() -> DigitalBrain.Runtime.Synapses.ReferenceSet!
+static DigitalBrain.Runtime.Synapses.SynapseBuild.operator !=(DigitalBrain.Runtime.Synapses.SynapseBuild? left, DigitalBrain.Runtime.Synapses.SynapseBuild? right) -> bool
+static DigitalBrain.Runtime.Synapses.SynapseBuild.operator ==(DigitalBrain.Runtime.Synapses.SynapseBuild? left, DigitalBrain.Runtime.Synapses.SynapseBuild? right) -> bool
+static DigitalBrain.Runtime.Synapses.SynapseDiagnostic.operator !=(DigitalBrain.Runtime.Synapses.SynapseDiagnostic? left, DigitalBrain.Runtime.Synapses.SynapseDiagnostic? right) -> bool
+static DigitalBrain.Runtime.Synapses.SynapseDiagnostic.operator ==(DigitalBrain.Runtime.Synapses.SynapseDiagnostic? left, DigitalBrain.Runtime.Synapses.SynapseDiagnostic? right) -> bool
+static DigitalBrain.Runtime.Synapses.SynapseSource.operator !=(DigitalBrain.Runtime.Synapses.SynapseSource? left, DigitalBrain.Runtime.Synapses.SynapseSource? right) -> bool
+static DigitalBrain.Runtime.Synapses.SynapseSource.operator ==(DigitalBrain.Runtime.Synapses.SynapseSource? left, DigitalBrain.Runtime.Synapses.SynapseSource? right) -> bool

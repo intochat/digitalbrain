@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../src/DigitalBrain.Runtime.Synapses/DigitalBrain.Runtime.Synapses.csproj" />
+    <ProjectReference Include="../../src/DigitalBrain.UI/DigitalBrain.UI.csproj" />
+  </ItemGroup>
+</Project>

@@ -17,6 +17,7 @@
     <Project Path="src/DigitalBrain.Identity.Local/DigitalBrain.Identity.Local.csproj" />
     <Project Path="src/DigitalBrain.Runtime.Http/DigitalBrain.Runtime.Http.csproj" />
     <Project Path="src/DigitalBrain.Runtime.Apps/DigitalBrain.Runtime.Apps.csproj" />
+    <Project Path="src/DigitalBrain.Runtime.Synapses/DigitalBrain.Runtime.Synapses.csproj" />
     <Project Path="src/DigitalBrain.Graph/DigitalBrain.Graph.csproj" />
   </Folder>
   <Folder Name="/examples/">
@@ -42,6 +43,7 @@
     <Project Path="tests/DigitalBrain.Identity.Local.Tests.Unit/DigitalBrain.Identity.Local.Tests.Unit.csproj" />
     <Project Path="tests/DigitalBrain.Runtime.Http.Tests.Unit/DigitalBrain.Runtime.Http.Tests.Unit.csproj" />
     <Project Path="tests/DigitalBrain.Runtime.Apps.Tests.Unit/DigitalBrain.Runtime.Apps.Tests.Unit.csproj" />
+    <Project Path="tests/DigitalBrain.Runtime.Synapses.Tests.Unit/DigitalBrain.Runtime.Synapses.Tests.Unit.csproj" />
     <Project Path="tests/DigitalBrain.Templates.Tests.Integration/DigitalBrain.Templates.Tests.Integration.csproj" />
     <Project Path="tests/DigitalBrain.Graph.Tests.Unit/DigitalBrain.Graph.Tests.Unit.csproj" />
   </Folder>
