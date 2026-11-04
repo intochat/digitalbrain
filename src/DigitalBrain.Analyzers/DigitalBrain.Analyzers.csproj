@@ -8,7 +8,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>DigitalBrain.Analyzers</PackageId>
     <RootNamespace>DigitalBrain.Analyzers</RootNamespace>
-    <Description>Build-time rules for DigitalBrain modules, apps and neurons (DB0001-DB0003, DB0013, DB0020-DB0023, DB0025-DB0028, DB0030-DB0033).</Description>
+    <Description>Build-time rules for DigitalBrain modules, apps and neurons (DB0001-DB0003, DB0013, DB0020-DB0023, DB0025-DB0028, DB0030-DB0033, DB0041-DB0044).</Description>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <IncludeSymbols>false</IncludeSymbols>

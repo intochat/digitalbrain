@@ -14,6 +14,7 @@ public static class RuntimeProtocol
     /// Web defaults with a depth of 128: a bounded UI tree of 32 nodes, each with a children array, fits inside an invocation.
     /// Types resolve through registered contexts, then the runtime's source-generated context, then reflection.
     /// </summary>
+    /// <remarks>Never serialize types from collectible load contexts (generated synapse sources) through these options: the System.Text.Json cache would pin the context and block unloading. Use <see cref="OptionsFor(Type)"/> and <see cref="Forget"/> instead.</remarks>
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { MaxDepth = 128, TypeInfoResolver = Resolver };
 
     /// <summary>
