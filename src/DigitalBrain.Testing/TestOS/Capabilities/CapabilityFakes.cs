@@ -11,10 +11,11 @@ namespace DigitalBrain.Testing;
 public sealed class CapabilityFakes
 {
     private readonly ConcurrentDictionary<(Type Contract, string Name), object> _bound = new();
-    private readonly ConcurrentQueue<(Type Contract, string Name)> _order = new();
+    private readonly Lock _gate = new();
+    private List<(Type Contract, string Name)> _order = [];
 
     /// <summary>The capability ids with at least one bound fake.</summary>
-    public IReadOnlyList<CapabilityId> Bound => [.. _order.Select(key => IdOf(key.Contract)).Distinct()];
+    public IReadOnlyList<CapabilityId> Bound => [.. Order.Select(key => IdOf(key.Contract)).Distinct()];
 
     /// <summary>The <c>name@version</c> of a <c>[Capability]</c> contract.</summary>
     /// <exception cref="ArgumentException"><paramref name="contract"/> is not an interface marked <c>[Capability]</c>.</exception>
@@ -34,16 +35,31 @@ public sealed class CapabilityFakes
         ArgumentNullException.ThrowIfNull(fake);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var id = IdOf(typeof(TCapability));
-        if (!_bound.TryAdd((typeof(TCapability), name), fake))
+        lock (_gate)
         {
-            throw new ArgumentException($"Capability {id} is already bound under the name '{name}'.", nameof(name));
+            if (!_bound.TryAdd((typeof(TCapability), name), fake))
+            {
+                throw new ArgumentException($"Capability {id} is already bound under the name '{name}'.", nameof(name));
+            }
+            _order = [.. _order, (typeof(TCapability), name)];
         }
-        _order.Enqueue((typeof(TCapability), name));
         return this;
     }
 
+    /// <summary>Removes the fake bound as the <typeparamref name="TCapability"/> named <paramref name="name"/>, if any.</summary>
+    /// <returns>True when a fake was removed.</returns>
+    internal bool Unbind<TCapability>(string name) where TCapability : class
+    {
+        lock (_gate)
+        {
+            if (!_bound.TryRemove((typeof(TCapability), name), out _)) { return false; }
+            _order = [.. _order.Where(key => key != (typeof(TCapability), name))];
+            return true;
+        }
+    }
+
     /// <summary>True when a fake implementing <paramref name="capability"/> is bound.</summary>
-    public bool IsBound(CapabilityId capability) => _order.Any(key => IdOf(key.Contract) == capability);
+    public bool IsBound(CapabilityId capability) => Order.Any(key => IdOf(key.Contract) == capability);
 
     /// <summary>The fake bound as the <typeparamref name="TCapability"/> named <paramref name="name"/>.</summary>
     /// <exception cref="CapabilityNotBoundException">Nothing is bound under that contract and name.</exception>
@@ -62,11 +78,16 @@ public sealed class CapabilityFakes
 
     /// <summary>The binding names of <typeparamref name="TCapability"/>, in binding order.</summary>
     public IReadOnlyList<string> Names<TCapability>() where TCapability : class
-        => [.. _order.Where(key => key.Contract == typeof(TCapability)).Select(key => key.Name)];
+        => [.. Order.Where(key => key.Contract == typeof(TCapability)).Select(key => key.Name)];
+
+    private List<(Type Contract, string Name)> Order => Volatile.Read(ref _order);
+
+    // The fake bound as contract under name, or null.
+    internal object? Find(Type contract, string name) => _bound.TryGetValue((contract, name), out var fake) ? fake : null;
 
     internal object Resolve(Type contract)
     {
-        var names = _order.Where(key => key.Contract == contract).ToList();
+        var names = Order.Where(key => key.Contract == contract).ToList();
         return names.Count switch
         {
             0 => throw new CapabilityNotBoundException(IdOf(contract), null),
@@ -79,7 +100,7 @@ public sealed class CapabilityFakes
     internal Array All(Type contract)
     {
         _ = IdOf(contract);
-        var fakes = _order.Where(key => key.Contract == contract).Select(key => _bound[key]).ToArray();
+        var fakes = Order.Where(key => key.Contract == contract).Select(key => _bound[key]).ToArray();
         var typed = Array.CreateInstance(contract, fakes.Length);
         Array.Copy(fakes, typed, fakes.Length);
         return typed;
@@ -124,14 +145,15 @@ public sealed class CapabilityNotBoundException : InvalidOperationException
 }
 
 // Neurons and apps resolve from this: capability contracts from the fakes, ICapabilityBroker over the fakes, the rest from the options' services.
-internal sealed class TestOSServices(CapabilityFakes fakes, IServiceProvider inner, DigitalBrain.Spi.IInstallHooks hooks) : IServiceProvider, ICapabilityBroker
+internal sealed class TestOSServices(CapabilityFakes fakes, IServiceProvider inner, DigitalBrain.Spi.IInstallHooks hooks, DigitalBrain.Spi.ISlotResolver slots)
+    : IServiceProvider, ICapabilityBroker
 {
     public object? GetService(Type serviceType)
     {
         ArgumentNullException.ThrowIfNull(serviceType);
         if (serviceType == typeof(ICapabilityBroker)) { return this; }
         if (serviceType == typeof(CapabilityFakes)) { return fakes; }
-        if (serviceType == typeof(DigitalBrain.Spi.ISlotResolver)) { return inner.GetService(serviceType) ?? new UnboundSlotResolver(); }
+        if (serviceType == typeof(DigitalBrain.Spi.ISlotResolver)) { return inner.GetService(serviceType) ?? slots; }
         if (serviceType == typeof(DigitalBrain.Spi.IInstallHooks)) { return inner.GetService(serviceType) ?? hooks; }
         if (CapabilityFakes.IsContract(serviceType)) { return fakes.Resolve(serviceType); }
         return CapabilityFakes.ListedContract(serviceType) is { } contract ? fakes.All(contract) : inner.GetService(serviceType);

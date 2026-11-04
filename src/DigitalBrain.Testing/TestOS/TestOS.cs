@@ -72,7 +72,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         Options = options;
         Clock = new TestClock(options.Start);
         Capabilities = new CapabilityFakes();
-        Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance, new TestInstallHooks(this));
+        Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance, new TestInstallHooks(this), new TestSlotResolver(this));
         Synapses = new SynapseRegistry(this);
         Confirmations = new TestConfirmations(Clock);
         Listeners = new TestClusterListeners(this);

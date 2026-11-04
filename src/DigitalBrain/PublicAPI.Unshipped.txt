@@ -2410,3 +2410,5 @@ static DigitalBrain.InstallRequested.operator !=(DigitalBrain.InstallRequested? 
 static DigitalBrain.InstallRequested.operator ==(DigitalBrain.InstallRequested? left, DigitalBrain.InstallRequested? right) -> bool
 static DigitalBrain.PendingInstall.operator !=(DigitalBrain.PendingInstall? left, DigitalBrain.PendingInstall? right) -> bool
 static DigitalBrain.PendingInstall.operator ==(DigitalBrain.PendingInstall? left, DigitalBrain.PendingInstall? right) -> bool
+DigitalBrain.Spi.IInstallHooks.ValidateBinding(DigitalBrain.NeuronId state, DigitalBrain.SlotDescriptor! slot, string! binding, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<string?>!
+DigitalBrain.NoInstallHooks.ValidateBinding(DigitalBrain.NeuronId state, DigitalBrain.SlotDescriptor! slot, string! binding, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<string?>!

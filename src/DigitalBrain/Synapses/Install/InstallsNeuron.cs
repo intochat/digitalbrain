@@ -36,6 +36,15 @@ public sealed class InstallsNeuron(SynapseCatalog catalog, IInstallHooks hooks) 
             return new InstallOutcome(InstallStatus.Refused, sentence, $"slot '{unbound.Name}' has no binding");
         }
 
+        ArgumentNullException.ThrowIfNull(hooks);
+        foreach (var slot in catalog.For(alias).SelectMany(d => d.Slots).DistinctBy(s => (s.Name, s.Contract)))
+        {
+            if (await hooks.ValidateBinding(StateOf(alias), slot, bindings[slot.Name], ct).ConfigureAwait(true) is { } problem)
+            {
+                return new InstallOutcome(InstallStatus.Refused, sentence, problem);
+            }
+        }
+
         var hash = needs.Hash();
         var existing = Find(alias);
         if (existing is not null && existing.NeedsHash == hash)

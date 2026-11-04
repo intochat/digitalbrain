@@ -17,4 +17,7 @@ public sealed class NoInstallHooks : IInstallHooks
 
     /// <inheritdoc />
     public Task UnregisterSchedules(NeuronId state, CancellationToken ct) => Task.CompletedTask;
+
+    /// <inheritdoc />
+    public Task<string?> ValidateBinding(NeuronId state, SlotDescriptor slot, string binding, CancellationToken ct) => Task.FromResult<string?>(null);
 }

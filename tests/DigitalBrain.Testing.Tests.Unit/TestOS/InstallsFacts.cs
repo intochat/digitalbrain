@@ -25,6 +25,8 @@ internal sealed class RecordingHooks : IInstallHooks, IServiceProvider
 
     public Task UnregisterSchedules(NeuronId state, CancellationToken ct) => Note($"unschedules {state}");
 
+    public Task<string?> ValidateBinding(NeuronId state, SlotDescriptor slot, string binding, CancellationToken ct) => Task.FromResult<string?>(null);
+
     private Task Note(string call)
     {
         Calls.Enqueue(call);

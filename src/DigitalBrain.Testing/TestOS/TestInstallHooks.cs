@@ -35,5 +35,14 @@ internal sealed class TestInstallHooks(TestOS os) : IInstallHooks
 
     public Task UnregisterSchedules(NeuronId state, CancellationToken ct) => Time(state.Brain).Unregister(state.Type, ct);
 
+    // A binding is the name of a capability fake bound for the slot's contract.
+    public Task<string?> ValidateBinding(NeuronId state, SlotDescriptor slot, string binding, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(slot);
+        return Task.FromResult(os.Capabilities.Find(slot.Contract, binding) is null
+            ? $"slot '{slot.Name}': no {slot.Capability} fake named '{binding}'"
+            : null);
+    }
+
     private ITime Time(BrainId brain) => os.Get<ITime>(new NeuronId(brain, TimeType, "default"));
 }

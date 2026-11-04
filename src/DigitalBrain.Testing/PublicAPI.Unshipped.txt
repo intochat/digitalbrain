@@ -697,3 +697,4 @@ DigitalBrain.Testing.TestConfirmations.ApproveAll() -> void
 DigitalBrain.Testing.RecordingSynapses.BrainWide.get -> System.Collections.Generic.IReadOnlyCollection<System.Type!>!
 DigitalBrain.Testing.RecordingSynapses.EnsureBrainWide(params System.Type![]! signals) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.RecordingSynapses.RemoveBrainWide() -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.TestOS.Without<TCapability>(string! name) -> DigitalBrain.Testing.TestOS!

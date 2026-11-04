@@ -55,6 +55,11 @@ internal sealed class OrleansInstallHooks(IServiceProvider services, InstalledGa
     /// <inheritdoc />
     public Task UnregisterSchedules(NeuronId state, CancellationToken ct) => Time(state.Brain).Unregister(state.Type, ct);
 
+    /// <inheritdoc />
+    /// <remarks>A binding is a connection key the brain lists as connected and providing the slot's capability.</remarks>
+    public async Task<string?> ValidateBinding(NeuronId state, SlotDescriptor slot, string binding, CancellationToken ct)
+        => (await BrokerSlotResolver.Find(services, state, slot, binding, ct).ConfigureAwait(true)).Problem;
+
     private ITime Time(BrainId brain) => NeuronHosting.Get<ITime>(services, new NeuronId(brain, TimeType, "default"));
 
     // The state host admits a brain-wide edge only from the installs neuron of its brain.

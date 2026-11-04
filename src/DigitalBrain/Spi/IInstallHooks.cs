@@ -26,4 +26,12 @@ public interface IInstallHooks
     /// <param name="state">The state neuron.</param>
     /// <param name="ct">Cancellation.</param>
     Task UnregisterSchedules(NeuronId state, CancellationToken ct);
+
+    /// <summary>Checks that <paramref name="binding"/> resolves <paramref name="slot"/> of <paramref name="state"/> on this host.</summary>
+    /// <param name="state">The state neuron.</param>
+    /// <param name="slot">The slot being bound.</param>
+    /// <param name="binding">The binding the install request gives the slot.</param>
+    /// <param name="ct">Cancellation.</param>
+    /// <returns>Null when the binding resolves; otherwise why it does not.</returns>
+    Task<string?> ValidateBinding(NeuronId state, SlotDescriptor slot, string binding, CancellationToken ct);
 }

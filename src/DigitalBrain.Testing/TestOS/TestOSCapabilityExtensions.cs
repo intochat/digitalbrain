@@ -15,4 +15,11 @@ public sealed partial class TestOS
     /// <exception cref="ArgumentException">The contract is not a <c>[Capability]</c> interface, or it is already bound under that name.</exception>
     public TestOS With<TCapability>(TCapability fake) where TCapability : class
         => With(CapabilityFakes.IdOf(typeof(TCapability)).Name, fake);
+
+    /// <summary>Removes the fake bound as <typeparamref name="TCapability"/> named <paramref name="name"/>; a slot bound to it then fails closed.</summary>
+    public TestOS Without<TCapability>(string name) where TCapability : class
+    {
+        _ = Capabilities.Unbind<TCapability>(name);
+        return this;
+    }
 }

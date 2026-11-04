@@ -55,7 +55,7 @@ public static class RuntimeSiloBuilderExtensions
         silo.Services.TryAddSingleton<DigitalBrain.Spi.IInstallHooks, OrleansInstallHooks>();
         silo.Services.AddJournalPayloads(modules);
         silo.Services.AddSignalPublisher();
-        silo.Services.TryAddSingleton<DigitalBrain.Spi.ISlotResolver, UnboundSlotResolver>();
+        silo.Services.TryAddSingleton<DigitalBrain.Spi.ISlotResolver, BrokerSlotResolver>();
         silo.Services.AddSingleton<SynapseCounters>();
         silo.AddSynapseRetention();
         silo.AddRuntimeServices();
