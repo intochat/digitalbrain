@@ -49,8 +49,17 @@ public sealed class InstallsNeuron(SynapseCatalog catalog, IInstallHooks hooks) 
         var existing = Find(alias);
         if (existing is not null && existing.NeedsHash == hash)
         {
+            var status = InstallStatus.Unchanged;
+            if (!SameBindings(existing.Bindings, bindings))
+            {
+                // The person approved these needs; a new binding of the same slots is saved without asking again.
+                var rebound = existing with { Bindings = new Dictionary<string, string>(bindings, StringComparer.Ordinal) };
+                await Save(State with { Records = [.. State.Records.Where(r => r.Alias != alias), rebound] }, [new Installed(alias, hash)]).ConfigureAwait(true);
+                status = InstallStatus.Updated;
+            }
+
             await GateChanged().ConfigureAwait(true);
-            return new InstallOutcome(InstallStatus.Unchanged, sentence, await Wire(alias, needs, ct).ConfigureAwait(true));
+            return new InstallOutcome(status, sentence, await Wire(alias, needs, ct).ConfigureAwait(true));
         }
 
         var plan = new ConfirmationPlan($"install:{alias}:{Guid.NewGuid():N}", ConfirmationAction.Other, Destructive: false, Title: alias, Body: sentence,
@@ -126,6 +135,9 @@ public sealed class InstallsNeuron(SynapseCatalog catalog, IInstallHooks hooks) 
         try { _ = await Context.Confirm(plan, CancellationToken.None).ConfigureAwait(true); }
         catch (Exception error) when (error is not OutOfMemoryException) { _ = error; }
     }
+
+    private static bool SameBindings(IReadOnlyDictionary<string, string> left, IReadOnlyDictionary<string, string> right)
+        => left.Count == right.Count && left.All(pair => right.TryGetValue(pair.Key, out var value) && value == pair.Value);
 
     private InstallRecord? Find(string alias) => State.Records.FirstOrDefault(r => r.Alias == alias);
 

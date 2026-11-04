@@ -8,7 +8,7 @@ public enum InstallStatus
     /// <summary>Approved and recorded for the first time.</summary>
     Installed,
 
-    /// <summary>Approved again because the needs changed.</summary>
+    /// <summary>The recorded needs are the same but the slot bindings changed; the new bindings were saved without asking.</summary>
     Updated,
 
     /// <summary>The recorded needs are the same; nothing was asked.</summary>
@@ -33,7 +33,7 @@ public sealed record InstallRequest(string Alias, IReadOnlyDictionary<string, st
 /// <param name="Status">How it ended.</param>
 /// <param name="Sentence">The needs sentence; empty when the alias is unknown.</param>
 /// <param name="Reason">
-/// Why it was refused, the plan id when <see cref="InstallStatus.Pending"/>, or <c>hooks failed: ...</c> when an unchanged install's
+/// Why it was refused, the plan id when <see cref="InstallStatus.Pending"/>, or <c>hooks failed: ...</c> when an unchanged or updated install's
 /// host hooks failed; null otherwise.
 /// </param>
 public sealed record InstallOutcome(InstallStatus Status, string Sentence, string? Reason);

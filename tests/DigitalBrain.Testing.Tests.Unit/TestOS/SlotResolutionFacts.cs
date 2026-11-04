@@ -143,6 +143,24 @@ public sealed class SlotResolutionFacts
     }
 
     [Fact]
+    public async Task ARebindingIsSavedSilentlyAndReturnsUpdated()
+    {
+        await using var os = Start().With<ISqlRead>("analytics", new FakeSqlRead(7)).With<ISqlRead>("finance", new FakeSqlRead(11));
+        await Install(os, "slot.stats", "analytics");
+
+        var again = await Ask(os, "slot.stats", "finance");
+        await os.Idle();
+
+        Assert.Equal(InstallStatus.Updated, again.Status);
+        Assert.Single(os.Confirmations.Requested);
+        var record = await os.Get<IInstalls>(Installs).Describe("slot.stats", Ct);
+        Assert.NotNull(record);
+        Assert.Equal("finance", record.Bindings["Db"]);
+        await Tick(os);
+        Assert.Equal(11, await Value(os, Stats));
+    }
+
+    [Fact]
     public async Task ADisconnectedBindingFailsClosedAtRunTime()
     {
         await using var os = Start().With<ISqlRead>("analytics", new FakeSqlRead(7));
