@@ -91,7 +91,7 @@ public sealed class SynapseCatalog
         {
             if ((strictStates || used.Contains(alias)) && !CreatableEmpty(type))
             {
-                throw new SynapseShapeException($"{type.FullName}: state record '{alias}' needs a public parameterless constructor (or one whose parameters all have defaults).");
+                throw new SynapseShapeException($"{type.FullName}: state record '{alias}' needs a public parameterless constructor (optional constructor parameters do not count).");
             }
         }
 
@@ -99,7 +99,7 @@ public sealed class SynapseCatalog
     }
 
     private static bool CreatableEmpty(Type type) =>
-        type.GetConstructors().Any(c => c.GetParameters().All(p => p.IsOptional));
+        type.GetConstructor(Type.EmptyTypes) is not null;
 
     private static int Depth(Type type)
     {

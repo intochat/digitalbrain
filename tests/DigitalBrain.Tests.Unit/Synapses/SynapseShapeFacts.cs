@@ -4,7 +4,10 @@ using DigitalBrain.Rules;
 namespace DigitalBrain.Tests.Unit.Synapses;
 
 [State("week")]
-public sealed record WeekSpend(DateOnly Week = default, decimal Spent = 0);
+public sealed record WeekSpend(DateOnly Week = default, decimal Spent = 0)
+{
+    public WeekSpend() : this(default, 0) { }
+}
 
 [Signal("test.charging")]
 public sealed record Charging(decimal Amount) : Signal;
@@ -48,6 +51,11 @@ public sealed class Shapes
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "The fixture is deliberately an instance method.")]
     public Check Instance(Charging s, WeekSpend w) => Check.Allow(w);
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1068:CancellationToken parameters must come last", Justification = "The fixture is the refused shape.")]
+    public static Check TokenFirst(CancellationToken ct, Charging s, WeekSpend w) => Check.Allow(w);
+
+    public static Check TwoTokens(Charging s, WeekSpend w, CancellationToken a, CancellationToken b) => Check.Allow(w);
+
     public static Check WithServices(Charging s, WeekSpend w, IServiceProvider sp) => Check.Allow(w);
 }
 
@@ -86,6 +94,8 @@ public sealed class SynapseShapeFacts
     [InlineData(nameof(Shapes.WrongState), "state record 'week'")]
     [InlineData(nameof(Shapes.ViewWithSignal), "view takes only the state")]
     [InlineData(nameof(Shapes.Instance), "public static")]
+    [InlineData(nameof(Shapes.TokenFirst), "not a signal, the state or CancellationToken")]
+    [InlineData(nameof(Shapes.TwoTokens), "not a signal, the state or CancellationToken")]
     [InlineData(nameof(Shapes.WithServices), "not a signal, the state or CancellationToken")]
     public void RefusedShapes(string name, string fragment)
     {

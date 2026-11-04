@@ -4,7 +4,13 @@ using System.Reflection.Emit;
 namespace DigitalBrain.Tests.Unit.Synapses;
 
 [State("other")]
-public sealed record OtherState(int X = 0);
+public sealed record OtherState(int X = 0)
+{
+    public OtherState() : this(0) { }
+}
+
+[State("optionalonly")]
+public sealed record OptionalOnly(int X = 0);
 
 public sealed class SynapseCatalogFacts
 {
@@ -46,6 +52,13 @@ public sealed class SynapseCatalogFacts
     {
         var e = Assert.Throws<SynapseShapeException>(() => SynapseCatalog.Scan([typeof(NoDefault)]));
         Assert.Contains("NoDefault", e.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AStateWithOnlyOptionalConstructorParametersIsRefusedByName()
+    {
+        var e = Assert.Throws<SynapseShapeException>(() => SynapseCatalog.Scan([typeof(OptionalOnly)]));
+        Assert.Contains("OptionalOnly", e.Message, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -91,9 +91,11 @@ public static class SynapseShape
         var stateCount = 0;
         var tokens = 0;
         var unknown = false;
-        foreach (var parameter in function.GetParameters())
+        var parameters = function.GetParameters();
+        var misplacedToken = false;
+        for (var i = 0; i < parameters.Length; i++)
         {
-            var type = parameter.ParameterType;
+            var type = parameters[i].ParameterType;
             if (typeof(Signal).IsAssignableFrom(type))
             {
                 signals++;
@@ -102,6 +104,7 @@ public static class SynapseShape
             else if (type == typeof(CancellationToken))
             {
                 tokens++;
+                misplacedToken |= i != parameters.Length - 1;
             }
             else if (state is not null && type == state)
             {
@@ -123,7 +126,7 @@ public static class SynapseShape
             throw new SynapseShapeException($"{name}: a synapse takes exactly one {SynapseReasons.StateRecord} '{alias}' parameter.");
         }
 
-        if (unknown || tokens > 1)
+        if (unknown || tokens > 1 || misplacedToken)
         {
             throw new SynapseShapeException($"{name}: a parameter is {SynapseReasons.UnknownParameter}.");
         }
