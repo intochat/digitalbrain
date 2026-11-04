@@ -422,6 +422,51 @@ public sealed class StateNeuronFacts
     }
 
     [Fact]
+    public async Task ARepeatedCommittedForAFlushedTicketSavesNothing()
+    {
+        var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
+        var a = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), Guid.NewGuid(), TestContext.Current.CancellationToken));
+        await n.Committed(new Charging(40m), a);
+        Assert.Single(Context.Writes);
+
+        await n.Committed(new Charging(40m), a);
+
+        Assert.Single(Context.Writes);
+    }
+
+    [Fact]
+    public async Task ARepeatedCommittedOfAnEarlierFlushedTicketNeverRollsTheStateBack()
+    {
+        var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
+        var a = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), Guid.NewGuid(), TestContext.Current.CancellationToken));
+        var b = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), Guid.NewGuid(), TestContext.Current.CancellationToken));
+        await n.Committed(new Charging(40m), b);
+        await n.Committed(new Charging(40m), a);
+        Assert.Equal(80m, ((WeekSpend)Assert.Single(Context.Writes).State).Spent);
+
+        await n.Committed(new Charging(40m), a);
+
+        Assert.Single(Context.Writes);
+        var after = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(20m), Guid.NewGuid(), TestContext.Current.CancellationToken));
+        Assert.Equal(100m, ((WeekSpend)after.Next).Spent);
+    }
+
+    [Fact]
+    public async Task AnAbortedForAFlushedTicketChangesNothing()
+    {
+        var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
+        var a = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), Guid.NewGuid(), TestContext.Current.CancellationToken));
+        await n.Committed(new Charging(40m), a);
+        var b = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), Guid.NewGuid(), TestContext.Current.CancellationToken));
+
+        await n.Aborted(new Charging(40m), a.Ticket);
+
+        Assert.Single(Context.Writes);
+        await n.Committed(new Charging(40m), b);
+        Assert.Equal(80m, ((WeekSpend)Context.Writes[1].State).Spent);
+    }
+
+    [Fact]
     public async Task AnEmptyTicketIsRefused()
     {
         var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));

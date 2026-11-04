@@ -37,7 +37,10 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     private const string GatePlaceholder = "gate";
     private readonly string _alias;
     private readonly IReadOnlyList<SynapseDescriptor> _synapses;
+    private const int FlushedMemory = 256;
     private readonly List<Entry> _provisional = [];
+    private readonly HashSet<Guid> _flushed = [];
+    private readonly Queue<Guid> _flushedOrder = new();
     private bool _viewsPending;
     private bool _journalingRefusal;
 
@@ -134,8 +137,9 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     /// the longest committed run from the head once and removes that run (a commit behind an uncommitted head saves nothing yet).
     /// Matches by ticket only; an empty ticket is refused. Committed entries never expire; an uncommitted head that outlives
     /// <see cref="StateNeuron.ProvisionalLease"/> is pruned on the next gate call, which then flushes the committed run behind it.
-    /// Without an uncommitted provisional entry, which is only reachable after the entry outlived the lease, saves the next state of
-    /// <paramref name="allowed"/>.
+    /// A repeated commit of a ticket the neuron already flushed (it remembers the last 256) is a no-op, so a duplicate never re-saves
+    /// an older state. A ticket that is neither provisional nor remembered as flushed, which is only reachable after the entry
+    /// outlived the lease, saves the next state of <paramref name="allowed"/>.
     /// </summary>
     /// <param name="signal">The published signal.</param>
     /// <param name="allowed">The verdict <see cref="Gate"/> returned, carrying its ticket.</param>
@@ -149,6 +153,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
         var index = Provisional(allowed.Ticket);
         if (index < 0)
         {
+            if (_flushed.Contains(allowed.Ticket)) { return; }
             await Save((TState)allowed.Next, [Changed(signal)]).ConfigureAwait(true);
             await PendingViews().ConfigureAwait(true);
             return;
@@ -166,6 +171,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
         if (run == 0) { return; }
         var next = _provisional[run - 1].Next;
         cause ??= _provisional[run - 1].Signal;
+        for (var i = 0; i < run; i++) { Remember(_provisional[i].Ticket); }
         _provisional.RemoveRange(0, run);
         await Save(next, [Changed(cause)]).ConfigureAwait(true);
         await PendingViews().ConfigureAwait(true);
@@ -176,7 +182,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     /// in order, on the new base; a re-gate that refuses keeps its entry with the base unchanged as its next state and publishes an
     /// ephemeral <see cref="Rejected"/> whose operation ends in <c> (late)</c>; a re-gate that throws is treated the same way, with the
     /// exception message, and never escapes. If the head run is then committed, it is saved once and the views run. An abort whose
-    /// entry is committed or was never added (the gate refused, threw or timed out before allowing) is ignored, so a host may abort a gate
+    /// entry is committed, already flushed or was never added (the gate refused, threw or timed out before allowing) is ignored, so a host may abort a gate
     /// whose verdict never arrived with its attempt id. Matches by ticket only; an empty ticket is refused.
     /// </summary>
     /// <param name="signal">The signal whose publish was abandoned.</param>
@@ -223,6 +229,14 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     }
 
     private static string AliasOf(Signal signal) => signal.GetType().GetCustomAttribute<SignalAttribute>()?.Alias ?? signal.GetType().Name;
+
+    // Remembers a flushed ticket, forgetting the oldest beyond the cap.
+    private void Remember(Guid ticket)
+    {
+        if (!_flushed.Add(ticket)) { return; }
+        _flushedOrder.Enqueue(ticket);
+        if (_flushedOrder.Count > FlushedMemory) { _flushed.Remove(_flushedOrder.Dequeue()); }
+    }
 
     // The uncommitted provisional entry of the ticket.
     private int Provisional(Guid ticket) => _provisional.FindIndex(entry => !entry.Committed && entry.Ticket == ticket);
