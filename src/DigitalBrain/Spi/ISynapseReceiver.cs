@@ -32,7 +32,10 @@ public interface ISynapseReceiver
     /// append threw): drops the provisional state of <paramref name="signal"/> without saving; later provisional states are re-gated on the new base.
     /// </summary>
     /// <param name="signal">The signal whose publish was abandoned.</param>
-    /// <param name="ticket">The <see cref="Check.Allowed.Ticket"/> of the entry to drop; <see cref="Guid.Empty"/> (legacy) falls back to matching by signal value.</param>
+    /// <param name="ticket">
+    /// The <see cref="Check.Allowed.Ticket"/> of the entry to drop. <see cref="Guid.Empty"/> means the newest uncommitted entry for
+    /// <paramref name="signal"/>: a host sends it for a gate that timed out or failed, whose verdict (and ticket) never arrived.
+    /// </param>
     /// <returns>A task that completes when the provisional state is dropped.</returns>
     Task Aborted(Signal signal, Guid ticket);
 }

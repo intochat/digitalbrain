@@ -384,6 +384,21 @@ public sealed class StateNeuronFacts
         Assert.Equal(40m, ((WeekSpend)Assert.Single(Context.Writes).State).Spent);
     }
 
+    [Fact]
+    public async Task AbortedWithoutATicketDropsTheNewestUncommittedEntryOfTheSignal()
+    {
+        var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
+        Assert.IsType<Check.Allowed>(await n.Gate(new Charging(30m), TestContext.Current.CancellationToken));
+        var b = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(30m), TestContext.Current.CancellationToken));
+        Assert.IsType<Check.Allowed>(await n.Gate(new Charging(30m), TestContext.Current.CancellationToken));
+
+        await n.Aborted(new Charging(30m), Guid.Empty);
+
+        // The newest went: the oldest is still an uncommitted head, so B's commit saves nothing yet.
+        await n.Committed(new Charging(30m), b);
+        Assert.Empty(Context.Writes);
+    }
+
     private sealed class SteppedClock : TimeProvider
     {
         public DateTimeOffset Now { get; set; } = new(2026, 11, 4, 0, 0, 0, TimeSpan.Zero);

@@ -83,7 +83,9 @@ internal static class TestGates
         }
     }
 
-    // A gate that does not answer within GateTimeout, or fails, refuses; its call is cancelled and its state is not touched.
+    // A gate that does not answer within GateTimeout, or fails, refuses; its call is cancelled, and an Aborted without a ticket
+    // (the verdict never arrived) is queued as a tracked turn behind it, so a gate that ignores the cancellation and allows late
+    // leaves no provisional entry.
     private static async Task<Check> Ask(TestOS os, TestNeuronHost host, Signal signal, SynapseDescriptor descriptor, CancellationToken ct)
     {
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -96,7 +98,13 @@ internal static class TestGates
         {
             await cancel.CancelAsync().ConfigureAwait(false);
             _ = turn.ContinueWith(static t => t.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
-            throw new RuleViolationException(new Rejected(descriptor.Name, [descriptor.Name], [NoAnswer]));
+            var refused = new RuleViolationException(new Rejected(descriptor.Name, [descriptor.Name], [NoAnswer]));
+            _ = os.Track(host.Turn(interleave: false, async neuron =>
+            {
+                await ((ISynapseReceiver)neuron).Aborted(signal, Guid.Empty).ConfigureAwait(false);
+                return 0;
+            }));
+            throw refused;
         }
     }
 }

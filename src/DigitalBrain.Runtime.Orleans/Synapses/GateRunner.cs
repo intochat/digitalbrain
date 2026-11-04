@@ -73,7 +73,7 @@ internal static partial class GateRunner
                     if (gate == publisher) { continue; }
                     var host = Host(grains, types, gate);
                     var (alias, json) = Encode(payloads, signal);
-                    var verdict = await Ask(host, alias, json, descriptor, timeout, ct).ConfigureAwait(true);
+                    var verdict = await Ask(host, alias, json, descriptor, timeout, log, ct).ConfigureAwait(true);
                     if (!verdict.Allowed) { throw new RuleViolationException(new Rejected(descriptor.Name, verdict.Rules, verdict.Messages)); }
                     // An allowance without a next state cannot be committed: it fails closed like a gate that did not answer.
                     if (verdict.Next is not { } next)
@@ -178,8 +178,9 @@ internal static partial class GateRunner
         else { RequestContext.Set(HostNeuronContext.GateChainKey, previous); }
     }
 
-    // A gate that does not answer within the timeout, or fails, refuses; its call is cancelled and its state is not touched.
-    private static async Task<GateVerdict> Ask(INeuronHost host, string alias, JsonElement json, SynapseDescriptor descriptor, TimeSpan timeout, CancellationToken ct)
+    // A gate that does not answer within the timeout, or fails, refuses; its call is cancelled, and an Aborted without a ticket (the
+    // verdict never arrived) is sent behind it, not awaited, so a gate that ignores the cancellation and allows late leaves no entry.
+    private static async Task<GateVerdict> Ask(INeuronHost host, string alias, JsonElement json, SynapseDescriptor descriptor, TimeSpan timeout, ILogger log, CancellationToken ct)
     {
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var call = host.Gate(alias, json, cancel.Token);
@@ -188,7 +189,11 @@ internal static partial class GateRunner
         {
             await cancel.CancelAsync().ConfigureAwait(true);
             _ = call.ContinueWith(static t => t.Exception, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
-            throw new RuleViolationException(new Rejected(descriptor.Name, [descriptor.Name], [NoAnswer]));
+            var refused = new RuleViolationException(new Rejected(descriptor.Name, [descriptor.Name], [NoAnswer]));
+            var gate = host.GetPrimaryKeyString();
+            _ = host.Aborted(alias, json, Guid.Empty, CancellationToken.None).ContinueWith(t => LogTimedOutGateAbortFailed(log, t.Exception!, gate, alias),
+                CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Default);
+            throw refused;
         }
     }
 
@@ -250,6 +255,10 @@ internal static partial class GateRunner
     [LoggerMessage(EventId = 4125, EventName = "GateAbortFailed", Level = LogLevel.Warning,
         Message = "The gate {Gate} could not drop its provisional state for {Signal}; its lease discards it.")]
     private static partial void LogGateAbortFailed(ILogger logger, Exception error, string gate, string signal);
+
+    [LoggerMessage(EventId = 4127, EventName = "TimedOutGateAbortFailed", Level = LogLevel.Debug,
+        Message = "The gate {Gate} that did not answer could not drop a late provisional state for {Signal}; its lease discards it.")]
+    private static partial void LogTimedOutGateAbortFailed(ILogger logger, Exception error, string gate, string signal);
 
     [LoggerMessage(EventId = 4126, EventName = "ReactionEnsureTimedOut", Level = LogLevel.Warning,
         Message = "The reaction edge to {Subscriber} for {Signal} was not ensured within the gate timeout; a later publish ensures it.")]

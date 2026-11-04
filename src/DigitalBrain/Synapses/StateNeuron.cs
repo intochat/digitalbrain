@@ -174,7 +174,9 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     /// in order, on the new base; a re-gate that refuses keeps its entry with the base unchanged as its next state and publishes an
     /// ephemeral <see cref="Rejected"/> whose operation ends in <c> (late)</c>; a re-gate that throws is treated the same way, with the
     /// exception message, and never escapes. An abort whose entry is committed or gone is ignored. Without a ticket
-    /// (<see cref="Guid.Empty"/>, legacy) matches the oldest uncommitted entry of an equal signal. Durable state is not touched.
+    /// (<see cref="Guid.Empty"/>) matches the newest uncommitted entry of an equal signal: the one legitimate use of the value fallback,
+    /// for a host aborting a gate that timed out before its verdict (and ticket) arrived, whose late entry is the newest one.
+    /// Durable state is not touched.
     /// </summary>
     /// <param name="signal">The signal whose publish was abandoned.</param>
     /// <param name="ticket">The <see cref="Verdict.Allowed.Ticket"/> of the entry to drop.</param>
@@ -182,7 +184,9 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     public async Task Aborted(Signal signal, Guid ticket)
     {
         ArgumentNullException.ThrowIfNull(signal);
-        var index = Provisional(signal, ticket);
+        var index = ticket != Guid.Empty
+            ? Provisional(signal, ticket)
+            : _provisional.FindLastIndex(entry => !entry.Committed && entry.Signal.Equals(signal));
         if (index < 0) { return; }
         _provisional.RemoveAt(index);
         var current = index > 0 ? _provisional[index - 1].Next : State;

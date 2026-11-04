@@ -78,6 +78,48 @@ public static class Stuck
     private static TaskCompletionSource New() => new(TaskCreationOptions.RunContinuationsAsynchronously);
 }
 
+[Signal("test.synapse.lagging")]
+public sealed record Lagging(decimal Amount) : Signal;
+
+[State("lag")]
+public sealed record LagSpend(decimal Spent)
+{
+    public LagSpend() : this(0m) { }
+}
+
+// A capped gate whose first call ignores cancellation: it answers Allowed only once released, after its publisher failed closed.
+public static class Late
+{
+    private static TaskCompletionSource _release = New();
+    private static TaskCompletionSource _waiting = New();
+    private static int _calls;
+
+    public static Task Waiting => _waiting.Task;
+
+    public static void Reset()
+    {
+        _release = New();
+        _waiting = New();
+        _calls = 0;
+    }
+
+    public static void Release() => _release.TrySetResult();
+
+    [Synapse(typeof(Lagging), "lag")]
+    public static async Task<Check> Cap(Lagging s, LagSpend state, CancellationToken ct)
+    {
+        if (Interlocked.Increment(ref _calls) == 1)
+        {
+            _waiting.TrySetResult();
+            await _release.Task;
+        }
+
+        return state.Spent + s.Amount > 100m ? Check.Reject("cap of $100") : Check.Allow(state with { Spent = state.Spent + s.Amount });
+    }
+
+    private static TaskCompletionSource New() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+}
+
 [Signal("test.synapse.fragile")]
 public sealed record Fragile : Signal;
 
@@ -122,6 +164,8 @@ public interface IPayments
 
     Task Stall();
 
+    Task Lag(decimal amount);
+
     Task Break();
 }
 
@@ -133,6 +177,8 @@ public sealed class Payments : Neuron<PayState>, IPayments
     public Task ChargeCapped(decimal amount) => Save(State with { Count = State.Count + 1 }, new CappedCharging(amount));
 
     public Task Stall() => Save(State with { Count = State.Count + 1 }, new Stalling());
+
+    public Task Lag(decimal amount) => Save(State with { Count = State.Count + 1 }, new Lagging(amount));
 
     public Task Break() => Save(State with { Count = State.Count + 1 }, new Fragile());
 }
@@ -240,6 +286,34 @@ public sealed class StateNeuronOnTestOSFacts
         Assert.Equal("the gate did not answer", e.Rejected.Messages[0]);
         Assert.Empty(os.Journal(Pay.Brain).Signals(Pay));
         Assert.Empty(os.Journal(Pay.Brain).Signals(NeuronId.Parse("b/hold/default")));
+    }
+
+    [Fact]
+    public async Task AGateThatAllowsAfterItsPublisherFailedClosedLeavesNoProvisionalEntry()
+    {
+        Late.Reset();
+        await using var os = Start();
+        var pay = os.Get<IPayments>(Pay);
+
+        var call = pay.Lag(60m);
+        for (var tries = 0; tries < 200 && !Late.Waiting.IsCompleted; tries++)
+        {
+            await Task.Delay(10, TestContext.Current.CancellationToken);
+        }
+        os.Clock.Advance(os.Options.GateTimeout + TimeSpan.FromSeconds(1));
+        var e = await Assert.ThrowsAsync<RuleViolationException>(() => call);
+        Assert.Equal("the gate did not answer", e.Rejected.Messages[0]);
+
+        // The gate ignores the cancellation and answers Allowed(60) after the publisher gave up; the abort sent on timeout drops it.
+        Late.Release();
+        await os.Idle();
+
+        // Against the inflated 60 this second 60 would break the cap of 100.
+        await pay.Lag(60m);
+        await os.Idle();
+
+        var state = await ((IBrainObserver)os).State(NeuronId.Parse("b/lag/default"), TestContext.Current.CancellationToken);
+        Assert.Equal(60m, state!.Value.GetProperty("spent").GetDecimal());
     }
 
     [Fact]
