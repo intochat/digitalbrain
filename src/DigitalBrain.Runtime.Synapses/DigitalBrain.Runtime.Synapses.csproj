@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <!-- Not packable yet: DigitalBrain.Analyzers packs analyzer-only (no lib/), so a package dependency on it would not resolve; packaging is a follow-up. -->
-    <IsPackable>false</IsPackable>
+    <IsPackable>true</IsPackable>
     <RootNamespace>DigitalBrain.Runtime.Synapses</RootNamespace>
     <PackageId>DigitalBrain.Runtime.Synapses</PackageId>
     <Description>Compiles synapse source to assemblies with the shipped DigitalBrain analyzers. No Orleans.</Description>
@@ -11,7 +10,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
-    <ProjectReference Include="../DigitalBrain.Analyzers/DigitalBrain.Analyzers.csproj" ReferenceOutputAssembly="true" />
+    <!-- DigitalBrain.Analyzers packs analyzer-only (no lib/), so it is no package dependency: its dll ships in this package's lib/. -->
+    <ProjectReference Include="../DigitalBrain.Analyzers/DigitalBrain.Analyzers.csproj" ReferenceOutputAssembly="true" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
@@ -19,6 +19,7 @@
     <AdditionalFiles Include="PublicAPI.Shipped.txt" />
     <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
     <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include="$(OutDir)DigitalBrain.Analyzers.dll" Pack="true" PackagePath="lib/$(TargetFramework)/" Visible="false" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Runtime.Synapses.Tests.Unit" />
