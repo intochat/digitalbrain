@@ -2583,3 +2583,7 @@ static DigitalBrain.DeployedSource.operator !=(DigitalBrain.DeployedSource? left
 static DigitalBrain.DeployedSource.operator ==(DigitalBrain.DeployedSource? left, DigitalBrain.DeployedSource? right) -> bool
 static DigitalBrain.SourceRecord.operator !=(DigitalBrain.SourceRecord? left, DigitalBrain.SourceRecord? right) -> bool
 static DigitalBrain.SourceRecord.operator ==(DigitalBrain.SourceRecord? left, DigitalBrain.SourceRecord? right) -> bool
+static DigitalBrain.Invocation.RuntimeProtocol.OptionsFor(System.Type! type) -> System.Text.Json.JsonSerializerOptions!
+static DigitalBrain.Invocation.RuntimeProtocol.Forget(System.Runtime.Loader.AssemblyLoadContext! context) -> void
+DigitalBrain.IInstalls.CancelPending(string! alias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.InstallsNeuron.CancelPending(string! alias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!

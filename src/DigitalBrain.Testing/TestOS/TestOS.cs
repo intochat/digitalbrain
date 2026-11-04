@@ -87,7 +87,8 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
             Source,
             brain => Get<IInstalls>(NeuronId.Parse($"{brain}/synapse.installs/default")),
             Store,
-            Listeners));
+            Listeners,
+            track: work => _ = Track(work)));
         Register<InstallsNeuron>();
         Register<TimeNeuron>();
         _ = Listeners.Listen<GateChanged>("testos.installed-gates", RefreshGates);

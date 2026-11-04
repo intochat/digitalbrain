@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Threading.Channels;
 using DigitalBrain.Spi;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -9,7 +10,8 @@ namespace DigitalBrain.Runtime.Synapses;
 /// Deploys, updates and retires generated synapse sources: compiles, loads into a collectible context, makes the source live through the
 /// registrar and installs its aliases. A version that changes the needs of an installed alias is staged (its catalog serves
 /// <see cref="ISynapseCatalogSource.ForNeeds"/> only) until every changed alias is <see cref="Installed"/>; an <see cref="InstallDenied"/>
-/// drops it and the old version stays live. Per brain and source key it keeps the live and the staged <see cref="LoadedSource"/> in memory.
+/// drops it and the old version stays live. Resolutions are queued and applied one at a time by a background loop, so a listener never waits
+/// on a deploy in progress. Per brain and source key it keeps the live and the staged <see cref="LoadedSource"/> in memory.
 /// </summary>
 public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
 {
@@ -29,6 +31,10 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
     private readonly Dictionary<(BrainId Brain, string SourceKey), Entry> entries = [];
     private readonly List<(string SourceKey, string Hash)> leaked = [];
     private readonly List<IAsyncDisposable> registrations = [];
+    private readonly Channel<(BrainId Brain, Signal Signal, TaskCompletionSource Done)> resolutions =
+        Channel.CreateUnbounded<(BrainId Brain, Signal Signal, TaskCompletionSource Done)>(new UnboundedChannelOptions { SingleReader = true });
+    private readonly Action<Task>? track;
+    private Task drain = Task.CompletedTask;
     private bool listening;
 
     /// <summary>Creates a host.</summary>
@@ -40,6 +46,7 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
     /// <param name="store">Where the live sources are kept.</param>
     /// <param name="listeners">The cluster listeners the host learns of <see cref="Installed"/> and <see cref="InstallDenied"/> from.</param>
     /// <param name="logger">Logs unloads that did not collect; optional.</param>
+    /// <param name="track">Given the completion of each queued install resolution, as a test host tracks outstanding work; optional.</param>
     public SynapseHost(
         SynapseCompiler compiler,
         SynapseLoader loader,
@@ -48,7 +55,8 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         Func<BrainId, IInstalls> installs,
         ISourceStore store,
         IClusterListeners listeners,
-        ILogger<SynapseHost>? logger = null)
+        ILogger<SynapseHost>? logger = null,
+        Action<Task>? track = null)
     {
         this.compiler = compiler ?? throw new ArgumentNullException(nameof(compiler));
         this.loader = loader ?? throw new ArgumentNullException(nameof(loader));
@@ -58,6 +66,7 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         this.store = store ?? throw new ArgumentNullException(nameof(store));
         this.listeners = listeners ?? throw new ArgumentNullException(nameof(listeners));
         this.logger = logger ?? NullLogger<SynapseHost>.Instance;
+        this.track = track;
     }
 
     /// <summary>The source key and hash of every context an unload or retire could not collect.</summary>
@@ -90,48 +99,37 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
                 return new DeployOutcome(DeployStatus.Unchanged, build.Hash, build.Diagnostics, Empty(), null);
             }
 
-            if (entry?.Staged is { } staged && string.Equals(staged.Loaded.Hash, build.Hash, StringComparison.Ordinal))
+            if (string.Equals(entry?.Staged?.Loaded.Hash, build.Hash, StringComparison.Ordinal))
             {
                 return new DeployOutcome(DeployStatus.Staged, build.Hash, build.Diagnostics, Empty(), "this version is already staged");
             }
 
             if (entry?.Staged is not null)
             {
-                await DropStaged(entry).ConfigureAwait(false);
+                await DropStaged(brain, entry, ct).ConfigureAwait(false);
             }
 
-            LoadedSource loaded;
-            try
+            var refusal = LoadChecked(brain, source.SourceKey, build, out var loaded, out var unload);
+            if (refusal is not null)
             {
-                loaded = loader.Load(build);
-            }
-            catch (Exception error) when (error is InvalidOperationException or BadImageFormatException or System.Reflection.ReflectionTypeLoadException or SynapseShapeException)
-            {
-                return new DeployOutcome(DeployStatus.Failed, build.Hash, build.Diagnostics, Empty(), $"the build does not load: {error.Message}");
-            }
-
-            var aliases = AliasesOf(loaded);
-            if (Owner(brain, source.SourceKey, aliases) is { } conflict)
-            {
-                var unload = Release(loaded);
-                loaded = null!;
                 await unload.ConfigureAwait(false);
-                return new DeployOutcome(DeployStatus.Refused, build.Hash, build.Diagnostics, Empty(), $"alias '{conflict.Alias}' is owned by source '{conflict.Owner}'");
+                return new DeployOutcome(refusal.Value.Status, build.Hash, build.Diagnostics, Empty(), refusal.Value.Reason);
             }
 
+            var aliases = AliasesOf(loaded!);
             var brainInstalls = installs(brain);
             var changed = new List<string>();
             foreach (var alias in aliases)
             {
                 if (entry is not null && entry.Live.Catalog.States.ContainsKey(alias) && catalog.Current.States.ContainsKey(alias)
                     && await brainInstalls.Describe(alias, ct).ConfigureAwait(false) is not null
-                    && !string.Equals(loaded.Catalog.NeedsOf(alias).Hash(), catalog.Current.NeedsOf(alias).Hash(), StringComparison.Ordinal))
+                    && !string.Equals(loaded!.Catalog.NeedsOf(alias).Hash(), catalog.Current.NeedsOf(alias).Hash(), StringComparison.Ordinal))
                 {
                     changed.Add(alias);
                 }
             }
 
-            var pending = new Pending(loaded, source, build, Bindings(aliases, bindingsPerAlias));
+            var pending = new Pending(loaded!, source, build, Bindings(aliases, bindingsPerAlias));
             return changed.Count == 0
                 ? await GoLive(brain, entry, pending, build.Diagnostics, ct).ConfigureAwait(false)
                 : await StageUpdate(brain, entry!, pending, changed, build.Diagnostics, ct).ConfigureAwait(false);
@@ -156,7 +154,7 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
 
             if (entry.Staged is not null)
             {
-                await DropStaged(entry).ConfigureAwait(false);
+                await DropStaged(brain, entry, ct).ConfigureAwait(false);
             }
 
             var hash = entry.Live.Hash;
@@ -204,10 +202,12 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         }
     }
 
-    /// <summary>Stops listening for install resolutions; deployed sources stay loaded.</summary>
+    /// <summary>Stops listening for install resolutions and applies the queued ones; deployed sources stay loaded.</summary>
     /// <returns>A task that completes when the listeners are disposed.</returns>
     public async ValueTask DisposeAsync()
     {
+        resolutions.Writer.TryComplete();
+        await drain.ConfigureAwait(false);
         foreach (var registration in registrations)
         {
             await registration.DisposeAsync().ConfigureAwait(false);
@@ -223,6 +223,32 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
 
     private static Dictionary<string, IReadOnlyDictionary<string, string>> Bindings(List<string> aliases, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> given) =>
         aliases.ToDictionary(alias => alias, alias => given.TryGetValue(alias, out var bindings) ? bindings : NoBindings, StringComparer.Ordinal);
+
+    // Loads the build and checks its aliases in a frame of its own: a refused load is released here, so no async frame of the host names
+    // the record while the loader collects it.
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private (DeployStatus Status, string Reason)? LoadChecked(BrainId brain, string sourceKey, SynapseBuild build, out LoadedSource? loaded, out Task unload)
+    {
+        unload = Task.CompletedTask;
+        try
+        {
+            loaded = loader.Load(build);
+        }
+        catch (Exception error) when (error is InvalidOperationException or BadImageFormatException or System.Reflection.ReflectionTypeLoadException or SynapseShapeException)
+        {
+            loaded = null;
+            return (DeployStatus.Failed, $"the build does not load: {error.Message}");
+        }
+
+        if (Owner(brain, sourceKey, AliasesOf(loaded)) is { } conflict)
+        {
+            unload = Release(loaded);
+            loaded = null;
+            return (DeployStatus.Refused, $"alias '{conflict.Alias}' is owned by source '{conflict.Owner}'");
+        }
+
+        return null;
+    }
 
     private (string Alias, string Owner)? Owner(BrainId brain, string sourceKey, List<string> aliases)
     {
@@ -270,13 +296,13 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         var outcomes = await InstallAll(brain, next, ct).ConfigureAwait(false);
         if (changed.FirstOrDefault(a => outcomes[a].Status is InstallStatus.Refused or InstallStatus.Denied) is { } refused)
         {
-            await DropStaged(entry).ConfigureAwait(false);
+            await DropStaged(brain, entry, ct).ConfigureAwait(false);
             return new DeployOutcome(DeployStatus.Refused, hash, diagnostics, outcomes, $"the install of '{refused}' was {outcomes[refused].Status.ToString().ToLowerInvariant()}: {outcomes[refused].Reason}");
         }
 
-        foreach (var alias in outcomes.Where(o => o.Value.Status == InstallStatus.Pending).Select(o => o.Key))
+        foreach (var (alias, outcome) in outcomes.Where(o => o.Value.Status == InstallStatus.Pending))
         {
-            next.Waiting.Add(alias);
+            next.Waiting[alias] = outcome.Reason ?? "";
         }
 
         if (next.Waiting.Count == 0)
@@ -337,9 +363,18 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
             new SourceRecord(next.Source.SourceKey, next.Source.Files, next.Source.Icon, next.Build.Hash, next.Build.AssemblyName, next.Build.Assembly, next.Build.Symbols, AliasesOf(next.Loaded), DateTimeOffset.UtcNow),
             ct);
 
-    private async Task DropStaged(Entry entry)
+    // The stage leaves: its asks still waiting are cancelled (superseded), its catalog unstaged and its context unloaded.
+    private async Task DropStaged(BrainId brain, Entry entry, CancellationToken ct)
     {
         var key = entry.Live.SourceKey;
+        var asked = entry.Staged!.Waiting.Keys.ToList();
+        entry.Staged.Waiting.Clear();
+        var brainInstalls = installs(brain);
+        foreach (var alias in asked)
+        {
+            await brainInstalls.CancelPending(alias, ct).ConfigureAwait(false);
+        }
+
         catalog.Unstage(key);
         await ReleaseStaged(entry).ConfigureAwait(false);
     }
@@ -388,8 +423,9 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
                 return;
             }
 
-            registrations.Add(await listeners.Listen<Installed>(ListenerName, (publisher, signal, ct) => OnResolved(publisher.Brain, signal.Alias, approved: true, ct)).ConfigureAwait(false));
-            registrations.Add(await listeners.Listen<InstallDenied>(ListenerName, (publisher, signal, ct) => OnResolved(publisher.Brain, signal.Alias, approved: false, ct)).ConfigureAwait(false));
+            drain = Task.Run(Drain);
+            registrations.Add(await listeners.Listen<Installed>(ListenerName, (publisher, signal, _) => Enqueue(publisher.Brain, signal)).ConfigureAwait(false));
+            registrations.Add(await listeners.Listen<InstallDenied>(ListenerName, (publisher, signal, _) => Enqueue(publisher.Brain, signal)).ConfigureAwait(false));
             Volatile.Write(ref listening, true);
         }
         finally
@@ -398,27 +434,56 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         }
     }
 
-    private async Task OnResolved(BrainId brain, string alias, bool approved, CancellationToken ct)
+    private Task Enqueue(BrainId brain, Signal signal)
     {
-        await gate.WaitAsync(ct).ConfigureAwait(false);
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (resolutions.Writer.TryWrite((brain, signal, done)))
+        {
+            track?.Invoke(done.Task);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private async Task Drain()
+    {
+        await foreach (var (brain, signal, done) in resolutions.Reader.ReadAllAsync().ConfigureAwait(false))
+        {
+            try
+            {
+                await OnResolved(brain, signal).ConfigureAwait(false);
+            }
+            catch (Exception error) when (error is not OutOfMemoryException)
+            {
+                LogResolutionFailed(error);
+            }
+
+            done.TrySetResult();
+        }
+    }
+
+    private async Task OnResolved(BrainId brain, Signal signal)
+    {
+        await gate.WaitAsync().ConfigureAwait(false);
         try
         {
-            var entry = entries.FirstOrDefault(e => e.Key.Brain == brain && e.Value.Staged?.Waiting.Contains(alias) == true).Value;
+            var entry = entries.FirstOrDefault(e => e.Key.Brain == brain && e.Value.Staged is { } staged && Awaits(staged, signal)).Value;
             if (entry is null)
             {
                 return;
             }
 
-            if (!approved)
+            if (signal is InstallDenied denied)
             {
-                await DropStaged(entry).ConfigureAwait(false);
+                entry.Staged!.Waiting.Remove(denied.Alias);
+                await DropStaged(brain, entry, CancellationToken.None).ConfigureAwait(false);
                 return;
             }
 
-            entry.Staged!.Waiting.Remove(alias);
+            entry.Staged!.Waiting.Remove(((Installed)signal).Alias);
             if (entry.Staged.Waiting.Count == 0)
             {
-                await CompleteStaged(brain, entry, ct).ConfigureAwait(false);
+                await CompleteStaged(brain, entry, CancellationToken.None).ConfigureAwait(false);
             }
         }
         finally
@@ -426,6 +491,18 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
             gate.Release();
         }
     }
+
+    // An Installed with the staged needs, or an InstallDenied of the very ask the stage made, resolves the stage's ask of that alias.
+    private static bool Awaits(Pending staged, Signal signal) => signal switch
+    {
+        Installed installed => staged.Waiting.ContainsKey(installed.Alias)
+            && string.Equals(staged.Loaded.Catalog.NeedsOf(installed.Alias).Hash(), installed.NeedsHash, StringComparison.Ordinal),
+        InstallDenied denied => staged.Waiting.TryGetValue(denied.Alias, out var plan) && string.Equals(plan, denied.PlanId, StringComparison.Ordinal),
+        _ => false,
+    };
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "An install resolution could not be applied.")]
+    private partial void LogResolutionFailed(Exception error);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The context of synapse source {SourceKey} ({Hash}) did not unload.")]
     private partial void LogLeaked(string sourceKey, string hash);
@@ -441,6 +518,7 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
 
     private sealed record Pending(LoadedSource Loaded, SynapseSource Source, SynapseBuild Build, Dictionary<string, IReadOnlyDictionary<string, string>> Bindings)
     {
-        public HashSet<string> Waiting { get; } = new(StringComparer.Ordinal);
+        // Alias to the plan id of its ask.
+        public Dictionary<string, string> Waiting { get; } = new(StringComparer.Ordinal);
     }
 }

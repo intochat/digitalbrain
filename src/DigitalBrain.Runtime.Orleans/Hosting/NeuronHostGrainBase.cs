@@ -163,7 +163,7 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
                 Check.Refused refused => new GateVerdict(false, [.. refused.Broken.Select(rule => rule.Name)], [.. refused.Broken.Select(rule => rule.Message)], null),
                 // A null next state travels as null: the publisher's GateRunner fails it closed.
                 Check.Allowed { Next: null } allowed => new GateVerdict(true, [], [], null) { Ticket = allowed.Ticket },
-                Check.Allowed allowed => new GateVerdict(true, [], [], JsonSerializer.SerializeToElement(allowed.Next, allowed.Next.GetType(), RuntimeProtocol.Json)) { Ticket = allowed.Ticket },
+                Check.Allowed allowed => new GateVerdict(true, [], [], JsonSerializer.SerializeToElement(allowed.Next, allowed.Next.GetType(), RuntimeProtocol.OptionsFor(allowed.Next.GetType()))) { Ticket = allowed.Ticket },
                 _ => throw new InvalidOperationException($"{_key} returned an unknown verdict."),
             };
         }
@@ -175,7 +175,7 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
     {
         var receiver = Receiver();
         var stateType = _class!.GetGenericArguments()[0];
-        var state = next.Deserialize(stateType, RuntimeProtocol.Json) ?? throw new JournalPayloadException($"The next state for {_key} is null.");
+        var state = next.Deserialize(stateType, RuntimeProtocol.OptionsFor(stateType)) ?? throw new JournalPayloadException($"The next state for {_key} is null.");
         try { await receiver.Committed(Decode(signalAlias, signal), new Check.Allowed(state) { Ticket = ticket }).ConfigureAwait(true); }
         finally { await Drain().ConfigureAwait(true); }
     }

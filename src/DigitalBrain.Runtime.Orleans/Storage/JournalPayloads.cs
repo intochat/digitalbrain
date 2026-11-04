@@ -26,7 +26,7 @@ internal sealed class JournalPayloads(SignalTypeMap types)
 
     public static byte[] EncodeState<T>(T value)
     {
-        try { return JsonSerializer.SerializeToUtf8Bytes(value, RuntimeProtocol.Json); }
+        try { return JsonSerializer.SerializeToUtf8Bytes(value, RuntimeProtocol.OptionsFor(value?.GetType() ?? typeof(T))); }
         catch (Exception error) when (error is JsonException or NotSupportedException)
         { throw new JournalPayloadException($"State {typeof(T).FullName} cannot be written as JSON.", error); }
     }
@@ -34,7 +34,7 @@ internal sealed class JournalPayloads(SignalTypeMap types)
     public static T? DecodeState<T>(byte[] json)
     {
         ArgumentNullException.ThrowIfNull(json);
-        try { return JsonSerializer.Deserialize<T>(json, RuntimeProtocol.Json); }
+        try { return JsonSerializer.Deserialize<T>(json, RuntimeProtocol.OptionsFor(typeof(T))); }
         catch (Exception error) when (error is JsonException or NotSupportedException)
         { throw new JournalPayloadException($"Stored state is not a valid {typeof(T).FullName}.", error); }
     }
@@ -45,7 +45,7 @@ internal sealed class JournalPayloads(SignalTypeMap types)
         var type = signal.GetType();
         if (!Types.TryAliasOf(type, out var alias))
         { throw new JournalPayloadException($"Signal {type.FullName} has no registered [Signal] alias; register its assembly with AddJournalPayloads."); }
-        try { return new JournaledSignalPayload(alias, JsonSerializer.SerializeToUtf8Bytes(signal, type, RuntimeProtocol.Json)); }
+        try { return new JournaledSignalPayload(alias, JsonSerializer.SerializeToUtf8Bytes(signal, type, RuntimeProtocol.OptionsFor(type))); }
         catch (Exception error) when (error is JsonException or NotSupportedException)
         { throw new JournalPayloadException($"Signal {alias} cannot be written as JSON.", error); }
     }
@@ -57,7 +57,7 @@ internal sealed class JournalPayloads(SignalTypeMap types)
         { throw new JournalPayloadException($"Journaled signal '{payload.Type}' is not a registered [Signal] alias."); }
         try
         {
-            return JsonSerializer.Deserialize(payload.Json, type, RuntimeProtocol.Json) as Signal
+            return JsonSerializer.Deserialize(payload.Json, type, RuntimeProtocol.OptionsFor(type)) as Signal
                 ?? throw new JournalPayloadException($"Journaled signal '{payload.Type}' is null.");
         }
         catch (Exception error) when (error is JsonException or NotSupportedException)

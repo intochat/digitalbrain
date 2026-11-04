@@ -110,6 +110,16 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
     }
 
     /// <inheritdoc />
+    public async Task CancelPending(string alias, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(alias);
+        var cancelled = State.Pending.Where(p => p.Alias == alias).ToList();
+        if (cancelled.Count == 0) { return; }
+        await Save(State with { Pending = [.. State.Pending.Where(p => p.Alias != alias)] },
+            [.. cancelled.Select(p => (Signal)new InstallDenied(alias, p.PlanId, "superseded"))]).ConfigureAwait(true);
+    }
+
+    /// <inheritdoc />
     /// <remarks>
     /// Pending asks of the alias are denied with reason <c>retired</c>. The record is removed and <see cref="DigitalBrain.GateChanged"/> published first; a failing hook is then swallowed, since
     /// <see cref="IInstalls.Retire"/> reports nothing, and leaves edges or schedules the host must tolerate (they reach a retired app).

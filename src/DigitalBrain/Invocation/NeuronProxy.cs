@@ -169,7 +169,7 @@ public class NeuronProxy : DispatchProxy
     private async Task<TResult> Typed<TResult>(RuntimeInvocation call, CallShape shape, CancellationToken cancellationToken)
     {
         var value = await Send(call, shape, cancellationToken).ConfigureAwait(false);
-        return value is { } json ? json.Deserialize<TResult>(RuntimeProtocol.Json)! : default!;
+        return value is { } json ? json.Deserialize<TResult>(RuntimeProtocol.OptionsFor(typeof(TResult)))! : default!;
     }
 
     private object? StreamItems<TItem>(RuntimeInvocation call, CallShape shape, CancellationToken cancellationToken)
@@ -182,7 +182,7 @@ public class NeuronProxy : DispatchProxy
     {
         await foreach (var item in _sink.Stream(Target, call, cancellationToken).ConfigureAwait(false))
         {
-            yield return item.Deserialize<TItem>(RuntimeProtocol.Json)!;
+            yield return item.Deserialize<TItem>(RuntimeProtocol.OptionsFor(typeof(TItem)))!;
         }
     }
 

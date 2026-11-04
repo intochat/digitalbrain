@@ -94,6 +94,7 @@ public sealed class SynapseLoader
         {
             if (weak.TryGetTarget(out var context))
             {
+                DigitalBrain.Invocation.RuntimeProtocol.Forget(context);
                 context.Unload();
             }
         }
@@ -112,6 +113,7 @@ public sealed class SynapseLoader
                 ? list.Find(w => w.TryGetTarget(out var c) && ReferenceEquals(c, context))
                 : null;
             weak ??= new WeakReference<SynapseLoadContext>(context);
+            DigitalBrain.Invocation.RuntimeProtocol.Forget(context);
             context.Unload();
             return weak;
         }

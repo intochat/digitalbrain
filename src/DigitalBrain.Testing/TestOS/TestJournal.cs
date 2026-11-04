@@ -83,13 +83,13 @@ public sealed class TestJournal : ISignalHistory
 
     internal T? Load<T>(NeuronId id)
     {
-        lock (_gate) { return _states.TryGetValue(id, out var json) ? json.Deserialize<T>(RuntimeProtocol.Json) : default; }
+        lock (_gate) { return _states.TryGetValue(id, out var json) ? json.Deserialize<T>(RuntimeProtocol.OptionsFor(typeof(T))) : default; }
     }
 
     // State and signals become one entry: the state goes through the wire codec, as on the host runtime.
     internal IReadOnlyList<JournaledSignal> Save<T>(NeuronId id, T next, IReadOnlyList<Signal> signals)
     {
-        var json = JsonSerializer.SerializeToElement(next, RuntimeProtocol.Json);
+        var json = JsonSerializer.SerializeToElement(next, RuntimeProtocol.OptionsFor(next?.GetType() ?? typeof(T)));
         lock (_gate)
         {
             _states[id] = json;

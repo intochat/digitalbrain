@@ -15,7 +15,8 @@ public static class InvocationEncoder
         for (var index = 0; index < parameters.Length; index++)
         {
             if (parameters[index].ParameterType == typeof(CancellationToken)) { continue; }
-            arguments.Add(JsonSerializer.SerializeToElement(args is not null && index < args.Length ? args[index] : null, parameters[index].ParameterType, RuntimeProtocol.Json));
+            var value = args is not null && index < args.Length ? args[index] : null;
+            arguments.Add(JsonSerializer.SerializeToElement(value, parameters[index].ParameterType, RuntimeProtocol.OptionsFor(value?.GetType() ?? parameters[index].ParameterType)));
         }
         return [.. arguments];
     }

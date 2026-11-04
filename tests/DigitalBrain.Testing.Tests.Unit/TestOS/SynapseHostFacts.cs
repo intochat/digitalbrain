@@ -53,6 +53,9 @@ internal static class HsSource
         .Replace("namespace Me.HostBudget;", "using DigitalBrain.Testing.Tests.Unit.Slots;\n\nnamespace Me.HostBudget;", StringComparison.Ordinal)
         .Replace("WeeklyCap(Charging s, WeekSpend t)", "WeeklyCap(Charging s, WeekSpend t, [Slot] ISqlRead Db)", StringComparison.Ordinal);
 
+    // A second needs-changing edit on top of WithDb.
+    internal static readonly string WithDbCap250 = WithDb.Replace("> 300m", "> 250m", StringComparison.Ordinal);
+
     // A compile error on line 22: the gate's ternary loses its condition.
     internal static readonly string Broken = Budget.Replace("t.Spent + s.Amount > 300m", "t.Spent + s.Amount >", StringComparison.Ordinal);
 
@@ -147,6 +150,7 @@ public sealed class SynapseHostFacts
         Assert.Equal(DeployStatus.Failed, broken.Status);
         Assert.Contains(broken.Diagnostics, d => d.File == "Budget.cs" && d.Line == 22);
         Assert.Empty(broken.Installs);
+        Assert.Empty(os.Synapses.Leaked);
         Assert.Equal(first.Hash, Assert.Single(await os.Synapses.List(Brain("hs2"), Ct)).Hash);
         var e = await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "hs2").Charge(350m));
         Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
@@ -157,6 +161,10 @@ public sealed class SynapseHostFacts
     {
         await using var os = Start();
         await DeployApproved(os, "hs3");
+        // A refused charge runs the old gate and its state through the runtime JSON; an allowed one would also stay in the TestOS
+        // journal, which keeps typed signal objects of the old version as history.
+        Assert.Equal("weekly cap of $300", (await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "hs3").Charge(350m))).Rejected.Messages[0]);
+        await os.Idle();
         var asked = os.Confirmations.Requested.Count;
 
         var update = await os.Synapses.Deploy(Brain("hs3"), HsSource.Of(HsSource.Cap200), None, Ct);
@@ -186,9 +194,8 @@ public sealed class SynapseHostFacts
         var listed = Assert.Single(await os.Synapses.List(Brain("hs4"), Ct));
         Assert.Equal((DeployStatus.Staged, first.Hash, update.Hash), (listed.Status, listed.Hash, listed.StagedHash));
         Assert.Empty(os.Catalog.NeedsOf("hs.week").Slots);
-        // The old gate stays the live one; no charge here: a state round trip of the old version would leave its WeekSpend in the
-        // runtime JSON options cache, which pins the old context (see the task 5 report).
-        Assert.DoesNotContain(os.Catalog.For("hs.week"), d => d.Slots.Count > 0);
+        var old = await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "hs4").Charge(350m));
+        Assert.Equal("weekly cap of $300", old.Rejected.Messages[0]);
         var asked = Assert.Single(os.Confirmations.Waiting);
         Assert.Equal(install.Reason, asked.PlanId);
         Assert.Contains("through Db", install.Sentence, StringComparison.Ordinal);
@@ -243,6 +250,7 @@ public sealed class SynapseHostFacts
         Assert.Empty(rival.Installs);
         Assert.Equal(first.Hash, Assert.Single(await os.Synapses.List(Brain("hs6"), Ct)).Hash);
         Assert.Null(await os.Store.Get(Brain("hs6"), "Me.Rival", Ct));
+        Assert.Empty(os.Synapses.Leaked);
         var e = await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "hs6").Charge(350m));
         Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
     }
@@ -252,6 +260,8 @@ public sealed class SynapseHostFacts
     {
         await using var os = Start();
         var first = await DeployApproved(os, "hs7");
+        Assert.Equal("weekly cap of $300", (await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "hs7").Charge(350m))).Rejected.Messages[0]);
+        await os.Idle();
 
         var retired = await os.Synapses.Retire(Brain("hs7"), HsSource.Key, Ct);
         await os.Idle();
@@ -263,6 +273,50 @@ public sealed class SynapseHostFacts
         Assert.Null(await os.Store.Get(Brain("hs7"), HsSource.Key, Ct));
         Assert.Empty(os.Synapses.Leaked);
         Assert.Equal(DeployStatus.Refused, (await os.Synapses.Retire(Brain("hs7"), HsSource.Key, Ct)).Status);
+        Assert.Empty(os.Failures);
+    }
+
+    [Fact]
+    public async Task ADeployOverAStageCancelsItsAsk()
+    {
+        await using var os = Start();
+        await DeployApproved(os, "hs8");
+        var installs = NeuronId.Parse("hs8/synapse.installs/default");
+        var first = await os.Synapses.Deploy(Brain("hs8"), HsSource.Of(HsSource.WithDb), DbBindings, Ct);
+        Assert.Equal(DeployStatus.Staged, first.Status);
+        var firstPlan = first.Installs["hs.week"].Reason!;
+
+        var second = await os.Synapses.Deploy(Brain("hs8"), HsSource.Of(HsSource.WithDbCap250), DbBindings, Ct);
+        await os.Idle();
+
+        Assert.Equal(DeployStatus.Staged, second.Status);
+        var pending = await os.Get<IInstalls>(installs).Pending(Ct);
+        Assert.DoesNotContain(pending, p => p.PlanId == firstPlan);
+        Assert.Contains(pending, p => p.PlanId == second.Installs["hs.week"].Reason);
+        Assert.Contains(os.Journal(installs.Brain).Signals(installs), s => s.Signal is InstallDenied { Reason: "superseded" } d && d.PlanId == firstPlan);
+        Assert.Equal(second.Hash, Assert.Single(await os.Synapses.List(Brain("hs8"), Ct)).StagedHash);
+        Assert.Empty(os.Synapses.Leaked);
+        Assert.Empty(os.Failures);
+    }
+
+    [Fact]
+    public async Task AnAutoApprovedInstallCompletesWithoutDeadlock()
+    {
+        await using var os = Start();
+        os.Confirmations.ApproveAll();
+        var installs = os.Get<IInstalls>(NeuronId.Parse("hs9/synapse.installs/default"));
+
+        var deployed = await os.Synapses.Deploy(Brain("hs9"), HsSource.Of(HsSource.Budget), None, Ct);
+        await os.Idle();
+        var staged = await os.Synapses.Deploy(Brain("hs9"), HsSource.Of(HsSource.WithDb), DbBindings, Ct);
+        await os.Idle();
+
+        Assert.Equal(DeployStatus.Deployed, deployed.Status);
+        Assert.Equal(DeployStatus.Staged, staged.Status);
+        Assert.Equal(os.Catalog.NeedsOf("hs.week").Hash(), (await installs.Describe("hs.week", Ct))?.NeedsHash);
+        var listed = Assert.Single(await os.Synapses.List(Brain("hs9"), Ct));
+        Assert.Equal((DeployStatus.Deployed, staged.Hash), (listed.Status, listed.Hash));
+        Assert.Empty(os.Synapses.Leaked);
         Assert.Empty(os.Failures);
     }
 }
