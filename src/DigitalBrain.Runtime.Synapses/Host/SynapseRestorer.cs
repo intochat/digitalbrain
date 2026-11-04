@@ -65,9 +65,11 @@ public sealed class SynapseRestorer : ISynapseRestorer
         // A context of the stored build still live in this process (an earlier restore) is reused: the loader loads a pair once.
         var reused = loader.TryGetLive(record.SourceKey, record.Hash, out var live);
         var loaded = reused ? live! : loader.Load(new SynapseBuild(true, [], record.Assembly, record.Symbols, record.Hash, record.AssemblyName));
+        var activated = false;
         try
         {
             await registrar.Activate(brain, loaded, CancellationToken.None).ConfigureAwait(false);
+            activated = true;
             if (host is not null)
             {
                 _ = await host.Adopt(brain, loaded, record, CancellationToken.None).ConfigureAwait(false);
@@ -75,8 +77,22 @@ public sealed class SynapseRestorer : ISynapseRestorer
         }
         catch when (!reused)
         {
-            // The new context is unloaded so a retry can load the build again.
-            _ = loader.Unload(loaded);
+            // The activation is undone before the new context is unloaded, so a retry can load the build again and no alias is left
+            // registered over a dead context.
+            try
+            {
+                if (activated)
+                {
+                    await (host is null
+                        ? registrar.Deactivate(brain, record.SourceKey, record.Aliases, CancellationToken.None)
+                        : host.Unwind(brain, record.SourceKey, record.Aliases)).ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                _ = loader.Unload(loaded);
+            }
+
             throw;
         }
 

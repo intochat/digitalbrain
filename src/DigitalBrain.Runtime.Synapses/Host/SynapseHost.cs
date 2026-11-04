@@ -169,9 +169,24 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
             }
 
             var pending = new Pending(loaded!, source, build, Bindings(aliases, bindingsPerAlias));
-            return changed.Count == 0
-                ? await GoLive(brain, entry, pending, build.Diagnostics, ct).ConfigureAwait(false)
-                : await StageUpdate(brain, entry!, pending, changed, build.Diagnostics, ct).ConfigureAwait(false);
+            if (changed.Count > 0)
+            {
+                return await StageUpdate(brain, entry!, pending, changed, build.Diagnostics, ct).ConfigureAwait(false);
+            }
+
+            try
+            {
+                return await GoLive(brain, entry, pending, build.Diagnostics, ct).ConfigureAwait(false);
+            }
+            catch when (pending.Abandoned)
+            {
+                // This frame is the last to name the record: it drops it before the load unloads.
+                var release = Release(brain, pending.Loaded, staged: false);
+                loaded = null;
+                pending = null!;
+                await release.ConfigureAwait(false);
+                throw;
+            }
         }
         finally
         {
@@ -338,9 +353,23 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
     private async Task<DeployOutcome> GoLive(BrainId brain, Entry? entry, Pending next, IReadOnlyList<SynapseDiagnostic> diagnostics, CancellationToken ct)
     {
         var hash = next.Loaded.Hash;
-        await ActivateOnce(brain, next.Loaded, ct).ConfigureAwait(false);
-        _ = Reference(brain, next.Loaded, staged: false);
-        var outcomes = await InstallAll(brain, next, ct).ConfigureAwait(false);
+        var key = next.Source.SourceKey;
+        var aliases = AliasesOf(next.Loaded);
+        Dictionary<string, InstallOutcome> outcomes;
+        try
+        {
+            await ActivateOnce(brain, next.Loaded, ct).ConfigureAwait(false);
+            _ = Reference(brain, next.Loaded, staged: false);
+            outcomes = await InstallAll(brain, next, ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Nothing went live: the activation is undone here; Deploy then releases the load once its own frame no longer names the record.
+            await UndoActivation(brain, entry, key, hash, aliases).ConfigureAwait(false);
+            next.Abandoned = true;
+            throw;
+        }
+
         if (entry is null)
         {
             entries[(brain, next.Source.SourceKey)] = new Entry(next.Loaded, DateTimeOffset.UtcNow);
@@ -352,6 +381,63 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         }
 
         return new DeployOutcome(DeployStatus.Deployed, hash, diagnostics, outcomes, null);
+    }
+
+    // A deploy that failed after its activation: when this brain is the only holder of the new load, a first deploy deactivates its aliases
+    // and an update makes the old live version active again (the registrar replaces by alias). Another brain's hold keeps it all as it is.
+    private async Task UndoActivation(BrainId brain, Entry? entry, string sourceKey, string hash, List<string> aliases)
+    {
+        var alone = !loads.TryGetValue((sourceKey, hash), out var shared) || shared.Brains.All(b => b.Brain == brain);
+        if (!alone || SourceUsedElsewhere(brain, sourceKey))
+        {
+            return;
+        }
+
+        if (entry is null)
+        {
+            await registrar.Deactivate(brain, sourceKey, aliases, CancellationToken.None).ConfigureAwait(false);
+        }
+        else
+        {
+            await registrar.Activate(brain, entry.Live, CancellationToken.None).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Undoes the activation of a source whose adoption failed, so its aliases do not stay registered over an unloaded context: they are
+    /// deactivated unless another brain still holds the source (a disposed host holds none).
+    /// </summary>
+    /// <param name="brain">The brain.</param>
+    /// <param name="sourceKey">The source key.</param>
+    /// <param name="aliases">The aliases the source made live.</param>
+    /// <returns>A task that completes when the aliases are deactivated or kept.</returns>
+    internal async Task Unwind(BrainId brain, string sourceKey, IReadOnlyList<string> aliases)
+    {
+        var held = false;
+        try
+        {
+            await gate.WaitAsync().ConfigureAwait(false);
+            held = true;
+        }
+        catch (ObjectDisposedException)
+        {
+            // A host that has shut down holds nothing.
+        }
+
+        try
+        {
+            if (!held || !SourceUsedElsewhere(brain, sourceKey))
+            {
+                await registrar.Deactivate(brain, sourceKey, aliases, CancellationToken.None).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            if (held)
+            {
+                gate.Release();
+            }
+        }
     }
 
     // An installed alias's needs changed: the new catalog is staged for needs only and every alias is installed again; the changed ones wait.
@@ -659,5 +745,8 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
     {
         // Alias to the plan id of its ask.
         public Dictionary<string, string> Waiting { get; } = new(StringComparer.Ordinal);
+
+        // Its go-live failed before anything was committed: the load is to be released.
+        public bool Abandoned { get; set; }
     }
 }
