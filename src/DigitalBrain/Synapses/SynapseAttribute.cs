@@ -1,0 +1,44 @@
+namespace DigitalBrain;
+
+/// <summary>
+/// Marks a state-neuron method as a synapse: a gate or reaction (<c>from</c> is a signal type) or a view (<c>from</c> is the state alias).
+/// </summary>
+[AttributeUsage(AttributeTargets.Method, Inherited = false)]
+public sealed class SynapseAttribute : Attribute
+{
+    private const string DefaultKey = "default";
+
+    /// <summary>Declares a gate or reaction fed by signals of type <paramref name="from"/> into state <paramref name="into"/>.</summary>
+    /// <param name="from">The <see cref="DigitalBrain.Signal"/> type that arrives.</param>
+    /// <param name="into">The target state: <c>{alias}</c> or <c>{alias}/{key}</c>.</param>
+    public SynapseAttribute(Type from, string into)
+    {
+        ArgumentNullException.ThrowIfNull(from);
+        ArgumentNullException.ThrowIfNull(into);
+        Signal = from;
+        var slash = into.IndexOf('/', StringComparison.Ordinal);
+        State = slash < 0 ? into : into[..slash];
+        Key = slash < 0 ? DefaultKey : into[(slash + 1)..];
+        if (State.Length == 0)
+        {
+            throw new ArgumentException("The state alias must not be empty.", nameof(into));
+        }
+    }
+
+    /// <summary>Declares a view over the state with alias <paramref name="from"/>.</summary>
+    /// <param name="from">The state alias.</param>
+    public SynapseAttribute(string from)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(from);
+        State = from;
+    }
+
+    /// <summary>The arriving signal type, or null for a view.</summary>
+    public Type? Signal { get; }
+
+    /// <summary>The state alias.</summary>
+    public string State { get; }
+
+    /// <summary>The state key; <c>default</c> unless the target names one.</summary>
+    public string Key { get; } = DefaultKey;
+}

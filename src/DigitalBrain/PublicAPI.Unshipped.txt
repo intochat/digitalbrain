@@ -1824,3 +1824,118 @@ static DigitalBrain.Signals.InstanceRetired.operator !=(DigitalBrain.Signals.Ins
 static DigitalBrain.Signals.InstanceRetired.operator ==(DigitalBrain.Signals.InstanceRetired? left, DigitalBrain.Signals.InstanceRetired? right) -> bool
 static DigitalBrain.Signals.TypeAdded.operator !=(DigitalBrain.Signals.TypeAdded? left, DigitalBrain.Signals.TypeAdded? right) -> bool
 static DigitalBrain.Signals.TypeAdded.operator ==(DigitalBrain.Signals.TypeAdded? left, DigitalBrain.Signals.TypeAdded? right) -> bool
+DigitalBrain.Reaction<TState>
+DigitalBrain.Reaction<TState>.<Clone>$() -> DigitalBrain.Reaction<TState>!
+DigitalBrain.Reaction<TState>.Deconstruct(out TState Next, out System.Collections.Generic.IReadOnlyList<DigitalBrain.Signal!>! Signals) -> void
+DigitalBrain.Reaction<TState>.Equals(DigitalBrain.Reaction<TState>? other) -> bool
+DigitalBrain.Reaction<TState>.Next.get -> TState
+DigitalBrain.Reaction<TState>.Next.init -> void
+DigitalBrain.Reaction<TState>.Reaction(TState Next, System.Collections.Generic.IReadOnlyList<DigitalBrain.Signal!>! Signals) -> void
+DigitalBrain.Reaction<TState>.Signals.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Signal!>!
+DigitalBrain.Reaction<TState>.Signals.init -> void
+DigitalBrain.Rules.Check
+DigitalBrain.Rules.Check.Allowed
+DigitalBrain.Rules.Check.Allowed.Allowed(object! Next) -> void
+DigitalBrain.Rules.Check.Allowed.Deconstruct(out object! Next) -> void
+DigitalBrain.Rules.Check.Allowed.Equals(DigitalBrain.Rules.Check.Allowed? other) -> bool
+DigitalBrain.Rules.Check.Allowed.Next.get -> object!
+DigitalBrain.Rules.Check.Allowed.Next.init -> void
+DigitalBrain.Rules.Check.Check(DigitalBrain.Rules.Check! original) -> void
+DigitalBrain.Rules.Check.Refused
+DigitalBrain.Rules.Check.Refused.Broken.get -> DigitalBrain.Rules.Rule![]!
+DigitalBrain.Rules.Check.Refused.Broken.init -> void
+DigitalBrain.Rules.Check.Refused.Deconstruct(out DigitalBrain.Rules.Rule![]! Broken) -> void
+DigitalBrain.Rules.Check.Refused.Equals(DigitalBrain.Rules.Check.Refused? other) -> bool
+DigitalBrain.Rules.Check.Refused.Refused(DigitalBrain.Rules.Rule![]! Broken) -> void
+DigitalBrain.StateAttribute
+DigitalBrain.StateAttribute.Alias.get -> string!
+DigitalBrain.StateAttribute.StateAttribute(string! alias) -> void
+DigitalBrain.SynapseAttribute
+DigitalBrain.SynapseAttribute.Key.get -> string!
+DigitalBrain.SynapseAttribute.Signal.get -> System.Type?
+DigitalBrain.SynapseAttribute.State.get -> string!
+DigitalBrain.SynapseAttribute.SynapseAttribute(System.Type! from, string! into) -> void
+DigitalBrain.SynapseAttribute.SynapseAttribute(string! from) -> void
+DigitalBrain.SynapseFinished
+DigitalBrain.SynapseFinished.Deconstruct(out string! Neuron, out string! Function, out string! Outcome, out double ElapsedMs) -> void
+DigitalBrain.SynapseFinished.ElapsedMs.get -> double
+DigitalBrain.SynapseFinished.ElapsedMs.init -> void
+DigitalBrain.SynapseFinished.Equals(DigitalBrain.SynapseFinished? other) -> bool
+DigitalBrain.SynapseFinished.Function.get -> string!
+DigitalBrain.SynapseFinished.Function.init -> void
+DigitalBrain.SynapseFinished.Neuron.get -> string!
+DigitalBrain.SynapseFinished.Neuron.init -> void
+DigitalBrain.SynapseFinished.Outcome.get -> string!
+DigitalBrain.SynapseFinished.Outcome.init -> void
+DigitalBrain.SynapseFinished.SynapseFinished(string! Neuron, string! Function, string! Outcome, double ElapsedMs) -> void
+DigitalBrain.SynapseStarted
+DigitalBrain.SynapseStarted.Deconstruct(out string! Neuron, out string! Function, out string! Signal) -> void
+DigitalBrain.SynapseStarted.Equals(DigitalBrain.SynapseStarted? other) -> bool
+DigitalBrain.SynapseStarted.Function.get -> string!
+DigitalBrain.SynapseStarted.Function.init -> void
+DigitalBrain.SynapseStarted.Neuron.get -> string!
+DigitalBrain.SynapseStarted.Neuron.init -> void
+DigitalBrain.SynapseStarted.Signal.get -> string!
+DigitalBrain.SynapseStarted.Signal.init -> void
+DigitalBrain.SynapseStarted.SynapseStarted(string! Neuron, string! Function, string! Signal) -> void
+DigitalBrain.ViewChanged
+DigitalBrain.ViewChanged.Deconstruct(out string! Neuron, out object! View) -> void
+DigitalBrain.ViewChanged.Equals(DigitalBrain.ViewChanged? other) -> bool
+DigitalBrain.ViewChanged.Neuron.get -> string!
+DigitalBrain.ViewChanged.Neuron.init -> void
+DigitalBrain.ViewChanged.View.get -> object!
+DigitalBrain.ViewChanged.View.init -> void
+DigitalBrain.ViewChanged.ViewChanged(string! Neuron, object! View) -> void
+abstract DigitalBrain.Rules.Check.<Clone>$() -> DigitalBrain.Rules.Check!
+override DigitalBrain.Reaction<TState>.Equals(object? obj) -> bool
+override DigitalBrain.Reaction<TState>.GetHashCode() -> int
+override DigitalBrain.Reaction<TState>.ToString() -> string!
+override DigitalBrain.Rules.Check.Allowed.<Clone>$() -> DigitalBrain.Rules.Check.Allowed!
+override DigitalBrain.Rules.Check.Allowed.Equals(object? obj) -> bool
+override DigitalBrain.Rules.Check.Allowed.GetHashCode() -> int
+override DigitalBrain.Rules.Check.Allowed.ToString() -> string!
+override DigitalBrain.Rules.Check.Equals(object? obj) -> bool
+override DigitalBrain.Rules.Check.GetHashCode() -> int
+override DigitalBrain.Rules.Check.Refused.<Clone>$() -> DigitalBrain.Rules.Check.Refused!
+override DigitalBrain.Rules.Check.Refused.Equals(object? obj) -> bool
+override DigitalBrain.Rules.Check.Refused.GetHashCode() -> int
+override DigitalBrain.Rules.Check.Refused.ToString() -> string!
+override DigitalBrain.Rules.Check.ToString() -> string!
+override DigitalBrain.SynapseFinished.<Clone>$() -> DigitalBrain.SynapseFinished!
+override DigitalBrain.SynapseFinished.Equals(object? obj) -> bool
+override DigitalBrain.SynapseFinished.GetHashCode() -> int
+override DigitalBrain.SynapseFinished.ToString() -> string!
+override DigitalBrain.SynapseStarted.<Clone>$() -> DigitalBrain.SynapseStarted!
+override DigitalBrain.SynapseStarted.Equals(object? obj) -> bool
+override DigitalBrain.SynapseStarted.GetHashCode() -> int
+override DigitalBrain.SynapseStarted.ToString() -> string!
+override DigitalBrain.ViewChanged.<Clone>$() -> DigitalBrain.ViewChanged!
+override DigitalBrain.ViewChanged.Equals(object? obj) -> bool
+override DigitalBrain.ViewChanged.GetHashCode() -> int
+override DigitalBrain.ViewChanged.ToString() -> string!
+override sealed DigitalBrain.Rules.Check.Allowed.Equals(DigitalBrain.Rules.Check? other) -> bool
+override sealed DigitalBrain.Rules.Check.Refused.Equals(DigitalBrain.Rules.Check? other) -> bool
+override sealed DigitalBrain.SynapseFinished.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.SynapseStarted.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.ViewChanged.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.Reaction<TState>.Of(TState next, params DigitalBrain.Signal![]! signals) -> DigitalBrain.Reaction<TState>!
+static DigitalBrain.Reaction<TState>.operator !=(DigitalBrain.Reaction<TState>? left, DigitalBrain.Reaction<TState>? right) -> bool
+static DigitalBrain.Reaction<TState>.operator ==(DigitalBrain.Reaction<TState>? left, DigitalBrain.Reaction<TState>? right) -> bool
+static DigitalBrain.Rules.Check.Allow<TState>(TState next) -> DigitalBrain.Rules.Check!
+static DigitalBrain.Rules.Check.Allowed.operator !=(DigitalBrain.Rules.Check.Allowed? left, DigitalBrain.Rules.Check.Allowed? right) -> bool
+static DigitalBrain.Rules.Check.Allowed.operator ==(DigitalBrain.Rules.Check.Allowed? left, DigitalBrain.Rules.Check.Allowed? right) -> bool
+static DigitalBrain.Rules.Check.Refused.operator !=(DigitalBrain.Rules.Check.Refused? left, DigitalBrain.Rules.Check.Refused? right) -> bool
+static DigitalBrain.Rules.Check.Refused.operator ==(DigitalBrain.Rules.Check.Refused? left, DigitalBrain.Rules.Check.Refused? right) -> bool
+static DigitalBrain.Rules.Check.Reject(params DigitalBrain.Rules.Rule![]! broken) -> DigitalBrain.Rules.Check!
+static DigitalBrain.Rules.Check.Reject(string! reason) -> DigitalBrain.Rules.Check!
+static DigitalBrain.Rules.Check.operator !=(DigitalBrain.Rules.Check? left, DigitalBrain.Rules.Check? right) -> bool
+static DigitalBrain.Rules.Check.operator ==(DigitalBrain.Rules.Check? left, DigitalBrain.Rules.Check? right) -> bool
+static DigitalBrain.SynapseFinished.operator !=(DigitalBrain.SynapseFinished? left, DigitalBrain.SynapseFinished? right) -> bool
+static DigitalBrain.SynapseFinished.operator ==(DigitalBrain.SynapseFinished? left, DigitalBrain.SynapseFinished? right) -> bool
+static DigitalBrain.SynapseStarted.operator !=(DigitalBrain.SynapseStarted? left, DigitalBrain.SynapseStarted? right) -> bool
+static DigitalBrain.SynapseStarted.operator ==(DigitalBrain.SynapseStarted? left, DigitalBrain.SynapseStarted? right) -> bool
+static DigitalBrain.ViewChanged.operator !=(DigitalBrain.ViewChanged? left, DigitalBrain.ViewChanged? right) -> bool
+static DigitalBrain.ViewChanged.operator ==(DigitalBrain.ViewChanged? left, DigitalBrain.ViewChanged? right) -> bool
+virtual DigitalBrain.Rules.Check.EqualityContract.get -> System.Type!
+virtual DigitalBrain.Rules.Check.Equals(DigitalBrain.Rules.Check? other) -> bool
+virtual DigitalBrain.Rules.Check.PrintMembers(System.Text.StringBuilder! builder) -> bool
