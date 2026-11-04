@@ -1939,3 +1939,50 @@ static DigitalBrain.ViewChanged.operator ==(DigitalBrain.ViewChanged? left, Digi
 virtual DigitalBrain.Rules.Check.EqualityContract.get -> System.Type!
 virtual DigitalBrain.Rules.Check.Equals(DigitalBrain.Rules.Check? other) -> bool
 virtual DigitalBrain.Rules.Check.PrintMembers(System.Text.StringBuilder! builder) -> bool
+DigitalBrain.SynapseCatalog
+DigitalBrain.SynapseCatalog.For(string! stateAlias) -> System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseDescriptor!>!
+DigitalBrain.SynapseCatalog.GatesOf(System.Type! signal) -> System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseDescriptor!>!
+DigitalBrain.SynapseCatalog.Merge(DigitalBrain.SynapseCatalog! other) -> DigitalBrain.SynapseCatalog!
+DigitalBrain.SynapseCatalog.States.get -> System.Collections.Generic.IReadOnlyDictionary<string!, System.Type!>!
+DigitalBrain.SynapseCatalog.Synapses.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseDescriptor!>!
+DigitalBrain.SynapseDescriptor
+DigitalBrain.SynapseDescriptor.<Clone>$() -> DigitalBrain.SynapseDescriptor!
+DigitalBrain.SynapseDescriptor.Deconstruct(out DigitalBrain.SynapseKind Kind, out System.Reflection.MethodInfo! Function, out System.Type? Signal, out System.Type! State, out string! StateAlias, out string! Key, out bool TakesCancellation) -> void
+DigitalBrain.SynapseDescriptor.Equals(DigitalBrain.SynapseDescriptor? other) -> bool
+DigitalBrain.SynapseDescriptor.Function.get -> System.Reflection.MethodInfo!
+DigitalBrain.SynapseDescriptor.Function.init -> void
+DigitalBrain.SynapseDescriptor.Key.get -> string!
+DigitalBrain.SynapseDescriptor.Key.init -> void
+DigitalBrain.SynapseDescriptor.Kind.get -> DigitalBrain.SynapseKind
+DigitalBrain.SynapseDescriptor.Kind.init -> void
+DigitalBrain.SynapseDescriptor.Name.get -> string!
+DigitalBrain.SynapseDescriptor.Signal.get -> System.Type?
+DigitalBrain.SynapseDescriptor.Signal.init -> void
+DigitalBrain.SynapseDescriptor.State.get -> System.Type!
+DigitalBrain.SynapseDescriptor.State.init -> void
+DigitalBrain.SynapseDescriptor.StateAlias.get -> string!
+DigitalBrain.SynapseDescriptor.StateAlias.init -> void
+DigitalBrain.SynapseDescriptor.SynapseDescriptor(DigitalBrain.SynapseKind Kind, System.Reflection.MethodInfo! Function, System.Type? Signal, System.Type! State, string! StateAlias, string! Key, bool TakesCancellation) -> void
+DigitalBrain.SynapseDescriptor.TakesCancellation.get -> bool
+DigitalBrain.SynapseDescriptor.TakesCancellation.init -> void
+DigitalBrain.SynapseKind
+DigitalBrain.SynapseKind.Gate = 0 -> DigitalBrain.SynapseKind
+DigitalBrain.SynapseKind.Reaction = 1 -> DigitalBrain.SynapseKind
+DigitalBrain.SynapseKind.View = 2 -> DigitalBrain.SynapseKind
+DigitalBrain.SynapseReasons
+DigitalBrain.SynapseShape
+DigitalBrain.SynapseShapeException
+DigitalBrain.SynapseShapeException.SynapseShapeException(string! message) -> void
+const DigitalBrain.SynapseReasons.AtMostOneSignal = "at most one signal" -> string!
+const DigitalBrain.SynapseReasons.GateNeedsSignal = "gate needs a signal" -> string!
+const DigitalBrain.SynapseReasons.PublicStatic = "public static" -> string!
+const DigitalBrain.SynapseReasons.StateRecord = "state record" -> string!
+const DigitalBrain.SynapseReasons.UnknownParameter = "not a signal, the state or CancellationToken" -> string!
+const DigitalBrain.SynapseReasons.ViewTakesOnlyState = "view takes only the state" -> string!
+override DigitalBrain.SynapseDescriptor.Equals(object? obj) -> bool
+override DigitalBrain.SynapseDescriptor.GetHashCode() -> int
+override DigitalBrain.SynapseDescriptor.ToString() -> string!
+static DigitalBrain.SynapseCatalog.Scan(params System.Reflection.Assembly![]! assemblies) -> DigitalBrain.SynapseCatalog!
+static DigitalBrain.SynapseDescriptor.operator !=(DigitalBrain.SynapseDescriptor? left, DigitalBrain.SynapseDescriptor? right) -> bool
+static DigitalBrain.SynapseDescriptor.operator ==(DigitalBrain.SynapseDescriptor? left, DigitalBrain.SynapseDescriptor? right) -> bool
+static DigitalBrain.SynapseShape.Of(System.Reflection.MethodInfo! function, System.Collections.Generic.IReadOnlyDictionary<string!, System.Type!>! states) -> DigitalBrain.SynapseDescriptor!
