@@ -367,4 +367,53 @@ public sealed class SynapseHostFacts
         Assert.Empty(os.Synapses.Leaked);
         Assert.Empty(os.Failures);
     }
+
+    [Fact]
+    public async Task SwapInOneBrainThenRetireTheOtherKeepsTheAliasLive()
+    {
+        await using var os = Start();
+        os.Confirmations.ApproveAll();
+        await os.Synapses.Deploy(Brain("sa"), HsSource.Of(HsSource.Budget), None, Ct);
+        await os.Synapses.Deploy(Brain("sb"), HsSource.Of(HsSource.Budget), None, Ct);
+        await os.Idle();
+        Assert.Equal(DeployStatus.Deployed, (await os.Synapses.Deploy(Brain("sa"), HsSource.Of(HsSource.Cap200), None, Ct)).Status);
+        await os.Idle();
+
+        Assert.Equal(DeployStatus.Retired, (await os.Synapses.Retire(Brain("sb"), HsSource.Key, Ct)).Status);
+        await os.Idle();
+
+        Assert.Contains("hs.week", os.Catalog.States.Keys);
+        await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "sa").Charge(250m));
+        Assert.Empty(os.Synapses.Leaked);
+
+        Assert.Equal(DeployStatus.Retired, (await os.Synapses.Retire(Brain("sa"), HsSource.Key, Ct)).Status);
+        await os.Idle();
+
+        Assert.DoesNotContain("hs.week", os.Catalog.States.Keys);
+        Assert.Empty(os.Synapses.Leaked);
+        Assert.Empty(os.Failures);
+    }
+
+    [Fact]
+    public async Task RetireStoredSkipsDeactivateWhileAnotherBrainIsLive()
+    {
+        await using var os = Start().Register<SrPayments>();
+        os.Confirmations.ApproveAll();
+        await os.Synapses.Deploy(Brain("ra"), HsSource.Of(HsSource.Budget), None, Ct);
+        await os.Synapses.Deploy(Brain("rb"), HsSource.Of(HsSource.Budget), None, Ct);
+        await os.Idle();
+        await os.Restart();
+        await Assert.ThrowsAsync<RuleViolationException>(() => os.Get<IHsPayments>(NeuronId.Parse("rb/sr.payments/p")).Charge(350m));
+        await os.Idle();
+        Assert.Single(await os.Synapses.List(Brain("rb"), Ct));
+        Assert.Empty(await os.Synapses.List(Brain("ra"), Ct));
+
+        Assert.Equal(DeployStatus.Retired, (await os.Synapses.Retire(Brain("ra"), HsSource.Key, Ct)).Status);
+        await os.Idle();
+
+        Assert.Contains("hs.week", os.Catalog.States.Keys);
+        var e = await Assert.ThrowsAsync<RuleViolationException>(() => os.Get<IHsPayments>(NeuronId.Parse("rb/sr.payments/p")).Charge(350m));
+        Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
+        Assert.Empty(os.Failures);
+    }
 }

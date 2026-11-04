@@ -204,7 +204,7 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
                 await brainInstalls.Retire(alias, ct).ConfigureAwait(false);
             }
 
-            if (!LiveElsewhere(brain, entry.Live))
+            if (!SourceUsedElsewhere(brain, sourceKey))
             {
                 await registrar.Deactivate(brain, sourceKey, aliases, ct).ConfigureAwait(false);
             }
@@ -274,7 +274,11 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
             await brainInstalls.Retire(alias, ct).ConfigureAwait(false);
         }
 
-        await registrar.Deactivate(brain, sourceKey, record.Aliases, ct).ConfigureAwait(false);
+        if (!SourceUsedElsewhere(brain, record.SourceKey))
+        {
+            await registrar.Deactivate(brain, sourceKey, record.Aliases, ct).ConfigureAwait(false);
+        }
+
         await store.Remove(brain, sourceKey, ct).ConfigureAwait(false);
         return new DeployOutcome(DeployStatus.Retired, record.Hash, [], Empty(), null);
     }
@@ -357,7 +361,19 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         catalog.Stage(next.Source.SourceKey, next.Loaded.Catalog);
         entry.Staged = next;
         _ = Reference(brain, next.Loaded, staged: true);
-        var outcomes = await InstallAll(brain, next, ct).ConfigureAwait(false);
+        Dictionary<string, InstallOutcome> outcomes;
+        try
+        {
+            outcomes = await InstallAll(brain, next, ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            catalog.Unstage(next.Source.SourceKey);
+            next = null!;
+            await ReleaseStaged(brain, entry).ConfigureAwait(false);
+            throw;
+        }
+
         if (changed.FirstOrDefault(a => outcomes[a].Status is InstallStatus.Refused or InstallStatus.Denied) is { } refused)
         {
             await DropStaged(brain, entry, ct).ConfigureAwait(false);
@@ -416,7 +432,7 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
                 await brainInstalls.Retire(alias, ct).ConfigureAwait(false);
             }
 
-            if (!LiveElsewhere(brain, entry.Live))
+            if (!SourceUsedElsewhere(brain, next.Source.SourceKey))
             {
                 await registrar.Deactivate(brain, next.Source.SourceKey, dropped, ct).ConfigureAwait(false);
             }
@@ -496,8 +512,10 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         }
     }
 
-    private bool LiveElsewhere(BrainId brain, LoadedSource loaded) =>
-        loads.TryGetValue((loaded.SourceKey, loaded.Hash), out var shared) && shared.Brains.Any(b => !b.Staged && b.Brain != brain);
+    // The registrar deactivates by alias, process-wide: while another brain references any load of the source key, live or staged,
+    // its aliases stay.
+    private bool SourceUsedElsewhere(BrainId brain, string sourceKey) =>
+        loads.Any(load => string.Equals(load.Key.SourceKey, sourceKey, StringComparison.Ordinal) && load.Value.Brains.Any(b => b.Brain != brain));
 
     // The registrar is process-wide: a load another brain already made live is not activated again.
     private async Task ActivateOnce(BrainId brain, LoadedSource loaded, CancellationToken ct)
