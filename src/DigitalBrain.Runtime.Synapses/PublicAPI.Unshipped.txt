@@ -49,5 +49,5 @@ DigitalBrain.Runtime.Synapses.NeuronSourceStore.Remove(DigitalBrain.BrainId brai
 DigitalBrain.Runtime.Synapses.NeuronSourceStore.Stage(DigitalBrain.BrainId brain, string! sourceKey, string! hash, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 DigitalBrain.Runtime.Synapses.SynapseHost.Adopt(DigitalBrain.BrainId brain, DigitalBrain.LoadedSource! loaded, DigitalBrain.SourceRecord! record, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<bool>!
 DigitalBrain.Runtime.Synapses.SynapseRestorer
-DigitalBrain.Runtime.Synapses.SynapseRestorer.SynapseRestorer(DigitalBrain.Runtime.Synapses.SynapseLoader! loader, DigitalBrain.Spi.ISynapseRegistrar! registrar, DigitalBrain.ISourceStore! store, DigitalBrain.Runtime.Synapses.SynapseHost? host = null) -> void
 DigitalBrain.Runtime.Synapses.SynapseRestorer.TryRestore(DigitalBrain.BrainId brain, string! alias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Runtime.Synapses.SynapseRestorer.SynapseRestorer(DigitalBrain.Runtime.Synapses.SynapseLoader! loader, DigitalBrain.Spi.ISynapseRegistrar! registrar, DigitalBrain.ISourceStore! store, DigitalBrain.ISynapseCatalogSource! catalog, DigitalBrain.Runtime.Synapses.SynapseHost? host = null) -> void

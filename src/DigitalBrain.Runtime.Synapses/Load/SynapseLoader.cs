@@ -9,6 +9,8 @@ public sealed class SynapseLoader
 {
     private readonly Lock _gate = new();
     private readonly Dictionary<(string SourceKey, string Hash), List<WeakReference<SynapseLoadContext>>> _contexts = [];
+    private readonly Dictionary<(string SourceKey, string Hash), WeakReference<LoadedSource>> _live = [];
+    private readonly ConditionalWeakTable<SynapseLoadContext, object> _detached = [];
 
     /// <summary>Loads a successful build into a new collectible context and scans it.</summary>
     /// <param name="build">The build; <see cref="SynapseBuild.Success"/> must be true.</param>
@@ -26,7 +28,7 @@ public sealed class SynapseLoader
         lock (_gate)
         {
             Prune();
-            if (_contexts.ContainsKey((sourceKey, build.Hash)))
+            if (HasLive(sourceKey, build.Hash))
             {
                 throw new InvalidOperationException($"A context for '{sourceKey}' with hash {build.Hash} is already loaded; unload it first.");
             }
@@ -46,13 +48,21 @@ public sealed class SynapseLoader
             IReadOnlyList<Type> states = [.. catalog.States.Values];
             lock (_gate)
             {
-                if (!_contexts.TryAdd((sourceKey, build.Hash), [new WeakReference<SynapseLoadContext>(context)]))
+                if (HasLive(sourceKey, build.Hash))
                 {
                     throw new InvalidOperationException($"A context for '{sourceKey}' with hash {build.Hash} is already loaded; unload it first.");
                 }
-            }
 
-            return new LoadedSource(sourceKey, build.Hash, assembly, catalog, signals, states);
+                if (!_contexts.TryGetValue((sourceKey, build.Hash), out var list))
+                {
+                    _contexts[(sourceKey, build.Hash)] = list = [];
+                }
+
+                list.Add(new WeakReference<SynapseLoadContext>(context));
+                var loaded = new LoadedSource(sourceKey, build.Hash, assembly, catalog, signals, states);
+                _live[(sourceKey, build.Hash)] = new WeakReference<LoadedSource>(loaded);
+                return loaded;
+            }
         }
         catch
         {
@@ -102,6 +112,22 @@ public sealed class SynapseLoader
         return CollectAll(pending, gcRounds);
     }
 
+    // The loaded source of a live (not unloading) context of the key and hash, when its record is still reachable.
+    internal bool TryGetLive(string sourceKey, string hash, out LoadedSource? loaded)
+    {
+        lock (_gate)
+        {
+            loaded = null;
+            return _live.TryGetValue((sourceKey, hash), out var weak) && weak.TryGetTarget(out loaded)
+                && !_detached.TryGetValue((SynapseLoadContext)AssemblyLoadContext.GetLoadContext(loaded.Assembly)!, out _);
+        }
+    }
+
+    // A context of the pair that is not unloading; an unloading one may still be collecting and does not block a new load.
+    private bool HasLive(string sourceKey, string hash) =>
+        _contexts.TryGetValue((sourceKey, hash), out var list)
+        && list.Exists(w => w.TryGetTarget(out var context) && !_detached.TryGetValue(context, out _));
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private WeakReference<SynapseLoadContext> Detach(LoadedSource loaded)
     {
@@ -113,6 +139,8 @@ public sealed class SynapseLoader
                 ? list.Find(w => w.TryGetTarget(out var c) && ReferenceEquals(c, context))
                 : null;
             weak ??= new WeakReference<SynapseLoadContext>(context);
+            _detached.AddOrUpdate(context, new object());
+            _ = _live.Remove((loaded.SourceKey, loaded.Hash));
             DigitalBrain.Invocation.RuntimeProtocol.Forget(context);
             context.Unload();
             return weak;

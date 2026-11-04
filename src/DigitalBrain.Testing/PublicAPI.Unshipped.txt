@@ -711,3 +711,4 @@ DigitalBrain.Testing.TestOS.Synapses.get -> DigitalBrain.Runtime.Synapses.Synaps
 DigitalBrain.Testing.InMemorySourceStore.Stage(DigitalBrain.BrainId brain, string! sourceKey, string! hash, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.TestOS.Restorer.get -> DigitalBrain.Spi.ISynapseRestorer!
 DigitalBrain.Testing.TestOS.Store.get -> DigitalBrain.ISourceStore!
+DigitalBrain.Testing.TestOS.GateRestores.get -> int

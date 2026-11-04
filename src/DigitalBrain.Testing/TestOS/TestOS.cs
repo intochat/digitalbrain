@@ -69,7 +69,6 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         new(() => new DigitalBrain.Runtime.Synapses.SynapseCompiler(DigitalBrain.Runtime.Synapses.ReferenceSet.FromDefaultContext()));
     private (DigitalBrain.Runtime.Synapses.SynapseHost Host, ISynapseRestorer Restorer)? _runtime;
     private readonly ConcurrentDictionary<string, byte> _generated = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, byte> _forgotten = new(StringComparer.Ordinal);
 
     private TestOS(TestOSOptions options)
     {
@@ -354,6 +353,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
             await Track(host.Deactivate(DeactivationCause.Shutdown)).ConfigureAwait(false);
         }
         await ForgetGenerated().ConfigureAwait(false);
+        Gates.Reset();
         foreach (var subscriber in Delivery.Behind())
         {
             await Activate(subscriber).ConfigureAwait(false);
@@ -423,7 +423,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
                 Listeners,
                 track: work => _ = Track(work));
             var restorer = Options.Services?.GetService(typeof(ISynapseRestorer)) as ISynapseRestorer
-                ?? new DigitalBrain.Runtime.Synapses.SynapseRestorer(loader, Registrar, Store, host);
+                ?? new DigitalBrain.Runtime.Synapses.SynapseRestorer(loader, Registrar, Store, Source, host);
             _runtime = (host, restorer);
             return (host, restorer);
         }
@@ -436,7 +436,6 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         foreach (var alias in _generated.Keys.ToList())
         {
             _ = Unregister(alias);
-            _forgotten[alias] = 0;
             foreach (var host in _hosts.Values.Where(host => host.Id.Type == alias).ToList())
             {
                 if (_hosts.TryRemove(new KeyValuePair<NeuronId, TestNeuronHost>(host.Id, host))) { host.Dispose(); }
@@ -477,8 +476,12 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
 
     internal bool HasHost(NeuronId id) => _hosts.ContainsKey(id);
 
-    // A generated alias a restart forgot is not in the catalog yet: the gate path may have to restore it.
-    internal bool Forgotten => _forgotten.Keys.Any(alias => !Source.Current.States.ContainsKey(alias));
+    private int _gateRestores;
+
+    /// <summary>How many gate paths awaited the restore of an installed alias missing from the catalog; every other gate path runs inline.</summary>
+    public int GateRestores => Volatile.Read(ref _gateRestores);
+
+    internal void CountGateRestore() => Interlocked.Increment(ref _gateRestores);
 
     internal bool TryHost(NeuronId id, out TestNeuronHost host)
     {

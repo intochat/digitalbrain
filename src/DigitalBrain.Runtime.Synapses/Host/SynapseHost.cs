@@ -176,7 +176,7 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         {
             if (!entries.TryGetValue((brain, sourceKey), out var entry))
             {
-                return new DeployOutcome(DeployStatus.Refused, null, [], Empty(), $"source '{sourceKey}' is not deployed");
+                return await RetireStored(brain, sourceKey, ct).ConfigureAwait(false);
             }
 
             if (entry.Staged is not null)
@@ -242,6 +242,25 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
 
         registrations.Clear();
         gate.Dispose();
+    }
+
+    // A source stored but not loaded here (not yet restored after a restart): its aliases are retired and its record removed.
+    private async Task<DeployOutcome> RetireStored(BrainId brain, string sourceKey, CancellationToken ct)
+    {
+        if (await store.Get(brain, sourceKey, ct).ConfigureAwait(false) is not { } record)
+        {
+            return new DeployOutcome(DeployStatus.Refused, null, [], Empty(), $"source '{sourceKey}' is not deployed");
+        }
+
+        var brainInstalls = installs(brain);
+        foreach (var alias in record.Aliases)
+        {
+            await brainInstalls.Retire(alias, ct).ConfigureAwait(false);
+        }
+
+        await registrar.Deactivate(brain, sourceKey, record.Aliases, ct).ConfigureAwait(false);
+        await store.Remove(brain, sourceKey, ct).ConfigureAwait(false);
+        return new DeployOutcome(DeployStatus.Retired, record.Hash, [], Empty(), null);
     }
 
     private static Dictionary<string, InstallOutcome> Empty() => new(StringComparer.Ordinal);

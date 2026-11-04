@@ -21,6 +21,24 @@ public sealed class InstalledGateIndex(ISynapseCatalogSource catalog) : IGateInd
         _installed[brain] = new HashSet<string>(records.Select(r => r.Alias), StringComparer.Ordinal);
     }
 
+    /// <summary>The installed aliases last given to <see cref="Refresh"/> for <paramref name="brain"/>; false when the brain was never refreshed.</summary>
+    /// <param name="brain">The brain.</param>
+    /// <param name="aliases">Its installed aliases.</param>
+    /// <returns>True when the brain has an entry.</returns>
+    public bool TryGetInstalled(BrainId brain, out IReadOnlyCollection<string> aliases)
+    {
+        var found = _installed.TryGetValue(brain, out var set);
+        aliases = found ? set! : [];
+        return found;
+    }
+
+    // As Refresh, unless the brain was refreshed meanwhile: a load that raced a GateChanged must not overwrite the newer aliases.
+    internal void RefreshIfAbsent(BrainId brain, IReadOnlyList<InstallRecord> records) =>
+        _ = _installed.TryAdd(brain, new HashSet<string>(records.Select(r => r.Alias), StringComparer.Ordinal));
+
+    /// <summary>Forgets every brain's installed aliases, as a host restart does; the next gate path of a brain loads them again.</summary>
+    public void Reset() => _installed.Clear();
+
     /// <inheritdoc />
     public IReadOnlyList<(NeuronId Gate, SynapseDescriptor Synapse)> GatesFor(BrainId brain, Type signal)
     {

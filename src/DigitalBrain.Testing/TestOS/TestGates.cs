@@ -18,7 +18,7 @@ internal static class TestGates
         var allowed = new List<(TestNeuronHost Gate, Signal Signal, Check.Allowed Allowed)>();
         if (signals.Any(s => !Ungated(s) && !s.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false)))
         {
-            await RestoreInstalled(os, publisher.Brain, ct).ConfigureAwait(false);
+            await RestoreInstalled(os, publisher, ct).ConfigureAwait(false);
         }
         try
         {
@@ -93,17 +93,33 @@ internal static class TestGates
         }
     }
 
-    // Installed aliases missing from the catalog (after a restart) are restored before the index is read; a brain that never hosted its
-    // installs neuron has nothing installed, and before any restart forgot a generated alias there is nothing to restore (the path stays
-    // synchronous). A restore that does not finish within GateTimeout, or fails, refuses the publish.
-    private static async Task RestoreInstalled(TestOS os, BrainId brain, CancellationToken ct)
+    // The brain's installed aliases come from the installed-gate index; a brain without an entry (first publish, or after a restart) loads
+    // them once from its installs neuron, or caches none when that neuron was never hosted. Only an installed alias missing from the
+    // catalog awaits a restore, bounded by GateTimeout and failing closed; otherwise this completes synchronously and the gates run inline.
+    // The installs neuron's own publishes (its ConfirmationRequested) never load: a call back into it from inside its turn would wait for
+    // that turn; without an entry its signals see no gates, as before.
+    private static async Task RestoreInstalled(TestOS os, NeuronId publisher, CancellationToken ct)
     {
+        var brain = publisher.Brain;
         var installs = new NeuronId(brain, "synapse.installs", "default");
-        if (!os.Forgotten || !os.HasHost(installs)) { return; }
         try
         {
-            await InstallRestore.EnsureInstalledAliases(os.Source, os.Get<IInstalls>(installs), os.Restorer, brain, ct)
-                .WaitAsync(os.Options.GateTimeout, os.Clock, ct).ConfigureAwait(false);
+            if (!os.Gates.TryGetInstalled(brain, out var installed))
+            {
+                if (publisher == installs) { return; }
+                var records = os.HasHost(installs)
+                    ? await os.Get<IInstalls>(installs).List(ct).WaitAsync(os.Options.GateTimeout, os.Clock, ct).ConfigureAwait(false)
+                    : [];
+                os.Gates.RefreshIfAbsent(brain, records);
+                _ = os.Gates.TryGetInstalled(brain, out installed);
+            }
+
+            if (installed.Any(alias => !os.Source.Current.States.ContainsKey(alias)))
+            {
+                os.CountGateRestore();
+                await InstallRestore.EnsureInstalledAliases(os.Source, installed, os.Restorer, brain, ct)
+                    .WaitAsync(os.Options.GateTimeout, os.Clock, ct).ConfigureAwait(false);
+            }
         }
         catch (Exception error) when (error is not OutOfMemoryException)
         {
