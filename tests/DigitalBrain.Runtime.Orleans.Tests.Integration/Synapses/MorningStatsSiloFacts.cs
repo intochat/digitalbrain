@@ -7,7 +7,7 @@ using Orleans.Runtime;
 namespace DigitalBrain.Runtime.Orleans.Tests.Integration.Synapses;
 
 [Signal("test.ms.report-ready")]
-public sealed record MsReportReady(DateOnly Day, int Orders, decimal Revenue) : Signal;
+public sealed record MsReportReady(DateOnly Day, int Orders, decimal Revenue, DateTimeOffset At) : Signal;
 
 [State("stats1m")]
 public sealed record MsStats(DateOnly? Day = null, int Orders = 0, decimal Revenue = 0)
@@ -25,7 +25,7 @@ public static class StatsEveryMinute
         var day = DateOnly.FromDateTime(t.At.UtcDateTime.Date).AddDays(-1);
         var orders = await Db.Scalar<int>("select count(*)", null, ct);
         var revenue = await Db.Scalar<int>("select sum(total)", null, ct);
-        return Reaction<MsStats>.Of(new MsStats(day, orders, revenue), new MsReportReady(day, orders, revenue));
+        return Reaction<MsStats>.Of(new MsStats(day, orders, revenue), new MsReportReady(day, orders, revenue, t.At));
     }
 }
 
@@ -76,12 +76,18 @@ public sealed class MorningStatsSiloFacts(SlotSilo silo) : IClassFixture<SlotSil
 
         await WaitFor(async () => (await Journal("msb", stats)).OfType<MsReportReady>().Any(), TimeSpan.FromSeconds(100));
 
+        // Best-effort: the collection is global and the fixture offers nothing to observe that this one grain was deactivated.
+        // The exactly-once guarantee is pinned by the count and distinct-tick assertions below regardless.
         await silo.Services.GetRequiredService<IGrainFactory>().GetGrain<IManagementGrain>(0).ForceActivationCollection(TimeSpan.Zero, Ct);
 
         await WaitFor(async () => (await Journal("msb", stats)).OfType<MsReportReady>().Count() >= 2, TimeSpan.FromSeconds(90));
 
+        // Settle, then re-read: a late duplicate delivery would show up as a third entry.
+        await Task.Delay(TimeSpan.FromSeconds(3), Ct);
         var journal = await Journal("msb", stats);
         Assert.Equal(2, journal.OfType<MsReportReady>().Count());
+        // Both ticks fall on the same UTC day, so the tick instant is what tells the two reports apart.
+        Assert.Equal(2, journal.OfType<MsReportReady>().Select(r => r.At).Distinct().Count());
         // A reaction that returns its own signals saves them in place of StateChanged, so these two entries are the only saves.
         Assert.Equal(2, journal.Count);
         Assert.All(journal.OfType<MsReportReady>(), r => Assert.Equal((7, 7m), (r.Orders, r.Revenue)));
