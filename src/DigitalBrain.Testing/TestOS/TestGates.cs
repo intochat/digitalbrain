@@ -32,18 +32,23 @@ internal static class TestGates
         return allowed;
     }
 
-    // Saves the next state of each allowing gate, each as a turn of its gate neuron.
+    // Once the publisher's append is durable, saves the next state of each allowing gate, each as a turn of its gate neuron.
+    // The publisher's entry and the gates' entries are not one transaction: a failing Committed goes to TestOS.Failures, never to the publisher.
     public static async Task Commit(TestOS os, IReadOnlyList<(TestNeuronHost Gate, Signal Signal, Check.Allowed Allowed)> allowed)
     {
         ArgumentNullException.ThrowIfNull(os);
         ArgumentNullException.ThrowIfNull(allowed);
         foreach (var (gate, signal, verdict) in allowed)
         {
-            await os.Track(gate.Turn(interleave: false, async neuron =>
+            try
             {
-                await ((ISynapseReceiver)neuron).Committed(signal, verdict).ConfigureAwait(false);
-                return 0;
-            })).ConfigureAwait(false);
+                await os.Track(gate.Turn(interleave: false, async neuron =>
+                {
+                    await ((ISynapseReceiver)neuron).Committed(signal, verdict).ConfigureAwait(false);
+                    return 0;
+                })).ConfigureAwait(false);
+            }
+            catch (Exception error) when (error is not OutOfMemoryException) { os.Fail(error); }
         }
     }
 

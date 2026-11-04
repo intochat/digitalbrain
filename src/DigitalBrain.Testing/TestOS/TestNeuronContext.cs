@@ -53,8 +53,8 @@ internal sealed class TestNeuronContext : INeuronContext
         var allowed = await TestGates.Run(_host.OS, Id, [signal], CancellationToken.None).ConfigureAwait(false);
         var written = _host.OS.Journal(Id.Brain).Append(Id, [signal]);
         _host.OS.Synapses.Committed(Id);
-        try { _host.OS.Synapses.Appended(Id, written); }
-        finally { await TestGates.Commit(_host.OS, allowed).ConfigureAwait(false); }
+        await TestGates.Commit(_host.OS, allowed).ConfigureAwait(false);
+        _host.OS.Synapses.Appended(Id, written);
     }
 
     public Task PublishEphemeral(Signal signal)
@@ -86,8 +86,8 @@ internal sealed class TestNeuronContext : INeuronContext
             var allowed = await TestGates.Run(host.OS, host.Id, signals, CancellationToken.None).ConfigureAwait(false);
             var written = host.OS.Journal(host.Id.Brain).Save(host.Id, next, signals);
             host.OS.Synapses.Committed(host.Id);
-            try { host.OS.Synapses.Appended(host.Id, written); }
-            finally { await TestGates.Commit(host.OS, allowed).ConfigureAwait(false); }
+            await TestGates.Commit(host.OS, allowed).ConfigureAwait(false);
+            host.OS.Synapses.Appended(host.Id, written);
         }
 
         public Task Clear()

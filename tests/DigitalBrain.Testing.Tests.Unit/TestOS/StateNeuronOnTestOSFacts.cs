@@ -55,17 +55,53 @@ public static class Books
 // A gate that never answers on its own: it waits for a completion nobody sets, until its call is cancelled.
 public static class Stuck
 {
-    private static readonly TaskCompletionSource Never = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private static TaskCompletionSource _never = New();
+    private static TaskCompletionSource _waiting = New();
 
-    public static TaskCompletionSource Waiting { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public static Task Waiting => _waiting.Task;
+
+    // Each fact that stalls starts from fresh completions.
+    public static void Reset()
+    {
+        _never = New();
+        _waiting = New();
+    }
 
     [Synapse(typeof(Stalling), "hold")]
     public static async Task<Check> Wait(Stalling s, Hold state, CancellationToken ct)
     {
-        Waiting.TrySetResult();
-        await Never.Task.WaitAsync(ct);
+        _waiting.TrySetResult();
+        await _never.Task.WaitAsync(ct);
         return Check.Allow(state with { Seen = state.Seen + 1 });
     }
+
+    private static TaskCompletionSource New() => new(TaskCreationOptions.RunContinuationsAsynchronously);
+}
+
+[Signal("test.synapse.fragile")]
+public sealed record Fragile : Signal;
+
+[State("brittle")]
+public sealed record Brittle(int Seen)
+{
+    public Brittle() : this(0) { }
+}
+
+[State("breaker")]
+public sealed record Breaker(int Seen)
+{
+    public Breaker() : this(0) { }
+}
+
+// Brittle allows Fragile; its Committed save of StateChanged then meets Breaker's gate, which throws for that cause only.
+public static class Fragility
+{
+    [Synapse(typeof(Fragile), "brittle")]
+    public static Check Allow(Fragile s, Brittle state) => Check.Allow(state with { Seen = state.Seen + 1 });
+
+    [Synapse(typeof(StateChanged), "breaker")]
+    public static Check Break(StateChanged s, Breaker state) =>
+        s.Cause == "test.synapse.fragile" ? throw new InvalidOperationException("breaker") : Check.Allow(state);
 }
 
 public interface IPayments
@@ -73,6 +109,8 @@ public interface IPayments
     Task Charge(decimal amount);
 
     Task Stall();
+
+    Task Break();
 }
 
 [Neuron("payments")]
@@ -81,6 +119,8 @@ public sealed class Payments : Neuron<PayState>, IPayments
     public Task Charge(decimal amount) => Save(State with { Count = State.Count + 1 }, new Charging(amount));
 
     public Task Stall() => Save(State with { Count = State.Count + 1 }, new Stalling());
+
+    public Task Break() => Save(State with { Count = State.Count + 1 }, new Fragile());
 }
 
 public sealed class StateNeuronOnTestOSFacts
@@ -135,12 +175,13 @@ public sealed class StateNeuronOnTestOSFacts
     [Fact]
     public async Task AGateThatNeverAnswersFailsClosed()
     {
+        Stuck.Reset();
         await using var os = Start();
         var pay = os.Get<IPayments>(Pay);
 
         var call = pay.Stall();
         // The gate's wait starts a moment after the call: wait for it, then move past GateTimeout (still short of CallTimeout).
-        for (var tries = 0; tries < 200 && !Stuck.Waiting.Task.IsCompleted; tries++)
+        for (var tries = 0; tries < 200 && !Stuck.Waiting.IsCompleted; tries++)
         {
             await Task.Delay(10, TestContext.Current.CancellationToken);
         }
@@ -152,6 +193,19 @@ public sealed class StateNeuronOnTestOSFacts
         Assert.Equal("the gate did not answer", e.Rejected.Messages[0]);
         Assert.Empty(os.Journal(Pay.Brain).Signals(Pay));
         Assert.Empty(os.Journal(Pay.Brain).Signals(NeuronId.Parse("b/hold/default")));
+    }
+
+    [Fact]
+    public async Task AFailingCommittedOnAGateIsReportedAndDoesNotFailThePublisher()
+    {
+        await using var os = Start();
+
+        await os.Get<IPayments>(Pay).Break();
+        await os.Idle();
+
+        Assert.Single(os.Journal(Pay.Brain).Signals(Pay), s => s.Signal is Fragile);
+        Assert.Contains(os.Failures, e => e is RuleViolationException { Rejected.Messages: ["the gate did not answer"] });
+        Assert.DoesNotContain(os.Journal(Pay.Brain).Signals(NeuronId.Parse("b/brittle/default")), s => s.Signal is StateChanged);
     }
 
     [Fact]
