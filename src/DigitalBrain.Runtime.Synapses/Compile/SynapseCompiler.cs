@@ -11,7 +11,7 @@ using Microsoft.CodeAnalysis.Emit;
 
 namespace DigitalBrain.Runtime.Synapses;
 
-/// <summary>Compiles synapse source with every shipped DigitalBrain analyzer plus DB0041; caches successful builds by hash.</summary>
+/// <summary>Compiles synapse source with every shipped DigitalBrain analyzer plus DB0041-DB0044; caches successful builds by hash.</summary>
 public sealed class SynapseCompiler
 {
     private const int Capacity = 256;
@@ -30,7 +30,7 @@ public sealed class SynapseCompiler
 
     private static readonly CSharpParseOptions ParseOptions = new(LanguageVersion.Preview);
 
-    private static readonly ImmutableArray<DiagnosticAnalyzer> Analyzers = ImmutableArray.Create<DiagnosticAnalyzer>([.. AnalyzerSet.All, new SynapseShapeAnalyzer()]);
+    private static readonly ImmutableArray<DiagnosticAnalyzer> Analyzers = ImmutableArray.Create<DiagnosticAnalyzer>([.. AnalyzerSet.All, .. AnalyzerSet.Synapses]);
 
     private readonly ReferenceSet references;
     private readonly ImmutableArray<DiagnosticAnalyzer> analyzers;
@@ -137,7 +137,7 @@ public sealed class SynapseCompiler
 
     private static List<SynapseDiagnostic> Map(IEnumerable<Diagnostic> diagnostics) =>
     [
-        .. diagnostics.Select(diagnostic =>
+        .. diagnostics.Where(diagnostic => diagnostic.Severity >= DiagnosticSeverity.Warning || diagnostic.Id == "AD0001").Select(diagnostic =>
         {
             var message = diagnostic.GetMessage(CultureInfo.InvariantCulture);
             if (!diagnostic.Location.IsInSource)

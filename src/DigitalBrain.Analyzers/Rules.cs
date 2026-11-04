@@ -40,6 +40,21 @@ internal static class Rules
         "'{0}' is not a gate, reaction or view synapse: {1}",
         Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
+    public static readonly DiagnosticDescriptor StateLocality = new(
+        "DB0042", "Synapse state declared in another assembly",
+        "'{0}' uses state '{1}' declared in another assembly; a synapse's state record is declared beside it",
+        Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor StatusString = new(
+        "DB0043", "Synapse state carries a status-like member",
+        "'{0}' carries a status-like member '{1}'; a synapse says no through a gate, not through state",
+        Category, DiagnosticSeverity.Warning, isEnabledByDefault: true);
+
+    public static readonly DiagnosticDescriptor NoOnInSynapseAssembly = new(
+        "DB0044", "[On] reaction in a synapse assembly",
+        "'{0}' is an [On] reaction in a synapse assembly; write it as a [Synapse] function",
+        Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
+
     public static readonly DiagnosticDescriptor ShareableContract = new(
         "DB0031", "Cross-brain contract interface requires [Shareable]",
         "Contract interface or member '{0}' violates [Shareable] contract rules",

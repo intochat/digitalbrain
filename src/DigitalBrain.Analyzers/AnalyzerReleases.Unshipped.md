@@ -23,3 +23,6 @@ DB0032 | DigitalBrain | Error | Neuron reentrancy requires explicit justificatio
 DB0033 | DigitalBrain | Error | Synchronous contract call cycle detected
 DB0040 | DigitalBrain | Disabled | Bare exception for an invariant inside a neuron or app
 DB0041 | DigitalBrain | Error | Synapse signature outside gate, reaction, view
+DB0042 | DigitalBrain | Error | Synapse state declared in another assembly
+DB0043 | DigitalBrain | Warning | Synapse state carries a status-like member
+DB0044 | DigitalBrain | Error | [On] reaction in a synapse assembly

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using DigitalBrain.Analyzers.Contracts;
 using DigitalBrain.Analyzers.Neurons;
 using DigitalBrain.Analyzers.Reactions;
+using DigitalBrain.Analyzers.Synapses;
 using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace DigitalBrain.Analyzers.Apps;
@@ -30,4 +31,11 @@ public static class AnalyzerSet
         new ShareableContractAnalyzer(),
         new ReentrancyJustificationAnalyzer(),
         new CallCycleAnalyzer());
+
+    /// <summary>The synapse analyzers: DB0041-DB0044, applied by the synapse compiler on top of <see cref="All"/>.</summary>
+    public static ImmutableArray<DiagnosticAnalyzer> Synapses { get; } = ImmutableArray.Create<DiagnosticAnalyzer>(
+        new SynapseShapeAnalyzer(),
+        new StateLocalityAnalyzer(),
+        new StatusStringAnalyzer(),
+        new NoOnInSynapseAssemblyAnalyzer());
 }

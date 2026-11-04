@@ -94,6 +94,88 @@ public sealed class SynapseCompilerFacts
     }
 
     [Fact]
+    public void AStateDeclaredInAnotherAssemblyIsRefusedAsDB0042()
+    {
+        // WeekSpend of the weekly-cap sample is compiled in its own assembly and referenced here.
+        var library = new SynapseCompiler(ReferenceSet.FromDefaultContext()).Compile(Source(Budget, "Me.Library"));
+        Assert.True(library.Success, string.Join("\n", library.Diagnostics));
+        var references = ReferenceSet.FromDefaultContext();
+        var path = Path.Combine(Path.GetTempPath(), library.AssemblyName + ".dll");
+        File.WriteAllBytes(path, library.Assembly);
+        var withLibrary = new ReferenceSet([.. references.References, MetadataReference.CreateFromFile(path)]);
+        const string text = """
+            namespace Me.Other;
+
+            using Me.Budget;
+
+            public static class Gates
+            {
+                [Synapse(typeof(Charging), "week")]
+                public static Check Cap(Charging s, WeekSpend t) => Check.Reject("no");
+            }
+            """;
+
+        var build = new SynapseCompiler(withLibrary).Compile(Source(text, "Me.Other"));
+
+        Assert.False(build.Success);
+        Assert.Contains(build.Diagnostics, d => d.Id == "DB0042");
+    }
+
+    [Fact]
+    public void AStatusLikeStateMemberCompilesWithADB0043Warning()
+    {
+        const string text = """
+            namespace Me.Budget;
+
+            [Signal("payments.charging")]
+            public sealed record Charging(decimal Amount) : Signal;
+
+            [State("week")]
+            public sealed record WeekSpend(decimal Spent = 0, string Status = "")
+            {
+                public WeekSpend() : this(0, "") { }
+            }
+
+            public static class Reactions
+            {
+                [Synapse(typeof(Charging), "week")]
+                public static WeekSpend Charge(Charging s, WeekSpend t) => t with { Spent = t.Spent + s.Amount };
+            }
+            """;
+
+        var build = new SynapseCompiler(ReferenceSet.FromDefaultContext()).Compile(Source(text));
+
+        Assert.True(build.Success, string.Join("\n", build.Diagnostics));
+        var warning = Assert.Single(build.Diagnostics, d => d.Id == "DB0043");
+        Assert.Equal("Budget.cs", warning.File);
+    }
+
+    [Fact]
+    public void AnOnReactionBesideAStateRecordIsRefusedAsDB0044()
+    {
+        const string text = """
+            namespace Me.Budget;
+
+            [State("week")]
+            public sealed record WeekSpend(decimal Spent = 0)
+            {
+                public WeekSpend() : this(0) { }
+            }
+
+            public static class Reactions
+            {
+                [On]
+                public static void Roll() { }
+            }
+            """;
+
+        var build = new SynapseCompiler(ReferenceSet.FromDefaultContext()).Compile(Source(text));
+
+        Assert.False(build.Success);
+        Assert.Contains(build.Diagnostics, d => d.Id == "DB0044");
+    }
+
+    [Fact]
     public void AnAppClassIsRefused()
     {
         const string text = """
