@@ -687,3 +687,5 @@ override DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.GetHash
 override DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.ToString() -> string!
 static DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.operator !=(DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject? left, DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject? right) -> bool
 static DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.operator ==(DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject? left, DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject? right) -> bool
+DigitalBrain.Testing.TestOS.Catalog.get -> DigitalBrain.SynapseCatalog!
+DigitalBrain.Testing.TestOS.Gates.get -> DigitalBrain.Spi.IGateIndex!

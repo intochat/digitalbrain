@@ -217,12 +217,21 @@ internal sealed class SynapseRegistry(TestOS os)
         }
     }
 
-    // A reaction is a turn: the most specific [On] method whose parameter accepts the signal; none means the signal is ignored.
+    // A reaction is a turn: a synapse receiver's Receive, else the most specific [On] method whose parameter accepts the signal; none means the signal is ignored.
     private Task React(TestNeuronHost subscriber, Signal signal, Entry entry, long cursor)
     {
         if (signal is not Gap)
         {
             os.NoteDelivery(new SignalDelivery(entry.Source.ToString(), subscriber.Id.ToString(), AliasOf(signal.GetType()), cursor));
+        }
+        if (typeof(ISynapseReceiver).IsAssignableFrom(subscriber.Class))
+        {
+            return subscriber.Turn(interleave: false, async neuron =>
+            {
+                Reacting.Value = new Reaction(subscriber.Id, entry, cursor);
+                await ((ISynapseReceiver)neuron).Receive(signal, CancellationToken.None).ConfigureAwait(false);
+                return 0;
+            });
         }
         if (Find(subscriber.Class, signal.GetType()) is not { } method) { return Task.CompletedTask; }
         return subscriber.Turn(interleave: false, async neuron =>

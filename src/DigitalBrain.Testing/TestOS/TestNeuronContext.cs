@@ -42,17 +42,19 @@ internal sealed class TestNeuronContext : INeuronContext
 
     public ISignalHistory History => _host.OS.Journal(Id.Brain);
 
-    public Task Publish(Signal signal)
+    public async Task Publish(Signal signal)
     {
         ArgumentNullException.ThrowIfNull(signal);
         if (signal.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false))
         {
-            return PublishEphemeral(signal);
+            await PublishEphemeral(signal).ConfigureAwait(false);
+            return;
         }
+        var allowed = await TestGates.Run(_host.OS, Id, [signal], CancellationToken.None).ConfigureAwait(false);
         var written = _host.OS.Journal(Id.Brain).Append(Id, [signal]);
         _host.OS.Synapses.Committed(Id);
-        _host.OS.Synapses.Appended(Id, written);
-        return Task.CompletedTask;
+        try { _host.OS.Synapses.Appended(Id, written); }
+        finally { await TestGates.Commit(_host.OS, allowed).ConfigureAwait(false); }
     }
 
     public Task PublishEphemeral(Signal signal)
@@ -78,13 +80,14 @@ internal sealed class TestNeuronContext : INeuronContext
     {
         public Task<T?> Load<T>() => Task.FromResult(host.OS.Journal(host.Id.Brain).Load<T>(host.Id));
 
-        public Task Save<T>(T next, IReadOnlyList<Signal> signals)
+        public async Task Save<T>(T next, IReadOnlyList<Signal> signals)
         {
             ArgumentNullException.ThrowIfNull(signals);
+            var allowed = await TestGates.Run(host.OS, host.Id, signals, CancellationToken.None).ConfigureAwait(false);
             var written = host.OS.Journal(host.Id.Brain).Save(host.Id, next, signals);
             host.OS.Synapses.Committed(host.Id);
-            host.OS.Synapses.Appended(host.Id, written);
-            return Task.CompletedTask;
+            try { host.OS.Synapses.Appended(host.Id, written); }
+            finally { await TestGates.Commit(host.OS, allowed).ConfigureAwait(false); }
         }
 
         public Task Clear()

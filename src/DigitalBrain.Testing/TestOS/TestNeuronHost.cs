@@ -201,6 +201,7 @@ internal sealed class TestNeuronHost : IDisposable
             await NeuronAttachment.Activate(neuron, CancellationToken.None).ConfigureAwait(false);
             _neuron = neuron;
             _os.Synapses.Activated(this);
+            _os.EnsureReactionEdges(this);
             return neuron;
         }
         finally { _activating.Release(); }
@@ -218,12 +219,12 @@ internal sealed class TestNeuronHost : IDisposable
         await NeuronAttachment.Deactivate(neuron, cause, CancellationToken.None).ConfigureAwait(false);
     }
 
-    // The widest public constructor, its parameters resolved from the TestOS services.
+    // The widest public constructor, its parameters resolved from the TestOS services; a SynapseCatalog is the TestOS catalog.
     private Neuron Construct()
     {
         var constructor = Class.GetConstructors().OrderByDescending(candidate => candidate.GetParameters().Length).FirstOrDefault()
             ?? throw new InvalidOperationException($"{Class.FullName} has no public constructor.");
-        var arguments = constructor.GetParameters().Select(parameter => _os.Services.GetService(parameter.ParameterType)
+        var arguments = constructor.GetParameters().Select(parameter => (parameter.ParameterType == typeof(SynapseCatalog) ? _os.Catalog : _os.Services.GetService(parameter.ParameterType))
             ?? (parameter.HasDefaultValue ? parameter.DefaultValue
                 : throw new InvalidOperationException($"{Class.FullName} needs a {parameter.ParameterType.Name} that TestOSOptions.Services does not provide."))).ToArray();
         try { return (Neuron)constructor.Invoke(arguments); }

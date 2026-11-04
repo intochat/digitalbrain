@@ -49,6 +49,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     private int _outstanding;
     private string? _failNextPublish;
     private TaskCompletionSource _quiet = Quiet();
+    private SynapseCatalog _catalog = SynapseCatalog.Scan();
 
     private TestOS(TestOSOptions options)
     {
@@ -59,7 +60,14 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         Synapses = new SynapseRegistry(this);
         Confirmations = new TestConfirmations(Clock);
         Listeners = new TestClusterListeners(this);
+        Gates = new CatalogGateIndex(_catalog);
     }
+
+    /// <summary>The <c>[State]</c> records and synapse functions of every assembly registered with <see cref="Register(Assembly)"/>.</summary>
+    public SynapseCatalog Catalog => Volatile.Read(ref _catalog);
+
+    /// <summary>The gate index over <see cref="Catalog"/>: the gate neurons a durable signal passes before it is appended.</summary>
+    public IGateIndex Gates { get; private set; }
 
     /// <summary>Host-level listeners on the signals of every brain of this TestOS (04-19); they survive <see cref="Restart"/>.</summary>
     public DigitalBrain.Spi.IClusterListeners ClusterListeners => Listeners;
@@ -111,10 +119,26 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     /// <exception cref="ArgumentException">The class has no <see cref="NeuronAttribute"/>, or its type name is taken by another class.</exception>
     public TestOS Register<TNeuron>() where TNeuron : Neuron => Register(typeof(TNeuron));
 
-    /// <summary>Registers every concrete <c>[Neuron("type")]</c> class of <paramref name="assembly"/>.</summary>
+    /// <summary>
+    /// Registers every concrete <c>[Neuron("type")]</c> class of <paramref name="assembly"/>, merges its <c>[State]</c> records and synapse
+    /// functions into <see cref="Catalog"/>, and hosts each state alias as a <see cref="StateNeuron{TState}"/>.
+    /// </summary>
+    /// <exception cref="SynapseShapeException">A synapse of unsupported shape, or a state alias already in <see cref="Catalog"/>.</exception>
     public TestOS Register(Assembly assembly)
     {
         ArgumentNullException.ThrowIfNull(assembly);
+        var scanned = SynapseCatalog.Scan(assembly);
+        lock (_gate)
+        {
+            _catalog = _catalog.Merge(scanned);
+            Gates = new CatalogGateIndex(_catalog);
+        }
+        foreach (var (alias, record) in scanned.States)
+        {
+            var neuron = typeof(StateNeuron<>).MakeGenericType(record);
+            var registered = _types.GetOrAdd(alias, neuron);
+            if (registered != neuron) { throw new ArgumentException($"State alias '{alias}' is already registered for {registered.FullName}.", nameof(assembly)); }
+        }
         foreach (var type in assembly.GetTypes().Where(type => type is { IsAbstract: false, IsClass: true } && typeof(Neuron).IsAssignableFrom(type) && type.IsDefined(typeof(NeuronAttribute), false)))
         {
             Register(type);
@@ -294,7 +318,50 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         {
             throw new InvalidOperationException($"No neuron class is registered for type '{id.Type}'. Call Register<TNeuron>() first.");
         }
-        return _hosts.GetOrAdd(id, key => new TestNeuronHost(this, key, type));
+        var created = new TestNeuronHost(this, id, type);
+        var added = _hosts.GetOrAdd(id, created);
+        if (ReferenceEquals(added, created)) { EnsureEdgesTo(added); }
+        else { created.Dispose(); }
+        return added;
+    }
+
+    // Reaction edges of this slice: an activated state neuron subscribes to every other host of its brain for the signals of its
+    // reaction synapses (here), and every active state neuron of the brain to a host created later (EnsureEdgesTo).
+    internal void EnsureReactionEdges(TestNeuronHost state)
+    {
+        foreach (var source in _hosts.Values.Where(host => host.Id.Brain == state.Id.Brain && host.Id != state.Id).ToList())
+        {
+            EnsureReactions(state, source.Id);
+        }
+    }
+
+    private void EnsureEdgesTo(TestNeuronHost source)
+    {
+        foreach (var state in _hosts.Values.Where(host => host.IsActive && host.Id.Brain == source.Id.Brain && host.Id != source.Id).ToList())
+        {
+            EnsureReactions(state, source.Id);
+        }
+    }
+
+    private void EnsureReactions(TestNeuronHost state, NeuronId source)
+    {
+        if (ReactionSignals(state.Class) is not { Length: > 0 } signals) { return; }
+        _ = Track(ObserveEdge(Synapses.Ensure(state, source, signals)));
+    }
+
+    private Type[]? ReactionSignals(Type neuronClass)
+    {
+        if (!neuronClass.IsGenericType || neuronClass.GetGenericTypeDefinition() != typeof(StateNeuron<>)) { return null; }
+        var record = neuronClass.GetGenericArguments()[0];
+        var catalog = Catalog;
+        var alias = catalog.States.FirstOrDefault(pair => pair.Value == record).Key;
+        return alias is null ? null : [.. catalog.For(alias).Where(d => d.Kind == SynapseKind.Reaction).Select(d => d.Signal!).Distinct()];
+    }
+
+    private async Task ObserveEdge(Task work)
+    {
+        try { await work.ConfigureAwait(false); }
+        catch (Exception error) when (error is not OutOfMemoryException) { Fail(error); }
     }
 
     internal bool TryHost(NeuronId id, out TestNeuronHost host)
