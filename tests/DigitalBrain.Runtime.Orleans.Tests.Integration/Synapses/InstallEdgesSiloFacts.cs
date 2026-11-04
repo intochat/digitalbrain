@@ -9,6 +9,8 @@ using Orleans.Storage;
 
 namespace DigitalBrain.Runtime.Orleans.Tests.Integration.Synapses;
 
+using SynapseSource = DigitalBrain.Runtime.Orleans.Synapses.SynapseSource;
+
 // The InstallEdgesFacts of TestOS on the silo: reaction edges come from the install, brain-wide; gates only for installed aliases.
 // Each fact has its own brain.
 public sealed class InstallEdgesSiloFacts(StatefulSilo silo) : IClassFixture<StatefulSilo>

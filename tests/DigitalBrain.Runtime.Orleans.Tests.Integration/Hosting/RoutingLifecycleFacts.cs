@@ -7,6 +7,8 @@ using Microsoft.Extensions.DependencyInjection;
 using OrleansSdk = Orleans;
 namespace DigitalBrain.Runtime.Orleans.Tests.Integration.Hosting;
 
+using ISynapseHost = DigitalBrain.Runtime.Orleans.Synapses.ISynapseHost;
+
 public sealed class RoutingLifecycleFacts
 {
     [Theory]

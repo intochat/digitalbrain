@@ -1,4 +1,4 @@
-namespace DigitalBrain.Runtime.Synapses;
+namespace DigitalBrain;
 
 /// <summary>The source of one synapse package: its key, its C# files by path, and an optional icon.</summary>
 /// <param name="SourceKey">The package key, e.g. <c>Me.Budget</c>; it names the compiled assembly.</param>

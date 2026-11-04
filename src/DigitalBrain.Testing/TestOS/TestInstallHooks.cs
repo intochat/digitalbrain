@@ -12,12 +12,12 @@ internal sealed class TestInstallHooks(TestOS os) : IInstallHooks
     public Task EnsureReactionEdges(NeuronId state, IReadOnlyList<Type> signals, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(signals);
-        return signals.Count == 0 ? Task.CompletedTask : os.Synapses.EnsureBrainWide(os.Host(state), [.. signals]);
+        return signals.Count == 0 ? Task.CompletedTask : os.Delivery.EnsureBrainWide(os.Host(state), [.. signals], exact: true);
     }
 
     public Task RemoveReactionEdges(NeuronId state, CancellationToken ct)
     {
-        os.Synapses.Remove(state, SynapseRegistry.BrainWideOf(state.Brain));
+        os.Delivery.Remove(state, SynapseRegistry.BrainWideOf(state.Brain));
         return Task.CompletedTask;
     }
 

@@ -58,9 +58,9 @@ internal sealed class TestNeuronContext : INeuronContext
             await TestGates.Abort(_host.OS, allowed).ConfigureAwait(false);
             throw;
         }
-        _host.OS.Synapses.Committed(Id);
+        _host.OS.Delivery.Committed(Id);
         await TestGates.Commit(_host.OS, allowed).ConfigureAwait(false);
-        _host.OS.Synapses.Appended(Id, written);
+        _host.OS.Delivery.Appended(Id, written);
     }
 
     public Task PublishEphemeral(Signal signal)
@@ -97,9 +97,9 @@ internal sealed class TestNeuronContext : INeuronContext
                 await TestGates.Abort(host.OS, allowed).ConfigureAwait(false);
                 throw;
             }
-            host.OS.Synapses.Committed(host.Id);
+            host.OS.Delivery.Committed(host.Id);
             await TestGates.Commit(host.OS, allowed).ConfigureAwait(false);
-            host.OS.Synapses.Appended(host.Id, written);
+            host.OS.Delivery.Appended(host.Id, written);
         }
 
         public Task Clear()

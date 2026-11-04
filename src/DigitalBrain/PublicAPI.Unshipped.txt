@@ -2461,3 +2461,125 @@ DigitalBrain.Spi.ISynapseRegistrar.Deactivate(DigitalBrain.BrainId brain, string
 DigitalBrain.Spi.ISynapseRestorer
 DigitalBrain.Spi.ISynapseRestorer.TryRestore(DigitalBrain.BrainId brain, string! alias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<bool>!
 static DigitalBrain.NoSynapseRestorer.Instance.get -> DigitalBrain.NoSynapseRestorer!
+DigitalBrain.SynapseDiagnostic
+DigitalBrain.SynapseDiagnostic.<Clone>$() -> DigitalBrain.SynapseDiagnostic!
+DigitalBrain.SynapseDiagnostic.Deconstruct(out string! File, out string! Id, out int Line, out string! Message) -> void
+DigitalBrain.SynapseDiagnostic.Equals(DigitalBrain.SynapseDiagnostic? other) -> bool
+DigitalBrain.SynapseDiagnostic.File.get -> string!
+DigitalBrain.SynapseDiagnostic.File.init -> void
+DigitalBrain.SynapseDiagnostic.Id.get -> string!
+DigitalBrain.SynapseDiagnostic.Id.init -> void
+DigitalBrain.SynapseDiagnostic.Line.get -> int
+DigitalBrain.SynapseDiagnostic.Line.init -> void
+DigitalBrain.SynapseDiagnostic.Message.get -> string!
+DigitalBrain.SynapseDiagnostic.Message.init -> void
+DigitalBrain.SynapseDiagnostic.SynapseDiagnostic(string! File, string! Id, int Line, string! Message) -> void
+DigitalBrain.SynapseSource
+DigitalBrain.SynapseSource.<Clone>$() -> DigitalBrain.SynapseSource!
+DigitalBrain.SynapseSource.Deconstruct(out string! SourceKey, out System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Files, out byte[]? Icon) -> void
+DigitalBrain.SynapseSource.Equals(DigitalBrain.SynapseSource? other) -> bool
+DigitalBrain.SynapseSource.Files.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+DigitalBrain.SynapseSource.Files.init -> void
+DigitalBrain.SynapseSource.Icon.get -> byte[]?
+DigitalBrain.SynapseSource.Icon.init -> void
+DigitalBrain.SynapseSource.SourceKey.get -> string!
+DigitalBrain.SynapseSource.SourceKey.init -> void
+DigitalBrain.SynapseSource.SynapseSource(string! SourceKey, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Files, byte[]? Icon) -> void
+override DigitalBrain.SynapseDiagnostic.Equals(object? obj) -> bool
+override DigitalBrain.SynapseDiagnostic.GetHashCode() -> int
+override DigitalBrain.SynapseDiagnostic.ToString() -> string!
+override DigitalBrain.SynapseSource.Equals(object? obj) -> bool
+override DigitalBrain.SynapseSource.GetHashCode() -> int
+override DigitalBrain.SynapseSource.ToString() -> string!
+static DigitalBrain.SynapseDiagnostic.operator !=(DigitalBrain.SynapseDiagnostic? left, DigitalBrain.SynapseDiagnostic? right) -> bool
+static DigitalBrain.SynapseDiagnostic.operator ==(DigitalBrain.SynapseDiagnostic? left, DigitalBrain.SynapseDiagnostic? right) -> bool
+static DigitalBrain.SynapseSource.operator !=(DigitalBrain.SynapseSource? left, DigitalBrain.SynapseSource? right) -> bool
+static DigitalBrain.SynapseSource.operator ==(DigitalBrain.SynapseSource? left, DigitalBrain.SynapseSource? right) -> bool
+DigitalBrain.ISynapseCatalogSource.Stage(string! sourceKey, DigitalBrain.SynapseCatalog! staged) -> void
+DigitalBrain.ISynapseCatalogSource.Unstage(string! sourceKey) -> void
+DigitalBrain.DeployOutcome
+DigitalBrain.DeployOutcome.<Clone>$() -> DigitalBrain.DeployOutcome!
+DigitalBrain.DeployOutcome.Deconstruct(out DigitalBrain.DeployStatus Status, out string? Hash, out System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseDiagnostic!>! Diagnostics, out System.Collections.Generic.IReadOnlyDictionary<string!, DigitalBrain.InstallOutcome!>! Installs, out string? Reason) -> void
+DigitalBrain.DeployOutcome.DeployOutcome(DigitalBrain.DeployStatus Status, string? Hash, System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseDiagnostic!>! Diagnostics, System.Collections.Generic.IReadOnlyDictionary<string!, DigitalBrain.InstallOutcome!>! Installs, string? Reason) -> void
+DigitalBrain.DeployOutcome.Diagnostics.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseDiagnostic!>!
+DigitalBrain.DeployOutcome.Diagnostics.init -> void
+DigitalBrain.DeployOutcome.Equals(DigitalBrain.DeployOutcome? other) -> bool
+DigitalBrain.DeployOutcome.Hash.get -> string?
+DigitalBrain.DeployOutcome.Hash.init -> void
+DigitalBrain.DeployOutcome.Installs.get -> System.Collections.Generic.IReadOnlyDictionary<string!, DigitalBrain.InstallOutcome!>!
+DigitalBrain.DeployOutcome.Installs.init -> void
+DigitalBrain.DeployOutcome.Reason.get -> string?
+DigitalBrain.DeployOutcome.Reason.init -> void
+DigitalBrain.DeployOutcome.Status.get -> DigitalBrain.DeployStatus
+DigitalBrain.DeployOutcome.Status.init -> void
+DigitalBrain.DeployStatus
+DigitalBrain.DeployStatus.Deployed = 0 -> DigitalBrain.DeployStatus
+DigitalBrain.DeployStatus.Failed = 5 -> DigitalBrain.DeployStatus
+DigitalBrain.DeployStatus.Refused = 4 -> DigitalBrain.DeployStatus
+DigitalBrain.DeployStatus.Retired = 3 -> DigitalBrain.DeployStatus
+DigitalBrain.DeployStatus.Staged = 1 -> DigitalBrain.DeployStatus
+DigitalBrain.DeployStatus.Unchanged = 2 -> DigitalBrain.DeployStatus
+DigitalBrain.DeployedSource
+DigitalBrain.DeployedSource.<Clone>$() -> DigitalBrain.DeployedSource!
+DigitalBrain.DeployedSource.Aliases.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.DeployedSource.Aliases.init -> void
+DigitalBrain.DeployedSource.At.get -> System.DateTimeOffset
+DigitalBrain.DeployedSource.At.init -> void
+DigitalBrain.DeployedSource.Deconstruct(out string! SourceKey, out string! Hash, out System.Collections.Generic.IReadOnlyList<string!>! Aliases, out DigitalBrain.DeployStatus Status, out string? StagedHash, out System.DateTimeOffset At) -> void
+DigitalBrain.DeployedSource.DeployedSource(string! SourceKey, string! Hash, System.Collections.Generic.IReadOnlyList<string!>! Aliases, DigitalBrain.DeployStatus Status, string? StagedHash, System.DateTimeOffset At) -> void
+DigitalBrain.DeployedSource.Equals(DigitalBrain.DeployedSource? other) -> bool
+DigitalBrain.DeployedSource.Hash.get -> string!
+DigitalBrain.DeployedSource.Hash.init -> void
+DigitalBrain.DeployedSource.SourceKey.get -> string!
+DigitalBrain.DeployedSource.SourceKey.init -> void
+DigitalBrain.DeployedSource.StagedHash.get -> string?
+DigitalBrain.DeployedSource.StagedHash.init -> void
+DigitalBrain.DeployedSource.Status.get -> DigitalBrain.DeployStatus
+DigitalBrain.DeployedSource.Status.init -> void
+DigitalBrain.ISourceStore
+DigitalBrain.ISourceStore.Get(DigitalBrain.BrainId brain, string! sourceKey, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.SourceRecord?>!
+DigitalBrain.ISourceStore.List(DigitalBrain.BrainId brain, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.SourceRecord!>!>!
+DigitalBrain.ISourceStore.Put(DigitalBrain.BrainId brain, DigitalBrain.SourceRecord! record, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.ISourceStore.Remove(DigitalBrain.BrainId brain, string! sourceKey, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.ISynapseHost
+DigitalBrain.ISynapseHost.Deploy(DigitalBrain.BrainId brain, DigitalBrain.SynapseSource! source, System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyDictionary<string!, string!>!>! bindingsPerAlias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.DeployOutcome!>!
+DigitalBrain.ISynapseHost.List(DigitalBrain.BrainId brain, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.DeployedSource!>!>!
+DigitalBrain.ISynapseHost.Retire(DigitalBrain.BrainId brain, string! sourceKey, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.DeployOutcome!>!
+DigitalBrain.SourceRecord
+DigitalBrain.SourceRecord.<Clone>$() -> DigitalBrain.SourceRecord!
+DigitalBrain.SourceRecord.Aliases.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.SourceRecord.Aliases.init -> void
+DigitalBrain.SourceRecord.Assembly.get -> byte[]!
+DigitalBrain.SourceRecord.Assembly.init -> void
+DigitalBrain.SourceRecord.AssemblyName.get -> string!
+DigitalBrain.SourceRecord.AssemblyName.init -> void
+DigitalBrain.SourceRecord.Deconstruct(out string! SourceKey, out System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Files, out byte[]? Icon, out string! Hash, out string! AssemblyName, out byte[]! Assembly, out byte[]! Symbols, out System.Collections.Generic.IReadOnlyList<string!>! Aliases, out System.DateTimeOffset DeployedAt) -> void
+DigitalBrain.SourceRecord.DeployedAt.get -> System.DateTimeOffset
+DigitalBrain.SourceRecord.DeployedAt.init -> void
+DigitalBrain.SourceRecord.Equals(DigitalBrain.SourceRecord? other) -> bool
+DigitalBrain.SourceRecord.Files.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+DigitalBrain.SourceRecord.Files.init -> void
+DigitalBrain.SourceRecord.Hash.get -> string!
+DigitalBrain.SourceRecord.Hash.init -> void
+DigitalBrain.SourceRecord.Icon.get -> byte[]?
+DigitalBrain.SourceRecord.Icon.init -> void
+DigitalBrain.SourceRecord.SourceKey.get -> string!
+DigitalBrain.SourceRecord.SourceKey.init -> void
+DigitalBrain.SourceRecord.SourceRecord(string! SourceKey, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Files, byte[]? Icon, string! Hash, string! AssemblyName, byte[]! Assembly, byte[]! Symbols, System.Collections.Generic.IReadOnlyList<string!>! Aliases, System.DateTimeOffset DeployedAt) -> void
+DigitalBrain.SourceRecord.Symbols.get -> byte[]!
+DigitalBrain.SourceRecord.Symbols.init -> void
+override DigitalBrain.DeployOutcome.Equals(object? obj) -> bool
+override DigitalBrain.DeployOutcome.GetHashCode() -> int
+override DigitalBrain.DeployOutcome.ToString() -> string!
+override DigitalBrain.DeployedSource.Equals(object? obj) -> bool
+override DigitalBrain.DeployedSource.GetHashCode() -> int
+override DigitalBrain.DeployedSource.ToString() -> string!
+override DigitalBrain.SourceRecord.Equals(object? obj) -> bool
+override DigitalBrain.SourceRecord.GetHashCode() -> int
+override DigitalBrain.SourceRecord.ToString() -> string!
+static DigitalBrain.DeployOutcome.operator !=(DigitalBrain.DeployOutcome? left, DigitalBrain.DeployOutcome? right) -> bool
+static DigitalBrain.DeployOutcome.operator ==(DigitalBrain.DeployOutcome? left, DigitalBrain.DeployOutcome? right) -> bool
+static DigitalBrain.DeployedSource.operator !=(DigitalBrain.DeployedSource? left, DigitalBrain.DeployedSource? right) -> bool
+static DigitalBrain.DeployedSource.operator ==(DigitalBrain.DeployedSource? left, DigitalBrain.DeployedSource? right) -> bool
+static DigitalBrain.SourceRecord.operator !=(DigitalBrain.SourceRecord? left, DigitalBrain.SourceRecord? right) -> bool
+static DigitalBrain.SourceRecord.operator ==(DigitalBrain.SourceRecord? left, DigitalBrain.SourceRecord? right) -> bool

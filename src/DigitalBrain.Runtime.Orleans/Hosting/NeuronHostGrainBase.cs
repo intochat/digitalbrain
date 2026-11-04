@@ -14,6 +14,8 @@ using DigitalBrain.Runtime.Orleans.Synapses;
 
 namespace DigitalBrain.Runtime.Orleans.Hosting;
 
+using ISynapseHost = DigitalBrain.Runtime.Orleans.Synapses.ISynapseHost;
+
 /// <summary>
 /// What the three host grains share: parse the key <c>brain/type/key</c>, resolve the plain class, build and attach it, then
 /// dispatch each <see cref="RuntimeInvocation"/> through the one <see cref="NeuronBinder"/>. The invocation's Behavior is ignored:

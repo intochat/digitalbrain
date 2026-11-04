@@ -9,6 +9,8 @@ using Orleans.Storage;
 using OrleansSdk = Orleans;
 namespace DigitalBrain.Runtime.Orleans.Tests.Integration.Storage;
 
+using SynapseSource = DigitalBrain.Runtime.Orleans.Synapses.SynapseSource;
+
 public sealed class BrainSignalHistoryFacts
 {
     private static BrainStore Store(TempHome home, FixedCursors cursors, int window = 1000, ManualTime? time = null)

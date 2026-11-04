@@ -65,6 +65,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     private int _outstanding;
     private string? _failNextPublish;
     private TaskCompletionSource _quiet = Quiet();
+    private readonly Lazy<DigitalBrain.Runtime.Synapses.SynapseHost> _synapses;
 
     private TestOS(TestOSOptions options)
     {
@@ -73,11 +74,20 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         Capabilities = new CapabilityFakes();
         Source = new SynapseCatalogSource(SynapseCatalog.Scan());
         Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance, new TestInstallHooks(this), new TestSlotResolver(this), Source);
-        Synapses = new SynapseRegistry(this);
+        Delivery = new SynapseRegistry(this);
         Confirmations = new TestConfirmations(Clock);
         Listeners = new TestClusterListeners(this);
         Gates = new InstalledGateIndex(Source);
         Registrar = new TestSynapseRegistrar(this);
+        Store = new InMemorySourceStore();
+        _synapses = new Lazy<DigitalBrain.Runtime.Synapses.SynapseHost>(() => new DigitalBrain.Runtime.Synapses.SynapseHost(
+            new DigitalBrain.Runtime.Synapses.SynapseCompiler(DigitalBrain.Runtime.Synapses.ReferenceSet.FromDefaultContext()),
+            new DigitalBrain.Runtime.Synapses.SynapseLoader(),
+            Registrar,
+            Source,
+            brain => Get<IInstalls>(NeuronId.Parse($"{brain}/synapse.installs/default")),
+            Store,
+            Listeners));
         Register<InstallsNeuron>();
         Register<TimeNeuron>();
         _ = Listeners.Listen<GateChanged>("testos.installed-gates", RefreshGates);
@@ -103,6 +113,15 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     /// replaced alias. TestOS journals typed signal objects, so a generated <c>[Signal]</c> needs no registration.
     /// </summary>
     public ISynapseRegistrar Registrar { get; }
+
+    /// <summary>
+    /// The synapse host of this TestOS: deploys generated sources through <see cref="Registrar"/>, <see cref="Source"/>, each brain's
+    /// <see cref="IInstalls"/> neuron, <see cref="Store"/> and <see cref="ClusterListeners"/>. Created on first use.
+    /// </summary>
+    public DigitalBrain.Runtime.Synapses.SynapseHost Synapses => _synapses.Value;
+
+    /// <summary>Where <see cref="Synapses"/> keeps the deployed sources.</summary>
+    public InMemorySourceStore Store { get; }
 
     /// <summary>Host-level listeners on the signals of every brain of this TestOS (04-19); they survive <see cref="Restart"/>.</summary>
     public DigitalBrain.Spi.IClusterListeners ClusterListeners => Listeners;
@@ -135,11 +154,11 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     public IReadOnlyCollection<Exception> Failures => _failures;
 
     /// <summary>How many duplicate signal references the cursor dedupe dropped.</summary>
-    public long DuplicatesDropped => Synapses.DuplicatesDropped;
+    public long DuplicatesDropped => Delivery.DuplicatesDropped;
 
     internal NeuronBinder Binder { get; } = new();
 
-    internal SynapseRegistry Synapses { get; }
+    internal SynapseRegistry Delivery { get; }
 
     /// <summary>A local TestOS.</summary>
     public static TestOS Local(Action<TestOSOptions>? configure = null)
@@ -255,7 +274,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     Task<ObservedSynapse[]> IBrainObserver.Synapses(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(Synapses.All());
+        return Task.FromResult(Delivery.All());
     }
 
     /// <summary>Deliveries from now on, across every brain of this TestOS.</summary>
@@ -307,7 +326,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         var journal = Journal(brain);
         foreach (var publisher in journal.Publishers())
         {
-            journal.Checkpoint(publisher, Options, Synapses.LowestLiveCursor(publisher));
+            journal.Checkpoint(publisher, Options, Delivery.LowestLiveCursor(publisher));
         }
     }
 
@@ -329,7 +348,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         {
             await Track(host.Deactivate(DeactivationCause.Shutdown)).ConfigureAwait(false);
         }
-        foreach (var subscriber in Synapses.Behind())
+        foreach (var subscriber in Delivery.Behind())
         {
             await Activate(subscriber).ConfigureAwait(false);
         }
@@ -343,14 +362,15 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     }
 
     /// <summary>The synapses <paramref name="subscriber"/> holds.</summary>
-    public IReadOnlyList<Synapse> SynapsesOf(NeuronId subscriber) => Synapses.Of(subscriber);
+    public IReadOnlyList<Synapse> SynapsesOf(NeuronId subscriber) => Delivery.Of(subscriber);
 
     /// <summary>The last sequence of <paramref name="source"/> that <paramref name="subscriber"/> has reacted to, or null without a synapse.</summary>
-    public long? Cursor(NeuronId subscriber, NeuronId source) => Synapses.Cursor(subscriber, source);
+    public long? Cursor(NeuronId subscriber, NeuronId source) => Delivery.Cursor(subscriber, source);
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        if (_synapses.IsValueCreated) { await _synapses.Value.DisposeAsync().ConfigureAwait(false); }
         foreach (var host in _hosts.Values)
         {
             try { await host.Deactivate(DeactivationCause.Shutdown).ConfigureAwait(false); }

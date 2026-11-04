@@ -11,4 +11,8 @@
     <!-- The 03-08 Azurite fixture, shared as source: CI sets AZURITE_CONNECTION_STRING; locally Docker starts the image. -->
     <Compile Include="../DigitalBrain.Runtime.Orleans.Azure.Tests.Integration/AzuriteFixture.cs" Link="AzuriteFixture.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Orleans brings Microsoft.CodeAnalysis.Common 5.0.0; the synapse compiler's CSharp (through DigitalBrain.Testing) must match it in one process. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.0.0" />
+  </ItemGroup>
 </Project>

@@ -58,7 +58,7 @@ public sealed class InstallEdgesFacts
     private static async Task EnsurePerSource(OS os, NeuronId subscriber, NeuronId from, Type signal)
     {
         const BindingFlags Any = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
-        var registry = typeof(OS).GetProperty("Synapses", Any)!.GetValue(os)!;
+        var registry = typeof(OS).GetProperty("Delivery", Any)!.GetValue(os)!;
         var host = typeof(OS).GetMethod("Host", Any, [typeof(NeuronId)])!.Invoke(os, [subscriber])!;
         var ensure = registry.GetType().GetMethods(Any).Single(m => m.Name == "Ensure" && m.GetParameters().Length == 3);
         await (Task)ensure.Invoke(registry, [host, from, new[] { signal }])!;

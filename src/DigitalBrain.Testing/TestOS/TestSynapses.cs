@@ -10,19 +10,19 @@ internal sealed class TestSynapses(TestNeuronHost host) : ISynapses
 {
     public Task Ensure<TSignal>(NeuronId from) where TSignal : Signal => Ensure(from, typeof(TSignal));
 
-    public Task Ensure(NeuronId from, params Type[] signals) => host.OS.Synapses.Ensure(host, from, signals);
+    public Task Ensure(NeuronId from, params Type[] signals) => host.OS.Delivery.Ensure(host, from, signals);
 
     public Task Remove(NeuronId from)
     {
-        host.OS.Synapses.Remove(host.Id, from);
+        host.OS.Delivery.Remove(host.Id, from);
         return Task.CompletedTask;
     }
 
-    public Task EnsureBrainWide(params Type[] signals) => host.OS.Synapses.EnsureBrainWide(host, signals);
+    public Task EnsureBrainWide(params Type[] signals) => host.OS.Delivery.EnsureBrainWide(host, signals);
 
     public Task RemoveBrainWide()
     {
-        host.OS.Synapses.Remove(host.Id, SynapseRegistry.BrainWideOf(host.Id.Brain));
+        host.OS.Delivery.Remove(host.Id, SynapseRegistry.BrainWideOf(host.Id.Brain));
         return Task.CompletedTask;
     }
 }
@@ -85,7 +85,8 @@ internal sealed class SynapseRegistry(TestOS os)
     internal static NeuronId BrainWideOf(BrainId brain) => new(brain, BrainWide, BrainWide);
 
     // No admission: a brain-wide synapse names no source to ask. It starts at the brain's last journal position.
-    public Task EnsureBrainWide(TestNeuronHost subscriber, Type[] signals)
+    // exact: the entry's signals become exactly signals (an install's reaction edges), so a replaced source's types do not linger.
+    public Task EnsureBrainWide(TestNeuronHost subscriber, Type[] signals, bool exact = false)
     {
         ArgumentNullException.ThrowIfNull(signals);
         if (subscriber.Class.IsDefined(typeof(StatelessNeuronAttribute), false))
@@ -106,6 +107,7 @@ internal sealed class SynapseRegistry(TestOS os)
             {
                 sources[key] = entry = new Entry(key, subscriber.Id) { BrainWide = true, Cursor = last, CursorAt = os.Clock.GetUtcNow() };
             }
+            if (exact) { entry.Signals.Clear(); }
             entry.Signals.UnionWith(signals);
             // A state neuron's per-source edges (plan 1) of signals the brain-wide entry now covers would deliver them twice: they go.
             if (typeof(ISynapseReceiver).IsAssignableFrom(subscriber.Class))
@@ -348,7 +350,11 @@ internal sealed class SynapseRegistry(TestOS os)
         });
     }
 
-    private static MethodInfo? Find(Type neuronClass, Type signal) => Reactions.GetOrAdd((neuronClass, signal), static key =>
+    // A collectible type (a generated synapse source) is never cached: the static cache would keep its context from unloading.
+    private static MethodInfo? Find(Type neuronClass, Type signal) =>
+        neuronClass.IsCollectible || signal.IsCollectible ? Lookup((neuronClass, signal)) : Reactions.GetOrAdd((neuronClass, signal), Lookup);
+
+    private static MethodInfo? Lookup((Type Class, Type Signal) key)
     {
         var candidates = new List<MethodInfo>();
         for (var type = key.Class; type is not null && type != typeof(object); type = type.BaseType)
@@ -357,7 +363,7 @@ internal sealed class SynapseRegistry(TestOS os)
                 .Where(method => method.IsDefined(typeof(OnAttribute), false) && method.GetParameters() is [var first, ..] && first.ParameterType.IsAssignableFrom(key.Signal)));
         }
         return candidates.OrderByDescending(method => Depth(method.GetParameters()[0].ParameterType)).FirstOrDefault();
-    });
+    }
 
     private static int Depth(Type type)
     {

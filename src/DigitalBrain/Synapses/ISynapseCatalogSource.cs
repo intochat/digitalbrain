@@ -19,4 +19,13 @@ public interface ISynapseCatalogSource
     /// <param name="alias">The state alias.</param>
     /// <returns>The catalog.</returns>
     SynapseCatalog ForNeeds(string alias);
+
+    /// <summary>Stages <paramref name="staged"/> under <paramref name="sourceKey"/> for <see cref="ForNeeds"/>, replacing an earlier stage of the key; <see cref="Current"/> is unchanged.</summary>
+    /// <param name="sourceKey">The key of the stage, such as a source key.</param>
+    /// <param name="staged">The catalog to serve for the aliases it declares.</param>
+    void Stage(string sourceKey, SynapseCatalog staged);
+
+    /// <summary>Drops the stage of <paramref name="sourceKey"/>; an unknown key is ignored.</summary>
+    /// <param name="sourceKey">The key of the stage.</param>
+    void Unstage(string sourceKey);
 }
