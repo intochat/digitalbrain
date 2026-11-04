@@ -14,7 +14,10 @@ internal sealed class RecordingHooks : IInstallHooks, IServiceProvider
 
     public object? GetService(Type serviceType) => serviceType == typeof(IInstallHooks) ? this : null;
 
-    public Task EnsureReactionEdges(NeuronId state, IReadOnlyList<Type> signals, CancellationToken ct) => Note($"edges {state}");
+    public bool FailEdges { get; set; }
+
+    public Task EnsureReactionEdges(NeuronId state, IReadOnlyList<Type> signals, CancellationToken ct)
+        => FailEdges ? throw new InvalidOperationException("edges down") : Note($"edges {state}");
 
     public Task RemoveReactionEdges(NeuronId state, CancellationToken ct) => Note($"unedges {state}");
 
@@ -141,6 +144,35 @@ public sealed class InstallsFacts
         Assert.Null(await os.Get<IInstalls>(Installs).Describe("week", Ct));
         Assert.Equal(["edges b/week/default", "schedules b/week/default", "unedges b/week/default", "unschedules b/week/default"], hooks.Calls);
         Assert.Contains(os.Journal(Installs.Brain).Signals(Installs), item => item.Signal is Retired { Alias: "week" });
+    }
+
+    [Fact]
+    public async Task AFailingHookStillRecordsAndPublishesGateChanged()
+    {
+        await using var os = Start(new RecordingHooks { FailEdges = true });
+        var outcome = await Answer(os, "week", approve: true);
+        Assert.Equal(InstallStatus.Installed, outcome.Status);
+        Assert.Equal("hooks failed: edges down", outcome.Reason);
+        Assert.NotNull(await os.Get<IInstalls>(Installs).Describe("week", Ct));
+        await os.Idle();
+        Assert.Single(os.InstalledGates.GatesFor(Installs.Brain, typeof(Charging)));
+    }
+
+    [Fact]
+    public async Task UnchangedPublishesGateChanged()
+    {
+        await using var os = Start(new RecordingHooks());
+        await Answer(os, "week", approve: true);
+        await os.Idle();
+        var heard = new ConcurrentQueue<GateChanged>();
+        await using var listen = await os.ClusterListeners.Listen<GateChanged>("fact", (_, signal, _) =>
+        {
+            heard.Enqueue(signal);
+            return Task.CompletedTask;
+        });
+        Assert.Equal(InstallStatus.Unchanged, (await os.Get<IInstalls>(Installs).Install(new InstallRequest("week", None), Ct)).Status);
+        await os.Idle();
+        Assert.Equal([new GateChanged("b")], heard);
     }
 
     [Fact]

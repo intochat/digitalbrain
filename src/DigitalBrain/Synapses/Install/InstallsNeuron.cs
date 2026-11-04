@@ -35,8 +35,8 @@ public sealed class InstallsNeuron(SynapseCatalog catalog, IInstallHooks hooks) 
         var existing = Find(alias);
         if (existing is not null && existing.NeedsHash == hash)
         {
-            await Wire(alias, needs, ct).ConfigureAwait(true);
-            return new InstallOutcome(InstallStatus.Unchanged, sentence, null);
+            await GateChanged().ConfigureAwait(true);
+            return new InstallOutcome(InstallStatus.Unchanged, sentence, await Wire(alias, needs, ct).ConfigureAwait(true));
         }
 
         var plan = new ConfirmationPlan($"install:{alias}:{Guid.NewGuid():N}", ConfirmationAction.Other, Destructive: false, Title: alias, Body: sentence,
@@ -50,21 +50,29 @@ public sealed class InstallsNeuron(SynapseCatalog catalog, IInstallHooks hooks) 
         var record = new InstallRecord(alias, hash, new Dictionary<string, string>(bindings, StringComparer.Ordinal),
             [.. needs.Schedules.Select(s => s.Text)], Context.Time.GetUtcNow());
         await Save(new InstallsState([.. State.Records.Where(r => r.Alias != alias), record]), [new Installed(alias, hash)]).ConfigureAwait(true);
-        await Wire(alias, needs, ct).ConfigureAwait(true);
-        await PublishEphemeral(new GateChanged(Id.Brain.Value!)).ConfigureAwait(true);
-        return new InstallOutcome(existing is null ? InstallStatus.Installed : InstallStatus.Updated, sentence, null);
+        await GateChanged().ConfigureAwait(true);
+        var failed = await Wire(alias, needs, ct).ConfigureAwait(true);
+        return new InstallOutcome(existing is null ? InstallStatus.Installed : InstallStatus.Updated, sentence, failed);
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// The record is removed and <see cref="DigitalBrain.GateChanged"/> published first; a failing hook is then swallowed, since
+    /// <see cref="IInstalls.Retire"/> reports nothing, and leaves edges or schedules the host must tolerate (they reach a retired app).
+    /// </remarks>
     public async Task Retire(string alias, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(hooks);
         if (Find(alias) is null) { return; }
-        var state = StateOf(alias);
-        await hooks.RemoveReactionEdges(state, ct).ConfigureAwait(true);
-        await hooks.UnregisterSchedules(state, ct).ConfigureAwait(true);
         await Save(new InstallsState([.. State.Records.Where(r => r.Alias != alias)]), [new Retired(alias)]).ConfigureAwait(true);
-        await PublishEphemeral(new GateChanged(Id.Brain.Value!)).ConfigureAwait(true);
+        await GateChanged().ConfigureAwait(true);
+        var state = StateOf(alias);
+        try
+        {
+            await hooks.RemoveReactionEdges(state, ct).ConfigureAwait(true);
+            await hooks.UnregisterSchedules(state, ct).ConfigureAwait(true);
+        }
+        catch (Exception error) when (error is not OutOfMemoryException) { _ = error; }
     }
 
     /// <inheritdoc />
@@ -77,12 +85,20 @@ public sealed class InstallsNeuron(SynapseCatalog catalog, IInstallHooks hooks) 
 
     private NeuronId StateOf(string alias) => new(Id.Brain, alias, "default");
 
-    private async Task Wire(string alias, SynapseNeeds needs, CancellationToken ct)
+    private Task GateChanged() => PublishEphemeral(new GateChanged(Id.Brain.Value!));
+
+    // Runs the hooks; a failure leaves the record standing and comes back as the outcome's reason. The next Install of the alias retries.
+    private async Task<string?> Wire(string alias, SynapseNeeds needs, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(hooks);
         var state = StateOf(alias);
         var signals = catalog.For(alias).Where(d => d.Kind == SynapseKind.Reaction).Select(d => d.Signal!).Distinct().ToList();
-        await hooks.EnsureReactionEdges(state, signals, ct).ConfigureAwait(true);
-        await hooks.RegisterSchedules(state, needs.Schedules, ct).ConfigureAwait(true);
+        try
+        {
+            await hooks.EnsureReactionEdges(state, signals, ct).ConfigureAwait(true);
+            await hooks.RegisterSchedules(state, needs.Schedules, ct).ConfigureAwait(true);
+            return null;
+        }
+        catch (Exception error) when (error is not OutOfMemoryException) { return $"hooks failed: {error.Message}"; }
     }
 }

@@ -29,7 +29,7 @@ public sealed record InstallRequest(string Alias, IReadOnlyDictionary<string, st
 /// <summary>The result of <see cref="IInstalls.Install"/>.</summary>
 /// <param name="Status">How it ended.</param>
 /// <param name="Sentence">The needs sentence; empty when the alias is unknown.</param>
-/// <param name="Reason">Why it was refused or denied; null otherwise.</param>
+/// <param name="Reason">Why it was refused or denied, or <c>hooks failed: ...</c> when recorded but the host hooks failed; null otherwise.</param>
 public sealed record InstallOutcome(InstallStatus Status, string Sentence, string? Reason);
 
 /// <summary>An installed synapse app, as the person approved it.</summary>
@@ -63,9 +63,11 @@ public interface IInstalls
     /// <summary>The record of <paramref name="alias"/>, or null when it is not installed.</summary>
     /// <param name="alias">The state alias.</param>
     /// <param name="ct">Cancellation.</param>
+    [ReadOnlyCall]
     Task<InstallRecord?> Describe(string alias, CancellationToken ct);
 
     /// <summary>Every installed app.</summary>
     /// <param name="ct">Cancellation.</param>
+    [ReadOnlyCall]
     Task<IReadOnlyList<InstallRecord>> List(CancellationToken ct);
 }
