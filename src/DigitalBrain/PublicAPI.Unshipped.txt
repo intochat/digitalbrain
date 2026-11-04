@@ -2452,3 +2452,12 @@ override DigitalBrain.LoadedSource.GetHashCode() -> int
 override DigitalBrain.LoadedSource.ToString() -> string!
 static DigitalBrain.LoadedSource.operator !=(DigitalBrain.LoadedSource? left, DigitalBrain.LoadedSource? right) -> bool
 static DigitalBrain.LoadedSource.operator ==(DigitalBrain.LoadedSource? left, DigitalBrain.LoadedSource? right) -> bool
+DigitalBrain.NoSynapseRestorer
+DigitalBrain.NoSynapseRestorer.NoSynapseRestorer() -> void
+DigitalBrain.NoSynapseRestorer.TryRestore(DigitalBrain.BrainId brain, string! alias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Spi.ISynapseRegistrar
+DigitalBrain.Spi.ISynapseRegistrar.Activate(DigitalBrain.BrainId brain, DigitalBrain.LoadedSource! source, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Spi.ISynapseRegistrar.Deactivate(DigitalBrain.BrainId brain, string! sourceKey, System.Collections.Generic.IReadOnlyList<string!>! aliases, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Spi.ISynapseRestorer
+DigitalBrain.Spi.ISynapseRestorer.TryRestore(DigitalBrain.BrainId brain, string! alias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<bool>!
+static DigitalBrain.NoSynapseRestorer.Instance.get -> DigitalBrain.NoSynapseRestorer!

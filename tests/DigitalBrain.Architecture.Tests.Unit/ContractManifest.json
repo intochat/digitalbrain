@@ -46,6 +46,7 @@
       "neuron.synapse-host",
       "post",
       "post-interleaved",
+      "reload",
       "remove-brain-wide",
       "sealed-secret",
       "signal.subscriber",

@@ -41,7 +41,11 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
     {
         _key = this.GetPrimaryKeyString();
         if (!NeuronId.TryParse(_key, out var id)) { throw new BindingException($"'{_key}' is not a neuron id brain/type/key."); }
-        if (!types.TryGetRegistration(id.Type, out var registration)) { throw new BindingException($"No neuron class is hosted for type '{id.Type}'."); }
+        if (!types.TryGetRegistration(id.Type, out var registration)
+            && !(await Restore(id, cancellationToken).ConfigureAwait(true) && types.TryGetRegistration(id.Type, out registration)))
+        {
+            throw new BindingException($"No neuron class is hosted for type '{id.Type}'.");
+        }
         var neuronClass = registration.Class;
         var expected = NeuronTypeRegistry.GrainTypeOf(registration.Policy);
         if (expected != GrainTypeName) { throw new BindingException($"{neuronClass.FullName} is hosted by {expected}, not {GrainTypeName}."); }
@@ -58,6 +62,17 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
         // Load persisted synapse subscription state and catch up any sources on activation (04 D-12).
         await synapses.Load().ConfigureAwait(true);
         await synapses.CatchUp().ConfigureAwait(true);
+    }
+
+    // On a registration miss the host's ISynapseRestorer (none restores by default) may restore the alias once.
+    private Task<bool> Restore(NeuronId id, CancellationToken cancellationToken)
+        => (ServiceProvider.GetService<ISynapseRestorer>() ?? NoSynapseRestorer.Instance).TryRestore(id.Brain, id.Type, cancellationToken);
+
+    /// <inheritdoc />
+    public Task Reload()
+    {
+        this.DeactivateOnIdle();
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc />

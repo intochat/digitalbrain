@@ -881,3 +881,4 @@ override DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.GetHashCode() -> int
 override DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.ToString() -> string!
 static DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.operator !=(DigitalBrain.Runtime.Orleans.Synapses.GateVerdict? left, DigitalBrain.Runtime.Orleans.Synapses.GateVerdict? right) -> bool
 static DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.operator ==(DigitalBrain.Runtime.Orleans.Synapses.GateVerdict? left, DigitalBrain.Runtime.Orleans.Synapses.GateVerdict? right) -> bool
+DigitalBrain.Runtime.Orleans.Hosting.INeuronHost.Reload() -> System.Threading.Tasks.Task!

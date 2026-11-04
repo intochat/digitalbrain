@@ -55,6 +55,8 @@ public static class RuntimeSiloBuilderExtensions
         silo.Services.TryAddSingleton<DigitalBrain.Spi.IGateIndex>(sp => sp.GetRequiredService<InstalledGateIndex>());
         silo.Services.TryAddSingleton<InstalledGates>();
         silo.Services.TryAddSingleton<DigitalBrain.Spi.IInstallHooks, OrleansInstallHooks>();
+        silo.Services.TryAddSingleton<DigitalBrain.Spi.ISynapseRegistrar, OrleansSynapseRegistrar>();
+        silo.Services.TryAddSingleton<DigitalBrain.Spi.ISynapseRestorer>(NoSynapseRestorer.Instance);
         silo.Services.AddJournalPayloads(modules);
         silo.Services.AddSignalPublisher();
         silo.Services.TryAddSingleton<DigitalBrain.Spi.ISlotResolver, BrokerSlotResolver>();

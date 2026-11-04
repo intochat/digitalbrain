@@ -77,6 +77,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         Confirmations = new TestConfirmations(Clock);
         Listeners = new TestClusterListeners(this);
         Gates = new InstalledGateIndex(Source);
+        Registrar = new TestSynapseRegistrar(this);
         Register<InstallsNeuron>();
         Register<TimeNeuron>();
         _ = Listeners.Listen<GateChanged>("testos.installed-gates", RefreshGates);
@@ -96,6 +97,12 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     /// <see cref="IInstalls"/> neuron records, refreshed on every <see cref="GateChanged"/>. A brain with no install has no gates.
     /// </summary>
     public InstalledGateIndex Gates { get; }
+
+    /// <summary>
+    /// Makes a loaded synapse source live on this TestOS, or removes it: <see cref="Source"/>, the state neuron classes and the hosts of a
+    /// replaced alias. TestOS journals typed signal objects, so a generated <c>[Signal]</c> needs no registration.
+    /// </summary>
+    public ISynapseRegistrar Registrar { get; }
 
     /// <summary>Host-level listeners on the signals of every brain of this TestOS (04-19); they survive <see cref="Restart"/>.</summary>
     public DigitalBrain.Spi.IClusterListeners ClusterListeners => Listeners;
@@ -355,7 +362,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     internal TestNeuronHost Host(NeuronId id)
     {
         if (_hosts.TryGetValue(id, out var host)) { return host; }
-        if (!_types.TryGetValue(id.Type, out var type))
+        if (!_types.TryGetValue(id.Type, out var type) && !(Restore(id) && _types.TryGetValue(id.Type, out type)))
         {
             throw new InvalidOperationException($"No neuron class is registered for type '{id.Type}'. Call Register<TNeuron>() first.");
         }
@@ -363,6 +370,24 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         var added = _hosts.GetOrAdd(id, created);
         if (!ReferenceEquals(added, created)) { created.Dispose(); }
         return added;
+    }
+
+    // On a miss, the ISynapseRestorer of TestOSOptions.Services (none by default) may restore the alias once.
+    private bool Restore(NeuronId id)
+        => Options.Services?.GetService(typeof(ISynapseRestorer)) is ISynapseRestorer restorer
+            && restorer.TryRestore(id.Brain, id.Type, CancellationToken.None).GetAwaiter().GetResult();
+
+    // Hosts alias as the state neuron of record from now on.
+    internal void ReplaceStateType(string alias, Type record) => _types[alias] = typeof(StateNeuron<>).MakeGenericType(record);
+
+    // Ends and forgets every host of alias, so the next call constructs the class registered then; state and synapses survive.
+    internal async Task DropHosts(string alias)
+    {
+        foreach (var host in _hosts.Values.Where(host => host.Id.Type == alias).ToList())
+        {
+            await Track(host.Deactivate(DeactivationCause.Requested)).ConfigureAwait(false);
+            if (_hosts.TryRemove(new KeyValuePair<NeuronId, TestNeuronHost>(host.Id, host))) { host.Dispose(); }
+        }
     }
 
     private async Task RefreshGates(NeuronId publisher, GateChanged changed, CancellationToken ct)

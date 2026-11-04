@@ -2,7 +2,10 @@
   <ItemGroup>
     <ProjectReference Include="../../src/DigitalBrain.Runtime.Orleans/DigitalBrain.Runtime.Orleans.csproj" />
     <ProjectReference Include="../../src/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+    <ProjectReference Include="../../src/DigitalBrain.Runtime.Synapses/DigitalBrain.Runtime.Synapses.csproj" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
+    <!-- Orleans brings Microsoft.CodeAnalysis.Common 5.0.0; the synapse compiler's CSharp must match it in one process. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.0.0" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="../DigitalBrain.Framework.Tests.E2E/WeeklyCap/Budget.cs" Link="Synapses/WeeklyCap/Budget.cs" />

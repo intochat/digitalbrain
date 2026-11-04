@@ -700,3 +700,4 @@ DigitalBrain.Testing.RecordingSynapses.RemoveBrainWide() -> System.Threading.Tas
 DigitalBrain.Testing.TestOS.Without<TCapability>(string! name) -> DigitalBrain.Testing.TestOS!
 DigitalBrain.Testing.TestOS.Source.get -> DigitalBrain.SynapseCatalogSource!
 DigitalBrain.Testing.TestOS.Unregister(string! alias) -> DigitalBrain.Testing.TestOS!
+DigitalBrain.Testing.TestOS.Registrar.get -> DigitalBrain.Spi.ISynapseRegistrar!
