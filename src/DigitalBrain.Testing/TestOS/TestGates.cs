@@ -47,14 +47,14 @@ internal static class TestGates
         }
     }
 
-    // A gate that does not answer within CallTimeout, or fails, refuses; its call is cancelled and its state is not touched.
+    // A gate that does not answer within GateTimeout, or fails, refuses; its call is cancelled and its state is not touched.
     private static async Task<Check> Ask(TestOS os, TestNeuronHost host, Signal signal, SynapseDescriptor descriptor, CancellationToken ct)
     {
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var turn = os.Track(host.Turn(interleave: false, neuron => ((ISynapseReceiver)neuron).Gate(signal, cancel.Token)));
         try
         {
-            return await turn.WaitAsync(os.Options.CallTimeout, os.Clock, ct).ConfigureAwait(false);
+            return await turn.WaitAsync(os.Options.GateTimeout, os.Clock, ct).ConfigureAwait(false);
         }
         catch (Exception error) when (error is not OutOfMemoryException)
         {

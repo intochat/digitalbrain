@@ -689,3 +689,5 @@ static DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.operator 
 static DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.operator ==(DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject? left, DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject? right) -> bool
 DigitalBrain.Testing.TestOS.Catalog.get -> DigitalBrain.SynapseCatalog!
 DigitalBrain.Testing.TestOS.Gates.get -> DigitalBrain.Spi.IGateIndex!
+DigitalBrain.Testing.TestOSOptions.GateTimeout.get -> System.TimeSpan
+DigitalBrain.Testing.TestOSOptions.GateTimeout.set -> void

@@ -26,6 +26,15 @@ public sealed class TestOSOptions
     /// <summary>How long an awaited call waits on the TestOS clock before it fails with <see cref="TimeoutException"/>. Default 30 seconds.</summary>
     public TimeSpan CallTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
+    /// <summary>How long a gate synapse may take before the publish fails closed; default half of <see cref="CallTimeout"/>.</summary>
+    public TimeSpan GateTimeout
+    {
+        get => _gateTimeout ?? CallTimeout / 2;
+        set => _gateTimeout = value;
+    }
+
+    private TimeSpan? _gateTimeout;
+
     /// <summary>The clock's start, or 2026-01-01 UTC.</summary>
     public DateTimeOffset? Start { get; set; }
 

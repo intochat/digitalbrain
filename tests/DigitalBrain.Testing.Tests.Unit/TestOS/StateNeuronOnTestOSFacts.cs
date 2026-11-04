@@ -57,12 +57,12 @@ public static class Stuck
 {
     private static readonly TaskCompletionSource Never = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    public static TaskCompletionSource Cancelled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public static TaskCompletionSource Waiting { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     [Synapse(typeof(Stalling), "hold")]
     public static async Task<Check> Wait(Stalling s, Hold state, CancellationToken ct)
     {
-        using var heard = ct.Register(() => Cancelled.TrySetResult());
+        Waiting.TrySetResult();
         await Never.Task.WaitAsync(ct);
         return Check.Allow(state with { Seen = state.Seen + 1 });
     }
@@ -73,25 +73,14 @@ public interface IPayments
     Task Charge(decimal amount);
 
     Task Stall();
-
-    Task<string?> LastRefusal();
 }
 
 [Neuron("payments")]
 public sealed class Payments : Neuron<PayState>, IPayments
 {
-    private string? _refusal;
-
     public Task Charge(decimal amount) => Save(State with { Count = State.Count + 1 }, new Charging(amount));
 
-    // The caller's own call times out at the same instant as the gate, so the refusal is kept for a second call to read.
-    public async Task Stall()
-    {
-        try { await Save(State with { Count = State.Count + 1 }, new Stalling()); }
-        catch (RuleViolationException error) { _refusal = error.Rejected.Messages[0]; }
-    }
-
-    public Task<string?> LastRefusal() => Task.FromResult(_refusal);
+    public Task Stall() => Save(State with { Count = State.Count + 1 }, new Stalling());
 }
 
 public sealed class StateNeuronOnTestOSFacts
@@ -150,16 +139,17 @@ public sealed class StateNeuronOnTestOSFacts
         var pay = os.Get<IPayments>(Pay);
 
         var call = pay.Stall();
-        // The gate's wait starts a moment after the call's: advance until the TestOS has given up on the gate.
-        for (var tries = 0; tries < 200 && !Stuck.Cancelled.Task.IsCompleted; tries++)
+        // The gate's wait starts a moment after the call: wait for it, then move past GateTimeout (still short of CallTimeout).
+        for (var tries = 0; tries < 200 && !Stuck.Waiting.Task.IsCompleted; tries++)
         {
-            os.Clock.Advance(os.Options.CallTimeout);
             await Task.Delay(10, TestContext.Current.CancellationToken);
         }
-        await Assert.ThrowsAsync<TimeoutException>(() => call);
+        os.Clock.Advance(os.Options.GateTimeout + TimeSpan.FromSeconds(1));
+
+        var e = await Assert.ThrowsAsync<RuleViolationException>(() => call);
         await os.Idle();
 
-        Assert.Equal("the gate did not answer", await pay.LastRefusal());
+        Assert.Equal("the gate did not answer", e.Rejected.Messages[0]);
         Assert.Empty(os.Journal(Pay.Brain).Signals(Pay));
         Assert.Empty(os.Journal(Pay.Brain).Signals(NeuronId.Parse("b/hold/default")));
     }
