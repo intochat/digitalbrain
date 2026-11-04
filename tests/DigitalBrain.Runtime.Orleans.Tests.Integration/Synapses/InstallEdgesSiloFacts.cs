@@ -1,9 +1,11 @@
 using DigitalBrain.Rules;
 using DigitalBrain.Runtime.Orleans.Hosting;
+using DigitalBrain.Runtime.Orleans.Synapses;
 using DigitalBrain.Runtime.Orleans.Tests.Integration.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
+using Orleans.Storage;
 
 namespace DigitalBrain.Runtime.Orleans.Tests.Integration.Synapses;
 
@@ -32,6 +34,32 @@ public sealed class InstallEdgesSiloFacts(StatefulSilo silo) : IClassFixture<Sta
 
         Assert.Equal(12m, await Spent(books));
         Assert.Equal(2, (await silo.History("iea").Read(books, 0, 10, Ct)).Signals.Count(s => s.Signal is StateChanged));
+    }
+
+    [Fact]
+    public async Task AnInstallReplacesPerSourceEdgesWithTheBrainWideOne()
+    {
+        var books = NeuronId.Parse("iee/sb.ledger/default");
+        var grain = GrainId.Create(NeuronTypeRegistry.AffineGrainType, books.ToString());
+        // Plan-1 data: a per-source entry on the state neuron, written before it ever activates.
+        var store = silo.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage);
+        await store.WriteStateAsync(SynapseState.Name, grain, new DigitalBrain.Runtime.Orleans.Tests.Integration.Storage.TestGrainState<SynapseState>
+        {
+            State = new SynapseState { Sources = [new SynapseSource { Source = "iee/sb.payments/one", Aliases = ["test.sb.charging"], Cursor = 0 }] },
+        });
+
+        await StateNeuronSiloFacts.Install(silo.Services, "iee", "sb.ledger");
+        await silo.Get<ISbPayments>("iee/sb.payments/one").Charge(5m);
+        await silo.Get<ISbPayments>("iee/sb.payments/two").Charge(7m);
+        await StateNeuronSiloFacts.Until(async () => await Spent(books) >= 12m, Ct);
+        await Task.Delay(500, Ct);
+
+        Assert.Equal(12m, await Spent(books));
+        Assert.Equal(2, (await silo.History("iee").Read(books, 0, 10, Ct)).Signals.Count(s => s.Signal is StateChanged));
+        var record = await (await silo.Services.GetRequiredService<BrainLogs>().For("iee")).Read("neuron.host/" + books, SynapseState.Name);
+        Assert.NotNull(record);
+        var entry = Assert.Single(JournalPayloads.DecodeState<SynapseState>(record.Record)!.Sources);
+        Assert.Equal("*", entry.Source);
     }
 
     [Fact]

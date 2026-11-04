@@ -416,7 +416,17 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
         }
         var added = aliases.Where(alias => !entry.Aliases.Contains(alias, StringComparer.Ordinal)).ToArray();
         entry.Aliases.AddRange(added);
-        if (created || added.Length > 0) { await Persist().ConfigureAwait(true); }
+        var trimmed = false;
+        // A state neuron's per-source entries (plan 1) of aliases the brain-wide entry now covers would deliver them twice: they go.
+        if (typeof(ISynapseReceiver).IsAssignableFrom(_registration.Class))
+        {
+            foreach (var source in _state.Sources.Where(item => item.Source != BrainWide))
+            {
+                trimmed |= source.Aliases.RemoveAll(alias => entry.Aliases.Contains(alias, StringComparer.Ordinal)) > 0;
+            }
+            _ = _state.Sources.RemoveAll(item => item.Source != BrainWide && item.Aliases.Count == 0);
+        }
+        if (created || added.Length > 0 || trimmed) { await Persist().ConfigureAwait(true); }
         foreach (var ns in aliases.Select(StreamNames.SignalNamespace).Distinct(StringComparer.Ordinal))
         {
             await Subscribe(StreamNames.ForNamespace(_id.Brain.Value, ns)).ConfigureAwait(true);

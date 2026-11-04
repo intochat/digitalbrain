@@ -107,6 +107,15 @@ internal sealed class SynapseRegistry(TestOS os)
                 sources[key] = entry = new Entry(key, subscriber.Id) { BrainWide = true, Cursor = last, CursorAt = os.Clock.GetUtcNow() };
             }
             entry.Signals.UnionWith(signals);
+            // A state neuron's per-source edges (plan 1) of signals the brain-wide entry now covers would deliver them twice: they go.
+            if (typeof(ISynapseReceiver).IsAssignableFrom(subscriber.Class))
+            {
+                foreach (var source in sources.Values.Where(item => !item.BrainWide).ToList())
+                {
+                    source.Signals.ExceptWith(entry.Signals);
+                    if (source.Signals.Count == 0) { sources.Remove(source.Source); }
+                }
+            }
         }
         return Task.CompletedTask;
     }

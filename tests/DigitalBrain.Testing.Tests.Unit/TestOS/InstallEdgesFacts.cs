@@ -1,3 +1,4 @@
+using System.Reflection;
 using DigitalBrain.Rules;
 using DigitalBrain.Spi;
 using DigitalBrain.Testing.Tests.Unit.Synapses;
@@ -50,6 +51,34 @@ public sealed class InstallEdgesFacts
         var synapse = Assert.Single(os.SynapsesOf(Books));
         Assert.Equal(new Synapse(new NeuronId(Books.Brain, "*", "*"), typeof(Charging), Books), synapse);
         Assert.Contains(new ObservedSynapse("*", Books.ToString(), "test.synapse.charging"), await ((IBrainObserver)os).Synapses(Ct));
+        Assert.Empty(os.Failures);
+    }
+
+    // A plan-1 per-source edge on the state neuron, as the registry holds it; the TestOS keeps it internal, so it is reached by reflection.
+    private static async Task EnsurePerSource(OS os, NeuronId subscriber, NeuronId from, Type signal)
+    {
+        const BindingFlags Any = BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public;
+        var registry = typeof(OS).GetProperty("Synapses", Any)!.GetValue(os)!;
+        var host = typeof(OS).GetMethod("Host", Any, [typeof(NeuronId)])!.Invoke(os, [subscriber])!;
+        var ensure = registry.GetType().GetMethods(Any).Single(m => m.Name == "Ensure" && m.GetParameters().Length == 3);
+        await (Task)ensure.Invoke(registry, [host, from, new[] { signal }])!;
+    }
+
+    [Fact]
+    public async Task AnInstallReplacesPerSourceEdgesWithTheBrainWideOne()
+    {
+        await using var os = Start();
+        await EnsurePerSource(os, Books, One, typeof(Charging));
+        Assert.Single(os.SynapsesOf(Books));
+
+        await Install(os, "ledger");
+        await os.Get<IPayments>(One).Charge(5m);
+        await os.Idle();
+
+        Assert.Equal(5m, await Spent(os));
+        Assert.Single(os.Journal(Books.Brain).Signals(Books), s => s.Signal is StateChanged);
+        var synapse = Assert.Single(os.SynapsesOf(Books));
+        Assert.Equal(new NeuronId(Books.Brain, "*", "*"), synapse.From);
         Assert.Empty(os.Failures);
     }
 
