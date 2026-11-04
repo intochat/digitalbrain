@@ -54,7 +54,7 @@ internal sealed class HostNeuronState(NeuronId id, GrainId grainId, NeuronRegist
         }
         _etag = state.ETag;
         await Announce(last, signals).ConfigureAwait(true);
-        await GateRunner.Commit(services, allowed).ConfigureAwait(true);
+        await GateRunner.Commit(services, id, allowed).ConfigureAwait(true);
     }
 
     public async Task Clear()
@@ -98,7 +98,7 @@ internal sealed class HostNeuronState(NeuronId id, GrainId grainId, NeuronRegist
             throw;
         }
         await Announce(last, signals).ConfigureAwait(true);
-        await GateRunner.Commit(services, allowed).ConfigureAwait(true);
+        await GateRunner.Commit(services, id, allowed).ConfigureAwait(true);
     }
 
     private async Task AnnounceEphemeral(Signal signal)

@@ -27,6 +27,9 @@ internal sealed class HostNeuronContext : INeuronContext, IHostNeuronContext
 {
     internal const string CallerKey = "db.caller";
 
+    // The publishers currently awaiting their gates or Commit along this call chain (comma-separated neuron ids), set by GateRunner.
+    internal const string GateChainKey = "db.gate-chain";
+
     private readonly IServiceProvider _services;
     private readonly IGrainFactory _grains;
     private readonly NeuronTypeRegistry _types;

@@ -26,6 +26,13 @@ namespace DigitalBrain.Runtime.Orleans.Synapses;
 /// is still in its turn awaiting <see cref="Commit"/>, so a gate on it that resolved to that publisher would deadlock. Reaction synapses
 /// on <see cref="StateChanged"/> are still ensured.
 /// </para>
+/// <para>
+/// No call of the gate path can stall a publisher: <see cref="Commit"/> and each reaction-edge ensure are bounded by
+/// <see cref="RuntimeOptions.GateTimeout"/> (logged and skipped on timeout), and no edge is ensured on a subscriber that is itself a
+/// publisher awaiting its gates or <see cref="Commit"/> along the current call chain (tracked in <see cref="RequestContext"/> under
+/// <c>HostNeuronContext.GateChainKey</c>): that subscriber's turn is blocked on this very chain, so the ensure would deadlock.
+/// Such an edge is ensured on a later publish.
+/// </para>
 /// </summary>
 internal static partial class GateRunner
 {
@@ -51,9 +58,11 @@ internal static partial class GateRunner
         var payloads = services.GetRequiredService<JournalPayloads>();
         var grains = services.GetRequiredService<IGrainFactory>();
         var types = services.GetRequiredService<NeuronTypeRegistry>();
-        await EnsureReactions(catalog, payloads, grains, types, publisher, durable, ensured).ConfigureAwait(true);
         var timeout = RuntimeOptions.From(services).GateTimeout;
+        var log = services.GetService<ILoggerFactory>()?.CreateLogger(typeof(GateRunner)) ?? NullLogger.Instance;
+        await EnsureReactions(catalog, payloads, grains, types, publisher, durable, ensured, timeout, log).ConfigureAwait(true);
         var allowed = new List<(INeuronHost Gate, Signal Signal, JsonElement Next)>();
+        var chain = EnterChain(publisher);
         try
         {
             foreach (var signal in gated)
@@ -80,6 +89,7 @@ internal static partial class GateRunner
             await Abort(services, allowed).ConfigureAwait(true);
             throw;
         }
+        finally { LeaveChain(chain); }
         return allowed;
     }
 
@@ -116,27 +126,55 @@ internal static partial class GateRunner
     /// publisher's entry and the gates' entries are not one transaction: a failing <c>Committed</c> is logged, never thrown to the publisher.
     /// </summary>
     /// <param name="services">The silo services.</param>
+    /// <param name="publisher">The publishing neuron, blocked on this call until every gate answered or timed out.</param>
     /// <param name="allowed">What <see cref="Run"/> returned.</param>
     /// <returns>A task that completes when every gate was asked.</returns>
-    public static async Task Commit(IServiceProvider services, IReadOnlyList<(INeuronHost Gate, Signal Signal, JsonElement Next)> allowed)
+    public static async Task Commit(IServiceProvider services, NeuronId publisher, IReadOnlyList<(INeuronHost Gate, Signal Signal, JsonElement Next)> allowed)
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(allowed);
         if (allowed.Count == 0) { return; }
         var payloads = services.GetRequiredService<JournalPayloads>();
         var log = services.GetService<ILoggerFactory>()?.CreateLogger(typeof(GateRunner)) ?? NullLogger.Instance;
-        foreach (var (gate, signal, next) in allowed)
+        var timeout = RuntimeOptions.From(services).GateTimeout;
+        var chain = EnterChain(publisher);
+        try
         {
-            try
+            foreach (var (gate, signal, next) in allowed)
             {
-                var (alias, json) = Encode(payloads, signal);
-                await gate.Committed(alias, json, next).ConfigureAwait(true);
-            }
-            catch (Exception error) when (error is not OutOfMemoryException)
-            {
-                LogGateCommitFailed(log, error, gate.GetPrimaryKeyString(), signal.GetType().Name);
+                try
+                {
+                    var (alias, json) = Encode(payloads, signal);
+                    // Bounded: a gate whose save stalls must not hold the publisher's turn; a timeout is logged like a failure.
+                    await gate.Committed(alias, json, next).WaitAsync(timeout).ConfigureAwait(true);
+                }
+                catch (Exception error) when (error is not OutOfMemoryException)
+                {
+                    LogGateCommitFailed(log, error, gate.GetPrimaryKeyString(), signal.GetType().Name);
+                }
             }
         }
+        finally { LeaveChain(chain); }
+    }
+
+    // The publishers along the current call chain that are blocked in Run or Commit.
+    private static string[] Chain()
+        => RequestContext.Get(HostNeuronContext.GateChainKey) is string chain ? chain.Split(',', StringSplitOptions.RemoveEmptyEntries) : [];
+
+    // Adds the publisher to the chain for the calls it makes while blocked; returns the previous value to restore.
+    private static object? EnterChain(NeuronId publisher)
+    {
+        var previous = RequestContext.Get(HostNeuronContext.GateChainKey);
+        var id = publisher.ToString();
+        var current = Chain();
+        if (!current.Contains(id, StringComparer.Ordinal)) { RequestContext.Set(HostNeuronContext.GateChainKey, string.Join(',', [.. current, id])); }
+        return previous;
+    }
+
+    private static void LeaveChain(object? previous)
+    {
+        if (previous is null) { RequestContext.Remove(HostNeuronContext.GateChainKey); }
+        else { RequestContext.Set(HostNeuronContext.GateChainKey, previous); }
     }
 
     // A gate that does not answer within the timeout, or fails, refuses; its call is cancelled and its state is not touched.
@@ -155,15 +193,17 @@ internal static partial class GateRunner
 
     // The interim reaction-edge rule (see the type summary): each (subscriber, signal) is ensured once per publisher activation.
     private static async Task EnsureReactions(SynapseCatalog catalog, JournalPayloads payloads, IGrainFactory grains, NeuronTypeRegistry types,
-        NeuronId publisher, Signal[] signals, ISet<string> ensured)
+        NeuronId publisher, Signal[] signals, ISet<string> ensured, TimeSpan timeout, ILogger log)
     {
+        // A subscriber blocked further up this call chain cannot take the ensure call; its edge waits for a later publish.
+        var blocked = Chain();
         foreach (var signal in signals)
         {
             if (!payloads.Types.TryAliasOf(signal.GetType(), out var alias)) { continue; }
             var subscribers = catalog.Synapses
                 .Where(d => d.Kind == SynapseKind.Reaction && d.Signal!.IsInstanceOfType(signal))
                 .Select(d => new NeuronId(publisher.Brain, d.StateAlias, d.Key))
-                .Where(subscriber => subscriber != publisher)
+                .Where(subscriber => subscriber != publisher && !blocked.Contains(subscriber.ToString(), StringComparer.Ordinal))
                 .Distinct();
             foreach (var subscriber in subscribers)
             {
@@ -172,7 +212,13 @@ internal static partial class GateRunner
                 var host = grains.GetGrain<ISynapseHost>(GrainId.Create(NeuronTypeRegistry.GrainTypeOf(types.Require(subscriber.Type).Policy), subscriber.ToString()));
                 var previous = RequestContext.Get(HostNeuronContext.CallerKey);
                 RequestContext.Set(HostNeuronContext.CallerKey, publisher.ToString());
-                try { await host.EnsureFrom(publisher, [alias]).ConfigureAwait(true); }
+                try { await host.EnsureFrom(publisher, [alias]).WaitAsync(timeout).ConfigureAwait(true); }
+                catch (TimeoutException)
+                {
+                    // Bounded like a gate: log, forget the edge so a later publish ensures it again, and go on with the publish.
+                    ensured.Remove(edge);
+                    LogReactionEnsureTimedOut(log, subscriber.ToString(), alias);
+                }
                 catch
                 {
                     ensured.Remove(edge);
@@ -203,4 +249,8 @@ internal static partial class GateRunner
     [LoggerMessage(EventId = 4125, EventName = "GateAbortFailed", Level = LogLevel.Warning,
         Message = "The gate {Gate} could not drop its provisional state for {Signal}; its lease discards it.")]
     private static partial void LogGateAbortFailed(ILogger logger, Exception error, string gate, string signal);
+
+    [LoggerMessage(EventId = 4126, EventName = "ReactionEnsureTimedOut", Level = LogLevel.Warning,
+        Message = "The reaction edge to {Subscriber} for {Signal} was not ensured within the gate timeout; a later publish ensures it.")]
+    private static partial void LogReactionEnsureTimedOut(ILogger logger, string subscriber, string signal);
 }

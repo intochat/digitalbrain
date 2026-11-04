@@ -87,9 +87,44 @@ public static class SbCapping
         state.Spent + s.Amount > 100m ? Check.Reject("cap of $100") : Check.Allow(state with { Spent = state.Spent + s.Amount });
 }
 
+[Signal("test.sb.relay")]
+public sealed record SbRelay(int N) : Signal;
+
+[Signal("test.sb.forwarded")]
+public sealed record SbForwarded(int N) : Signal;
+
+[State("sb.relay")]
+public sealed record SbRelayState(int Count)
+{
+    public SbRelayState() : this(0) { }
+}
+
+[State("sb.tally")]
+public sealed record SbTally(int Seen)
+{
+    public SbTally() : this(0) { }
+}
+
+// The relay is a state neuron that is itself a publisher: its reaction publishes SbForwarded, which the tally gates. The tally's
+// Committed saves StateChanged, and the relay reacts to StateChanged, so ensuring that edge would call the relay while it is
+// blocked in its own Commit.
+public static class SbRelaying
+{
+    [Synapse(typeof(SbRelay), "sb.relay")]
+    public static Reaction<SbRelayState> Forward(SbRelay s, SbRelayState state) => Reaction<SbRelayState>.Of(state with { Count = state.Count + 1 }, new SbForwarded(s.N));
+
+    [Synapse(typeof(StateChanged), "sb.relay")]
+    public static SbRelayState Hear(StateChanged s, SbRelayState state) => state;
+
+    [Synapse(typeof(SbForwarded), "sb.tally")]
+    public static Check Count(SbForwarded s, SbTally state) => Check.Allow(state with { Seen = state.Seen + 1 });
+}
+
 public interface ISbPayments
 {
     Task Charge(decimal amount);
+
+    Task Relay(int n);
 
     Task ChargeCapped(decimal amount);
 
@@ -102,6 +137,8 @@ public sealed class SbPayments : Neuron<SbPayState>, ISbPayments
     public Task Charge(decimal amount) => Save(State with { Count = State.Count + 1 }, new SbCharging(amount));
 
     public Task ChargeCapped(decimal amount) => Save(State with { Count = State.Count + 1 }, new SbCappedCharging(amount));
+
+    public Task Relay(int n) => Save(State with { Count = State.Count + 1 }, new SbRelay(n));
 
     public Task Stall() => Save(State with { Count = State.Count + 1 }, new SbStalling());
 }
@@ -169,6 +206,28 @@ public sealed class StateNeuronSiloFacts(StatefulSilo silo) : IClassFixture<Stat
 
         Assert.Equal(1, charges.Count(c => c.IsCompletedSuccessfully));
         Assert.Equal(60m, await SpentOf(silo.Services, NeuronId.Parse("sb/sb.cap/default")));
+    }
+
+    [Fact]
+    public async Task AStateNeuronThatPublishesThroughAGateCompletesWithoutStalling()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var tally = NeuronId.Parse("sb/sb.tally/default");
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+
+        await silo.Get<ISbPayments>("sb/sb.payments/relay").Relay(1);
+        await Until(async () => await SeenOf(tally) == 1, ct);
+
+        Assert.Equal(1, await SeenOf(tally));
+        Assert.True(clock.Elapsed < RuntimeOptions.Default.GateTimeout, $"took {clock.Elapsed}");
+        Assert.Single((await silo.History("sb").Read(NeuronId.Parse("sb/sb.relay/default"), 0, 10, ct)).Signals, s => s.Signal is SbForwarded);
+    }
+
+    private async Task<int> SeenOf(NeuronId id)
+    {
+        var host = silo.Services.GetRequiredService<IGrainFactory>().GetGrain<INeuronHost>(GrainId.Create(NeuronTypeRegistry.AffineGrainType, id.ToString()));
+        var state = await host.InspectState(TestContext.Current.CancellationToken);
+        return state is { } json && json.TryGetProperty("seen", out var seen) ? seen.GetInt32() : 0;
     }
 
     internal static async Task<decimal> SpentOf(IServiceProvider services, NeuronId id)
