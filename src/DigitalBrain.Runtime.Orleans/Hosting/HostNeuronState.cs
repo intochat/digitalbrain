@@ -14,6 +14,7 @@ namespace DigitalBrain.Runtime.Orleans.Hosting;
 /// </summary>
 internal sealed class HostNeuronState(NeuronId id, GrainId grainId, NeuronRegistration registration, IServiceProvider services) : INeuronState
 {
+    private readonly HashSet<string> _ensured = new(StringComparer.Ordinal);
     private string? _etag;
 
     private IGrainStorage Store => services.GetKeyedService<IGrainStorage>(RuntimeOptions.From(services).ClusterGrainStorage)
@@ -41,10 +42,13 @@ internal sealed class HostNeuronState(NeuronId id, GrainId grainId, NeuronRegist
             _etag = state.ETag;
             return;
         }
+        // Gates run first, as nested turns of the gate neurons; a refusal throws before anything is written.
+        var allowed = await GateRunner.Run(services, id, signals, _ensured, CancellationToken.None).ConfigureAwait(true);
         // A save inside a synapse reaction carries the subscriber's advanced cursor in the same entry (R4-09).
         var last = await journal.WriteStateAsync(registration.StateName, grainId, state, id.ToString(), signals, ReactionCursor.For(grainId)).ConfigureAwait(true);
         _etag = state.ETag;
         await Announce(last, signals).ConfigureAwait(true);
+        await GateRunner.Commit(services, allowed).ConfigureAwait(true);
     }
 
     public async Task Clear()
@@ -79,8 +83,10 @@ internal sealed class HostNeuronState(NeuronId id, GrainId grainId, NeuronRegist
         }
         if (Store is not BrainGrainStorage journal) { throw new InvalidOperationException($"{id} publishes, which needs BrainLog as the cluster store (BrainStorageRegistration)."); }
         IReadOnlyList<Signal> signals = [signal];
+        var allowed = await GateRunner.Run(services, id, signals, _ensured, CancellationToken.None).ConfigureAwait(true);
         var last = await journal.AppendSignalsAsync(registration.StateName, grainId, id.ToString(), signals, ReactionCursor.For(grainId)).ConfigureAwait(true);
         await Announce(last, signals).ConfigureAwait(true);
+        await GateRunner.Commit(services, allowed).ConfigureAwait(true);
     }
 
     private async Task AnnounceEphemeral(Signal signal)

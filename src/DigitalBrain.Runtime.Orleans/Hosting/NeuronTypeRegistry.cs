@@ -41,10 +41,25 @@ internal sealed class NeuronTypeRegistry
     private readonly Dictionary<string, NeuronRegistration> _types = new(StringComparer.Ordinal);
     private readonly Dictionary<Type, NeuronRegistration> _byContract = [];
 
+    /// <summary>
+    /// Registers the <c>[Neuron]</c> classes of <paramref name="assemblies"/> and, under each <c>[State]</c> alias of their
+    /// <see cref="SynapseCatalog"/>, the closed <see cref="StateNeuron{TState}"/> with <see cref="HostPolicy.Affine"/>.
+    /// </summary>
     /// <exception cref="InvalidOperationException">Two classes claim one type name, or a <c>[Neuron]</c> class is an app.</exception>
+    /// <exception cref="SynapseShapeException">A state alias is declared twice, or a synapse function has an unsupported shape.</exception>
     public NeuronTypeRegistry(IEnumerable<Assembly> assemblies)
-        : this((assemblies ?? throw new ArgumentNullException(nameof(assemblies))).Distinct().SelectMany(Loadable))
+        : this(Listed(assemblies).SelectMany(Loadable))
     {
+        Catalog = SynapseCatalog.Scan(Listed(assemblies));
+        foreach (var (alias, record) in Catalog.States)
+        {
+            var neuronClass = typeof(StateNeuron<>).MakeGenericType(record);
+            if (_types.TryGetValue(alias, out var other))
+            {
+                throw new InvalidOperationException($"Neuron type '{alias}' is claimed by {other.Class.FullName} and the [State] record {record.FullName}.");
+            }
+            _types[alias] = new NeuronRegistration(alias, neuronClass, DefaultStateName, HostPolicy.Affine, []);
+        }
     }
 
     /// <exception cref="InvalidOperationException">Two classes claim one type name, or a <c>[Neuron]</c> class is an app.</exception>
@@ -69,6 +84,9 @@ internal sealed class NeuronTypeRegistry
             foreach (var contract in registration.Contracts) { _byContract.TryAdd(contract, registration); }
         }
     }
+
+    /// <summary>The state records and synapse functions of the hosted assemblies; empty for a registry built from types.</summary>
+    public SynapseCatalog Catalog { get; } = SynapseCatalog.Scan();
 
     /// <summary>The hosted type names.</summary>
     public IReadOnlyCollection<string> Names => _types.Keys;
@@ -113,6 +131,9 @@ internal sealed class NeuronTypeRegistry
 
     private static Type[] ContractsOf(Type neuronClass)
         => [.. neuronClass.GetInterfaces().Where(face => face.Assembly != typeof(Neuron).Assembly && face.Assembly != typeof(object).Assembly)];
+
+    private static Assembly[] Listed(IEnumerable<Assembly> assemblies)
+        => [.. (assemblies ?? throw new ArgumentNullException(nameof(assemblies))).Distinct()];
 
     private static IEnumerable<Type> Loadable(Assembly assembly)
     {

@@ -20,6 +20,11 @@ internal interface ISynapseHost : IGrainWithStringKey
     /// <summary>Catches up every source of this subscriber from its cursor.</summary>
     [OrleansSdk.Concurrency.OneWay, Alias("catch-up")]
     Task CatchUp();
+
+    /// <summary>Ensures signals of <paramref name="signalAliases"/> from <paramref name="source"/> reach this subscriber, through admission on the source.</summary>
+    /// <exception cref="UnauthorizedAccessException">The caller is not <paramref name="source"/>, or the source refuses.</exception>
+    [Alias("ensure-from")]
+    Task EnsureFrom(NeuronId source, string[] signalAliases);
 }
 
 /// <summary><see cref="ISynapses"/> of a hosted neuron, over its activation's <see cref="SynapseEngine"/>.</summary>

@@ -68,6 +68,9 @@ public sealed record RuntimeOptions
     /// <summary>The configuration key that selects the master-key custody kind.</summary>
     public string CustodyConfigurationKey { get; init; } = "DigitalBrain:Platform:Storage:Custody";
 
+    /// <summary>How long a publisher waits for one gate neuron's verdict before the gate counts as refusing (fail closed).</summary>
+    public TimeSpan GateTimeout { get; init; } = TimeSpan.FromSeconds(15);
+
     /// <summary>Keys named after DigitalBrain, home <c>~/.digitalbrain</c>.</summary>
     public static RuntimeOptions Default { get; } = new();
 

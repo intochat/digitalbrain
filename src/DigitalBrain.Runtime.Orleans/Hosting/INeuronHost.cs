@@ -36,6 +36,16 @@ public interface INeuronHost : IGrainWithStringKey
     [Alias("stream")]
     IAsyncEnumerable<JsonElement> Stream(RuntimeInvocation call, CancellationToken cancellationToken = default);
 
+    /// <summary>Runs the gate synapses of the hosted state neuron for a signal, as a turn; saves nothing on allow.</summary>
+    /// <exception cref="InvalidOperationException">The hosted neuron is not a state neuron.</exception>
+    [Alias("gate")]
+    Task<Synapses.GateVerdict> Gate(string signalAlias, JsonElement signal, CancellationToken cancellationToken = default);
+
+    /// <summary>After the publisher's append, saves <paramref name="next"/> as the hosted state neuron's state with the signal, as a turn.</summary>
+    /// <exception cref="InvalidOperationException">The hosted neuron is not a state neuron.</exception>
+    [Alias("committed")]
+    Task Committed(string signalAlias, JsonElement signal, JsonElement next, CancellationToken cancellationToken = default);
+
     /// <summary>Inspects the live state of the hosted neuron.</summary>
     [AlwaysInterleave, Alias("inspect-state")]
     Task<JsonElement?> InspectState(CancellationToken cancellationToken = default);

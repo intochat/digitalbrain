@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using DigitalBrain.Invocation;
+using DigitalBrain.Rules;
 using DigitalBrain.Spi;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -133,6 +134,40 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
         return Task.FromResult<JsonElement?>(null);
     }
 
+    /// <inheritdoc />
+    public async Task<GateVerdict> Gate(string signalAlias, JsonElement signal, CancellationToken cancellationToken = default)
+    {
+        var receiver = Receiver();
+        try
+        {
+            var verdict = await receiver.Gate(Decode(signalAlias, signal), cancellationToken).ConfigureAwait(true);
+            return verdict switch
+            {
+                Check.Refused refused => new GateVerdict(false, [.. refused.Broken.Select(rule => rule.Name)], [.. refused.Broken.Select(rule => rule.Message)], null),
+                Check.Allowed allowed => new GateVerdict(true, [], [], JsonSerializer.SerializeToElement(allowed.Next, allowed.Next.GetType(), RuntimeProtocol.Json)),
+                _ => throw new InvalidOperationException($"{_key} returned an unknown verdict."),
+            };
+        }
+        finally { await Drain().ConfigureAwait(true); }
+    }
+
+    /// <inheritdoc />
+    public async Task Committed(string signalAlias, JsonElement signal, JsonElement next, CancellationToken cancellationToken = default)
+    {
+        var receiver = Receiver();
+        var stateType = _class!.GetGenericArguments()[0];
+        var state = next.Deserialize(stateType, RuntimeProtocol.Json) ?? throw new JournalPayloadException($"The next state for {_key} is null.");
+        try { await receiver.Committed(Decode(signalAlias, signal), new Check.Allowed(state)).ConfigureAwait(true); }
+        finally { await Drain().ConfigureAwait(true); }
+    }
+
+    private ISynapseReceiver Receiver()
+        => _neuron as ISynapseReceiver ?? throw new InvalidOperationException($"The neuron {_key} is not a state neuron: it runs no gate.");
+
+    private Signal Decode(string signalAlias, JsonElement signal)
+        => ServiceProvider.GetRequiredService<JournalPayloads>().DecodeSignal(new JournaledSignalPayload(signalAlias,
+            JsonElementSurrogateConverter.Utf8(signal) ?? throw new JournalPayloadException($"The signal '{signalAlias}' for {_key} is empty.")));
+
     private void RequireInterleaving(RuntimeInvocation call)
     {
         var (neuron, bound) = Prepare(call);
@@ -155,6 +190,19 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
         IReadOnlyList<Type> signals = [.. signalAliases.Select(alias => map.TryResolve(alias, out var type) ? type : throw new ArgumentException($"'{alias}' is not a registered [Signal] alias.", nameof(signalAliases)))];
         // The caller stamp comes from the call's RequestContext (the trusted edge's Stamp), never from the arguments (04-19).
         await NeuronAttachment.Admit(neuron, new SynapseRequest(subscriber, signals, Capabilities.RuntimeCallerContext.Current)).ConfigureAwait(true);
+    }
+
+    /// <inheritdoc />
+    public Task EnsureFrom(NeuronId source, string[] signalAliases)
+    {
+        if (_synapses is not { } synapses) { throw new InvalidOperationException($"The neuron {_key} is not active."); }
+        // Only the source itself asks for its edge; the source's own admission still decides (the interim rule of GateRunner).
+        var caller = RequestContext.Get(HostNeuronContext.CallerKey) as string ?? string.Empty;
+        if (!string.Equals(caller, source.ToString(), StringComparison.Ordinal))
+        {
+            throw new UnauthorizedAccessException($"An edge from {source} was asked by '{caller}', not by the source.");
+        }
+        return synapses.EnsureAliases(source, signalAliases);
     }
 
     /// <inheritdoc />

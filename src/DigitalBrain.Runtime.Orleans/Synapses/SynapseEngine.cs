@@ -299,7 +299,7 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
     // One reaction (R4-09): the cursor moves to the signal's sequence before it runs and every save or publish of the reaction writes
     // it in the same journal entry; a reaction that wrote nothing gets one cursor-only entry. A failure before any write puts the cursor
     // back and logs it; once an entry carried the cursor, the reaction counts as done, so a stop after its save never runs it twice.
-    // A runtime service that is an ISignalSink takes the journaled signal itself; a module neuron runs its [On] method.
+    // A runtime service that is an ISignalSink takes the journaled signal itself; a state neuron runs its reaction synapses; a module neuron runs its [On] method.
     private async Task<bool> React(Neuron neuron, JournaledSignal item, SynapseSource entry)
     {
         var before = entry.Cursor;
@@ -308,6 +308,7 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
         try
         {
             if (neuron is ISignalSink sink) { await sink.Deliver(item).ConfigureAwait(true); }
+            else if (neuron is ISynapseReceiver receiver) { await receiver.Receive(item.Signal, CancellationToken.None).ConfigureAwait(true); }
             else { await ReactionDispatcher.React(neuron, item.Signal, CancellationToken.None).ConfigureAwait(true); }
             NoteDelivery(entry, item);
             await _drain().ConfigureAwait(true);

@@ -856,3 +856,25 @@ static DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.StampScope
 static DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.TryGet(out DigitalBrain.Capabilities.CapabilityCaller? context) -> bool
 static DigitalBrain.Runtime.Orleans.Compute.TraceRequestContext.OriginOf(string! brainId, string! osKey) -> DigitalBrain.NeuronId
 static DigitalBrain.Runtime.Orleans.RuntimeOptions.Resolve(Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> DigitalBrain.Runtime.Orleans.RuntimeOptions!
+DigitalBrain.Runtime.Orleans.RuntimeOptions.GateTimeout.get -> System.TimeSpan
+DigitalBrain.Runtime.Orleans.RuntimeOptions.GateTimeout.init -> void
+DigitalBrain.Runtime.Orleans.Hosting.INeuronHost.Committed(string! signalAlias, System.Text.Json.JsonElement signal, System.Text.Json.JsonElement next, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Hosting.INeuronHost.Gate(string! signalAlias, System.Text.Json.JsonElement signal, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Runtime.Orleans.Synapses.GateVerdict!>!
+DigitalBrain.Runtime.Orleans.Synapses.GateVerdict
+DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.<Clone>$() -> DigitalBrain.Runtime.Orleans.Synapses.GateVerdict!
+DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Allowed.get -> bool
+DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Allowed.init -> void
+DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Deconstruct(out bool Allowed, out string![]! Rules, out string![]! Messages, out System.Text.Json.JsonElement? Next) -> void
+DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Equals(DigitalBrain.Runtime.Orleans.Synapses.GateVerdict? other) -> bool
+DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.GateVerdict(bool Allowed, string![]! Rules, string![]! Messages, System.Text.Json.JsonElement? Next) -> void
+DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Messages.get -> string![]!
+DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Messages.init -> void
+DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Next.get -> System.Text.Json.JsonElement?
+DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Next.init -> void
+DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Rules.get -> string![]!
+DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Rules.init -> void
+override DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Equals(object? obj) -> bool
+override DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.GetHashCode() -> int
+override DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.ToString() -> string!
+static DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.operator !=(DigitalBrain.Runtime.Orleans.Synapses.GateVerdict? left, DigitalBrain.Runtime.Orleans.Synapses.GateVerdict? right) -> bool
+static DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.operator ==(DigitalBrain.Runtime.Orleans.Synapses.GateVerdict? left, DigitalBrain.Runtime.Orleans.Synapses.GateVerdict? right) -> bool

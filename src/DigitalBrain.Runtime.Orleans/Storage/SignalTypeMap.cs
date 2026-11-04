@@ -4,7 +4,7 @@ namespace DigitalBrain.Runtime.Orleans;
 
 /// <summary>
 /// The closed set of signal types the journal decodes: <c>[Signal(alias)]</c> records from the composed assemblies plus the framework signals
-/// <see cref="Gap"/> and <see cref="DigitalBrain.Rules.Rejected"/>. A type name read from disk never reaches <see cref="Type.GetType(string)"/> (T-04-12).
+/// <see cref="Gap"/>, <see cref="DigitalBrain.Rules.Rejected"/> and <see cref="StateChanged"/>. A type name read from disk never reaches <see cref="Type.GetType(string)"/> (T-04-12).
 /// </summary>
 internal sealed class SignalTypeMap
 {
@@ -17,6 +17,7 @@ internal sealed class SignalTypeMap
         ArgumentNullException.ThrowIfNull(assemblies);
         Add(typeof(Gap));
         Add(typeof(DigitalBrain.Rules.Rejected));
+        Add(typeof(StateChanged));
         foreach (var assembly in assemblies.Distinct())
         {
             foreach (var type in Loadable(assembly))
