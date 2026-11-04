@@ -78,12 +78,12 @@ public sealed partial record Schedule(string Text, ScheduleKind Kind, TimeSpan P
 
     private static TimeOnly Time(string hhmm) => TimeOnly.ParseExact(hhmm, "HH:mm", CultureInfo.InvariantCulture);
 
-    [GeneratedRegex("^(?<t>([01][0-9]|2[0-3]):[0-5][0-9])$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("^(?<t>([01][0-9]|2[0-3]):[0-5][0-9])\\z", RegexOptions.CultureInvariant)]
     private static partial Regex DailyRule();
 
-    [GeneratedRegex("^(?<d>Mon|Tue|Wed|Thu|Fri|Sat|Sun) (?<t>([01][0-9]|2[0-3]):[0-5][0-9])$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("^(?<d>Mon|Tue|Wed|Thu|Fri|Sat|Sun) (?<t>([01][0-9]|2[0-3]):[0-5][0-9])\\z", RegexOptions.CultureInvariant)]
     private static partial Regex WeeklyRule();
 
-    [GeneratedRegex("^every (?<n>[0-9]{1,6})(?<u>[mh])$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex("^every (?<n>[0-9]{1,6})(?<u>[mh])\\z", RegexOptions.CultureInvariant)]
     private static partial Regex IntervalRule();
 }

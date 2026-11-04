@@ -61,10 +61,14 @@ public sealed record SynapseNeeds(
 
     private static string Describe(Schedule s) => s.Kind switch
     {
-        ScheduleKind.Daily => $"run daily at {s.Text} UTC",
-        ScheduleKind.Weekly => $"run weekly on {s.Text[..3]} at {s.Text[4..]} UTC",
+        ScheduleKind.Daily => $"run daily at {Clock(s)} UTC",
+        ScheduleKind.Weekly => $"run weekly on {DayNames[(int)s.Day!.Value]} at {Clock(s)} UTC",
         _ => $"run {s.Text}",
     };
+
+    private static readonly string[] DayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+    private static string Clock(Schedule s) => s.At!.Value.ToString("HH:mm", CultureInfo.InvariantCulture);
 
     private static IEnumerable<string> Sorted(IEnumerable<string> items) => items.OrderBy(i => i, StringComparer.Ordinal);
 }

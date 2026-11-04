@@ -23,6 +23,9 @@ public sealed class ScheduleFacts
     [InlineData("Monday 00:00")]
     [InlineData("mon 00:00")]
     [InlineData("")]
+    [InlineData("07:00\n")]
+    [InlineData("Mon 09:00\n")]
+    [InlineData("every 5m\n")]
     public void RefusesAnythingElse(string text) => Assert.Throws<FormatException>(() => Schedule.Parse(text));
 
     [Fact]
@@ -48,6 +51,20 @@ public sealed class ScheduleFacts
         var now = new DateTimeOffset(2026, 11, 4, 0, 0, 0, TimeSpan.Zero); // a Wednesday
         Assert.Equal(DayOfWeek.Monday, s.NextAfter(now).DayOfWeek);
         Assert.Equal(new DateTimeOffset(2026, 11, 9, 0, 0, 0, TimeSpan.Zero), s.NextAfter(now));
+    }
+
+    [Fact]
+    public void WeeklyNextAfterExactlyOnTheOccurrenceYieldsTheNextWeek()
+    {
+        var now = new DateTimeOffset(2026, 11, 9, 0, 0, 0, TimeSpan.Zero); // a Monday
+        Assert.Equal(new DateTimeOffset(2026, 11, 16, 0, 0, 0, TimeSpan.Zero), Schedule.Parse("Mon 00:00").NextAfter(now));
+    }
+
+    [Fact]
+    public void WeeklyNextAfterWrapsFromSunday()
+    {
+        var now = new DateTimeOffset(2026, 11, 8, 12, 0, 0, TimeSpan.Zero); // a Sunday
+        Assert.Equal(new DateTimeOffset(2026, 11, 9, 0, 0, 0, TimeSpan.Zero), Schedule.Parse("Mon 00:00").NextAfter(now));
     }
 
     [Fact]
