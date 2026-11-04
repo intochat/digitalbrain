@@ -72,7 +72,7 @@ public interface IInstalls
     /// <returns>How it ended, or that it waits for the person.</returns>
     Task<InstallOutcome> Install(InstallRequest request, CancellationToken ct);
 
-    /// <summary>Retires an installed app; an alias that is not installed is ignored.</summary>
+    /// <summary>Retires an installed app and cancels its pending asks; an alias that is neither is ignored.</summary>
     /// <param name="alias">The state alias.</param>
     /// <param name="ct">Cancellation.</param>
     Task Retire(string alias, CancellationToken ct);

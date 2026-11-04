@@ -99,12 +99,20 @@ public sealed class InstallsNeuron(SynapseCatalog catalog, IInstallHooks hooks) 
 
     /// <inheritdoc />
     /// <remarks>
-    /// The record is removed and <see cref="DigitalBrain.GateChanged"/> published first; a failing hook is then swallowed, since
+    /// Pending asks of the alias are denied with reason <c>retired</c>. The record is removed and <see cref="DigitalBrain.GateChanged"/> published first; a failing hook is then swallowed, since
     /// <see cref="IInstalls.Retire"/> reports nothing, and leaves edges or schedules the host must tolerate (they reach a retired app).
     /// </remarks>
     public async Task Retire(string alias, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(hooks);
+        // Every pending ask of the alias is cancelled, record or not; a later answer to it is then ignored.
+        var cancelled = State.Pending.Where(p => p.Alias == alias).ToList();
+        if (cancelled.Count > 0)
+        {
+            await Save(State with { Pending = [.. State.Pending.Where(p => p.Alias != alias)] },
+                [.. cancelled.Select(p => (Signal)new InstallDenied(alias, p.PlanId, "retired"))]).ConfigureAwait(true);
+        }
+
         if (Find(alias) is null) { return; }
         await Save(State with { Records = [.. State.Records.Where(r => r.Alias != alias)] }, [new Retired(alias)]).ConfigureAwait(true);
         await GateChanged().ConfigureAwait(true);

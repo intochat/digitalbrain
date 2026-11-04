@@ -140,6 +140,23 @@ public sealed class InstallsFacts
     }
 
     [Fact]
+    public async Task RetireDuringAPendingAskCancelsIt()
+    {
+        await using var os = Start(new RecordingHooks());
+        var outcome = await os.Get<IInstalls>(Installs).Install(new InstallRequest("week", None), Ct);
+        Assert.Equal(InstallStatus.Pending, outcome.Status);
+
+        await os.Get<IInstalls>(Installs).Retire("week", Ct);
+        await os.Confirmations.Approve(outcome.Reason!);
+        await os.Idle();
+
+        Assert.Null(await os.Get<IInstalls>(Installs).Describe("week", Ct));
+        Assert.Empty(await os.Get<IInstalls>(Installs).Pending(Ct));
+        Assert.Contains(os.Journal(Installs.Brain).Signals(Installs),
+            item => item.Signal is InstallDenied { Alias: "week", Reason: "retired" } denied && denied.PlanId == outcome.Reason);
+    }
+
+    [Fact]
     public async Task AFailingHookStillRecordsAndPublishesGateChanged()
     {
         await using var os = Start(new RecordingHooks { FailEdges = true });
