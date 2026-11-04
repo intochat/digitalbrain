@@ -120,9 +120,37 @@ public static class SbRelaying
     public static Check Count(SbForwarded s, SbTally state) => Check.Allow(state with { Seen = state.Seen + 1 });
 }
 
+[Signal("test.sb.voiding")]
+public sealed record SbVoiding : Signal;
+
+[State("sb.void")]
+public sealed record SbVoid(int Seen)
+{
+    public SbVoid() : this(0) { }
+}
+
+[State("sb.skip")]
+public sealed record SbSkip(int Seen)
+{
+    public SbSkip() : this(0) { }
+}
+
+public static class SbOddGates
+{
+    // A gate that allows without a next state: the publisher fails it closed.
+    [Synapse(typeof(SbVoiding), "sb.void")]
+    public static Check Empty(SbVoiding s, SbVoid state) => Check.Allow<SbVoid>(null!);
+
+    // A gate on StateChanged: the hosts never call it.
+    [Synapse(typeof(StateChanged), "sb.skip")]
+    public static Check Never(StateChanged s, SbSkip state) => Check.Reject("never runs");
+}
+
 public interface ISbPayments
 {
     Task Charge(decimal amount);
+
+    Task Void();
 
     Task Relay(int n);
 
@@ -139,6 +167,8 @@ public sealed class SbPayments : Neuron<SbPayState>, ISbPayments
     public Task ChargeCapped(decimal amount) => Save(State with { Count = State.Count + 1 }, new SbCappedCharging(amount));
 
     public Task Relay(int n) => Save(State with { Count = State.Count + 1 }, new SbRelay(n));
+
+    public Task Void() => Save(State with { Count = State.Count + 1 }, new SbVoiding());
 
     public Task Stall() => Save(State with { Count = State.Count + 1 }, new SbStalling());
 }
@@ -228,6 +258,41 @@ public sealed class StateNeuronSiloFacts(StatefulSilo silo) : IClassFixture<Stat
         var host = silo.Services.GetRequiredService<IGrainFactory>().GetGrain<INeuronHost>(GrainId.Create(NeuronTypeRegistry.AffineGrainType, id.ToString()));
         var state = await host.InspectState(TestContext.Current.CancellationToken);
         return state is { } json && json.TryGetProperty("seen", out var seen) ? seen.GetInt32() : 0;
+    }
+
+    [Fact]
+    public async Task AGateOnStateChangedIsNeverCalled()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var started = new ConcurrentQueue<SynapseStarted>();
+        await using var listener = await silo.Services.GetRequiredService<IClusterListeners>().Listen<SynapseStarted>("started", (_, s, _) =>
+        {
+            started.Enqueue(s);
+            return Task.CompletedTask;
+        });
+
+        // The week gate allows and its Committed saves StateChanged, which the sb.skip gate is declared on.
+        await silo.Get<ISbPayments>("sb/sb.payments/skip").Charge(1m);
+        await Until(() => Task.FromResult(started.Any(s => s.Function.EndsWith(".WeeklyCap", StringComparison.Ordinal))), ct);
+        await Task.Delay(300, ct);
+
+        Assert.Contains(started, s => s.Function.EndsWith(".WeeklyCap", StringComparison.Ordinal));
+        Assert.DoesNotContain(started, s => s.Function.EndsWith(".Never", StringComparison.Ordinal));
+        Assert.Empty((await silo.History("sb").Read(NeuronId.Parse("sb/sb.skip/default"), 0, 10, ct)).Signals);
+    }
+
+    [Fact]
+    public async Task AnAllowanceWithoutANextStateFailsClosed()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var pay = NeuronId.Parse("sb/sb.payments/void");
+
+        var e = await Assert.ThrowsAsync<RuleViolationException>(() => silo.Get<ISbPayments>(pay.ToString()).Void());
+
+        Assert.Equal("the gate did not answer", e.Rejected.Messages[0]);
+        Assert.EndsWith(".Empty", e.Rejected.Rules[0], StringComparison.Ordinal);
+        Assert.Empty((await silo.History("sb").Read(pay, 0, 10, ct)).Signals);
+        Assert.Empty((await silo.History("sb").Read(NeuronId.Parse("sb/sb.void/default"), 0, 10, ct)).Signals);
     }
 
     internal static async Task<decimal> SpentOf(IServiceProvider services, NeuronId id)

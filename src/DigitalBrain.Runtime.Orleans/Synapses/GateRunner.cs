@@ -24,7 +24,8 @@ namespace DigitalBrain.Runtime.Orleans.Synapses;
 /// <para>
 /// Gates never run on <see cref="StateChanged"/>: a gate's <c>Committed</c> saves <see cref="StateChanged"/> while the original publisher
 /// is still in its turn awaiting <see cref="Commit"/>, so a gate on it that resolved to that publisher would deadlock. Reaction synapses
-/// on <see cref="StateChanged"/> are still ensured.
+/// on <see cref="StateChanged"/> are still ensured. Nor on <see cref="Rejected"/>: the refusing gate journals it inside its own gate
+/// turn, so a gate on it (say, one on base <see cref="Signal"/>) would run nested in that turn.
 /// </para>
 /// <para>
 /// No call of the gate path can stall a publisher: <see cref="Commit"/> and each reaction-edge ensure are bounded by
@@ -53,7 +54,7 @@ internal static partial class GateRunner
         ArgumentNullException.ThrowIfNull(signals);
         ArgumentNullException.ThrowIfNull(ensured);
         var durable = signals.Where(signal => !signal.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false)).ToArray();
-        var gated = durable.Where(signal => signal is not StateChanged).ToArray();
+        var gated = durable.Where(signal => signal is not StateChanged and not Rejected).ToArray();
         if (durable.Length == 0 || services.GetService<IGateIndex>() is not { } index || services.GetService<SynapseCatalog>() is not { } catalog) { return []; }
         var payloads = services.GetRequiredService<JournalPayloads>();
         var grains = services.GetRequiredService<IGrainFactory>();

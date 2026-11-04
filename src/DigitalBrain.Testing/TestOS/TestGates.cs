@@ -19,7 +19,8 @@ internal static class TestGates
         try
         {
             // Gates never run on StateChanged: a gate's Committed saves it while the publisher still awaits Commit (as the Orleans GateRunner).
-            foreach (var signal in signals.Where(s => s is not StateChanged && !s.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false)))
+            // Nor on Rejected: the refusing gate journals it inside its own gate turn, so a gate on it would run nested in that turn.
+            foreach (var signal in signals.Where(s => s is not StateChanged and not Rejected && !s.GetType().IsDefined(typeof(EphemeralSignalAttribute), inherit: false)))
             {
                 foreach (var (gate, descriptor) in os.Gates.GatesFor(publisher.Brain, signal.GetType()))
                 {

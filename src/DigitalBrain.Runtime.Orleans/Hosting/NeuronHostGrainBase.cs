@@ -144,6 +144,8 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
             return verdict switch
             {
                 Check.Refused refused => new GateVerdict(false, [.. refused.Broken.Select(rule => rule.Name)], [.. refused.Broken.Select(rule => rule.Message)], null),
+                // A null next state travels as null: the publisher's GateRunner fails it closed.
+                Check.Allowed { Next: null } => new GateVerdict(true, [], [], null),
                 Check.Allowed allowed => new GateVerdict(true, [], [], JsonSerializer.SerializeToElement(allowed.Next, allowed.Next.GetType(), RuntimeProtocol.Json)),
                 _ => throw new InvalidOperationException($"{_key} returned an unknown verdict."),
             };
