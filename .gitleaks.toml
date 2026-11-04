@@ -2,6 +2,9 @@
 useDefault = true
 
 [allowlist]
-description = "Roslyn CodeFix equivalence keys in Fixes.cs"
+description = "Roslyn CodeFix equivalence keys in Fixes.cs and Azurite well-known development storage key"
 commits = ["76357d8698cc0bbf01ca3f0208246d8e5b86950d"]
 paths = ['''src/DigitalBrain\.Analyzers\.CodeFixes/Fixes\.cs''']
+regexes = [
+  '''(?i)Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==''',
+]
