@@ -39,7 +39,7 @@ public sealed class InstallsNeuron(SynapseCatalog catalog, IInstallHooks hooks) 
             return new InstallOutcome(InstallStatus.Unchanged, sentence, null);
         }
 
-        var plan = new ConfirmationPlan($"install:{alias}:{hash}", ConfirmationAction.Other, Destructive: false, Title: alias, Body: sentence,
+        var plan = new ConfirmationPlan($"install:{alias}:{Guid.NewGuid():N}", ConfirmationAction.Other, Destructive: false, Title: alias, Body: sentence,
             ApproveLabel: "Allow", DenyLabel: "Deny", TargetLabel: alias) { RequiresPerson = true };
         var result = await Context.Confirm(plan, ct).ConfigureAwait(true);
         if (!result.Approved)

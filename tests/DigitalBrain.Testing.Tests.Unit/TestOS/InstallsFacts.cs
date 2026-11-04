@@ -89,6 +89,16 @@ public sealed class InstallsFacts
     }
 
     [Fact]
+    public async Task ADeniedInstallCanBeAskedAgain()
+    {
+        await using var os = Start(new RecordingHooks());
+        Assert.Equal(InstallStatus.Denied, (await Answer(os, "week", approve: false)).Status);
+        Assert.Equal(InstallStatus.Installed, (await Answer(os, "week", approve: true, asked: 2)).Status);
+        Assert.Equal(2, os.Confirmations.Requested.Count);
+        Assert.NotNull(await os.Get<IInstalls>(Installs).Describe("week", Ct));
+    }
+
+    [Fact]
     public async Task ASecondInstallWithTheSameNeedsIsUnchangedAndSilent()
     {
         var hooks = new RecordingHooks();
