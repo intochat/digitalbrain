@@ -239,6 +239,21 @@ public sealed class StateNeuronSiloFacts(StatefulSilo silo) : IClassFixture<Stat
     }
 
     [Fact]
+    public async Task TwoConcurrentAllowedChargesCountBothWhateverOrderTheyCommitIn()
+    {
+        for (var i = 0; i < 5; i++)
+        {
+            var brain = $"sbo{i}";
+            var first = silo.Get<ISbPayments>($"{brain}/sb.payments/one");
+            var second = silo.Get<ISbPayments>($"{brain}/sb.payments/two");
+
+            await Task.WhenAll(first.ChargeCapped(40m), second.ChargeCapped(40m));
+
+            Assert.Equal(80m, await SpentOf(silo.Services, NeuronId.Parse($"{brain}/sb.cap/default")));
+        }
+    }
+
+    [Fact]
     public async Task AStateNeuronThatPublishesThroughAGateCompletesWithoutStalling()
     {
         var ct = TestContext.Current.CancellationToken;

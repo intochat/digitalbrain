@@ -21,19 +21,22 @@ public static class StateNeuron
 /// <typeparam name="TState">The state record.</typeparam>
 /// <remarks>
 /// After an allowance the neuron holds the allowed next state as provisional, keyed by the gated signal (in arrival order), until the
-/// host calls <see cref="Committed"/> (saved) or <see cref="Aborted"/> (dropped). A later gate call evaluates against the newest
-/// provisional state, so two publishers gated back to back cannot both pass a check only one of them may pass. Aborting an entry also
-/// drops every provisional entry gated after it: those were computed on an aborted base; their commits then save their verdict's own
-/// next state, as a gate without a provisional entry does, and the hosts re-gate those publishers' next attempts. Provisional entries
-/// older than <see cref="StateNeuron.ProvisionalLease"/> are discarded on the next gate call. Entries match by signal equality; equal
-/// signals match the oldest entry first.
+/// host calls <see cref="Committed"/> or <see cref="Aborted"/>. A later gate call evaluates against the newest provisional state, so
+/// two publishers gated back to back cannot both pass a check only one of them may pass; each entry's next state includes every
+/// earlier entry. Commits are head-ordered: <see cref="Committed"/> marks its entry, and the neuron saves only once the oldest entry is
+/// committed, saving the next state of the longest committed run from the head (once) and removing that run, so a commit arriving out
+/// of order never rolls the state back. <see cref="Aborted"/> removes only its entry and re-runs the gate functions of every later
+/// entry, in order, on the new base; a re-gate that refuses keeps the entry (its publisher appended or will) with the base unchanged as
+/// its next state and publishes an ephemeral <see cref="Rejected"/> whose operation ends in <c> (late)</c>, so the late refusal is
+/// visible and never counted. Provisional entries older than <see cref="StateNeuron.ProvisionalLease"/> are discarded on the next gate
+/// call. Entries match by signal equality; equal signals match the oldest entry first.
 /// </remarks>
 public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where TState : class, new()
 {
     private const string GatePlaceholder = "gate";
     private readonly string _alias;
     private readonly IReadOnlyList<SynapseDescriptor> _synapses;
-    private readonly List<(Signal Signal, TState Next, DateTimeOffset At)> _provisional = [];
+    private readonly List<Entry> _provisional = [];
     private bool _viewsPending;
     private bool _journalingRefusal;
 
@@ -79,6 +82,14 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
         var now = Context.Time.GetUtcNow();
         _provisional.RemoveAll(entry => now - entry.At > StateNeuron.ProvisionalLease);
         var current = _provisional.Count > 0 ? _provisional[^1].Next : State;
+        var verdict = await Evaluate(signal, current, late: false, ct).ConfigureAwait(true);
+        if (verdict is Verdict.Allowed { Next: TState provisional }) { _provisional.Add(new Entry(signal, provisional, now)); }
+        return verdict;
+    }
+
+    // Runs the gate chain for signal on current; a refusal is journaled, or when late published ephemerally as "<name> (late)".
+    private async Task<Verdict> Evaluate(Signal signal, TState current, bool late, CancellationToken ct)
+    {
         var verdict = Verdict.Allow(current);
         foreach (var gate in Matching(SynapseKind.Gate, signal))
         {
@@ -88,6 +99,12 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
                 if (verdict is not Verdict.Refused refused) { return "allowed"; }
                 var names = refused.Broken.Select(rule => rule.Name == GatePlaceholder ? gate.Name : rule.Name).ToArray();
                 var messages = refused.Broken.Select(rule => rule.Message).ToArray();
+                if (late)
+                {
+                    await PublishEphemeral(new Rejected(gate.Name + " (late)", names, messages)).ConfigureAwait(true);
+                    return "rejected";
+                }
+
                 _journalingRefusal = true;
                 try { await Save(State, [new Rejected(gate.Name, names, messages)]).ConfigureAwait(true); }
                 finally { _journalingRefusal = false; }
@@ -98,29 +115,61 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
             if (verdict is Verdict.Allowed { Next: TState next }) { current = next; }
         }
 
-        if (verdict is Verdict.Allowed { Next: TState provisional }) { _provisional.Add((signal, provisional, now)); }
         return verdict;
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Marks the provisional entry of <paramref name="signal"/> committed; when the oldest entry is committed, saves the next state of
+    /// the longest committed run from the head once and removes that run (a commit behind an uncommitted head saves nothing yet).
+    /// Without a provisional entry, which is only reachable after the entry outlived <see cref="StateNeuron.ProvisionalLease"/>, saves
+    /// the next state of <paramref name="allowed"/>.
+    /// </summary>
+    /// <param name="signal">The published signal.</param>
+    /// <param name="allowed">The verdict <see cref="Gate"/> returned.</param>
+    /// <returns>A task that completes when the state is saved or the entry marked.</returns>
     public async Task Committed(Signal signal, Verdict.Allowed allowed)
     {
         ArgumentNullException.ThrowIfNull(signal);
         ArgumentNullException.ThrowIfNull(allowed);
         var index = Provisional(signal);
-        var next = index < 0 ? (TState)allowed.Next : _provisional[index].Next;
-        if (index >= 0) { _provisional.RemoveAt(index); }
+        if (index < 0)
+        {
+            await Save((TState)allowed.Next, [Changed(signal)]).ConfigureAwait(true);
+            await PendingViews().ConfigureAwait(true);
+            return;
+        }
+
+        _provisional[index].Committed = true;
+        var run = 0;
+        while (run < _provisional.Count && _provisional[run].Committed) { run++; }
+        if (run == 0) { return; }
+        var next = _provisional[run - 1].Next;
+        _provisional.RemoveRange(0, run);
         await Save(next, [Changed(signal)]).ConfigureAwait(true);
         await PendingViews().ConfigureAwait(true);
     }
 
-    /// <inheritdoc />
-    public Task Aborted(Signal signal)
+    /// <summary>
+    /// Removes the provisional entry of <paramref name="signal"/> without saving, then re-runs the gate functions of every later entry,
+    /// in order, on the new base; a re-gate that refuses keeps its entry with the base unchanged as its next state and publishes an
+    /// ephemeral <see cref="Rejected"/> whose operation ends in <c> (late)</c>. Durable state is not touched.
+    /// </summary>
+    /// <param name="signal">The signal whose publish was abandoned.</param>
+    /// <returns>A task that completes when the later entries are re-gated.</returns>
+    public async Task Aborted(Signal signal)
     {
         ArgumentNullException.ThrowIfNull(signal);
         var index = Provisional(signal);
-        if (index >= 0) { _provisional.RemoveRange(index, _provisional.Count - index); }
-        return Task.CompletedTask;
+        if (index < 0) { return; }
+        _provisional.RemoveAt(index);
+        var current = index > 0 ? _provisional[index - 1].Next : State;
+        for (var i = index; i < _provisional.Count; i++)
+        {
+            var entry = _provisional[i];
+            var verdict = await Evaluate(entry.Signal, current, late: true, CancellationToken.None).ConfigureAwait(true);
+            entry.Next = verdict is Verdict.Allowed { Next: TState next } ? next : current;
+            current = entry.Next;
+        }
     }
 
     /// <summary>Marks the views to run over the new state once the saving synapse has reported its outcome; a journaled refusal leaves the state as it was and runs none.</summary>
@@ -135,6 +184,18 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     private int Provisional(Signal signal) => _provisional.FindIndex(entry => entry.Signal.Equals(signal));
 
     private StateChanged Changed(Signal cause) => new(Id.ToString(), AliasOf(cause));
+
+    // A provisional allowance: its next state is rewritten when an earlier entry aborts.
+    private sealed class Entry(Signal signal, TState next, DateTimeOffset at)
+    {
+        public Signal Signal { get; } = signal;
+
+        public TState Next { get; set; } = next;
+
+        public DateTimeOffset At { get; } = at;
+
+        public bool Committed { get; set; }
+    }
 
     private Task PendingViews()
     {

@@ -25,7 +25,7 @@ public interface ISynapseReceiver
 
     /// <summary>
     /// Called when the publish <paramref name="signal"/> was gated for did not happen (a later gate refused, timed out or failed, or the
-    /// append threw): drops the provisional state of <paramref name="signal"/> without saving, and every provisional state gated after it.
+    /// append threw): drops the provisional state of <paramref name="signal"/> without saving; later provisional states are re-gated on the new base.
     /// </summary>
     /// <param name="signal">The signal whose publish was abandoned.</param>
     /// <returns>A task that completes when the provisional state is dropped.</returns>

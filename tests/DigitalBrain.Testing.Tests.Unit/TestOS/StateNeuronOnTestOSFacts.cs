@@ -180,6 +180,23 @@ public sealed class StateNeuronOnTestOSFacts
     }
 
     [Fact]
+    public async Task TwoConcurrentAllowedChargesCountBothWhateverOrderTheyCommitIn()
+    {
+        for (var i = 0; i < 20; i++)
+        {
+            await using var os = Start();
+            var first = os.Get<IPayments>(NeuronId.Parse("b/payments/one"));
+            var second = os.Get<IPayments>(NeuronId.Parse("b/payments/two"));
+
+            await Task.WhenAll(first.ChargeCapped(40m), second.ChargeCapped(40m));
+            await os.Idle();
+
+            var state = await ((IBrainObserver)os).State(NeuronId.Parse("b/cap/default"), TestContext.Current.CancellationToken);
+            Assert.Equal(80m, state!.Value.GetProperty("spent").GetDecimal());
+        }
+    }
+
+    [Fact]
     public async Task AReactionSynapseIsEnsuredAndDeliversOnce()
     {
         await using var os = Start();

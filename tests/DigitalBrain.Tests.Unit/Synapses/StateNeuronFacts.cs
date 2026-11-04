@@ -50,6 +50,28 @@ public static class Faulty
     public static Check Broken(Charging s, WeekSpend w) => throw new InvalidOperationException("broken");
 }
 
+[State("balance")]
+public sealed record Balance(decimal Amount)
+{
+    public Balance() : this(0m) { }
+}
+
+[Signal("test.deposit")]
+public sealed record Deposit(decimal Amount) : Signal;
+
+[Signal("test.withdraw")]
+public sealed record Withdraw(decimal Amount) : Signal;
+
+public static class Account
+{
+    [Synapse(typeof(Deposit), "balance")]
+    public static Check Credit(Deposit s, Balance b) => Check.Allow(b with { Amount = b.Amount + s.Amount });
+
+    [Synapse(typeof(Withdraw), "balance")]
+    public static Check Debit(Withdraw s, Balance b) =>
+        b.Amount - s.Amount < 0m ? Check.Reject("no overdraft") : Check.Allow(b with { Amount = b.Amount - s.Amount });
+}
+
 public sealed class StateNeuronFacts
 {
     private static readonly NeuronId Id = new(new BrainId("alice"), "week", "default");
@@ -190,7 +212,7 @@ public sealed class StateNeuronFacts
     }
 
     [Fact]
-    public async Task AbortedDropsTheEntryAndTheEntriesGatedAfterItWithoutSaving()
+    public async Task AbortedDropsTheEntryWithoutSavingAndKeepsTheLaterEntries()
     {
         var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
         Assert.IsType<Check.Allowed>(await n.Gate(new Charging(60m), TestContext.Current.CancellationToken));
@@ -200,7 +222,7 @@ public sealed class StateNeuronFacts
 
         Assert.Empty(Context.Writes);
         var again = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(60m), TestContext.Current.CancellationToken));
-        Assert.Equal(60m, ((WeekSpend)again.Next).Spent);
+        Assert.Equal(90m, ((WeekSpend)again.Next).Spent);
     }
 
     [Fact]
@@ -216,6 +238,59 @@ public sealed class StateNeuronFacts
         var later = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(60m), TestContext.Current.CancellationToken));
         Assert.Equal(60m, ((WeekSpend)later.Next).Spent);
         Assert.Equal(TimeSpan.FromSeconds(30), StateNeuron.ProvisionalLease);
+    }
+
+    [Fact]
+    public async Task ALaterCommitBeforeTheHeadSavesNothingUntilTheHeadCommits()
+    {
+        var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
+        var a = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), TestContext.Current.CancellationToken));
+        var b = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(41m), TestContext.Current.CancellationToken));
+        Assert.Equal(81m, ((WeekSpend)b.Next).Spent);
+
+        await n.Committed(new Charging(41m), b);
+        Assert.Empty(Context.Writes);
+
+        await n.Committed(new Charging(40m), a);
+        Assert.Equal(81m, ((WeekSpend)Assert.Single(Context.Writes).State).Spent);
+        var after = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(19m), TestContext.Current.CancellationToken));
+        Assert.Equal(19m, ((WeekSpend)after.Next).Spent - 81m);
+    }
+
+    [Fact]
+    public async Task AbortedReGatesTheLaterEntriesOnTheNewBase()
+    {
+        var n = Attach(new StateNeuron<WeekSpend>(Catalog(typeof(WeekSpend), typeof(Hundred))));
+        Assert.IsType<Check.Allowed>(await n.Gate(new Charging(40m), TestContext.Current.CancellationToken));
+        var b = Assert.IsType<Check.Allowed>(await n.Gate(new Charging(41m), TestContext.Current.CancellationToken));
+        Assert.IsType<Check.Refused>(await n.Gate(new Charging(42m), TestContext.Current.CancellationToken));
+        var writes = Context.Writes.Count;
+
+        await n.Aborted(new Charging(40m));
+        Assert.Equal(writes, Context.Writes.Count);
+
+        await n.Committed(new Charging(41m), b);
+        Assert.Equal(41m, ((WeekSpend)Context.Writes[^1].State).Spent);
+    }
+
+    [Fact]
+    public async Task AReGateThatRefusesIsALateRefusalAndCommitsTheBase()
+    {
+        Context.Store(new Balance(100m));
+        var n = Attach(new StateNeuron<Balance>(Catalog(typeof(Balance), typeof(Account))));
+        await NeuronAttachment.Activate(n, TestContext.Current.CancellationToken);
+        Assert.IsType<Check.Allowed>(await n.Gate(new Deposit(50m), TestContext.Current.CancellationToken));
+        var b = Assert.IsType<Check.Allowed>(await n.Gate(new Withdraw(120m), TestContext.Current.CancellationToken));
+        Assert.Equal(30m, ((Balance)b.Next).Amount);
+
+        await n.Aborted(new Deposit(50m));
+
+        Assert.Empty(Context.Writes);
+        var late = Assert.IsType<Rejected>(Assert.Single(Context.Published, p => p is Rejected));
+        Assert.EndsWith(".Account.Debit (late)", late.Operation, StringComparison.Ordinal);
+        Assert.Equal("no overdraft", late.Messages[0]);
+        await n.Committed(new Withdraw(120m), b);
+        Assert.Equal(100m, ((Balance)Assert.Single(Context.Writes).State).Amount);
     }
 
     private sealed class SteppedClock : TimeProvider
