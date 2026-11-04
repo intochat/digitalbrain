@@ -25,7 +25,7 @@ namespace DigitalBrain.Runtime.Orleans.Synapses;
 /// is still in its turn awaiting <see cref="Commit"/>, so a gate on it that resolved to that publisher would deadlock. Nor on
 /// <see cref="Rejected"/>: the refusing gate journals it inside its own gate turn, so a gate on it (say, one on base
 /// <see cref="Signal"/>) would run nested in that turn. Nor on <see cref="DigitalBrain.Time.Tick"/>, <see cref="Installed"/>,
-/// <see cref="Retired"/> and the time registrations: their publishers (the time and installs neurons) serve the gate path itself.
+/// <see cref="Retired"/>, <see cref="InstallRequested"/>, <see cref="InstallDenied"/> and the time registrations: their publishers (the time and installs neurons) serve the gate path itself.
 /// </para>
 /// <para>
 /// No call of the gate path can stall a publisher: <see cref="Commit"/> is bounded by <see cref="RuntimeOptions.GateTimeout"/> (logged
@@ -160,7 +160,7 @@ internal static partial class GateRunner
 
     // The signals no gate runs on (see the type summary).
     private static bool Ungated(Signal signal)
-        => signal is StateChanged or Rejected or DigitalBrain.Time.Tick or Installed or Retired or DigitalBrain.Time.Registered or DigitalBrain.Time.Unregistered;
+        => signal is StateChanged or Rejected or DigitalBrain.Time.Tick or Installed or Retired or InstallRequested or InstallDenied or DigitalBrain.Time.Registered or DigitalBrain.Time.Unregistered;
 
     // The publishers along the current call chain that are blocked in Run or Commit.
     private static string[] Chain()

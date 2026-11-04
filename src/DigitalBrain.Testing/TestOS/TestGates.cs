@@ -44,9 +44,9 @@ internal static class TestGates
 
     // Gates never run on StateChanged: a gate's Committed saves it while the publisher still awaits Commit (as the Orleans GateRunner).
     // Nor on Rejected: the refusing gate journals it inside its own gate turn, so a gate on it would run nested in that turn. Nor on
-    // the runtime's own Tick, Installed, Retired and time registrations: their publishers (time, installs) serve the gate path itself.
+    // the runtime's own Tick, Installed, Retired, InstallRequested, InstallDenied and time registrations: their publishers (time, installs) serve the gate path itself.
     private static bool Ungated(Signal signal)
-        => signal is StateChanged or Rejected or DigitalBrain.Time.Tick or Installed or Retired or DigitalBrain.Time.Registered or DigitalBrain.Time.Unregistered;
+        => signal is StateChanged or Rejected or DigitalBrain.Time.Tick or Installed or Retired or InstallRequested or InstallDenied or DigitalBrain.Time.Registered or DigitalBrain.Time.Unregistered;
 
     // The publish did not happen (a later gate stopped it, or the append threw): each allowing gate drops its provisional state, as a turn.
     // A failing Aborted goes to TestOS.Failures; the gate's lease then discards the entry.
