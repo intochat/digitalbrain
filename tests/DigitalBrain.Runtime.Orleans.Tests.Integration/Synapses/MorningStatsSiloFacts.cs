@@ -49,10 +49,14 @@ public sealed class MorningStatsSiloFacts(SlotSilo silo) : IClassFixture<SlotSil
     private async Task<IReadOnlyList<Signal>> Journal(string brain, NeuronId id)
         => [.. (await silo.Services.GetRequiredService<BrainSignalHistories>().For(id.Brain).Read(id, 0, 100, Ct)).Signals.Select(s => s.Signal)];
 
-    private static async Task WaitFor(Func<Task<bool>> condition, TimeSpan limit)
+    private static async Task WaitFor(string what, Func<Task<bool>> condition, TimeSpan limit)
     {
         var deadline = DateTime.UtcNow + limit;
-        while (!await condition() && DateTime.UtcNow < deadline) { await Task.Delay(500, Ct); }
+        while (!await condition())
+        {
+            if (DateTime.UtcNow >= deadline) { throw new TimeoutException($"Waited {limit} for {what}."); }
+            await Task.Delay(500, Ct);
+        }
     }
 
     [Fact]
@@ -74,13 +78,13 @@ public sealed class MorningStatsSiloFacts(SlotSilo silo) : IClassFixture<SlotSil
         var stats = NeuronId.Parse("msb/stats1m/default");
         await Install("msb");
 
-        await WaitFor(async () => (await Journal("msb", stats)).OfType<MsReportReady>().Any(), TimeSpan.FromSeconds(100));
+        await WaitFor("the first MsReportReady of msb", async () => (await Journal("msb", stats)).OfType<MsReportReady>().Any(), TimeSpan.FromSeconds(100));
 
         // Best-effort: the collection is global and the fixture offers nothing to observe that this one grain was deactivated.
         // The exactly-once guarantee is pinned by the count and distinct-tick assertions below regardless.
         await silo.Services.GetRequiredService<IGrainFactory>().GetGrain<IManagementGrain>(0).ForceActivationCollection(TimeSpan.Zero, Ct);
 
-        await WaitFor(async () => (await Journal("msb", stats)).OfType<MsReportReady>().Count() >= 2, TimeSpan.FromSeconds(90));
+        await WaitFor("the second MsReportReady of msb", async () => (await Journal("msb", stats)).OfType<MsReportReady>().Count() >= 2, TimeSpan.FromSeconds(90));
 
         // Settle, then re-read: a late duplicate delivery would show up as a third entry.
         await Task.Delay(TimeSpan.FromSeconds(3), Ct);

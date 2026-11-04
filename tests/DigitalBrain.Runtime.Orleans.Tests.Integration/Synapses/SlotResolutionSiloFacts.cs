@@ -162,8 +162,22 @@ public sealed class SlotResolutionSiloFacts(SlotSilo silo) : IClassFixture<SlotS
         await Install("slc", "sl.stats", "analytics");
         await Install("slc", "sl.audit", "finance");
 
-        await silo.Get<ISlPoker>("slc/sl.poker/one").Poke();
-        await StateNeuronSiloFacts.Until(async () => await Value("slc/sl.stats/default") == 7 && await Value("slc/sl.audit/default") == 11, Ct);
+        // Wait on the reactions' journaled StateChanged, heard through the silo's listeners, rather than polling the states.
+        var stats = NeuronId.Parse("slc/sl.stats/default");
+        var audit = NeuronId.Parse("slc/sl.audit/default");
+        var heardStats = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var heardAudit = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await using (await silo.Services.GetRequiredService<IClusterListeners>().Listen<StateChanged>("fact.slc", (publisher, _, _) =>
+        {
+            if (publisher == stats) { heardStats.TrySetResult(); }
+            if (publisher == audit) { heardAudit.TrySetResult(); }
+            return Task.CompletedTask;
+        }))
+        {
+            await silo.Get<ISlPoker>("slc/sl.poker/one").Poke();
+            try { await Task.WhenAll(heardStats.Task, heardAudit.Task).WaitAsync(TimeSpan.FromSeconds(60), Ct); }
+            catch (TimeoutException) { throw new TimeoutException("Waited 60 s for the StateChanged of slc/sl.stats and slc/sl.audit."); }
+        }
 
         Assert.Equal(7, await Value("slc/sl.stats/default"));
         Assert.Equal(11, await Value("slc/sl.audit/default"));
