@@ -267,3 +267,44 @@ public sealed class FrameworkSourceNamesNoProductFacts
         Assert.True(offenders.Count == 0, "Product names in framework source:" + Environment.NewLine + string.Join(Environment.NewLine, offenders));
     }
 }
+
+public sealed class ScriptFacts
+{
+    [Fact]
+    public void NoScriptFilesExistInRepository()
+    {
+        var scriptExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".sh", ".py", ".ps1", ".pyc"
+        };
+
+        var allFiles = Directory.EnumerateFiles(Repository.Root, "*", SearchOption.AllDirectories)
+            .Where(file => !file.Contains(Path.DirectorySeparatorChar + ".git" + Path.DirectorySeparatorChar)
+                        && !file.EndsWith(Path.DirectorySeparatorChar + ".git", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var offenders = new List<string>();
+
+        foreach (var file in allFiles)
+        {
+            var relativePath = Path.GetRelativePath(Repository.Root, file).Replace('\\', '/');
+
+            // Check extension
+            var ext = Path.GetExtension(file);
+            if (scriptExtensions.Contains(ext))
+            {
+                offenders.Add(relativePath);
+                continue;
+            }
+
+            // Check scripts/*.cs
+            if (relativePath.StartsWith("scripts/", StringComparison.OrdinalIgnoreCase) && ext.Equals(".cs", StringComparison.OrdinalIgnoreCase))
+            {
+                offenders.Add(relativePath);
+            }
+        }
+
+        Assert.True(offenders.Count == 0, "Script files found in repository:" + Environment.NewLine + string.Join(Environment.NewLine, offenders));
+    }
+}
+

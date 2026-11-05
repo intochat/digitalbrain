@@ -43,6 +43,7 @@
     <Project Path="tests/DigitalBrain.Runtime.Http.Tests.Integration/DigitalBrain.Runtime.Http.Tests.Integration.csproj" />
     <Project Path="tests/DigitalBrain.Runtime.Synapses.Tests.Unit/DigitalBrain.Runtime.Synapses.Tests.Unit.csproj" />
     <Project Path="tests/DigitalBrain.Templates.Tests.Integration/DigitalBrain.Templates.Tests.Integration.csproj" />
+    <Project Path="tests/DigitalBrain.Templates.Tests.Unit/DigitalBrain.Templates.Tests.Unit.csproj" />
     <Project Path="tests/DigitalBrain.Graph.Tests.Unit/DigitalBrain.Graph.Tests.Unit.csproj" />
   </Folder>
 </Solution>

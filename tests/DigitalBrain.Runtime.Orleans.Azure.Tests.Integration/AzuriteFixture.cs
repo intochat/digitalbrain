@@ -52,7 +52,9 @@ public sealed class AzuriteFixture : IAsyncLifetime
     public string Require()
     {
         if (ConnectionString is { } value) { return value; }
+#pragma warning disable RS0030 // The symbol 'Assert.Skip(string)' is banned in E2E tests, but this is the integration fixture
         if (Mode == AzuriteMode.Skip) { Assert.Skip(SkipReason); }
+#pragma warning restore RS0030
         throw new InvalidOperationException(_failure ?? "Azurite is required in CI (CI=true) but is unreachable.");
     }
 

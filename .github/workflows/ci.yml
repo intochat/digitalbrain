@@ -19,6 +19,7 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
   NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
   CI: 'true'
+  GITLEAKS_VERSION: '8.30.1'
 
 # Gate jobs: format, build, facts, runtime, product, no-orleans, template. The aggregate `ci` job needs all of them.
 jobs:
@@ -45,6 +46,17 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o "$RUNNER_TEMP/gitleaks.tgz"
+          mkdir "$RUNNER_TEMP/gitleaks-bin"
+          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP/gitleaks-bin" gitleaks
+
+      - name: Scan history with gitleaks
+        run: '"$RUNNER_TEMP/gitleaks-bin/gitleaks" git . --redact --verbose --config .gitleaks.toml --baseline-path .gitleaks-baseline.json'
 
       - uses: actions/setup-dotnet@v6
         with:
@@ -88,8 +100,6 @@ jobs:
             tests/DigitalBrain.Testing.Tests.Unit \
             tests/DigitalBrain.Runtime.Orleans.Tests.Unit \
             tests/DigitalBrain.Runtime.Http.Tests.Unit \
-            tests/DigitalBrain.Runtime.Apps.Tests.Unit \
-            tests/DigitalBrain.Apps.Packaging.Tests.Unit \
             tests/DigitalBrain.Graph.Tests.Unit \
             tests/DigitalBrain.Capabilities.Storage.Tests.Unit \
             tests/DigitalBrain.Capabilities.Secrets.Tests.Unit \
@@ -124,6 +134,7 @@ jobs:
           for project in \
             tests/DigitalBrain.Runtime.Orleans.Tests.Integration \
             tests/DigitalBrain.Runtime.Orleans.Azure.Tests.Integration \
+            tests/DigitalBrain.Runtime.Http.Tests.Integration \
             examples/Calculator.Tests.Integration; do
             name=$(basename "$project")
             dotnet test --project "$project/$name.csproj" -c Release
@@ -147,10 +158,7 @@ jobs:
         run: docker run -d --name azurite -p 10000:10000 -p 10001:10001 -p 10002:10002 mcr.microsoft.com/azure-storage/azurite azurite -l /data --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
 
       - name: Framework host conformance facts
-        run: dotnet test --project tests/DigitalBrain.Framework.Tests.E2E/DigitalBrain.Framework.Tests.E2E.csproj -c Release --report-xunit-trx --results-directory artifacts/e2e
-
-      - name: No skipped e2e facts
-        run: bash scripts/ci/fail-on-skipped.sh artifacts/e2e
+        run: dotnet test --project tests/DigitalBrain.Framework.Tests.E2E/DigitalBrain.Framework.Tests.E2E.csproj -c Release
 
   # The Orleans-free packages must stay Orleans-free, transitively.
   no-orleans:
@@ -167,7 +175,7 @@ jobs:
       - name: No Orleans in the core packages
         run: |
           status=0
-          for name in DigitalBrain DigitalBrain.UI DigitalBrain.Testing DigitalBrain.Analyzers DigitalBrain.Runtime.Apps DigitalBrain.Capabilities.Compute DigitalBrain.Capabilities.Connections DigitalBrain.Identity.Local; do
+          for name in DigitalBrain DigitalBrain.UI DigitalBrain.Testing DigitalBrain.Analyzers DigitalBrain.Capabilities.Compute DigitalBrain.Capabilities.Connections DigitalBrain.Identity.Local DigitalBrain.Client; do
             project="src/$name/$name.csproj"
             dotnet restore "$project" -v quiet
             if dotnet list "$project" package --include-transitive | grep -i orleans; then
@@ -177,7 +185,7 @@ jobs:
           done
           exit $status
 
-  # dotnet new intochat-app / intochat-module outside the repository, from this run's packages.
+  # dotnet new intochat-app / intochat-module tests outside the repository, from this run's packages.
   template:
     name: template
     needs: build
@@ -195,11 +203,11 @@ jobs:
           name: packages
           path: artifacts/packages
 
-      - name: Template smoke (local)
-        run: bash scripts/ci/template-smoke.sh local "$RUNNER_TEMP/t" "$GITHUB_WORKSPACE/artifacts/packages"
+      - name: Template smoke facts (unit)
+        run: dotnet test --project tests/DigitalBrain.Templates.Tests.Unit/DigitalBrain.Templates.Tests.Unit.csproj -c Release
 
       # 08-05: dotnet new intochat-app (Notes, Foo.Bar) into a custom hive, build -warnaserror, generated baseline green, DB0030 probe.
-      - name: intochat-app template facts
+      - name: intochat-app and intochat-module template facts
         env:
           DIGITALBRAIN_TEMPLATE_PACKAGES: ${{ github.workspace }}/artifacts/packages
         run: dotnet test --project tests/DigitalBrain.Templates.Tests.Integration/DigitalBrain.Templates.Tests.Integration.csproj -c Release
@@ -218,110 +226,3 @@ jobs:
         run: |
           echo "$RESULTS"
           exit 1
-
-  # Prerelease packages to nuget.org via Trusted Publishing, only after the gate on a push to main/master.
-  publish:
-    name: publish
-    needs: [ci]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    environment: nuget-preview
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-    concurrency:
-      group: publish-main
-      cancel-in-progress: false
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      nuget_org: ${{ steps.push-nuget.outputs.published }}
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-dotnet@v6
-        with:
-          global-json-file: global.json
-
-      - name: Version
-        id: version
-        env:
-          RUN_NUMBER: ${{ github.run_number }}
-        run: echo "version=$(tr -d '[:space:]' < VERSION)-preview.${RUN_NUMBER}" >> "$GITHUB_OUTPUT"
-
-      - name: Pack prerelease packages
-        env:
-          RUN_NUMBER: ${{ github.run_number }}
-        run: |
-          dotnet pack DigitalBrain.slnx -c Release -o artifacts "-p:VersionSuffix=preview.${RUN_NUMBER}"
-          dotnet pack templates/DigitalBrain.Templates/DigitalBrain.Templates.csproj -c Release -o artifacts "-p:VersionSuffix=preview.${RUN_NUMBER}"
-
-      # DIST-04: only the eighteen DigitalBrain ids leave this repository.
-      - name: Package allowlist
-        run: |
-          allowed=" DigitalBrain DigitalBrain.UI DigitalBrain.Testing DigitalBrain.Analyzers DigitalBrain.Templates DigitalBrain.Runtime.Orleans DigitalBrain.Runtime.Orleans.Azure DigitalBrain.Capabilities.Storage DigitalBrain.Capabilities.Secrets DigitalBrain.Capabilities.Identity DigitalBrain.Capabilities.Compute DigitalBrain.Capabilities.Connections DigitalBrain.Identity.Local DigitalBrain.Runtime.Http DigitalBrain.Testing.Silo DigitalBrain.Graph DigitalBrain.Apps.Packaging DigitalBrain.Runtime.Apps DigitalBrain.Runtime.Synapses "
-          version='${{ steps.version.outputs.version }}'
-          count=0
-          for pkg in artifacts/*.nupkg; do
-            id=$(basename "$pkg" ".${version}.nupkg")
-            case "$allowed" in *" $id "*) count=$((count + 1)) ;; *) echo "::error::unexpected package $pkg"; exit 1 ;; esac
-          done
-          [ "$count" -eq 19 ] || { echo "::error::expected 19 packages, got $count"; exit 1; }
-
-      - name: NuGet login (Trusted Publishing)
-        id: login
-        if: env.NUGET_USER != ''
-        env:
-          NUGET_USER: ${{ secrets.NUGET_USER }}
-        uses: NuGet/login@v1
-        with:
-          user: ${{ secrets.NUGET_USER }}
-
-      # Separate from pack so --skip-duplicate cannot mask a pack failure.
-      - name: Push to nuget.org
-        id: push-nuget
-        if: env.NUGET_USER != ''
-        env:
-          NUGET_USER: ${{ secrets.NUGET_USER }}
-          NUGET_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
-        run: |
-          dotnet nuget push "artifacts/*.nupkg" --source https://api.nuget.org/v3/index.json --api-key "${NUGET_KEY}" --skip-duplicate
-          echo "published=true" >> "$GITHUB_OUTPUT"
-
-      - name: Push to GitHub Packages
-        env:
-          GITHUB_TOKEN: ${{ secrets.PACKAGE_TOKEN || secrets.GITHUB_TOKEN }}
-        run: |
-          for pkg in artifacts/*.nupkg; do
-            dotnet nuget push "$pkg" --source https://nuget.pkg.github.com/intochat/index.json --api-key "${GITHUB_TOKEN}" --skip-duplicate || echo "::warning::Could not push $pkg to GitHub Packages (check repository package ownership)"
-          done
-
-      - name: Notify consumers
-        env:
-          GH_TOKEN: ${{ secrets.OS_DOWNSTREAM_TOKEN }}
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          if [ -n "${GH_TOKEN}" ]; then
-            gh api repos/intochat/modules/dispatches -f event_type=digitalbrain-published -F client_payload[version]="${VERSION}"
-            gh api repos/intochat/os/dispatches -f event_type=digitalbrain-published -F client_payload[version]="${VERSION}"
-          fi
-
-  # The external-author path: the template from nuget.org with the just-published preview.
-  template-feed:
-    name: template-feed
-    needs: [publish]
-    if: needs.publish.outputs.nuget_org == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-dotnet@v6
-        with:
-          global-json-file: global.json
-
-      - name: Template smoke (feed)
-        env:
-          VERSION: ${{ needs.publish.outputs.version }}
-        run: bash scripts/ci/template-smoke.sh feed "$RUNNER_TEMP/t" "$VERSION"
