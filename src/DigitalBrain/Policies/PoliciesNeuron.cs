@@ -66,6 +66,7 @@ public sealed class PoliciesNeuron : Neuron<PoliciesState>, IPolicies
     public async Task<PolicyDecision> Allow(string action, decimal amount, IReadOnlyDictionary<string, string>? facts, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(action);
+        ArgumentOutOfRangeException.ThrowIfNegative(amount);
         var now = Context.Time.GetUtcNow();
         var decisionId = Guid.NewGuid().ToString("N");
         var matching = State.Rules
@@ -147,9 +148,10 @@ public sealed class PoliciesNeuron : Neuron<PoliciesState>, IPolicies
             return true;
         }
 
+        // A fact the caller did not supply cannot prove the rule does not apply: fail closed.
         if (facts is null || !facts.TryGetValue(condition.Fact, out var actual) || actual is null)
         {
-            return false;
+            return true;
         }
 
         return condition.Op switch

@@ -25,8 +25,8 @@ public interface IPolicies
     /// <see cref="PolicyRule.Condition"/> holds against <paramref name="facts"/>, reserving <paramref name="amount"/> when allowed.
     /// </summary>
     /// <param name="action">The action identifier.</param>
-    /// <param name="amount">The amount to reserve for <see cref="PolicyMeasure.Sum"/> rules.</param>
-    /// <param name="facts">Optional string facts for condition evaluation.</param>
+    /// <param name="amount">The non-negative amount to reserve for <see cref="PolicyMeasure.Sum"/> rules.</param>
+    /// <param name="facts">Optional string facts for condition evaluation. A conditional rule whose fact is absent applies.</param>
     /// <param name="ct">Cancellation.</param>
     /// <returns>Whether the action is allowed and the reservation's decision id.</returns>
     Task<PolicyDecision> Allow(string action, decimal amount, IReadOnlyDictionary<string, string>? facts, CancellationToken ct = default);

@@ -203,4 +203,31 @@ public sealed class PoliciesFacts
         Assert.Contains(os.Journal(Policies.Brain).Signals(Policies), s => s.Signal is PolicyRetired { RuleId: "r1" });
         Assert.True((await policies.Allow("charges.charge", 300m, null, Ct)).Allowed);
     }
+
+    [Fact]
+    public async Task ANegativeAmountIsRejectedBeforeItCanLowerTheTotal()
+    {
+        await using var os = Start();
+        var policies = os.Get<IPolicies>(Policies);
+        _ = await Adopt(os, WeeklyThreeHundred(os.Clock));
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => policies.Allow("charges.charge", -1000m, null, Ct));
+
+        Assert.True((await policies.Allow("charges.charge", 300m, null, Ct)).Allowed);
+        Assert.False((await policies.Allow("charges.charge", 1m, null, Ct)).Allowed);
+    }
+
+    [Fact]
+    public async Task AMissingFactMakesAConditionalRuleApply()
+    {
+        await using var os = Start();
+        var policies = os.Get<IPolicies>(Policies);
+        var rule = PolicyGrammar.Parse("r1", "gmail.draft.create", "Count", "Day", 1m, "To", "EndsWith", "@corp.com", ChargesTestModule.Drafts, os.Clock);
+        _ = await Adopt(os, rule);
+
+        Assert.True((await policies.Allow("gmail.draft.create", 1m, null, Ct)).Allowed);
+        var second = await policies.Allow("gmail.draft.create", 1m, new Dictionary<string, string> { ["Subject"] = "hi" }, Ct);
+        Assert.False(second.Allowed);
+        Assert.Equal("r1", second.RuleId);
+    }
 }
