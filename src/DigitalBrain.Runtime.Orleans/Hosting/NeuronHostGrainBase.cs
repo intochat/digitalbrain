@@ -14,14 +14,12 @@ using DigitalBrain.Runtime.Orleans.Synapses;
 
 namespace DigitalBrain.Runtime.Orleans.Hosting;
 
-using ISynapseHost = DigitalBrain.Runtime.Orleans.Synapses.ISynapseHost;
-
 /// <summary>
 /// What the three host grains share: parse the key <c>brain/type/key</c>, resolve the plain class, build and attach it, then
 /// dispatch each <see cref="RuntimeInvocation"/> through the one <see cref="NeuronBinder"/>. The invocation's Behavior is ignored:
 /// provenance comes from RequestContext, stamped by <see cref="OrleansInvocationSink"/>.
 /// </summary>
-internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IGrainFactory grains) : Grain, INeuronHost, ISynapseHost, IStreamSubscriptionObserver, IRemindable, IHostTicks
+internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IGrainFactory grains) : Grain, INeuronHost, Synapses.ISynapseHost, IStreamSubscriptionObserver, IRemindable, IHostTicks
 {
     private readonly Dictionary<string, IGrainTimer> _timers = new(StringComparer.Ordinal);
     /// <summary>The binder every host grain dispatches through; its cache also serves scheduling policy checks.</summary>

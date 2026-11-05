@@ -112,6 +112,7 @@ public sealed class SynapseLoaderFacts
         if (hold)
         {
             s_held = loaded.Signals[0];
+            Assert.NotNull(s_held);
         }
 
         return loader.Unload(loaded, gcRounds);

@@ -9,8 +9,6 @@ using Orleans.Storage;
 
 namespace DigitalBrain.Runtime.Orleans.Tests.Integration.Synapses;
 
-using SynapseSource = DigitalBrain.Runtime.Orleans.Synapses.SynapseSource;
-
 // The InstallEdgesFacts of TestOS on the silo: reaction edges come from the install, brain-wide; gates only for installed aliases.
 // Each fact has its own brain.
 public sealed class InstallEdgesSiloFacts(StatefulSilo silo) : IClassFixture<StatefulSilo>
@@ -47,7 +45,7 @@ public sealed class InstallEdgesSiloFacts(StatefulSilo silo) : IClassFixture<Sta
         var store = silo.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage);
         await store.WriteStateAsync(SynapseState.Name, grain, new DigitalBrain.Runtime.Orleans.Tests.Integration.Storage.TestGrainState<SynapseState>
         {
-            State = new SynapseState { Sources = [new SynapseSource { Source = "iee/sb.payments/one", Aliases = ["test.sb.charging"], Cursor = 0 }] },
+            State = new SynapseState { Sources = [new global::DigitalBrain.Runtime.Orleans.Synapses.SynapseSource { Source = "iee/sb.payments/one", Aliases = ["test.sb.charging"], Cursor = 0 }] },
         });
 
         await StateNeuronSiloFacts.Install(silo.Services, "iee", "sb.ledger");

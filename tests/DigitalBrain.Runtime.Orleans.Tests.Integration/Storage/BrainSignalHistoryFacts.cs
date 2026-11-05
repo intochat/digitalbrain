@@ -9,8 +9,6 @@ using Orleans.Storage;
 using OrleansSdk = Orleans;
 namespace DigitalBrain.Runtime.Orleans.Tests.Integration.Storage;
 
-using SynapseSource = DigitalBrain.Runtime.Orleans.Synapses.SynapseSource;
-
 public sealed class BrainSignalHistoryFacts
 {
     private static BrainStore Store(TempHome home, FixedCursors cursors, int window = 1000, ManualTime? time = null)
@@ -101,7 +99,7 @@ public sealed class BrainSignalHistoryFacts
             Assert.IsType<BrainGrainStorage>(host.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage));
             Assert.NotNull(host.Services.GetRequiredService<BrainSignalHistories>());
             var cluster = host.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage);
-            var grainState = new TestGrainState<SynapseState> { State = new SynapseState { Sources = [new SynapseSource { Source = BrainStore.P.ToString(), Cursor = 5 }] } };
+            var grainState = new TestGrainState<SynapseState> { State = new SynapseState { Sources = [new global::DigitalBrain.Runtime.Orleans.Synapses.SynapseSource { Source = BrainStore.P.ToString(), Cursor = 5 }] } };
             await cluster.WriteStateAsync(SynapseState.Name, GrainId.Create("neuron.host", "b1/probe/s"), grainState);
         }
         await using (var host = await new LocalSiloHostFactory(registration).Start(new InProcessHostOptions { Home = home.Path }, ct))

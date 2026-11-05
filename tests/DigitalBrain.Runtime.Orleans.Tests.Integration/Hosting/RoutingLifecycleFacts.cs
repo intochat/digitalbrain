@@ -7,8 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 using OrleansSdk = Orleans;
 namespace DigitalBrain.Runtime.Orleans.Tests.Integration.Hosting;
 
-using ISynapseHost = DigitalBrain.Runtime.Orleans.Synapses.ISynapseHost;
-
 public sealed class RoutingLifecycleFacts
 {
     [Theory]
@@ -36,7 +34,7 @@ public sealed class RoutingLifecycleFacts
             if (queuedCatchUp)
             {
                 await host.Services.GetRequiredService<IGrainFactory>()
-                    .GetGrain<ISynapseHost>(GrainId.Create("neuron.host", id.ToString())).CatchUp();
+                    .GetGrain<global::DigitalBrain.Runtime.Orleans.Synapses.ISynapseHost>(GrainId.Create("neuron.host", id.ToString())).CatchUp();
             }
             queued = probe.Touch();
             var dispatch = host.Services.GetRequiredService<IGrainFactory>().GetGrain<INeuronHost>(GrainId.Create("neuron.host", id.ToString()));
