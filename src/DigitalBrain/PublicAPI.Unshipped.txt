@@ -2256,12 +2256,6 @@ DigitalBrain.Spi.IInstallHooks.EnsureReactionEdges(DigitalBrain.NeuronId state, 
 DigitalBrain.Spi.IInstallHooks.RegisterSchedules(DigitalBrain.NeuronId state, System.Collections.Generic.IReadOnlyList<DigitalBrain.Time.Schedule!>! schedules, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 DigitalBrain.Spi.IInstallHooks.RemoveReactionEdges(DigitalBrain.NeuronId state, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 DigitalBrain.Spi.IInstallHooks.UnregisterSchedules(DigitalBrain.NeuronId state, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
-DigitalBrain.NoInstallHooks
-DigitalBrain.NoInstallHooks.EnsureReactionEdges(DigitalBrain.NeuronId state, System.Collections.Generic.IReadOnlyList<System.Type!>! signals, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
-DigitalBrain.NoInstallHooks.NoInstallHooks() -> void
-DigitalBrain.NoInstallHooks.RegisterSchedules(DigitalBrain.NeuronId state, System.Collections.Generic.IReadOnlyList<DigitalBrain.Time.Schedule!>! schedules, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
-DigitalBrain.NoInstallHooks.RemoveReactionEdges(DigitalBrain.NeuronId state, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
-DigitalBrain.NoInstallHooks.UnregisterSchedules(DigitalBrain.NeuronId state, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 override DigitalBrain.InstallOutcome.Equals(object? obj) -> bool
 override DigitalBrain.InstallOutcome.GetHashCode() -> int
 override DigitalBrain.InstallOutcome.ToString() -> string!
@@ -2411,7 +2405,6 @@ static DigitalBrain.InstallRequested.operator ==(DigitalBrain.InstallRequested? 
 static DigitalBrain.PendingInstall.operator !=(DigitalBrain.PendingInstall? left, DigitalBrain.PendingInstall? right) -> bool
 static DigitalBrain.PendingInstall.operator ==(DigitalBrain.PendingInstall? left, DigitalBrain.PendingInstall? right) -> bool
 DigitalBrain.Spi.IInstallHooks.ValidateBinding(DigitalBrain.NeuronId state, DigitalBrain.SlotDescriptor! slot, string! binding, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<string?>!
-DigitalBrain.NoInstallHooks.ValidateBinding(DigitalBrain.NeuronId state, DigitalBrain.SlotDescriptor! slot, string! binding, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<string?>!
 DigitalBrain.ISynapseCatalogSource
 DigitalBrain.ISynapseCatalogSource.Changed -> System.Action<DigitalBrain.SynapseCatalog!>?
 DigitalBrain.ISynapseCatalogSource.Current.get -> DigitalBrain.SynapseCatalog!
@@ -2933,3 +2926,5 @@ static DigitalBrain.ProposalOutcome.operator !=(DigitalBrain.ProposalOutcome? le
 static DigitalBrain.ProposalOutcome.operator ==(DigitalBrain.ProposalOutcome? left, DigitalBrain.ProposalOutcome? right) -> bool
 static DigitalBrain.Reservation.operator !=(DigitalBrain.Reservation? left, DigitalBrain.Reservation? right) -> bool
 static DigitalBrain.Reservation.operator ==(DigitalBrain.Reservation? left, DigitalBrain.Reservation? right) -> bool
+static DigitalBrain.PolicyGuard.Guard<T>(this DigitalBrain.IPolicies! policies, string! action, decimal amount, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? facts, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! call, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<T>!
+static DigitalBrain.PolicyGuard.Guard(this DigitalBrain.IPolicies! policies, string! action, decimal amount, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? facts, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! call, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!

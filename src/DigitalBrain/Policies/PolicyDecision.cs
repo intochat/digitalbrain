@@ -51,4 +51,49 @@ public static class PolicyGuard
         var reason = decision.Reason ?? "refused by policy";
         throw new RuleViolationException(new Rejected(rule, [rule], [reason]));
     }
+
+    /// <summary>
+    /// Asks <paramref name="policies"/> to allow <paramref name="action"/>, runs <paramref name="call"/> when allowed, and releases the
+    /// reservation when the call throws. A throw is read as "not dispatched"; a module whose call can end uncertain keeps its own
+    /// Allow/Release so an unknown outcome stays counted.
+    /// </summary>
+    /// <typeparam name="T">The call's result.</typeparam>
+    /// <param name="policies">The brain's policies neuron.</param>
+    /// <param name="action">The declared action name.</param>
+    /// <param name="amount">The non-negative amount for <see cref="PolicyMeasure.Sum"/> rules.</param>
+    /// <param name="facts">Optional facts for conditions.</param>
+    /// <param name="call">The external call.</param>
+    /// <param name="ct">Cancellation.</param>
+    /// <returns>The call's result.</returns>
+    /// <exception cref="RuleViolationException">A policy refused the action; the call never ran.</exception>
+    public static async Task<T> Guard<T>(this IPolicies policies, string action, decimal amount, IReadOnlyDictionary<string, string>? facts, Func<CancellationToken, Task<T>> call, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(policies);
+        ArgumentNullException.ThrowIfNull(call);
+        var decision = await policies.Allow(action, amount, facts, ct).ConfigureAwait(false);
+        Require(decision);
+        try
+        {
+            return await call(ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            await policies.Release(decision.DecisionId, CancellationToken.None).ConfigureAwait(false);
+            throw;
+        }
+    }
+
+    /// <summary>The <see cref="Guard{T}"/> of a call without a result.</summary>
+    /// <param name="policies">The brain's policies neuron.</param>
+    /// <param name="action">The declared action name.</param>
+    /// <param name="amount">The non-negative amount for <see cref="PolicyMeasure.Sum"/> rules.</param>
+    /// <param name="facts">Optional facts for conditions.</param>
+    /// <param name="call">The external call.</param>
+    /// <param name="ct">Cancellation.</param>
+    /// <exception cref="RuleViolationException">A policy refused the action; the call never ran.</exception>
+    public static Task Guard(this IPolicies policies, string action, decimal amount, IReadOnlyDictionary<string, string>? facts, Func<CancellationToken, Task> call, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(call);
+        return policies.Guard(action, amount, facts, async token => { await call(token).ConfigureAwait(false); return true; }, ct);
+    }
 }

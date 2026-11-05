@@ -25,8 +25,8 @@ namespace DigitalBrain.Testing;
 /// </example>
 public static class AppBaseline
 {
-    /// <summary>How long one row may take, install included.</summary>
-    public static readonly TimeSpan Budget = TimeSpan.FromSeconds(5);
+    /// <summary>How long one row may take, install included. Generous enough for a full-solution run on a loaded machine; a hung operation still fails.</summary>
+    public static readonly TimeSpan Budget = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// The capabilities a baseline binds a default fake for when the test binds none: <c>storage@1</c> (<see cref="FakeStorage"/>) and

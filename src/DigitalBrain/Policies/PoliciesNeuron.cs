@@ -13,9 +13,27 @@ public sealed class PoliciesNeuron : Neuron<PoliciesState>, IPolicies
     public async Task<ProposalOutcome> Propose(PolicyRule rule, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(rule);
-        var text = DeclaredActions.FirstOrDefault(a => string.Equals(a.Name, rule.Action, StringComparison.Ordinal)) is { } declared
-            ? PolicyGrammar.Render(rule, declared)
-            : rule.Text;
+        if (string.IsNullOrWhiteSpace(rule.Id))
+        {
+            return new ProposalOutcome(ProposalStatus.Refused, null, string.Empty, null, "grammar: rule id must not be empty.");
+        }
+
+        // Nothing reaches the person unless a module declared the action and the row renders under the grammar.
+        if (DeclaredActions.FirstOrDefault(a => string.Equals(a.Name, rule.Action, StringComparison.Ordinal)) is not { } declared)
+        {
+            return new ProposalOutcome(ProposalStatus.Refused, rule.Id, string.Empty, null, $"grammar: action '{rule.Action}' is not declared by any module.");
+        }
+
+        string text;
+        try
+        {
+            text = PolicyGrammar.Render(rule, declared);
+        }
+        catch (PolicyGrammarException error)
+        {
+            return new ProposalOutcome(ProposalStatus.Refused, rule.Id, string.Empty, null, error.Message);
+        }
+
         var prepared = rule with { Text = text };
         var plan = new ConfirmationPlan(
             $"policy:{prepared.Id}:{Guid.NewGuid():N}",
@@ -56,9 +74,11 @@ public sealed class PoliciesNeuron : Neuron<PoliciesState>, IPolicies
             return;
         }
 
-        var adopted = pending.Rule with { AdoptedAt = Context.Time.GetUtcNow() };
+        var now = Context.Time.GetUtcNow();
+        var adopted = pending.Rule with { AdoptedAt = now };
+        var rules = (IReadOnlyList<PolicyRule>)[.. State.Rules.Where(r => r.Id != adopted.Id), adopted];
         await Save(
-            State with { Rules = [.. State.Rules.Where(r => r.Id != adopted.Id), adopted], Pending = rest },
+            State with { Rules = rules, Reservations = Pruned(State.Reservations.Where(r => r.RuleId != adopted.Id), rules, now), Pending = rest },
             [new PolicyAdopted(adopted.Id, adopted.Action, adopted.Text)]).ConfigureAwait(true);
     }
 
@@ -79,7 +99,7 @@ public sealed class PoliciesNeuron : Neuron<PoliciesState>, IPolicies
             var used = WindowTotal(rule, now);
             if (used + increment > rule.Limit)
             {
-                await Save(State, [new PolicyRefused(action, amount, rule.Id)]).ConfigureAwait(true);
+                await Save(State with { Reservations = Pruned(State.Reservations, State.Rules, now) }, [new PolicyRefused(action, amount, rule.Id)]).ConfigureAwait(true);
                 return new PolicyDecision(false, decisionId, rule.Id, rule.Text);
             }
         }
@@ -87,7 +107,7 @@ public sealed class PoliciesNeuron : Neuron<PoliciesState>, IPolicies
         if (matching.Count > 0)
         {
             var added = matching.Select(rule => new Reservation(decisionId, rule.Id, IncrementOf(rule, amount), now)).ToList();
-            await Save(State with { Reservations = [.. State.Reservations, .. added] }, [new StateChanged(Id.ToString(), "policy.reserved")]).ConfigureAwait(true);
+            await Save(State with { Reservations = Pruned([.. State.Reservations, .. added], State.Rules, now) }, [new StateChanged(Id.ToString(), "policy.reserved")]).ConfigureAwait(true);
         }
 
         return new PolicyDecision(true, decisionId, null, null);
@@ -102,7 +122,8 @@ public sealed class PoliciesNeuron : Neuron<PoliciesState>, IPolicies
             return Task.CompletedTask;
         }
 
-        return Save(State with { Reservations = [.. State.Reservations.Where(r => r.DecisionId != decisionId)] }, [new StateChanged(Id.ToString(), "policy.released")]);
+        var now = Context.Time.GetUtcNow();
+        return Save(State with { Reservations = Pruned(State.Reservations.Where(r => r.DecisionId != decisionId), State.Rules, now) }, [new StateChanged(Id.ToString(), "policy.released")]);
     }
 
     /// <inheritdoc />
@@ -167,29 +188,10 @@ public sealed class PoliciesNeuron : Neuron<PoliciesState>, IPolicies
     private decimal WindowTotal(PolicyRule rule, DateTimeOffset now)
     {
         var utcNow = now.ToUniversalTime();
-        return rule.Window.Kind switch
-        {
-            PolicyWindowKind.None => 0m,
-            PolicyWindowKind.Day => SumSince(rule.Id, new DateTimeOffset(utcNow.Year, utcNow.Month, utcNow.Day, 0, 0, 0, TimeSpan.Zero), inclusive: true),
-            PolicyWindowKind.Week => SumSince(rule.Id, StartOfUtcWeek(utcNow), inclusive: true),
-            PolicyWindowKind.Month => SumSince(rule.Id, new DateTimeOffset(utcNow.Year, utcNow.Month, 1, 0, 0, 0, TimeSpan.Zero), inclusive: true),
-            PolicyWindowKind.Rolling => SumSince(rule.Id, utcNow - (rule.Window.Span ?? TimeSpan.Zero), inclusive: false),
-            _ => 0m,
-        };
-    }
-
-    private decimal SumSince(string ruleId, DateTimeOffset threshold, bool inclusive)
-    {
         var total = 0m;
         foreach (var reservation in State.Reservations)
         {
-            if (reservation.RuleId != ruleId)
-            {
-                continue;
-            }
-
-            var inWindow = inclusive ? reservation.At >= threshold : reservation.At > threshold;
-            if (inWindow)
+            if (reservation.RuleId == rule.Id && InWindow(rule, reservation, utcNow))
             {
                 total += reservation.Amount;
             }
@@ -197,6 +199,25 @@ public sealed class PoliciesNeuron : Neuron<PoliciesState>, IPolicies
 
         return total;
     }
+
+    // Reservations outside their rule's window, or without a live rule, can never count again: every save drops them,
+    // so the state stays bounded by one window of traffic per rule. A None window accumulates nothing at all.
+    private static IReadOnlyList<Reservation> Pruned(IEnumerable<Reservation> reservations, IReadOnlyList<PolicyRule> rules, DateTimeOffset now)
+    {
+        var utcNow = now.ToUniversalTime();
+        var live = rules.ToDictionary(r => r.Id, StringComparer.Ordinal);
+        return [.. reservations.Where(r => live.TryGetValue(r.RuleId, out var rule) && InWindow(rule, r, utcNow))];
+    }
+
+    private static bool InWindow(PolicyRule rule, Reservation reservation, DateTimeOffset utcNow) => rule.Window.Kind switch
+    {
+        PolicyWindowKind.None => false,
+        PolicyWindowKind.Day => reservation.At >= new DateTimeOffset(utcNow.Year, utcNow.Month, utcNow.Day, 0, 0, 0, TimeSpan.Zero),
+        PolicyWindowKind.Week => reservation.At >= StartOfUtcWeek(utcNow),
+        PolicyWindowKind.Month => reservation.At >= new DateTimeOffset(utcNow.Year, utcNow.Month, 1, 0, 0, 0, TimeSpan.Zero),
+        PolicyWindowKind.Rolling => reservation.At > utcNow - (rule.Window.Span ?? TimeSpan.Zero),
+        _ => false,
+    };
 
     private static DateTimeOffset StartOfUtcWeek(DateTimeOffset utcNow)
     {

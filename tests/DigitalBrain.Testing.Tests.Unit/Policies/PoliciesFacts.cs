@@ -27,15 +27,7 @@ public sealed class PoliciesFacts
     private static PolicyRule WeeklyThreeHundred(TimeProvider clock)
         => PolicyGrammar.Parse("r1", "charges.charge", "Sum", "Week", 300m, null, null, null, ChargesTestModule.Charges, clock);
 
-    private static async Task<PolicyRule> Adopt(OS os, PolicyRule rule)
-    {
-        var policies = os.Get<IPolicies>(Policies);
-        var outcome = await policies.Propose(rule, Ct);
-        Assert.Equal(ProposalStatus.Pending, outcome.Status);
-        await os.Confirmations.Approve(outcome.PlanId!);
-        await os.Idle();
-        return Assert.Single(await policies.List(Ct), r => r.Id == rule.Id);
-    }
+    private static Task<PolicyRule> Adopt(OS os, PolicyRule rule) => os.AdoptPolicy("b", rule, Ct);
 
     [Fact]
     public async Task ProposeAsksThePersonAndAdoptsOnApproval()
@@ -229,5 +221,86 @@ public sealed class PoliciesFacts
         var second = await policies.Allow("gmail.draft.create", 1m, new Dictionary<string, string> { ["Subject"] = "hi" }, Ct);
         Assert.False(second.Allowed);
         Assert.Equal("r1", second.RuleId);
+    }
+
+    [Fact]
+    public async Task ProposeRefusesAnUndeclaredActionWithoutAskingAnyone()
+    {
+        await using var os = Start();
+        var policies = os.Get<IPolicies>(Policies);
+        var rule = new PolicyRule("r1", "payments.send", PolicyMeasure.Count, new PolicyWindow(PolicyWindowKind.Day, null), 1m, null, "Send all the money", os.Clock.GetUtcNow());
+
+        var outcome = await policies.Propose(rule, Ct);
+
+        Assert.Equal(ProposalStatus.Refused, outcome.Status);
+        Assert.Contains("payments.send", outcome.Reason);
+        Assert.Equal(string.Empty, outcome.Text);
+        Assert.Empty(os.Confirmations.Waiting);
+        Assert.Empty(await policies.List(Ct));
+    }
+
+    [Fact]
+    public async Task ProposeRefusesAMalformedRuleAndNeverShowsCallerText()
+    {
+        await using var os = Start();
+        var policies = os.Get<IPolicies>(Policies);
+        var negative = new PolicyRule("r1", "charges.charge", PolicyMeasure.Sum, new PolicyWindow(PolicyWindowKind.Week, null), -5m, null, "Allow anything", os.Clock.GetUtcNow());
+        var rolling = new PolicyRule("r2", "charges.charge", PolicyMeasure.Sum, new PolicyWindow(PolicyWindowKind.Rolling, null), 5m, null, "Allow anything", os.Clock.GetUtcNow());
+        var blank = new PolicyRule(" ", "charges.charge", PolicyMeasure.Sum, new PolicyWindow(PolicyWindowKind.Week, null), 5m, null, "Allow anything", os.Clock.GetUtcNow());
+
+        foreach (var rule in new[] { negative, rolling, blank })
+        {
+            var outcome = await policies.Propose(rule, Ct);
+            Assert.Equal(ProposalStatus.Refused, outcome.Status);
+            Assert.StartsWith("grammar:", outcome.Reason, StringComparison.Ordinal);
+            Assert.DoesNotContain("Allow anything", outcome.Text, StringComparison.Ordinal);
+        }
+
+        Assert.Empty(os.Confirmations.Waiting);
+    }
+
+    [Fact]
+    public async Task ReservationsOutsideTheirWindowArePrunedOnTheNextSave()
+    {
+        var sunday = new DateTimeOffset(2026, 11, 8, 23, 59, 0, TimeSpan.Zero);
+        await using var os = Start(sunday);
+        var policies = os.Get<IPolicies>(Policies);
+        _ = await Adopt(os, WeeklyThreeHundredRow(os.Clock));
+        var perCall = PolicyGrammar.Parse("r2", "gmail.draft.create", "Count", "None", 1m, null, null, null, ChargesTestModule.Drafts, os.Clock);
+        _ = await Adopt(os, perCall);
+
+        Assert.True((await policies.Allow("charges.charge", 300m, null, Ct)).Allowed);
+        Assert.True((await policies.Allow("gmail.draft.create", 1m, null, Ct)).Allowed);
+        Assert.Equal(1, await ReservationCount(os));
+
+        os.Clock.Advance(TimeSpan.FromMinutes(2));
+        Assert.True((await policies.Allow("charges.charge", 300m, null, Ct)).Allowed);
+
+        Assert.Equal(1, await ReservationCount(os));
+        Assert.False((await policies.Allow("charges.charge", 1m, null, Ct)).Allowed);
+    }
+
+    [Fact]
+    public async Task GuardRunsTheCallWhenAllowedAndReleasesWhenItThrows()
+    {
+        await using var os = Start();
+        var policies = os.Get<IPolicies>(Policies);
+        _ = await Adopt(os, PolicyGrammar.Parse("r1", "gmail.draft.create", "Count", "Day", 1m, null, null, null, ChargesTestModule.Drafts, os.Clock));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => policies.Guard("gmail.draft.create", 1m, null, _ => throw new InvalidOperationException("boom"), Ct));
+
+        var ran = await policies.Guard("gmail.draft.create", 1m, null, _ => Task.FromResult(42), Ct);
+        Assert.Equal(42, ran);
+
+        var refused = await Assert.ThrowsAsync<RuleViolationException>(() => policies.Guard("gmail.draft.create", 1m, null, _ => Task.FromResult(0), Ct));
+        Assert.Contains("create a mail draft", refused.Message, StringComparison.Ordinal);
+    }
+
+    private static PolicyRule WeeklyThreeHundredRow(TimeProvider clock) => WeeklyThreeHundred(clock);
+
+    private static async Task<int> ReservationCount(OS os)
+    {
+        var state = await ((DigitalBrain.Spi.IBrainObserver)os).State(Policies, Ct);
+        return state is { } json && json.TryGetProperty("reservations", out var reservations) ? reservations.GetArrayLength() : -1;
     }
 }
