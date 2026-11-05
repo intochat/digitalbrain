@@ -1,3 +1,5 @@
+using DigitalBrain.Spi;
+
 namespace DigitalBrain.Spi
 {
     /// <summary>Finds the gate neurons a signal must pass before it is published.</summary>
@@ -13,8 +15,6 @@ namespace DigitalBrain.Spi
 
 namespace DigitalBrain
 {
-    using DigitalBrain.Spi;
-
     /// <summary>An <see cref="IGateIndex"/> over a <see cref="SynapseCatalog"/>: the gate neuron is <c>{brain}/{StateAlias}/{Key}</c>.</summary>
     /// <param name="catalog">The synapse catalog.</param>
     public sealed class CatalogGateIndex(SynapseCatalog catalog) : IGateIndex
