@@ -260,14 +260,14 @@ jobs:
       # DIST-04: only the eighteen DigitalBrain ids leave this repository.
       - name: Package allowlist
         run: |
-          allowed=" DigitalBrain DigitalBrain.UI DigitalBrain.Testing DigitalBrain.Analyzers DigitalBrain.Templates DigitalBrain.Runtime.Orleans DigitalBrain.Runtime.Orleans.Azure DigitalBrain.Capabilities.Storage DigitalBrain.Capabilities.Secrets DigitalBrain.Capabilities.Identity DigitalBrain.Capabilities.Compute DigitalBrain.Capabilities.Connections DigitalBrain.Identity.Local DigitalBrain.Runtime.Http DigitalBrain.Testing.Silo DigitalBrain.Graph DigitalBrain.Apps.Packaging DigitalBrain.Runtime.Apps "
+          allowed=" DigitalBrain DigitalBrain.UI DigitalBrain.Testing DigitalBrain.Analyzers DigitalBrain.Templates DigitalBrain.Runtime.Orleans DigitalBrain.Runtime.Orleans.Azure DigitalBrain.Capabilities.Storage DigitalBrain.Capabilities.Secrets DigitalBrain.Capabilities.Identity DigitalBrain.Capabilities.Compute DigitalBrain.Capabilities.Connections DigitalBrain.Identity.Local DigitalBrain.Runtime.Http DigitalBrain.Testing.Silo DigitalBrain.Graph DigitalBrain.Apps.Packaging DigitalBrain.Runtime.Apps DigitalBrain.Runtime.Synapses "
           version='${{ steps.version.outputs.version }}'
           count=0
           for pkg in artifacts/*.nupkg; do
             id=$(basename "$pkg" ".${version}.nupkg")
             case "$allowed" in *" $id "*) count=$((count + 1)) ;; *) echo "::error::unexpected package $pkg"; exit 1 ;; esac
           done
-          [ "$count" -eq 18 ] || { echo "::error::expected 18 packages, got $count"; exit 1; }
+          [ "$count" -eq 19 ] || { echo "::error::expected 19 packages, got $count"; exit 1; }
 
       - name: NuGet login (Trusted Publishing)
         id: login
