@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <Description>Connects apps, sandboxes and remote agents to a DigitalBrain runtime over HTTP and SSE: typed neuron calls and live signal subscriptions.</Description>
+    <RootNamespace>DigitalBrain.Client</RootNamespace>
+    <PackageId>DigitalBrain.Client</PackageId>
+    <PackageReadmeFile Condition="Exists('README.md')">README.md</PackageReadmeFile>
+    <WarningsAsErrors>$(WarningsAsErrors);RS0016;RS0017</WarningsAsErrors>
+    <!-- CA1068: session connection constructor parameters follow the existing IntoChatOSConnection signature -->
+    <!-- RS0026: overloads with optional parameters are by design across DigitalBrain client and watch APIs -->
+    <NoWarn>$(NoWarn);CA1068;RS0026</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+    <None Include="README.md" Pack="true" PackagePath="/" Condition="Exists('README.md')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />
+  </ItemGroup>
+</Project>

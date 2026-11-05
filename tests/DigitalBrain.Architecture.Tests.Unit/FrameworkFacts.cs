@@ -67,7 +67,7 @@ public sealed class VocabularyRingFacts
 // V-02: no Orleans library anywhere in the restore graph of the core-side projects.
 public sealed class CoreHasNoOrleansFacts
 {
-    public static readonly TheoryData<string> CoreProjects = new() { "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Analyzers", "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity", "DigitalBrain.Capabilities.Compute", "DigitalBrain.Capabilities.Connections", "DigitalBrain.Identity.Local", "DigitalBrain.Runtime.Http", "DigitalBrain.Runtime.Apps" };
+    public static readonly TheoryData<string> CoreProjects = new() { "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Analyzers", "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity", "DigitalBrain.Capabilities.Compute", "DigitalBrain.Capabilities.Connections", "DigitalBrain.Identity.Local", "DigitalBrain.Runtime.Http", "DigitalBrain.Client" };
 
     [Theory]
     [MemberData(nameof(CoreProjects))]
@@ -87,7 +87,7 @@ public sealed class CoreHasNoOrleansFacts
     }
 
     // 04-03 (CORE-01, T-04-08): the built core assemblies reference no Orleans assembly and declare no Orleans namespace.
-    public static readonly TheoryData<string> CoreAssemblies = new() { "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity", "DigitalBrain.Capabilities.Compute", "DigitalBrain.Capabilities.Connections", "DigitalBrain.Identity.Local", "DigitalBrain.Runtime.Http", "DigitalBrain.Runtime.Apps" };
+    public static readonly TheoryData<string> CoreAssemblies = new() { "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity", "DigitalBrain.Capabilities.Compute", "DigitalBrain.Capabilities.Connections", "DigitalBrain.Identity.Local", "DigitalBrain.Runtime.Http", "DigitalBrain.Client" };
 
     private static Assembly Anchor(string name) => name switch
     {
@@ -101,7 +101,7 @@ public sealed class CoreHasNoOrleansFacts
         "DigitalBrain.Capabilities.Connections" => typeof(DigitalBrain.Capabilities.Connections.IConnection).Assembly,
         "DigitalBrain.Identity.Local" => typeof(DigitalBrain.Identity.Local.LocalIdentityHosting).Assembly,
         "DigitalBrain.Runtime.Http" => typeof(DigitalBrain.Runtime.Http.IModuleHttpSurface).Assembly, // 09-03, R4-06: ASP.NET, never Orleans
-        "DigitalBrain.Runtime.Apps" => typeof(DigitalBrain.Runtime.Apps.InProcessAppHost).Assembly,
+        "DigitalBrain.Client" => typeof(DigitalBrain.Client.DigitalBrainConnection).Assembly,
         _ => throw new ArgumentOutOfRangeException(nameof(name)),
     };
 
@@ -241,7 +241,7 @@ public sealed partial class VocabularyWordFacts
 // The framework names no product: IntoChat appears in src only in the obsolete shim and the obsolete caller aliases.
 public sealed class FrameworkSourceNamesNoProductFacts
 {
-    private const string Shim = "IntoChatOSNames.cs";
+    private static readonly string[] AllowedFiles = ["IntoChatOSNames.cs", "DigitalBrainConnection.cs", "SessionConnection.cs"];
 
     [Fact]
     public void FrameworkSourceNamesNoProduct()
@@ -250,7 +250,7 @@ public sealed class FrameworkSourceNamesNoProductFacts
         var files = Repository.SourceFiles(source, "*.cs").ToList();
 
         var offenders = new List<string>();
-        foreach (var path in files.Where(path => Path.GetFileName(path) != Shim))
+        foreach (var path in files.Where(path => !AllowedFiles.Contains(Path.GetFileName(path))))
         {
             var lines = File.ReadAllLines(path);
             for (var index = 0; index < lines.Length; index++)

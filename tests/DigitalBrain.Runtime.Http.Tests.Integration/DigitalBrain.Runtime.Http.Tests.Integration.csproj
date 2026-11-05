@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../../src/DigitalBrain.Client/DigitalBrain.Client.csproj" />
+    <ProjectReference Include="../../src/DigitalBrain.Runtime.Http/DigitalBrain.Runtime.Http.csproj" />
+    <ProjectReference Include="../../src/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
+  </ItemGroup>
+</Project>

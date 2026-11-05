@@ -42,6 +42,27 @@
       "defaultValue": "__DIGITALBRAIN_VERSION__",
       "description": "DigitalBrain and DigitalBrain.Testing package version.",
       "replaces": "DIGITALBRAIN_VERSION_VALUE"
+    },
+    "inTree": {
+      "type": "parameter",
+      "datatype": "bool",
+      "defaultValue": "false",
+      "description": "Scaffold as an in-tree module (excludes root Directory.Build.props, Directory.Packages.props, global.json, nuget.config)."
     }
-  }
+  },
+  "sources": [
+    {
+      "modifiers": [
+        {
+          "condition": "(inTree)",
+          "exclude": [
+            "Directory.Build.props",
+            "Directory.Packages.props",
+            "global.json",
+            "nuget.config"
+          ]
+        }
+      ]
+    }
+  ]
 }

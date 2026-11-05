@@ -15,7 +15,6 @@ public sealed partial class TestTierFacts
     {
         "DigitalBrain.Runtime.Orleans.Tests.Unit",
         "DigitalBrain.Runtime.Http.Tests.Unit",
-        "DigitalBrain.Runtime.Apps.Tests.Unit",
     };
 
     [GeneratedRegex(@"\[(Fact|Theory)\b")]
@@ -92,7 +91,8 @@ public sealed partial class TestTierFacts
             Assert.DoesNotContain(refs, r => r.Contains("Aspire.Hosting", StringComparison.OrdinalIgnoreCase));
             Assert.DoesNotContain(refs, r => r.Contains("Playwright", StringComparison.OrdinalIgnoreCase));
 
-            if (project.Name != "DigitalBrain.Templates.Tests.Integration")
+            if (project.Name != "DigitalBrain.Templates.Tests.Integration"
+                && project.Name != "DigitalBrain.Runtime.Http.Tests.Integration")
             {
                 Assert.Contains(refs, r =>
                     r == "DigitalBrain.Testing.Silo"
