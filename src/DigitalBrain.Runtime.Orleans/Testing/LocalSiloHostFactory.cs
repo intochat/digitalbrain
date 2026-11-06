@@ -58,15 +58,16 @@ public sealed class LocalSiloHostFactory : IInProcessHostFactory
         return host;
     }
 
-    internal IHost Build(InProcessHostOptions options, string home)
+    internal IHost Build(InProcessHostOptions options, string home, PortLease? lease = null)
     {
+        var (siloPort, gatewayPort) = lease ?? PortReservation.ReservePair();
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings());
         var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
         {
             [_options.TopologyKey] = Topology.Local.ToConfigValue(),
             [_options.HomeKey] = home,
-            [TopologyContext.SiloPortKey] = FreePort().ToString(System.Globalization.CultureInfo.InvariantCulture),
-            [TopologyContext.GatewayPortKey] = FreePort().ToString(System.Globalization.CultureInfo.InvariantCulture),
+            [TopologyContext.SiloPortKey] = siloPort.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            [TopologyContext.GatewayPortKey] = gatewayPort.ToString(System.Globalization.CultureInfo.InvariantCulture),
         };
         foreach (var (key, value) in options.Configuration) { values[key] = value; }
         builder.Configuration.AddInMemoryCollection(values);
@@ -85,13 +86,6 @@ public sealed class LocalSiloHostFactory : IInProcessHostFactory
         return builder.Build();
     }
 
-    private static int FreePort()
-    {
-        using var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        return ((IPEndPoint)listener.LocalEndpoint).Port;
-    }
-
     private sealed class Unregistered : IClusterStoreRegistration
     {
         // LocalProfile already registered UnregisteredClusterStorage; nothing replaces it.
@@ -102,6 +96,7 @@ public sealed class LocalSiloHostFactory : IInProcessHostFactory
 internal sealed class LocalSiloHost(LocalSiloHostFactory factory, InProcessHostOptions options, string home, bool temporary) : IInProcessHost
 {
     private IHost? _host;
+    private PortLease? _portLease;
 
     public IServiceProvider Services => (_host ?? throw new ObjectDisposedException(nameof(LocalSiloHost))).Services;
 
@@ -109,8 +104,19 @@ internal sealed class LocalSiloHost(LocalSiloHostFactory factory, InProcessHostO
 
     internal async Task Start(CancellationToken ct)
     {
-        _host = factory.Build(options, home);
-        await _host.StartAsync(ct).ConfigureAwait(false);
+        var lease = PortReservation.ReservePair();
+        _portLease = lease;
+        try
+        {
+            _host = factory.Build(options, home, lease);
+            await _host.StartAsync(ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            lease.Dispose();
+            _portLease = null;
+            throw;
+        }
     }
 
     public async Task Restart(CancellationToken ct)
@@ -135,14 +141,22 @@ internal sealed class LocalSiloHost(LocalSiloHostFactory factory, InProcessHostO
 
     private async Task Stop(CancellationToken ct)
     {
-        if (_host is null) { return; }
-        var host = _host;
-        _host = null;
-        try { await host.StopAsync(ct).ConfigureAwait(false); }
+        try
+        {
+            if (_host is null) { return; }
+            var host = _host;
+            _host = null;
+            try { await host.StopAsync(ct).ConfigureAwait(false); }
+            finally
+            {
+                if (host is IAsyncDisposable async) { await async.DisposeAsync().ConfigureAwait(false); }
+                else { host.Dispose(); }
+            }
+        }
         finally
         {
-            if (host is IAsyncDisposable async) { await async.DisposeAsync().ConfigureAwait(false); }
-            else { host.Dispose(); }
+            _portLease?.Dispose();
+            _portLease = null;
         }
     }
 }

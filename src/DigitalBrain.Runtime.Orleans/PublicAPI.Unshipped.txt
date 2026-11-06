@@ -464,6 +464,15 @@ DigitalBrain.Runtime.Orleans.Testing.LocalSiloHostFactory.LocalSiloHostFactory(D
 DigitalBrain.Runtime.Orleans.Testing.LocalSiloHostFactory.LocalSiloHostFactory(DigitalBrain.Runtime.Orleans.IClusterStoreRegistration? clusterStore, System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection!>? configureServices) -> void
 DigitalBrain.Runtime.Orleans.Testing.LocalSiloHostFactory.LocalSiloHostFactory(DigitalBrain.Runtime.Orleans.IClusterStoreRegistration? clusterStore, System.Action<Microsoft.Extensions.DependencyInjection.IServiceCollection!>? configureServices, DigitalBrain.Runtime.Orleans.RuntimeOptions? options) -> void
 DigitalBrain.Runtime.Orleans.Testing.LocalSiloHostFactory.Start(DigitalBrain.InProcessHostOptions! options, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Spi.IInProcessHost!>!
+DigitalBrain.Runtime.Orleans.Testing.PortLease
+DigitalBrain.Runtime.Orleans.Testing.PortLease.Deconstruct(out int siloPort, out int gatewayPort) -> void
+DigitalBrain.Runtime.Orleans.Testing.PortLease.Dispose() -> void
+DigitalBrain.Runtime.Orleans.Testing.PortLease.GatewayPort.get -> int
+DigitalBrain.Runtime.Orleans.Testing.PortLease.SiloPort.get -> int
+DigitalBrain.Runtime.Orleans.Testing.PortReservation
+const DigitalBrain.Runtime.Orleans.Testing.PortReservation.MaxPort = 29000 -> int
+const DigitalBrain.Runtime.Orleans.Testing.PortReservation.MinPort = 21000 -> int
+static DigitalBrain.Runtime.Orleans.Testing.PortReservation.ReservePair() -> DigitalBrain.Runtime.Orleans.Testing.PortLease!
 DigitalBrain.Runtime.Orleans.Topology
 DigitalBrain.Runtime.Orleans.Topology.Cloud = 2 -> DigitalBrain.Runtime.Orleans.Topology
 DigitalBrain.Runtime.Orleans.Topology.Local = 0 -> DigitalBrain.Runtime.Orleans.Topology
