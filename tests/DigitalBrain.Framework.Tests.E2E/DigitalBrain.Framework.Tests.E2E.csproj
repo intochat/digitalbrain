@@ -5,6 +5,8 @@
     <ProjectReference Include="../../src/DigitalBrain.Testing.Silo/DigitalBrain.Testing.Silo.csproj" />
     <ProjectReference Include="../../src/DigitalBrain.Runtime.Orleans/DigitalBrain.Runtime.Orleans.csproj" />
     <ProjectReference Include="../../src/DigitalBrain.Runtime.Orleans.Azure/DigitalBrain.Runtime.Orleans.Azure.csproj" />
+    <ProjectReference Include="../../src/DigitalBrain.Runtime.Http/DigitalBrain.Runtime.Http.csproj" />
+    <ProjectReference Include="../../src/DigitalBrain.Client/DigitalBrain.Client.csproj" />
     <PackageReference Include="Microsoft.Orleans.Sdk" />
     <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
   </ItemGroup>
