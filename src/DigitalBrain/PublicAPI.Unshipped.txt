@@ -2928,3 +2928,23 @@ static DigitalBrain.Reservation.operator !=(DigitalBrain.Reservation? left, Digi
 static DigitalBrain.Reservation.operator ==(DigitalBrain.Reservation? left, DigitalBrain.Reservation? right) -> bool
 static DigitalBrain.PolicyGuard.Guard<T>(this DigitalBrain.IPolicies! policies, string! action, decimal amount, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? facts, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! call, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<T>!
 static DigitalBrain.PolicyGuard.Guard(this DigitalBrain.IPolicies! policies, string! action, decimal amount, System.Collections.Generic.IReadOnlyDictionary<string!, string!>? facts, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! call, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Brains.ICreationHandler
+DigitalBrain.Brains.ICreationHandler.Created(string! brainId, DigitalBrain.Signals.Created! created, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+DigitalBrain.Confirmation.ConfirmationInbox
+DigitalBrain.Confirmation.ConfirmationInbox.<Clone>$() -> DigitalBrain.Confirmation.ConfirmationInbox!
+DigitalBrain.Confirmation.ConfirmationInbox.ConfirmationInbox(long Revision, DigitalBrain.Confirmation.ConfirmationRequested![]! Pending) -> void
+DigitalBrain.Confirmation.ConfirmationInbox.Deconstruct(out long Revision, out DigitalBrain.Confirmation.ConfirmationRequested![]! Pending) -> void
+DigitalBrain.Confirmation.ConfirmationInbox.Equals(DigitalBrain.Confirmation.ConfirmationInbox? other) -> bool
+DigitalBrain.Confirmation.ConfirmationInbox.Pending.get -> DigitalBrain.Confirmation.ConfirmationRequested![]!
+DigitalBrain.Confirmation.ConfirmationInbox.Pending.init -> void
+DigitalBrain.Confirmation.ConfirmationInbox.Revision.get -> long
+DigitalBrain.Confirmation.ConfirmationInbox.Revision.init -> void
+DigitalBrain.Confirmation.IConfirmationInbox
+DigitalBrain.Confirmation.IConfirmationInbox.Key(string! brain) -> string!
+DigitalBrain.Confirmation.IConfirmationInbox.Read() -> System.Threading.Tasks.Task<DigitalBrain.Confirmation.ConfirmationInbox!>!
+DigitalBrain.Confirmation.IConfirmationInbox.Resolve(string! planId, bool approve) -> System.Threading.Tasks.Task!
+override DigitalBrain.Confirmation.ConfirmationInbox.Equals(object? obj) -> bool
+override DigitalBrain.Confirmation.ConfirmationInbox.GetHashCode() -> int
+override DigitalBrain.Confirmation.ConfirmationInbox.ToString() -> string!
+static DigitalBrain.Confirmation.ConfirmationInbox.operator !=(DigitalBrain.Confirmation.ConfirmationInbox? left, DigitalBrain.Confirmation.ConfirmationInbox? right) -> bool
+static DigitalBrain.Confirmation.ConfirmationInbox.operator ==(DigitalBrain.Confirmation.ConfirmationInbox? left, DigitalBrain.Confirmation.ConfirmationInbox? right) -> bool

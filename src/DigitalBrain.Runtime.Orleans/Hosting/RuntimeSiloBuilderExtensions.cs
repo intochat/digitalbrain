@@ -93,6 +93,7 @@ public static class RuntimeSiloBuilderExtensions
         silo.AddSynapseRetention();
         silo.AddRuntimeServices();
         silo.Services.AddCapabilityBroker();
+        silo.Services.TryAddSingleton<Operations.IConfirmationContexts, Confirmations.KernelConfirmations>();
         silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IOutgoingGrainCallFilter, TraceOutgoingFilter>());
         return silo;
     }

@@ -882,3 +882,99 @@ override DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.ToString() -> string!
 static DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.operator !=(DigitalBrain.Runtime.Orleans.Synapses.GateVerdict? left, DigitalBrain.Runtime.Orleans.Synapses.GateVerdict? right) -> bool
 static DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.operator ==(DigitalBrain.Runtime.Orleans.Synapses.GateVerdict? left, DigitalBrain.Runtime.Orleans.Synapses.GateVerdict? right) -> bool
 DigitalBrain.Runtime.Orleans.Hosting.INeuronHost.Reload() -> System.Threading.Tasks.Task!
+const DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationOptions.Section = "DigitalBrain:Confirmations" -> string!
+const DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationPolicyPreference.Section = "DigitalBrain:Confirmations" -> string!
+DigitalBrain.Runtime.Orleans.Brain.BrainNeuron
+DigitalBrain.Runtime.Orleans.Brain.BrainNeuron.BrainNeuron(System.Collections.Generic.IEnumerable<DigitalBrain.Brains.ICreationHandler!>! creation, Microsoft.Extensions.Logging.ILogger<DigitalBrain.Runtime.Orleans.Brain.BrainNeuron!>! logger) -> void
+DigitalBrain.Runtime.Orleans.Brain.BrainNeuron.Create(DigitalBrain.Brains.Owner! owner) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Brain.BrainNeuron.InstanceCreated(string! type, string! key) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Brain.BrainNeuron.InstanceRetired(string! type, string! key) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Brain.BrainNeuron.Read() -> System.Threading.Tasks.Task<DigitalBrain.Brains.BrainState!>!
+DigitalBrain.Runtime.Orleans.Brain.BrainNeuron.TypeAdded(string! name) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Brain.BrainStorage
+DigitalBrain.Runtime.Orleans.Brain.BrainStorage.<Clone>$() -> DigitalBrain.Runtime.Orleans.Brain.BrainStorage!
+DigitalBrain.Runtime.Orleans.Brain.BrainStorage.BrainStorage() -> void
+DigitalBrain.Runtime.Orleans.Brain.BrainStorage.CreatedAt.get -> System.DateTimeOffset
+DigitalBrain.Runtime.Orleans.Brain.BrainStorage.CreatedAt.init -> void
+DigitalBrain.Runtime.Orleans.Brain.BrainStorage.Equals(DigitalBrain.Runtime.Orleans.Brain.BrainStorage? other) -> bool
+DigitalBrain.Runtime.Orleans.Brain.BrainStorage.Owner.get -> DigitalBrain.Brains.Owner?
+DigitalBrain.Runtime.Orleans.Brain.BrainStorage.Owner.init -> void
+DigitalBrain.Runtime.Orleans.Brain.IBrainAnnouncer
+DigitalBrain.Runtime.Orleans.Brain.IBrainAnnouncer.InstanceCreated(string! type, string! key) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Brain.IBrainAnnouncer.InstanceRetired(string! type, string! key) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Brain.IBrainAnnouncer.TypeAdded(string! name) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry.<Clone>$() -> DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry!
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry.ConfirmationEntry(DigitalBrain.Confirmation.ConfirmationRequested! Request, DigitalBrain.Confirmation.ConfirmationResult? Result = null) -> void
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry.Deconstruct(out DigitalBrain.Confirmation.ConfirmationRequested! Request, out DigitalBrain.Confirmation.ConfirmationResult? Result) -> void
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry.Equals(DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry? other) -> bool
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry.Request.get -> DigitalBrain.Confirmation.ConfirmationRequested!
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry.Request.init -> void
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry.Result.get -> DigitalBrain.Confirmation.ConfirmationResult?
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry.Result.init -> void
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationOptions
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationOptions.Brains.get -> System.Collections.Generic.Dictionary<string!, DigitalBrain.Confirmation.ConfirmationPolicy>!
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationOptions.Brains.set -> void
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationOptions.ConfirmationOptions() -> void
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationOptions.For(string! brain) -> DigitalBrain.Confirmation.ConfirmationPolicy
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationPolicyPreference
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationPolicyPreference.Brains.get -> System.Collections.Generic.Dictionary<string!, DigitalBrain.Confirmation.ConfirmationPolicy>!
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationPolicyPreference.Brains.set -> void
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationPolicyPreference.ConfirmationPolicyPreference() -> void
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationPolicyPreference.For(string! brain) -> DigitalBrain.Confirmation.ConfirmationPolicy
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationPolicyPreference.Value.get -> DigitalBrain.Confirmation.ConfirmationPolicy
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationPolicyPreference.Value.set -> void
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationsNeuron
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationsNeuron.Begin(DigitalBrain.Confirmation.ConfirmationPlan! plan, string! origin) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationsNeuron.Cancel(string! planId) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationsNeuron.ConfirmationsNeuron(Microsoft.Extensions.Options.IOptions<DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationOptions!>! options) -> void
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationsNeuron.Read() -> System.Threading.Tasks.Task<DigitalBrain.Confirmation.ConfirmationInbox!>!
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationsNeuron.Resolve(string! planId, bool approve) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationsNeuron.ResolveAsRequester(string! planId, bool approve) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationsNeuron.Result(string! planId) -> System.Threading.Tasks.Task<DigitalBrain.Confirmation.ConfirmationResult?>!
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState.<Clone>$() -> DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState!
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState.ConfirmationState() -> void
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState.Entries.get -> DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry![]!
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState.Entries.init -> void
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState.Equals(DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState? other) -> bool
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState.Revision.get -> long
+DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState.Revision.init -> void
+DigitalBrain.Runtime.Orleans.Confirmations.IConfirmationEntity
+DigitalBrain.Runtime.Orleans.Confirmations.IConfirmationEntity.Begin(DigitalBrain.Confirmation.ConfirmationPlan! plan, string! origin) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Confirmations.IConfirmationEntity.Cancel(string! planId) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Confirmations.IConfirmationEntity.ResolveAsRequester(string! planId, bool approve) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Confirmations.IConfirmationEntity.Result(string! planId) -> System.Threading.Tasks.Task<DigitalBrain.Confirmation.ConfirmationResult?>!
+DigitalBrain.Runtime.Orleans.Confirmations.KernelConfirmations
+DigitalBrain.Runtime.Orleans.Confirmations.KernelConfirmations.For(DigitalBrain.BrainId brain, string! requester) -> DigitalBrain.Confirmation.IConfirmations!
+DigitalBrain.Runtime.Orleans.Confirmations.KernelConfirmations.KernelConfirmations(System.IServiceProvider! services, Microsoft.Extensions.Options.IOptions<DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationOptions!>! options) -> void
+DigitalBrain.Runtime.Orleans.Enforcement.CallFilter
+DigitalBrain.Runtime.Orleans.Enforcement.CallFilter.AuthorizeAsync(DigitalBrain.Capabilities.Identity.CallRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<DigitalBrain.Capabilities.Identity.CallDecision!>
+DigitalBrain.Runtime.Orleans.Enforcement.CallFilter.CallFilter(System.Collections.Generic.IEnumerable<DigitalBrain.Runtime.Orleans.Enforcement.ICallFilterStage!>! stages, DigitalBrain.Runtime.Orleans.Enforcement.ICallBindings? bindings = null) -> void
+DigitalBrain.Runtime.Orleans.Enforcement.ICallBindings
+DigitalBrain.Runtime.Orleans.Enforcement.ICallBindings.IsBound(DigitalBrain.Capabilities.Identity.CallRequest! request, string! callerScope, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<bool>
+DigitalBrain.Runtime.Orleans.Enforcement.ICallFilter
+DigitalBrain.Runtime.Orleans.Enforcement.ICallFilter.AuthorizeAsync(DigitalBrain.Capabilities.Identity.CallRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<DigitalBrain.Capabilities.Identity.CallDecision!>
+DigitalBrain.Runtime.Orleans.Enforcement.ICallFilterStage
+DigitalBrain.Runtime.Orleans.Enforcement.ICallFilterStage.EvaluateAsync(DigitalBrain.Capabilities.Identity.CallRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<DigitalBrain.Capabilities.Identity.CallDecision?>
+DigitalBrain.Runtime.Orleans.Enforcement.ICallFilterStage.Order.get -> int
+DigitalBrain.Runtime.Orleans.Enforcement.PlainNeuronCallFilter
+DigitalBrain.Runtime.Orleans.Enforcement.PlainNeuronCallFilter.Invoke(Orleans.IIncomingGrainCallContext! context) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Enforcement.PlainNeuronCallFilter.PlainNeuronCallFilter(DigitalBrain.Runtime.Orleans.Enforcement.ICallFilter! filter, Microsoft.Extensions.Logging.ILogger<DigitalBrain.Runtime.Orleans.Enforcement.PlainNeuronCallFilter!>! logger) -> void
+override DigitalBrain.Runtime.Orleans.Brain.BrainStorage.Equals(object? obj) -> bool
+override DigitalBrain.Runtime.Orleans.Brain.BrainStorage.GetHashCode() -> int
+override DigitalBrain.Runtime.Orleans.Brain.BrainStorage.ToString() -> string!
+override DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry.Equals(object? obj) -> bool
+override DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry.GetHashCode() -> int
+override DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry.ToString() -> string!
+override DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState.Equals(object? obj) -> bool
+override DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState.GetHashCode() -> int
+override DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState.ToString() -> string!
+static DigitalBrain.Runtime.Orleans.Brain.BrainStorage.operator !=(DigitalBrain.Runtime.Orleans.Brain.BrainStorage? left, DigitalBrain.Runtime.Orleans.Brain.BrainStorage? right) -> bool
+static DigitalBrain.Runtime.Orleans.Brain.BrainStorage.operator ==(DigitalBrain.Runtime.Orleans.Brain.BrainStorage? left, DigitalBrain.Runtime.Orleans.Brain.BrainStorage? right) -> bool
+static DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry.operator !=(DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry? left, DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry? right) -> bool
+static DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry.operator ==(DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry? left, DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry? right) -> bool
+static DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationPolicyPreference.For(DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationOptions! options, string! brain) -> DigitalBrain.Confirmation.ConfirmationPolicy
+static DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState.operator !=(DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState? left, DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState? right) -> bool
+static DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState.operator ==(DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState? left, DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState? right) -> bool
+static DigitalBrain.Runtime.Orleans.Enforcement.PlainNeuronCallFilter.Authorize(DigitalBrain.Runtime.Orleans.Enforcement.ICallFilter! filter, Microsoft.Extensions.Logging.ILogger! logger, DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.NeuronId id, DigitalBrain.Invocation.RuntimeInvocation! call) -> System.Threading.Tasks.Task!

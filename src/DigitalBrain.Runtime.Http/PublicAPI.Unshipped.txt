@@ -82,3 +82,135 @@ static DigitalBrain.Runtime.Http.Surface.HttpProblems.Validation(DigitalBrain.Mo
 static DigitalBrain.Runtime.Http.Surface.IpPrefix.Truncate(string? address) -> string!
 static DigitalBrain.Runtime.Http.Surface.ThrottleResult.operator !=(DigitalBrain.Runtime.Http.Surface.ThrottleResult? left, DigitalBrain.Runtime.Http.Surface.ThrottleResult? right) -> bool
 static DigitalBrain.Runtime.Http.Surface.ThrottleResult.operator ==(DigitalBrain.Runtime.Http.Surface.ThrottleResult? left, DigitalBrain.Runtime.Http.Surface.ThrottleResult? right) -> bool
+const DigitalBrain.Runtime.Http.Storage.StorageContentGateway.CopyBuffer = 81920 -> int
+const DigitalBrain.Runtime.Http.Storage.StorageContentGateway.MaxBytes = 2147483648 -> long
+const DigitalBrain.Runtime.Http.Storage.UploadTicket.Purpose = "DigitalBrain.Runtime.Http.Storage.UploadTicket" -> string!
+DigitalBrain.Runtime.Http.Storage.ContentUploadLog
+DigitalBrain.Runtime.Http.Storage.ContentUploadLog.ContentUploadLog() -> void
+DigitalBrain.Runtime.Http.Storage.ContentUploadLog.Done.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Storage.OperationDone!>!
+DigitalBrain.Runtime.Http.Storage.ContentUploadLog.Failed(DigitalBrain.Operations.OperationId id) -> void
+DigitalBrain.Runtime.Http.Storage.Download
+DigitalBrain.Runtime.Http.Storage.Download.Content.get -> System.IO.Stream?
+DigitalBrain.Runtime.Http.Storage.Download.Content.init -> void
+DigitalBrain.Runtime.Http.Storage.Download.ContentType.get -> string!
+DigitalBrain.Runtime.Http.Storage.Download.ContentType.init -> void
+DigitalBrain.Runtime.Http.Storage.Download.Download() -> void
+DigitalBrain.Runtime.Http.Storage.Download.End.get -> long
+DigitalBrain.Runtime.Http.Storage.Download.End.init -> void
+DigitalBrain.Runtime.Http.Storage.Download.Error.get -> Microsoft.AspNetCore.Http.IResult?
+DigitalBrain.Runtime.Http.Storage.Download.Error.init -> void
+DigitalBrain.Runtime.Http.Storage.Download.ETag.get -> string?
+DigitalBrain.Runtime.Http.Storage.Download.ETag.init -> void
+DigitalBrain.Runtime.Http.Storage.Download.FileName.get -> string!
+DigitalBrain.Runtime.Http.Storage.Download.FileName.init -> void
+DigitalBrain.Runtime.Http.Storage.Download.Inline.get -> bool
+DigitalBrain.Runtime.Http.Storage.Download.Inline.init -> void
+DigitalBrain.Runtime.Http.Storage.Download.Modified.get -> System.DateTimeOffset?
+DigitalBrain.Runtime.Http.Storage.Download.Modified.init -> void
+DigitalBrain.Runtime.Http.Storage.Download.Ranged.get -> byte[]?
+DigitalBrain.Runtime.Http.Storage.Download.Ranged.init -> void
+DigitalBrain.Runtime.Http.Storage.Download.Seekable.get -> bool
+DigitalBrain.Runtime.Http.Storage.Download.Seekable.init -> void
+DigitalBrain.Runtime.Http.Storage.Download.Start.get -> long
+DigitalBrain.Runtime.Http.Storage.Download.Start.init -> void
+DigitalBrain.Runtime.Http.Storage.Download.Total.get -> long?
+DigitalBrain.Runtime.Http.Storage.Download.Total.init -> void
+DigitalBrain.Runtime.Http.Storage.IStorageContentAuthorizer
+DigitalBrain.Runtime.Http.Storage.IStorageContentAuthorizer.Authorise(DigitalBrain.BrainId brain, string! storageKey, DigitalBrain.Capabilities.Storage.ItemId item, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Http.Storage.ParkedOverwrite
+DigitalBrain.Runtime.Http.Storage.ParkedOverwrite.Brain.get -> string!
+DigitalBrain.Runtime.Http.Storage.ParkedOverwrite.Folder.get -> string!
+DigitalBrain.Runtime.Http.Storage.ParkedOverwrite.Name.get -> string!
+DigitalBrain.Runtime.Http.Storage.ParkedOverwrite.Outcome.get -> DigitalBrain.Confirmation.ConfirmationOutcome?
+DigitalBrain.Runtime.Http.Storage.ParkedOverwrite.Plan.get -> DigitalBrain.Capabilities.Storage.WritePlan!
+DigitalBrain.Runtime.Http.Storage.ParkedOverwrite.PlanId.get -> string!
+DigitalBrain.Runtime.Http.Storage.ParkedOverwrite.Started.get -> bool
+DigitalBrain.Runtime.Http.Storage.ParkedOverwrite.Storage.get -> string!
+DigitalBrain.Runtime.Http.Storage.StorageContentEndpoints
+DigitalBrain.Runtime.Http.Storage.StorageContentGateway
+DigitalBrain.Runtime.Http.Storage.StorageContentGateway.Open(Microsoft.AspNetCore.Http.HttpRequest! request, string! brainId, string! storageKey, string! itemValue, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Runtime.Http.Storage.Download!>!
+DigitalBrain.Runtime.Http.Storage.StorageContentGateway.Put(Microsoft.AspNetCore.Http.HttpRequest! request, string! brainId, string! storageKey, string! folderValue, string! name, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<Microsoft.AspNetCore.Http.IResult!>!
+DigitalBrain.Runtime.Http.Storage.StorageContentGateway.StorageContentGateway(System.Func<DigitalBrain.BrainId, string!, System.Threading.CancellationToken, System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.IStorage!>!>! storageResolver, DigitalBrain.Runtime.Http.Storage.UploadPlanBook! book, DigitalBrain.Runtime.Http.Storage.ContentUploadLog! uploads, Microsoft.AspNetCore.DataProtection.IDataProtectionProvider! protection, System.TimeProvider! clock, DigitalBrain.Runtime.Http.Storage.IStorageContentAuthorizer? authorizer = null) -> void
+DigitalBrain.Runtime.Http.Storage.StorageContentGateway.Ticket(string! brainId, string! storageKey, string! folderValue, string! name, string? planId, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<Microsoft.AspNetCore.Http.IResult!>!
+DigitalBrain.Runtime.Http.Storage.UploadPlanBook
+DigitalBrain.Runtime.Http.Storage.UploadPlanBook.Approve(string! planId, DigitalBrain.Capabilities.CapabilityCaller! caller) -> bool
+DigitalBrain.Runtime.Http.Storage.UploadPlanBook.Deny(string! planId) -> void
+DigitalBrain.Runtime.Http.Storage.UploadPlanBook.Expire(string! planId) -> void
+DigitalBrain.Runtime.Http.Storage.UploadPlanBook.Find(string? planId) -> DigitalBrain.Runtime.Http.Storage.ParkedOverwrite?
+DigitalBrain.Runtime.Http.Storage.UploadPlanBook.MarkStarted(string! planId) -> void
+DigitalBrain.Runtime.Http.Storage.UploadPlanBook.Park(string! brain, string! storage, DigitalBrain.Capabilities.Storage.ItemId folder, string! name) -> DigitalBrain.Runtime.Http.Storage.ParkedOverwrite!
+DigitalBrain.Runtime.Http.Storage.UploadPlanBook.UploadPlanBook() -> void
+DigitalBrain.Runtime.Http.Storage.UploadTicket
+DigitalBrain.Runtime.Http.Storage.UploadTicket.<Clone>$() -> DigitalBrain.Runtime.Http.Storage.UploadTicket!
+DigitalBrain.Runtime.Http.Storage.UploadTicket.Brain.get -> string!
+DigitalBrain.Runtime.Http.Storage.UploadTicket.Brain.init -> void
+DigitalBrain.Runtime.Http.Storage.UploadTicket.Deconstruct(out string! Brain, out string! Storage, out string! Folder, out string! Name, out string? PlanId, out System.DateTimeOffset Expires) -> void
+DigitalBrain.Runtime.Http.Storage.UploadTicket.Equals(DigitalBrain.Runtime.Http.Storage.UploadTicket? other) -> bool
+DigitalBrain.Runtime.Http.Storage.UploadTicket.Expires.get -> System.DateTimeOffset
+DigitalBrain.Runtime.Http.Storage.UploadTicket.Expires.init -> void
+DigitalBrain.Runtime.Http.Storage.UploadTicket.Folder.get -> string!
+DigitalBrain.Runtime.Http.Storage.UploadTicket.Folder.init -> void
+DigitalBrain.Runtime.Http.Storage.UploadTicket.Name.get -> string!
+DigitalBrain.Runtime.Http.Storage.UploadTicket.Name.init -> void
+DigitalBrain.Runtime.Http.Storage.UploadTicket.PlanId.get -> string?
+DigitalBrain.Runtime.Http.Storage.UploadTicket.PlanId.init -> void
+DigitalBrain.Runtime.Http.Storage.UploadTicket.Protect(Microsoft.AspNetCore.DataProtection.IDataProtector! protector) -> string!
+DigitalBrain.Runtime.Http.Storage.UploadTicket.Storage.get -> string!
+DigitalBrain.Runtime.Http.Storage.UploadTicket.Storage.init -> void
+DigitalBrain.Runtime.Http.Storage.UploadTicket.UploadTicket(string! Brain, string! Storage, string! Folder, string! Name, string? PlanId, System.DateTimeOffset Expires) -> void
+DigitalBrain.Runtime.Http.Surface.LoadedContracts
+DigitalBrain.Runtime.Http.Surface.NeuronInstance
+DigitalBrain.Runtime.Http.Surface.NeuronInstance.<Clone>$() -> DigitalBrain.Runtime.Http.Surface.NeuronInstance!
+DigitalBrain.Runtime.Http.Surface.NeuronInstance.Contract.get -> string!
+DigitalBrain.Runtime.Http.Surface.NeuronInstance.Contract.init -> void
+DigitalBrain.Runtime.Http.Surface.NeuronInstance.Created.get -> System.DateTimeOffset
+DigitalBrain.Runtime.Http.Surface.NeuronInstance.Created.init -> void
+DigitalBrain.Runtime.Http.Surface.NeuronInstance.Creator.get -> string!
+DigitalBrain.Runtime.Http.Surface.NeuronInstance.Creator.init -> void
+DigitalBrain.Runtime.Http.Surface.NeuronInstance.Deconstruct(out string! Contract, out string! Key, out System.DateTimeOffset Created, out string! Creator) -> void
+DigitalBrain.Runtime.Http.Surface.NeuronInstance.Equals(DigitalBrain.Runtime.Http.Surface.NeuronInstance? other) -> bool
+DigitalBrain.Runtime.Http.Surface.NeuronInstance.Key.get -> string!
+DigitalBrain.Runtime.Http.Surface.NeuronInstance.Key.init -> void
+DigitalBrain.Runtime.Http.Surface.NeuronInstance.NeuronInstance(string! Contract, string! Key, System.DateTimeOffset Created, string! Creator) -> void
+DigitalBrain.Runtime.Http.Surface.NeuronsService
+DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest
+DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.<Clone>$() -> DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest!
+DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.Arguments.get -> System.Text.Json.JsonElement[]?
+DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.Arguments.init -> void
+DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.Contract.get -> string!
+DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.Contract.init -> void
+DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.Deconstruct(out string! Contract, out string! Key, out string! Method, out System.Text.Json.JsonElement[]? Arguments) -> void
+DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.Equals(DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest? other) -> bool
+DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.Key.get -> string!
+DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.Key.init -> void
+DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.Method.get -> string!
+DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.Method.init -> void
+DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.NeuronCallRequest(string! Contract, string! Key, string! Method, System.Text.Json.JsonElement[]? Arguments) -> void
+DigitalBrain.Runtime.Http.Surface.NeuronSurface
+DigitalBrain.Runtime.Http.Surface.NeuronSurface.Allowed(string! contract) -> bool
+DigitalBrain.Runtime.Http.Surface.NeuronSurface.Call(string! brainId, string! contract, string! key, string! method, string! arguments, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Text.Json.JsonElement?>!
+DigitalBrain.Runtime.Http.Surface.NeuronSurface.NeuronSurface(DigitalBrain.Runtime.Http.IRuntimeInvocationDispatcher! dispatcher, System.Collections.Generic.IReadOnlySet<string!>? allowed = null) -> void
+DigitalBrain.Runtime.Http.Surface.NeuronSurface.Restrict(System.Collections.Generic.IReadOnlyCollection<string!>! names) -> DigitalBrain.Runtime.Http.Surface.NeuronSurface!
+override DigitalBrain.Runtime.Http.Storage.UploadTicket.Equals(object? obj) -> bool
+override DigitalBrain.Runtime.Http.Storage.UploadTicket.GetHashCode() -> int
+override DigitalBrain.Runtime.Http.Storage.UploadTicket.ToString() -> string!
+override DigitalBrain.Runtime.Http.Surface.NeuronInstance.Equals(object? obj) -> bool
+override DigitalBrain.Runtime.Http.Surface.NeuronInstance.GetHashCode() -> int
+override DigitalBrain.Runtime.Http.Surface.NeuronInstance.ToString() -> string!
+override DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.Equals(object? obj) -> bool
+override DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.GetHashCode() -> int
+override DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.ToString() -> string!
+static DigitalBrain.Runtime.Http.Storage.Download.Fail(Microsoft.AspNetCore.Http.IResult! error) -> DigitalBrain.Runtime.Http.Storage.Download!
+static DigitalBrain.Runtime.Http.Storage.StorageContentEndpoints.Map(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> void
+static DigitalBrain.Runtime.Http.Storage.StorageContentGateway.SafeName(string! name) -> bool
+static DigitalBrain.Runtime.Http.Storage.UploadTicket.Open(Microsoft.AspNetCore.DataProtection.IDataProtector! protector, string? token, System.TimeProvider! clock) -> DigitalBrain.Runtime.Http.Storage.UploadTicket?
+static DigitalBrain.Runtime.Http.Storage.UploadTicket.operator !=(DigitalBrain.Runtime.Http.Storage.UploadTicket? left, DigitalBrain.Runtime.Http.Storage.UploadTicket? right) -> bool
+static DigitalBrain.Runtime.Http.Storage.UploadTicket.operator ==(DigitalBrain.Runtime.Http.Storage.UploadTicket? left, DigitalBrain.Runtime.Http.Storage.UploadTicket? right) -> bool
+static DigitalBrain.Runtime.Http.Surface.LoadedContracts.Find(string! name) -> System.Type!
+static DigitalBrain.Runtime.Http.Surface.NeuronInstance.operator !=(DigitalBrain.Runtime.Http.Surface.NeuronInstance? left, DigitalBrain.Runtime.Http.Surface.NeuronInstance? right) -> bool
+static DigitalBrain.Runtime.Http.Surface.NeuronInstance.operator ==(DigitalBrain.Runtime.Http.Surface.NeuronInstance? left, DigitalBrain.Runtime.Http.Surface.NeuronInstance? right) -> bool
+static DigitalBrain.Runtime.Http.Surface.NeuronsService.Map(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> void
+static DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.operator !=(DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest? left, DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest? right) -> bool
+static DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.operator ==(DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest? left, DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest? right) -> bool
+static DigitalBrain.Runtime.Http.Surface.NeuronSurface.Get(string! contract, string! key, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+static readonly DigitalBrain.Runtime.Http.Storage.UploadTicket.Lifetime -> System.TimeSpan

@@ -67,7 +67,7 @@ public sealed partial class HttpBoundaryFacts
     public void Runtime_http_references_the_aspnet_framework_and_identity_contract_only()
     {
         var project = Repository.ProjectNamed(HttpProject);
-        Assert.Equal(["DigitalBrain.Capabilities.Identity", "DigitalBrain.Client"], Repository.ProjectReferences(project.Path));
+        Assert.Equal(["DigitalBrain.Capabilities.Identity", "DigitalBrain.Capabilities.Storage", "DigitalBrain.Client"], Repository.ProjectReferences(project.Path));
         Assert.Equal(["Microsoft.CodeAnalysis.PublicApiAnalyzers"], Repository.PackageReferences(project.Path));
         Assert.Equal(["Microsoft.AspNetCore.App"], FrameworkReferences(project.Path));
         var restored = Path.Combine(project.Directory, "obj", "project.assets.json");
