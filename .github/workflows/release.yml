@@ -52,6 +52,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${GITHUB_REF_NAME}" artifacts/packages/*.nupkg --clobber
 
+      - name: Push to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.PACKAGE_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          for pkg in artifacts/packages/*.nupkg; do
+            dotnet nuget push "$pkg" --source https://nuget.pkg.github.com/intochat/index.json --api-key "${GITHUB_TOKEN}" --skip-duplicate || echo "::warning::Could not push $pkg to GitHub Packages"
+          done
+
       - name: NuGet login (Trusted Publishing)
         id: login
         if: env.NUGET_USER != ''
