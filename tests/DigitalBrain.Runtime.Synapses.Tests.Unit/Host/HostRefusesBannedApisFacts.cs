@@ -31,6 +31,13 @@ public sealed class HostRefusesBannedApisFacts
         { "System.Environment.GetEnvironmentVariable", "public static class Leak { public static string? Path() => Environment.GetEnvironmentVariable(\"PATH\"); }" },
         { "System.Linq.Expressions", "public static class Leak { public static object? Exit() => System.Linq.Expressions.Expression.Lambda(System.Linq.Expressions.Expression.Call(typeof(Environment), \"Exit\", null, System.Linq.Expressions.Expression.Constant(0))).Compile().DynamicInvoke(); }" },
         { "System.Threading.Tasks.Task.", "public static class Leak { public static void Spawn() => new Task(() => { }).Start(); }" },
+        { "System.Runtime.CompilerServices.Unsafe.As called from Leak", "public static class Leak { public static long Cast(object o) => System.Runtime.CompilerServices.Unsafe.As<object, long>(ref o); }" },
+        { "System.Runtime.InteropServices.MemoryMarshal.CreateSpan called from Leak", "public static class Leak { public static int Poke(ref int x) => System.Runtime.InteropServices.MemoryMarshal.CreateSpan(ref x, 64)[63]; }" },
+        { "DigitalBrain.ISynapseHost", "public static class Leak { public static object? Host(IServiceProvider services) => services.GetService(typeof(ISynapseHost)); }" },
+        { "DigitalBrain.Runtime.Synapses.SynapseHost", "public static class Leak { public static Type Host() => typeof(DigitalBrain.Runtime.Synapses.SynapseHost); }" },
+        { "System.AppContext.", "public static class Leak { public static object? Data() => AppContext.GetData(\"x\"); }" },
+        { "System.Progress", "public static class Leak { public static object Report() => new Progress<int>(_ => { }); }" },
+        { "System.Buffers.ArrayPool.get_Shared", "public static class Leak { public static int[] Rent() => System.Buffers.ArrayPool<int>.Shared.Rent(4); }" },
         { "System.Timers", "public static class Leak { public static object Tick() => new System.Timers.Timer(10); }" },
     };
 
@@ -103,6 +110,63 @@ public sealed class HostRefusesBannedApisFacts
                     foreach (var item in span) { total += item; }
                     foreach (var item in copy) { total += item; }
                     return total + list.Count + array.Length + names.Count + size + tag.GetHashCode() % 1;
+                }
+            }
+            """), None, Ct);
+
+        Assert.True(outcome.Status == DeployStatus.Deployed, outcome.Reason);
+    }
+
+    [Fact]
+    public async Task AUnitUsingWhatTheCompilerEmitsDeploys()
+    {
+        await using var host = Host(new Installs());
+        var outcome = await host.Deploy(Brain("ce"), Source(SynapseCompilerFacts.Budget + """
+
+            public sealed record Item
+            {
+                public required string Name { get; init; }
+            }
+
+            public static class Emitted
+            {
+                private static readonly object Gate = new();
+
+                public static async Task<int> Later(CancellationToken ct)
+                {
+                    await Task.Delay(1, ct);
+                    return 1;
+                }
+
+                public static IEnumerable<int> Count(int n)
+                {
+                    for (var i = 0; i < n; i++) { yield return i; }
+                }
+
+                public static async IAsyncEnumerable<int> Stream([System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+                {
+                    await Task.Delay(1, ct);
+                    yield return 1;
+                }
+
+                public static int Sum(params ReadOnlySpan<int> values)
+                {
+                    var total = 0;
+                    foreach (var value in values) { total += value; }
+                    return total;
+                }
+
+                public static string Name(int n) => n switch { 1 => "one", 2 => "two" };
+
+                public static int Read(ref readonly int value) => value;
+
+                public static string Locked(Item item)
+                {
+                    lock (Gate)
+                    {
+                        var pool = System.Buffers.ArrayPool<int>.Create();
+                        return $"{item.Name}:{Sum(1, 2, 3)}:{pool.GetHashCode() % 1}";
+                    }
                 }
             }
             """), None, Ct);

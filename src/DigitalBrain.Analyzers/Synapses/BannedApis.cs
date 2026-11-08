@@ -20,6 +20,8 @@ internal static class BannedApis
         "System.Diagnostics.Process",
         "System.Environment",
         "System.Console",
+        "System.AppContext",
+        "System.Progress",
         // Code loading and reflection (Type.GetType + Activator + Invoke reaches anything), and the dynamic binder.
         "System.Reflection",
         "System.Runtime.Loader",
@@ -69,6 +71,7 @@ internal static class BannedApis
         "System.Threading.Tasks.Task.Start",
         "System.Threading.Tasks.Task.ContinueWith",
         "System.Delegate.DynamicInvoke",
+        "System.Buffers.ArrayPool.Shared",
         "System.Type.GetType*",
         "System.Type.InvokeMember",
         "System.Delegate.CreateDelegate",
