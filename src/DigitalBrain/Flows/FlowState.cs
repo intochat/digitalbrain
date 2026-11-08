@@ -1,8 +1,10 @@
 using System.Collections.Immutable;
+using System.Text.Json.Serialization;
 
 namespace DigitalBrain.Flows;
 
 /// <summary>Where a flow stands.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<FlowStatus>))]
 public enum FlowStatus
 {
     /// <summary>Not started.</summary>
@@ -28,6 +30,7 @@ public enum FlowStatus
 }
 
 /// <summary>What a waiting step waits for.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<WaitReason>))]
 public enum WaitReason
 {
     /// <summary>A person's answer to a confirmation plan.</summary>
@@ -41,6 +44,7 @@ public enum WaitReason
 }
 
 /// <summary>How one flow relates to another.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<RelationKind>))]
 public enum RelationKind
 {
     /// <summary>This flow waits for the target.</summary>

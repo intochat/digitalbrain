@@ -2,6 +2,7 @@ using DigitalBrain.Confirmation;
 using DigitalBrain.Flows;
 using DigitalBrain.Spi;
 using DigitalBrain.Tests.Unit.Neurons;
+using System.Text.Json;
 using Microsoft.Extensions.Hosting;
 
 namespace DigitalBrain.Tests.Unit.Flows;
@@ -155,6 +156,22 @@ internal sealed class ManualClock : TimeProvider
 
 public sealed class FlowFacts
 {
+    [Fact]
+    public void FlowEnumsSerializeAsStrings()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var relation = new FlowRelation("f2", RelationKind.BlockedBy, null);
+        var waiting = new Waiting("b", WaitReason.Approval, null, null);
+
+        var relationJson = JsonSerializer.Serialize(relation, options);
+        var waitingJson = JsonSerializer.Serialize(waiting, options);
+
+        Assert.Contains("\"BlockedBy\"", relationJson);
+        Assert.Contains("\"Approval\"", waitingJson);
+        Assert.Equal(relation, JsonSerializer.Deserialize<FlowRelation>(relationJson, options));
+        Assert.Equal(waiting, JsonSerializer.Deserialize<Waiting>(waitingJson, options));
+    }
+
     private static readonly NeuronId FlowId = new(new BrainId("alice"), "test.flow", "f1");
 
     private readonly RecordingConfirmations _confirmations = new();

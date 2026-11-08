@@ -1,6 +1,9 @@
+using System.Text.Json.Serialization;
+
 namespace DigitalBrain.Flows;
 
 /// <summary>How a step ran.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<StepOutcome>))]
 public enum StepOutcome
 {
     /// <summary>The body started.</summary>
@@ -14,6 +17,7 @@ public enum StepOutcome
 }
 
 /// <summary>How a wait ended.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<WaitOutcome>))]
 public enum WaitOutcome
 {
     /// <summary>A person approved.</summary>
@@ -33,6 +37,7 @@ public enum WaitOutcome
 }
 
 /// <summary>How a flow ended.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<FlowOutcome>))]
 public enum FlowOutcome
 {
     /// <summary>Every step completed.</summary>
