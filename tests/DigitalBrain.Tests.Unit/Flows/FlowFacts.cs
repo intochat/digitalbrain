@@ -81,6 +81,15 @@ internal sealed class RecordingConfirmations : IConfirmations
     }
 }
 
+internal sealed class ThrowingConfirmations : IConfirmations
+{
+    public ConfirmationPolicy Policy => ConfirmationPolicy.DestructiveOnly;
+
+    public Task<ConfirmationResult> Confirm(ConfirmationPlan plan, CancellationToken ct = default) => throw new InvalidOperationException("inbox down");
+
+    public Task Resolve(string planId, bool approve, CancellationToken ct = default) => Task.CompletedTask;
+}
+
 internal sealed class RecordingReminders : IReminders
 {
     public Dictionary<string, TimeSpan> Started { get; } = [];
@@ -125,12 +134,13 @@ public sealed class FlowFacts
         TwoStepFlow.SawCancellation = false;
     }
 
-    private async Task<(TwoStepFlow Flow, RecordingContext Context)> Activated(object? stored = null)
+    private async Task<(TwoStepFlow Flow, RecordingContext Context)> Activated(object? stored = null, IConfirmations? confirmations = null)
     {
-        var context = new RecordingContext(FlowId) { RecordedConfirmations = _confirmations, RecordedReminders = _reminders, Time = _clock };
+        var context = new RecordingContext(FlowId) { RecordedConfirmations = confirmations ?? _confirmations, RecordedReminders = _reminders, Time = _clock };
         if (stored is not null) { context.Store(stored); }
         var flow = new TwoStepFlow();
         NeuronAttachment.Attach(flow, context);
+        context.Neurons[FlowId] = flow;
         await NeuronAttachment.Activate(flow, CancellationToken.None);
         return (flow, context);
     }
@@ -332,7 +342,7 @@ public sealed class FlowFacts
     [Fact]
     public async Task RelateAppendsRelation()
     {
-        var (flow, _) = await Activated();
+        var (flow, context) = await Activated();
         await flow.Start("Build", "ann", "parent", new Box { AskFirst = true });
         var relation = new FlowRelation("other", RelationKind.BlockedBy, null);
 
@@ -340,6 +350,39 @@ public sealed class FlowFacts
         await flow.Relate(relation);
 
         Assert.Equal([relation], flow.Current.Relations);
+        Assert.Single(Signals(context), signal => signal == new FlowRelated(FlowId.ToString(), relation));
         Assert.Equal("parent", flow.Current.ParentFlowId);
+    }
+
+    [Fact]
+    public async Task ScheduleWaitResumesOnExpiry()
+    {
+        var (flow, context) = await Activated();
+        await flow.Start("Build", "ann", null, new Box { AskFirst = true, Reason = WaitReason.Schedule, ExpiresIn = TimeSpan.FromMinutes(10) });
+
+        _clock.Now += TimeSpan.FromMinutes(11);
+        await flow.Tick("flow-expiry");
+
+        var id = FlowId.ToString();
+        var signals = Signals(context);
+        Assert.Contains(new FlowResolve(id, "b", WaitOutcome.Arrived, null), signals);
+        Assert.Contains(new FlowStep(id, "b", StepOutcome.Completed, null), signals);
+        Assert.Equal(new FlowDone(id, FlowOutcome.Completed, null), signals[^1]);
+        Assert.Equal(["a", "b"], flow.Current.Done);
+    }
+
+    [Fact]
+    public async Task FailedConfirmationFailsTheFlow()
+    {
+        var (flow, context) = await Activated(confirmations: new ThrowingConfirmations());
+
+        await flow.Start("Build", "ann", null, new Box { AskFirst = true });
+
+        var id = FlowId.ToString();
+        var signals = Signals(context);
+        Assert.Contains(new FlowStep(id, "b", StepOutcome.Failed, "confirmation: inbox down"), signals);
+        Assert.Equal(new FlowDone(id, FlowOutcome.Failed, "confirmation"), signals[^1]);
+        Assert.Equal(FlowStatus.Failed, flow.Current.Status);
+        Assert.Null(flow.Current.Waiting);
     }
 }

@@ -82,3 +82,9 @@ public sealed record FlowResolve(string FlowId, string Step, WaitOutcome Outcome
 /// <param name="Detail">Why it failed or was cancelled, if known.</param>
 [Signal("flow.done")]
 public sealed record FlowDone(string FlowId, FlowOutcome Outcome, string? Detail) : Signal;
+
+/// <summary>A relation was added to a flow.</summary>
+/// <param name="FlowId">The flow id.</param>
+/// <param name="Relation">The relation.</param>
+[Signal("flow.related")]
+public sealed record FlowRelated(string FlowId, FlowRelation Relation) : Signal;

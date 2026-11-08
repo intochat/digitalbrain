@@ -12,7 +12,7 @@ namespace DigitalBrain.Flows;
 /// </summary>
 /// <typeparam name="T">The flow's own state.</typeparam>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "The activation token source holds no timer; OnDeactivate disposes it.")]
-public abstract class Flow<T> : Neuron<FlowState<T>> where T : class, new()
+public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : class, new()
 {
     /// <summary>The reminder that expires an external or schedule wait.</summary>
     public const string ExpiryReminder = "flow-expiry";
@@ -103,7 +103,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>> where T : class, new()
     {
         ArgumentNullException.ThrowIfNull(relation);
         if (State.Relations.Contains(relation)) { return; }
-        await Save(State with { Relations = State.Relations.Add(relation) }, new StateChanged(FlowId, "flow.related")).ConfigureAwait(true);
+        await Save(State with { Relations = State.Relations.Add(relation) }, new FlowRelated(FlowId, relation)).ConfigureAwait(true);
     }
 
     /// <summary>Ends an approval wait when its plan is resolved; other plans are ignored.</summary>
@@ -123,6 +123,14 @@ public abstract class Flow<T> : Neuron<FlowState<T>> where T : class, new()
             _ => WaitOutcome.Denied,
         };
         return Resolve(waiting.Step, outcome, resolved.Approver?.Id);
+    }
+
+    /// <inheritdoc />
+    async Task IFlowCallbacks.ConfirmationFailed(string planId, string detail)
+    {
+        if (State is not { Status: FlowStatus.Waiting, Waiting: { Reason: WaitReason.Approval } waiting } || waiting.ConfirmationPlanId != planId) { return; }
+        await Save(State with { Status = FlowStatus.Failed, Waiting = null, Ended = Context.Time.GetUtcNow() },
+            [new FlowStep(FlowId, waiting.Step, StepOutcome.Failed, "confirmation: " + detail), new FlowDone(FlowId, FlowOutcome.Failed, "confirmation")]).ConfigureAwait(true);
     }
 
     /// <summary>The confirmation plan an approval wait of <paramref name="step"/> raises.</summary>
@@ -153,7 +161,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>> where T : class, new()
         if (name != ExpiryReminder) { return; }
         if (State is { Status: FlowStatus.Waiting, Waiting: { Reason: not WaitReason.Approval, Expires: { } expires } waiting })
         {
-            if (Context.Time.GetUtcNow() >= expires) { await Resolve(waiting.Step, WaitOutcome.Expired, null).ConfigureAwait(true); }
+            if (Context.Time.GetUtcNow() >= expires) { await Resolve(waiting.Step, waiting.Reason == WaitReason.Schedule ? WaitOutcome.Arrived : WaitOutcome.Expired, null).ConfigureAwait(true); }
             return;
         }
         await Context.Reminders.Stop(ExpiryReminder).ConfigureAwait(true);
@@ -214,7 +222,12 @@ public abstract class Flow<T> : Neuron<FlowState<T>> where T : class, new()
     private async Task Ask(ConfirmationPlan plan)
     {
         try { _ = await Context.Confirm(plan, CancellationToken.None).ConfigureAwait(true); }
-        catch (Exception error) when (error is not OutOfMemoryException) { _ = error; }
+        catch (Exception error) when (error is not OutOfMemoryException)
+        {
+            // Back through the neuron's own mailbox: the failure is saved in a turn, never from this detached task.
+            try { await Context.Get<IFlowCallbacks>(Id).ConfirmationFailed(plan.Id, error.Message).ConfigureAwait(true); }
+            catch (Exception relay) when (relay is not OutOfMemoryException) { _ = relay; }
+        }
     }
 
     private async Task Resolve(string step, WaitOutcome outcome, string? by)
@@ -238,6 +251,15 @@ public abstract class Flow<T> : Neuron<FlowState<T>> where T : class, new()
     private static bool Ended(FlowStatus status) => status is FlowStatus.Completed or FlowStatus.Failed or FlowStatus.Cancelled;
 
     private static TimeSpan Positive(TimeSpan span) => span > TimeSpan.Zero ? span : TimeSpan.FromSeconds(1);
+}
+
+/// <summary>What a flow's own detached work calls back on it, so results are saved in a turn. Not for other callers.</summary>
+public interface IFlowCallbacks
+{
+    /// <summary>The confirmation plan <paramref name="planId"/> could not be raised; the waiting flow fails.</summary>
+    /// <param name="planId">The plan id.</param>
+    /// <param name="detail">Why.</param>
+    Task ConfirmationFailed(string planId, string detail);
 }
 
 // The request's trace id. TraceContext lives in DigitalBrain.Capabilities.Compute, which this assembly does not reference, so it is

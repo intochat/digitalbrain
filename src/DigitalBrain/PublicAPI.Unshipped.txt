@@ -3213,3 +3213,20 @@ virtual DigitalBrain.Flows.Flow<T>.Start(string! title, string! owner, string? p
 ~DigitalBrain.Flows.FlowState<T>.Equals(DigitalBrain.Flows.FlowState<T>? other) -> bool
 ~static DigitalBrain.Flows.FlowState<T>.operator !=(DigitalBrain.Flows.FlowState<T>? left, DigitalBrain.Flows.FlowState<T>? right) -> bool
 ~static DigitalBrain.Flows.FlowState<T>.operator ==(DigitalBrain.Flows.FlowState<T>? left, DigitalBrain.Flows.FlowState<T>? right) -> bool
+DigitalBrain.Flows.FlowRelated
+DigitalBrain.Flows.FlowRelated.Deconstruct(out string! FlowId, out DigitalBrain.Flows.FlowRelation! Relation) -> void
+DigitalBrain.Flows.FlowRelated.Equals(DigitalBrain.Flows.FlowRelated? other) -> bool
+DigitalBrain.Flows.FlowRelated.FlowId.get -> string!
+DigitalBrain.Flows.FlowRelated.FlowId.init -> void
+DigitalBrain.Flows.FlowRelated.FlowRelated(string! FlowId, DigitalBrain.Flows.FlowRelation! Relation) -> void
+DigitalBrain.Flows.FlowRelated.Relation.get -> DigitalBrain.Flows.FlowRelation!
+DigitalBrain.Flows.FlowRelated.Relation.init -> void
+DigitalBrain.Flows.IFlowCallbacks
+DigitalBrain.Flows.IFlowCallbacks.ConfirmationFailed(string! planId, string! detail) -> System.Threading.Tasks.Task!
+override DigitalBrain.Flows.FlowRelated.<Clone>$() -> DigitalBrain.Flows.FlowRelated!
+override DigitalBrain.Flows.FlowRelated.Equals(object? obj) -> bool
+override DigitalBrain.Flows.FlowRelated.GetHashCode() -> int
+override DigitalBrain.Flows.FlowRelated.ToString() -> string!
+override sealed DigitalBrain.Flows.FlowRelated.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.Flows.FlowRelated.operator !=(DigitalBrain.Flows.FlowRelated? left, DigitalBrain.Flows.FlowRelated? right) -> bool
+static DigitalBrain.Flows.FlowRelated.operator ==(DigitalBrain.Flows.FlowRelated? left, DigitalBrain.Flows.FlowRelated? right) -> bool

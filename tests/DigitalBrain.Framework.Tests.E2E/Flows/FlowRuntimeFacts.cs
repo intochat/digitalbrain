@@ -37,6 +37,39 @@ public sealed class FlowRuntimeFacts(FlowRuntimeFixture fixture) : IClassFixture
         var ended = await runtime.WaitForSignals<FlowDone>(id, 1, TimeSpan.FromSeconds(20), Ct);
         Assert.Equal(FlowOutcome.Completed, Assert.Single(ended).Outcome);
     }
+
+    [Theory, MemberData(nameof(NeuronRuntimeKinds.Both), MemberType = typeof(NeuronRuntimeKinds))]
+    public async Task ApprovalWaitResolvesOnBothRuntimes(NeuronRuntimeKind kind)
+    {
+        var runtime = await fixture.Runtime(kind);
+        var id = runtime.Id("test.flow", "approval");
+        await runtime.Get<ITestFlow>(id).Start("Build", "ann", null, new FlowBox { AskFirst = true, Approval = true });
+        var waiting = Assert.Single(await runtime.WaitForSignals<FlowWaiting>(id, 1, TimeSpan.FromSeconds(20), Ct));
+        Assert.Equal(WaitReason.Approval, waiting.Reason);
+        var planId = Assert.IsType<string>(waiting.ConfirmationPlanId);
+
+        await ApproveWhenPending(runtime, planId);
+
+        var ended = await runtime.WaitForSignals<FlowDone>(id, 1, TimeSpan.FromSeconds(20), Ct);
+        Assert.Equal(FlowOutcome.Completed, Assert.Single(ended).Outcome);
+        var resolved = Assert.Single(await runtime.Signals<FlowResolve>(id, Ct));
+        Assert.Equal(WaitOutcome.Approved, resolved.Outcome);
+        Assert.Equal(["a", "b"], (await runtime.Get<ITestFlow>(id).Read()).Done);
+    }
+
+    // The detached Confirm reaches the confirmations side asynchronously; approve once the plan is pending there.
+    private static async Task ApproveWhenPending(INeuronRuntime runtime, string planId)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        while (true)
+        {
+            await runtime.Idle();
+            await runtime.ApproveAsPerson(planId, Ct);
+            await runtime.Idle();
+            if ((await runtime.Signals<FlowResolve>(runtime.Id("test.flow", "approval"), Ct)).Count > 0 || DateTime.UtcNow > deadline) { return; }
+            await runtime.Elapse(TimeSpan.FromMilliseconds(100), Ct);
+        }
+    }
 }
 
 [Module("flow-runtime-conformance")]
@@ -48,6 +81,8 @@ public sealed class FlowRuntimeModule : Module
 public sealed class FlowBox
 {
     public bool AskFirst { get; init; }
+
+    public bool Approval { get; init; }
 
     public int Runs { get; init; }
 }
@@ -64,7 +99,7 @@ public interface ITestFlow
     Task<FlowSnapshot> Read();
 }
 
-/// <summary>Two steps; "b" waits for an external signal when <see cref="FlowBox.AskFirst"/>.</summary>
+/// <summary>Two steps; "b" waits (for approval when <see cref="FlowBox.Approval"/>, else an external signal) when <see cref="FlowBox.AskFirst"/>.</summary>
 [Neuron("test.flow", State = "test-flow")]
 public sealed class TwoStepFlow : Flow<FlowBox>, ITestFlow
 {
@@ -74,9 +109,9 @@ public sealed class TwoStepFlow : Flow<FlowBox>, ITestFlow
 
     protected override Task<StepResult<FlowBox>> Run(string step, FlowBox inner, CancellationToken ct)
     {
-        var next = new FlowBox { AskFirst = inner.AskFirst, Runs = inner.Runs + 1 };
+        var next = new FlowBox { AskFirst = inner.AskFirst, Approval = inner.Approval, Runs = inner.Runs + 1 };
         return Task.FromResult(step == "b" && inner.AskFirst
-            ? new StepResult<FlowBox>(next, new Waiting("b", WaitReason.External, null, null))
+            ? new StepResult<FlowBox>(next, new Waiting("b", inner.Approval ? WaitReason.Approval : WaitReason.External, null, null))
             : new StepResult<FlowBox>(next));
     }
 }

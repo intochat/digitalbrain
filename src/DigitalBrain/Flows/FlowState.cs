@@ -36,7 +36,7 @@ public enum WaitReason
     /// <summary>A signal from outside the flow, delivered through <see cref="Flow{T}.Resume"/>.</summary>
     External,
 
-    /// <summary>A time, delivered through <see cref="Flow{T}.Resume"/>.</summary>
+    /// <summary>A time: when <see cref="Waiting.Expires"/> is reached the wait arrives and the flow goes on (or <see cref="Flow{T}.Resume"/> ends it earlier).</summary>
     Schedule,
 }
 

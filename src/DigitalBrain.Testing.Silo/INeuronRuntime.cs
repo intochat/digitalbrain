@@ -39,6 +39,10 @@ public interface INeuronRuntime : IAsyncDisposable
         }
     }
 
+    // Approves the pending confirmation plan planId as a person (TestOS's confirmations; the silo's confirmations neuron under a
+    // person caller stamp), as an approve button would.
+    Task ApproveAsPerson(string planId, CancellationToken ct);
+
     // Stops every activation and starts again over the same state (TestOS keeps its journal; the silo keeps its home).
     Task Restart(CancellationToken ct);
 }
