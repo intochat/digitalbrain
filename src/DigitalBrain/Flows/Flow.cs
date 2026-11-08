@@ -221,7 +221,8 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
             try { result = await Run(step, State.Inner, token).ConfigureAwait(true); }
             // Interrupted, not failed: a cancelled body (any token) or an ending activation leaves Current set and the flow
             // running, so the nudge or the next activation runs the step again.
-            catch (Exception error) when (error is OperationCanceledException || token.IsCancellationRequested) { return; }
+            // A host that is stopping can refuse the body's calls before it cancels the activation: that is an interruption too.
+            catch (Exception error) when (error is OperationCanceledException || token.IsCancellationRequested || HostShutdown.IsStopping(Context.Services, error)) { return; }
             catch (Exception error) when (error is not OutOfMemoryException)
             {
                 if (State.Status != FlowStatus.Running) { return; }
@@ -367,5 +368,28 @@ internal static class FlowTrace
     {
         var trace = TraceCurrent.Value?.GetValue(null);
         return trace?.GetType().GetProperty("TraceId")?.GetValue(trace) as string;
+    }
+}
+
+// Whether the host is shutting down. IHostApplicationLifetime lives in Microsoft.Extensions.Hosting.Abstractions, which this assembly
+// does not reference (its packages are pinned), so the lifetime is found by reflection (as FlowTrace finds TraceContext). An Orleans
+// SiloUnavailableException anywhere in the chain is the second signal: the silo refuses calls while it stops.
+internal static class HostShutdown
+{
+    private static readonly Lazy<(Type Lifetime, PropertyInfo Stopping)?> Lifetime = new(static () =>
+    {
+        var type = Type.GetType("Microsoft.Extensions.Hosting.IHostApplicationLifetime, Microsoft.Extensions.Hosting.Abstractions", throwOnError: false);
+        return type?.GetProperty("ApplicationStopping") is { } stopping ? (type, stopping) : null;
+    });
+
+    public static bool IsStopping(IServiceProvider services, Exception error)
+    {
+        for (var current = error; current is not null; current = current.InnerException)
+        {
+            if (current.GetType().FullName == "Orleans.Runtime.SiloUnavailableException") { return true; }
+        }
+        if (Lifetime.Value is not { } lifetime) { return false; }
+        try { return services.GetService(lifetime.Lifetime) is { } host && lifetime.Stopping.GetValue(host) is CancellationToken { IsCancellationRequested: true }; }
+        catch (NotSupportedException) { return false; }
     }
 }

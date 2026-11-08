@@ -2,6 +2,7 @@ using DigitalBrain.Confirmation;
 using DigitalBrain.Flows;
 using DigitalBrain.Spi;
 using DigitalBrain.Tests.Unit.Neurons;
+using Microsoft.Extensions.Hosting;
 
 namespace DigitalBrain.Tests.Unit.Flows;
 
@@ -34,6 +35,9 @@ public sealed class TwoStepFlow : Flow<Box>
     /// <summary>When set, bodies wait for it before they run.</summary>
     public static Task? Hold { get; set; }
 
+    /// <summary>The number of bodies still to throw an <see cref="InvalidOperationException"/>, as a refused cross-neuron call does.</summary>
+    public static int RefusalsLeft { get; set; }
+
     /// <summary>The number of bodies still to throw an <see cref="OperationCanceledException"/> of a token not the flow's.</summary>
     public static int ForeignCancelsLeft { get; set; }
 
@@ -45,6 +49,11 @@ public sealed class TwoStepFlow : Flow<Box>
     {
         lock (Gate) { Calls.Add(step); }
         if (Hold is { } gate) { await gate; }
+        if (RefusalsLeft > 0)
+        {
+            RefusalsLeft--;
+            throw new InvalidOperationException("host refused the call");
+        }
         if (ForeignCancelsLeft > 0)
         {
             ForeignCancelsLeft--;
@@ -159,11 +168,12 @@ public sealed class FlowFacts
         TwoStepFlow.SawCancellation = false;
         TwoStepFlow.Hold = null;
         TwoStepFlow.ForeignCancelsLeft = 0;
+        TwoStepFlow.RefusalsLeft = 0;
     }
 
-    private async Task<(TwoStepFlow Flow, RecordingContext Context)> Activated(object? stored = null, IConfirmations? confirmations = null)
+    private async Task<(TwoStepFlow Flow, RecordingContext Context)> Activated(object? stored = null, IConfirmations? confirmations = null, IServiceProvider? services = null)
     {
-        var context = new RecordingContext(FlowId) { RecordedConfirmations = confirmations ?? _confirmations, RecordedReminders = _reminders, Time = _clock };
+        var context = new RecordingContext(FlowId) { RecordedConfirmations = confirmations ?? _confirmations, RecordedReminders = _reminders, Time = _clock, RecordedServices = services };
         if (stored is not null) { context.Store(stored); }
         var flow = new TwoStepFlow();
         NeuronAttachment.Attach(flow, context);
@@ -555,5 +565,55 @@ public sealed class FlowFacts
         Assert.Equal(FlowStatus.Running, flow.Current.Status);
         Assert.Empty(TwoStepFlow.Calls);
         Assert.Contains("flow-nudge", _reminders.Started.Keys);
+    }
+
+    [Fact]
+    public async Task BodyFailureDuringHostShutdownIsInterruption()
+    {
+        using var lifetime = new StoppingLifetime();
+        var (flow, context) = await Activated(services: new LifetimeServices(lifetime));
+        lifetime.Stop();
+        TwoStepFlow.RefusalsLeft = 1;
+
+        await Started(flow, context, "Build", "ann", null, new Box());
+
+        Assert.Equal(FlowStatus.Running, flow.Current.Status);
+        Assert.Equal("a", flow.Current.Current);
+        Assert.DoesNotContain(Signals(context), signal => signal is FlowStep { Outcome: StepOutcome.Failed } or FlowDone);
+    }
+
+    [Fact]
+    public async Task BodyFailureOutsideShutdownStillFails()
+    {
+        using var lifetime = new StoppingLifetime();
+        var (flow, context) = await Activated(services: new LifetimeServices(lifetime));
+        TwoStepFlow.RefusalsLeft = 1;
+
+        await Started(flow, context, "Build", "ann", null, new Box());
+
+        Assert.Equal(FlowStatus.Failed, flow.Current.Status);
+        Assert.Contains(new FlowStep(FlowId.ToString(), "a", StepOutcome.Failed, "host refused the call"), Signals(context));
+    }
+
+    private sealed class StoppingLifetime : IHostApplicationLifetime, IDisposable
+    {
+        private readonly CancellationTokenSource _stopping = new();
+
+        public CancellationToken ApplicationStarted => CancellationToken.None;
+
+        public CancellationToken ApplicationStopping => _stopping.Token;
+
+        public CancellationToken ApplicationStopped => CancellationToken.None;
+
+        public void Stop() => _stopping.Cancel();
+
+        public void StopApplication() => Stop();
+
+        public void Dispose() => _stopping.Dispose();
+    }
+
+    private sealed class LifetimeServices(IHostApplicationLifetime lifetime) : IServiceProvider
+    {
+        public object? GetService(Type serviceType) => serviceType == typeof(IHostApplicationLifetime) ? lifetime : null;
     }
 }
