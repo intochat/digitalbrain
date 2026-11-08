@@ -476,6 +476,28 @@ public sealed class FlowFacts
     }
 
     [Fact]
+    public async Task AFailedCancelPostDoesNotStallTheFlow()
+    {
+        var (flow, context) = await Activated();
+        TwoStepFlow.HangsLeft = 1;
+        await flow.Start("Build", "ann", null, new Box());
+        var started = Drain(context);
+        context.Neurons.Remove(FlowId); // the cancel's self-call cannot be posted
+
+        await Assert.ThrowsAnyAsync<Exception>(() => flow.Cancel("stop"));
+        await started;
+
+        Assert.True(TwoStepFlow.SawCancellation);
+        Assert.Equal(FlowStatus.Running, flow.Current.Status);
+        Assert.Contains(Signals(context), signal => signal is FlowStep { Step: "a", Outcome: StepOutcome.Interrupted });
+
+        await flow.Tick("flow-nudge");
+
+        Assert.Equal(FlowStatus.Completed, flow.Current.Status);
+        Assert.Equal(["a", "a", "b"], TwoStepFlow.Calls);
+    }
+
+    [Fact]
     public async Task CancelResolvesPendingApprovalPlan()
     {
         var (flow, context) = await Activated();

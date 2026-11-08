@@ -43,6 +43,13 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     // Cancelled when the flow is cancelled or the activation ends: the running body's token.
     private readonly CancellationTokenSource _activation = new();
 
+    // The running body's own source, linked to _activation: Cancel fires only this one, so a cancel whose post fails interrupts the
+    // current body and the next advance runs normally.
+    private CancellationTokenSource? _running;
+
+    // Completes when Cancel's post is sent (true) or failed (false), so an interrupted body knows whether the cancel holds.
+    private Task<bool> _cancelPosted = Task.FromResult(true);
+
     // 1 once OnDeactivate disposed _activation: a late (interleaved) Cancel must not touch it.
     private int _disposed;
 
@@ -136,12 +143,20 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
         if (Ended(State.Status) || _cancelRequested is not null) { return; }
         _cancelRequested = reason;
-        await CancelActivation().ConfigureAwait(true);
+        var posted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _cancelPosted = posted.Task;
+        await CancelRunning().ConfigureAwait(true);
         var proof = Proof();
-        try { await Context.Get<IFlowCallbacks>(Id).CancelRequested(reason, proof).ConfigureAwait(true); }
+        try
+        {
+            await Context.Get<IFlowCallbacks>(Id).CancelRequested(reason, proof).ConfigureAwait(true);
+            posted.TrySetResult(true);
+        }
         catch (Exception error) when (error is not OutOfMemoryException)
         {
-            // Not posted: a later Cancel tries again.
+            posted.TrySetResult(false);
+            // Not posted: the body was only interrupted, the nudge runs it again, and a later Cancel tries again.
+            FlowLog.CancelPostFailed(Logger(), error, FlowId);
             Forget(proof);
             _cancelRequested = null;
             throw;
@@ -235,6 +250,13 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         if (Interlocked.Exchange(ref _disposed, 1) == 0) { _activation.Dispose(); }
     }
 
+    private async Task CancelRunning()
+    {
+        if (_running is not { } running) { return; }
+        try { await running.CancelAsync().ConfigureAwait(true); }
+        catch (ObjectDisposedException) { } // the body ended meanwhile
+    }
+
     private async Task CancelActivation()
     {
         if (Volatile.Read(ref _disposed) != 0) { return; }
@@ -285,12 +307,17 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
             await Save(State with { Current = step }, new FlowStep(FlowId, step, StepOutcome.Started, null)).ConfigureAwait(true);
             if (_cancelRequested is not null) { return; }
             StepResult<T> result;
-            try { result = await Run(step, State.Inner, token).ConfigureAwait(true); }
+            using var run = CancellationTokenSource.CreateLinkedTokenSource(token);
+            _running = run;
+            try { result = await Run(step, State.Inner, run.Token).ConfigureAwait(true); }
             // Interrupted, not failed: a cancelled body (any token) or an ending activation leaves Current set and the flow
             // running, so the nudge or the next activation runs the step again.
             // A host that is stopping can refuse the body's calls before it cancels the activation: that is an interruption too.
-            catch (Exception error) when (error is OperationCanceledException || token.IsCancellationRequested || HostShutdown.IsStopping(Context.Services, error))
+            catch (Exception error) when (error is OperationCanceledException || run.IsCancellationRequested || HostShutdown.IsStopping(Context.Services, error))
             {
+                _running = null;
+                // A cancel whose post failed leaves only an interruption behind.
+                if (_cancelRequested is not null && !await _cancelPosted.ConfigureAwait(true)) { _cancelRequested = null; }
                 if (_cancelRequested is null && State.Status == FlowStatus.Running) { await Interrupted(step, error.Message).ConfigureAwait(true); }
                 return;
             }
@@ -302,6 +329,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
                 await StopNudge().ConfigureAwait(true);
                 return;
             }
+            _running = null;
             // Cancelled while the body ran: its result is dropped.
             if (State.Status != FlowStatus.Running || result is null || _cancelRequested is not null) { return; }
             if (result.Wait is { } wait)
@@ -501,6 +529,9 @@ internal static partial class FlowLog
 {
     [LoggerMessage(Level = LogLevel.Error, Message = "Flow {FlowId} could not record the answer to confirmation plan {PlanId}; it stays waiting")]
     public static partial void RelayFailed(ILogger logger, Exception exception, string flowId, string planId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Flow {FlowId} could not post its cancel; the running body was interrupted and the flow runs on")]
+    public static partial void CancelPostFailed(ILogger logger, Exception exception, string flowId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Flow {FlowId} could not journal the interruption of step {Step}; it runs again")]
     public static partial void InterruptionNotSaved(ILogger logger, Exception exception, string flowId, string step);
