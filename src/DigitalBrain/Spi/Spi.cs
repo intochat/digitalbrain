@@ -119,7 +119,7 @@ public interface IOperations
 /// <summary>Read-only view of operations, for an app that shows progress (for example a Tasks list) without starting or cancelling them.</summary>
 public interface IOperationsQuery
 {
-    /// <summary>The running operations of this brain driven on this silo. Operations driven elsewhere, or orphaned by a silo restart, are not listed; <see cref="Read"/> is the cross-silo path.</summary>
+    /// <summary>The running operations of this brain driven by this host. Operations driven by another host, or orphaned by a host restart, are not listed; <see cref="Read"/> is the path across hosts.</summary>
     Task<IReadOnlyList<DigitalBrain.Operations.OperationView>> Running(CancellationToken ct);
 
     /// <summary>The operation <paramref name="id"/>, running or done, or null when no operation of this brain has that id.</summary>
