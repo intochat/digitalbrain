@@ -16,10 +16,21 @@ internal static class BannedReferences
         using var pe = new PEReader(ImmutableArray.Create(assembly));
         var metadata = pe.GetMetadataReader();
 
+        // A P/Invoke (an ImplMap row) is native code whatever names it uses.
+        foreach (var handle in metadata.MethodDefinitions)
+        {
+            var method = metadata.GetMethodDefinition(handle);
+            if (!method.GetImport().Name.IsNil || (method.Attributes & System.Reflection.MethodAttributes.PinvokeImpl) != 0)
+            {
+                var owner = metadata.GetTypeDefinition(method.GetDeclaringType());
+                return $"native import {metadata.GetString(owner.Name)}.{metadata.GetString(method.Name)}";
+            }
+        }
+
         foreach (var handle in metadata.TypeReferences)
         {
             var type = TypeName(metadata, handle);
-            if (BannedApis.IsBannedType(type))
+            if (BannedApis.IsBannedReference(type))
             {
                 return type;
             }

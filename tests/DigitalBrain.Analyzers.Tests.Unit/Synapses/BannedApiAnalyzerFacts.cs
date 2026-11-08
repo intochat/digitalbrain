@@ -56,6 +56,24 @@ public sealed class BannedApiAnalyzerFacts
     }
 
     [Fact]
+    public Task ReflectionAndEnvironmentAreDB0045ButNewLineIsAllowed()
+    {
+        var test = Verify<BannedApiAnalyzer>.Create(State + """
+
+            public static class Reach
+            {
+                public static object? Make() => {|#0:System.Activator.CreateInstance({|#1:System.Type.GetType("X")|}!)|};
+                public static string? Path() => {|#2:System.Environment.GetEnvironmentVariable("PATH")|};
+                public static string Line() => System.Environment.NewLine;
+            }
+            """);
+        test.ExpectedDiagnostics.Add(new DiagnosticResult("DB0045", DiagnosticSeverity.Error).WithLocation(0).WithArguments("System.Activator.CreateInstance"));
+        test.ExpectedDiagnostics.Add(new DiagnosticResult("DB0045", DiagnosticSeverity.Error).WithLocation(1).WithArguments("System.Type.GetType"));
+        test.ExpectedDiagnostics.Add(new DiagnosticResult("DB0045", DiagnosticSeverity.Error).WithLocation(2).WithArguments("System.Environment.GetEnvironmentVariable"));
+        return test.RunAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
     public Task AnAssemblyWithoutStateIsIgnored() => Verify<BannedApiAnalyzer>.Diagnostics("""
         public static class Fetch
         {

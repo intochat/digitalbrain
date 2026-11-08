@@ -58,7 +58,7 @@ internal static class Rules
     // The synapse host refuses a build that references the same list (BannedApis), so skipping this analyzer does not get a build in.
     public static readonly DiagnosticDescriptor BannedApi = new(
         "DB0045", "Banned API in a synapse assembly",
-        "'{0}' is banned in a synapse assembly (no network, disk, processes, thread pool or code loading); reach the outside through a [Slot] capability",
+        "'{0}' is banned in a synapse assembly (no network, disk, processes, environment, reflection, native code, dynamic or thread pool); reach the outside through a [Slot] capability",
         Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
     public static readonly DiagnosticDescriptor ShareableContract = new(

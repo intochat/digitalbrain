@@ -84,7 +84,7 @@ public sealed class SynapseCompiler
             assemblyName,
             trees,
             references.References,
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable, deterministic: true));
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable, deterministic: true, allowUnsafe: false));
 
         var analyzed = compilation.WithAnalyzers(analyzers).GetAllDiagnosticsAsync().GetAwaiter().GetResult();
         if (analyzed.Any(IsError))

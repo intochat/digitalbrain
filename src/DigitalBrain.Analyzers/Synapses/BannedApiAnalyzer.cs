@@ -25,6 +25,9 @@ public sealed class BannedApiAnalyzer : DiagnosticAnalyzer
             start.RegisterOperationAction(AnalyzeOperation,
                 OperationKind.Invocation, OperationKind.ObjectCreation, OperationKind.PropertyReference,
                 OperationKind.FieldReference, OperationKind.EventReference, OperationKind.MethodReference);
+            start.RegisterOperationAction(AnalyzeDynamic,
+                OperationKind.DynamicInvocation, OperationKind.DynamicMemberReference, OperationKind.DynamicObjectCreation,
+                OperationKind.DynamicIndexerAccess);
             start.RegisterSyntaxNodeAction(AnalyzeUsing, SyntaxKind.UsingDirective);
         });
     }
@@ -47,6 +50,10 @@ public sealed class BannedApiAnalyzer : DiagnosticAnalyzer
         }
     }
 
+    // dynamic binds at run time through Microsoft.CSharp.RuntimeBinder, which reaches any member: it is banned as a whole.
+    private static void AnalyzeDynamic(OperationAnalysisContext context) =>
+        context.ReportDiagnostic(Diagnostic.Create(Rules.BannedApi, context.Operation.Syntax.GetLocation(), "dynamic"));
+
     private static void AnalyzeUsing(SyntaxNodeAnalysisContext context)
     {
         var directive = (UsingDirectiveSyntax)context.Node;
@@ -54,7 +61,7 @@ public sealed class BannedApiAnalyzer : DiagnosticAnalyzer
         if (context.SemanticModel.GetSymbolInfo(directive.Name!, context.CancellationToken).Symbol is not INamedTypeSymbol type) { return; }
 
         var typeName = TypeName(type);
-        if (BannedApis.IsBannedType(typeName))
+        if (BannedApis.IsBannedReference(typeName))
         {
             context.ReportDiagnostic(Diagnostic.Create(Rules.BannedApi, directive.GetLocation(), typeName));
         }
