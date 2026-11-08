@@ -139,6 +139,11 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
                 return await RebindOrKeep(brain, entry, source, build, effective, ct).ConfigureAwait(false);
             }
 
+            if (entry is not null)
+            {
+                entry.Rebind = null;
+            }
+
             if (string.Equals(entry?.Staged?.Loaded.Hash, build.Hash, StringComparison.Ordinal))
             {
                 return new DeployOutcome(DeployStatus.Staged, build.Hash, build.Diagnostics, Empty(), "this version is already staged");
@@ -339,9 +344,20 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
 
         var next = new Pending(entry.Live, source, build, wanted);
         var outcomes = await InstallAll(brain, next, ct).ConfigureAwait(false);
-        if (outcomes.Values.All(o => o.Status != InstallStatus.Pending))
+        if (aliases.FirstOrDefault(a => outcomes[a].Status is InstallStatus.Refused or InstallStatus.Denied) is { } refused)
         {
-            await Store(brain, next, ct).ConfigureAwait(false);
+            return new DeployOutcome(DeployStatus.Refused, build.Hash, build.Diagnostics, outcomes, $"the install of '{refused}' was {outcomes[refused].Status.ToString().ToLowerInvariant()}: {outcomes[refused].Reason}");
+        }
+
+        // An alias still waiting for the person keeps its stored bindings until the ask is approved (ResolveRebind stores them then).
+        var waiting = aliases.Where(a => outcomes[a].Status == InstallStatus.Pending).ToList();
+        entry.Rebind = waiting.Count == 0 ? null : new Rebind(
+            waiting.ToDictionary(a => a, a => outcomes[a].Reason ?? "", StringComparer.Ordinal),
+            waiting.ToDictionary(a => a, a => wanted[a], StringComparer.Ordinal));
+        if (waiting.Count < aliases.Count)
+        {
+            var kept = aliases.ToDictionary(a => a, a => waiting.Contains(a) ? stored.TryGetValue(a, out var old) ? old : NoBindings : wanted[a], StringComparer.Ordinal);
+            await Store(brain, next with { Bindings = kept }, ct).ConfigureAwait(false);
         }
 
         return new DeployOutcome(DeployStatus.Deployed, build.Hash, build.Diagnostics, outcomes, null);
@@ -728,6 +744,7 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         await gate.WaitAsync().ConfigureAwait(false);
         try
         {
+            await ResolveRebind(brain, signal).ConfigureAwait(false);
             var entry = entries.FirstOrDefault(e => e.Key.Brain == brain && e.Value.Staged is { } staged && Awaits(staged, signal)).Value;
             if (entry is null)
             {
@@ -750,6 +767,48 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         finally
         {
             gate.Release();
+        }
+    }
+
+    // The ask of a rebind was answered: an approval stores the bindings the ask carried, a denial drops them.
+    private async Task ResolveRebind(BrainId brain, Signal signal)
+    {
+        foreach (var ((owner, key), entry) in entries)
+        {
+            if (owner != brain || entry.Rebind is not { } rebind)
+            {
+                continue;
+            }
+
+            var alias = signal switch
+            {
+                Installed installed when rebind.Waiting.ContainsKey(installed.Alias) => installed.Alias,
+                InstallDenied denied when rebind.Waiting.TryGetValue(denied.Alias, out var plan) && string.Equals(plan, denied.PlanId, StringComparison.Ordinal) => denied.Alias,
+                _ => null,
+            };
+            if (alias is null)
+            {
+                continue;
+            }
+
+            var bindings = rebind.Bindings[alias];
+            _ = rebind.Waiting.Remove(alias);
+            _ = rebind.Bindings.Remove(alias);
+            if (rebind.Waiting.Count == 0)
+            {
+                entry.Rebind = null;
+            }
+
+            if (signal is Installed && await store.Get(brain, key, CancellationToken.None).ConfigureAwait(false) is { } record)
+            {
+                var merged = new Dictionary<string, IReadOnlyDictionary<string, string>>(record.Bindings ?? new Dictionary<string, IReadOnlyDictionary<string, string>>(), StringComparer.Ordinal)
+                {
+                    [alias] = bindings,
+                };
+                await store.Put(brain, record with { Bindings = merged }, CancellationToken.None).ConfigureAwait(false);
+            }
+
+            return;
         }
     }
 
@@ -783,8 +842,14 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
 
         public Pending? Staged { get; set; }
 
+        // The asks of a rebind of the live build still waiting for the person.
+        public Rebind? Rebind { get; set; }
+
         public DateTimeOffset At { get; set; } = at;
     }
+
+    // Alias to the plan id of its ask, and alias to the bindings the ask carries.
+    private sealed record Rebind(Dictionary<string, string> Waiting, Dictionary<string, IReadOnlyDictionary<string, string>> Bindings);
 
     private sealed record Pending(LoadedSource Loaded, SynapseSource Source, SynapseBuild Build, Dictionary<string, IReadOnlyDictionary<string, string>> Bindings)
     {

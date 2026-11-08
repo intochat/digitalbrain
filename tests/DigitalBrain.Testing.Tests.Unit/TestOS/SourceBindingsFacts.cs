@@ -184,7 +184,46 @@ public sealed class SourceBindingsFacts
         Assert.Equal(DeployStatus.Deployed, again.Status);
         Assert.Equal(InstallStatus.Pending, again.Installs["hs.week"].Status);
         Assert.Equal("conn-1", (await os.Store.Get(brain, HsSource.Key, Ct))!.Bindings!["hs.week"]["Db"]);
+
+        await os.Confirmations.Approve(again.Installs["hs.week"].Reason!);
+        await os.Idle();
+
+        Assert.Equal("conn-2", (await os.Store.Get(brain, HsSource.Key, Ct))!.Bindings!["hs.week"]["Db"]);
     }
+
+    [Fact]
+    public async Task AnApprovedRebindIsStored()
+    {
+        await using var os = Start();
+        var brain = Brain("sb9");
+        var two = HsSource.Of(TwoAliases);
+        var first = await os.Synapses.Deploy(brain, two with { Bindings = Both("conn-1", "conn-1") }, None, Ct);
+        // Only hs.week is approved: hs.week2 stays asked, so the redeploy re-binds one alias now and asks again for the other.
+        await os.Confirmations.Approve(first.Installs["hs.week"].Reason!);
+        await os.Idle();
+
+        var again = await os.Synapses.Deploy(brain, two with { Bindings = Both("conn-2", "conn-2") }, None, Ct);
+        await os.Idle();
+
+        Assert.Equal(InstallStatus.Updated, again.Installs["hs.week"].Status);
+        Assert.Equal(InstallStatus.Pending, again.Installs["hs.week2"].Status);
+        var stored = (await os.Store.Get(brain, HsSource.Key, Ct))!.Bindings!;
+        Assert.Equal("conn-2", stored["hs.week"]["Db"]);
+        Assert.Equal("conn-1", stored["hs.week2"]["Db"]);
+
+        await os.Confirmations.Approve(again.Installs["hs.week2"].Reason!);
+        await os.Idle();
+
+        stored = (await os.Store.Get(brain, HsSource.Key, Ct))!.Bindings!;
+        Assert.Equal("conn-2", stored["hs.week"]["Db"]);
+        Assert.Equal("conn-2", stored["hs.week2"]["Db"]);
+    }
+
+    private static Dictionary<string, IReadOnlyDictionary<string, string>> Both(string week, string week2) => new()
+    {
+        ["hs.week"] = new Dictionary<string, string> { ["Db"] = week },
+        ["hs.week2"] = new Dictionary<string, string> { ["Db"] = week2 },
+    };
 
     // The gate source plus a second state alias that has its own Db slot.
     private static readonly string TwoAliases = ReadsDb + """
