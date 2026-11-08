@@ -66,8 +66,9 @@ public sealed class ViewActivationSiloFacts(StatefulSilo silo) : IClassFixture<S
         await StateNeuronSiloFacts.Until(async () => await views.Read(alias) is not null, Ct);
 
         var view = (await views.Read(alias))!;
-        var row = Assert.IsType<DigitalBrain.UI.Row>(view.View.Root);
-        Assert.Equal("1", Assert.IsType<DigitalBrain.UI.Badge>(row.Children[0]).Label);
+        var root = view.View.GetProperty("root");
+        Assert.Equal("row", root.GetProperty("kind").GetString());
+        Assert.Equal("1", root.GetProperty("children")[0].GetProperty("label").GetString());
         var refused = await Assert.ThrowsAsync<ActivationRefusedException>(() => views.Activate(alias, view.Generation, "foreign", null));
         Assert.Equal(ActivationRefusedException.ForeignOwner, refused.Reason);
 

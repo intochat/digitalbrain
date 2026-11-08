@@ -6,7 +6,6 @@ using DigitalBrain.Invocation;
 using DigitalBrain.Rules;
 using Verdict = DigitalBrain.Rules.Check;
 using DigitalBrain.Spi;
-using DigitalBrain.UI;
 
 namespace DigitalBrain;
 
@@ -34,9 +33,10 @@ public static class StateNeuron
 /// visible and never counted. Provisional entries older than <see cref="StateNeuron.ProvisionalLease"/> are discarded on the next gate
 /// call. Entries are matched by the <see cref="Verdict.Allowed.Ticket"/> <see cref="Gate"/> assigned, so value-equal signals of two
 /// publishers never take each other's entry; the ticket is the host's attempt id for the gate call, and an empty one is refused.
-/// <para>A view synapse returning <see cref="View"/> stores it as the alias's current view with a generation, journals
-/// <see cref="ViewChanged"/>, and serves it through <see cref="IViewReader"/>; other view results are not stored. The view is
-/// held in memory: after a reactivation <see cref="Read"/> is null until the next state change runs the views again.</para>
+/// <para>A view synapse returning a <c>DigitalBrain.UI.View</c> stores it, as wire JSON, as the alias's current view with the next
+/// generation, saved with the state in the same save that journals <see cref="ViewChanged"/>, and serves it through
+/// <see cref="IViewReader"/>; so the view and its generation survive deactivation and restart. Any other view result is not stored
+/// and is logged as a warning once per synapse.</para>
 /// </remarks>
 public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IViewReader where TState : class, new()
 {
@@ -50,6 +50,8 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
     private bool _viewsPending;
     private bool _journalingRefusal;
     private PublishedView? _view;
+    private bool _savingView;
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> WarnedViews = new(StringComparer.Ordinal);
 
     /// <summary>Creates the neuron for <typeparamref name="TState"/> over the live <paramref name="catalog"/>, read again on every turn.</summary>
     /// <param name="catalog">The live synapse catalog.</param>
@@ -279,7 +281,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
     /// <summary>Marks the views to run over the new state once the saving synapse has reported its outcome; a journaled refusal leaves the state as it was and runs none.</summary>
     protected override void OnCommitted()
     {
-        _viewsPending |= !_journalingRefusal;
+        _viewsPending |= !_journalingRefusal && !_savingView;
     }
 
     private static string AliasOf(Signal signal) => SignalAliases.Of(signal);
@@ -329,10 +331,23 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
         {
             await Run(view, null, State, async result =>
             {
-                if (result is View stored && AliasIn(_catalog.Current) is { } alias)
+                if (result is not null && result.GetType().FullName == ViewNodes.ViewType && AliasIn(_catalog.Current) is { } alias)
                 {
-                    _view = new PublishedView(alias, (_view?.Generation ?? 0) + 1, stored);
-                    await Publish(new ViewChanged(alias, _view.Generation)).ConfigureAwait(true);
+                    var type = result.GetType();
+                    var previous = _view;
+                    _view = new PublishedView(alias, (previous?.Generation ?? 0) + 1, JsonSerializer.SerializeToElement(result, type, RuntimeProtocol.OptionsFor(type)));
+                    _savingView = true;
+                    try { await Save(State, [new ViewChanged(alias, _view.Generation)]).ConfigureAwait(true); }
+                    catch
+                    {
+                        _view = previous;
+                        throw;
+                    }
+                    finally { _savingView = false; }
+                }
+                else if (WarnedViews.TryAdd(view.Name, 0))
+                {
+                    StateNeuronLog.ViewNotStored(Logger(), view.Name, result?.GetType().FullName ?? "null");
                 }
 
                 return "viewed";
@@ -354,7 +369,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
             throw new ActivationRefusedException(ActivationRefusedException.Stale);
         }
 
-        var node = ViewNodes.Find(view.View.Root, nodeKey) ?? throw new ActivationRefusedException(ActivationRefusedException.UnknownNode);
+        var node = ViewNodes.Find(view.View, nodeKey) ?? throw new ActivationRefusedException(ActivationRefusedException.UnknownNode);
         var emit = ViewNodes.EmitOf(node) ?? throw new ActivationRefusedException(ActivationRefusedException.NoEmit);
         if (!string.Equals(emit.Owner, alias, StringComparison.Ordinal)) { throw new ActivationRefusedException(ActivationRefusedException.ForeignOwner); }
 
@@ -362,6 +377,27 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
         var signal = new EmittedSignal(emit.Signal, ViewNodes.Payload(emit.Args, fieldValue));
         await Publish(signal).ConfigureAwait(true);
         await React(signal, Context.TraceId, null, CancellationToken.None).ConfigureAwait(true);
+    }
+
+    // The state is stored with the current view beside it; a state stored before views were kept loads as the bare record.
+    internal override async Task<TState?> LoadState()
+    {
+        var stored = await Context.State.Load<StoredState<TState>>().ConfigureAwait(true);
+        if (stored?.State is { } state)
+        {
+            _view = stored.View;
+            return state;
+        }
+
+        return await Context.State.Load<TState>().ConfigureAwait(true);
+    }
+
+    internal override Task StoreState(TState next, IReadOnlyList<Signal> signals) => Context.State.Save(new StoredState<TState>(next, _view), signals);
+
+    private Microsoft.Extensions.Logging.ILogger Logger()
+    {
+        try { return (Context.Services.GetService(typeof(Microsoft.Extensions.Logging.ILoggerFactory)) as Microsoft.Extensions.Logging.ILoggerFactory)?.CreateLogger("DigitalBrain.Synapses") ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance; }
+        catch (InvalidOperationException) { return Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance; }
     }
 
     private IEnumerable<SynapseDescriptor> Matching(SynapseKind kind, Signal signal) =>
@@ -426,4 +462,14 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
 
         return returned;
     }
+}
+
+/// <summary>What a state neuron stores: its state record and its current view.</summary>
+internal sealed record StoredState<TState>(TState? State, PublishedView? View) where TState : class;
+
+internal static partial class StateNeuronLog
+{
+    [Microsoft.Extensions.Logging.LoggerMessage(EventId = 4140, EventName = "ViewNotStored", Level = Microsoft.Extensions.Logging.LogLevel.Warning,
+        Message = "View synapse {Synapse} returned {Type}, not a DigitalBrain.UI.View; its result is not stored or announced.")]
+    public static partial void ViewNotStored(Microsoft.Extensions.Logging.ILogger logger, string synapse, string type);
 }

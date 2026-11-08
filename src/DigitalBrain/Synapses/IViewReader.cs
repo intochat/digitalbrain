@@ -1,12 +1,12 @@
 using System.Text.Json;
 using DigitalBrain.Contracts;
-using DigitalBrain.UI;
 
 namespace DigitalBrain;
 
 /// <summary>
 /// The current view of a state alias, read and activated at that alias's state neuron (<c>{brain}/{alias}/default</c>).
-/// A view synapse returning <see cref="View"/> stores it there with a generation that increases on every stored view.
+/// A view synapse returning a <c>DigitalBrain.UI.View</c> stores it there, as its wire JSON, with a generation that increases on every
+/// stored view; the view and its generation are saved with the state, so they survive deactivation and restart.
 /// </summary>
 [NeuronAlias("synapse.view")]
 public interface IViewReader
@@ -17,10 +17,14 @@ public interface IViewReader
     Task<PublishedView?> Read(string alias);
 
     /// <summary>
-    /// Activates the node keyed <paramref name="nodeKey"/> of the view of <paramref name="generation"/>: journals its <see cref="Emit"/>'s
-    /// signal (payload its args, plus <c>value</c> when <paramref name="fieldValue"/> is given) and runs the alias's reactions on it.
-    /// The caller is the signal's cause.
+    /// Activates the node whose <c>"key"</c> is <paramref name="nodeKey"/> in the view of <paramref name="generation"/>: journals its
+    /// <c>"emit"</c>'s signal (payload its <c>args</c>, plus <c>value</c> when <paramref name="fieldValue"/> is given) and runs the alias's
+    /// reactions on it. The caller is the signal's cause.
     /// </summary>
+    /// <remarks>
+    /// The owner's reactions run inline, inside this call, after the signal is journaled: a state neuron never hears its own journal,
+    /// so the call returns once the owner has reacted. Other neurons with an alias edge on the signal get it through the journal.
+    /// </remarks>
     /// <param name="alias">The state alias that owns the view.</param>
     /// <param name="generation">The generation of the view the caller saw.</param>
     /// <param name="nodeKey">The key of the activated node.</param>
@@ -32,8 +36,8 @@ public interface IViewReader
 /// <summary>The stored view of a state alias.</summary>
 /// <param name="Alias">The state alias.</param>
 /// <param name="Generation">The generation, increasing with every stored view.</param>
-/// <param name="View">The view.</param>
-public sealed record PublishedView(string Alias, long Generation, View View);
+/// <param name="View">The view as wire JSON (the <c>DigitalBrain.UI</c> shape, nodes discriminated by <c>"kind"</c>).</param>
+public sealed record PublishedView(string Alias, long Generation, JsonElement View);
 
 /// <summary>An activation was refused; nothing was journaled.</summary>
 public sealed class ActivationRefusedException : InvalidOperationException

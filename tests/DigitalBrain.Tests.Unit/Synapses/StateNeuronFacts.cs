@@ -111,9 +111,9 @@ public sealed class StateNeuronFacts
 
         Assert.Equal(100m, ((WeekSpend)Context.Writes[0].State).Spent);
         Assert.Equal([new StateChanged(Id.ToString(), "test.charging")], Context.Writes[0].Signals);
-        Assert.Contains(Context.Published, p => p is ViewChanged { Alias: "week", Generation: 1 });
+        Assert.Equal(new ViewChanged("week", 1), Assert.Single(Assert.Single(Context.ViewWrites).Signals));
         var view = await n.Read("week");
-        Assert.Equal(new Text("100 of 300"), view?.View.Root);
+        Assert.Equal("100 of 300", view?.View.GetProperty("root").GetProperty("value").GetString());
     }
 
     [Fact]
@@ -159,7 +159,8 @@ public sealed class StateNeuronFacts
         var e = Context.Published;
         var started = e.FindIndex(p => p is SynapseStarted s && s.Function.EndsWith(".Add", StringComparison.Ordinal));
         var finished = e.FindIndex(p => p is SynapseFinished { Outcome: "saved" } f && f.Function.EndsWith(".Add", StringComparison.Ordinal));
-        var viewed = e.FindIndex(p => p is ViewChanged { Alias: "ledger", Generation: 1 });
+        var viewed = e.FindIndex(p => p is SynapseFinished { Outcome: "viewed" });
+        Assert.Equal(new ViewChanged("ledger", 1), Assert.Single(Assert.Single(Context.ViewWrites).Signals));
         Assert.True(started >= 0 && finished > started && viewed > finished, string.Join(", ", e));
         Assert.Contains(e, p => p is SynapseFinished { Outcome: "viewed" });
     }

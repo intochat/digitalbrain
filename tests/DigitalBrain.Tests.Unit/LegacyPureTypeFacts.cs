@@ -32,33 +32,25 @@ public sealed class LegacyPureTypeFacts
         Assert.Null(typeof(DigitalBrain.Contracts.NeuronAliasAttribute).GetMethod("Of"));
     }
 
-    // 03-04 relaxation: one ProjectReference to DigitalBrain.Analyzers, analyzer-only; 0.18.0: plus DigitalBrain.UI (a plain reference,
-    // which references no project), because a state neuron stores its View. Anything else fails.
+    // 03-04 relaxation: exactly one ProjectReference, to DigitalBrain.Analyzers, analyzer-only. Anything else fails.
     [Fact]
-    public void Core_references_only_the_analyzer_as_analyzer_and_the_view_model()
+    public void Core_references_only_the_analyzer_project_as_analyzer()
     {
-        Assert.True(Allowed(CoreReferences(LoadCore())), LoadCore().ToString());
+        var references = CoreReferences(LoadCore());
+        var reference = Assert.Single(references);
+        Assert.True(IsAnalyzerOnly(reference), reference.ToString());
     }
 
     [Theory]
     [InlineData("<ProjectReference Include=\"../DigitalBrain.UI/DigitalBrain.UI.csproj\" />")]
-    [InlineData("<ProjectReference Include=\"../DigitalBrain.Analyzers/DigitalBrain.Analyzers.csproj\" ReferenceOutputAssembly=\"false\" OutputItemType=\"Analyzer\" /><ProjectReference Include=\"../Other/Other.csproj\" />")]
     [InlineData("<ProjectReference Include=\"../DigitalBrain.Analyzers/DigitalBrain.Analyzers.csproj\" />")]
     [InlineData("<ProjectReference Include=\"../DigitalBrain.Analyzers/DigitalBrain.Analyzers.csproj\" ReferenceOutputAssembly=\"true\" OutputItemType=\"Analyzer\" />")]
     [InlineData("<ProjectReference Include=\"../Other/Other.csproj\" ReferenceOutputAssembly=\"false\" OutputItemType=\"Analyzer\" />")]
     public void Any_other_reference_is_rejected(string reference)
     {
         var csproj = XDocument.Parse($"<Project><ItemGroup>{reference}</ItemGroup></Project>");
-        Assert.False(Allowed(CoreReferences(csproj)));
+        Assert.False(CoreReferences(csproj).All(IsAnalyzerOnly) && CoreReferences(csproj).Count == 1);
     }
-
-    // Exactly the analyzer-only reference and the view model reference.
-    private static bool Allowed(List<XElement> references)
-        => references.Count == 2 && references.Count(IsAnalyzerOnly) == 1 && references.Count(IsViewModel) == 1;
-
-    private static bool IsViewModel(XElement reference)
-        => Path.GetFileName((reference.Attribute("Include")?.Value ?? string.Empty).Replace('\\', '/')) == "DigitalBrain.UI.csproj"
-            && reference.Attribute("OutputItemType") is null;
 
     private static List<XElement> CoreReferences(XDocument csproj) => csproj.Descendants("ProjectReference").ToList();
 

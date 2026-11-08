@@ -1,41 +1,44 @@
-using System.Collections;
-using System.Collections.Concurrent;
-using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using DigitalBrain.UI;
 
 namespace DigitalBrain;
 
-// Walks a view's node tree by reflection, so every node type that carries a Key and an Emit is activatable without a list here.
+// Walks a view's wire JSON: every object with a "key" is addressable, its "emit" object ({owner, signal, args}) is what it emits.
 internal static class ViewNodes
 {
-    private static readonly ConcurrentDictionary<Type, PropertyInfo[]> Children = new();
+    // The full name of the view model's root record, which the core does not reference.
+    public const string ViewType = "DigitalBrain.UI.View";
 
-    // The first node, depth first, whose Key is the key.
-    public static Node? Find(Node root, string key)
+    // The first object, depth first, whose "key" is the key.
+    public static JsonElement? Find(JsonElement root, string key)
     {
-        var pending = new Stack<Node>([root]);
+        var pending = new Stack<JsonElement>([root]);
         while (pending.Count > 0)
         {
-            var node = pending.Pop();
-            if (string.Equals(node.GetType().GetProperty("Key")?.GetValue(node) as string, key, StringComparison.Ordinal)) { return node; }
-            var found = new List<Node>();
-            foreach (var property in ChildProperties(node.GetType()))
+            var element = pending.Pop();
+            if (element.ValueKind == JsonValueKind.Object)
             {
-                switch (property.GetValue(node))
-                {
-                    case Node child: found.Add(child); break;
-                    case IEnumerable many and not string: found.AddRange(many.OfType<Node>()); break;
-                }
+                if (element.TryGetProperty("key", out var k) && k.ValueKind == JsonValueKind.String && k.GetString() == key) { return element; }
+                foreach (var property in element.EnumerateObject().Reverse()) { pending.Push(property.Value); }
             }
-            for (var i = found.Count - 1; i >= 0; i--) { pending.Push(found[i]); }
+            else if (element.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in element.EnumerateArray().Reverse()) { pending.Push(item); }
+            }
         }
 
         return null;
     }
 
-    public static Emit? EmitOf(Node node) => node.GetType().GetProperty("Emit")?.GetValue(node) as Emit;
+    // The node's emit: owner and signal are strings, args optional; null when it has none.
+    public static (string Owner, string Signal, JsonElement? Args)? EmitOf(JsonElement node)
+    {
+        if (!node.TryGetProperty("emit", out var emit) || emit.ValueKind != JsonValueKind.Object) { return null; }
+        if (!emit.TryGetProperty("owner", out var owner) || owner.ValueKind != JsonValueKind.String
+            || !emit.TryGetProperty("signal", out var signal) || signal.ValueKind != JsonValueKind.String) { return null; }
+        JsonElement? args = emit.TryGetProperty("args", out var a) && a.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined) ? a : null;
+        return (owner.GetString()!, signal.GetString()!, args);
+    }
 
     // The emit's args (a JSON object, or none) with the field value added as "value".
     public static JsonElement Payload(JsonElement? args, string? fieldValue)
@@ -45,8 +48,4 @@ internal static class ViewNodes
         if (fieldValue is not null) { payload["value"] = fieldValue; }
         return JsonSerializer.SerializeToElement(payload);
     }
-
-    private static PropertyInfo[] ChildProperties(Type type) => Children.GetOrAdd(type, t =>
-        [.. t.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.GetIndexParameters().Length == 0
-            && (typeof(Node).IsAssignableFrom(p.PropertyType) || (p.PropertyType != typeof(string) && typeof(IEnumerable).IsAssignableFrom(p.PropertyType))))]);
 }

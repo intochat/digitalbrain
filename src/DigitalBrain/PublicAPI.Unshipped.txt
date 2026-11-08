@@ -3278,12 +3278,12 @@ DigitalBrain.PublishedView
 DigitalBrain.PublishedView.<Clone>$() -> DigitalBrain.PublishedView!
 DigitalBrain.PublishedView.Alias.get -> string!
 DigitalBrain.PublishedView.Alias.init -> void
-DigitalBrain.PublishedView.Deconstruct(out string! Alias, out long Generation, out DigitalBrain.UI.View! View) -> void
+DigitalBrain.PublishedView.Deconstruct(out string! Alias, out long Generation, out System.Text.Json.JsonElement View) -> void
 DigitalBrain.PublishedView.Equals(DigitalBrain.PublishedView? other) -> bool
 DigitalBrain.PublishedView.Generation.get -> long
 DigitalBrain.PublishedView.Generation.init -> void
-DigitalBrain.PublishedView.PublishedView(string! Alias, long Generation, DigitalBrain.UI.View! View) -> void
-DigitalBrain.PublishedView.View.get -> DigitalBrain.UI.View!
+DigitalBrain.PublishedView.PublishedView(string! Alias, long Generation, System.Text.Json.JsonElement View) -> void
+DigitalBrain.PublishedView.View.get -> System.Text.Json.JsonElement
 DigitalBrain.PublishedView.View.init -> void
 DigitalBrain.StateNeuron<TState>.Activate(string! alias, long generation, string! nodeKey, string? fieldValue) -> System.Threading.Tasks.Task!
 DigitalBrain.StateNeuron<TState>.Read(string! alias) -> System.Threading.Tasks.Task<DigitalBrain.PublishedView?>!

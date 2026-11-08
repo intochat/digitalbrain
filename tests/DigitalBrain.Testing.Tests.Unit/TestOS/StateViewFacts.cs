@@ -58,8 +58,9 @@ public sealed class StateViewFacts
 
         Assert.NotNull(published);
         Assert.Equal("vw", published.Alias);
-        var row = Assert.IsType<Row>(published.View.Root);
-        Assert.Equal("1", Assert.IsType<Badge>(row.Children[0]).Label);
+        var root = published.View.GetProperty("root");
+        Assert.Equal("row", root.GetProperty("kind").GetString());
+        Assert.Equal("1", root.GetProperty("children")[0].GetProperty("label").GetString());
         Assert.Contains(os.Journal(Board.Brain).Signals(Board), item => item.Signal is ViewChanged { Alias: "vw" } changed && changed.Generation == published.Generation);
         Assert.Empty(os.Failures);
     }
@@ -107,5 +108,28 @@ public sealed class StateViewFacts
         var refused = await Assert.ThrowsAsync<ActivationRefusedException>(() => views.Activate("vw", view.Generation - 1, "refresh", null));
 
         Assert.Equal(ActivationRefusedException.Stale, refused.Reason);
+    }
+
+    [Fact]
+    public async Task TheViewSurvivesDeactivationAndRestart()
+    {
+        await using var os = await Started();
+        var before = (await os.Get<IViewReader>(Board).Read("vw"))!;
+
+        await os.Deactivate(Board);
+        await os.Idle();
+        var deactivated = (await os.Get<IViewReader>(Board).Read("vw"))!;
+        await os.Restart();
+        var restarted = (await os.Get<IViewReader>(Board).Read("vw"))!;
+
+        Assert.Equal(before.Generation, deactivated.Generation);
+        Assert.Equal(before.Generation, restarted.Generation);
+        Assert.Equal(before.View.GetRawText(), restarted.View.GetRawText());
+        await os.Get<IPoller>(Pollster).Poll(2);
+        await os.Idle();
+        var next = (await os.Get<IViewReader>(Board).Read("vw"))!;
+        Assert.Equal(before.Generation + 1, next.Generation);
+        Assert.Equal("2", next.View.GetProperty("root").GetProperty("children")[0].GetProperty("label").GetString());
+        Assert.Empty(os.Failures);
     }
 }

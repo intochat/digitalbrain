@@ -9,6 +9,8 @@ internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronSta
 
     public List<(object State, IReadOnlyList<Signal> Signals)> Writes { get; } = [];
 
+    public List<(object State, IReadOnlyList<Signal> Signals)> ViewWrites { get; } = [];
+
     public List<Signal> Published { get; } = [];
 
     public List<NeuronId> Gets { get; } = [];
@@ -79,8 +81,14 @@ internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronSta
 
     public Task Save<T>(T next, IReadOnlyList<Signal> signals)
     {
-        Writes.Add((next!, [.. signals]));
+        // A state neuron stores its record with its view beside it: the record is what a write is about. A save that only journals a
+        // stored view (ViewChanged) is recorded in ViewWrites, so the facts about state writes count state changes only.
         _stored = next;
+        object state = next is { } value && value.GetType() is { IsGenericType: true } type && type.GetGenericTypeDefinition() == typeof(StoredState<>)
+            ? type.GetProperty(nameof(StoredState<object>.State))!.GetValue(value)!
+            : next!;
+        if (signals.Count > 0 && signals.All(signal => signal is ViewChanged)) { ViewWrites.Add((state, [.. signals])); }
+        else { Writes.Add((state, [.. signals])); }
         return Task.CompletedTask;
     }
 

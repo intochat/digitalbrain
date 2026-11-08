@@ -26,8 +26,6 @@
          dependency list (pack-and-consume probe), so the analyzer dll is bundled under analyzers/dotnet/cs below;
          DigitalBrain.Analyzers still ships as its own package. -->
     <ProjectReference Include="../DigitalBrain.Analyzers/DigitalBrain.Analyzers.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
-    <!-- 0.18.0: a state neuron stores its view as the one UI tree, DigitalBrain.UI.View (which references no project). -->
-    <ProjectReference Include="../DigitalBrain.UI/DigitalBrain.UI.csproj" />
   </ItemGroup>
   <Target Name="DigitalBrainBundleAnalyzers" BeforeTargets="_GetPackageFiles">
     <MSBuild Projects="../DigitalBrain.Analyzers/DigitalBrain.Analyzers.csproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration)">

@@ -20,7 +20,12 @@ public abstract class Neuron<TState> : Neuron, Spi.IStateInspectable where TStat
     }
 
     internal override async Task Load()
-        => State = await Context.State.Load<TState>().ConfigureAwait(true) ?? new TState();
+        => State = await LoadState().ConfigureAwait(true) ?? new TState();
+
+    // How the state is read and written: a state neuron keeps its stored view beside the state.
+    internal virtual Task<TState?> LoadState() => Context.State.Load<TState>();
+
+    internal virtual Task StoreState(TState next, IReadOnlyList<Signal> signals) => Context.State.Save(next, signals);
 
     /// <summary>Saves <paramref name="next"/> with the signal that says what changed and, optionally, the signal that says what was acted on.</summary>
     protected Task Save(TState next, Signal changed, Signal? acted = null)
@@ -37,7 +42,7 @@ public abstract class Neuron<TState> : Neuron, Spi.IStateInspectable where TStat
         ArgumentNullException.ThrowIfNull(signals);
         if (signals.Count == 0) { throw new ArgumentException("A state change publishes at least one signal.", nameof(signals)); }
         if (signals.Any(signal => signal is null)) { throw new ArgumentException("A signal is null.", nameof(signals)); }
-        await Context.State.Save(next, signals).ConfigureAwait(true);
+        await StoreState(next, signals).ConfigureAwait(true);
         State = next;
         OnCommitted();
     }
