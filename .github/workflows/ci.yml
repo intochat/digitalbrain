@@ -106,6 +106,8 @@ jobs:
             tests/DigitalBrain.Capabilities.Identity.Tests.Unit \
             tests/DigitalBrain.Capabilities.Compute.Tests.Unit \
             tests/DigitalBrain.Capabilities.Connections.Tests.Unit \
+            tests/DigitalBrain.Capabilities.Http.Tests.Unit \
+            tests/DigitalBrain.Capabilities.Tools.Tests.Unit \
             tests/DigitalBrain.Identity.Local.Tests.Unit \
             examples/Calculator.Tests.Unit; do
             name=$(basename "$project")

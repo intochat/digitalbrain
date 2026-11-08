@@ -16,7 +16,7 @@ public sealed partial class HttpBoundaryFacts
     {
         "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Analyzers",
         "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity",
-        "DigitalBrain.Capabilities.Compute", "DigitalBrain.Capabilities.Connections", "DigitalBrain.Identity.Local",
+        "DigitalBrain.Capabilities.Compute", "DigitalBrain.Capabilities.Connections", "DigitalBrain.Capabilities.Http", "DigitalBrain.Capabilities.Tools", "DigitalBrain.Identity.Local",
     };
 
     [GeneratedRegex(@"^\s*using\s+(static\s+)?Microsoft\.AspNetCore(\.|;)", RegexOptions.Multiline)]
@@ -44,7 +44,8 @@ public sealed partial class HttpBoundaryFacts
             typeof(Signal).Assembly, typeof(DigitalBrain.UI.View).Assembly, typeof(DigitalBrain.Testing.ManualTime).Assembly,
             typeof(DigitalBrain.Capabilities.Storage.IStorage).Assembly, typeof(DigitalBrain.Capabilities.Secrets.ISecrets).Assembly,
             typeof(DigitalBrain.Capabilities.Identity.IIdentity).Assembly, typeof(DigitalBrain.Capabilities.Compute.ICostMeter).Assembly,
-            typeof(DigitalBrain.Capabilities.Connections.IConnection).Assembly, typeof(DigitalBrain.Identity.Local.LocalIdentityHosting).Assembly,
+            typeof(DigitalBrain.Capabilities.Connections.IConnection).Assembly, typeof(DigitalBrain.Capabilities.Http.IHttpRead).Assembly,
+            typeof(DigitalBrain.Capabilities.Tools.ITool).Assembly, typeof(DigitalBrain.Identity.Local.LocalIdentityHosting).Assembly,
         ];
         foreach (var assembly in assemblies)
         {

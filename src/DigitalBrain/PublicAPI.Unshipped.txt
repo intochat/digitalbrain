@@ -3303,3 +3303,9 @@ override DigitalBrain.PublishedView.ToString() -> string!
 static DigitalBrain.PublishedView.operator !=(DigitalBrain.PublishedView? left, DigitalBrain.PublishedView? right) -> bool
 static DigitalBrain.PublishedView.operator ==(DigitalBrain.PublishedView? left, DigitalBrain.PublishedView? right) -> bool
 const DigitalBrain.ActivationRefusedException.Unspecified = "Unspecified" -> string!
+const DigitalBrain.Capabilities.Capability.Http.V1Id = "http@1" -> string!
+DigitalBrain.Capabilities.Capability.Http
+static DigitalBrain.Capabilities.Capability.Http.V1.get -> DigitalBrain.Capabilities.CapabilityId
+const DigitalBrain.Capabilities.Capability.Tools.V1Id = "tool@1" -> string!
+DigitalBrain.Capabilities.Capability.Tools
+static DigitalBrain.Capabilities.Capability.Tools.V1.get -> DigitalBrain.Capabilities.CapabilityId

@@ -55,4 +55,24 @@ public static class Capability
         /// <summary>identity@1.</summary>
         public static CapabilityId V1 { get; } = CapabilityId.Parse(V1Id);
     }
+
+    /// <summary>Read-only HTTP against the allowed hosts of a connection.</summary>
+    public static class Http
+    {
+        /// <summary>The string form of <see cref="V1"/>.</summary>
+        public const string V1Id = "http@1";
+
+        /// <summary>http@1.</summary>
+        public static CapabilityId V1 { get; } = CapabilityId.Parse(V1Id);
+    }
+
+    /// <summary>Named tools of a brain's connectors.</summary>
+    public static class Tools
+    {
+        /// <summary>The string form of <see cref="V1"/>.</summary>
+        public const string V1Id = "tool@1";
+
+        /// <summary>tool@1.</summary>
+        public static CapabilityId V1 { get; } = CapabilityId.Parse(V1Id);
+    }
 }

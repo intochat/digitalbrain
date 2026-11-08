@@ -1,0 +1,21 @@
+#nullable enable
+DigitalBrain.Capabilities.Http.HostNotAllowedException
+DigitalBrain.Capabilities.Http.HostNotAllowedException.Host.get -> string!
+DigitalBrain.Capabilities.Http.HostNotAllowedException.HostNotAllowedException(string! host) -> void
+DigitalBrain.Capabilities.Http.HttpConnectionOptions
+DigitalBrain.Capabilities.Http.HttpConnectionOptions.AllowedHosts.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Capabilities.Http.HttpConnectionOptions.AllowedHosts.init -> void
+DigitalBrain.Capabilities.Http.HttpConnectionOptions.Deconstruct(out System.Collections.Generic.IReadOnlyList<string!>! AllowedHosts) -> void
+DigitalBrain.Capabilities.Http.HttpConnectionOptions.Equals(DigitalBrain.Capabilities.Http.HttpConnectionOptions? other) -> bool
+DigitalBrain.Capabilities.Http.HttpConnectionOptions.HttpConnectionOptions(System.Collections.Generic.IReadOnlyList<string!>! AllowedHosts) -> void
+DigitalBrain.Capabilities.Http.HttpConnectionOptions.<Clone>$() -> DigitalBrain.Capabilities.Http.HttpConnectionOptions!
+DigitalBrain.Capabilities.Http.HttpHosts
+DigitalBrain.Capabilities.Http.IHttpRead
+DigitalBrain.Capabilities.Http.IHttpRead.GetJson(string! url, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Text.Json.JsonElement>!
+DigitalBrain.Capabilities.Http.IHttpRead.GetText(string! url, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<string!>!
+override DigitalBrain.Capabilities.Http.HttpConnectionOptions.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Http.HttpConnectionOptions.GetHashCode() -> int
+override DigitalBrain.Capabilities.Http.HttpConnectionOptions.ToString() -> string!
+static DigitalBrain.Capabilities.Http.HttpConnectionOptions.operator !=(DigitalBrain.Capabilities.Http.HttpConnectionOptions? left, DigitalBrain.Capabilities.Http.HttpConnectionOptions? right) -> bool
+static DigitalBrain.Capabilities.Http.HttpConnectionOptions.operator ==(DigitalBrain.Capabilities.Http.HttpConnectionOptions? left, DigitalBrain.Capabilities.Http.HttpConnectionOptions? right) -> bool
+static DigitalBrain.Capabilities.Http.HttpHosts.Require(System.Uri! url, System.Collections.Generic.IReadOnlyList<string!>! allowed) -> void

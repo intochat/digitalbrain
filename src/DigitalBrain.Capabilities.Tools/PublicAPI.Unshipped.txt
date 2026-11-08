@@ -1,0 +1,4 @@
+#nullable enable
+DigitalBrain.Capabilities.Tools.ITool
+DigitalBrain.Capabilities.Tools.ITool.List() -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string!>!>!
+DigitalBrain.Capabilities.Tools.ITool.Run(string! tool, System.Text.Json.JsonElement args, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Text.Json.JsonElement>!

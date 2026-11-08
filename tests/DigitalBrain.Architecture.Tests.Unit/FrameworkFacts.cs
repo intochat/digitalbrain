@@ -16,6 +16,8 @@ public sealed class VocabularyRingFacts
     [InlineData("DigitalBrain.Capabilities.Identity")]
     [InlineData("DigitalBrain.Capabilities.Compute")]
     [InlineData("DigitalBrain.Capabilities.Connections")]
+    [InlineData("DigitalBrain.Capabilities.Http")]
+    [InlineData("DigitalBrain.Capabilities.Tools")]
     public void Capability_contract_references_only_the_core(string name)
     {
         var project = Repository.ProjectNamed(name).Path;
@@ -67,7 +69,7 @@ public sealed class VocabularyRingFacts
 // V-02: no Orleans library anywhere in the restore graph of the core-side projects.
 public sealed class CoreHasNoOrleansFacts
 {
-    public static readonly TheoryData<string> CoreProjects = new() { "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Analyzers", "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity", "DigitalBrain.Capabilities.Compute", "DigitalBrain.Capabilities.Connections", "DigitalBrain.Identity.Local", "DigitalBrain.Runtime.Http", "DigitalBrain.Client" };
+    public static readonly TheoryData<string> CoreProjects = new() { "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Analyzers", "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity", "DigitalBrain.Capabilities.Compute", "DigitalBrain.Capabilities.Connections", "DigitalBrain.Capabilities.Http", "DigitalBrain.Capabilities.Tools", "DigitalBrain.Identity.Local", "DigitalBrain.Runtime.Http", "DigitalBrain.Client" };
 
     [Theory]
     [MemberData(nameof(CoreProjects))]
@@ -87,7 +89,7 @@ public sealed class CoreHasNoOrleansFacts
     }
 
     // 04-03 (CORE-01, T-04-08): the built core assemblies reference no Orleans assembly and declare no Orleans namespace.
-    public static readonly TheoryData<string> CoreAssemblies = new() { "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity", "DigitalBrain.Capabilities.Compute", "DigitalBrain.Capabilities.Connections", "DigitalBrain.Identity.Local", "DigitalBrain.Runtime.Http", "DigitalBrain.Client" };
+    public static readonly TheoryData<string> CoreAssemblies = new() { "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity", "DigitalBrain.Capabilities.Compute", "DigitalBrain.Capabilities.Connections", "DigitalBrain.Capabilities.Http", "DigitalBrain.Capabilities.Tools", "DigitalBrain.Identity.Local", "DigitalBrain.Runtime.Http", "DigitalBrain.Client" };
 
     private static Assembly Anchor(string name) => name switch
     {
@@ -99,6 +101,8 @@ public sealed class CoreHasNoOrleansFacts
         "DigitalBrain.Capabilities.Identity" => typeof(DigitalBrain.Capabilities.Identity.IIdentity).Assembly, // 05-03, D-15
         "DigitalBrain.Capabilities.Compute" => typeof(DigitalBrain.Capabilities.Compute.ICostMeter).Assembly,
         "DigitalBrain.Capabilities.Connections" => typeof(DigitalBrain.Capabilities.Connections.IConnection).Assembly,
+        "DigitalBrain.Capabilities.Http" => typeof(DigitalBrain.Capabilities.Http.IHttpRead).Assembly,
+        "DigitalBrain.Capabilities.Tools" => typeof(DigitalBrain.Capabilities.Tools.ITool).Assembly,
         "DigitalBrain.Identity.Local" => typeof(DigitalBrain.Identity.Local.LocalIdentityHosting).Assembly,
         "DigitalBrain.Runtime.Http" => typeof(DigitalBrain.Runtime.Http.IModuleHttpSurface).Assembly, // 09-03, R4-06: ASP.NET, never Orleans
         "DigitalBrain.Client" => typeof(DigitalBrain.Client.DigitalBrainConnection).Assembly,
@@ -133,7 +137,7 @@ public sealed class ReferenceClosureFacts
     public void Core_closure_is_clean()
     {
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        var pending = new Stack<Assembly>([typeof(Signal).Assembly, typeof(DigitalBrain.UI.View).Assembly, typeof(DigitalBrain.Capabilities.Storage.IStorage).Assembly, typeof(DigitalBrain.Capabilities.Secrets.ISecrets).Assembly, typeof(DigitalBrain.Capabilities.Identity.IIdentity).Assembly, typeof(DigitalBrain.Capabilities.Compute.ICostMeter).Assembly, typeof(DigitalBrain.Capabilities.Connections.IConnection).Assembly, typeof(DigitalBrain.Identity.Local.LocalIdentityHosting).Assembly]);
+        var pending = new Stack<Assembly>([typeof(Signal).Assembly, typeof(DigitalBrain.UI.View).Assembly, typeof(DigitalBrain.Capabilities.Storage.IStorage).Assembly, typeof(DigitalBrain.Capabilities.Secrets.ISecrets).Assembly, typeof(DigitalBrain.Capabilities.Identity.IIdentity).Assembly, typeof(DigitalBrain.Capabilities.Compute.ICostMeter).Assembly, typeof(DigitalBrain.Capabilities.Connections.IConnection).Assembly, typeof(DigitalBrain.Capabilities.Http.IHttpRead).Assembly, typeof(DigitalBrain.Capabilities.Tools.ITool).Assembly, typeof(DigitalBrain.Identity.Local.LocalIdentityHosting).Assembly]);
         while (pending.TryPop(out var assembly))
         {
             foreach (var reference in assembly.GetReferencedAssemblies())
