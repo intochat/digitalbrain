@@ -33,6 +33,13 @@ internal sealed partial class BrainSignalHistory(BrainLogs logs, BrainId brain, 
         return keepUnknown ? page : Without(page);
     }
 
+    /// <summary>
+    /// Polls the brain-wide read keeping signals of unknown type, which are yielded as <see cref="UnknownSignal"/> under their
+    /// journaled alias, so a debugger sees unit signals whose type is not loaded.
+    /// </summary>
+    public IAsyncEnumerable<JournaledSignal> Watch(long since, CancellationToken ct)
+        => SignalTail.Poll((after, limit, token) => Read(after, limit, keepUnknown: true, token), since, SignalTail.PollInterval, ct);
+
     public async Task<SignalPage> ReadTrace(string traceId, long since, int limit, CancellationToken ct)
     {
         ArgumentException.ThrowIfNullOrEmpty(traceId);
@@ -83,8 +90,8 @@ internal sealed partial class BrainSignalHistory(BrainLogs logs, BrainId brain, 
 }
 
 /// <summary>
-/// A journaled signal whose type is not a registered alias. It never leaves the runtime and is delivered only to a state neuron's
-/// alias reactions on its alias, which get <see cref="Json"/> as the envelope payload. Equality is by <see cref="Type"/> only.
+/// A journaled signal whose type is not a registered alias. It is delivered only to a state neuron's alias reactions on its
+/// alias, which get <see cref="Json"/> as the envelope payload, and is yielded as-is by <see cref="ISignalHistory.Watch"/>. Equality is by <see cref="Type"/> only.
 /// </summary>
 internal sealed record UnknownSignal(string Type) : Signal, IUntypedSignal
 {

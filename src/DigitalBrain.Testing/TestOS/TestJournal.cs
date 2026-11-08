@@ -18,6 +18,7 @@ public sealed class TestJournal : ISignalHistory
     private readonly Dictionary<NeuronId, Log> _logs = [];
     private readonly List<(long Position, JournaledSignal Entry)> _brain = [];
     private long _position;
+    private TaskCompletionSource _appended = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     internal TestJournal(BrainId brain, TimeProvider time)
     {
@@ -96,6 +97,11 @@ public sealed class TestJournal : ISignalHistory
         }
     }
 
+    /// <inheritdoc />
+    /// <remarks>Woken by every append, so a new entry is yielded without polling delay.</remarks>
+    public IAsyncEnumerable<JournaledSignal> Watch(long since, CancellationToken ct)
+        => SignalTail.Poll(Read, since, TimeSpan.FromSeconds(1), ct, () => { lock (_gate) { return _appended.Task; } });
+
     internal T? Load<T>(NeuronId id)
     {
         lock (_gate) { return _states.TryGetValue(id, out var json) ? json.Deserialize<T>(RuntimeProtocol.OptionsFor(typeof(T))) : default; }
@@ -158,6 +164,12 @@ public sealed class TestJournal : ISignalHistory
             log.Entries.Add(entry);
             _brain.Add((++_position, entry));
             written.Add(entry);
+        }
+        if (written.Count > 0)
+        {
+            var appended = _appended;
+            _appended = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            appended.TrySetResult();
         }
         return written;
     }

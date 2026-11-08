@@ -314,7 +314,7 @@ public sealed class StorageContentEndpointFacts
         public override DateTimeOffset GetUtcNow() => Now;
     }
 
-    private sealed class FakeIdentity : IIdentity
+    internal sealed class FakeIdentity : IIdentity
     {
         public Task<Account?> ReadAccount(string accountId, CancellationToken cancellationToken = default) => Task.FromResult<Account?>(null);
         public Task<Account?> OwnerOfBrain(string brainId, CancellationToken cancellationToken = default) => Task.FromResult<Account?>(null);

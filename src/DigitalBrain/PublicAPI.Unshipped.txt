@@ -3309,3 +3309,6 @@ static DigitalBrain.Capabilities.Capability.Http.V1.get -> DigitalBrain.Capabili
 const DigitalBrain.Capabilities.Capability.Tools.V1Id = "tool@1" -> string!
 DigitalBrain.Capabilities.Capability.Tools
 static DigitalBrain.Capabilities.Capability.Tools.V1.get -> DigitalBrain.Capabilities.CapabilityId
+DigitalBrain.IStateReader
+DigitalBrain.IStateReader.Read(string! alias) -> System.Threading.Tasks.Task<System.Text.Json.JsonElement>!
+DigitalBrain.Spi.ISignalHistory.Watch(long since, System.Threading.CancellationToken ct) -> System.Collections.Generic.IAsyncEnumerable<DigitalBrain.JournaledSignal!>!

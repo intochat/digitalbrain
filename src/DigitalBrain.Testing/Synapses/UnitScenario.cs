@@ -156,8 +156,9 @@ public static class UnitScenario
 
     private static async Task<string?> CheckState(TestOS os, ExpectState expect, CancellationToken ct)
     {
-        var state = await ((IBrainObserver)os).State(NeuronId.Parse($"{Brain}/{expect.Alias}/default"), ct).ConfigureAwait(false);
-        if (state is not { } root) { return "no state"; }
+        ct.ThrowIfCancellationRequested();
+        var root = await os.Get<IStateReader>(NeuronId.Parse($"{Brain}/{expect.Alias}/default")).Read(expect.Alias).ConfigureAwait(false);
+        if (root.ValueKind == JsonValueKind.Null) { return "no state"; }
         var node = root;
         foreach (var part in expect.JsonPath.Split('.', StringSplitOptions.RemoveEmptyEntries))
         {

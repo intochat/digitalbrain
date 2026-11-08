@@ -36,9 +36,9 @@ public static class StateNeuron
 /// <para>A view synapse returning a <c>DigitalBrain.UI.View</c> stores it, as wire JSON, as the alias's current view with the next
 /// generation, saved with the state in the same save that journals <see cref="ViewChanged"/>, and serves it through
 /// <see cref="IViewReader"/>; so the view and its generation survive deactivation and restart. Any other view result is not stored
-/// and is logged as a warning once per synapse.</para>
+/// and is logged as a warning once per synapse. The state record itself is read through <see cref="IStateReader"/>.</para>
 /// </remarks>
-public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IViewReader where TState : class, new()
+public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IViewReader, IStateReader where TState : class, new()
 {
     private const string GatePlaceholder = "gate";
     private readonly ISynapseCatalogSource _catalog;
@@ -358,6 +358,12 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
     /// <inheritdoc />
     public Task<PublishedView?> Read(string alias)
         => Task.FromResult(_view is { } view && string.Equals(view.Alias, alias, StringComparison.Ordinal) ? view : null);
+
+    /// <inheritdoc />
+    Task<JsonElement> IStateReader.Read(string alias)
+        => Task.FromResult(string.Equals(AliasIn(_catalog.Current), alias, StringComparison.Ordinal)
+            ? JsonSerializer.SerializeToElement(State, RuntimeProtocol.OptionsFor(typeof(TState)))
+            : JsonSerializer.SerializeToElement<object?>(null));
 
     /// <inheritdoc />
     public async Task Activate(string alias, long generation, string nodeKey, string? fieldValue)

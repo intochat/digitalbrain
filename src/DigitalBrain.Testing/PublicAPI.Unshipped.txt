@@ -827,3 +827,4 @@ DigitalBrain.Testing.Synapses.ScenarioTranscript.Deconstruct(out bool Passed, ou
 DigitalBrain.Testing.Synapses.ScenarioTranscript.ScenarioTranscript(bool Passed, System.Collections.Generic.IReadOnlyList<DigitalBrain.Testing.Synapses.ScenarioEvent!>! Events, System.Collections.Generic.IReadOnlyList<string!>! Failures, System.Collections.Generic.IReadOnlyList<string!>! Consented, System.Collections.Generic.IReadOnlyList<DigitalBrain.PublishedView!>! Views) -> void
 DigitalBrain.Testing.Synapses.ScenarioTranscript.Views.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.PublishedView!>!
 DigitalBrain.Testing.Synapses.ScenarioTranscript.Views.init -> void
+DigitalBrain.Testing.TestJournal.Watch(long since, System.Threading.CancellationToken ct) -> System.Collections.Generic.IAsyncEnumerable<DigitalBrain.JournaledSignal!>!

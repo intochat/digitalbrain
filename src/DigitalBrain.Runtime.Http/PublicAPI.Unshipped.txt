@@ -214,3 +214,7 @@ static DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.operat
 static DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest.operator ==(DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest? left, DigitalBrain.Runtime.Http.Surface.NeuronsService.NeuronCallRequest? right) -> bool
 static DigitalBrain.Runtime.Http.Surface.NeuronSurface.Get(string! contract, string! key, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
 static readonly DigitalBrain.Runtime.Http.Storage.UploadTicket.Lifetime -> System.TimeSpan
+DigitalBrain.Runtime.Http.Surface.JournalTailEndpoints
+const DigitalBrain.Runtime.Http.Surface.JournalTailEndpoints.EventType = "journaled-signal" -> string!
+static readonly DigitalBrain.Runtime.Http.Surface.JournalTailEndpoints.Window -> System.TimeSpan
+static DigitalBrain.Runtime.Http.Surface.JournalTailEndpoints.Map(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> void

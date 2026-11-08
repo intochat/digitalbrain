@@ -53,7 +53,7 @@ internal static class AllowedApis
         "DigitalBrain.SourceRecord", "DigitalBrain.LoadedSource", "DigitalBrain.NoSynapseRestorer",
         "DigitalBrain.IInstalls", "DigitalBrain.InstallsNeuron", "DigitalBrain.InstallsState", "DigitalBrain.InstalledGateIndex", "DigitalBrain.InstallRestore",
         "DigitalBrain.ISynapseCatalogSource", "DigitalBrain.SynapseCatalogSource", "DigitalBrain.SynapseCatalog", "DigitalBrain.UnboundSlotResolver",
-        "DigitalBrain.IViewReader", "DigitalBrain.StateNeuron", "DigitalBrain.BddNeuron", "DigitalBrain.IBdd",
+        "DigitalBrain.IViewReader", "DigitalBrain.IStateReader", "DigitalBrain.StateNeuron", "DigitalBrain.BddNeuron", "DigitalBrain.IBdd",
         "DigitalBrain.INeuronResolver", "DigitalBrain.IBrainSignalLog", "DigitalBrain.IPolicies", "DigitalBrain.PoliciesNeuron",
         "DigitalBrain.InProcessHostOptions", "DigitalBrain.ModuleAuth", "DigitalBrain.PrivilegedGrant", "DigitalBrain.Secret",
         // App and module declaration, neuron base classes and grain-shape attributes, configuration wiring, catalog plumbing.
