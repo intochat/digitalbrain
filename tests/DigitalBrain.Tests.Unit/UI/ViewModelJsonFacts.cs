@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using DigitalBrain.Invocation;
 using DigitalBrain.UI;
 
 namespace DigitalBrain.Tests.Unit.UI;
@@ -53,16 +54,20 @@ public sealed class ViewModelJsonFacts
     public void ButtonRoundTripsWithEmit()
     {
         var view = new View("v", new Column([new Button("go", "Go", new Emit("app.files", "files.open", JsonSerializer.SerializeToElement(new { id = 1 })))]));
+        var options = RuntimeProtocol.OptionsFor(typeof(View));
 
-        var json = JsonSerializer.Serialize(view);
-        using var doc = JsonDocument.Parse(json);
-        var button = doc.RootElement.GetProperty("Root").GetProperty("Children")[0];
+        var element = JsonSerializer.SerializeToElement(view, options);
+        var button = element.GetProperty("root").GetProperty("children")[0];
 
         Assert.Equal("button", button.GetProperty("kind").GetString());
-        Assert.Equal("go", button.GetProperty("Key").GetString());
-        Assert.Equal("app.files", button.GetProperty("Emit").GetProperty("Owner").GetString());
-        var back = Assert.IsType<Column>(JsonSerializer.Deserialize<View>(json)!.Root);
-        var again = Assert.IsType<Button>(back.Children[0]);
+        Assert.Equal("go", button.GetProperty("key").GetString());
+        var emit = button.GetProperty("emit");
+        Assert.Equal(("app.files", "files.open", 1), (emit.GetProperty("owner").GetString(), emit.GetProperty("signal").GetString(), emit.GetProperty("args").GetProperty("id").GetInt32()));
+        var found = ViewNodes.Find(element, "go");
+        Assert.NotNull(found);
+        var (owner, signal, args) = ViewNodes.EmitOf(found.Value)!.Value;
+        Assert.Equal(("app.files", "files.open", 1), (owner, signal, args!.Value.GetProperty("id").GetInt32()));
+        var again = Assert.IsType<Button>(Assert.IsType<Column>(JsonSerializer.Deserialize<View>(element.GetRawText(), options)!.Root).Children[0]);
         Assert.Equal("files.open", again.Emit!.Signal);
         Assert.Null(again.Intent);
     }
