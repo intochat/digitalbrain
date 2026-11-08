@@ -464,6 +464,18 @@ public sealed class FlowFacts
     }
 
     [Fact]
+    public async Task CancelAfterDeactivationDoesNotThrow()
+    {
+        var (flow, context) = await Activated();
+        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true, Reason = WaitReason.External });
+        await NeuronAttachment.Deactivate(flow, DeactivationCause.Idle, CancellationToken.None);
+
+        await flow.Cancel("late");
+
+        Assert.Equal(FlowStatus.Cancelled, flow.Current.Status);
+    }
+
+    [Fact]
     public async Task CancelResolvesPendingApprovalPlan()
     {
         var (flow, context) = await Activated();

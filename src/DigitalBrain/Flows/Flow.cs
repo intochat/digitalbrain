@@ -34,6 +34,9 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     // Cancelled when the flow is cancelled or the activation ends: the running body's token.
     private readonly CancellationTokenSource _activation = new();
 
+    // 1 once OnDeactivate disposed _activation: a late (interleaved) Cancel must not touch it.
+    private int _disposed;
+
     // One-use proofs handed to the flow's own detached work for its call back: a callback without one is a foreign caller. Held in
     // memory, so a callback that outlives its activation is refused and the durable paths (ConfirmationResolved, the nudge) recover.
     private readonly HashSet<string> _proofs = new(StringComparer.Ordinal);
@@ -124,7 +127,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
         if (Ended(State.Status) || _cancelRequested is not null) { return; }
         _cancelRequested = reason;
-        await _activation.CancelAsync().ConfigureAwait(true);
+        await CancelActivation().ConfigureAwait(true);
         var proof = Proof();
         try { await Context.Get<IFlowCallbacks>(Id).CancelRequested(reason, proof).ConfigureAwait(true); }
         catch (Exception error) when (error is not OutOfMemoryException)
@@ -219,8 +222,23 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     /// <inheritdoc />
     protected override async Task OnDeactivate(DeactivationCause cause, CancellationToken cancellationToken)
     {
-        await _activation.CancelAsync().ConfigureAwait(true);
-        _activation.Dispose();
+        await CancelActivation().ConfigureAwait(true);
+        if (Interlocked.Exchange(ref _disposed, 1) == 0) { _activation.Dispose(); }
+    }
+
+    private async Task CancelActivation()
+    {
+        if (Volatile.Read(ref _disposed) != 0) { return; }
+        try { await _activation.CancelAsync().ConfigureAwait(true); }
+        catch (ObjectDisposedException) { } // disposed between the check and the cancel: the activation has ended
+    }
+
+    // The running body's token; a cancelled one once the activation's source is disposed.
+    private CancellationToken ActivationToken()
+    {
+        if (Volatile.Read(ref _disposed) != 0) { return new CancellationToken(canceled: true); }
+        try { return _activation.Token; }
+        catch (ObjectDisposedException) { return new CancellationToken(canceled: true); }
     }
 
     /// <inheritdoc />
@@ -245,7 +263,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     // Runs the first step not done until the flow waits or ends.
     private async Task Advance()
     {
-        var token = _activation.Token;
+        var token = ActivationToken();
         while (State is { Status: FlowStatus.Running, Waiting: null } && !token.IsCancellationRequested && _cancelRequested is null)
         {
             if (Steps.FirstOrDefault(candidate => !State.Done.Contains(candidate)) is not { } step)
