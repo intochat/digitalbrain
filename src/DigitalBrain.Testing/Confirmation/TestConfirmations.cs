@@ -78,13 +78,15 @@ public sealed class TestConfirmations
     public Task Click(Button button)
     {
         ArgumentNullException.ThrowIfNull(button);
-        var action = button.Action;
-        if (action.Neuron != IConfirmations.ConfirmationsNeuronKey || action.Operation != IConfirmations.ResolveOperation || action.Arguments.Count != 2)
+        var emit = button.Emit;
+        if (emit is null || emit.Owner != IConfirmations.ConfirmationsNeuronKey || emit.Signal != IConfirmations.ResolveOperation
+            || emit.Args is not { ValueKind: System.Text.Json.JsonValueKind.Object } args
+            || !args.TryGetProperty("planId", out var planId) || !args.TryGetProperty("approve", out var approve))
         {
-            throw new ArgumentException($"The button calls {action.Neuron}/{action.Operation}, not the confirmations neuron.", nameof(button));
+            throw new ArgumentException($"The button emits {emit?.Owner}/{emit?.Signal}, not the confirmations neuron.", nameof(button));
         }
         if (!button.Enabled) { throw new InvalidOperationException($"The button '{button.Label}' is disabled."); }
-        return Resolve(action.Arguments[0], bool.Parse(action.Arguments[1]), Current);
+        return Resolve(planId.GetString()!, approve.GetBoolean(), Current);
     }
 
     /// <summary>Answers <paramref name="planId"/> as <paramref name="approver"/>. The first answer wins; unknown or answered ids are ignored.</summary>

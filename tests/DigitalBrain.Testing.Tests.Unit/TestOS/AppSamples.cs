@@ -123,7 +123,7 @@ public sealed class FilesLike(IReadOnlyList<IStorageLike> storages, IPresenter p
         }
         presenter.Present(
             new View("Storages", new Collection(entries)),
-            new View("Files", new Column([new TextField("filter", null, "Filter names"), new Collection([]), new Text("content")])));
+            new View("Files", new Column([new Field("filter", "filter", FieldKind.Search, "Filter names"), new Collection([]), new Text("content")])));
     }
 
     [On]

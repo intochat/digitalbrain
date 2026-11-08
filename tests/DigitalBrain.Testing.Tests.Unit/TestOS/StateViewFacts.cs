@@ -28,10 +28,10 @@ public static class ViewBoardUnit
     public static View Show(ViewBoard b) => new("Board", new Row(
     [
         new Badge(b.Polls.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-        new Button("Refresh", new ButtonAction("vw", "x.refresh", [])) { Key = "refresh", Emit = new Emit("vw", "x.refresh", System.Text.Json.JsonSerializer.SerializeToElement(new { key = "hidden", kind = "button" })) },
-        new Button("Foreign", new ButtonAction("other.alias", "x.refresh", [])) { Key = "foreign", Emit = new Emit("other.alias", "x.refresh") },
-        new Button("Boom", new ButtonAction("vw", "x.boom", [])) { Key = "boom", Emit = new Emit("vw", "x.boom") },
-        new Button("Plain", new ButtonAction("vw", "none", [])) { Key = "plain" },
+        new Button("refresh", "Refresh", new Emit("vw", "x.refresh", System.Text.Json.JsonSerializer.SerializeToElement(new { key = "hidden", kind = "button" }))),
+        new Button("foreign", "Foreign", new Emit("other.alias", "x.refresh")),
+        new Button("boom", "Boom", new Emit("vw", "x.boom")),
+        new Button("plain", "Plain", Intent: new Intent(IntentKind.Copy, "x")),
     ]));
 }
 

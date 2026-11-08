@@ -64,7 +64,7 @@ public sealed class PresentedView
     ];
 
     /// <summary>The text fields of the view, in order.</summary>
-    public IReadOnlyList<TextField> Fields => [.. Nodes.OfType<TextField>()];
+    public IReadOnlyList<Field> Fields => [.. Nodes.OfType<Field>()];
 
     /// <summary>The ids <see cref="Find(string)"/> knows: entry ids and field names.</summary>
     public IReadOnlyList<string> Ids => [.. Entries.Select(entry => entry.Id).Concat(Fields.Select(textField => textField.Name))];

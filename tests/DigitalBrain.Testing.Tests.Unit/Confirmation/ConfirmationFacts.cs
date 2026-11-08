@@ -180,8 +180,10 @@ public sealed class ConfirmationFacts
         Assert.Equal(2, buttons.Count);
         Assert.Equal(("Delete", ButtonTone.Accent, true), (buttons[0].Label, buttons[0].Tone, buttons[0].Enabled));
         Assert.Equal(("Keep", ButtonTone.Neutral), (buttons[1].Label, buttons[1].Tone));
-        Assert.Equal(new ButtonAction("confirmations", "Resolve", ["p7", "true"]), buttons[0].Action);
-        Assert.Equal(new ButtonAction("confirmations", "Resolve", ["p7", "false"]), buttons[1].Action);
+        Assert.Equal(("approve", "deny"), (buttons[0].Key, buttons[1].Key));
+        Assert.Equal(ConfirmView.Resolve("p7", approve: true), buttons[0].Emit);
+        Assert.Equal("""{"planId":"p7","approve":false}""", buttons[1].Emit!.Args!.Value.GetRawText());
+        Assert.Equal(("confirmations", "Resolve"), (buttons[0].Emit!.Owner, buttons[0].Emit!.Signal));
         Assert.Equal(IConfirmations.ConfirmationsNeuronKey, ConfirmView.ConfirmationsNeuronKey);
         Assert.Equal(IConfirmations.ResolveOperation, ConfirmView.ResolveOperation);
     }

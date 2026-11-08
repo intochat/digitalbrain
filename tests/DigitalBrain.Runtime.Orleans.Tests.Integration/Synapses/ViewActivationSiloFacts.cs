@@ -34,8 +34,8 @@ internal static class VaSource
             public static View Show(Board b) => new("Board", new Row(
             [
                 new Badge(b.Polls.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                new Button("Refresh", new ButtonAction("ar.vw", "ar.refresh", [])) { Key = "refresh", Emit = new Emit("ar.vw", "ar.refresh") },
-                new Button("Foreign", new ButtonAction("other", "ar.refresh", [])) { Key = "foreign", Emit = new Emit("other.alias", "ar.refresh") },
+                new Button("refresh", "Refresh", new Emit("ar.vw", "ar.refresh")),
+                new Button("foreign", "Foreign", new Emit("other.alias", "ar.refresh")),
             ]));
         }
         """;

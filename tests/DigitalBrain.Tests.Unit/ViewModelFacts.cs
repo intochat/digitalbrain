@@ -11,7 +11,7 @@ public sealed class ViewModelFacts
         var view = new View("Files", new Column([
             new Text("Recent"),
             new Collection([new Entry("a", "Report", "today"), new Entry("b", "Notes", null)]),
-            new TextField("search", null, "Search"),
+            new Field("search", "search", FieldKind.Search, "Search"),
             new Toast("Saved"),
         ]));
 
@@ -24,7 +24,7 @@ public sealed class ViewModelFacts
         Assert.Equal(4, column.Children.Count);
         var collection = Assert.IsType<Collection>(column.Children[1]);
         Assert.Equal(new Entry("a", "Report", "today"), collection.Entries[0]);
-        Assert.Equal(new TextField("search", null, "Search"), column.Children[2]);
+        Assert.Equal(new Field("search", "search", FieldKind.Search, "Search"), column.Children[2]);
         Assert.Contains("\"kind\":\"column\"", json, StringComparison.Ordinal);
     }
 

@@ -5,7 +5,7 @@ namespace DigitalBrain.UI.Confirmation;
 /// <summary>
 /// The confirmation card (07 D-11, D-14, D-16, D-19): a <see cref="Card"/> with the plan's title and body, the static line
 /// "This request expires in 5 minutes." and two <see cref="Button"/>s. Approve is <see cref="ButtonTone.Accent"/>, deny is
-/// <see cref="ButtonTone.Neutral"/>; there is no destructive tone. Both buttons call operation <see cref="ResolveOperation"/> of the
+/// <see cref="ButtonTone.Neutral"/>; there is no destructive tone. Both buttons emit signal <see cref="ResolveOperation"/> of the
 /// runtime neuron <see cref="ConfirmationsNeuronKey"/> with the plan id and the approve flag, never the requesting app's neuron,
 /// so the click is dispatched to the runtime and stamped with the person viewing it. Built from value-tree nodes only: no new Dart.
 /// </summary>
@@ -41,15 +41,15 @@ public static class ConfirmView
             new Text(string.Create(CultureInfo.InvariantCulture, $"This request expires in {minutes} {(minutes == 1 ? "minute" : "minutes")}.")),
         };
         if (!viewerIsHuman) { children.Add(new Text(WaitingText)); }
-        children.Add(new Button(approveLabel, Resolve(planId, approve: true), Enabled: viewerIsHuman, Tone: ButtonTone.Accent));
-        children.Add(new Button(denyLabel, Resolve(planId, approve: false), Enabled: true, Tone: ButtonTone.Neutral));
+        children.Add(new Button("approve", approveLabel, Resolve(planId, approve: true), Enabled: viewerIsHuman, Tone: ButtonTone.Accent));
+        children.Add(new Button("deny", denyLabel, Resolve(planId, approve: false), Enabled: true, Tone: ButtonTone.Neutral));
         return new Card(title, body, children);
     }
 
-    /// <summary>The action of an approve (<paramref name="approve"/> true) or deny button for <paramref name="planId"/>.</summary>
-    public static ButtonAction Resolve(string planId, bool approve)
+    /// <summary>The emit of an approve (<paramref name="approve"/> true) or deny button for <paramref name="planId"/>: owner <see cref="ConfirmationsNeuronKey"/>, signal <see cref="ResolveOperation"/>, args <c>planId</c> and <c>approve</c>.</summary>
+    public static Emit Resolve(string planId, bool approve)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(planId);
-        return new ButtonAction(ConfirmationsNeuronKey, ResolveOperation, [planId, approve ? "true" : "false"]);
+        return new Emit(ConfirmationsNeuronKey, ResolveOperation, System.Text.Json.JsonSerializer.SerializeToElement(new { planId, approve }));
     }
 }

@@ -20,7 +20,8 @@ public sealed record View(string Title, Node Root);
 [JsonDerivedType(typeof(Text), "text")]
 [JsonDerivedType(typeof(Badge), "badge")]
 [JsonDerivedType(typeof(TagPill), "tagPill")]
-[JsonDerivedType(typeof(TextField), "textField")]
+[JsonDerivedType(typeof(Field), "field")]
+[JsonDerivedType(typeof(Intent), "intent")]
 [JsonDerivedType(typeof(Switch), "switch")]
 [JsonDerivedType(typeof(Select), "select")]
 [JsonDerivedType(typeof(Progress), "progress")]
@@ -126,7 +127,7 @@ public sealed record Surface(
 }
 
 /// <summary>A single tab item in a <see cref="Tabs"/> bar.</summary>
-public sealed record TabItem(string Id, string Label, ButtonAction Action, string? Icon = null);
+public sealed record TabItem(string Key, string Id, string Label, Emit Emit, string? Icon = null);
 
 /// <summary>A horizontal tab bar.</summary>
 public sealed record Tabs(IReadOnlyList<TabItem> Items, string SelectedId) : Node
@@ -188,19 +189,45 @@ public sealed record Badge(string Label, string Tone = "neutral", string? Icon =
 /// <summary>22px desktop tag pill with tabular figures and optional Lucide icon.</summary>
 public sealed record TagPill(string Label, string Tone = "neutral", string? Icon = null) : Node;
 
-/// <summary>An editable text field.</summary>
-public sealed record TextField(string Name, string? Value, string? Placeholder) : Node
+/// <summary>What an editable field holds; the client picks the input and its keyboard from it.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum FieldKind
 {
-    /// <summary>Optional action invoked when the field is submitted.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public ButtonAction? OnSubmit { get; init; }
+    /// <summary>Single-line text.</summary>
+    Text,
+
+    /// <summary>A search box.</summary>
+    Search,
+
+    /// <summary>A number.</summary>
+    Number,
+
+    /// <summary>A password, masked as typed.</summary>
+    Password,
+
+    /// <summary>A secret value (token, key), masked and never echoed back.</summary>
+    Secret,
+
+    /// <summary>Text with suggestions.</summary>
+    Suggest,
+
+    /// <summary>Several lines of text.</summary>
+    Multiline,
 }
 
+/// <summary>An editable field. Submitting it emits <paramref name="OnSubmit"/> with the typed text added as <c>value</c>.</summary>
+/// <param name="Key">The node's key within its view, by which an activation names it.</param>
+/// <param name="Name">The field's label.</param>
+/// <param name="Kind">What the field holds.</param>
+/// <param name="Placeholder">Hint shown while empty.</param>
+/// <param name="OnSubmit">The signal a submit emits.</param>
+public sealed record Field(string Key, string Name, [property: JsonPropertyName("fieldKind")] FieldKind Kind, string? Placeholder = null, Emit? OnSubmit = null) : Node;
+
 /// <summary>A 36x20px pill toggle switch.</summary>
-public sealed record Switch(string Label, bool IsOn, ButtonAction? Action = null, bool Locked = false) : Node;
+public sealed record Switch(string Key, string Label, bool IsOn, Emit? Emit = null, bool Locked = false) : Node;
 
 /// <summary>An option in a <see cref="Select"/> control.</summary>
-public sealed record SelectOption(string Id, string Label, ButtonAction? Action = null);
+public sealed record SelectOption(string Key, string Id, string Label, Emit? Emit = null);
 
 /// <summary>A desktop dropdown / segmented selector.</summary>
 public sealed record Select(string Label, string Selected, IReadOnlyList<SelectOption> Options) : Node
@@ -244,26 +271,20 @@ public static class ButtonTone
     public const string Accent = "accent";
 }
 
-/// <summary>What a button click calls: an operation of a neuron, addressed by key in the viewer's brain, with string arguments.</summary>
-/// <param name="Neuron">The neuron key the click is dispatched to.</param>
-/// <param name="Operation">The operation called.</param>
-/// <param name="Arguments">The call arguments, in order.</param>
-public sealed record ButtonAction(string Neuron, string Operation, IReadOnlyList<string> Arguments)
-{
-    /// <inheritdoc />
-    public bool Equals(ButtonAction? other) => other is not null && Neuron == other.Neuron && Operation == other.Operation && Arguments.SequenceEqual(other.Arguments);
-
-    /// <inheritdoc />
-    public override int GetHashCode() => HashCode.Combine(Neuron, Operation, Arguments.Count);
-}
-
 /// <summary>A button (the os <c>button</c> control).</summary>
+/// <param name="Key">The node's key within its view, by which an activation names it.</param>
 /// <param name="Label">The label.</param>
-/// <param name="Action">What a click calls.</param>
+/// <param name="Emit">The signal a click emits; exactly one of <paramref name="Emit"/> and <paramref name="Intent"/> is given.</param>
+/// <param name="Intent">The client-local intent a click performs.</param>
 /// <param name="Enabled">False shows the button disabled.</param>
 /// <param name="Tone"><see cref="ButtonTone.Neutral"/> or <see cref="ButtonTone.Accent"/>.</param>
-public sealed record Button(string Label, ButtonAction Action, bool Enabled = true, string Tone = ButtonTone.Neutral) : Node
+public sealed record Button(string Key, string Label, Emit? Emit = null, Intent? Intent = null, bool Enabled = true, string Tone = ButtonTone.Neutral) : Node
 {
+    // Not serialised (private); a button that emits and intends, or does neither, cannot be built.
+    private readonly bool _oneAction = (Emit is null) != (Intent is null)
+        ? true
+        : throw new ArgumentException("A button carries exactly one of Emit and Intent.", nameof(Intent));
+
     /// <summary>Visual style (<c>primary</c>, <c>secondary</c>, <c>ghost</c>, <c>danger</c>, <c>link</c>).</summary>
     public string Style { get; init; } = "secondary";
 
@@ -273,21 +294,43 @@ public sealed record Button(string Label, ButtonAction Action, bool Enabled = tr
 
     /// <summary>True for the compact 30px desktop button height.</summary>
     public bool Small { get; init; }
-
-    /// <summary>The node's key within its view, by which an activation names it.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Key { get; init; }
-
-    /// <summary>The signal a click emits to its owning alias.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public Emit? Emit { get; init; }
 }
 
 /// <summary>A signal a node emits when activated: journaled with alias <paramref name="Signal"/> to the state alias <paramref name="Owner"/>.</summary>
 /// <param name="Owner">The state alias that owns the view and receives the signal.</param>
 /// <param name="Signal">The journal alias of the emitted signal.</param>
 /// <param name="Args">Optional JSON object payload; an activation's field value is added as <c>value</c>.</param>
-public sealed record Emit(string Owner, string Signal, System.Text.Json.JsonElement? Args = null);
+public sealed record Emit(string Owner, string Signal, System.Text.Json.JsonElement? Args = null)
+{
+    /// <inheritdoc />
+    public bool Equals(Emit? other) => other is not null && Owner == other.Owner && Signal == other.Signal && Args?.GetRawText() == other.Args?.GetRawText();
+
+    /// <inheritdoc />
+    public override int GetHashCode() => HashCode.Combine(Owner, Signal, Args?.GetRawText());
+}
+
+/// <summary>What a client-local intent does.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum IntentKind
+{
+    /// <summary>Copy <see cref="Intent.Arg"/> to the clipboard.</summary>
+    Copy,
+
+    /// <summary>Open the window or URL named by <see cref="Intent.Arg"/>.</summary>
+    OpenWindow,
+
+    /// <summary>Open the settings, at the page named by <see cref="Intent.Arg"/> when given.</summary>
+    OpenSettings,
+}
+
+/// <summary>What a button does in the client itself, without a round trip to the server.</summary>
+/// <param name="Kind">What to do.</param>
+/// <param name="Arg">The text, window or page the intent acts on.</param>
+public sealed record Intent([property: JsonPropertyName("intentKind")] IntentKind Kind, string? Arg = null) : Node;
+
+/// <summary>An approval card's resolution: the OS inbox surface answers plan <paramref name="PlanId"/> (approve or deny); never an <see cref="Emit"/>.</summary>
+/// <param name="PlanId">The confirmation plan id.</param>
+public sealed record Resolve(string PlanId);
 
 /// <summary>Sortable tabular data card with optional <c>neuron://</c> source URI.</summary>
 public sealed record DataTable(
@@ -349,6 +392,7 @@ public sealed record ApprovalRowNode(string Label, string OldValue, string NewVa
 
 /// <summary>Pre-filled inline approval card.</summary>
 public sealed record ApprovalCardNode(
+    string Key,
     string Id,
     string Title,
     string Summary,
@@ -356,8 +400,7 @@ public sealed record ApprovalCardNode(
     string ValueLabel = "Value",
     string SystemName = "DigitalBrain",
     string Status = "pending",
-    ButtonAction? OnApprove = null,
-    ButtonAction? OnReject = null,
+    Resolve? Resolve = null,
     string? SourceNeuronUri = null) : Node
 {
     /// <inheritdoc />
@@ -370,8 +413,8 @@ public sealed record ApprovalCardNode(
         SystemName == other.SystemName &&
         Status == other.Status &&
         SourceNeuronUri == other.SourceNeuronUri &&
-        Equals(OnApprove, other.OnApprove) &&
-        Equals(OnReject, other.OnReject) &&
+        Key == other.Key &&
+        Equals(Resolve, other.Resolve) &&
         Rows.SequenceEqual(other.Rows);
 
     /// <inheritdoc />
@@ -379,7 +422,7 @@ public sealed record ApprovalCardNode(
 }
 
 /// <summary>One numbered option inside a <see cref="ChoiceCardNode"/>.</summary>
-public sealed record ChoiceOptionNode(string Title, string? Detail = null, ButtonAction? Action = null, string? Icon = null);
+public sealed record ChoiceOptionNode(string Key, string Title, string? Detail = null, Emit? Emit = null, string? Icon = null);
 
 /// <summary>Disambiguation choice card (2 to 5 options).</summary>
 public sealed record ChoiceCardNode(
@@ -402,6 +445,7 @@ public sealed record ChoiceCardNode(
 
 /// <summary>Pre-filled outbound message draft card (email, Slack, SMS).</summary>
 public sealed record DraftCardNode(
+    string Key,
     string Id,
     string Channel,
     string To,
@@ -409,20 +453,21 @@ public sealed record DraftCardNode(
     string From,
     string? Subject = null,
     string Status = "pending",
-    ButtonAction? OnSend = null,
-    ButtonAction? OnDiscard = null) : Node;
+    Emit? OnSend = null,
+    Emit? OnDiscard = null) : Node;
 
 /// <summary>A key-value field in a <see cref="RecordCardNode"/>.</summary>
 public sealed record RecordFieldNode(string Label, string Value, bool Warn = false);
 
 /// <summary>Structured record summary card.</summary>
 public sealed record RecordCardNode(
+    string Key,
     string ObjectLabel,
     string Name,
     IReadOnlyList<RecordFieldNode> Fields,
     string? Subtitle = null,
     string LinkLabel = "Open Neuron",
-    ButtonAction? OnOpen = null) : Node
+    Emit? OnOpen = null) : Node
 {
     /// <inheritdoc />
     public bool Equals(RecordCardNode? other) =>
@@ -440,24 +485,26 @@ public sealed record RecordCardNode(
 
 /// <summary>Secure credential request card.</summary>
 public sealed record SecretCardNode(
+    string Key,
     string Name,
     string Why,
     string SavedIn = "Variables and secrets",
     string Status = "pending",
-    ButtonAction? OnEnter = null,
-    ButtonAction? OnSkip = null) : Node;
+    Emit? OnEnter = null,
+    Emit? OnSkip = null) : Node;
 
 /// <summary>A step in a <see cref="JobCardNode"/>.</summary>
 public sealed record JobStepNode(string Label, string Status = "waiting", string? Detail = null);
 
 /// <summary>Multi-step background job progress card.</summary>
 public sealed record JobCardNode(
+    string Key,
     string Title,
     IReadOnlyList<JobStepNode> Steps,
     double Progress = 0,
     string Status = "running",
     string? ResultText = null,
-    ButtonAction? OnCancel = null) : Node
+    Emit? OnCancel = null) : Node
 {
     /// <inheritdoc />
     public bool Equals(JobCardNode? other) =>
@@ -475,6 +522,7 @@ public sealed record JobCardNode(
 
 /// <summary>A 3D neuron node in a <see cref="BrainSceneNode"/>.</summary>
 public sealed record BrainGraphNode(
+    string Key,
     string Id,
     string Label,
     string Uri,
@@ -484,7 +532,7 @@ public sealed record BrainGraphNode(
     double Z,
     string Status = "idle",
     string? Subtitle = null,
-    ButtonAction? OnSelect = null);
+    Emit? OnSelect = null);
 
 /// <summary>A directed synapse edge in a <see cref="BrainSceneNode"/>.</summary>
 public sealed record BrainGraphSynapse(

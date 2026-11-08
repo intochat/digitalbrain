@@ -327,7 +327,7 @@ DigitalBrain.Testing.PresentationAssertionException.PresentationAssertionExcepti
 DigitalBrain.Testing.PresentedView
 DigitalBrain.Testing.PresentedView.Entries.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Entry!>!
 DigitalBrain.Testing.PresentedView.Entry(string! id) -> DigitalBrain.UI.Entry!
-DigitalBrain.Testing.PresentedView.Fields.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.TextField!>!
+DigitalBrain.Testing.PresentedView.Fields.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Field!>!
 DigitalBrain.Testing.PresentedView.Find(string! id) -> object!
 DigitalBrain.Testing.PresentedView.Ids.get -> System.Collections.Generic.IReadOnlyList<string!>!
 DigitalBrain.Testing.PresentedView.IsSet.get -> bool

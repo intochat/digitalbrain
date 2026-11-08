@@ -30,7 +30,7 @@ public sealed class PresentationAssertionFacts
         var files = await os.Install<FilesLike>();
         await files.Request("open");
 
-        Assert.Equal("Filter names", Assert.IsType<TextField>(files.Main.Find("filter")).Placeholder);
+        Assert.Equal("Filter names", Assert.IsType<Field>(files.Main.Find("filter")).Placeholder);
         Assert.Equal("quota unknown", files.Side.Entry("c").Trailing);
         Assert.IsType<Entry>(files.Find("c"));
 

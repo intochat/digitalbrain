@@ -143,7 +143,6 @@ DigitalBrain.Apps.Hosting.AppTurns.Definition.get -> DigitalBrain.AppDefinition!
 DigitalBrain.Apps.Hosting.AppTurns.Enqueue(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 DigitalBrain.Apps.Hosting.AppTurns.PresentationError.get -> System.Exception?
 DigitalBrain.Apps.Hosting.AppTurns.Request(string! operation, object? argument, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
-DigitalBrain.Apps.Hosting.BehaviorIds
 DigitalBrain.Apps.Hosting.BehaviorView
 DigitalBrain.Apps.Hosting.BehaviorView.<Clone>$() -> DigitalBrain.Apps.Hosting.BehaviorView!
 DigitalBrain.Apps.Hosting.BehaviorView.BehaviorView(string! Id, string! Hash, string! Status, string? Error) -> void
@@ -161,13 +160,6 @@ DigitalBrain.Apps.Hosting.IAppHost
 DigitalBrain.Apps.Hosting.IAppHost.Assign(DigitalBrain.Apps.Hosting.ProgramAssignment! assignment, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 DigitalBrain.Apps.Hosting.IAppHost.Describe(string! owner, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Apps.Hosting.BehaviorView![]!>!
 DigitalBrain.Apps.Hosting.IAppHost.Retire(string! owner, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
-DigitalBrain.Apps.Hosting.IPrograms
-DigitalBrain.Apps.Hosting.IPrograms.Assign(string! owner, System.Collections.Generic.Dictionary<string!, string!>! sources, System.Collections.Generic.Dictionary<string!, string!>! settings) -> System.Threading.Tasks.Task<DigitalBrain.Apps.Hosting.ProgramView!>!
-DigitalBrain.Apps.Hosting.IPrograms.AssignPrebuilt(string! owner, System.Collections.Generic.Dictionary<string!, DigitalBrain.Apps.Hosting.PrebuiltBehavior!>! behaviors, System.Collections.Generic.Dictionary<string!, string!>! settings) -> System.Threading.Tasks.Task<DigitalBrain.Apps.Hosting.ProgramView!>!
-DigitalBrain.Apps.Hosting.IPrograms.Describe(string! owner) -> System.Threading.Tasks.Task<DigitalBrain.Apps.Hosting.ProgramView?>!
-DigitalBrain.Apps.Hosting.IPrograms.Retire(string! owner) -> System.Threading.Tasks.Task!
-DigitalBrain.Apps.Hosting.IPrograms.Settled(string! owner, System.TimeSpan timeout) -> System.Threading.Tasks.Task<DigitalBrain.Apps.Hosting.ProgramView?>!
-DigitalBrain.Apps.Hosting.IPrograms.Stage(string! hash, int offset, byte[]! chunk, bool last) -> System.Threading.Tasks.Task!
 DigitalBrain.Apps.Hosting.PrebuiltBehavior
 DigitalBrain.Apps.Hosting.PrebuiltBehavior.<Clone>$() -> DigitalBrain.Apps.Hosting.PrebuiltBehavior!
 DigitalBrain.Apps.Hosting.PrebuiltBehavior.Assembly.get -> byte[]!
@@ -192,17 +184,6 @@ DigitalBrain.Apps.Hosting.ProgramAssignment.Owner.init -> void
 DigitalBrain.Apps.Hosting.ProgramAssignment.ProgramAssignment(string! Owner, string! Hash, System.Collections.Generic.IReadOnlyDictionary<string!, DigitalBrain.Apps.Hosting.PrebuiltBehavior!>! Behaviors, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Settings) -> void
 DigitalBrain.Apps.Hosting.ProgramAssignment.Settings.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
 DigitalBrain.Apps.Hosting.ProgramAssignment.Settings.init -> void
-DigitalBrain.Apps.Hosting.ProgramView
-DigitalBrain.Apps.Hosting.ProgramView.<Clone>$() -> DigitalBrain.Apps.Hosting.ProgramView!
-DigitalBrain.Apps.Hosting.ProgramView.Behaviors.get -> DigitalBrain.Apps.Hosting.BehaviorView![]!
-DigitalBrain.Apps.Hosting.ProgramView.Behaviors.init -> void
-DigitalBrain.Apps.Hosting.ProgramView.Deconstruct(out string! Owner, out string! Hash, out DigitalBrain.Apps.Hosting.BehaviorView![]! Behaviors) -> void
-DigitalBrain.Apps.Hosting.ProgramView.Equals(DigitalBrain.Apps.Hosting.ProgramView? other) -> bool
-DigitalBrain.Apps.Hosting.ProgramView.Hash.get -> string!
-DigitalBrain.Apps.Hosting.ProgramView.Hash.init -> void
-DigitalBrain.Apps.Hosting.ProgramView.Owner.get -> string!
-DigitalBrain.Apps.Hosting.ProgramView.Owner.init -> void
-DigitalBrain.Apps.Hosting.ProgramView.ProgramView(string! Owner, string! Hash, DigitalBrain.Apps.Hosting.BehaviorView![]! Behaviors) -> void
 DigitalBrain.Apps.SpecComment
 DigitalBrain.Apps.SpecComment.Describes(string! operation) -> bool
 DigitalBrain.Apps.SpecComment.Description.get -> string!
@@ -1172,9 +1153,6 @@ override DigitalBrain.Apps.Hosting.PrebuiltBehavior.ToString() -> string!
 override DigitalBrain.Apps.Hosting.ProgramAssignment.Equals(object? obj) -> bool
 override DigitalBrain.Apps.Hosting.ProgramAssignment.GetHashCode() -> int
 override DigitalBrain.Apps.Hosting.ProgramAssignment.ToString() -> string!
-override DigitalBrain.Apps.Hosting.ProgramView.Equals(object? obj) -> bool
-override DigitalBrain.Apps.Hosting.ProgramView.GetHashCode() -> int
-override DigitalBrain.Apps.Hosting.ProgramView.ToString() -> string!
 override DigitalBrain.Apps.SpecCommentError.ToString() -> string!
 override DigitalBrain.AppSignalSubscription.Equals(object? obj) -> bool
 override DigitalBrain.AppSignalSubscription.GetHashCode() -> int
@@ -1396,15 +1374,12 @@ static DigitalBrain.AppKey.Parse(DigitalBrain.BrainId brain, string! path) -> Di
 static DigitalBrain.AppKey.Parse(string! path) -> DigitalBrain.AppKey
 static DigitalBrain.AppRequirements.operator !=(DigitalBrain.AppRequirements? left, DigitalBrain.AppRequirements? right) -> bool
 static DigitalBrain.AppRequirements.operator ==(DigitalBrain.AppRequirements? left, DigitalBrain.AppRequirements? right) -> bool
-static DigitalBrain.Apps.Hosting.BehaviorIds.For(string! owner, string! path) -> string!
 static DigitalBrain.Apps.Hosting.BehaviorView.operator !=(DigitalBrain.Apps.Hosting.BehaviorView? left, DigitalBrain.Apps.Hosting.BehaviorView? right) -> bool
 static DigitalBrain.Apps.Hosting.BehaviorView.operator ==(DigitalBrain.Apps.Hosting.BehaviorView? left, DigitalBrain.Apps.Hosting.BehaviorView? right) -> bool
 static DigitalBrain.Apps.Hosting.PrebuiltBehavior.operator !=(DigitalBrain.Apps.Hosting.PrebuiltBehavior? left, DigitalBrain.Apps.Hosting.PrebuiltBehavior? right) -> bool
 static DigitalBrain.Apps.Hosting.PrebuiltBehavior.operator ==(DigitalBrain.Apps.Hosting.PrebuiltBehavior? left, DigitalBrain.Apps.Hosting.PrebuiltBehavior? right) -> bool
 static DigitalBrain.Apps.Hosting.ProgramAssignment.operator !=(DigitalBrain.Apps.Hosting.ProgramAssignment? left, DigitalBrain.Apps.Hosting.ProgramAssignment? right) -> bool
 static DigitalBrain.Apps.Hosting.ProgramAssignment.operator ==(DigitalBrain.Apps.Hosting.ProgramAssignment? left, DigitalBrain.Apps.Hosting.ProgramAssignment? right) -> bool
-static DigitalBrain.Apps.Hosting.ProgramView.operator !=(DigitalBrain.Apps.Hosting.ProgramView? left, DigitalBrain.Apps.Hosting.ProgramView? right) -> bool
-static DigitalBrain.Apps.Hosting.ProgramView.operator ==(DigitalBrain.Apps.Hosting.ProgramView? left, DigitalBrain.Apps.Hosting.ProgramView? right) -> bool
 static DigitalBrain.Apps.SpecComment.Extract(string! source) -> string?
 static DigitalBrain.Apps.SpecComment.NormalizeOperation(string! name) -> string!
 static DigitalBrain.Apps.SpecComment.Parse(string! text) -> DigitalBrain.Apps.SpecComment!
