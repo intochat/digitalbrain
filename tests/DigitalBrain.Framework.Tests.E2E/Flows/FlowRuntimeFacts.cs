@@ -148,6 +148,20 @@ public sealed class FlowRuntimeFacts(FlowRuntimeFixture fixture, FaultingConfirm
     }
 
     [Theory, MemberData(nameof(NeuronRuntimeKinds.Both), MemberType = typeof(NeuronRuntimeKinds))]
+    public async Task ATopLevelStartHasOneTraceId(NeuronRuntimeKind kind)
+    {
+        var runtime = await fixture.Runtime(kind);
+        var id = runtime.Id("test.flow", "top-level");
+        await runtime.Get<ITestFlow>(id).Start("Build", "ann", null, new FlowBox());
+
+        _ = await runtime.WaitForSignals<FlowStarted>(id, 1, TimeSpan.FromSeconds(20), Ct);
+
+        var journaled = await runtime.Get<ITestFlow>(id).StartedTraceId();
+        Assert.False(string.IsNullOrEmpty(journaled));
+        Assert.Equal(journaled, await runtime.Get<ITestFlow>(id).TraceId());
+    }
+
+    [Theory, MemberData(nameof(NeuronRuntimeKinds.Both), MemberType = typeof(NeuronRuntimeKinds))]
     public async Task CancelDuringALongBodyEndsCancelledWithoutConflict(NeuronRuntimeKind kind)
     {
         var runtime = await fixture.Runtime(kind);

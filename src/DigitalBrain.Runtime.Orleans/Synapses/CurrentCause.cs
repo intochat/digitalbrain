@@ -19,6 +19,11 @@ internal static class CurrentCause
 
     private static readonly AsyncLocal<(string TraceId, string CausationId)?> Current = new();
 
+    // The fresh trace id minted for this async flow when it had no cause and no request trace: every later stamp of the flow (a
+    // flow's State.TraceId and the save that journals FlowStarted) agrees on it. Set inside a turn's async method, so it never
+    // reaches the caller's flow or the next turn.
+    private static readonly AsyncLocal<string?> Fresh = new();
+
     /// <summary>Makes <paramref name="cause"/> the current cause of this flow; disposing the scope restores the previous one.</summary>
     public static Scope Open(JournaledSignal cause)
     {
@@ -42,7 +47,7 @@ internal static class CurrentCause
     private static (string TraceId, string? CausationId) Inherited()
         => RequestContext.Get(TraceKey) is string trace
             ? (trace, RequestContext.Get(CausationKey) as string)
-            : (TraceContext.Current?.TraceId ?? Guid.NewGuid().ToString("N"), null);
+            : (TraceContext.Current?.TraceId ?? (Fresh.Value ??= Guid.NewGuid().ToString("N")), null);
 
     /// <summary>Restores the previous cause when disposed.</summary>
     public readonly struct Scope((string, string)? previous, object? previousTrace, object? previousCausation) : IDisposable
