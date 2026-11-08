@@ -32,10 +32,11 @@ public static class AnalyzerSet
         new ReentrancyJustificationAnalyzer(),
         new CallCycleAnalyzer());
 
-    /// <summary>The synapse analyzers: DB0041-DB0044, applied by the synapse compiler on top of <see cref="All"/>.</summary>
+    /// <summary>The synapse analyzers: DB0041-DB0045, applied by the synapse compiler on top of <see cref="All"/>.</summary>
     public static ImmutableArray<DiagnosticAnalyzer> Synapses { get; } = ImmutableArray.Create<DiagnosticAnalyzer>(
         new SynapseShapeAnalyzer(),
         new StateLocalityAnalyzer(),
         new StatusStringAnalyzer(),
-        new NoOnInSynapseAssemblyAnalyzer());
+        new NoOnInSynapseAssemblyAnalyzer(),
+        new BannedApiAnalyzer());
 }

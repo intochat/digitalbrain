@@ -55,6 +55,12 @@ internal static class Rules
         "'{0}' is an [On] reaction in a synapse assembly; write it as a [Synapse] function",
         Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
+    // The synapse host refuses a build that references the same list (BannedApis), so skipping this analyzer does not get a build in.
+    public static readonly DiagnosticDescriptor BannedApi = new(
+        "DB0045", "Banned API in a synapse assembly",
+        "'{0}' is banned in a synapse assembly (no network, disk, processes, thread pool or code loading); reach the outside through a [Slot] capability",
+        Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
+
     public static readonly DiagnosticDescriptor ShareableContract = new(
         "DB0031", "Cross-brain contract interface requires [Shareable]",
         "Contract interface or member '{0}' violates [Shareable] contract rules",

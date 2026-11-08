@@ -154,6 +154,13 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
                 await DropStaged(brain, entry, ct).ConfigureAwait(false);
             }
 
+            // DB0045 again on the emitted bytes, before anything loads: a build that skipped the analyzer is still refused.
+            if (BannedReferences.First(build.Assembly) is { } banned)
+            {
+                var reason = $"'{banned}' is banned in a synapse assembly";
+                return new DeployOutcome(DeployStatus.Refused, build.Hash, [.. build.Diagnostics, new SynapseDiagnostic("", "DB0045", 0, reason)], Empty(), reason);
+            }
+
             var refusal = LoadChecked(brain, source.SourceKey, build, out var loaded, out var unload);
             if (refusal is not null)
             {

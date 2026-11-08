@@ -33,7 +33,7 @@ public sealed class NoOnInSynapseAssemblyAnalyzer : DiagnosticAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(Rules.NoOnInSynapseAssembly, method.Locations[0], name));
     }
 
-    private static bool DeclaresState(INamespaceOrTypeSymbol container)
+    internal static bool DeclaresState(INamespaceOrTypeSymbol container)
     {
         foreach (var member in container.GetMembers())
         {

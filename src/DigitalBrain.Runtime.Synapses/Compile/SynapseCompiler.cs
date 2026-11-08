@@ -11,7 +11,7 @@ using Microsoft.CodeAnalysis.Emit;
 
 namespace DigitalBrain.Runtime.Synapses;
 
-/// <summary>Compiles synapse source with every shipped DigitalBrain analyzer plus DB0041-DB0044; caches successful builds by hash.</summary>
+/// <summary>Compiles synapse source with every shipped DigitalBrain analyzer plus DB0041-DB0045; caches successful builds by hash.</summary>
 public sealed class SynapseCompiler
 {
     private const int Capacity = 256;
@@ -46,11 +46,12 @@ public sealed class SynapseCompiler
     {
     }
 
-    internal SynapseCompiler(ReferenceSet references, IEnumerable<DiagnosticAnalyzer> extraAnalyzers)
+    // withoutBannedApis drops DB0045 so a test can emit a build that only the host's own banned-API check stands in front of.
+    internal SynapseCompiler(ReferenceSet references, IEnumerable<DiagnosticAnalyzer> extraAnalyzers, bool withoutBannedApis = false)
     {
         ArgumentNullException.ThrowIfNull(references);
         this.references = references;
-        analyzers = [.. Analyzers, .. extraAnalyzers];
+        analyzers = [.. Analyzers.Where(analyzer => !withoutBannedApis || analyzer is not BannedApiAnalyzer), .. extraAnalyzers];
     }
 
     /// <summary>How many builds this compiler has emitted (cache hits do not count).</summary>
