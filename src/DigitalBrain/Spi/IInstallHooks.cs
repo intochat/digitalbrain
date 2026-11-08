@@ -11,6 +11,20 @@ public interface IInstallHooks
     /// <param name="ct">Cancellation.</param>
     Task EnsureReactionEdges(NeuronId state, IReadOnlyList<Type> signals, CancellationToken ct);
 
+    /// <summary>Ensures <paramref name="state"/> receives <paramref name="signals"/> and the signals named by <paramref name="signalAliases"/> of its brain.</summary>
+    /// <param name="state">The state neuron, <c>{brain}/{alias}/default</c>.</param>
+    /// <param name="signals">The signal types its typed reactions take.</param>
+    /// <param name="signalAliases">The journal aliases its alias reactions are fed by.</param>
+    /// <param name="ct">Cancellation.</param>
+    /// <exception cref="NotSupportedException">Aliases are given and this host does not route by alias.</exception>
+    Task EnsureReactionEdges(NeuronId state, IReadOnlyList<Type> signals, IReadOnlyList<string> signalAliases, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(signalAliases);
+        return signalAliases.Count == 0
+            ? EnsureReactionEdges(state, signals, ct)
+            : throw new NotSupportedException($"{GetType().Name} does not route reactions by signal alias.");
+    }
+
     /// <summary>Removes every reaction edge of <paramref name="state"/>.</summary>
     /// <param name="state">The state neuron.</param>
     /// <param name="ct">Cancellation.</param>

@@ -192,6 +192,7 @@ public sealed class SynapseShapeFacts
         Assert.Equal("schedule", SynapseReasons.Schedule);
         Assert.Equal("every needs a Tick reaction", SynapseReasons.EveryNeedsTick);
         Assert.Equal("slot", SynapseReasons.SlotBoundTwice);
+        Assert.Equal("alias reaction takes a SignalEnvelope, not a signal type", SynapseReasons.AliasNeedsEnvelope);
     }
 
     [Fact]

@@ -36,6 +36,7 @@ public sealed class SynapseShapeAnalyzerFacts
     [InlineData("[Synapse(typeof(Tick), \"week\", Every = \"07:00\")] public static WeekSpend {|#0:Daily|}(Tick t, WeekSpend w) => w;")]
     [InlineData("[Synapse(typeof(Tick), \"week\", Every = \"Mon 07:00\")] public static WeekSpend {|#0:Weekly|}(Tick t, WeekSpend w) => w;")]
     [InlineData("[Synapse(typeof(Tick), \"week\", Every = \"every 5m\")] public static WeekSpend {|#0:Interval|}(Tick t, WeekSpend w) => w;")]
+    [InlineData("[Synapse(\"x.polled\", \"week\")] public static WeekSpend {|#0:ByAlias|}(SignalEnvelope s, WeekSpend w) => w;")]
     public Task Recognised_shapes_report_nothing(string method) => Run(method, null);
 
     [Theory]
@@ -67,6 +68,11 @@ public sealed class SynapseShapeAnalyzerFacts
         "an every needs a Tick reaction.")]
     [InlineData("[Synapse(\"week\", Every = \"07:00\")] public static string {|#0:EveryOnView|}(WeekSpend w) => string.Empty;", "EveryOnView",
         "an every needs a Tick reaction.")]
+    [InlineData("[Synapse(\"x.polled\", \"week\")] public static WeekSpend {|#0:TypedOnAlias|}(Charging s, WeekSpend w) => w;", "TypedOnAlias",
+        "an alias reaction takes a SignalEnvelope, not a signal type.")]
+    [InlineData("[Synapse(\"x.polled\", \"week\")] public static Check {|#0:GateOnAlias|}(SignalEnvelope s, WeekSpend w) => default!;", "GateOnAlias",
+        "an alias reaction takes a SignalEnvelope, not a signal type.")]
+    [InlineData("[Synapse(typeof(Charging), \"week\")] public static WeekSpend {|#0:EnvelopeOnType|}(SignalEnvelope s, WeekSpend w) => w;", "EnvelopeOnType", UnknownParameter)]
     public Task Refused_shapes_report_DB0041_with_the_reason(string method, string name, string reason) => Run(method, ("Shapes." + name, reason));
 
     [Fact]
@@ -90,8 +96,14 @@ public sealed class SynapseShapeAnalyzerFacts
     public Task A_method_without_the_attribute_is_ignored() => Verify<SynapseShapeAnalyzer>.Diagnostics(Wrap("public Check NotASynapse(WeekSpend w) => default!;"));
 
     [Fact]
+    public Task AnalyzerDB0041FlagsTypedParameterOnAliasReaction() => Run(
+        "[Synapse(\"x.polled\", \"week\")] public static WeekSpend {|#0:Typed|}(Charging s, WeekSpend w) => w;",
+        ("Shapes.Typed", "an alias reaction takes a SignalEnvelope, not a signal type."));
+
+    [Fact]
     public void Reason_fragments_are_the_specified_text()
     {
+        Assert.Equal("alias reaction takes a SignalEnvelope, not a signal type", Rules.SynapseReasons.AliasNeedsEnvelope);
         Assert.Equal("gate needs a signal", Rules.SynapseReasons.GateNeedsSignal);
         Assert.Equal("at most one signal", Rules.SynapseReasons.AtMostOneSignal);
         Assert.Equal("state record", Rules.SynapseReasons.StateRecord);

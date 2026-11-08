@@ -163,6 +163,7 @@ public sealed class RecordingSynapses : ISynapses
 {
     private readonly List<Synapse> _synapses = [];
     private readonly HashSet<Type> _brainWide = [];
+    private readonly HashSet<string> _brainWideAliases = new(StringComparer.Ordinal);
 
     /// <summary>Synapses held by <paramref name="subscriber"/>.</summary>
     public RecordingSynapses(NeuronId subscriber) => Subscriber = subscriber;
@@ -213,10 +214,27 @@ public sealed class RecordingSynapses : ISynapses
         return Task.CompletedTask;
     }
 
+    /// <summary>The signal aliases of the brain-wide synapse; empty when there is none.</summary>
+    public IReadOnlyCollection<string> BrainWideAliases => _brainWideAliases;
+
+    /// <inheritdoc />
+    public Task EnsureBrainWide(IReadOnlyList<string> signalAliases)
+    {
+        ArgumentNullException.ThrowIfNull(signalAliases);
+        if (signalAliases.Count == 0) { throw new ArgumentException("A synapse names at least one signal alias.", nameof(signalAliases)); }
+        foreach (var alias in signalAliases)
+        {
+            if (string.IsNullOrEmpty(alias)) { throw new ArgumentException("A signal alias must not be empty.", nameof(signalAliases)); }
+            _brainWideAliases.Add(alias);
+        }
+        return Task.CompletedTask;
+    }
+
     /// <inheritdoc />
     public Task RemoveBrainWide()
     {
         _brainWide.Clear();
+        _brainWideAliases.Clear();
         return Task.CompletedTask;
     }
 }

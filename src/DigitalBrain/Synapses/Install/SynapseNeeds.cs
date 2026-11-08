@@ -17,7 +17,7 @@ public sealed record SlotNeed(string Name, CapabilityId Capability, string Contr
 /// <param name="Slots">The capability slots.</param>
 /// <param name="Schedules">The schedules it runs on.</param>
 /// <param name="Gates">The signal aliases it can stop.</param>
-/// <param name="Reactions">The signal aliases it reacts to.</param>
+/// <param name="Reactions">The reactions it runs: a typed reaction by its function name, an alias reaction as <c>alias:{signal alias}</c>.</param>
 /// <param name="HasView">True when it shows a view.</param>
 public sealed record SynapseNeeds(
     string Alias,
@@ -34,10 +34,13 @@ public sealed record SynapseNeeds(
         parts.AddRange(Slots.Select(s => $"{s.ContractDisplayName} through {s.Name}"));
         parts.AddRange(Schedules.Select(Describe));
         parts.AddRange(Gates.Select(g => $"stop {g} before it happens"));
-        if (Reactions.Count > 0)
+        var typed = Reactions.Count(r => !r.StartsWith(AliasPrefix, StringComparison.Ordinal));
+        if (typed > 0)
         {
-            parts.Add(string.Create(CultureInfo.InvariantCulture, $"react to {Reactions.Count} signal{(Reactions.Count == 1 ? "" : "s")}"));
+            parts.Add(string.Create(CultureInfo.InvariantCulture, $"react to {typed} signal{(typed == 1 ? "" : "s")}"));
         }
+
+        parts.AddRange(Reactions.Where(r => r.StartsWith(AliasPrefix, StringComparison.Ordinal)).Select(r => $"reacts to {r[AliasPrefix.Length..]}"));
 
         if (HasView)
         {
@@ -58,6 +61,9 @@ public sealed record SynapseNeeds(
         lines.Add(HasView ? "view:true" : "view:false");
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', lines))));
     }
+
+    /// <summary>The prefix of an alias reaction's entry in <see cref="Reactions"/>.</summary>
+    public const string AliasPrefix = "alias:";
 
     private static string Describe(Schedule s) => s.Kind switch
     {

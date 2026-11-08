@@ -713,3 +713,5 @@ DigitalBrain.Testing.TestJournal.ReadTrace(string! traceId, long since, int limi
 DigitalBrain.Testing.InMemorySignalHistory.ReadTrace(string! traceId, long since, int limit, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.SignalPage!>!
 DigitalBrain.Testing.FakeNeuronContext.TraceId.get -> string?
 DigitalBrain.Testing.FakeNeuronContext.TraceId.set -> void
+DigitalBrain.Testing.RecordingSynapses.BrainWideAliases.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+DigitalBrain.Testing.RecordingSynapses.EnsureBrainWide(System.Collections.Generic.IReadOnlyList<string!>! signalAliases) -> System.Threading.Tasks.Task!

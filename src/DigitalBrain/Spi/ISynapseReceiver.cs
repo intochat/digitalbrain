@@ -11,6 +11,16 @@ public interface ISynapseReceiver
     /// <returns>A task that completes when every reaction has run.</returns>
     Task Receive(Signal signal, CancellationToken ct);
 
+    /// <summary>Runs the reaction synapses for the journal entry <paramref name="journaled"/>; alias reactions get its trace and causation ids.</summary>
+    /// <param name="journaled">The arriving journal entry.</param>
+    /// <param name="ct">Cancels the call.</param>
+    /// <returns>A task that completes when every reaction has run.</returns>
+    Task Receive(JournaledSignal journaled, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(journaled);
+        return Receive(journaled.Signal, ct);
+    }
+
     /// <summary>Runs the gate synapses for <paramref name="signal"/> in order; returns the first refusal (journaled) or the last allowance. Saves nothing on allow; holds the allowed next state as provisional until <see cref="Committed"/> or <see cref="Aborted"/>, and later gate calls evaluate against it.</summary>
     /// <param name="signal">The signal about to be published.</param>
     /// <param name="attempt">

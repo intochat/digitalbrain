@@ -28,6 +28,14 @@ public interface ISynapses
     /// <exception cref="InvalidOperationException">This neuron is stateless.</exception>
     Task EnsureBrainWide(params Type[] signals);
 
+    /// <summary>
+    /// Ensures signals whose journal alias is one of <paramref name="signalAliases"/>, published by any other neuron of this brain, reach
+    /// this neuron through its one brain-wide synapse; the subscriber needs no reference to the signal types. Calling it again adds aliases.
+    /// </summary>
+    /// <exception cref="ArgumentException">No alias is given, or an alias is empty (or, on a runtime that resolves aliases, unknown).</exception>
+    /// <exception cref="InvalidOperationException">This neuron is stateless.</exception>
+    Task EnsureBrainWide(IReadOnlyList<string> signalAliases);
+
     /// <summary>Removes the brain-wide synapse of this neuron; one it does not hold is ignored.</summary>
     Task RemoveBrainWide();
 }

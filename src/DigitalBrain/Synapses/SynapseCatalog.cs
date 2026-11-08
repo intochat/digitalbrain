@@ -77,7 +77,9 @@ public sealed class SynapseCatalog
             .Select(d => d.Signal!.GetCustomAttribute<SignalAttribute>()?.Alias ?? d.Signal!.Name)
             .Distinct(StringComparer.Ordinal)
             .ToList();
-        var reactions = own.Where(d => d.Kind == SynapseKind.Reaction).Select(d => d.Function.Name).ToList();
+        var reactions = own.Where(d => d.Kind == SynapseKind.Reaction)
+            .Select(d => d.SignalAlias is { } signal ? SynapseNeeds.AliasPrefix + signal : d.Function.Name)
+            .ToList();
         return new SynapseNeeds(alias, slots, schedules, gates, reactions, own.Any(d => d.Kind == SynapseKind.View));
     }
 

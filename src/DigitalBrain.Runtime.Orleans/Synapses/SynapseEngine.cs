@@ -309,7 +309,7 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
         try
         {
             if (neuron is ISignalSink sink) { await sink.Deliver(item).ConfigureAwait(true); }
-            else if (neuron is ISynapseReceiver receiver) { await receiver.Receive(item.Signal, CancellationToken.None).ConfigureAwait(true); }
+            else if (neuron is ISynapseReceiver receiver) { await receiver.Receive(item, CancellationToken.None).ConfigureAwait(true); }
             else { await ReactionDispatcher.React(neuron, item.Signal, CancellationToken.None).ConfigureAwait(true); }
             NoteDelivery(entry, item);
             await _drain().ConfigureAwait(true);

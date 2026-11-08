@@ -13,6 +13,7 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
     private const string CancellationTokenType = "System.Threading.CancellationToken";
     private const string TaskType = "System.Threading.Tasks.Task`1";
     private const string ReactionType = "DigitalBrain.Reaction`1";
+    private const string EnvelopeType = "DigitalBrain.SignalEnvelope";
 
     // Mirrors DigitalBrain.Time.Schedule: HH:mm, Day HH:mm, every Nm / every Nh (N from 1 to 999999).
     private static readonly Regex ScheduleRule = new Regex(
@@ -65,15 +66,17 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
             return $"a synapse function must be {Rules.SynapseReasons.PublicStatic} on a static class or a top-level type, not nested in a non-static class.";
         }
 
-        // [Synapse(Type from, string into)] declares a signal; [Synapse(string from)] is a view.
+        // [Synapse(Type from, string into)] declares a signal; [Synapse(string signalAlias, string into)] an alias reaction; [Synapse(string from)] is a view.
         var args = attribute.ConstructorArguments;
         var hasSignal = args.Length > 1;
+        var byAlias = hasSignal && args[0].Value is string;
         var into = (hasSignal ? args[1] : args[0]).Value as string ?? string.Empty;
         var slash = into.IndexOf('/');
         var alias = slash < 0 ? into : into.Substring(0, slash);
         var state = FindState(compilation, alias);
 
         var signals = 0;
+        var envelopes = 0;
         var stateCount = 0;
         var tokens = 0;
         var unknown = false;
@@ -96,6 +99,10 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
                 hasSignalParameter = true;
                 signalParameter = type;
             }
+            else if (byAlias && Rules.FullName(type as INamedTypeSymbol) == EnvelopeType)
+            {
+                envelopes++;
+            }
             else if (Rules.FullName(type as INamedTypeSymbol) == CancellationTokenType)
             {
                 tokens++;
@@ -109,6 +116,11 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
             {
                 unknown = true;
             }
+        }
+
+        if (byAlias && (signals > 0 || envelopes != 1))
+        {
+            return $"an {Rules.SynapseReasons.AliasNeedsEnvelope}.";
         }
 
         if (signals > 1)
@@ -132,6 +144,11 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
             || (returned is INamedTypeSymbol { IsGenericType: true } generic
                 && Rules.FullName(generic.OriginalDefinition) == ReactionType
                 && SymbolEqualityComparer.Default.Equals(generic.TypeArguments[0], state));
+
+        if (byAlias)
+        {
+            return isReaction ? EveryRefusal(attribute, isReaction: false, declared: null) : $"an {Rules.SynapseReasons.AliasNeedsEnvelope}.";
+        }
 
         if (!isGate && !isReaction)
         {

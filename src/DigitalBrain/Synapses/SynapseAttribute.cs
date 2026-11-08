@@ -29,18 +29,40 @@ public sealed class SynapseAttribute : Attribute
         }
 
         Signal = from;
+        (State, Key) = Target(into);
+    }
+
+    /// <summary>
+    /// Declares a reaction fed by signals with the journal alias <paramref name="signalAlias"/> into state <paramref name="into"/>; the
+    /// function takes a <see cref="SignalEnvelope"/>, so it needs no reference to the signal's type.
+    /// </summary>
+    /// <param name="signalAlias">The <c>[Signal]</c> alias of the arriving signal.</param>
+    /// <param name="into">The target state: <c>{alias}</c> or <c>{alias}/{key}</c>.</param>
+    /// <exception cref="ArgumentException">The signal alias is empty, or the state alias or the key after the slash is empty.</exception>
+    public SynapseAttribute(string signalAlias, string into)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(signalAlias);
+        ArgumentNullException.ThrowIfNull(into);
+        SignalAlias = signalAlias;
+        (State, Key) = Target(into);
+    }
+
+    private static (string State, string Key) Target(string into)
+    {
         var slash = into.IndexOf('/', StringComparison.Ordinal);
-        State = slash < 0 ? into : into[..slash];
-        Key = slash < 0 ? DefaultKey : into[(slash + 1)..];
-        if (State.Length == 0)
+        var state = slash < 0 ? into : into[..slash];
+        var key = slash < 0 ? DefaultKey : into[(slash + 1)..];
+        if (state.Length == 0)
         {
             throw new ArgumentException("The state alias must not be empty.", nameof(into));
         }
 
-        if (Key.Length == 0)
+        if (key.Length == 0)
         {
             throw new ArgumentException("The state key after the slash must not be empty.", nameof(into));
         }
+
+        return (state, key);
     }
 
     /// <summary>Declares a view over the state with alias <paramref name="from"/>.</summary>
@@ -51,8 +73,11 @@ public sealed class SynapseAttribute : Attribute
         State = from;
     }
 
-    /// <summary>The arriving signal type, or null for a view.</summary>
+    /// <summary>The arriving signal type, or null for a view or an alias reaction.</summary>
     public Type? Signal { get; }
+
+    /// <summary>The journal alias of the arriving signal of an alias reaction; null otherwise. Never the state alias.</summary>
+    public string? SignalAlias { get; }
 
     /// <summary>The state alias.</summary>
     public string State { get; }

@@ -50,6 +50,8 @@ internal static class Verify<TAnalyzer> where TAnalyzer : DiagnosticAnalyzer, ne
             {
                 public SynapseAttribute(System.Type from, string into) { Signal = from; State = into; }
                 public SynapseAttribute(string from) { State = from; }
+                public SynapseAttribute(string signalAlias, string into) { SignalAlias = signalAlias; State = into; }
+                public string? SignalAlias { get; }
                 public System.Type? Signal { get; }
                 public string State { get; }
                 public string Key { get; } = "default";
@@ -60,6 +62,7 @@ internal static class Verify<TAnalyzer> where TAnalyzer : DiagnosticAnalyzer, ne
             [System.AttributeUsage(System.AttributeTargets.Interface)]
             public sealed class CapabilityAttribute(string name, int version) : System.Attribute { public string Name { get; } = name; public int Version { get; } = version; }
             public sealed class Reaction<T> { }
+            public sealed record SignalEnvelope(string Alias, System.Text.Json.JsonElement Payload, string? TraceId, string? CausationId);
             [System.AttributeUsage(System.AttributeTargets.Method)] public sealed class OnAttribute : System.Attribute;
             [System.AttributeUsage(System.AttributeTargets.Method)] public sealed class ScenarioAttribute(string title) : System.Attribute;
         }

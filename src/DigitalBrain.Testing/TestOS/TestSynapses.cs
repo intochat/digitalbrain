@@ -20,6 +20,12 @@ internal sealed class TestSynapses(TestNeuronHost host) : ISynapses
 
     public Task EnsureBrainWide(params Type[] signals) => host.OS.Delivery.EnsureBrainWide(host, signals);
 
+    public Task EnsureBrainWide(IReadOnlyList<string> signalAliases)
+    {
+        ArgumentNullException.ThrowIfNull(signalAliases);
+        return host.OS.Delivery.EnsureBrainWide(host, [], aliases: signalAliases);
+    }
+
     public Task RemoveBrainWide()
     {
         host.OS.Delivery.Remove(host.Id, SynapseRegistry.BrainWideOf(host.Id.Brain));
@@ -86,17 +92,23 @@ internal sealed class SynapseRegistry(TestOS os)
 
     // No admission: a brain-wide synapse names no source to ask. It starts at the brain's last journal position.
     // exact: the entry's signals become exactly signals (an install's reaction edges), so a replaced source's types do not linger.
-    public Task EnsureBrainWide(TestNeuronHost subscriber, Type[] signals, bool exact = false)
+    // aliases: journal aliases of alias reactions, matched against each journaled signal's [Signal] alias.
+    public Task EnsureBrainWide(TestNeuronHost subscriber, Type[] signals, bool exact = false, IReadOnlyList<string>? aliases = null)
     {
         ArgumentNullException.ThrowIfNull(signals);
+        aliases ??= [];
         if (subscriber.Class.IsDefined(typeof(StatelessNeuronAttribute), false))
         {
             throw new InvalidOperationException($"{subscriber.Class.FullName} is a [StatelessNeuron] and holds no synapses.");
         }
-        if (signals.Length == 0) { throw new ArgumentException("A synapse names at least one signal type.", nameof(signals)); }
+        if (signals.Length == 0 && aliases.Count == 0) { throw new ArgumentException("A synapse names at least one signal type.", nameof(signals)); }
         foreach (var signal in signals)
         {
             if (signal is null || !typeof(Signal).IsAssignableFrom(signal)) { throw new ArgumentException($"{signal} is not a signal type.", nameof(signals)); }
+        }
+        foreach (var alias in aliases)
+        {
+            if (string.IsNullOrEmpty(alias)) { throw new ArgumentException("A signal alias must not be empty.", nameof(aliases)); }
         }
         var last = os.Journal(subscriber.Id.Brain).Position;
         var key = BrainWideOf(subscriber.Id.Brain);
@@ -107,14 +119,20 @@ internal sealed class SynapseRegistry(TestOS os)
             {
                 sources[key] = entry = new Entry(key, subscriber.Id) { BrainWide = true, Cursor = last, CursorAt = os.Clock.GetUtcNow() };
             }
-            if (exact) { entry.Signals.Clear(); }
+            if (exact)
+            {
+                entry.Signals.Clear();
+                entry.Aliases.Clear();
+            }
             entry.Signals.UnionWith(signals);
+            entry.Aliases.UnionWith(aliases);
             // A state neuron's per-source edges (plan 1) of signals the brain-wide entry now covers would deliver them twice: they go.
             if (typeof(ISynapseReceiver).IsAssignableFrom(subscriber.Class))
             {
                 foreach (var source in sources.Values.Where(item => !item.BrainWide).ToList())
                 {
                     source.Signals.ExceptWith(entry.Signals);
+                    source.Signals.RemoveWhere(signal => entry.Aliases.Contains(AliasOf(signal)));
                     if (source.Signals.Count == 0) { sources.Remove(source.Source); }
                 }
             }
@@ -134,8 +152,8 @@ internal sealed class SynapseRegistry(TestOS os)
     {
         lock (_gate)
         {
-            return [.. _bySubscriber.SelectMany(pair => pair.Value.Values.SelectMany(entry => entry.Signals.Select(signal =>
-                new ObservedSynapse(entry.BrainWide ? BrainWide : entry.Source.ToString(), pair.Key.ToString(), AliasOf(signal)))))
+            return [.. _bySubscriber.SelectMany(pair => pair.Value.Values.SelectMany(entry => entry.Signals.Select(AliasOf).Union(entry.Aliases, StringComparer.Ordinal).Select(alias =>
+                new ObservedSynapse(entry.BrainWide ? BrainWide : entry.Source.ToString(), pair.Key.ToString(), alias))))
                 .OrderBy(row => row.From, StringComparer.Ordinal).ThenBy(row => row.To, StringComparer.Ordinal).ThenBy(row => row.Signal, StringComparer.Ordinal)];
         }
     }
@@ -267,8 +285,8 @@ internal sealed class SynapseRegistry(TestOS os)
             foreach (var item in due)
             {
                 bool wanted;
-                lock (_gate) { wanted = entry.Signals.Any(type => type.IsInstanceOfType(item.Signal)); }
-                if (wanted) { await React(subscriber, item.Signal, entry, item.Sequence, entry.Source, item.TraceId).ConfigureAwait(false); }
+                lock (_gate) { wanted = Wants(entry, item.Signal); }
+                if (wanted) { await React(subscriber, item.Signal, entry, item.Sequence, entry.Source, item.TraceId, item).ConfigureAwait(false); }
                 Advance(entry, item.Sequence);
             }
         }
@@ -293,8 +311,8 @@ internal sealed class SynapseRegistry(TestOS os)
             foreach (var item in page.Signals)
             {
                 bool wanted;
-                lock (_gate) { wanted = !(deaf && item.Publisher == subscriber.Id) && entry.Signals.Any(type => type.IsInstanceOfType(item.Signal)); }
-                if (wanted) { await React(subscriber, item.Signal, entry, item.Sequence, item.Publisher, item.TraceId).ConfigureAwait(false); }
+                lock (_gate) { wanted = !(deaf && item.Publisher == subscriber.Id) && Wants(entry, item.Signal); }
+                if (wanted) { await React(subscriber, item.Signal, entry, item.Sequence, item.Publisher, item.TraceId, item).ConfigureAwait(false); }
                 Advance(entry, item.Sequence);
             }
         }
@@ -317,7 +335,11 @@ internal sealed class SynapseRegistry(TestOS os)
     }
 
     // A reaction is a turn: a synapse receiver's Receive, else the most specific [On] method whose parameter accepts the signal; none means the signal is ignored.
-    private Task React(TestNeuronHost subscriber, Signal signal, Entry entry, long cursor, NeuronId from, string? traceId = null)
+    // A signal is wanted by its type or by its journal alias; call under _gate.
+    private static bool Wants(Entry entry, Signal signal)
+        => entry.Signals.Any(type => type.IsInstanceOfType(signal)) || (entry.Aliases.Count > 0 && entry.Aliases.Contains(AliasOf(signal.GetType())));
+
+    private Task React(TestNeuronHost subscriber, Signal signal, Entry entry, long cursor, NeuronId from, string? traceId = null, JournaledSignal? item = null)
     {
         if (signal is not Gap)
         {
@@ -329,7 +351,8 @@ internal sealed class SynapseRegistry(TestOS os)
             {
                 Reacting.Value = new Reaction(subscriber.Id, entry, cursor);
                 TestCause.Enter(from, cursor, traceId);
-                await ((ISynapseReceiver)neuron).Receive(signal, CancellationToken.None).ConfigureAwait(false);
+                var receiver = (ISynapseReceiver)neuron;
+                await (item is null ? receiver.Receive(signal, CancellationToken.None) : receiver.Receive(item, CancellationToken.None)).ConfigureAwait(false);
                 return 0;
             });
         }
@@ -383,6 +406,8 @@ internal sealed class SynapseRegistry(TestOS os)
         public NeuronId Subscriber { get; } = subscriber;
 
         public HashSet<Type> Signals { get; } = [];
+
+        public HashSet<string> Aliases { get; } = new(StringComparer.Ordinal);
 
         public bool BrainWide { get; init; }
 

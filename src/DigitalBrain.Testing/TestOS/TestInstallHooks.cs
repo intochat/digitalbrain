@@ -9,10 +9,16 @@ internal sealed class TestInstallHooks(TestOS os) : IInstallHooks
 {
     private const string TimeType = "time";
 
-    public Task EnsureReactionEdges(NeuronId state, IReadOnlyList<Type> signals, CancellationToken ct)
+    public Task EnsureReactionEdges(NeuronId state, IReadOnlyList<Type> signals, CancellationToken ct) => EnsureReactionEdges(state, signals, [], ct);
+
+    // Alias reactions share the brain-wide entry, matched by each journaled signal's [Signal] alias.
+    public Task EnsureReactionEdges(NeuronId state, IReadOnlyList<Type> signals, IReadOnlyList<string> signalAliases, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(signals);
-        return signals.Count == 0 ? Task.CompletedTask : os.Delivery.EnsureBrainWide(os.Host(state), [.. signals], exact: true);
+        ArgumentNullException.ThrowIfNull(signalAliases);
+        return signals.Count == 0 && signalAliases.Count == 0
+            ? Task.CompletedTask
+            : os.Delivery.EnsureBrainWide(os.Host(state), [.. signals], exact: true, aliases: signalAliases);
     }
 
     public Task RemoveReactionEdges(NeuronId state, CancellationToken ct)

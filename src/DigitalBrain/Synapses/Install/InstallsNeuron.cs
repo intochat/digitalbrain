@@ -202,10 +202,12 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
     {
         ArgumentNullException.ThrowIfNull(hooks);
         var state = StateOf(alias);
-        var signals = catalog.Current.For(alias).Where(d => d.Kind == SynapseKind.Reaction).Select(d => d.Signal!).Distinct().ToList();
+        var reactions = catalog.Current.For(alias).Where(d => d.Kind == SynapseKind.Reaction).ToList();
+        var signals = reactions.Where(d => d.SignalAlias is null).Select(d => d.Signal!).Distinct().ToList();
+        var aliases = reactions.Select(d => d.SignalAlias).OfType<string>().Distinct(StringComparer.Ordinal).ToList();
         try
         {
-            await hooks.EnsureReactionEdges(state, signals, ct).ConfigureAwait(true);
+            await hooks.EnsureReactionEdges(state, signals, aliases, ct).ConfigureAwait(true);
             await hooks.RegisterSchedules(state, needs.Schedules, ct).ConfigureAwait(true);
             return null;
         }

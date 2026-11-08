@@ -20,15 +20,20 @@ internal sealed class OrleansInstallHooks(IServiceProvider services, InstalledGa
     private const string TimeType = "time";
 
     /// <inheritdoc />
-    public async Task EnsureReactionEdges(NeuronId state, IReadOnlyList<Type> signals, CancellationToken ct)
+    public Task EnsureReactionEdges(NeuronId state, IReadOnlyList<Type> signals, CancellationToken ct) => EnsureReactionEdges(state, signals, [], ct);
+
+    /// <inheritdoc />
+    /// <remarks>Typed reactions and alias reactions share the one brain-wide synapse; the edge holds journal aliases either way.</remarks>
+    public async Task EnsureReactionEdges(NeuronId state, IReadOnlyList<Type> signals, IReadOnlyList<string> signalAliases, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(signals);
+        ArgumentNullException.ThrowIfNull(signalAliases);
         gates.Invalidate(state.Brain);
-        if (signals.Count == 0) { return; }
+        if (signals.Count == 0 && signalAliases.Count == 0) { return; }
         var map = services.GetRequiredService<JournalPayloads>().Types;
         string[] aliases = [.. signals.Select(signal => map.TryAliasOf(signal, out var alias)
             ? alias
-            : throw new ArgumentException($"{signal.Name} is not a registered [Signal] type.", nameof(signals))).Distinct(StringComparer.Ordinal)];
+            : throw new ArgumentException($"{signal.Name} is not a registered [Signal] type.", nameof(signals))).Concat(signalAliases).Distinct(StringComparer.Ordinal)];
         await AsInstalls(state, host => host.EnsureBrainWide(aliases)).ConfigureAwait(true);
     }
 

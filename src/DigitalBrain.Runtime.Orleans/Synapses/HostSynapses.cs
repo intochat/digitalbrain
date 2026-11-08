@@ -43,5 +43,11 @@ internal sealed class HostSynapses(SynapseEngine engine) : ISynapses
 
     public Task EnsureBrainWide(params Type[] signals) => engine.EnsureBrain(signals);
 
+    public Task EnsureBrainWide(IReadOnlyList<string> signalAliases)
+    {
+        ArgumentNullException.ThrowIfNull(signalAliases);
+        return engine.EnsureBrain([.. signalAliases]);
+    }
+
     public Task RemoveBrainWide() => engine.RemoveBrain();
 }

@@ -3244,3 +3244,31 @@ DigitalBrain.Flows.FlowState<T>.Interruptions.get -> int
 DigitalBrain.Flows.FlowState<T>.Interruptions.init -> void
 DigitalBrain.IInstalls.Validate(DigitalBrain.InstallRequest! request, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<string?>!
 DigitalBrain.InstallsNeuron.Validate(DigitalBrain.InstallRequest! request, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<string?>!
+DigitalBrain.SignalEnvelope
+DigitalBrain.SignalEnvelope.<Clone>$() -> DigitalBrain.SignalEnvelope!
+DigitalBrain.SignalEnvelope.Alias.get -> string!
+DigitalBrain.SignalEnvelope.Alias.init -> void
+DigitalBrain.SignalEnvelope.CausationId.get -> string?
+DigitalBrain.SignalEnvelope.CausationId.init -> void
+DigitalBrain.SignalEnvelope.Deconstruct(out string! Alias, out System.Text.Json.JsonElement Payload, out string? TraceId, out string? CausationId) -> void
+DigitalBrain.SignalEnvelope.Equals(DigitalBrain.SignalEnvelope? other) -> bool
+DigitalBrain.SignalEnvelope.Payload.get -> System.Text.Json.JsonElement
+DigitalBrain.SignalEnvelope.Payload.init -> void
+DigitalBrain.SignalEnvelope.SignalEnvelope(string! Alias, System.Text.Json.JsonElement Payload, string? TraceId, string? CausationId) -> void
+DigitalBrain.SignalEnvelope.TraceId.get -> string?
+DigitalBrain.SignalEnvelope.TraceId.init -> void
+DigitalBrain.Spi.IInstallHooks.EnsureReactionEdges(DigitalBrain.NeuronId state, System.Collections.Generic.IReadOnlyList<System.Type!>! signals, System.Collections.Generic.IReadOnlyList<string!>! signalAliases, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Spi.ISynapseReceiver.Receive(DigitalBrain.JournaledSignal! journaled, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Spi.ISynapses.EnsureBrainWide(System.Collections.Generic.IReadOnlyList<string!>! signalAliases) -> System.Threading.Tasks.Task!
+DigitalBrain.StateNeuron<TState>.Receive(DigitalBrain.JournaledSignal! journaled, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.SynapseAttribute.SignalAlias.get -> string?
+DigitalBrain.SynapseAttribute.SynapseAttribute(string! signalAlias, string! into) -> void
+DigitalBrain.SynapseDescriptor.SignalAlias.get -> string?
+DigitalBrain.SynapseDescriptor.SignalAlias.init -> void
+const DigitalBrain.SynapseNeeds.AliasPrefix = "alias:" -> string!
+const DigitalBrain.SynapseReasons.AliasNeedsEnvelope = "alias reaction takes a SignalEnvelope, not a signal type" -> string!
+override DigitalBrain.SignalEnvelope.Equals(object? obj) -> bool
+override DigitalBrain.SignalEnvelope.GetHashCode() -> int
+override DigitalBrain.SignalEnvelope.ToString() -> string!
+static DigitalBrain.SignalEnvelope.operator !=(DigitalBrain.SignalEnvelope? left, DigitalBrain.SignalEnvelope? right) -> bool
+static DigitalBrain.SignalEnvelope.operator ==(DigitalBrain.SignalEnvelope? left, DigitalBrain.SignalEnvelope? right) -> bool

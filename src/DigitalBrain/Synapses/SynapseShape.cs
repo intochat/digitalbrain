@@ -38,6 +38,9 @@ public sealed record SynapseDescriptor(
     IReadOnlyList<SlotDescriptor> Slots,
     Schedule? Every)
 {
+    /// <summary>The journal alias an alias reaction is fed by (its <see cref="Signal"/> is <see cref="SignalEnvelope"/>); null otherwise.</summary>
+    public string? SignalAlias { get; init; }
+
     /// <summary>The qualified function name.</summary>
     public string Name => Function.DeclaringType!.FullName + "." + Function.Name;
 }
@@ -82,6 +85,9 @@ public static class SynapseReasons
     /// <summary><c>Every</c> on anything but a reaction to <c>Tick</c>.</summary>
     public const string EveryNeedsTick = "every needs a Tick reaction";
 
+    /// <summary>An alias reaction whose signal parameter is not <see cref="SignalEnvelope"/>, or an alias synapse that is not a reaction.</summary>
+    public const string AliasNeedsEnvelope = "alias reaction takes a SignalEnvelope, not a signal type";
+
     /// <summary>The catalog found one slot name bound to two contracts.</summary>
     public const string SlotBoundTwice = "slot";
 }
@@ -123,6 +129,7 @@ public static class SynapseShape
         var state = states.TryGetValue(alias, out var known) ? known : null;
         Type? signal = null;
         var signals = 0;
+        var envelopes = 0;
         var stateCount = 0;
         var tokens = 0;
         var unknown = false;
@@ -147,6 +154,10 @@ public static class SynapseShape
                 signals++;
                 signal = type;
             }
+            else if (type == typeof(SignalEnvelope) && attribute.SignalAlias is not null)
+            {
+                envelopes++;
+            }
             else if (type == typeof(CancellationToken))
             {
                 tokens++;
@@ -160,6 +171,11 @@ public static class SynapseShape
             {
                 unknown = true;
             }
+        }
+
+        if (attribute.SignalAlias is not null && (signals > 0 || envelopes != 1))
+        {
+            throw new SynapseShapeException($"{name}: an {SynapseReasons.AliasNeedsEnvelope}.");
         }
 
         if (signals > 1)
@@ -181,6 +197,21 @@ public static class SynapseShape
         var kind = returned == typeof(Rules.Check) ? SynapseKind.Gate
             : returned == state || returned == typeof(Reaction<>).MakeGenericType(state) ? SynapseKind.Reaction
             : SynapseKind.View;
+
+        if (attribute.SignalAlias is { } signalAlias)
+        {
+            if (kind != SynapseKind.Reaction)
+            {
+                throw new SynapseShapeException($"{name}: an {SynapseReasons.AliasNeedsEnvelope}; an alias synapse must return the state.");
+            }
+
+            if (attribute.Every is not null)
+            {
+                throw new SynapseShapeException($"{name}: {SynapseReasons.EveryNeedsTick}.");
+            }
+
+            return new SynapseDescriptor(kind, function, typeof(SignalEnvelope), state, alias, attribute.Key, tokens == 1, slots, null) { SignalAlias = signalAlias };
+        }
 
         if (kind == SynapseKind.View)
         {

@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
+using System.Text.Json;
+using DigitalBrain.Invocation;
 using DigitalBrain.Rules;
 using Verdict = DigitalBrain.Rules.Check;
 using DigitalBrain.Spi;
@@ -69,11 +71,31 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     }
 
     /// <inheritdoc />
-    public async Task Receive(Signal signal, CancellationToken ct)
+    public Task Receive(Signal signal, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(signal);
-        foreach (var reaction in Matching(SynapseKind.Reaction, signal))
+        return React(signal, null, null, ct);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>An alias reaction gets the entry as a <see cref="SignalEnvelope"/>: the payload is the signal serialised with the journal's options.</remarks>
+    public Task Receive(JournaledSignal journaled, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(journaled);
+        return React(journaled.Signal, journaled.TraceId, journaled.CausationId, ct);
+    }
+
+    // Runs every reaction the signal reaches, typed or by alias, in registration order; the envelope is built once, when first needed.
+    private async Task React(Signal signal, string? traceId, string? causationId, CancellationToken ct)
+    {
+        SignalEnvelope? envelope = null;
+        foreach (var reaction in Reactions(signal))
         {
+            if (reaction.SignalAlias is not null)
+            {
+                envelope ??= Envelope(signal, traceId ?? Context.TraceId, causationId);
+            }
+
             await Run(reaction, signal, State, async result =>
             {
                 if (ReferenceEquals(result, State)) { return "unchanged"; }
@@ -87,9 +109,23 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
                 }
 
                 return "saved";
-            }, ct).ConfigureAwait(true);
+            }, ct, reaction.SignalAlias is null ? null : envelope).ConfigureAwait(true);
             await PendingViews().ConfigureAwait(true);
         }
+    }
+
+    private static SignalEnvelope Envelope(Signal signal, string? traceId, string? causationId)
+    {
+        var type = signal.GetType();
+        return new SignalEnvelope(AliasOf(signal), JsonSerializer.SerializeToElement(signal, type, RuntimeProtocol.OptionsFor(type)), traceId, causationId);
+    }
+
+    // The reactions of the signal: typed ones whose declared type it is, alias ones whose alias is its [Signal] alias.
+    private IEnumerable<SynapseDescriptor> Reactions(Signal signal)
+    {
+        var alias = AliasOf(signal);
+        return Synapses().Where(d => d.Kind == SynapseKind.Reaction
+            && (d.SignalAlias is null ? d.Signal!.IsInstanceOfType(signal) : string.Equals(d.SignalAlias, alias, StringComparison.Ordinal)));
     }
 
     /// <inheritdoc />
@@ -295,9 +331,9 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     }
 
     private IEnumerable<SynapseDescriptor> Matching(SynapseKind kind, Signal signal) =>
-        Synapses().Where(d => d.Kind == kind && d.Signal!.IsInstanceOfType(signal));
+        Synapses().Where(d => d.Kind == kind && d.SignalAlias is null && d.Signal!.IsInstanceOfType(signal));
 
-    private async Task Run(SynapseDescriptor synapse, Signal? signal, TState state, Func<object?, Task<string>> settle, CancellationToken ct)
+    private async Task Run(SynapseDescriptor synapse, Signal? signal, TState state, Func<object?, Task<string>> settle, CancellationToken ct, SignalEnvelope? envelope = null)
     {
         var neuron = Id.ToString();
         var arriving = signal is null ? AliasIn(_catalog.Current) ?? Id.Type : AliasOf(signal);
@@ -306,7 +342,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
         string outcome;
         try
         {
-            outcome = await settle(await Invoke(synapse, signal, state, ct).ConfigureAwait(true)).ConfigureAwait(true);
+            outcome = await settle(await Invoke(synapse, signal, envelope, state, ct).ConfigureAwait(true)).ConfigureAwait(true);
         }
         catch
         {
@@ -318,13 +354,17 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     }
 
     // Slots are resolved sequentially in parameter order, once per call. An unbound slot refuses a gate by name; any other synapse fails.
-    private async Task<object?> Invoke(SynapseDescriptor synapse, Signal? signal, TState state, CancellationToken ct)
+    private async Task<object?> Invoke(SynapseDescriptor synapse, Signal? signal, SignalEnvelope? envelope, TState state, CancellationToken ct)
     {
         var parameters = synapse.Function.GetParameters();
         var arguments = new object?[parameters.Length];
         for (var i = 0; i < parameters.Length; i++)
         {
-            arguments[i] = parameters[i].ParameterType == typeof(CancellationToken) ? ct : typeof(Signal).IsAssignableFrom(parameters[i].ParameterType) ? signal : state;
+            var type = parameters[i].ParameterType;
+            arguments[i] = type == typeof(CancellationToken) ? ct
+                : type == typeof(SignalEnvelope) ? envelope
+                : typeof(Signal).IsAssignableFrom(type) ? signal
+                : state;
         }
 
         foreach (var slot in synapse.Slots.OrderBy(slot => slot.ParameterIndex))

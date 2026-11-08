@@ -99,6 +99,7 @@ internal static class Rules
         public const string SlotContractNeedsCapability = "slot contract needs [Capability]";
         public const string Schedule = "schedule";
         public const string EveryNeedsTick = "every needs a Tick reaction";
+        public const string AliasNeedsEnvelope = "alias reaction takes a SignalEnvelope, not a signal type";
     }
 
     public static readonly ImmutableHashSet<string> IdentityAttributes = ImmutableHashSet.Create(

@@ -105,6 +105,8 @@ internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronSta
 
     public Task EnsureBrainWide(params Type[] signals) => Task.CompletedTask;
 
+    public Task EnsureBrainWide(IReadOnlyList<string> signalAliases) => Task.CompletedTask;
+
     public Task RemoveBrainWide() => Task.CompletedTask;
 
     public Task Remove(NeuronId from)
