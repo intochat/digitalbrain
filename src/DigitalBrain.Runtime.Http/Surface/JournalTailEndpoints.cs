@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DigitalBrain.Runtime.Http.Surface;
 
@@ -47,16 +49,18 @@ public static class JournalTailEndpoints
         }
 
         var history = journals(new BrainId(brainId));
-        return TypedResults.ServerSentEvents(Batches(ct => history.Watch(since ?? 0, ct), http.RequestAborted));
+        var logger = http.RequestServices.GetService<ILoggerFactory>()?.CreateLogger(typeof(JournalTailEndpoints).FullName!) ?? NullLogger.Instance;
+        return TypedResults.ServerSentEvents(Batches(ct => history.Watch(since ?? 0, ct), logger, http.RequestAborted));
     }
 
-    // Pumps the tail into a channel and sends what arrived within a window of the first signal; a backlog goes out without waiting.
+    // Pumps the tail into a channel. A batch takes what is already there; unless that fills a batch (1000 signals, a catch-up
+    // backlog), it waits one window and takes what arrived meanwhile, so a batch is sent at most a window after its first signal.
     internal static async IAsyncEnumerable<SseItem<string>> Batches(Func<CancellationToken, IAsyncEnumerable<JournaledSignal>> tail,
-        [EnumeratorCancellation] CancellationToken ct)
+        ILogger logger, [EnumeratorCancellation] CancellationToken ct)
     {
         var channel = Channel.CreateUnbounded<JournaledSignal>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var pump = Pump(tail(stop.Token), channel.Writer, stop.Token);
+        var pump = Pump(tail(stop.Token), channel.Writer, logger, stop.Token);
         try
         {
             var reader = channel.Reader;
@@ -88,7 +92,7 @@ public static class JournalTailEndpoints
         }
     }
 
-    private static async Task Pump(IAsyncEnumerable<JournaledSignal> tail, ChannelWriter<JournaledSignal> writer, CancellationToken ct)
+    private static async Task Pump(IAsyncEnumerable<JournaledSignal> tail, ChannelWriter<JournaledSignal> writer, ILogger logger, CancellationToken ct)
     {
         Exception? failure = null;
         try
@@ -97,10 +101,17 @@ public static class JournalTailEndpoints
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
 #pragma warning disable CA1031 // A failing tail ends the stream; the reader sees it as the channel's completion.
-        catch (Exception error) { failure = error; }
+        catch (Exception error)
+        {
+            failure = error;
+            LogTailFailed(logger, error);
+        }
 #pragma warning restore CA1031
         writer.TryComplete(failure);
     }
+
+    private static readonly Action<ILogger, Exception?> LogTailFailed =
+        LoggerMessage.Define(LogLevel.Warning, new EventId(2, "JournalTailFailed"), "The brain journal tail failed; the stream ends.");
 
     private sealed record TailBatch(IReadOnlyList<TailedSignal> Signals);
 

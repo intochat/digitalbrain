@@ -106,6 +106,15 @@ public sealed class UnitScenarioFacts
     }
 
     [Fact]
+    public async Task ExpectStateOnANeverReactedAliasFails()
+    {
+        var transcript = await UnitScenario.Run(Source(XWatch), OnePost(), [new ExpectState("x.watch", "Unseen", Json("0"))], Ct);
+
+        Assert.False(transcript.Passed);
+        Assert.Equal("step 0 ExpectState: no state saved for x.watch", Assert.Single(transcript.Failures));
+    }
+
+    [Fact]
     public async Task AFailingExpectationNamesTheStep()
     {
         var transcript = await UnitScenario.Run(Source(XWatch), OnePost(),

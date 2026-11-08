@@ -26,27 +26,35 @@ public interface ISignalHistory
     /// so a debugger sees every signal; trimmed entries below the floor are skipped. Batching for a wire (the HTTP tail) is the
     /// caller's concern.
     /// </summary>
-    /// <remarks>The default implementation polls <see cref="Read(long, int, CancellationToken)"/>; a runtime overrides it.</remarks>
+    /// <remarks>The default implementation polls <see cref="Read(long, int, CancellationToken)"/>, backing off from 50 ms to 1 s while idle; a runtime may override it.</remarks>
     /// <param name="since">The brain sequence to tail after; 0 for the whole held journal.</param>
     /// <param name="ct">Ends the tail.</param>
     /// <exception cref="OperationCanceledException"><paramref name="ct"/> was cancelled (thrown by the enumerator).</exception>
-    IAsyncEnumerable<JournaledSignal> Watch(long since, CancellationToken ct) => SignalTail.Poll(Read, since, SignalTail.PollInterval, ct);
+    IAsyncEnumerable<JournaledSignal> Watch(long since, CancellationToken ct) => SignalTail.Poll(Read, since, SignalTail.PollInterval, SignalTail.MaxPollInterval, ct);
 }
 
 /// <summary>The polling tail behind <see cref="ISignalHistory.Watch"/>.</summary>
 internal static class SignalTail
 {
-    /// <summary>How long a polling tail waits after an empty read.</summary>
+    /// <summary>How long a polling tail first waits after an empty read.</summary>
     public static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(50);
 
+    /// <summary>The longest wait between empty reads: an idle tail doubles its wait up to this.</summary>
+    public static readonly TimeSpan MaxPollInterval = TimeSpan.FromSeconds(1);
+
     /// <summary>
-    /// Pages through <paramref name="read"/> after <paramref name="since"/>, waiting <paramref name="interval"/> (or until
-    /// <paramref name="appended"/> completes, when given) after an empty page; the cursor only moves forward, so nothing is yielded twice.
+    /// Pages through <paramref name="read"/> after <paramref name="since"/>; the cursor only moves forward, so nothing is yielded twice.
+    /// After an empty read it waits (through <paramref name="delay"/>, default <see cref="Task.Delay(TimeSpan, CancellationToken)"/>)
+    /// <paramref name="interval"/>, doubling on each further empty read up to <paramref name="maxInterval"/> and back to
+    /// <paramref name="interval"/> after a non-empty one. When <paramref name="appended"/> is given, a wait also ends as soon as the
+    /// task it hands out (taken before each read) completes.
     /// </summary>
     public static async IAsyncEnumerable<JournaledSignal> Poll(Func<long, int, CancellationToken, Task<SignalPage>> read, long since, TimeSpan interval,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct, Func<Task>? appended = null)
+        TimeSpan maxInterval, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct, Func<Task>? appended = null,
+        Func<TimeSpan, CancellationToken, Task>? delay = null)
     {
         var cursor = Math.Max(0, since);
+        var wait = interval;
         while (true)
         {
             ct.ThrowIfCancellationRequested();
@@ -61,10 +69,17 @@ internal static class SignalTail
                 yield return item;
             }
 
-            if (moved) { continue; }
-            if (wake is null) { await Task.Delay(interval, ct).ConfigureAwait(false); continue; }
-            try { await wake.WaitAsync(interval, ct).ConfigureAwait(false); }
-            catch (TimeoutException) { /* poll again */ }
+            if (moved)
+            {
+                wait = interval;
+                continue;
+            }
+
+            var sleep = (delay ?? Task.Delay)(wait, ct);
+            wait = TimeSpan.FromTicks(Math.Min(wait.Ticks * 2, maxInterval.Ticks));
+            if (wake is null) { await sleep.ConfigureAwait(false); continue; }
+            await Task.WhenAny(sleep, wake).ConfigureAwait(false);
+            ct.ThrowIfCancellationRequested();
         }
     }
 }

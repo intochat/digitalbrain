@@ -56,6 +56,21 @@ public sealed class StateViewFacts
     }
 
     [Fact]
+    public async Task ReadReturnsNullBeforeTheFirstSave()
+    {
+        await using var os = OS.Local().Register(typeof(StateViewFacts).Assembly);
+        os.Confirmations.ApproveAll();
+        await os.Get<IInstalls>(Installs).Install(new InstallRequest("vw", new Dictionary<string, string>()), Ct);
+        await os.Idle();
+        var reader = os.Get<IStateReader>(Board);
+
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, (await reader.Read("vw")).ValueKind);
+        await os.Get<IPoller>(Pollster).Poll(1);
+        await os.Idle();
+        Assert.Equal(1, (await reader.Read("vw")).GetProperty("polls").GetInt32());
+    }
+
+    [Fact]
     public async Task AViewSynapseIsReadable()
     {
         await using var os = await Started();

@@ -11,8 +11,8 @@ namespace DigitalBrain;
 public interface IStateReader
 {
     /// <summary>
-    /// The state record of <paramref name="alias"/> as JSON (the runtime wire shape of the record), or JSON <c>null</c> when the neuron
-    /// is not that alias's. A state never saved reads as the record's default.
+    /// The state record of <paramref name="alias"/> as JSON (the runtime wire shape of the record), or JSON <c>null</c> when the alias
+    /// has never saved state or the neuron is not that alias's (the default record is never materialised).
     /// </summary>
     /// <param name="alias">The state alias.</param>
     [ReadOnlyCall]

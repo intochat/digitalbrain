@@ -96,7 +96,7 @@ public static class UnitScenario
                     case ExpectState expect:
                         if (await CheckState(os, expect, ct).ConfigureAwait(false) is { } problem)
                         {
-                            failures.Add($"step {i} ExpectState {expect.Alias} {expect.JsonPath}: {problem}");
+                            failures.Add(problem == NoState ? $"step {i} ExpectState: no state saved for {expect.Alias}" : $"step {i} ExpectState {expect.Alias} {expect.JsonPath}: {problem}");
                         }
 
                         break;
@@ -154,11 +154,13 @@ public static class UnitScenario
         }
     }
 
+    private const string NoState = "no state";
+
     private static async Task<string?> CheckState(TestOS os, ExpectState expect, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var root = await os.Get<IStateReader>(NeuronId.Parse($"{Brain}/{expect.Alias}/default")).Read(expect.Alias).ConfigureAwait(false);
-        if (root.ValueKind == JsonValueKind.Null) { return "no state"; }
+        if (root.ValueKind == JsonValueKind.Null) { return NoState; }
         var node = root;
         foreach (var part in expect.JsonPath.Split('.', StringSplitOptions.RemoveEmptyEntries))
         {

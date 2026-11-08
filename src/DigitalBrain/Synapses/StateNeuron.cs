@@ -51,6 +51,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
     private bool _journalingRefusal;
     private PublishedView? _view;
     private bool _savingView;
+    private bool _stored;
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> WarnedViews = new(StringComparer.Ordinal);
 
     /// <summary>Creates the neuron for <typeparamref name="TState"/> over the live <paramref name="catalog"/>, read again on every turn.</summary>
@@ -361,7 +362,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
 
     /// <inheritdoc />
     Task<JsonElement> IStateReader.Read(string alias)
-        => Task.FromResult(string.Equals(AliasIn(_catalog.Current), alias, StringComparison.Ordinal)
+        => Task.FromResult(_stored && string.Equals(AliasIn(_catalog.Current), alias, StringComparison.Ordinal)
             ? JsonSerializer.SerializeToElement(State, RuntimeProtocol.OptionsFor(typeof(TState)))
             : JsonSerializer.SerializeToElement<object?>(null));
 
@@ -396,14 +397,21 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
         var stored = await Context.State.Load<StoredState<TState>>().ConfigureAwait(true);
         if (stored?.State is { } state)
         {
+            _stored = true;
             _view = stored.View;
             return state;
         }
 
-        return await Context.State.Load<TState>().ConfigureAwait(true);
+        var bare = await Context.State.Load<TState>().ConfigureAwait(true);
+        _stored = bare is not null;
+        return bare;
     }
 
-    internal override Task StoreState(TState next, IReadOnlyList<Signal> signals) => Context.State.Save(new StoredState<TState>(next, _view), signals);
+    internal override async Task StoreState(TState next, IReadOnlyList<Signal> signals)
+    {
+        await Context.State.Save(new StoredState<TState>(next, _view), signals).ConfigureAwait(true);
+        _stored = true;
+    }
 
     private Microsoft.Extensions.Logging.ILogger Logger()
     {

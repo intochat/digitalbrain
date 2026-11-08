@@ -100,7 +100,7 @@ public sealed class TestJournal : ISignalHistory
     /// <inheritdoc />
     /// <remarks>Woken by every append, so a new entry is yielded without polling delay.</remarks>
     public IAsyncEnumerable<JournaledSignal> Watch(long since, CancellationToken ct)
-        => SignalTail.Poll(Read, since, TimeSpan.FromSeconds(1), ct, () => { lock (_gate) { return _appended.Task; } });
+        => SignalTail.Poll(Read, since, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1), ct, () => { lock (_gate) { return _appended.Task; } });
 
     internal T? Load<T>(NeuronId id)
     {

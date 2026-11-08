@@ -11,7 +11,7 @@ public sealed class StateReaderSiloFacts(StatefulSilo silo) : IClassFixture<Stat
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task ReadReturnsTheRecordAfterAReactionOnTheSilo()
+    public async Task ReadReturnsNullBeforeTheFirstSaveAndTheRecordAfterAReaction()
     {
         const string brain = "sr1";
         var alias = brain + ".vw";
@@ -19,9 +19,10 @@ public sealed class StateReaderSiloFacts(StatefulSilo silo) : IClassFixture<Stat
         Assert.True(deploy.Status == DeployStatus.Deployed, $"{deploy.Status}: {deploy.Reason} {string.Join("; ", deploy.Diagnostics)}");
         var installs = silo.Get<IInstalls>($"{brain}/synapse.installs/default");
         await StateNeuronSiloFacts.Until(async () => await installs.Describe(alias, Ct) is not null, Ct);
+        var reader = silo.Get<IStateReader>($"{brain}/{alias}/default");
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, (await reader.Read(alias)).ValueKind);
         await silo.Services.GetRequiredService<IBrainJournalWriter>().Append(brain, null, $"{brain}/os.adapter/x",
             [new JournalSignalWrite(brain + ".polled", "{}"u8.ToArray())], Ct);
-        var reader = silo.Get<IStateReader>($"{brain}/{alias}/default");
 
         await StateNeuronSiloFacts.Until(async () => (await reader.Read(alias)) is { ValueKind: System.Text.Json.JsonValueKind.Object } record
             && record.TryGetProperty("polls", out var polls) && polls.GetInt32() == 1, Ct);

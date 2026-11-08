@@ -35,10 +35,11 @@ internal sealed partial class BrainSignalHistory(BrainLogs logs, BrainId brain, 
 
     /// <summary>
     /// Polls the brain-wide read keeping signals of unknown type, which are yielded as <see cref="UnknownSignal"/> under their
-    /// journaled alias, so a debugger sees unit signals whose type is not loaded.
+    /// journaled alias, so a debugger sees unit signals whose type is not loaded. An idle tail backs off from 50 ms to 1 s between
+    /// reads and returns to 50 ms after a read that found signals (waking on append is deferred).
     /// </summary>
     public IAsyncEnumerable<JournaledSignal> Watch(long since, CancellationToken ct)
-        => SignalTail.Poll((after, limit, token) => Read(after, limit, keepUnknown: true, token), since, SignalTail.PollInterval, ct);
+        => SignalTail.Poll((after, limit, token) => Read(after, limit, keepUnknown: true, token), since, SignalTail.PollInterval, SignalTail.MaxPollInterval, ct);
 
     public async Task<SignalPage> ReadTrace(string traceId, long since, int limit, CancellationToken ct)
     {

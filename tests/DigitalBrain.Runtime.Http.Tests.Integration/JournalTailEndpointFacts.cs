@@ -22,7 +22,7 @@ public sealed class JournalTailEndpointFacts
     [Fact]
     public async Task TailWithoutASessionIs401AndAnotherBrainIs403()
     {
-        var history = new LockedHistory();
+        using var history = new LockedHistory();
         await using var app = await Start(history);
         using var client = Client(app);
 
@@ -38,7 +38,7 @@ public sealed class JournalTailEndpointFacts
     [Fact]
     public async Task TwoSignalsAppendedWithinTheWindowArriveInOneEvent()
     {
-        var history = new LockedHistory();
+        using var history = new LockedHistory();
         history.Append(new Tick(1));
         await using var app = await Start(history);
         using var client = Client(app);
@@ -49,7 +49,9 @@ public sealed class JournalTailEndpointFacts
         using var reader = new StreamReader(await response.Content.ReadAsStreamAsync(Ct));
 
         var first = await NextEvent(reader);
+        // Longer than a poll, shorter than the 100 ms window: the second signal still joins the first one's batch.
         history.Append(new Tick(2));
+        await Task.Delay(60, Ct);
         history.Append(new Tick(3));
         var second = await NextEvent(reader);
 
@@ -67,7 +69,7 @@ public sealed class JournalTailEndpointFacts
     [Fact]
     public async Task MappingTheModuleSurfacesExposesTheTail()
     {
-        var history = new LockedHistory();
+        using var history = new LockedHistory();
         history.Append(new Tick(1));
         await using var app = await Start(history, surfaces: true);
         using var client = Client(app);
@@ -129,15 +131,36 @@ public sealed class JournalTailEndpointFacts
         return app;
     }
 
-    // The in-memory history behind a lock, so the test appends while the tail polls.
-    private sealed class LockedHistory : ISignalHistory
+    // The in-memory history behind a lock, so the test appends while the tail reads; its tail wakes on every append, so the
+    // timing of a batch is the endpoint's window alone.
+    private sealed class LockedHistory : ISignalHistory, IDisposable
     {
         private readonly Lock _gate = new();
         private readonly InMemorySignalHistory _inner = new();
+        private readonly SemaphoreSlim _appended = new(0);
+
+        public void Dispose() => _appended.Dispose();
 
         public void Append(Signal signal)
         {
             lock (_gate) { _inner.Append(Publisher, signal, DateTimeOffset.UtcNow); }
+            _appended.Release();
+        }
+
+        public async IAsyncEnumerable<JournaledSignal> Watch(long since, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+        {
+            var cursor = since;
+            while (true)
+            {
+                var page = await Read(cursor, SignalPage.MaxLimit, ct);
+                foreach (var item in page.Signals)
+                {
+                    cursor = item.Sequence;
+                    yield return item;
+                }
+
+                if (page.Signals.Count == 0) { await _appended.WaitAsync(ct); }
+            }
         }
 
         public Task<SignalPage> Read(NeuronId publisher, long since, int limit, CancellationToken ct)
