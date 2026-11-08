@@ -56,7 +56,7 @@ public interface ISynapseHost
     /// </summary>
     /// <param name="brain">The brain.</param>
     /// <param name="source">The synapse source.</param>
-    /// <param name="bindingsPerAlias">Slot bindings per state alias; an alias with no entry binds nothing.</param>
+    /// <param name="bindingsPerAlias">Slot bindings per state alias; an alias with no entry binds nothing. When empty, the bindings of <see cref="SynapseSource.Bindings"/> are used; a non-empty argument wins over the source's.</param>
     /// <param name="ct">Cancellation.</param>
     /// <returns>How it ended.</returns>
     Task<DeployOutcome> Deploy(BrainId brain, SynapseSource source, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> bindingsPerAlias, CancellationToken ct);

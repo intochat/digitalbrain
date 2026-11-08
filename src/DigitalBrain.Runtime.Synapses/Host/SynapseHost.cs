@@ -168,7 +168,7 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
                 }
             }
 
-            var pending = new Pending(loaded!, source, build, Bindings(aliases, bindingsPerAlias));
+            var pending = new Pending(loaded!, source, build, Bindings(aliases, bindingsPerAlias.Count > 0 ? bindingsPerAlias : source.Bindings ?? bindingsPerAlias));
             if (changed.Count > 0)
             {
                 return await StageUpdate(brain, entry!, pending, changed, build.Diagnostics, ct).ConfigureAwait(false);
@@ -532,7 +532,7 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
     private Task Store(BrainId brain, Pending next, CancellationToken ct) =>
         store.Put(
             brain,
-            new SourceRecord(next.Source.SourceKey, next.Source.Files, next.Source.Icon, next.Build.Hash, next.Build.AssemblyName, next.Build.Assembly, next.Build.Symbols, AliasesOf(next.Loaded), DateTimeOffset.UtcNow),
+            new SourceRecord(next.Source.SourceKey, next.Source.Files, next.Source.Icon, next.Build.Hash, next.Build.AssemblyName, next.Build.Assembly, next.Build.Symbols, AliasesOf(next.Loaded), DateTimeOffset.UtcNow, next.Bindings),
             ct);
 
     // The stage leaves: its asks still waiting are cancelled (superseded), its catalog unstaged and its context unloaded.

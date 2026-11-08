@@ -2469,15 +2469,17 @@ DigitalBrain.SynapseDiagnostic.Message.init -> void
 DigitalBrain.SynapseDiagnostic.SynapseDiagnostic(string! File, string! Id, int Line, string! Message) -> void
 DigitalBrain.SynapseSource
 DigitalBrain.SynapseSource.<Clone>$() -> DigitalBrain.SynapseSource!
-DigitalBrain.SynapseSource.Deconstruct(out string! SourceKey, out System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Files, out byte[]? Icon) -> void
+DigitalBrain.SynapseSource.Deconstruct(out string! SourceKey, out System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Files, out byte[]? Icon, out System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyDictionary<string!, string!>!>? Bindings) -> void
 DigitalBrain.SynapseSource.Equals(DigitalBrain.SynapseSource? other) -> bool
 DigitalBrain.SynapseSource.Files.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
 DigitalBrain.SynapseSource.Files.init -> void
+DigitalBrain.SynapseSource.Bindings.get -> System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyDictionary<string!, string!>!>?
+DigitalBrain.SynapseSource.Bindings.init -> void
 DigitalBrain.SynapseSource.Icon.get -> byte[]?
 DigitalBrain.SynapseSource.Icon.init -> void
 DigitalBrain.SynapseSource.SourceKey.get -> string!
 DigitalBrain.SynapseSource.SourceKey.init -> void
-DigitalBrain.SynapseSource.SynapseSource(string! SourceKey, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Files, byte[]? Icon) -> void
+DigitalBrain.SynapseSource.SynapseSource(string! SourceKey, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Files, byte[]? Icon, System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyDictionary<string!, string!>!>? Bindings = null) -> void
 override DigitalBrain.SynapseDiagnostic.Equals(object? obj) -> bool
 override DigitalBrain.SynapseDiagnostic.GetHashCode() -> int
 override DigitalBrain.SynapseDiagnostic.ToString() -> string!
@@ -2540,13 +2542,15 @@ DigitalBrain.ISynapseHost.List(DigitalBrain.BrainId brain, System.Threading.Canc
 DigitalBrain.ISynapseHost.Retire(DigitalBrain.BrainId brain, string! sourceKey, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.DeployOutcome!>!
 DigitalBrain.SourceRecord
 DigitalBrain.SourceRecord.<Clone>$() -> DigitalBrain.SourceRecord!
+DigitalBrain.SourceRecord.Bindings.get -> System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyDictionary<string!, string!>!>?
+DigitalBrain.SourceRecord.Bindings.init -> void
 DigitalBrain.SourceRecord.Aliases.get -> System.Collections.Generic.IReadOnlyList<string!>!
 DigitalBrain.SourceRecord.Aliases.init -> void
 DigitalBrain.SourceRecord.Assembly.get -> byte[]!
 DigitalBrain.SourceRecord.Assembly.init -> void
 DigitalBrain.SourceRecord.AssemblyName.get -> string!
 DigitalBrain.SourceRecord.AssemblyName.init -> void
-DigitalBrain.SourceRecord.Deconstruct(out string! SourceKey, out System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Files, out byte[]? Icon, out string! Hash, out string! AssemblyName, out byte[]! Assembly, out byte[]! Symbols, out System.Collections.Generic.IReadOnlyList<string!>! Aliases, out System.DateTimeOffset DeployedAt) -> void
+DigitalBrain.SourceRecord.Deconstruct(out string! SourceKey, out System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Files, out byte[]? Icon, out string! Hash, out string! AssemblyName, out byte[]! Assembly, out byte[]! Symbols, out System.Collections.Generic.IReadOnlyList<string!>! Aliases, out System.DateTimeOffset DeployedAt, out System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyDictionary<string!, string!>!>? Bindings) -> void
 DigitalBrain.SourceRecord.DeployedAt.get -> System.DateTimeOffset
 DigitalBrain.SourceRecord.DeployedAt.init -> void
 DigitalBrain.SourceRecord.Equals(DigitalBrain.SourceRecord? other) -> bool
@@ -2558,7 +2562,7 @@ DigitalBrain.SourceRecord.Icon.get -> byte[]?
 DigitalBrain.SourceRecord.Icon.init -> void
 DigitalBrain.SourceRecord.SourceKey.get -> string!
 DigitalBrain.SourceRecord.SourceKey.init -> void
-DigitalBrain.SourceRecord.SourceRecord(string! SourceKey, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Files, byte[]? Icon, string! Hash, string! AssemblyName, byte[]! Assembly, byte[]! Symbols, System.Collections.Generic.IReadOnlyList<string!>! Aliases, System.DateTimeOffset DeployedAt) -> void
+DigitalBrain.SourceRecord.SourceRecord(string! SourceKey, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! Files, byte[]? Icon, string! Hash, string! AssemblyName, byte[]! Assembly, byte[]! Symbols, System.Collections.Generic.IReadOnlyList<string!>! Aliases, System.DateTimeOffset DeployedAt, System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyDictionary<string!, string!>!>? Bindings = null) -> void
 DigitalBrain.SourceRecord.Symbols.get -> byte[]!
 DigitalBrain.SourceRecord.Symbols.init -> void
 override DigitalBrain.DeployOutcome.Equals(object? obj) -> bool

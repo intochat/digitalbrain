@@ -10,6 +10,7 @@ namespace DigitalBrain;
 /// <param name="Symbols">The portable PDB bytes.</param>
 /// <param name="Aliases">The state aliases the source declares.</param>
 /// <param name="DeployedAt">When it went live.</param>
+/// <param name="Bindings">The slot bindings per alias it was installed with, <c>Bindings[alias][slotName] = connectionKey</c>; null on a record stored before they were kept.</param>
 public sealed record SourceRecord(
     string SourceKey,
     IReadOnlyDictionary<string, string> Files,
@@ -19,7 +20,8 @@ public sealed record SourceRecord(
     byte[] Assembly,
     byte[] Symbols,
     IReadOnlyList<string> Aliases,
-    DateTimeOffset DeployedAt);
+    DateTimeOffset DeployedAt,
+    IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? Bindings = null);
 
 /// <summary>Where a synapse host keeps the live sources of each brain.</summary>
 public interface ISourceStore
