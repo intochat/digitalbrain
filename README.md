@@ -66,6 +66,8 @@ public sealed class CalculatorApp : App<CalculatorState>
 | `DigitalBrain.Runtime.Orleans` | Distributed Orleans runtime for `LocalProfile` and `LocalCloudProfile`. |
 | `DigitalBrain.Runtime.Orleans.Azure` | `CloudProfile` on Azure Storage and Key Vault. |
 | `DigitalBrain.Runtime.Http` | ASP.NET Core edge seam for module routes, webhooks, and session cookies. |
+| `DigitalBrain.Capabilities.Http` | The `http@1` capability contract: outbound HTTP slot for units. |
+| `DigitalBrain.Capabilities.Tools` | The `tool@1` capability contract: tool invocation slot for units. |
 
 ## Documentation & Ecosystem
 
