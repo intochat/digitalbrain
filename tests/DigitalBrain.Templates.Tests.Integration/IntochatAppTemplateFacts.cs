@@ -17,6 +17,7 @@ public sealed class IntochatAppTemplateFacts
         "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Testing.Silo", "DigitalBrain.Runtime.Orleans",
         "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity",
         "DigitalBrain.Capabilities.Compute", "DigitalBrain.Capabilities.Connections", "DigitalBrain.Identity.Local", "DigitalBrain.Runtime.Synapses",
+        "DigitalBrain.Capabilities.Http", "DigitalBrain.Capabilities.Tools",
     ];
 
     [Theory]

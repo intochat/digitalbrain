@@ -177,7 +177,7 @@ jobs:
       - name: No Orleans in the core packages
         run: |
           status=0
-          for name in DigitalBrain DigitalBrain.UI DigitalBrain.Testing DigitalBrain.Analyzers DigitalBrain.Capabilities.Compute DigitalBrain.Capabilities.Connections DigitalBrain.Identity.Local DigitalBrain.Client; do
+          for name in DigitalBrain DigitalBrain.UI DigitalBrain.Testing DigitalBrain.Analyzers DigitalBrain.Capabilities.Compute DigitalBrain.Capabilities.Connections DigitalBrain.Capabilities.Http DigitalBrain.Capabilities.Tools DigitalBrain.Identity.Local DigitalBrain.Client; do
             project="src/$name/$name.csproj"
             dotnet restore "$project" -v quiet
             if dotnet list "$project" package --include-transitive | grep -i orleans; then
