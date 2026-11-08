@@ -42,6 +42,8 @@ internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronSta
 
     public ISignalHistory History => this;
 
+    public string? TraceId { get; set; }
+
     public List<Synapse> SynapseList { get; } = [];
 
     public List<NeuronId> Removed { get; } = [];

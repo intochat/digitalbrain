@@ -112,6 +112,8 @@ public sealed class CoreVocabularyFacts
         public DigitalBrain.Confirmation.IConfirmations Confirmations => throw new NotSupportedException();
         public ISynapses Synapses => throw new NotSupportedException();
         public ISignalHistory History => throw new NotSupportedException();
+
+        public string? TraceId => null;
         public Task Publish(Signal signal) => Task.CompletedTask;
         public T Get<T>(NeuronId id) where T : class => throw new NotSupportedException();
         public void Defer(Func<Task> work) => throw new NotSupportedException();

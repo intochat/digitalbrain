@@ -542,6 +542,9 @@ public sealed class FakeNeuronContext : INeuronContext
 
     ISignalHistory INeuronContext.History => History;
 
+    /// <summary>The trace id a save made now is stamped with; null by default (a flow then takes a fresh one).</summary>
+    public string? TraceId { get; set; }
+
     /// <summary>The confirmation gate on <see cref="Clock"/>; this neuron asks as an app and its signals are recorded in <see cref="Published"/>.</summary>
     public TestConfirmations Confirmations => field ??= new TestConfirmations(Clock);
 

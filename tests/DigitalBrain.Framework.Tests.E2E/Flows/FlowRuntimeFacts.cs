@@ -1,4 +1,5 @@
 using DigitalBrain;
+using DigitalBrain.Capabilities.Compute;
 using DigitalBrain.Confirmation;
 using DigitalBrain.Flows;
 using DigitalBrain.Runtime.Orleans.Operations;
@@ -129,6 +130,23 @@ public sealed class FlowRuntimeFacts(FlowRuntimeFixture fixture, FaultingConfirm
         Assert.Equal(FlowStatus.Failed, (await runtime.Get<ITestFlow>(id).Read()).Status);
     }
 
+    [Theory, MemberData(nameof(NeuronRuntimeKinds.Both), MemberType = typeof(NeuronRuntimeKinds))]
+    public async Task AFlowStartedFromAReactionKeepsTheCauseTrace(NeuronRuntimeKind kind)
+    {
+        var runtime = await fixture.Runtime(kind);
+        var kicker = runtime.Id("test.flow.kicker", "traced");
+        var id = runtime.Id("test.flow", "traced");
+        await runtime.Get<IFlowStarter>(runtime.Id("test.flow.starter", "traced")).Follow(kicker.ToString());
+        var trace = TraceContext.Begin("acct", runtime.Brain.Value, kicker);
+        using (TraceContext.Enter(trace)) { await runtime.Get<IFlowKicker>(kicker).Kick("traced"); }
+
+        _ = await runtime.WaitForSignals<FlowStarted>(id, 1, TimeSpan.FromSeconds(20), Ct);
+
+        var journaled = await runtime.Get<ITestFlow>(id).StartedTraceId();
+        Assert.Equal(trace.TraceId, journaled);
+        Assert.Equal(journaled, await runtime.Get<ITestFlow>(id).TraceId());
+    }
+
     // The detached Confirm reaches the confirmations side asynchronously; approve once the plan is pending there.
     private static async Task ApproveWhenPending(INeuronRuntime runtime, string planId)
     {
@@ -147,7 +165,7 @@ public sealed class FlowRuntimeFacts(FlowRuntimeFixture fixture, FaultingConfirm
 [Module("flow-runtime-conformance")]
 public sealed class FlowRuntimeModule : Module
 {
-    public static ModuleManifest Manifest { get; } = new([], [], [Need.State("test-flow")], [], []);
+    public static ModuleManifest Manifest { get; } = new([], [], [Need.State("test-flow"), Need.State("test-flow-kick")], [], []);
 }
 
 public sealed class FlowBox
@@ -169,6 +187,10 @@ public interface ITestFlow
     Task Resume(string step, WaitOutcome outcome, string? by);
 
     Task<FlowSnapshot> Read();
+
+    Task<string> TraceId();
+
+    Task<string?> StartedTraceId();
 }
 
 /// <summary>Two steps; "b" waits (for approval when <see cref="FlowBox.Approval"/>, else an external signal) when <see cref="FlowBox.AskFirst"/>.</summary>
@@ -179,6 +201,11 @@ public sealed class TwoStepFlow : Flow<FlowBox>, ITestFlow
 
     public Task<FlowSnapshot> Read() => Task.FromResult(new FlowSnapshot(State.Status, [.. State.Done], State.Waiting?.Step, State.Inner.Runs));
 
+    public Task<string> TraceId() => Task.FromResult(State.TraceId);
+
+    public async Task<string?> StartedTraceId()
+        => (await Context.History.Read(Id, 0, 100, CancellationToken.None)).Signals.FirstOrDefault(item => item.Signal is FlowStarted)?.TraceId;
+
     protected override Task<StepResult<FlowBox>> Run(string step, FlowBox inner, CancellationToken ct)
     {
         var next = new FlowBox { AskFirst = inner.AskFirst, Approval = inner.Approval, Runs = inner.Runs + 1 };
@@ -186,4 +213,38 @@ public sealed class TwoStepFlow : Flow<FlowBox>, ITestFlow
             ? new StepResult<FlowBox>(next, new Waiting("b", inner.Approval ? WaitReason.Approval : WaitReason.External, null, null))
             : new StepResult<FlowBox>(next));
     }
+}
+
+[Signal("test.flow.kicked")]
+public sealed record FlowKicked(string FlowKey) : Signal;
+
+public sealed record FlowKick
+{
+    public int Count { get; init; }
+}
+
+public interface IFlowKicker
+{
+    Task Kick(string flowKey);
+}
+
+public interface IFlowStarter
+{
+    Task Follow(string source);
+}
+
+[Neuron("test.flow.kicker", State = "test-flow-kick")]
+public sealed class FlowKickerNeuron : Neuron<FlowKick>, IFlowKicker
+{
+    public Task Kick(string flowKey) => Save(State with { Count = State.Count + 1 }, new FlowKicked(flowKey));
+}
+
+/// <summary>Starts the flow a kick names from inside its reaction, so the start runs under the kick's cause.</summary>
+[Neuron("test.flow.starter")]
+public sealed class FlowStarterNeuron : Neuron, IFlowStarter
+{
+    public Task Follow(string source) => Context.Synapses.Ensure<FlowKicked>(NeuronId.Parse(source));
+
+    [On]
+    public Task On(FlowKicked kicked) => Get<ITestFlow>(new NeuronId(Id.Brain, "test.flow", kicked.FlowKey)).Start("Build", "ann", null, new FlowBox());
 }

@@ -73,7 +73,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
             FlowId = FlowId,
             Title = title,
             Owner = owner,
-            TraceId = FlowTrace.Current() ?? Guid.NewGuid().ToString("N"),
+            TraceId = Context.TraceId ?? Guid.NewGuid().ToString("N"),
             Status = FlowStatus.Running,
             ParentFlowId = parentFlowId,
             Started = Context.Time.GetUtcNow(),
@@ -426,23 +426,8 @@ internal static partial class FlowLog
     public static partial void AdvancePostFailed(ILogger logger, Exception exception, string flowId);
 }
 
-// The request's trace id. TraceContext lives in DigitalBrain.Capabilities.Compute, which this assembly does not reference, so it is
-// read by reflection when that assembly is loaded (as TestOS's TestCause does).
-internal static class FlowTrace
-{
-    private static readonly Lazy<PropertyInfo?> TraceCurrent = new(static () => AppDomain.CurrentDomain.GetAssemblies()
-        .FirstOrDefault(assembly => assembly.GetName().Name == "DigitalBrain.Capabilities.Compute")
-        ?.GetType("DigitalBrain.Capabilities.Compute.TraceContext")?.GetProperty("Current", BindingFlags.Public | BindingFlags.Static));
-
-    public static string? Current()
-    {
-        var trace = TraceCurrent.Value?.GetValue(null);
-        return trace?.GetType().GetProperty("TraceId")?.GetValue(trace) as string;
-    }
-}
-
 // Whether the host is shutting down. IHostApplicationLifetime lives in Microsoft.Extensions.Hosting.Abstractions, which this assembly
-// does not reference (its packages are pinned), so the lifetime is found by reflection (as FlowTrace finds TraceContext). An Orleans
+// does not reference (its packages are pinned), so the lifetime is found by reflection. An Orleans
 // SiloUnavailableException anywhere in the chain is the second signal: the silo refuses calls while it stops.
 internal static class HostShutdown
 {

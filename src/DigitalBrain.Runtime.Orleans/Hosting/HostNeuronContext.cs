@@ -92,6 +92,8 @@ internal sealed class HostNeuronContext : INeuronContext, IHostNeuronContext
         => _services.GetService<IConfirmationContexts>()?.For(Id.Brain, Id.ToString())
             ?? _services.GetService<DigitalBrain.Confirmation.IConfirmations>() ?? UnavailableConfirmations.Instance;
 
+    public string? TraceId => DigitalBrain.Runtime.Orleans.Synapses.CurrentCause.Stamp().TraceId;
+
     public string Caller => RequestContext.Get(CallerKey) as string ?? string.Empty;
 
     public string Silo { get; }

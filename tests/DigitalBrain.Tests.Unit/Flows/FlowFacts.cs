@@ -247,6 +247,17 @@ public sealed class FlowFacts
     }
 
     [Fact]
+    public async Task StartTakesTheContextTraceId()
+    {
+        var (flow, context) = await Activated();
+        context.TraceId = "cause-trace";
+
+        await Started(flow, context, "Build", "ann", null, new Box());
+
+        Assert.Equal("cause-trace", flow.Current.TraceId);
+    }
+
+    [Fact]
     public async Task ThrowingBodyFailsFlow()
     {
         var (flow, context) = await Activated();

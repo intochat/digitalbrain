@@ -35,6 +35,12 @@ public interface INeuronContext
     /// <summary>The brain's signal history.</summary>
     ISignalHistory History { get; }
 
+    /// <summary>
+    /// The trace id the runtime would journal the signals of a save made now with: the current cause's (a reaction, or a neuron it
+    /// called), else the request's trace, else a fresh id. Null when the context does not stamp traces.
+    /// </summary>
+    string? TraceId { get; }
+
     /// <summary>Publishes a signal from this neuron.</summary>
     Task Publish(Signal signal);
 

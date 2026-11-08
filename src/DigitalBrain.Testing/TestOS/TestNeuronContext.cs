@@ -47,6 +47,8 @@ internal sealed class TestNeuronContext : INeuronContext
 
     public ISignalHistory History => _host.OS.Journal(Id.Brain);
 
+    public string? TraceId => TestCause.Stamp().TraceId;
+
     public async Task Publish(Signal signal)
     {
         ArgumentNullException.ThrowIfNull(signal);
