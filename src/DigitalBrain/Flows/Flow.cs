@@ -64,6 +64,9 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     // The plan an Ask of this activation is raising, so the nudge does not raise it twice.
     private string? _asking;
 
+    // What ConfirmationResolved signals claimed per plan: the approver is named only when the verified outcome agrees.
+    private readonly Dictionary<string, (ConfirmationOutcome Outcome, string? By)> _claimed = new(StringComparer.Ordinal);
+
     // Set by Cancel (which interleaves) until the Cancelled save, made in a turn of its own: nothing else saves meanwhile.
     private string? _cancelRequested;
 
@@ -196,17 +199,24 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         await Save(State with { Relations = State.Relations.Add(relation) }, new FlowRelated(FlowId, relation)).ConfigureAwait(true);
     }
 
-    /// <summary>Ends an approval wait when its plan is resolved; other plans are ignored.</summary>
+    /// <summary>
+    /// Checks an approval wait when its plan is reported resolved; other plans are ignored. Any neuron can journal a
+    /// <see cref="ConfirmationResolved"/>, so the signal is not trusted: it re-joins the plan through <see cref="IConfirmations.Confirm"/>
+    /// (idempotent for this requester), and the answer the confirmations side gives ends the wait.
+    /// </summary>
     /// <param name="resolved">The resolution.</param>
     [On]
     protected Task OnConfirmation(ConfirmationResolved resolved)
     {
         ArgumentNullException.ThrowIfNull(resolved);
-        if (State.Waiting is not { Reason: WaitReason.Approval, ConfirmationPlanId: { } planId } waiting || planId != resolved.PlanId)
+        if (State.Waiting is not { Reason: WaitReason.Approval, ConfirmationPlanId: { } planId } || planId != resolved.PlanId)
         {
             return Task.CompletedTask;
         }
-        return Resolve(waiting.Step, WaitOutcomeOf(resolved.Outcome), resolved.Approver?.Id);
+        // Kept only to name the approver when the verified answer agrees with the signal.
+        _claimed[planId] = (resolved.Outcome, resolved.Approver?.Id);
+        ReRaise();
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc />
@@ -224,7 +234,8 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     {
         Prove(proof);
         if (State is not { Status: FlowStatus.Waiting, Waiting: { Reason: WaitReason.Approval } waiting } || waiting.ConfirmationPlanId != planId) { return Task.CompletedTask; }
-        return Resolve(waiting.Step, WaitOutcomeOf(outcome), null);
+        var by = _claimed.Remove(planId, out var claim) && claim.Outcome == outcome ? claim.By : null;
+        return Resolve(waiting.Step, WaitOutcomeOf(outcome), by);
     }
 
     /// <summary>The confirmation plan an approval wait of <paramref name="step"/> raises.</summary>

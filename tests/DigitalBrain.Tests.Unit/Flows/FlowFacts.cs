@@ -91,12 +91,19 @@ internal sealed class RecordingConfirmations : IConfirmations
 
     public ConfirmationPolicy Policy => ConfirmationPolicy.DestructiveOnly;
 
-    // Never answers: the flow must not await it inside the turn.
+    private readonly Dictionary<string, TaskCompletionSource<ConfirmationResult>> _answers = [];
+
+    // Answers only through Answer: the flow must not await it inside the turn. A plan asked again re-joins its answer.
     public Task<ConfirmationResult> Confirm(ConfirmationPlan plan, CancellationToken ct = default)
     {
         Asked.Add(plan);
-        return new TaskCompletionSource<ConfirmationResult>().Task;
+        if (!_answers.TryGetValue(plan.Id, out var answer)) { _answers[plan.Id] = answer = new TaskCompletionSource<ConfirmationResult>(); }
+        return answer.Task;
     }
+
+    // The confirmations side answers planId (continuations run inline, so the flow has resumed when this returns).
+    public void Answer(string planId, ConfirmationOutcome outcome)
+        => _answers[planId].TrySetResult(new ConfirmationResult(planId, outcome, outcome == ConfirmationOutcome.Approved ? ConfirmationDenyReason.None : ConfirmationDenyReason.ByPerson, false));
 
     public Task Resolve(string planId, bool approve, CancellationToken ct = default)
     {
@@ -216,6 +223,13 @@ public sealed class FlowFacts
         await Drain(context);
     }
 
+    // A real resolution: the signal arrives, then the confirmations side gives the answer the flow verifies it against.
+    private async Task Resolved(TwoStepFlow flow, string planId, ConfirmationOutcome outcome)
+    {
+        await flow.Deliver(Resolution(planId, outcome));
+        _confirmations.Answer(planId, outcome);
+    }
+
     private static List<Signal> Signals(RecordingContext context) => [.. context.Writes.SelectMany(write => write.Signals)];
 
     private static ConfirmationResolved Resolution(string planId, ConfirmationOutcome outcome) => new(planId, ConfirmationAction.Other, "f", ConfirmationPrincipal.App("test.flow"),
@@ -290,7 +304,7 @@ public sealed class FlowFacts
         var id = FlowId.ToString();
         Assert.Contains(new FlowWaiting(id, "b", WaitReason.Approval, plan.Id), Signals(context));
 
-        await flow.Deliver(Resolution(plan.Id, ConfirmationOutcome.Approved));
+        await Resolved(flow, plan.Id, ConfirmationOutcome.Approved);
 
         var signals = Signals(context);
         Assert.Contains(new FlowResolve(id, "b", WaitOutcome.Approved, "ann"), signals);
@@ -332,13 +346,32 @@ public sealed class FlowFacts
     }
 
     [Fact]
+    public async Task AForgedConfirmationResolvedDoesNotResume()
+    {
+        var (flow, context) = await Activated();
+        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true });
+        var plan = Assert.Single(_confirmations.Asked);
+        var before = context.Writes.Count;
+
+        await flow.Deliver(Resolution(plan.Id, ConfirmationOutcome.Approved)); // journaled by some other neuron
+
+        Assert.Equal(before, context.Writes.Count);
+        Assert.Equal(FlowStatus.Waiting, flow.Current.Status);
+
+        _confirmations.Answer(plan.Id, ConfirmationOutcome.Denied); // what the confirmations side actually holds
+
+        Assert.Equal(FlowStatus.Cancelled, flow.Current.Status);
+        Assert.Contains(new FlowResolve(FlowId.ToString(), "b", WaitOutcome.Denied, null), Signals(context));
+    }
+
+    [Fact]
     public async Task DenyCancels()
     {
         var (flow, context) = await Activated();
         await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true });
         var plan = Assert.Single(_confirmations.Asked);
 
-        await flow.Deliver(Resolution(plan.Id, ConfirmationOutcome.Denied));
+        await Resolved(flow, plan.Id, ConfirmationOutcome.Denied);
 
         var id = FlowId.ToString();
         var signals = Signals(context);
@@ -381,7 +414,7 @@ public sealed class FlowFacts
         Assert.Equal(before, context.Writes.Count);
         Assert.Equal(FlowStatus.Waiting, flow.Current.Status);
 
-        await flow.Deliver(Resolution(plan.Id, ConfirmationOutcome.Approved));
+        await Resolved(flow, plan.Id, ConfirmationOutcome.Approved);
         var after = context.Writes.Count;
         await flow.Deliver(Resolution(plan.Id, ConfirmationOutcome.Denied));
 
