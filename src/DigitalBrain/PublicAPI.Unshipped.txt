@@ -3235,3 +3235,6 @@ DigitalBrain.Flows.IFlowCallbacks.ConfirmationAnswered(string! planId, DigitalBr
 DigitalBrain.Flows.IFlowCallbacks.Advance() -> System.Threading.Tasks.Task!
 DigitalBrain.Spi.INeuronContext.TraceId.get -> string?
 DigitalBrain.Flows.IFlowCallbacks.CancelRequested(string! reason, string! proof) -> System.Threading.Tasks.Task!
+DigitalBrain.Flows.StepOutcome.Interrupted = 3 -> DigitalBrain.Flows.StepOutcome
+DigitalBrain.Flows.FlowState<T>.Interruptions.get -> int
+DigitalBrain.Flows.FlowState<T>.Interruptions.init -> void

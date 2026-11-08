@@ -185,7 +185,7 @@ public sealed class FlowRuntimeFacts(FlowRuntimeFixture fixture, FaultingConfirm
 [Module("flow-runtime-conformance")]
 public sealed class FlowRuntimeModule : Module
 {
-    public static ModuleManifest Manifest { get; } = new([], [], [Need.State("test-flow"), Need.State("test-flow-kick")], [], []);
+    public static ModuleManifest Manifest { get; } = new([], [], [Need.State("test-flow"), Need.State("test-flow-kick"), Need.Reminders], [], []);
 }
 
 public sealed class FlowBox

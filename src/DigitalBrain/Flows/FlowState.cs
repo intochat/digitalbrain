@@ -127,4 +127,7 @@ public sealed record FlowState<T>(
         : this(string.Empty, string.Empty, string.Empty, string.Empty, FlowStatus.Pending, [], null, null, [], null, default, null, new T())
     {
     }
+
+    /// <summary>How many times the body of <see cref="Current"/> was interrupted; reset when a step completes.</summary>
+    public int Interruptions { get; init; }
 }

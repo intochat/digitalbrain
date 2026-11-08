@@ -635,6 +635,27 @@ public sealed class FlowFacts
     }
 
     [Fact]
+    public async Task TwentyInterruptionsFailTheStep()
+    {
+        var (flow, context) = await Activated();
+        TwoStepFlow.ForeignCancelsLeft = 25;
+        await Started(flow, context, "Build", "ann", null, new Box());
+
+        for (var tick = 1; tick < 19; tick++) { await flow.Tick("flow-nudge"); }
+        Assert.Equal(FlowStatus.Running, flow.Current.Status);
+        Assert.Equal(19, flow.Current.Interruptions);
+        Assert.Equal(19, Signals(context).Count(signal => signal is FlowStep { Outcome: StepOutcome.Interrupted }));
+
+        await flow.Tick("flow-nudge");
+
+        var id = FlowId.ToString();
+        Assert.Equal(FlowStatus.Failed, flow.Current.Status);
+        Assert.Contains(new FlowStep(id, "a", StepOutcome.Failed, "interrupted 20 times"), Signals(context));
+        Assert.Equal(new FlowDone(id, FlowOutcome.Failed, "interrupted 20 times"), Signals(context)[^1]);
+        Assert.Equal(20, TwoStepFlow.Calls.Count);
+    }
+
+    [Fact]
     public async Task NudgeStopsWhileWaitingAndRestartsOnResume()
     {
         var (flow, context) = await Activated();

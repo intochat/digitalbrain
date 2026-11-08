@@ -14,7 +14,13 @@ namespace DigitalBrain.Flows;
 /// during a membership change can also run a step twice (the state's ETag stops the second save). A body that throws
 /// <see cref="OperationCanceledException"/> (any token) is interrupted, not failed, and runs again the same way. On Orleans the grain
 /// is not reentrant, so deactivation and shutdown cannot cancel a running body: shutdown waits for it or abandons it, and either way
-/// the step runs again on activation. Every change journals one of the <c>flow.*</c> signals.
+/// the step runs again on activation. Each interruption is journaled as <see cref="StepOutcome.Interrupted"/> and counted in
+/// <see cref="FlowState{T}.Interruptions"/>; the 20th interruption of the same step fails the flow. Every change journals one of the
+/// <c>flow.*</c> signals.
+/// <para>
+/// A module hosting a flow must declare <c>Need.Reminders</c>: the <c>flow-nudge</c> and <c>flow-expiry</c> reminders are how it
+/// recovers and how its waits expire. Bodies run at least once and must be idempotent.
+/// </para>
 /// </summary>
 /// <typeparam name="T">The flow's own state.</typeparam>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "The activation token source holds no timer; OnDeactivate disposes it.")]
@@ -27,6 +33,9 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     public const string NudgeReminder = "flow-nudge";
 
     private static readonly TimeSpan NudgePeriod = TimeSpan.FromMinutes(1);
+
+    // The interruptions of one step after which the flow fails rather than running it again.
+    private const int MaxInterruptions = 20;
 
     // Approval waits expire through their plan; other waits through a reminder, re-checked every minute until they end.
     private static readonly TimeSpan ExpiryPeriod = TimeSpan.FromMinutes(1);
@@ -280,7 +289,11 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
             // Interrupted, not failed: a cancelled body (any token) or an ending activation leaves Current set and the flow
             // running, so the nudge or the next activation runs the step again.
             // A host that is stopping can refuse the body's calls before it cancels the activation: that is an interruption too.
-            catch (Exception error) when (error is OperationCanceledException || token.IsCancellationRequested || HostShutdown.IsStopping(Context.Services, error)) { return; }
+            catch (Exception error) when (error is OperationCanceledException || token.IsCancellationRequested || HostShutdown.IsStopping(Context.Services, error))
+            {
+                if (_cancelRequested is null && State.Status == FlowStatus.Running) { await Interrupted(step, error.Message).ConfigureAwait(true); }
+                return;
+            }
             catch (Exception error) when (error is not OutOfMemoryException)
             {
                 if (State.Status != FlowStatus.Running || _cancelRequested is not null) { return; }
@@ -296,9 +309,29 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
                 await Wait(step, result, wait).ConfigureAwait(true);
                 return;
             }
-            await Save(State with { Done = State.Done.Add(step), Current = null, Inner = result.Next },
+            await Save(State with { Done = State.Done.Add(step), Current = null, Inner = result.Next, Interruptions = 0 },
                 [new FlowStep(FlowId, step, StepOutcome.Completed, null), .. result.Emits ?? []]).ConfigureAwait(true);
         }
+    }
+
+    // Journals an interruption of step; the MaxInterruptions-th fails the flow. A save refused by a stopping host is logged: the step
+    // stays current and runs again either way.
+    private async Task Interrupted(string step, string detail)
+    {
+        var count = State.Interruptions + 1;
+        try
+        {
+            if (count >= MaxInterruptions)
+            {
+                var failure = $"interrupted {MaxInterruptions} times";
+                await Save(State with { Status = FlowStatus.Failed, Interruptions = count, Ended = Context.Time.GetUtcNow() },
+                    [new FlowStep(FlowId, step, StepOutcome.Failed, failure), new FlowDone(FlowId, FlowOutcome.Failed, failure)]).ConfigureAwait(true);
+                await StopNudge().ConfigureAwait(true);
+                return;
+            }
+            await Save(State with { Interruptions = count }, new FlowStep(FlowId, step, StepOutcome.Interrupted, detail)).ConfigureAwait(true);
+        }
+        catch (Exception error) when (error is not OutOfMemoryException) { FlowLog.InterruptionNotSaved(Logger(), error, FlowId, step); }
     }
 
     private async Task Wait(string step, StepResult<T> result, Waiting wait)
@@ -381,7 +414,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         var resolve = new FlowResolve(FlowId, step, outcome, by);
         if (outcome is WaitOutcome.Approved or WaitOutcome.Arrived)
         {
-            await Save(State with { Status = FlowStatus.Running, Waiting = null, Current = null, Done = State.Done.Add(step) },
+            await Save(State with { Status = FlowStatus.Running, Waiting = null, Current = null, Done = State.Done.Add(step), Interruptions = 0 },
                 [resolve, new FlowStep(FlowId, step, StepOutcome.Completed, null)]).ConfigureAwait(true);
             await StartNudge().ConfigureAwait(true);
         }
@@ -468,6 +501,9 @@ internal static partial class FlowLog
 {
     [LoggerMessage(Level = LogLevel.Error, Message = "Flow {FlowId} could not record the answer to confirmation plan {PlanId}; it stays waiting")]
     public static partial void RelayFailed(ILogger logger, Exception exception, string flowId, string planId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Flow {FlowId} could not journal the interruption of step {Step}; it runs again")]
+    public static partial void InterruptionNotSaved(ILogger logger, Exception exception, string flowId, string step);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Flow {FlowId} could not post its first advance; the flow-nudge reminder or the next activation advances it")]
     public static partial void AdvancePostFailed(ILogger logger, Exception exception, string flowId);

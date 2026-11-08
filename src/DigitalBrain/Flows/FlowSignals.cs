@@ -14,6 +14,9 @@ public enum StepOutcome
 
     /// <summary>The body failed.</summary>
     Failed,
+
+    /// <summary>The body was interrupted (cancelled, the activation ended or the host stopped); the step runs again.</summary>
+    Interrupted,
 }
 
 /// <summary>How a wait ended.</summary>
@@ -61,7 +64,7 @@ public sealed record FlowStarted(string FlowId, string Type, string Title) : Sig
 /// <param name="FlowId">The flow id.</param>
 /// <param name="Step">The step.</param>
 /// <param name="Outcome">What happened.</param>
-/// <param name="Detail">The failure detail, if any.</param>
+/// <param name="Detail">The failure or interruption detail, if any.</param>
 [Signal("flow.step")]
 public sealed record FlowStep(string FlowId, string Step, StepOutcome Outcome, string? Detail) : Signal;
 
