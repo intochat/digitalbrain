@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using DigitalBrain.Contracts;
 using DigitalBrain.Runtime.Synapses;
 using DigitalBrain.Spi;
@@ -11,12 +10,15 @@ namespace DigitalBrain.Testing.Synapses;
 /// it on a fresh <see cref="TestOS.Local"/> with its slots bound to <see cref="FakeSlots"/>, drives the steps and returns a transcript.
 /// A source that fails to compile, to pass the host boundary or to deploy is a failed transcript, not an exception.
 /// </summary>
-public static partial class UnitScenario
+public static class UnitScenario
 {
     private static readonly BrainId Brain = NeuronId.Parse("scenario/x/y").Brain;
     private static readonly Lazy<SynapseCompiler> Compiler = new(() => new SynapseCompiler(ReferenceSet.FromDefaultContext()));
 
-    /// <summary>Runs <paramref name="steps"/> against <paramref name="source"/>.</summary>
+    /// <summary>
+    /// Runs <paramref name="steps"/> against <paramref name="source"/>. Every install the source asks for is approved as the person would;
+    /// the needs sentences approved are listed in <see cref="ScenarioTranscript.Consented"/> so the caller can show them.
+    /// </summary>
     /// <param name="source">The synapse source.</param>
     /// <param name="fakes">The fakes its slots bind to, by slot name.</param>
     /// <param name="steps">The steps, in order.</param>
@@ -34,12 +36,19 @@ public static partial class UnitScenario
             return Failed([.. build.Diagnostics.Select(d => $"compile {d.File}({d.Line}) {d.Id}: {d.Message}")]);
         }
 
+        IReadOnlyList<string> aliases;
+        try { aliases = await StateAliases(build).ConfigureAwait(false); }
+        catch (Exception e) when (e is InvalidOperationException or BadImageFormatException or TypeLoadException or System.Reflection.ReflectionTypeLoadException)
+        {
+            return Failed([$"load {e.GetType().Name}: {e.Message}"]);
+        }
+
         await using var os = TestOS.Local();
         fakes.BindTo(os);
         os.Register<ScenarioInput>();
         os.Confirmations.ApproveAll();
 
-        var outcome = await os.Synapses.Deploy(Brain, source, Bindings(source, fakes), ct).ConfigureAwait(false);
+        var outcome = await os.Synapses.Deploy(Brain, source, Bindings(source, aliases, fakes), ct).ConfigureAwait(false);
         await os.Idle().ConfigureAwait(false);
         if (outcome.Status != DeployStatus.Deployed)
         {
@@ -49,6 +58,8 @@ public static partial class UnitScenario
         var refused = outcome.Installs.Where(i => i.Value.Status == InstallStatus.Refused).Select(i => $"install {i.Key}: {i.Value.Reason}").ToList();
         if (refused.Count > 0) { return Failed(refused); }
 
+        var consented = outcome.Installs.Values.Where(i => i.Status != InstallStatus.Refused && !string.IsNullOrEmpty(i.Sentence))
+            .Select(i => i.Sentence).ToList();
         var journal = os.Journal(Brain);
         var position = (await journal.Read(long.MaxValue, 1, ct).ConfigureAwait(false)).Last;
         var seenFailures = os.Failures.Count;
@@ -73,7 +84,13 @@ public static partial class UnitScenario
                         break;
                     case Tick tick:
                         var now = os.Clock.GetUtcNow();
-                        if (tick.At > now) { os.Clock.Advance(tick.At - now); }
+                        if (tick.At <= now)
+                        {
+                            failures.Add($"step {i} Tick: At is not after now ({tick.At:O} <= {now:O})");
+                            break;
+                        }
+
+                        os.Clock.Advance(tick.At - now);
                         await os.Idle().ConfigureAwait(false);
                         break;
                     case ExpectState expect:
@@ -105,10 +122,26 @@ public static partial class UnitScenario
             position = await Drain(journal, position, i, events, ct).ConfigureAwait(false);
         }
 
-        return new ScenarioTranscript(failures.Count == 0, events, failures);
+        var views = new List<PublishedView>();
+        foreach (var alias in aliases)
+        {
+            if (await os.Get<IViewReader>(NeuronId.Parse($"{Brain}/{alias}/default")).Read(alias).ConfigureAwait(false) is { } view) { views.Add(view); }
+        }
+
+        return new ScenarioTranscript(failures.Count == 0, events, failures, consented, views);
     }
 
-    private static ScenarioTranscript Failed(List<string> failures) => new(false, [], failures.Count == 0 ? ["failed"] : failures);
+    private static ScenarioTranscript Failed(List<string> failures) => new(false, [], failures.Count == 0 ? ["failed"] : failures, [], []);
+
+    // The aliases the compiled source declares, scanned from the build the host would load; the load context is unloaded again.
+    private static async Task<IReadOnlyList<string>> StateAliases(SynapseBuild build)
+    {
+        var loader = new SynapseLoader();
+        var loaded = loader.Load(build);
+        var aliases = loaded.Catalog.States.Keys.ToList();
+        _ = await loader.Unload(loaded, gcRounds: 0).ConfigureAwait(false);
+        return aliases;
+    }
 
     private static async Task<long> Drain(TestJournal journal, long position, int step, List<ScenarioEvent> events, CancellationToken ct)
     {
@@ -157,10 +190,9 @@ public static partial class UnitScenario
 
     // Every alias the source declares binds every fake by its slot name; a binding the alias does not use is ignored. The source's own
     // bindings stay for the slots no fake names.
-    private static Dictionary<string, IReadOnlyDictionary<string, string>> Bindings(SynapseSource source, FakeSlots fakes)
+    private static Dictionary<string, IReadOnlyDictionary<string, string>> Bindings(SynapseSource source, IReadOnlyList<string> aliases, FakeSlots fakes)
     {
         var result = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.Ordinal);
-        var aliases = source.Files.Values.SelectMany(text => StateAlias().Matches(text)).Select(m => m.Groups[1].Value).Distinct(StringComparer.Ordinal);
         foreach (var alias in aliases)
         {
             var bindings = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -176,8 +208,6 @@ public static partial class UnitScenario
         return result;
     }
 
-    [GeneratedRegex("""\[\s*State\s*\(\s*"([^"]+)"\s*\)""", RegexOptions.CultureInvariant)]
-    private static partial Regex StateAlias();
 }
 
 /// <summary>The scenario's own publisher: journals a signal by alias into the brain.</summary>

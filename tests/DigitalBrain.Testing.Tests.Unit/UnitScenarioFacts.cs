@@ -58,7 +58,51 @@ public sealed class UnitScenarioFacts
 
         Assert.True(transcript.Passed, string.Join("; ", transcript.Failures));
         Assert.Empty(transcript.Failures);
-        Assert.Contains(transcript.Events, e => e.Step == 0 && SignalAliases.Of(e.Signal.Signal) == "x.polled");
+        var polled = Assert.Single(transcript.Events, e => e.Step == 0 && SignalAliases.Of(e.Signal.Signal) == "x.polled");
+        Assert.Equal(1, JsonSerializer.SerializeToElement(polled.Signal.Signal, polled.Signal.Signal.GetType(), JsonSerializerOptions.Web).GetProperty("fresh").GetInt32());
+        Assert.Contains(transcript.Views, v => v.Alias == "x.watch" && v.View.GetProperty("root").GetProperty("children")[0].GetProperty("value").GetString() == "1");
+    }
+
+    [Fact]
+    public async Task TheTranscriptListsWhatWasConsented()
+    {
+        var transcript = await UnitScenario.Run(Source(XWatch), OnePost(), [], Ct);
+
+        Assert.True(transcript.Passed, string.Join("; ", transcript.Failures));
+        var sentence = Assert.Single(transcript.Consented);
+        Assert.Contains("http", sentence, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("6", sentence, StringComparison.Ordinal);
+        Assert.Contains("view", sentence, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AConstAliasIsBound()
+    {
+        var text = XWatch.Replace("public static class XWatch", "public static class Names { public const string Watch = \"x.watch\"; }\n\npublic static class XWatch", StringComparison.Ordinal)
+            .Replace("[State(\"x.watch\")]", "[State(Names.Watch)]", StringComparison.Ordinal);
+        Assert.DoesNotContain("[State(\"", text, StringComparison.Ordinal);
+
+        var transcript = await UnitScenario.Run(Source(text), OnePost(), [new Tick(Start.AddMinutes(6)), new ExpectState("x.watch", "Unseen", Json("1"))], Ct);
+
+        Assert.True(transcript.Passed, string.Join("; ", transcript.Failures));
+    }
+
+    [Fact]
+    public async Task TwoTicksFireTwice()
+    {
+        var transcript = await UnitScenario.Run(Source(XWatch), OnePost(),
+            [new Tick(Start.AddMinutes(6)), new Tick(Start.AddMinutes(12)), new ExpectState("x.watch", "Unseen", Json("2"))], Ct);
+
+        Assert.True(transcript.Passed, string.Join("; ", transcript.Failures));
+    }
+
+    [Fact]
+    public async Task ATickNotAfterNowFailsTheStep()
+    {
+        var transcript = await UnitScenario.Run(Source(XWatch), OnePost(), [new Tick(Start.AddMinutes(6)), new Tick(Start.AddMinutes(6))], Ct);
+
+        Assert.False(transcript.Passed);
+        Assert.StartsWith("step 1 Tick: At is not after now", Assert.Single(transcript.Failures), StringComparison.Ordinal);
     }
 
     [Fact]
