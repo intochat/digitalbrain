@@ -120,7 +120,7 @@ internal sealed class HostNeuronState(NeuronId id, GrainId grainId, NeuronRegist
         var types = services.GetRequiredService<JournalPayloads>().Types;
         var entries = signals.Select((signal, index) => (
             Sequence: last - signals.Count + 1 + index,
-            Alias: types.TryAliasOf(signal.GetType(), out var alias) ? alias : throw new JournalPayloadException($"{signal.GetType().Name} has no registered [Signal] alias.")))
+            Alias: signal is EmittedSignal emitted ? emitted.Alias : types.TryAliasOf(signal.GetType(), out var alias) ? alias : throw new JournalPayloadException($"{signal.GetType().Name} has no registered [Signal] alias.")))
             .ToArray();
         services.GetService<Signalling.ClusterListeners>()?.Offer(id, signals);
         return services.GetRequiredService<SignalPublisher>().Publish(new AppendedSignals(id, entries));

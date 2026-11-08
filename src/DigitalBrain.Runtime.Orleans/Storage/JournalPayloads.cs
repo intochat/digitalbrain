@@ -42,6 +42,8 @@ internal sealed class JournalPayloads(SignalTypeMap types)
     public JournaledSignalPayload EncodeSignal(Signal signal)
     {
         ArgumentNullException.ThrowIfNull(signal);
+        // An emitted signal (a view activation) has no record type: it is journaled under its alias with its JSON payload as is.
+        if (signal is EmittedSignal emitted) { return new JournaledSignalPayload(emitted.Alias, JsonSerializer.SerializeToUtf8Bytes(emitted.Payload)); }
         var type = signal.GetType();
         if (!Types.TryAliasOf(type, out var alias))
         { throw new JournalPayloadException($"Signal {type.FullName} has no registered [Signal] alias; register its assembly with AddJournalPayloads."); }

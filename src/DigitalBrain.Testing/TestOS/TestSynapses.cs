@@ -337,7 +337,7 @@ internal sealed class SynapseRegistry(TestOS os)
     // A reaction is a turn: a synapse receiver's Receive, else the most specific [On] method whose parameter accepts the signal; none means the signal is ignored.
     // A signal is wanted by its type or by its journal alias; call under _gate.
     private static bool Wants(Entry entry, Signal signal)
-        => entry.Signals.Any(type => type.IsInstanceOfType(signal)) || (entry.Aliases.Count > 0 && entry.Aliases.Contains(AliasOf(signal.GetType())));
+        => entry.Signals.Any(type => type.IsInstanceOfType(signal)) || (entry.Aliases.Count > 0 && entry.Aliases.Contains(SignalAliases.Of(signal)));
 
     private Task React(TestNeuronHost subscriber, Signal signal, Entry entry, long cursor, NeuronId from, string? traceId = null, JournaledSignal? item = null)
     {

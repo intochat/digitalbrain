@@ -1,11 +1,10 @@
 namespace DigitalBrain;
 
-/// <summary>A view of a state neuron changed. Ephemeral: never journaled.</summary>
-/// <param name="Neuron">The neuron key.</param>
-/// <param name="View">The new view value.</param>
+/// <summary>A state alias stored a new view; journaled, read it with <see cref="IViewReader.Read"/>.</summary>
+/// <param name="Alias">The state alias.</param>
+/// <param name="Generation">The generation of the stored view.</param>
 [Signal("synapse.view-changed")]
-[EphemeralSignal]
-public sealed record ViewChanged(string Neuron, object View) : Signal;
+public sealed record ViewChanged(string Alias, long Generation) : Signal;
 
 /// <summary>A synapse function started. Ephemeral: never journaled.</summary>
 /// <param name="Neuron">The neuron key.</param>

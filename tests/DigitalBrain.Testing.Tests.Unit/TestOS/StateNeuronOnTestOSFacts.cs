@@ -43,7 +43,7 @@ public static class Budget
             : Check.Allow(state with { Spent = state.Spent + s.Amount });
 
     [Synapse("week")]
-    public static string Show(WeekSpend w) => $"{w.Spent} of 300";
+    public static DigitalBrain.UI.View Show(WeekSpend w) => new("week", new DigitalBrain.UI.Text($"{w.Spent} of 300"));
 }
 
 public static class Books
@@ -137,7 +137,7 @@ public static class Fragility
     public static Check Allow(Fragile s, Brittle state) => Check.Allow(state with { Seen = state.Seen + 1 });
 
     [Synapse("brittle")]
-    public static string Break(Brittle state) => state.Seen > 0 ? throw new InvalidOperationException("breaker") : "untouched";
+    public static DigitalBrain.UI.View Break(Brittle state) => state.Seen > 0 ? throw new InvalidOperationException("breaker") : new("brittle", new DigitalBrain.UI.Text("untouched"));
 }
 
 [Signal("test.synapse.capped-charging")]
@@ -385,14 +385,14 @@ public sealed class StateNeuronOnTestOSFacts
         var heard = new ConcurrentQueue<string>();
         await using var listener = await os.ClusterListeners.Listen<ViewChanged>("views", (_, changed, _) =>
         {
-            heard.Enqueue(changed.Neuron);
+            heard.Enqueue(changed.Alias);
             return Task.CompletedTask;
         });
 
         await os.Get<IPayments>(Pay).Charge(10m);
         await os.Idle();
 
-        Assert.Contains("b/week/default", heard);
+        Assert.Contains("week", heard);
     }
 
     private static async Task<decimal> Spent(OS os)

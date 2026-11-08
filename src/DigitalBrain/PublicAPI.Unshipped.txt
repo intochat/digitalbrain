@@ -1881,13 +1881,7 @@ DigitalBrain.SynapseStarted.Signal.get -> string!
 DigitalBrain.SynapseStarted.Signal.init -> void
 DigitalBrain.SynapseStarted.SynapseStarted(string! Neuron, string! Function, string! Signal) -> void
 DigitalBrain.ViewChanged
-DigitalBrain.ViewChanged.Deconstruct(out string! Neuron, out object! View) -> void
 DigitalBrain.ViewChanged.Equals(DigitalBrain.ViewChanged? other) -> bool
-DigitalBrain.ViewChanged.Neuron.get -> string!
-DigitalBrain.ViewChanged.Neuron.init -> void
-DigitalBrain.ViewChanged.View.get -> object!
-DigitalBrain.ViewChanged.View.init -> void
-DigitalBrain.ViewChanged.ViewChanged(string! Neuron, object! View) -> void
 abstract DigitalBrain.Rules.Check.<Clone>$() -> DigitalBrain.Rules.Check!
 override DigitalBrain.Reaction<TState>.Equals(object? obj) -> bool
 override DigitalBrain.Reaction<TState>.GetHashCode() -> int
@@ -3272,3 +3266,39 @@ override DigitalBrain.SignalEnvelope.GetHashCode() -> int
 override DigitalBrain.SignalEnvelope.ToString() -> string!
 static DigitalBrain.SignalEnvelope.operator !=(DigitalBrain.SignalEnvelope? left, DigitalBrain.SignalEnvelope? right) -> bool
 static DigitalBrain.SignalEnvelope.operator ==(DigitalBrain.SignalEnvelope? left, DigitalBrain.SignalEnvelope? right) -> bool
+DigitalBrain.ActivationRefusedException
+DigitalBrain.ActivationRefusedException.ActivationRefusedException() -> void
+DigitalBrain.ActivationRefusedException.ActivationRefusedException(string! message, System.Exception! inner) -> void
+DigitalBrain.ActivationRefusedException.ActivationRefusedException(string! reason) -> void
+DigitalBrain.ActivationRefusedException.Reason.get -> string!
+DigitalBrain.IViewReader
+DigitalBrain.IViewReader.Activate(string! alias, long generation, string! nodeKey, string? fieldValue) -> System.Threading.Tasks.Task!
+DigitalBrain.IViewReader.Read(string! alias) -> System.Threading.Tasks.Task<DigitalBrain.PublishedView?>!
+DigitalBrain.PublishedView
+DigitalBrain.PublishedView.<Clone>$() -> DigitalBrain.PublishedView!
+DigitalBrain.PublishedView.Alias.get -> string!
+DigitalBrain.PublishedView.Alias.init -> void
+DigitalBrain.PublishedView.Deconstruct(out string! Alias, out long Generation, out DigitalBrain.UI.View! View) -> void
+DigitalBrain.PublishedView.Equals(DigitalBrain.PublishedView? other) -> bool
+DigitalBrain.PublishedView.Generation.get -> long
+DigitalBrain.PublishedView.Generation.init -> void
+DigitalBrain.PublishedView.PublishedView(string! Alias, long Generation, DigitalBrain.UI.View! View) -> void
+DigitalBrain.PublishedView.View.get -> DigitalBrain.UI.View!
+DigitalBrain.PublishedView.View.init -> void
+DigitalBrain.StateNeuron<TState>.Activate(string! alias, long generation, string! nodeKey, string? fieldValue) -> System.Threading.Tasks.Task!
+DigitalBrain.StateNeuron<TState>.Read(string! alias) -> System.Threading.Tasks.Task<DigitalBrain.PublishedView?>!
+DigitalBrain.ViewChanged.Alias.get -> string!
+DigitalBrain.ViewChanged.Alias.init -> void
+DigitalBrain.ViewChanged.Deconstruct(out string! Alias, out long Generation) -> void
+DigitalBrain.ViewChanged.Generation.get -> long
+DigitalBrain.ViewChanged.Generation.init -> void
+DigitalBrain.ViewChanged.ViewChanged(string! Alias, long Generation) -> void
+const DigitalBrain.ActivationRefusedException.ForeignOwner = "ForeignOwner" -> string!
+const DigitalBrain.ActivationRefusedException.NoEmit = "NoEmit" -> string!
+const DigitalBrain.ActivationRefusedException.Stale = "Stale" -> string!
+const DigitalBrain.ActivationRefusedException.UnknownNode = "UnknownNode" -> string!
+override DigitalBrain.PublishedView.Equals(object? obj) -> bool
+override DigitalBrain.PublishedView.GetHashCode() -> int
+override DigitalBrain.PublishedView.ToString() -> string!
+static DigitalBrain.PublishedView.operator !=(DigitalBrain.PublishedView? left, DigitalBrain.PublishedView? right) -> bool
+static DigitalBrain.PublishedView.operator ==(DigitalBrain.PublishedView? left, DigitalBrain.PublishedView? right) -> bool

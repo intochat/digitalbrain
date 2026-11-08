@@ -49,7 +49,7 @@ public static class SbBudget
             : Check.Allow(state with { Spent = state.Spent + s.Amount });
 
     [Synapse("sb.week")]
-    public static string Show(SbWeekSpend w) => $"{w.Spent} of 300";
+    public static DigitalBrain.UI.View Show(SbWeekSpend w) => new("sb.week", new DigitalBrain.UI.Text($"{w.Spent} of 300"));
 }
 
 public static class SbBooks
@@ -414,14 +414,14 @@ public sealed class StateNeuronSiloFacts(StatefulSilo silo) : IClassFixture<Stat
         var heard = new ConcurrentQueue<string>();
         await using var listener = await silo.Services.GetRequiredService<IClusterListeners>().Listen<ViewChanged>("views", (_, changed, _) =>
         {
-            heard.Enqueue(changed.Neuron);
+            heard.Enqueue(changed.Alias);
             return Task.CompletedTask;
         });
 
         await silo.Get<ISbPayments>("sb/sb.payments/view").Charge(1m);
-        await Until(() => Task.FromResult(heard.Contains("sb/sb.week/default")), ct);
+        await Until(() => Task.FromResult(heard.Contains("sb.week")), ct);
 
-        Assert.Contains("sb/sb.week/default", heard);
+        Assert.Contains("sb.week", heard);
     }
 
     // Reaction edges and gates come from the install: each fact installs the aliases it charges in its brain (approved by the fixture).

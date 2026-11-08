@@ -1,3 +1,4 @@
+using DigitalBrain.UI;
 using DigitalBrain.Rules;
 using DigitalBrain.Spi;
 using DigitalBrain.Tests.Unit.Neurons;
@@ -19,7 +20,7 @@ public static class Budget
             : Check.Allow(state with { Spent = state.Spent + s.Amount });
 
     [Synapse("week")]
-    public static string Show(WeekSpend w) => $"{w.Spent} of 300";
+    public static View Show(WeekSpend w) => new("week", new Text($"{w.Spent} of 300"));
 }
 
 public static class Books
@@ -28,7 +29,7 @@ public static class Books
     public static Ledger Add(Charging s, Ledger w) => w with { Spent = w.Spent + s.Amount };
 
     [Synapse("ledger")]
-    public static string Show(Ledger w) => $"{w.Spent} of 300";
+    public static View Show(Ledger w) => new("ledger", new Text($"{w.Spent} of 300"));
 }
 
 public static class Idle
@@ -110,7 +111,9 @@ public sealed class StateNeuronFacts
 
         Assert.Equal(100m, ((WeekSpend)Context.Writes[0].State).Spent);
         Assert.Equal([new StateChanged(Id.ToString(), "test.charging")], Context.Writes[0].Signals);
-        Assert.Contains(Context.Published, p => p is ViewChanged { View: "100 of 300" });
+        Assert.Contains(Context.Published, p => p is ViewChanged { Alias: "week", Generation: 1 });
+        var view = await n.Read("week");
+        Assert.Equal(new Text("100 of 300"), view?.View.Root);
     }
 
     [Fact]
@@ -156,7 +159,7 @@ public sealed class StateNeuronFacts
         var e = Context.Published;
         var started = e.FindIndex(p => p is SynapseStarted s && s.Function.EndsWith(".Add", StringComparison.Ordinal));
         var finished = e.FindIndex(p => p is SynapseFinished { Outcome: "saved" } f && f.Function.EndsWith(".Add", StringComparison.Ordinal));
-        var viewed = e.FindIndex(p => p is ViewChanged { View: "5 of 300" });
+        var viewed = e.FindIndex(p => p is ViewChanged { Alias: "ledger", Generation: 1 });
         Assert.True(started >= 0 && finished > started && viewed > finished, string.Join(", ", e));
         Assert.Contains(e, p => p is SynapseFinished { Outcome: "viewed" });
     }

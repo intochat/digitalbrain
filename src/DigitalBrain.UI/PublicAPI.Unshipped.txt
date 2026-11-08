@@ -944,3 +944,23 @@ override sealed DigitalBrain.UI.WebBrowser.Equals(DigitalBrain.UI.Node? other) -
 static DigitalBrain.UI.Ui.WebBrowser(string! url, string? title = null, string! key = "web-browser", double height = 520, string! executionMode = "wasm-ui") -> DigitalBrain.UI.WebBrowser!
 static DigitalBrain.UI.WebBrowser.operator !=(DigitalBrain.UI.WebBrowser? left, DigitalBrain.UI.WebBrowser? right) -> bool
 static DigitalBrain.UI.WebBrowser.operator ==(DigitalBrain.UI.WebBrowser? left, DigitalBrain.UI.WebBrowser? right) -> bool
+DigitalBrain.UI.Button.Emit.get -> DigitalBrain.UI.Emit?
+DigitalBrain.UI.Button.Emit.init -> void
+DigitalBrain.UI.Button.Key.get -> string?
+DigitalBrain.UI.Button.Key.init -> void
+DigitalBrain.UI.Emit
+DigitalBrain.UI.Emit.Args.get -> System.Text.Json.JsonElement?
+DigitalBrain.UI.Emit.Args.init -> void
+DigitalBrain.UI.Emit.Deconstruct(out string! Owner, out string! Signal, out System.Text.Json.JsonElement? Args) -> void
+DigitalBrain.UI.Emit.Emit(string! Owner, string! Signal, System.Text.Json.JsonElement? Args = null) -> void
+DigitalBrain.UI.Emit.Equals(DigitalBrain.UI.Emit? other) -> bool
+DigitalBrain.UI.Emit.Owner.get -> string!
+DigitalBrain.UI.Emit.Owner.init -> void
+DigitalBrain.UI.Emit.Signal.get -> string!
+DigitalBrain.UI.Emit.Signal.init -> void
+override DigitalBrain.UI.Emit.Equals(object? obj) -> bool
+override DigitalBrain.UI.Emit.GetHashCode() -> int
+override DigitalBrain.UI.Emit.ToString() -> string!
+static DigitalBrain.UI.Emit.operator !=(DigitalBrain.UI.Emit? left, DigitalBrain.UI.Emit? right) -> bool
+static DigitalBrain.UI.Emit.operator ==(DigitalBrain.UI.Emit? left, DigitalBrain.UI.Emit? right) -> bool
+DigitalBrain.UI.Emit.<Clone>$() -> DigitalBrain.UI.Emit!

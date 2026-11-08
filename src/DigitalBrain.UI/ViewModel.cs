@@ -273,7 +273,21 @@ public sealed record Button(string Label, ButtonAction Action, bool Enabled = tr
 
     /// <summary>True for the compact 30px desktop button height.</summary>
     public bool Small { get; init; }
+
+    /// <summary>The node's key within its view, by which an activation names it.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Key { get; init; }
+
+    /// <summary>The signal a click emits to its owning alias.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Emit? Emit { get; init; }
 }
+
+/// <summary>A signal a node emits when activated: journaled with alias <paramref name="Signal"/> to the state alias <paramref name="Owner"/>.</summary>
+/// <param name="Owner">The state alias that owns the view and receives the signal.</param>
+/// <param name="Signal">The journal alias of the emitted signal.</param>
+/// <param name="Args">Optional JSON object payload; an activation's field value is added as <c>value</c>.</param>
+public sealed record Emit(string Owner, string Signal, System.Text.Json.JsonElement? Args = null);
 
 /// <summary>Sortable tabular data card with optional <c>neuron://</c> source URI.</summary>
 public sealed record DataTable(

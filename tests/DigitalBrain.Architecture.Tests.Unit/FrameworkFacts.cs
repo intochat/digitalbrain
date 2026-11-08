@@ -45,11 +45,11 @@ public sealed class VocabularyRingFacts
         Assert.Empty(Repository.ProjectReferences(Repository.ProjectNamed("DigitalBrain.UI").Path));
     }
 
-    // 03-04: the core's only project reference is the analyzer, analyzer-only (no assembly reference).
+    // 03-04: the core references the analyzer, analyzer-only (no assembly reference); 0.18.0: and the view model, whose View a state neuron stores.
     [Fact]
-    public void Core_references_only_the_analyzer_as_analyzer()
+    public void Core_references_only_the_analyzer_and_the_view_model()
     {
-        Assert.Equal(["DigitalBrain.Analyzers"], Repository.ProjectReferences(Repository.ProjectNamed("DigitalBrain").Path));
+        Assert.Equal(["DigitalBrain.Analyzers", "DigitalBrain.UI"], Repository.ProjectReferences(Repository.ProjectNamed("DigitalBrain").Path).Order(StringComparer.Ordinal));
     }
 
     [Theory]

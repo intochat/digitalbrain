@@ -6,6 +6,7 @@ using DigitalBrain.Invocation;
 using DigitalBrain.Rules;
 using Verdict = DigitalBrain.Rules.Check;
 using DigitalBrain.Spi;
+using DigitalBrain.UI;
 
 namespace DigitalBrain;
 
@@ -33,8 +34,11 @@ public static class StateNeuron
 /// visible and never counted. Provisional entries older than <see cref="StateNeuron.ProvisionalLease"/> are discarded on the next gate
 /// call. Entries are matched by the <see cref="Verdict.Allowed.Ticket"/> <see cref="Gate"/> assigned, so value-equal signals of two
 /// publishers never take each other's entry; the ticket is the host's attempt id for the gate call, and an empty one is refused.
+/// <para>A view synapse returning <see cref="View"/> stores it as the alias's current view with a generation, journals
+/// <see cref="ViewChanged"/>, and serves it through <see cref="IViewReader"/>; other view results are not stored. The view is
+/// held in memory: after a reactivation <see cref="Read"/> is null until the next state change runs the views again.</para>
 /// </remarks>
-public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where TState : class, new()
+public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IViewReader where TState : class, new()
 {
     private const string GatePlaceholder = "gate";
     private readonly ISynapseCatalogSource _catalog;
@@ -45,6 +49,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     private readonly Queue<Guid> _flushedOrder = new();
     private bool _viewsPending;
     private bool _journalingRefusal;
+    private PublishedView? _view;
 
     /// <summary>Creates the neuron for <typeparamref name="TState"/> over the live <paramref name="catalog"/>, read again on every turn.</summary>
     /// <param name="catalog">The live synapse catalog.</param>
@@ -324,10 +329,39 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
         {
             await Run(view, null, State, async result =>
             {
-                await PublishEphemeral(new ViewChanged(Id.ToString(), result!)).ConfigureAwait(true);
+                if (result is View stored && AliasIn(_catalog.Current) is { } alias)
+                {
+                    _view = new PublishedView(alias, (_view?.Generation ?? 0) + 1, stored);
+                    await Publish(new ViewChanged(alias, _view.Generation)).ConfigureAwait(true);
+                }
+
                 return "viewed";
             }, CancellationToken.None).ConfigureAwait(true);
         }
+    }
+
+    /// <inheritdoc />
+    public Task<PublishedView?> Read(string alias)
+        => Task.FromResult(_view is { } view && string.Equals(view.Alias, alias, StringComparison.Ordinal) ? view : null);
+
+    /// <inheritdoc />
+    public async Task Activate(string alias, long generation, string nodeKey, string? fieldValue)
+    {
+        ArgumentNullException.ThrowIfNull(alias);
+        ArgumentNullException.ThrowIfNull(nodeKey);
+        if (_view is not { } view || !string.Equals(view.Alias, alias, StringComparison.Ordinal) || view.Generation != generation)
+        {
+            throw new ActivationRefusedException(ActivationRefusedException.Stale);
+        }
+
+        var node = ViewNodes.Find(view.View.Root, nodeKey) ?? throw new ActivationRefusedException(ActivationRefusedException.UnknownNode);
+        var emit = ViewNodes.EmitOf(node) ?? throw new ActivationRefusedException(ActivationRefusedException.NoEmit);
+        if (!string.Equals(emit.Owner, alias, StringComparison.Ordinal)) { throw new ActivationRefusedException(ActivationRefusedException.ForeignOwner); }
+
+        // Journaled from the state neuron with the caller's cause; a state neuron never hears its own signals, so it reacts here.
+        var signal = new EmittedSignal(emit.Signal, ViewNodes.Payload(emit.Args, fieldValue));
+        await Publish(signal).ConfigureAwait(true);
+        await React(signal, Context.TraceId, null, CancellationToken.None).ConfigureAwait(true);
     }
 
     private IEnumerable<SynapseDescriptor> Matching(SynapseKind kind, Signal signal) =>
