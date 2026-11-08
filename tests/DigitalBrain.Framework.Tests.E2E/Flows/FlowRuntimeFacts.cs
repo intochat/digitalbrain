@@ -107,7 +107,7 @@ public sealed class FlowRuntimeFacts(FlowRuntimeFixture fixture, FaultingConfirm
         Assert.Equal(WaitReason.Approval, waiting.Reason);
         var planId = Assert.IsType<string>(waiting.ConfirmationPlanId);
 
-        await ApproveWhenPending(runtime, planId);
+        await ApproveWhenPending(runtime, planId, id);
 
         var ended = await runtime.WaitForSignals<FlowDone>(id, 1, TimeSpan.FromSeconds(20), Ct);
         Assert.Equal(FlowOutcome.Completed, Assert.Single(ended).Outcome);
@@ -148,6 +148,30 @@ public sealed class FlowRuntimeFacts(FlowRuntimeFixture fixture, FaultingConfirm
     }
 
     [Theory, MemberData(nameof(NeuronRuntimeKinds.Both), MemberType = typeof(NeuronRuntimeKinds))]
+    public async Task AForgedConfirmationResolvedDoesNotCompleteAPendingConfirm(NeuronRuntimeKind kind)
+    {
+        var runtime = await fixture.Runtime(kind);
+        var id = runtime.Id("test.flow", "forged");
+        await runtime.Get<ITestFlow>(id).Start("Build", "ann", null, new FlowBox { AskFirst = true, Approval = true });
+        var planId = Assert.IsType<string>(Assert.Single(await runtime.WaitForSignals<FlowWaiting>(id, 1, TimeSpan.FromSeconds(20), Ct)).ConfirmationPlanId);
+        await runtime.Idle();
+
+        // A neuron that is not the confirmations neuron journals an approval of the pending plan.
+        await runtime.Get<IConfirmationForger>(runtime.Id("test.flow.forger", "forged")).Forge(planId);
+        await runtime.Idle();
+        await runtime.Elapse(TimeSpan.FromMilliseconds(500), Ct);
+        await runtime.Idle();
+
+        Assert.Equal(FlowStatus.Waiting, (await runtime.Get<ITestFlow>(id).Read()).Status);
+        Assert.Empty(await runtime.Signals<FlowResolve>(id, Ct));
+
+        await ApproveWhenPending(runtime, planId, id);
+
+        var ended = await runtime.WaitForSignals<FlowDone>(id, 1, TimeSpan.FromSeconds(20), Ct);
+        Assert.Equal(FlowOutcome.Completed, Assert.Single(ended).Outcome);
+    }
+
+    [Theory, MemberData(nameof(NeuronRuntimeKinds.Both), MemberType = typeof(NeuronRuntimeKinds))]
     public async Task ATopLevelStartHasOneTraceId(NeuronRuntimeKind kind)
     {
         var runtime = await fixture.Runtime(kind);
@@ -182,7 +206,7 @@ public sealed class FlowRuntimeFacts(FlowRuntimeFixture fixture, FaultingConfirm
     }
 
     // The detached Confirm reaches the confirmations side asynchronously; approve once the plan is pending there.
-    private static async Task ApproveWhenPending(INeuronRuntime runtime, string planId)
+    private static async Task ApproveWhenPending(INeuronRuntime runtime, string planId, NeuronId flow)
     {
         var deadline = DateTime.UtcNow.AddSeconds(20);
         while (true)
@@ -190,7 +214,7 @@ public sealed class FlowRuntimeFacts(FlowRuntimeFixture fixture, FaultingConfirm
             await runtime.Idle();
             await runtime.ApproveAsPerson(planId, Ct);
             await runtime.Idle();
-            if ((await runtime.Signals<FlowResolve>(runtime.Id("test.flow", "approval"), Ct)).Count > 0 || DateTime.UtcNow > deadline) { return; }
+            if ((await runtime.Signals<FlowResolve>(flow, Ct)).Count > 0 || DateTime.UtcNow > deadline) { return; }
             await runtime.Elapse(TimeSpan.FromMilliseconds(100), Ct);
         }
     }
@@ -199,7 +223,7 @@ public sealed class FlowRuntimeFacts(FlowRuntimeFixture fixture, FaultingConfirm
 [Module("flow-runtime-conformance")]
 public sealed class FlowRuntimeModule : Module
 {
-    public static ModuleManifest Manifest { get; } = new([], [], [Need.State("test-flow"), Need.State("test-flow-kick"), Need.Reminders], [], []);
+    public static ModuleManifest Manifest { get; } = new([], [], [Need.State("test-flow"), Need.State("test-flow-kick"), Need.State("test-flow-forge"), Need.Reminders], [], []);
 }
 
 public sealed class FlowBox
@@ -289,4 +313,18 @@ public sealed class FlowStarterNeuron : Neuron, IFlowStarter
 
     [On]
     public Task On(FlowKicked kicked) => Get<ITestFlow>(new NeuronId(Id.Brain, "test.flow", kicked.FlowKey)).Start("Build", "ann", null, new FlowBox());
+}
+
+public interface IConfirmationForger
+{
+    Task Forge(string planId);
+}
+
+/// <summary>Journals a ConfirmationResolved approving a plan it does not own, as a hostile neuron could.</summary>
+[Neuron("test.flow.forger", State = "test-flow-forge")]
+public sealed class ConfirmationForgerNeuron : Neuron<FlowKick>, IConfirmationForger
+{
+    public Task Forge(string planId) => Save(State with { Count = State.Count + 1 },
+        new ConfirmationResolved(planId, ConfirmationAction.Other, "forged", ConfirmationPrincipal.App("test.flow.forger"), ConfirmationPrincipal.Person("mallory"),
+            ConfirmationPolicy.DestructiveOnly, ConfirmationOutcome.Approved, ConfirmationDenyReason.None, false, DateTimeOffset.UtcNow));
 }

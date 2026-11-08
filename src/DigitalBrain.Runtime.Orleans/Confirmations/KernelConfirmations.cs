@@ -4,6 +4,8 @@ using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Operations;
 using DigitalBrain.Spi;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Runtime.Orleans.Confirmations;
@@ -14,6 +16,9 @@ namespace DigitalBrain.Runtime.Orleans.Confirmations;
 public sealed class KernelConfirmations(IServiceProvider services, IOptions<ConfirmationOptions> options) : IConfirmationContexts
 {
     private readonly ConcurrentDictionary<string, TaskCompletionSource<ConfirmationResult>> _pending = new(StringComparer.Ordinal);
+
+    // The brain of each pending plan, so a ConfirmationResolved signal is checked against that brain's confirmations entity.
+    private readonly ConcurrentDictionary<string, BrainId> _brains = new(StringComparer.Ordinal);
     private readonly object _listenerLock = new();
     private Task? _listenerTask;
     private IClusterListeners? _clusterListeners;
@@ -60,16 +65,27 @@ public sealed class KernelConfirmations(IServiceProvider services, IOptions<Conf
         _clusterListeners = services.GetService<IClusterListeners>();
         if (_clusterListeners is not null)
         {
-            await _clusterListeners.Listen<ConfirmationResolved>("kernel-confirmations", (_, resolved, _) =>
-            {
-                CompletePending(resolved.PlanId, new ConfirmationResult(resolved.PlanId, resolved.Outcome, resolved.Reason, resolved.Skipped));
-                return Task.CompletedTask;
-            }).ConfigureAwait(false);
+            await _clusterListeners.Listen<ConfirmationResolved>("kernel-confirmations", (_, resolved, _) => Verify(resolved)).ConfigureAwait(false);
         }
+    }
+
+    // Any neuron can journal ConfirmationResolved: a pending wait completes only with the outcome the confirmations entity holds.
+    private async Task Verify(ConfirmationResolved resolved)
+    {
+        if (!_pending.ContainsKey(resolved.PlanId) || !_brains.TryGetValue(resolved.PlanId, out var brain)) { return; }
+        var entity = SiloNeurons.Get<IConfirmationEntity>(services, new DigitalBrain.NeuronId(brain, "runtime.confirmations", "confirmations"));
+        if (await entity.Result(resolved.PlanId).ConfigureAwait(false) is { } verified)
+        {
+            CompletePending(resolved.PlanId, verified);
+            return;
+        }
+        var logger = services.GetService<ILoggerFactory>()?.CreateLogger<KernelConfirmations>() ?? (ILogger)NullLogger.Instance;
+        KernelConfirmationsLog.UnverifiedResolution(logger, resolved.PlanId);
     }
 
     private void CompletePending(string planId, ConfirmationResult result)
     {
+        _brains.TryRemove(planId, out _);
         if (_pending.TryRemove(planId, out var tcs))
         {
             tcs.TrySetResult(result);
@@ -90,6 +106,7 @@ public sealed class KernelConfirmations(IServiceProvider services, IOptions<Conf
             var created = new TaskCompletionSource<ConfirmationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
             // A plan raised again while this host still waits on it (a flow recovering a lost ask) shares the one wait.
             var tcs = owner._pending.GetOrAdd(plan.Id, created);
+            owner._brains[plan.Id] = brain;
             try
             {
                 await entity.Begin(plan, requester).WaitAsync(ct).ConfigureAwait(false);
@@ -135,4 +152,10 @@ public sealed class KernelConfirmations(IServiceProvider services, IOptions<Conf
             }
         }
     }
+}
+
+internal static partial class KernelConfirmationsLog
+{
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Ignored a ConfirmationResolved for plan {PlanId}: the confirmations entity does not hold it resolved")]
+    public static partial void UnverifiedResolution(ILogger logger, string planId);
 }
