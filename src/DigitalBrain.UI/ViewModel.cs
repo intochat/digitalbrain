@@ -190,7 +190,7 @@ public sealed record Badge(string Label, string Tone = "neutral", string? Icon =
 public sealed record TagPill(string Label, string Tone = "neutral", string? Icon = null) : Node;
 
 /// <summary>What an editable field holds; the client picks the input and its keyboard from it.</summary>
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(JsonStringEnumConverter<FieldKind>))]
 public enum FieldKind
 {
     /// <summary>Single-line text.</summary>
@@ -310,7 +310,7 @@ public sealed record Emit(string Owner, string Signal, System.Text.Json.JsonElem
 }
 
 /// <summary>What a client-local intent does.</summary>
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(JsonStringEnumConverter<IntentKind>))]
 public enum IntentKind
 {
     /// <summary>Copy <see cref="Intent.Arg"/> to the clipboard.</summary>
