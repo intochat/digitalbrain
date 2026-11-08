@@ -123,4 +123,85 @@ public sealed class SourceBindingsFacts
         Assert.Equal("conn-2", (await os.Store.Get(brain, HsSource.Key, Ct))!.Bindings!["hs.week"]["Db"]);
         Assert.Equal(DeployStatus.Unchanged, (await os.Synapses.Deploy(brain, Source(Bind("conn-2")), None, Ct)).Status);
     }
+
+    [Fact]
+    public async Task SameFilesNoBindingsStaysUnchanged()
+    {
+        await using var os = Start();
+        var brain = Brain("sb6");
+        _ = await Deploy(os, brain, Source(Bind("conn-1")), None);
+
+        var again = await os.Synapses.Deploy(brain, Source(null), None, Ct);
+
+        Assert.Equal(DeployStatus.Unchanged, again.Status);
+        Assert.Equal("conn-1", (await os.Store.Get(brain, HsSource.Key, Ct))!.Bindings!["hs.week"]["Db"]);
+        Assert.Equal("db 1", await Read(os, "sb6"));
+    }
+
+    [Fact]
+    public async Task ARefusedRebindLeavesEveryAliasOnItsOldBinding()
+    {
+        await using var os = Start();
+        var brain = Brain("sb7");
+        var two = HsSource.Of(TwoAliases);
+        var both = new Dictionary<string, IReadOnlyDictionary<string, string>>
+        {
+            ["hs.week"] = new Dictionary<string, string> { ["Db"] = "conn-1" },
+            ["hs.week2"] = new Dictionary<string, string> { ["Db"] = "conn-1" },
+        };
+        var first = await os.Synapses.Deploy(brain, two with { Bindings = both }, None, Ct);
+        foreach (var install in first.Installs.Values) { await os.Confirmations.Approve(install.Reason!); }
+        await os.Idle();
+        var bad = new Dictionary<string, IReadOnlyDictionary<string, string>>
+        {
+            ["hs.week"] = new Dictionary<string, string> { ["Db"] = "conn-2" },
+            ["hs.week2"] = new Dictionary<string, string> { ["Db"] = "nowhere" },
+        };
+
+        var again = await os.Synapses.Deploy(brain, two with { Bindings = bad }, None, Ct);
+
+        Assert.Equal(DeployStatus.Refused, again.Status);
+        var installs = os.Get<IInstalls>(NeuronId.Parse("sb7/synapse.installs/default"));
+        Assert.Equal("conn-1", (await installs.Describe("hs.week", Ct))!.Bindings["Db"]);
+        Assert.Equal("conn-1", (await installs.Describe("hs.week2", Ct))!.Bindings["Db"]);
+        var stored = (await os.Store.Get(brain, HsSource.Key, Ct))!.Bindings!;
+        Assert.Equal("conn-1", stored["hs.week"]["Db"]);
+        Assert.Equal("conn-1", stored["hs.week2"]["Db"]);
+        Assert.Equal("db 1", await Read(os, "sb7"));
+    }
+
+    [Fact]
+    public async Task ARebindThatWaitsForThePersonIsNotStoredYet()
+    {
+        await using var os = Start();
+        var brain = Brain("sb8");
+        // The first install is never answered, so the same needs are asked again, not re-bound.
+        var first = await os.Synapses.Deploy(brain, Source(Bind("conn-1")), None, Ct);
+        Assert.Equal(InstallStatus.Pending, first.Installs["hs.week"].Status);
+
+        var again = await os.Synapses.Deploy(brain, Source(Bind("conn-2")), None, Ct);
+
+        Assert.Equal(DeployStatus.Deployed, again.Status);
+        Assert.Equal(InstallStatus.Pending, again.Installs["hs.week"].Status);
+        Assert.Equal("conn-1", (await os.Store.Get(brain, HsSource.Key, Ct))!.Bindings!["hs.week"]["Db"]);
+    }
+
+    // The gate source plus a second state alias that has its own Db slot.
+    private static readonly string TwoAliases = ReadsDb + """
+
+        [Signal("hs.charging2")]
+        public sealed record Charging2(decimal Amount) : Signal;
+
+        [State("hs.week2")]
+        public sealed record WeekSpend2(decimal Spent = 0)
+        {
+            public WeekSpend2() : this(0) { }
+        }
+
+        public static class Budget2
+        {
+            [Synapse(typeof(Charging2), "hs.week2")]
+            public static Check Cap2(Charging2 s, WeekSpend2 t, [Slot] ISqlRead Db) => Check.Allow(t with { Spent = t.Spent + s.Amount });
+        }
+        """;
 }

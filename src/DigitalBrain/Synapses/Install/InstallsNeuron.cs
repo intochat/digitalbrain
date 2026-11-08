@@ -24,31 +24,15 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
     public async Task<InstallOutcome> Install(InstallRequest request, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(request);
-        ArgumentNullException.ThrowIfNull(catalog);
+        var (sentence, problem) = await Check(request, ct).ConfigureAwait(true);
+        if (problem is not null)
+        {
+            return new InstallOutcome(InstallStatus.Refused, sentence, problem);
+        }
+
         var alias = request.Alias;
-        var source = alias is null ? null : catalog.ForNeeds(alias);
-        if (alias is null || source is null || !source.States.ContainsKey(alias))
-        {
-            return new InstallOutcome(InstallStatus.Refused, string.Empty, $"no synapse app '{alias}'");
-        }
-
-        var needs = source.NeedsOf(alias);
-        var sentence = needs.Sentence();
         var bindings = request.Bindings ?? new Dictionary<string, string>();
-        if (needs.Slots.FirstOrDefault(slot => !bindings.ContainsKey(slot.Name)) is { } unbound)
-        {
-            return new InstallOutcome(InstallStatus.Refused, sentence, $"slot '{unbound.Name}' has no binding");
-        }
-
-        ArgumentNullException.ThrowIfNull(hooks);
-        foreach (var slot in source.For(alias).SelectMany(d => d.Slots).DistinctBy(s => (s.Name, s.Contract)))
-        {
-            if (await hooks.ValidateBinding(StateOf(alias), slot, bindings[slot.Name], ct).ConfigureAwait(true) is { } problem)
-            {
-                return new InstallOutcome(InstallStatus.Refused, sentence, problem);
-            }
-        }
-
+        var needs = catalog.ForNeeds(alias).NeedsOf(alias);
         var hash = needs.Hash();
         var existing = Find(alias);
         if (existing is not null && existing.NeedsHash == hash)
@@ -74,6 +58,43 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
         await Save(State with { Pending = [.. State.Pending.Where(p => p.Alias != alias), pending] }, [new InstallRequested(alias, plan.Id)]).ConfigureAwait(true);
         _ = Ask(plan);
         return new InstallOutcome(InstallStatus.Pending, sentence, plan.Id);
+    }
+
+    /// <inheritdoc />
+    public async Task<string?> Validate(InstallRequest request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return (await Check(request, ct).ConfigureAwait(true)).Problem;
+    }
+
+    // Why the request would be refused (unknown alias, an unbound slot, a binding the host rejects), or null; with the needs sentence.
+    private async Task<(string Sentence, string? Problem)> Check(InstallRequest request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        var alias = request.Alias;
+        var source = alias is null ? null : catalog.ForNeeds(alias);
+        if (alias is null || source is null || !source.States.ContainsKey(alias))
+        {
+            return (string.Empty, $"no synapse app '{alias}'");
+        }
+
+        var sentence = source.NeedsOf(alias).Sentence();
+        var bindings = request.Bindings ?? new Dictionary<string, string>();
+        if (source.NeedsOf(alias).Slots.FirstOrDefault(slot => !bindings.ContainsKey(slot.Name)) is { } unbound)
+        {
+            return (sentence, $"slot '{unbound.Name}' has no binding");
+        }
+
+        ArgumentNullException.ThrowIfNull(hooks);
+        foreach (var slot in source.For(alias).SelectMany(d => d.Slots).DistinctBy(s => (s.Name, s.Contract)))
+        {
+            if (await hooks.ValidateBinding(StateOf(alias), slot, bindings[slot.Name], ct).ConfigureAwait(true) is { } problem)
+            {
+                return (sentence, problem);
+            }
+        }
+
+        return (sentence, null);
     }
 
     /// <summary>Completes a pending install when its plan is resolved.</summary>

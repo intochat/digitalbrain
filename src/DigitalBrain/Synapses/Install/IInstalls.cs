@@ -72,6 +72,12 @@ public interface IInstalls
     /// <returns>How it ended, or that it waits for the person.</returns>
     Task<InstallOutcome> Install(InstallRequest request, CancellationToken ct);
 
+    /// <summary>Whether <see cref="Install"/> would accept <paramref name="request"/>: the reason it would refuse it (unknown alias, unbound slot, a binding the host rejects), or null. Changes nothing.</summary>
+    /// <param name="request">The alias and its slot bindings.</param>
+    /// <param name="ct">Cancellation.</param>
+    [ReadOnlyCall]
+    Task<string?> Validate(InstallRequest request, CancellationToken ct);
+
     /// <summary>Retires an installed app and cancels its pending asks; an alias that is neither is ignored.</summary>
     /// <param name="alias">The state alias.</param>
     /// <param name="ct">Cancellation.</param>

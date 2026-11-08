@@ -88,6 +88,8 @@ public sealed class SynapseHostUnwindFacts
         public Task<InstallOutcome> Install(InstallRequest request, CancellationToken ct) =>
             throws ? throw new InvalidOperationException("install failed") : Task.FromResult(new InstallOutcome(InstallStatus.Installed, "", null));
 
+        public Task<string?> Validate(InstallRequest request, CancellationToken ct) => Task.FromResult<string?>(null);
+
         public Task Retire(string alias, CancellationToken ct) => Task.CompletedTask;
 
         public Task CancelPending(string alias, CancellationToken ct) => Task.CompletedTask;

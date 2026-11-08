@@ -3242,3 +3242,5 @@ DigitalBrain.Flows.IFlowCallbacks.CancelRequested(string! reason, string! proof)
 DigitalBrain.Flows.StepOutcome.Interrupted = 3 -> DigitalBrain.Flows.StepOutcome
 DigitalBrain.Flows.FlowState<T>.Interruptions.get -> int
 DigitalBrain.Flows.FlowState<T>.Interruptions.init -> void
+DigitalBrain.IInstalls.Validate(DigitalBrain.InstallRequest! request, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<string?>!
+DigitalBrain.InstallsNeuron.Validate(DigitalBrain.InstallRequest! request, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<string?>!

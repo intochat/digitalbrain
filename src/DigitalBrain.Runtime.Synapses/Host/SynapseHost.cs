@@ -307,7 +307,7 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
     private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> Effective(SynapseSource source, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> argument) =>
         argument.Count > 0 ? argument : source.Bindings ?? argument;
 
-    private static bool SameBindings(List<string> aliases, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> left, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> right) =>
+    private static bool SameBindings(List<string> aliases, Dictionary<string, IReadOnlyDictionary<string, string>> left, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> right) =>
         aliases.All(alias =>
         {
             var l = left.TryGetValue(alias, out var x) ? x : NoBindings;
@@ -315,25 +315,35 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
             return l.Count == r.Count && l.All(pair => r.TryGetValue(pair.Key, out var value) && string.Equals(value, pair.Value, StringComparison.Ordinal));
         });
 
-    // The live build was deployed again: with the bindings it is stored with it is unchanged; with others the aliases are installed again
-    // under the new bindings (the person already approved these needs) and the record keeps them.
+    // The live build was deployed again. An alias the deploy gives no bindings keeps the stored ones; with the bindings it is stored with
+    // the deploy is unchanged. Others are checked for every alias first (a refusal touches nothing), then the aliases are installed again
+    // (the person already approved these needs) and the record keeps the new bindings, unless an install still waits for the person.
     private async Task<DeployOutcome> RebindOrKeep(BrainId brain, Entry entry, SynapseSource source, SynapseBuild build, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> effective, CancellationToken ct)
     {
         var aliases = AliasesOf(entry.Live);
-        var stored = (await store.Get(brain, source.SourceKey, ct).ConfigureAwait(false))?.Bindings;
-        if (SameBindings(aliases, effective, stored ?? new Dictionary<string, IReadOnlyDictionary<string, string>>()))
+        var stored = (await store.Get(brain, source.SourceKey, ct).ConfigureAwait(false))?.Bindings ?? new Dictionary<string, IReadOnlyDictionary<string, string>>();
+        var wanted = aliases.ToDictionary(a => a, a => effective.TryGetValue(a, out var given) ? given : stored.TryGetValue(a, out var kept) ? kept : NoBindings, StringComparer.Ordinal);
+        if (SameBindings(aliases, wanted, stored))
         {
             return new DeployOutcome(DeployStatus.Unchanged, build.Hash, build.Diagnostics, Empty(), null);
         }
 
-        var next = new Pending(entry.Live, source, build, Bindings(aliases, effective));
-        var outcomes = await InstallAll(brain, next, ct).ConfigureAwait(false);
-        if (aliases.FirstOrDefault(a => outcomes[a].Status is InstallStatus.Refused or InstallStatus.Denied) is { } refused)
+        var brainInstalls = installs(brain);
+        foreach (var alias in aliases)
         {
-            return new DeployOutcome(DeployStatus.Refused, build.Hash, build.Diagnostics, outcomes, $"the install of '{refused}' was {outcomes[refused].Status.ToString().ToLowerInvariant()}: {outcomes[refused].Reason}");
+            if (await brainInstalls.Validate(new InstallRequest(alias, wanted[alias]), ct).ConfigureAwait(false) is { } problem)
+            {
+                return new DeployOutcome(DeployStatus.Refused, build.Hash, build.Diagnostics, Empty(), $"the bindings of '{alias}' are refused: {problem}");
+            }
         }
 
-        await Store(brain, next, ct).ConfigureAwait(false);
+        var next = new Pending(entry.Live, source, build, wanted);
+        var outcomes = await InstallAll(brain, next, ct).ConfigureAwait(false);
+        if (outcomes.Values.All(o => o.Status != InstallStatus.Pending))
+        {
+            await Store(brain, next, ct).ConfigureAwait(false);
+        }
+
         return new DeployOutcome(DeployStatus.Deployed, build.Hash, build.Diagnostics, outcomes, null);
     }
 
