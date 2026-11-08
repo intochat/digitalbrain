@@ -24,6 +24,10 @@ public interface IViewReader
     /// <remarks>
     /// The owner's reactions run inline, inside this call, after the signal is journaled: a state neuron never hears its own journal,
     /// so the call returns once the owner has reacted. Other neurons with an alias edge on the signal get it through the journal.
+    /// The owner's envelope carries the caller's trace and, as its cause, the address of the journaled emit entry.
+    /// Journaling and reacting are not one transaction: a reaction that fails after the emit is journaled behaves like any failing
+    /// reaction on a journaled signal, so the emit stands, the state is unchanged, <see cref="SynapseFinished"/> reports
+    /// <c>failed</c>, and the failure is thrown to the caller.
     /// </remarks>
     /// <param name="alias">The state alias that owns the view.</param>
     /// <param name="generation">The generation of the view the caller saw.</param>
@@ -54,17 +58,20 @@ public sealed class ActivationRefusedException : InvalidOperationException
     /// <summary>The keyed node emits nothing.</summary>
     public const string NoEmit = "NoEmit";
 
+    /// <summary>No reason was given (the standard exception constructors).</summary>
+    public const string Unspecified = "Unspecified";
+
     /// <summary>Creates the exception for <paramref name="reason"/>.</summary>
     /// <param name="reason">One of the reason constants.</param>
     public ActivationRefusedException(string reason) : base($"The activation was refused: {reason}.") => Reason = reason;
 
     /// <summary>Creates the exception.</summary>
-    public ActivationRefusedException() : this(UnknownNode) { }
+    public ActivationRefusedException() : this(Unspecified) { }
 
     /// <summary>Creates the exception with a message and cause.</summary>
     /// <param name="message">The message.</param>
     /// <param name="inner">The cause.</param>
-    public ActivationRefusedException(string message, Exception inner) : base(message, inner) => Reason = UnknownNode;
+    public ActivationRefusedException(string message, Exception inner) : base(message, inner) => Reason = Unspecified;
 
     /// <summary>Why the activation was refused: one of the reason constants.</summary>
     public string Reason { get; }

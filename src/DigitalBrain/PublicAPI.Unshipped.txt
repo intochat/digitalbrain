@@ -3302,3 +3302,4 @@ override DigitalBrain.PublishedView.GetHashCode() -> int
 override DigitalBrain.PublishedView.ToString() -> string!
 static DigitalBrain.PublishedView.operator !=(DigitalBrain.PublishedView? left, DigitalBrain.PublishedView? right) -> bool
 static DigitalBrain.PublishedView.operator ==(DigitalBrain.PublishedView? left, DigitalBrain.PublishedView? right) -> bool
+const DigitalBrain.ActivationRefusedException.Unspecified = "Unspecified" -> string!

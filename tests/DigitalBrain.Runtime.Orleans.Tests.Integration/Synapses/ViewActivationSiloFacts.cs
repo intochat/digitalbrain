@@ -16,9 +16,9 @@ internal static class VaSource
         namespace Me.ViewBoard;
 
         [State("ar.vw")]
-        public sealed record Board(int Polls = 0, int Refreshes = 0, string? Value = null)
+        public sealed record Board(int Polls = 0, int Refreshes = 0, string? Value = null, string? TraceId = null, string? CausationId = null)
         {
-            public Board() : this(0, 0, null) { }
+            public Board() : this(0, 0, null, null, null) { }
         }
 
         public static class Unit
@@ -28,7 +28,7 @@ internal static class VaSource
 
             [Synapse("ar.refresh", "ar.vw")]
             public static Board Refreshed(SignalEnvelope s, Board b)
-                => b with { Refreshes = b.Refreshes + 1, Value = s.Payload.TryGetProperty("value", out var v) ? v.GetString() : null };
+                => b with { Refreshes = b.Refreshes + 1, Value = s.Payload.TryGetProperty("value", out var v) ? v.GetString() : null, TraceId = s.TraceId, CausationId = s.CausationId };
 
             [Synapse("ar.vw")]
             public static View Show(Board b) => new("Board", new Row(
@@ -78,5 +78,11 @@ public sealed class ViewActivationSiloFacts(StatefulSilo silo) : IClassFixture<S
         Assert.Equal("now", (await State(brain))!.Value.GetProperty("value").GetString());
         var journaled = await silo.History(brain).Read(NeuronId.Parse($"{brain}/{alias}/default"), 0, 50, Ct);
         Assert.Contains(journaled.Signals, s => s.Signal is ViewChanged { Generation: > 0 });
+        // A read leaves out the emit (no loaded type has its alias); the reaction's StateChanged, journaled next, names it as its cause.
+        var changed = Assert.Single(journaled.Signals, s => s.Signal is StateChanged { Cause: var cause } && cause == brain + ".refresh");
+        var state = (await State(brain))!.Value;
+        Assert.Equal(Causation.Address(NeuronId.Parse($"{brain}/{alias}/default"), changed.Sequence - 1), state.GetProperty("causationId").GetString());
+        Assert.NotNull(changed.TraceId);
+        Assert.Equal(changed.TraceId, state.GetProperty("traceId").GetString());
     }
 }

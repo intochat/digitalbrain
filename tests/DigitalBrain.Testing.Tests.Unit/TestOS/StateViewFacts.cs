@@ -4,11 +4,12 @@ using OS = DigitalBrain.Testing.TestOS;
 
 namespace DigitalBrain.Testing.Tests.Unit.Synapses;
 
-// A unit whose view counts polls and offers a refresh button it owns, and one owned by another alias.
+// A unit whose view counts polls and offers a refresh button it owns, one owned by another alias, one whose reaction fails, and
+// one that emits nothing; the refresh button's args carry a "key" that names no node.
 [State("vw")]
-public sealed record ViewBoard(int Polls, int Refreshes, string? Value)
+public sealed record ViewBoard(int Polls, int Refreshes, string? Value, string? TraceId, string? CausationId)
 {
-    public ViewBoard() : this(0, 0, null) { }
+    public ViewBoard() : this(0, 0, null, null, null) { }
 }
 
 public static class ViewBoardUnit
@@ -18,14 +19,19 @@ public static class ViewBoardUnit
 
     [Synapse("x.refresh", "vw")]
     public static ViewBoard Refreshed(SignalEnvelope s, ViewBoard b)
-        => b with { Refreshes = b.Refreshes + 1, Value = s.Payload.TryGetProperty("value", out var v) ? v.GetString() : null };
+        => b with { Refreshes = b.Refreshes + 1, Value = s.Payload.TryGetProperty("value", out var v) ? v.GetString() : null, TraceId = s.TraceId, CausationId = s.CausationId };
+
+    [Synapse("x.boom", "vw")]
+    public static ViewBoard Boom(SignalEnvelope s, ViewBoard b) => throw new InvalidOperationException("boom");
 
     [Synapse("vw")]
     public static View Show(ViewBoard b) => new("Board", new Row(
     [
         new Badge(b.Polls.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-        new Button("Refresh", new ButtonAction("vw", "x.refresh", [])) { Key = "refresh", Emit = new Emit("vw", "x.refresh") },
+        new Button("Refresh", new ButtonAction("vw", "x.refresh", [])) { Key = "refresh", Emit = new Emit("vw", "x.refresh", System.Text.Json.JsonSerializer.SerializeToElement(new { key = "hidden", kind = "button" })) },
         new Button("Foreign", new ButtonAction("other.alias", "x.refresh", [])) { Key = "foreign", Emit = new Emit("other.alias", "x.refresh") },
+        new Button("Boom", new ButtonAction("vw", "x.boom", [])) { Key = "boom", Emit = new Emit("vw", "x.boom") },
+        new Button("Plain", new ButtonAction("vw", "none", [])) { Key = "plain" },
     ]));
 }
 
@@ -78,7 +84,10 @@ public sealed class StateViewFacts
         var state = await ((IBrainObserver)os).State(Board, Ct);
         Assert.Equal(1, state?.GetProperty("refreshes").GetInt32());
         Assert.Equal("now", state?.GetProperty("value").GetString());
-        Assert.Contains(os.Journal(Board.Brain).Signals(Board), item => SignalAliases.Of(item.Signal) == "x.refresh");
+        var emit = Assert.Single(os.Journal(Board.Brain).Signals(Board), item => SignalAliases.Of(item.Signal) == "x.refresh");
+        Assert.Equal(Causation.Address(Board, emit.Sequence), state?.GetProperty("causationId").GetString());
+        Assert.NotNull(emit.TraceId);
+        Assert.Equal(emit.TraceId, state?.GetProperty("traceId").GetString());
         Assert.True((await views.Read("vw"))!.Generation > before.Generation);
         Assert.Empty(os.Failures);
     }
@@ -105,9 +114,77 @@ public sealed class StateViewFacts
         var views = os.Get<IViewReader>(Board);
         var view = (await views.Read("vw"))!;
 
+        var journaled = os.Journal(Board.Brain).Signals(Board).Count;
+
         var refused = await Assert.ThrowsAsync<ActivationRefusedException>(() => views.Activate("vw", view.Generation - 1, "refresh", null));
+        await os.Idle();
 
         Assert.Equal(ActivationRefusedException.Stale, refused.Reason);
+        Assert.Equal(journaled, os.Journal(Board.Brain).Signals(Board).Count);
+    }
+
+    [Fact]
+    public async Task ActivateRefusesAnUnknownNode()
+    {
+        await using var os = await Started();
+        var views = os.Get<IViewReader>(Board);
+        var view = (await views.Read("vw"))!;
+        var journaled = os.Journal(Board.Brain).Signals(Board).Count;
+
+        var refused = await Assert.ThrowsAsync<ActivationRefusedException>(() => views.Activate("vw", view.Generation, "missing", null));
+
+        Assert.Equal(ActivationRefusedException.UnknownNode, refused.Reason);
+        Assert.Equal(journaled, os.Journal(Board.Brain).Signals(Board).Count);
+    }
+
+    [Fact]
+    public async Task ActivateRefusesANodeWithoutEmit()
+    {
+        await using var os = await Started();
+        var views = os.Get<IViewReader>(Board);
+        var view = (await views.Read("vw"))!;
+        var journaled = os.Journal(Board.Brain).Signals(Board).Count;
+
+        var refused = await Assert.ThrowsAsync<ActivationRefusedException>(() => views.Activate("vw", view.Generation, "plain", null));
+
+        Assert.Equal(ActivationRefusedException.NoEmit, refused.Reason);
+        Assert.Equal(journaled, os.Journal(Board.Brain).Signals(Board).Count);
+    }
+
+    [Fact]
+    public async Task FindIgnoresKeysInsideEmitArgs()
+    {
+        await using var os = await Started();
+        var views = os.Get<IViewReader>(Board);
+        var view = (await views.Read("vw"))!;
+        Assert.Contains("\"hidden\"", view.View.GetRawText(), StringComparison.Ordinal);
+
+        var refused = await Assert.ThrowsAsync<ActivationRefusedException>(() => views.Activate("vw", view.Generation, "hidden", null));
+
+        Assert.Equal(ActivationRefusedException.UnknownNode, refused.Reason);
+        Assert.Null(ViewNodes.Find(System.Text.Json.JsonElement.Parse("""{"kind":"row","children":[{"kind":"button","emit":{"owner":"a","signal":"s","args":{"kind":"x","key":"k"}}}]}"""), "k"));
+    }
+
+    [Fact]
+    public async Task AFailingReactionLeavesTheEmitJournaled()
+    {
+        await using var os = await Started();
+        var finished = new System.Collections.Concurrent.ConcurrentQueue<SynapseFinished>();
+        await using var listener = await os.ClusterListeners.Listen<SynapseFinished>("finished", (_, signal, _) =>
+        {
+            finished.Enqueue(signal);
+            return Task.CompletedTask;
+        });
+        var views = os.Get<IViewReader>(Board);
+        var view = (await views.Read("vw"))!;
+        var before = await ((IBrainObserver)os).State(Board, Ct);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => views.Activate("vw", view.Generation, "boom", null));
+        await os.Idle();
+
+        Assert.Single(os.Journal(Board.Brain).Signals(Board), item => SignalAliases.Of(item.Signal) == "x.boom");
+        Assert.Equal(before?.GetRawText(), (await ((IBrainObserver)os).State(Board, Ct))?.GetRawText());
+        Assert.Contains(finished, f => f.Function.EndsWith(".Boom", StringComparison.Ordinal) && f.Outcome == "failed");
     }
 
     [Fact]

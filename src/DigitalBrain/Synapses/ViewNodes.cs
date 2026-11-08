@@ -3,13 +3,13 @@ using System.Text.Json.Nodes;
 
 namespace DigitalBrain;
 
-// Walks a view's wire JSON: every object with a "key" is addressable, its "emit" object ({owner, signal, args}) is what it emits.
+// Walks a view's wire JSON: every node (an object with a "kind") with a "key" is addressable, its "emit" object ({owner, signal, args}) is what it emits.
 internal static class ViewNodes
 {
     // The full name of the view model's root record, which the core does not reference.
     public const string ViewType = "DigitalBrain.UI.View";
 
-    // The first object, depth first, whose "key" is the key.
+    // The first node, depth first, whose "key" is the key; emit and args objects are not searched.
     public static JsonElement? Find(JsonElement root, string key)
     {
         var pending = new Stack<JsonElement>([root]);
@@ -18,8 +18,10 @@ internal static class ViewNodes
             var element = pending.Pop();
             if (element.ValueKind == JsonValueKind.Object)
             {
-                if (element.TryGetProperty("key", out var k) && k.ValueKind == JsonValueKind.String && k.GetString() == key) { return element; }
-                foreach (var property in element.EnumerateObject().Reverse()) { pending.Push(property.Value); }
+                if (element.TryGetProperty("kind", out var kind) && kind.ValueKind == JsonValueKind.String
+                    && element.TryGetProperty("key", out var k) && k.ValueKind == JsonValueKind.String && k.GetString() == key) { return element; }
+                // An emit (and its args) is data, not view: a "key" inside it names no node.
+                foreach (var property in element.EnumerateObject().Reverse().Where(p => p.Name is not ("emit" or "args"))) { pending.Push(property.Value); }
             }
             else if (element.ValueKind == JsonValueKind.Array)
             {

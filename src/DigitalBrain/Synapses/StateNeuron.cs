@@ -345,7 +345,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
                     }
                     finally { _savingView = false; }
                 }
-                else if (WarnedViews.TryAdd(view.Name, 0))
+                else if (WarnedViews.TryAdd(Id.Brain + "/" + view.Name, 0))
                 {
                     StateNeuronLog.ViewNotStored(Logger(), view.Name, result?.GetType().FullName ?? "null");
                 }
@@ -375,8 +375,13 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
 
         // Journaled from the state neuron with the caller's cause; a state neuron never hears its own signals, so it reacts here.
         var signal = new EmittedSignal(emit.Signal, ViewNodes.Payload(emit.Args, fieldValue));
+        // The neuron is the only writer of its own journal and this is its turn: its last sequence after the publish is the emit's.
+        // (A runtime may leave a signal of no loaded type out of a read's page, but never out of the page's Last.)
+        // The trace is taken before the publish, in this flow, so the publish's stamp and the envelope agree on a freshly minted one.
+        var trace = Context.TraceId;
         await Publish(signal).ConfigureAwait(true);
-        await React(signal, Context.TraceId, null, CancellationToken.None).ConfigureAwait(true);
+        var sequence = (await Context.History.Read(Id, long.MaxValue, 1, CancellationToken.None).ConfigureAwait(true)).Last;
+        await React(signal, trace, Causation.Address(Id, sequence), CancellationToken.None).ConfigureAwait(true);
     }
 
     // The state is stored with the current view beside it; a state stored before views were kept loads as the bare record.
