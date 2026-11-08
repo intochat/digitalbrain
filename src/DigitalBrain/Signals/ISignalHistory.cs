@@ -13,4 +13,8 @@ public interface ISignalHistory
     /// <summary>Signals of the whole brain after <paramref name="since"/>, at most <paramref name="limit"/>, by sequence.</summary>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="limit"/> is outside 1..1000.</exception>
     Task<SignalPage> Read(long since, int limit, CancellationToken ct);
+
+    /// <summary>Signals of the whole brain carrying <paramref name="traceId"/> after <paramref name="since"/>, at most <paramref name="limit"/>, by sequence.</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="limit"/> is outside 1..1000.</exception>
+    Task<SignalPage> ReadTrace(string traceId, long since, int limit);
 }

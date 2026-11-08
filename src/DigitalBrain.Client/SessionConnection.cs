@@ -346,7 +346,9 @@ public sealed record AssignmentEvent(string Behavior, string Hash, Uri Assembly,
 { public const string Kind = "assign"; }
 public sealed record RetireEvent(string Behavior) { public const string Kind = "retire"; }
 public sealed record SubscribedEvent(string Behavior, string Contract, string Key, string Signal, string Subscription) { public const string Kind = "subscribed"; }
-public sealed record SignalBatchEvent(string Subscription, string[] Signals, long Watermark, string? TraceParent = null) { public const string Kind = "signals"; }
+/// <summary>A batch of signals; <see cref="TraceIds"/> and <see cref="CausationIds"/>, when sent, hold one entry per signal, null where unknown.</summary>
+public sealed record SignalBatchEvent(string Subscription, string[] Signals, long Watermark, string? TraceParent = null,
+    string?[]? TraceIds = null, string?[]? CausationIds = null) { public const string Kind = "signals"; }
 public sealed record TokenEvent(string Token) { public const string Kind = "token"; }
 public sealed record ReadyEvent(string Session, string[] Behaviors) { public const string Kind = "ready"; }
 

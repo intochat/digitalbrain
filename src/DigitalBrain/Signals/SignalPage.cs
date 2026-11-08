@@ -1,7 +1,9 @@
 namespace DigitalBrain;
 
 /// <summary>A signal as journaled: its publisher, its sequence and when it was published.</summary>
-public sealed record JournaledSignal(NeuronId Publisher, long Sequence, Signal Signal, DateTimeOffset At);
+/// <param name="TraceId">The operation the signal belongs to; null for entries journaled before trace ids.</param>
+/// <param name="CausationId">The <see cref="Causation.Address"/> of the signal whose reaction published this one, or null.</param>
+public sealed record JournaledSignal(NeuronId Publisher, long Sequence, Signal Signal, DateTimeOffset At, string? TraceId = null, string? CausationId = null);
 
 /// <summary>A page of signal history.</summary>
 /// <param name="Floor">The lowest sequence still held; earlier entries were trimmed.</param>

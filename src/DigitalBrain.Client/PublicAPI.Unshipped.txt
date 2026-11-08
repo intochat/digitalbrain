@@ -170,9 +170,13 @@ DigitalBrain.Client.SessionTokens.SessionTokens(byte[]! key, System.TimeProvider
 DigitalBrain.Client.SessionTokens.Validate(string? token) -> DigitalBrain.Client.SessionClaims?
 DigitalBrain.Client.SignalBatchEvent
 DigitalBrain.Client.SignalBatchEvent.<Clone>$() -> DigitalBrain.Client.SignalBatchEvent!
-DigitalBrain.Client.SignalBatchEvent.Deconstruct(out string! Subscription, out string![]! Signals, out long Watermark, out string? TraceParent) -> void
+DigitalBrain.Client.SignalBatchEvent.Deconstruct(out string! Subscription, out string![]! Signals, out long Watermark, out string? TraceParent, out string?[]? TraceIds, out string?[]? CausationIds) -> void
 DigitalBrain.Client.SignalBatchEvent.Equals(DigitalBrain.Client.SignalBatchEvent? other) -> bool
-DigitalBrain.Client.SignalBatchEvent.SignalBatchEvent(string! Subscription, string![]! Signals, long Watermark, string? TraceParent = null) -> void
+DigitalBrain.Client.SignalBatchEvent.SignalBatchEvent(string! Subscription, string![]! Signals, long Watermark, string? TraceParent = null, string?[]? TraceIds = null, string?[]? CausationIds = null) -> void
+DigitalBrain.Client.SignalBatchEvent.TraceIds.get -> string?[]?
+DigitalBrain.Client.SignalBatchEvent.TraceIds.init -> void
+DigitalBrain.Client.SignalBatchEvent.CausationIds.get -> string?[]?
+DigitalBrain.Client.SignalBatchEvent.CausationIds.init -> void
 DigitalBrain.Client.SignalBatchEvent.Signals.get -> string![]!
 DigitalBrain.Client.SignalBatchEvent.Signals.init -> void
 DigitalBrain.Client.SignalBatchEvent.Subscription.get -> string!

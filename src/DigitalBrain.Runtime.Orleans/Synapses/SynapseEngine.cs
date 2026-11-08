@@ -305,6 +305,7 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
         var before = entry.Cursor;
         entry.Cursor = item.Sequence;
         using var scope = ReactionCursor.Open(_grainId, () => JournalPayloads.EncodeState(_state), _etag);
+        using var cause = CurrentCause.Open(item);
         try
         {
             if (neuron is ISignalSink sink) { await sink.Deliver(item).ConfigureAwait(true); }

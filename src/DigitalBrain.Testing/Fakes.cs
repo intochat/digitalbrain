@@ -254,6 +254,10 @@ public sealed class InMemorySignalHistory : ISignalHistory
     public Task<SignalPage> Read(long since, int limit, CancellationToken ct)
         => Task.FromResult(Page(_ => true, since, limit));
 
+    /// <inheritdoc />
+    public Task<SignalPage> ReadTrace(string traceId, long since, int limit)
+        => Task.FromResult(Page(entry => entry.TraceId == traceId, since, limit));
+
     private SignalPage Page(Func<JournaledSignal, bool> filter, long since, int limit)
     {
         SignalPage.CheckLimit(limit);

@@ -15,9 +15,13 @@ internal enum BrainLogFormat : byte { Legacy = 0, Framed = 1, Json = 2 }
 [GenerateSerializer, Alias("storage.brain-record")]
 internal sealed record BrainRecord([property: Id(0)] byte[] Record, [property: Id(1)] long ETag, [property: Id(2)] string? Type = null);
 
-/// <summary>One journaled signal: its frozen <c>[Signal]</c> alias and its JSON through RuntimeProtocol.Json.</summary>
+/// <summary>
+/// One journaled signal: its frozen <c>[Signal]</c> alias and its JSON through RuntimeProtocol.Json. <see cref="TraceId"/> and
+/// <see cref="CausationId"/> were added within <see cref="BrainLogFormat.Json"/>: payloads written without them read as null.
+/// </summary>
 [GenerateSerializer, Alias("storage.journaled-signal")]
-internal sealed record JournaledSignalPayload([property: Id(0)] string Type, [property: Id(1)] byte[] Json);
+internal sealed record JournaledSignalPayload([property: Id(0)] string Type, [property: Id(1)] byte[] Json,
+    [property: Id(2)] string? TraceId = null, [property: Id(3)] string? CausationId = null);
 
 /// <summary>A publisher's retention floor and last sequence; every sequence at or below the floor is trimmed.</summary>
 [GenerateSerializer, Alias("storage.publisher-mark")]

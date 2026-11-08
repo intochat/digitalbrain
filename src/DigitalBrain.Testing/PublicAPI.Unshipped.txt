@@ -707,3 +707,5 @@ DigitalBrain.Testing.TestOS.Store.get -> DigitalBrain.ISourceStore!
 DigitalBrain.Testing.TestOS.GateRestores.get -> int
 DigitalBrain.Testing.TestOSPolicyExtensions
 static DigitalBrain.Testing.TestOSPolicyExtensions.AdoptPolicy(this DigitalBrain.Testing.TestOS! os, string! brainId, DigitalBrain.PolicyRule! rule, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.PolicyRule!>!
+DigitalBrain.Testing.TestJournal.ReadTrace(string! traceId, long since, int limit) -> System.Threading.Tasks.Task<DigitalBrain.SignalPage!>!
+DigitalBrain.Testing.InMemorySignalHistory.ReadTrace(string! traceId, long since, int limit) -> System.Threading.Tasks.Task<DigitalBrain.SignalPage!>!

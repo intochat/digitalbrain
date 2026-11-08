@@ -81,6 +81,19 @@ public sealed class TestJournal : ISignalHistory
         }
     }
 
+    /// <inheritdoc />
+    public Task<SignalPage> ReadTrace(string traceId, long since, int limit)
+    {
+        SignalPage.CheckLimit(limit);
+        lock (_gate)
+        {
+            var floor = _brain.Count == 0 ? _position : _brain[0].Position - 1;
+            var page = _brain.Where(item => item.Position > since && item.Entry.TraceId == traceId).Take(limit)
+                .Select(item => item.Entry with { Sequence = item.Position }).ToList();
+            return Task.FromResult(new SignalPage(floor, _position, page));
+        }
+    }
+
     internal T? Load<T>(NeuronId id)
     {
         lock (_gate) { return _states.TryGetValue(id, out var json) ? json.Deserialize<T>(RuntimeProtocol.OptionsFor(typeof(T))) : default; }

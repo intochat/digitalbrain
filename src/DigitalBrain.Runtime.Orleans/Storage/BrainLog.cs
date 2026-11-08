@@ -175,11 +175,20 @@ internal sealed class BrainLog : IAsyncDisposable
         return (sequence, lastSignal);
     }
 
+    // Every signal of one entry shares the entry's trace and cause; a payload an adapter already stamped keeps its own ids.
+    private static JournaledSignalPayload[] Stamped(JournaledSignalPayload[] encoded)
+    {
+        if (encoded.Length == 0 || encoded.All(payload => payload.TraceId is not null)) { return encoded; }
+        var (traceId, causationId) = CurrentCause.Stamp();
+        return [.. encoded.Select(payload => payload.TraceId is null ? payload with { TraceId = traceId, CausationId = causationId } : payload)];
+    }
+
     private async Task<(long Sequence, long LastSignal, long LastPosition)> AppendEncodedWithPosition(string grainId, string stateName, long? expectedETag, BrainRecordChange change,
         byte[] record, string? recordType, string publisher, JournaledSignalPayload[] encoded, BrainSideWrite? side, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(encoded);
         if (encoded.Length > 0) { ArgumentException.ThrowIfNullOrEmpty(publisher); }
+        encoded = Stamped(encoded);
         await gate.WaitAsync(ct);
         try
         {
@@ -284,6 +293,22 @@ internal sealed class BrainLog : IAsyncDisposable
         {
             var floor = signals.Count == 0 ? position : signals[0].FirstPosition - 1;
             StoredSignal[] held = [.. Held().Where(item => item.Position > since).Take(limit)];
+            return Task.FromResult(new StoredSlice(floor, position, held));
+        }
+    }
+
+    /// <summary>Held signals of the whole brain carrying <paramref name="traceId"/> after brain position <paramref name="since"/>.</summary>
+    public Task<StoredSlice> TraceSignals(string traceId, long since, int limit, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(traceId);
+        ArgumentOutOfRangeException.ThrowIfNegative(since);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        ct.ThrowIfCancellationRequested();
+        RequireOpen();
+        lock (stateLock)
+        {
+            var floor = signals.Count == 0 ? position : signals[0].FirstPosition - 1;
+            StoredSignal[] held = [.. Held().Where(item => item.Position > since && item.Payload.TraceId == traceId).Take(limit)];
             return Task.FromResult(new StoredSlice(floor, position, held));
         }
     }

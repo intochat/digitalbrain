@@ -80,6 +80,17 @@ public sealed class JournalJsonFacts
     }
 
     [Fact]
+    public void OldPayloadWithoutIdsReadsAsNull()
+    {
+        var serializer = GoldenBytesFacts.Serializer();
+        var entry = serializer.Deserialize<BrainEntry>(Convert.FromHexString(GoldenBytesFacts.EntryBeforeTrace))!;
+        var payload = Assert.Single(entry.Signals);
+        Assert.Equal("test.note", payload.Type);
+        Assert.Null(payload.TraceId);
+        Assert.Null(payload.CausationId);
+    }
+
+    [Fact]
     public async Task An_unregistered_alias_or_json_deeper_than_128_throws_JournalPayloadException()
     {
         using var home = new TempHome();

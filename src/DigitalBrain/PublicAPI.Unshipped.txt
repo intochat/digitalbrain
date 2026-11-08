@@ -634,9 +634,9 @@ DigitalBrain.JournaledSignal
 DigitalBrain.JournaledSignal.<Clone>$() -> DigitalBrain.JournaledSignal!
 DigitalBrain.JournaledSignal.At.get -> System.DateTimeOffset
 DigitalBrain.JournaledSignal.At.init -> void
-DigitalBrain.JournaledSignal.Deconstruct(out DigitalBrain.NeuronId Publisher, out long Sequence, out DigitalBrain.Signal! Signal, out System.DateTimeOffset At) -> void
+DigitalBrain.JournaledSignal.Deconstruct(out DigitalBrain.NeuronId Publisher, out long Sequence, out DigitalBrain.Signal! Signal, out System.DateTimeOffset At, out string? TraceId, out string? CausationId) -> void
 DigitalBrain.JournaledSignal.Equals(DigitalBrain.JournaledSignal? other) -> bool
-DigitalBrain.JournaledSignal.JournaledSignal(DigitalBrain.NeuronId Publisher, long Sequence, DigitalBrain.Signal! Signal, System.DateTimeOffset At) -> void
+DigitalBrain.JournaledSignal.JournaledSignal(DigitalBrain.NeuronId Publisher, long Sequence, DigitalBrain.Signal! Signal, System.DateTimeOffset At, string? TraceId = null, string? CausationId = null) -> void
 DigitalBrain.JournaledSignal.Publisher.get -> DigitalBrain.NeuronId
 DigitalBrain.JournaledSignal.Publisher.init -> void
 DigitalBrain.JournaledSignal.Sequence.get -> long
@@ -2948,3 +2948,10 @@ override DigitalBrain.Confirmation.ConfirmationInbox.GetHashCode() -> int
 override DigitalBrain.Confirmation.ConfirmationInbox.ToString() -> string!
 static DigitalBrain.Confirmation.ConfirmationInbox.operator !=(DigitalBrain.Confirmation.ConfirmationInbox? left, DigitalBrain.Confirmation.ConfirmationInbox? right) -> bool
 static DigitalBrain.Confirmation.ConfirmationInbox.operator ==(DigitalBrain.Confirmation.ConfirmationInbox? left, DigitalBrain.Confirmation.ConfirmationInbox? right) -> bool
+DigitalBrain.Causation
+static DigitalBrain.Causation.Address(DigitalBrain.NeuronId publisher, long sequence) -> string!
+DigitalBrain.Spi.ISignalHistory.ReadTrace(string! traceId, long since, int limit) -> System.Threading.Tasks.Task<DigitalBrain.SignalPage!>!
+DigitalBrain.JournaledSignal.TraceId.get -> string?
+DigitalBrain.JournaledSignal.TraceId.init -> void
+DigitalBrain.JournaledSignal.CausationId.get -> string?
+DigitalBrain.JournaledSignal.CausationId.init -> void
