@@ -41,6 +41,9 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     // The plan an Ask of this activation is raising, so the nudge does not raise it twice.
     private string? _asking;
 
+    // Set by Cancel (which interleaves) until the Cancelled save, made in a turn of its own: nothing else saves meanwhile.
+    private string? _cancelRequested;
+
     /// <summary>The steps, in order. Step names are the keys of <see cref="FlowState{T}.Done"/> and never change.</summary>
     protected abstract IReadOnlyList<string> Steps { get; }
 
@@ -91,7 +94,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     }
 
     /// <inheritdoc />
-    Task IFlowCallbacks.Advance() => State is { Status: FlowStatus.Running, Waiting: null } ? Advance() : Task.CompletedTask;
+    Task IFlowCallbacks.Advance() => State is { Status: FlowStatus.Running, Waiting: null } && _cancelRequested is null ? Advance() : Task.CompletedTask;
 
     /// <summary>
     /// Ends the wait of <paramref name="step"/>: <see cref="WaitOutcome.Approved"/> and <see cref="WaitOutcome.Arrived"/> complete the
@@ -110,19 +113,38 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
 
     /// <summary>
     /// Cancels the flow: the running body's token fires, the flow ends <see cref="FlowOutcome.Cancelled"/> and a pending approval
-    /// plan is answered deny. Ignored once the flow has ended. Cancelling the operations a flow started is the caller's job.
+    /// plan is answered deny. Ignored once the flow has ended or a cancel is under way. Cancelling the operations a flow started is
+    /// the caller's job. This call interleaves with a running body, so it only fires the token and posts a self-call; the Cancelled
+    /// save runs in a turn of its own once the body has stopped, and a step's result that arrives meanwhile is dropped.
     /// </summary>
     /// <param name="reason">Why.</param>
     [Interleaves]
     public async Task Cancel(string reason)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        if (Ended(State.Status) || _cancelRequested is not null) { return; }
+        _cancelRequested = reason;
+        await _activation.CancelAsync().ConfigureAwait(true);
+        var proof = Proof();
+        try { await Context.Get<IFlowCallbacks>(Id).CancelRequested(reason, proof).ConfigureAwait(true); }
+        catch (Exception error) when (error is not OutOfMemoryException)
+        {
+            // Not posted: a later Cancel tries again.
+            Forget(proof);
+            _cancelRequested = null;
+            throw;
+        }
+    }
+
+    /// <inheritdoc />
+    async Task IFlowCallbacks.CancelRequested(string reason, string proof)
+    {
+        Prove(proof);
         if (Ended(State.Status)) { return; }
         var waiting = State.Waiting;
         await Save(State with { Status = FlowStatus.Cancelled, Waiting = null, Current = null, Ended = Context.Time.GetUtcNow() },
             new FlowDone(FlowId, FlowOutcome.Cancelled, reason)).ConfigureAwait(true);
         await StopNudge().ConfigureAwait(true);
-        await _activation.CancelAsync().ConfigureAwait(true);
         if (waiting is { Reason: WaitReason.Approval, ConfirmationPlanId: { } planId })
         {
             await Context.Confirmations.Resolve(planId, approve: false).ConfigureAwait(true);
@@ -224,7 +246,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     private async Task Advance()
     {
         var token = _activation.Token;
-        while (State is { Status: FlowStatus.Running, Waiting: null } && !token.IsCancellationRequested)
+        while (State is { Status: FlowStatus.Running, Waiting: null } && !token.IsCancellationRequested && _cancelRequested is null)
         {
             if (Steps.FirstOrDefault(candidate => !State.Done.Contains(candidate)) is not { } step)
             {
@@ -234,6 +256,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
                 return;
             }
             await Save(State with { Current = step }, new FlowStep(FlowId, step, StepOutcome.Started, null)).ConfigureAwait(true);
+            if (_cancelRequested is not null) { return; }
             StepResult<T> result;
             try { result = await Run(step, State.Inner, token).ConfigureAwait(true); }
             // Interrupted, not failed: a cancelled body (any token) or an ending activation leaves Current set and the flow
@@ -242,14 +265,14 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
             catch (Exception error) when (error is OperationCanceledException || token.IsCancellationRequested || HostShutdown.IsStopping(Context.Services, error)) { return; }
             catch (Exception error) when (error is not OutOfMemoryException)
             {
-                if (State.Status != FlowStatus.Running) { return; }
+                if (State.Status != FlowStatus.Running || _cancelRequested is not null) { return; }
                 await Save(State with { Status = FlowStatus.Failed, Ended = Context.Time.GetUtcNow() },
                     [new FlowStep(FlowId, step, StepOutcome.Failed, error.Message), new FlowDone(FlowId, FlowOutcome.Failed, error.Message)]).ConfigureAwait(true);
                 await StopNudge().ConfigureAwait(true);
                 return;
             }
             // Cancelled while the body ran: its result is dropped.
-            if (State.Status != FlowStatus.Running || result is null) { return; }
+            if (State.Status != FlowStatus.Running || result is null || _cancelRequested is not null) { return; }
             if (result.Wait is { } wait)
             {
                 await Wait(step, result, wait).ConfigureAwait(true);
@@ -336,7 +359,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
 
     private async Task Resolve(string step, WaitOutcome outcome, string? by)
     {
-        if (State is not { Status: FlowStatus.Waiting, Waiting: { } waiting } || waiting.Step != step) { return; }
+        if (State is not { Status: FlowStatus.Waiting, Waiting: { } waiting } || waiting.Step != step || _cancelRequested is not null) { return; }
         var resolve = new FlowResolve(FlowId, step, outcome, by);
         if (outcome is WaitOutcome.Approved or WaitOutcome.Arrived)
         {
@@ -411,6 +434,12 @@ public interface IFlowCallbacks
     /// <param name="outcome">How it ended.</param>
     /// <param name="proof">The proof the flow handed its detached work.</param>
     Task ConfirmationAnswered(string planId, ConfirmationOutcome outcome, string proof);
+
+    /// <summary>A cancel the flow's <see cref="Flow{T}.Cancel"/> posted: saves the flow Cancelled in a turn, after the running body stopped.</summary>
+    /// <param name="reason">Why.</param>
+    /// <param name="proof">The proof the flow handed its own cancel.</param>
+    [OneWayCall]
+    Task CancelRequested(string reason, string proof);
 
     /// <summary>Runs the steps of a started flow that is running and not waiting; otherwise ignored. One-way: the self-call Start defers must not wait on its own turn.</summary>
     [OneWayCall]

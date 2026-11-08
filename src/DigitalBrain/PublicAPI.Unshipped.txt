@@ -3234,3 +3234,4 @@ static DigitalBrain.Flows.FlowRelated.operator ==(DigitalBrain.Flows.FlowRelated
 DigitalBrain.Flows.IFlowCallbacks.ConfirmationAnswered(string! planId, DigitalBrain.Confirmation.ConfirmationOutcome outcome, string! proof) -> System.Threading.Tasks.Task!
 DigitalBrain.Flows.IFlowCallbacks.Advance() -> System.Threading.Tasks.Task!
 DigitalBrain.Spi.INeuronContext.TraceId.get -> string?
+DigitalBrain.Flows.IFlowCallbacks.CancelRequested(string! reason, string! proof) -> System.Threading.Tasks.Task!

@@ -147,6 +147,26 @@ public sealed class FlowRuntimeFacts(FlowRuntimeFixture fixture, FaultingConfirm
         Assert.Equal(journaled, await runtime.Get<ITestFlow>(id).TraceId());
     }
 
+    [Theory, MemberData(nameof(NeuronRuntimeKinds.Both), MemberType = typeof(NeuronRuntimeKinds))]
+    public async Task CancelDuringALongBodyEndsCancelledWithoutConflict(NeuronRuntimeKind kind)
+    {
+        var runtime = await fixture.Runtime(kind);
+        var id = runtime.Id("test.flow", "cancel-long");
+        await runtime.Get<ITestFlow>(id).Start("Build", "ann", null, new FlowBox { Hang = true });
+        // The body hangs, so the runtime never idles: poll the journal instead of waiting for idle.
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        while ((await runtime.Signals<FlowStep>(id, Ct)).Count == 0 && DateTime.UtcNow < deadline) { await Task.Delay(50, Ct); }
+
+        await runtime.Get<ITestFlow>(id).Cancel("stop");
+
+        var ended = await runtime.WaitForSignals<FlowDone>(id, 1, TimeSpan.FromSeconds(20), Ct);
+        Assert.Equal(new FlowDone(id.ToString(), FlowOutcome.Cancelled, "stop"), Assert.Single(ended));
+        Assert.DoesNotContain(await runtime.Signals<FlowStep>(id, Ct), step => step.Outcome is StepOutcome.Failed or StepOutcome.Completed);
+        var done = await runtime.Get<ITestFlow>(id).Read();
+        Assert.Equal(FlowStatus.Cancelled, done.Status);
+        Assert.Empty(done.Done);
+    }
+
     // The detached Confirm reaches the confirmations side asynchronously; approve once the plan is pending there.
     private static async Task ApproveWhenPending(INeuronRuntime runtime, string planId)
     {
@@ -174,6 +194,9 @@ public sealed class FlowBox
 
     public bool Approval { get; init; }
 
+    /// <summary>Step "a" runs until its token is cancelled.</summary>
+    public bool Hang { get; init; }
+
     public int Runs { get; init; }
 }
 
@@ -185,6 +208,10 @@ public interface ITestFlow
     Task Start(string title, string owner, string? parentFlowId, FlowBox inner);
 
     Task Resume(string step, WaitOutcome outcome, string? by);
+
+    // A caller outside the silo routes by the contract, so the contract declares the interleave Flow.Cancel needs.
+    [Interleaves]
+    Task Cancel(string reason);
 
     Task<FlowSnapshot> Read();
 
@@ -206,12 +233,13 @@ public sealed class TwoStepFlow : Flow<FlowBox>, ITestFlow
     public async Task<string?> StartedTraceId()
         => (await Context.History.Read(Id, 0, 100, CancellationToken.None)).Signals.FirstOrDefault(item => item.Signal is FlowStarted)?.TraceId;
 
-    protected override Task<StepResult<FlowBox>> Run(string step, FlowBox inner, CancellationToken ct)
+    protected override async Task<StepResult<FlowBox>> Run(string step, FlowBox inner, CancellationToken ct)
     {
-        var next = new FlowBox { AskFirst = inner.AskFirst, Approval = inner.Approval, Runs = inner.Runs + 1 };
-        return Task.FromResult(step == "b" && inner.AskFirst
+        if (step == "a" && inner.Hang) { await Task.Delay(Timeout.Infinite, ct); }
+        var next = new FlowBox { AskFirst = inner.AskFirst, Approval = inner.Approval, Hang = inner.Hang, Runs = inner.Runs + 1 };
+        return step == "b" && inner.AskFirst
             ? new StepResult<FlowBox>(next, new Waiting("b", inner.Approval ? WaitReason.Approval : WaitReason.External, null, null))
-            : new StepResult<FlowBox>(next));
+            : new StepResult<FlowBox>(next);
     }
 }
 
