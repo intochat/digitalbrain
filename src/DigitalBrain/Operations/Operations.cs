@@ -39,3 +39,13 @@ public abstract record OperationResult
     /// <param name="Steps">The planned steps, in order.</param>
     public sealed record Planned(IReadOnlyList<string> Steps) : OperationResult;
 }
+
+/// <summary>A snapshot of one operation.</summary>
+/// <param name="Id">The operation id.</param>
+/// <param name="Kind">The plan type name, for example <c>WritePlan</c>.</param>
+/// <param name="Origin">The neuron (<c>brain/type/key</c>) or app that started it.</param>
+/// <param name="Fraction">The last saved progress, 0..1.</param>
+/// <param name="Result">How it ended, or null while it runs.</param>
+/// <param name="Started">When it started.</param>
+/// <param name="TraceId">The trace id current when it started, if any.</param>
+public sealed record OperationView(OperationId Id, string Kind, string Origin, double Fraction, OperationResult? Result, DateTimeOffset Started, string? TraceId);

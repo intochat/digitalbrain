@@ -408,13 +408,17 @@ DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.Alias.get -> string!
 DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.Alias.init -> void
 DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.At.get -> System.DateTimeOffset
 DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.At.init -> void
-DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.Deconstruct(out string! Source, out long Sequence, out string! Alias, out System.Text.Json.JsonElement Payload, out System.DateTimeOffset At) -> void
+DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.Deconstruct(out string! Source, out long Sequence, out string! Alias, out System.Text.Json.JsonElement Payload, out System.DateTimeOffset At, out string? TraceId, out string? CausationId) -> void
 DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.Equals(DigitalBrain.Runtime.Orleans.Signalling.SessionSignal? other) -> bool
 DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.Payload.get -> System.Text.Json.JsonElement
 DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.Payload.init -> void
 DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.Sequence.get -> long
 DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.Sequence.init -> void
-DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.SessionSignal(string! Source, long Sequence, string! Alias, System.Text.Json.JsonElement Payload, System.DateTimeOffset At) -> void
+DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.SessionSignal(string! Source, long Sequence, string! Alias, System.Text.Json.JsonElement Payload, System.DateTimeOffset At, string? TraceId = null, string? CausationId = null) -> void
+DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.TraceId.get -> string?
+DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.TraceId.init -> void
+DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.CausationId.get -> string?
+DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.CausationId.init -> void
 DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.Source.get -> string!
 DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.Source.init -> void
 DigitalBrain.Runtime.Orleans.Signalling.SessionSynapseOptions

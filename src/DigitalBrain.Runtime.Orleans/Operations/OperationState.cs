@@ -31,6 +31,7 @@ internal enum OperationPhase
 /// <param name="Updated">When the state last changed.</param>
 /// <param name="Driver">The exact silo address and generation running the operation, absent for older saved operations.</param>
 /// <param name="DriverLifetime">Optional host evidence identifying the exact process running the operation.</param>
+/// <param name="TraceId">The trace id current when the operation started, absent for older saved operations.</param>
 internal sealed record OperationState(
     string Id,
     string Brain,
@@ -46,4 +47,5 @@ internal sealed record OperationState(
     DateTimeOffset Started,
     DateTimeOffset Updated,
     string? Driver = null,
-    string? DriverLifetime = null);
+    string? DriverLifetime = null,
+    string? TraceId = null);

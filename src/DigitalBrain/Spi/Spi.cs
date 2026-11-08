@@ -26,11 +26,20 @@ public interface INeuronContext
     /// <summary>Long-running operations.</summary>
     IOperations Operations { get; }
 
+    /// <summary>Read-only view of the operations of this brain.</summary>
+    IOperationsQuery OperationsQuery { get; }
+
     /// <summary>The synapses this neuron holds as a subscriber.</summary>
     ISynapses Synapses { get; }
 
     /// <summary>The brain's signal history.</summary>
     ISignalHistory History { get; }
+
+    /// <summary>
+    /// The trace id the runtime would journal the signals of a save made now with: the current cause's (a reaction, or a neuron it
+    /// called), else the request's trace, else a fresh id. Null when the context does not stamp traces.
+    /// </summary>
+    string? TraceId => null;
 
     /// <summary>Publishes a signal from this neuron.</summary>
     Task Publish(Signal signal);
@@ -105,6 +114,16 @@ public interface IOperations
 
     /// <summary>Requests cancellation of a running operation; its handle's <see cref="IOperation.Cancellation"/> fires.</summary>
     Task Cancel(DigitalBrain.Operations.OperationId id, CancellationToken ct);
+}
+
+/// <summary>Read-only view of operations, for an app that shows progress (for example a Tasks list) without starting or cancelling them.</summary>
+public interface IOperationsQuery
+{
+    /// <summary>The running operations of this brain driven by this host. Operations driven by another host, or orphaned by a host restart, are not listed; <see cref="Read"/> is the path across hosts.</summary>
+    Task<IReadOnlyList<DigitalBrain.Operations.OperationView>> Running(CancellationToken ct);
+
+    /// <summary>The operation <paramref name="id"/>, running or done, or null when no operation of this brain has that id.</summary>
+    Task<DigitalBrain.Operations.OperationView?> Read(DigitalBrain.Operations.OperationId id, CancellationToken ct);
 }
 
 /// <summary>The handle of a running operation.</summary>

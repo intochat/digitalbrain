@@ -7,6 +7,7 @@ using DigitalBrain.Invocation;
 using DigitalBrain.Operations;
 using DigitalBrain.Runtime.Orleans.Capabilities;
 using DigitalBrain.Runtime.Orleans.Hosting;
+using DigitalBrain.Runtime.Orleans.Synapses;
 using DigitalBrain.Spi;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
@@ -37,7 +38,7 @@ internal sealed class RuntimeOperations(IServiceProvider services, BrainId brain
         var id = new OperationId("op-" + Guid.NewGuid().ToString("N"));
         var entity = Entity(services, brain, id);
         await entity.Begin(Initial(id, plan, time.GetUtcNow())).ConfigureAwait(false);
-        var handle = new RuntimeOperation(id, entity, time, registry, plan is WritePlan);
+        var handle = new RuntimeOperation(id, brain, entity, time, registry, plan is WritePlan);
         registry.Add(handle);
 
         if (plan is WritePlan write)
@@ -141,7 +142,8 @@ internal sealed class RuntimeOperations(IServiceProvider services, BrainId brain
         }
         return new OperationState(id.Value, brain.Value, origin, plan.GetType().Name, json, length, hash, OperationPhase.Running, false, 0, null, now, now,
             services.GetRequiredService<ILocalSiloDetails>().SiloAddress.ToParsableString(),
-            services.GetService<IOperationDriverLifetime>()?.Capture());
+            services.GetService<IOperationDriverLifetime>()?.Capture(),
+            CurrentCause.Stamp().TraceId);
     }
 
     private static async Task Drive(StorageWriteRunner runner, WritePlan plan, RuntimeOperation handle)
@@ -187,7 +189,7 @@ internal sealed class RuntimeOperations(IServiceProvider services, BrainId brain
 }
 
 /// <summary>The handle of a runtime operation: reports and completion go to its entity; cancellation is local and cross-silo.</summary>
-internal sealed class RuntimeOperation(OperationId id, IOperationEntity entity, TimeProvider time, OperationRegistry registry, bool driven) : IOperation, IDisposable
+internal sealed class RuntimeOperation(OperationId id, BrainId brain, IOperationEntity entity, TimeProvider time, OperationRegistry registry, bool driven) : IOperation, IDisposable
 {
     private readonly CancellationTokenSource _cancellation = new();
     private readonly TaskCompletionSource<OperationResult> _done = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -196,6 +198,9 @@ internal sealed class RuntimeOperation(OperationId id, IOperationEntity entity, 
     private int _completing;
 
     public OperationId Id { get; } = id;
+
+    /// <summary>The brain the operation runs in.</summary>
+    internal BrainId Brain { get; } = brain;
 
     public CancellationToken Cancellation => _cancellation.Token;
 
@@ -270,6 +275,9 @@ internal sealed class OperationRegistry
     public void Add(RuntimeOperation operation) => _running[operation.Id] = operation;
 
     public bool TryGet(OperationId id, out RuntimeOperation operation) => _running.TryGetValue(id, out operation!);
+
+    /// <summary>The ids of the operations of <paramref name="brain"/> driven on this silo. Operations driven elsewhere, or orphaned by a silo restart, are not listed; reading an entity by id is the cross-silo path.</summary>
+    public IReadOnlyList<OperationId> Running(BrainId brain) => [.. _running.Values.Where(operation => operation.Brain == brain).Select(operation => operation.Id)];
 
     public void Remove(OperationId id) => _running.TryRemove(id, out _);
 }

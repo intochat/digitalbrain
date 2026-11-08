@@ -268,7 +268,7 @@ internal sealed class SynapseRegistry(TestOS os)
             {
                 bool wanted;
                 lock (_gate) { wanted = entry.Signals.Any(type => type.IsInstanceOfType(item.Signal)); }
-                if (wanted) { await React(subscriber, item.Signal, entry, item.Sequence, entry.Source).ConfigureAwait(false); }
+                if (wanted) { await React(subscriber, item.Signal, entry, item.Sequence, entry.Source, item.TraceId).ConfigureAwait(false); }
                 Advance(entry, item.Sequence);
             }
         }
@@ -294,7 +294,7 @@ internal sealed class SynapseRegistry(TestOS os)
             {
                 bool wanted;
                 lock (_gate) { wanted = !(deaf && item.Publisher == subscriber.Id) && entry.Signals.Any(type => type.IsInstanceOfType(item.Signal)); }
-                if (wanted) { await React(subscriber, item.Signal, entry, item.Sequence, item.Publisher).ConfigureAwait(false); }
+                if (wanted) { await React(subscriber, item.Signal, entry, item.Sequence, item.Publisher, item.TraceId).ConfigureAwait(false); }
                 Advance(entry, item.Sequence);
             }
         }
@@ -317,7 +317,7 @@ internal sealed class SynapseRegistry(TestOS os)
     }
 
     // A reaction is a turn: a synapse receiver's Receive, else the most specific [On] method whose parameter accepts the signal; none means the signal is ignored.
-    private Task React(TestNeuronHost subscriber, Signal signal, Entry entry, long cursor, NeuronId from)
+    private Task React(TestNeuronHost subscriber, Signal signal, Entry entry, long cursor, NeuronId from, string? traceId = null)
     {
         if (signal is not Gap)
         {
@@ -328,6 +328,7 @@ internal sealed class SynapseRegistry(TestOS os)
             return subscriber.Turn(interleave: false, async neuron =>
             {
                 Reacting.Value = new Reaction(subscriber.Id, entry, cursor);
+                TestCause.Enter(from, cursor, traceId);
                 await ((ISynapseReceiver)neuron).Receive(signal, CancellationToken.None).ConfigureAwait(false);
                 return 0;
             });
@@ -336,6 +337,7 @@ internal sealed class SynapseRegistry(TestOS os)
         return subscriber.Turn(interleave: false, async neuron =>
         {
             Reacting.Value = new Reaction(subscriber.Id, entry, cursor);
+            TestCause.Enter(from, cursor, traceId);
             var arguments = method.GetParameters().Length == 2 ? new object?[] { signal, CancellationToken.None } : [signal];
             object? returned;
             try { returned = method.Invoke(neuron, arguments); }

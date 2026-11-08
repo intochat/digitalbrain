@@ -634,9 +634,9 @@ DigitalBrain.JournaledSignal
 DigitalBrain.JournaledSignal.<Clone>$() -> DigitalBrain.JournaledSignal!
 DigitalBrain.JournaledSignal.At.get -> System.DateTimeOffset
 DigitalBrain.JournaledSignal.At.init -> void
-DigitalBrain.JournaledSignal.Deconstruct(out DigitalBrain.NeuronId Publisher, out long Sequence, out DigitalBrain.Signal! Signal, out System.DateTimeOffset At) -> void
+DigitalBrain.JournaledSignal.Deconstruct(out DigitalBrain.NeuronId Publisher, out long Sequence, out DigitalBrain.Signal! Signal, out System.DateTimeOffset At, out string? TraceId, out string? CausationId) -> void
 DigitalBrain.JournaledSignal.Equals(DigitalBrain.JournaledSignal? other) -> bool
-DigitalBrain.JournaledSignal.JournaledSignal(DigitalBrain.NeuronId Publisher, long Sequence, DigitalBrain.Signal! Signal, System.DateTimeOffset At) -> void
+DigitalBrain.JournaledSignal.JournaledSignal(DigitalBrain.NeuronId Publisher, long Sequence, DigitalBrain.Signal! Signal, System.DateTimeOffset At, string? TraceId = null, string? CausationId = null) -> void
 DigitalBrain.JournaledSignal.Publisher.get -> DigitalBrain.NeuronId
 DigitalBrain.JournaledSignal.Publisher.init -> void
 DigitalBrain.JournaledSignal.Sequence.get -> long
@@ -2948,3 +2948,293 @@ override DigitalBrain.Confirmation.ConfirmationInbox.GetHashCode() -> int
 override DigitalBrain.Confirmation.ConfirmationInbox.ToString() -> string!
 static DigitalBrain.Confirmation.ConfirmationInbox.operator !=(DigitalBrain.Confirmation.ConfirmationInbox? left, DigitalBrain.Confirmation.ConfirmationInbox? right) -> bool
 static DigitalBrain.Confirmation.ConfirmationInbox.operator ==(DigitalBrain.Confirmation.ConfirmationInbox? left, DigitalBrain.Confirmation.ConfirmationInbox? right) -> bool
+DigitalBrain.Causation
+static DigitalBrain.Causation.Address(DigitalBrain.NeuronId publisher, long sequence) -> string!
+DigitalBrain.Spi.ISignalHistory.ReadTrace(string! traceId, long since, int limit, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.SignalPage!>!
+DigitalBrain.JournaledSignal.TraceId.get -> string?
+DigitalBrain.JournaledSignal.TraceId.init -> void
+DigitalBrain.JournaledSignal.CausationId.get -> string?
+DigitalBrain.JournaledSignal.CausationId.init -> void
+DigitalBrain.Operations.OperationView
+DigitalBrain.Operations.OperationView.Fraction.get -> double
+DigitalBrain.Operations.OperationView.Id.get -> DigitalBrain.Operations.OperationId
+DigitalBrain.Operations.OperationView.Kind.get -> string!
+DigitalBrain.Operations.OperationView.Origin.get -> string!
+DigitalBrain.Operations.OperationView.Result.get -> DigitalBrain.Operations.OperationResult?
+DigitalBrain.Operations.OperationView.Started.get -> System.DateTimeOffset
+DigitalBrain.Operations.OperationView.TraceId.get -> string?
+DigitalBrain.Spi.INeuronContext.OperationsQuery.get -> DigitalBrain.Spi.IOperationsQuery!
+DigitalBrain.Spi.IOperationsQuery
+DigitalBrain.Spi.IOperationsQuery.Read(DigitalBrain.Operations.OperationId id, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Operations.OperationView?>!
+DigitalBrain.Spi.IOperationsQuery.Running(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Operations.OperationView!>!>!
+DigitalBrain.Operations.OperationView.Deconstruct(out DigitalBrain.Operations.OperationId Id, out string! Kind, out string! Origin, out double Fraction, out DigitalBrain.Operations.OperationResult? Result, out System.DateTimeOffset Started, out string? TraceId) -> void
+DigitalBrain.Operations.OperationView.Equals(DigitalBrain.Operations.OperationView? other) -> bool
+DigitalBrain.Operations.OperationView.OperationView(DigitalBrain.Operations.OperationId Id, string! Kind, string! Origin, double Fraction, DigitalBrain.Operations.OperationResult? Result, System.DateTimeOffset Started, string? TraceId) -> void
+DigitalBrain.Operations.OperationView.<Clone>$() -> DigitalBrain.Operations.OperationView!
+override DigitalBrain.Operations.OperationView.Equals(object? obj) -> bool
+override DigitalBrain.Operations.OperationView.GetHashCode() -> int
+override DigitalBrain.Operations.OperationView.ToString() -> string!
+static DigitalBrain.Operations.OperationView.operator !=(DigitalBrain.Operations.OperationView? left, DigitalBrain.Operations.OperationView? right) -> bool
+static DigitalBrain.Operations.OperationView.operator ==(DigitalBrain.Operations.OperationView? left, DigitalBrain.Operations.OperationView? right) -> bool
+DigitalBrain.Operations.OperationView.Id.init -> void
+DigitalBrain.Operations.OperationView.Kind.init -> void
+DigitalBrain.Operations.OperationView.Origin.init -> void
+DigitalBrain.Operations.OperationView.Fraction.init -> void
+DigitalBrain.Operations.OperationView.Result.init -> void
+DigitalBrain.Operations.OperationView.Started.init -> void
+DigitalBrain.Operations.OperationView.TraceId.init -> void
+DigitalBrain.Flows.Flow<T>
+DigitalBrain.Flows.Flow<T>.Cancel(string! reason) -> System.Threading.Tasks.Task!
+DigitalBrain.Flows.Flow<T>.Flow() -> void
+DigitalBrain.Flows.Flow<T>.OnConfirmation(DigitalBrain.Confirmation.ConfirmationResolved! resolved) -> System.Threading.Tasks.Task!
+DigitalBrain.Flows.Flow<T>.Relate(DigitalBrain.Flows.FlowRelation! relation) -> System.Threading.Tasks.Task!
+DigitalBrain.Flows.Flow<T>.Resume(string! step, DigitalBrain.Flows.WaitOutcome outcome, string? by) -> System.Threading.Tasks.Task!
+DigitalBrain.Flows.FlowDone
+DigitalBrain.Flows.FlowDone.Deconstruct(out string! FlowId, out DigitalBrain.Flows.FlowOutcome Outcome, out string? Detail) -> void
+DigitalBrain.Flows.FlowDone.Detail.get -> string?
+DigitalBrain.Flows.FlowDone.Detail.init -> void
+DigitalBrain.Flows.FlowDone.Equals(DigitalBrain.Flows.FlowDone? other) -> bool
+DigitalBrain.Flows.FlowDone.FlowDone(string! FlowId, DigitalBrain.Flows.FlowOutcome Outcome, string? Detail) -> void
+DigitalBrain.Flows.FlowDone.FlowId.get -> string!
+DigitalBrain.Flows.FlowDone.FlowId.init -> void
+DigitalBrain.Flows.FlowDone.Outcome.get -> DigitalBrain.Flows.FlowOutcome
+DigitalBrain.Flows.FlowDone.Outcome.init -> void
+DigitalBrain.Flows.FlowFailed
+DigitalBrain.Flows.FlowFailed.FlowFailed(string! step, string! detail) -> void
+DigitalBrain.Flows.FlowFailed.Step.get -> string!
+DigitalBrain.Flows.FlowOutcome
+DigitalBrain.Flows.FlowOutcome.Cancelled = 2 -> DigitalBrain.Flows.FlowOutcome
+DigitalBrain.Flows.FlowOutcome.Completed = 0 -> DigitalBrain.Flows.FlowOutcome
+DigitalBrain.Flows.FlowOutcome.Failed = 1 -> DigitalBrain.Flows.FlowOutcome
+DigitalBrain.Flows.FlowRelation
+DigitalBrain.Flows.FlowRelation.<Clone>$() -> DigitalBrain.Flows.FlowRelation!
+DigitalBrain.Flows.FlowRelation.Deconstruct(out string! TargetFlowId, out DigitalBrain.Flows.RelationKind Kind, out System.TimeSpan? Lag) -> void
+DigitalBrain.Flows.FlowRelation.Equals(DigitalBrain.Flows.FlowRelation? other) -> bool
+DigitalBrain.Flows.FlowRelation.FlowRelation(string! TargetFlowId, DigitalBrain.Flows.RelationKind Kind, System.TimeSpan? Lag) -> void
+DigitalBrain.Flows.FlowRelation.Kind.get -> DigitalBrain.Flows.RelationKind
+DigitalBrain.Flows.FlowRelation.Kind.init -> void
+DigitalBrain.Flows.FlowRelation.Lag.get -> System.TimeSpan?
+DigitalBrain.Flows.FlowRelation.Lag.init -> void
+DigitalBrain.Flows.FlowRelation.TargetFlowId.get -> string!
+DigitalBrain.Flows.FlowRelation.TargetFlowId.init -> void
+DigitalBrain.Flows.FlowResolve
+DigitalBrain.Flows.FlowResolve.By.get -> string?
+DigitalBrain.Flows.FlowResolve.By.init -> void
+DigitalBrain.Flows.FlowResolve.Deconstruct(out string! FlowId, out string! Step, out DigitalBrain.Flows.WaitOutcome Outcome, out string? By) -> void
+DigitalBrain.Flows.FlowResolve.Equals(DigitalBrain.Flows.FlowResolve? other) -> bool
+DigitalBrain.Flows.FlowResolve.FlowId.get -> string!
+DigitalBrain.Flows.FlowResolve.FlowId.init -> void
+DigitalBrain.Flows.FlowResolve.FlowResolve(string! FlowId, string! Step, DigitalBrain.Flows.WaitOutcome Outcome, string? By) -> void
+DigitalBrain.Flows.FlowResolve.Outcome.get -> DigitalBrain.Flows.WaitOutcome
+DigitalBrain.Flows.FlowResolve.Outcome.init -> void
+DigitalBrain.Flows.FlowResolve.Step.get -> string!
+DigitalBrain.Flows.FlowResolve.Step.init -> void
+DigitalBrain.Flows.FlowStarted
+DigitalBrain.Flows.FlowStarted.Deconstruct(out string! FlowId, out string! Type, out string! Title) -> void
+DigitalBrain.Flows.FlowStarted.Equals(DigitalBrain.Flows.FlowStarted? other) -> bool
+DigitalBrain.Flows.FlowStarted.FlowId.get -> string!
+DigitalBrain.Flows.FlowStarted.FlowId.init -> void
+DigitalBrain.Flows.FlowStarted.FlowStarted(string! FlowId, string! Type, string! Title) -> void
+DigitalBrain.Flows.FlowStarted.Title.get -> string!
+DigitalBrain.Flows.FlowStarted.Title.init -> void
+DigitalBrain.Flows.FlowStarted.Type.get -> string!
+DigitalBrain.Flows.FlowStarted.Type.init -> void
+DigitalBrain.Flows.FlowState<T>
+DigitalBrain.Flows.FlowState<T>.Current.get -> string?
+DigitalBrain.Flows.FlowState<T>.Current.init -> void
+DigitalBrain.Flows.FlowState<T>.Deconstruct(out string! FlowId, out string! Title, out string! Owner, out string! TraceId, out DigitalBrain.Flows.FlowStatus Status, out System.Collections.Immutable.ImmutableList<string!>! Done, out string? Current, out DigitalBrain.Flows.Waiting? Waiting, out System.Collections.Immutable.ImmutableList<DigitalBrain.Flows.FlowRelation!>! Relations, out string? ParentFlowId, out System.DateTimeOffset Started, out System.DateTimeOffset? Ended, out T! Inner) -> void
+DigitalBrain.Flows.FlowState<T>.Done.get -> System.Collections.Immutable.ImmutableList<string!>!
+DigitalBrain.Flows.FlowState<T>.Done.init -> void
+DigitalBrain.Flows.FlowState<T>.Ended.get -> System.DateTimeOffset?
+DigitalBrain.Flows.FlowState<T>.Ended.init -> void
+DigitalBrain.Flows.FlowState<T>.FlowId.get -> string!
+DigitalBrain.Flows.FlowState<T>.FlowId.init -> void
+DigitalBrain.Flows.FlowState<T>.FlowState() -> void
+DigitalBrain.Flows.FlowState<T>.FlowState(string! FlowId, string! Title, string! Owner, string! TraceId, DigitalBrain.Flows.FlowStatus Status, System.Collections.Immutable.ImmutableList<string!>! Done, string? Current, DigitalBrain.Flows.Waiting? Waiting, System.Collections.Immutable.ImmutableList<DigitalBrain.Flows.FlowRelation!>! Relations, string? ParentFlowId, System.DateTimeOffset Started, System.DateTimeOffset? Ended, T! Inner) -> void
+DigitalBrain.Flows.FlowState<T>.Inner.get -> T!
+DigitalBrain.Flows.FlowState<T>.Inner.init -> void
+DigitalBrain.Flows.FlowState<T>.Owner.get -> string!
+DigitalBrain.Flows.FlowState<T>.Owner.init -> void
+DigitalBrain.Flows.FlowState<T>.ParentFlowId.get -> string?
+DigitalBrain.Flows.FlowState<T>.ParentFlowId.init -> void
+DigitalBrain.Flows.FlowState<T>.Relations.get -> System.Collections.Immutable.ImmutableList<DigitalBrain.Flows.FlowRelation!>!
+DigitalBrain.Flows.FlowState<T>.Relations.init -> void
+DigitalBrain.Flows.FlowState<T>.Started.get -> System.DateTimeOffset
+DigitalBrain.Flows.FlowState<T>.Started.init -> void
+DigitalBrain.Flows.FlowState<T>.Status.get -> DigitalBrain.Flows.FlowStatus
+DigitalBrain.Flows.FlowState<T>.Status.init -> void
+DigitalBrain.Flows.FlowState<T>.Title.get -> string!
+DigitalBrain.Flows.FlowState<T>.Title.init -> void
+DigitalBrain.Flows.FlowState<T>.TraceId.get -> string!
+DigitalBrain.Flows.FlowState<T>.TraceId.init -> void
+DigitalBrain.Flows.FlowState<T>.Waiting.get -> DigitalBrain.Flows.Waiting?
+DigitalBrain.Flows.FlowState<T>.Waiting.init -> void
+DigitalBrain.Flows.FlowStatus
+DigitalBrain.Flows.FlowStatus.Blocked = 3 -> DigitalBrain.Flows.FlowStatus
+DigitalBrain.Flows.FlowStatus.Cancelled = 6 -> DigitalBrain.Flows.FlowStatus
+DigitalBrain.Flows.FlowStatus.Completed = 4 -> DigitalBrain.Flows.FlowStatus
+DigitalBrain.Flows.FlowStatus.Failed = 5 -> DigitalBrain.Flows.FlowStatus
+DigitalBrain.Flows.FlowStatus.Pending = 0 -> DigitalBrain.Flows.FlowStatus
+DigitalBrain.Flows.FlowStatus.Running = 1 -> DigitalBrain.Flows.FlowStatus
+DigitalBrain.Flows.FlowStatus.Waiting = 2 -> DigitalBrain.Flows.FlowStatus
+DigitalBrain.Flows.FlowStep
+DigitalBrain.Flows.FlowStep.Deconstruct(out string! FlowId, out string! Step, out DigitalBrain.Flows.StepOutcome Outcome, out string? Detail) -> void
+DigitalBrain.Flows.FlowStep.Detail.get -> string?
+DigitalBrain.Flows.FlowStep.Detail.init -> void
+DigitalBrain.Flows.FlowStep.Equals(DigitalBrain.Flows.FlowStep? other) -> bool
+DigitalBrain.Flows.FlowStep.FlowId.get -> string!
+DigitalBrain.Flows.FlowStep.FlowId.init -> void
+DigitalBrain.Flows.FlowStep.FlowStep(string! FlowId, string! Step, DigitalBrain.Flows.StepOutcome Outcome, string? Detail) -> void
+DigitalBrain.Flows.FlowStep.Outcome.get -> DigitalBrain.Flows.StepOutcome
+DigitalBrain.Flows.FlowStep.Outcome.init -> void
+DigitalBrain.Flows.FlowStep.Step.get -> string!
+DigitalBrain.Flows.FlowStep.Step.init -> void
+DigitalBrain.Flows.FlowWaiting
+DigitalBrain.Flows.FlowWaiting.ConfirmationPlanId.get -> string?
+DigitalBrain.Flows.FlowWaiting.ConfirmationPlanId.init -> void
+DigitalBrain.Flows.FlowWaiting.Deconstruct(out string! FlowId, out string! Step, out DigitalBrain.Flows.WaitReason Reason, out string? ConfirmationPlanId) -> void
+DigitalBrain.Flows.FlowWaiting.Equals(DigitalBrain.Flows.FlowWaiting? other) -> bool
+DigitalBrain.Flows.FlowWaiting.FlowId.get -> string!
+DigitalBrain.Flows.FlowWaiting.FlowId.init -> void
+DigitalBrain.Flows.FlowWaiting.FlowWaiting(string! FlowId, string! Step, DigitalBrain.Flows.WaitReason Reason, string? ConfirmationPlanId) -> void
+DigitalBrain.Flows.FlowWaiting.Reason.get -> DigitalBrain.Flows.WaitReason
+DigitalBrain.Flows.FlowWaiting.Reason.init -> void
+DigitalBrain.Flows.FlowWaiting.Step.get -> string!
+DigitalBrain.Flows.FlowWaiting.Step.init -> void
+DigitalBrain.Flows.RelationKind
+DigitalBrain.Flows.RelationKind.BlockedBy = 0 -> DigitalBrain.Flows.RelationKind
+DigitalBrain.Flows.RelationKind.Blocks = 1 -> DigitalBrain.Flows.RelationKind
+DigitalBrain.Flows.RelationKind.Duplicates = 7 -> DigitalBrain.Flows.RelationKind
+DigitalBrain.Flows.RelationKind.Follows = 2 -> DigitalBrain.Flows.RelationKind
+DigitalBrain.Flows.RelationKind.Parent = 5 -> DigitalBrain.Flows.RelationKind
+DigitalBrain.Flows.RelationKind.Precedes = 3 -> DigitalBrain.Flows.RelationKind
+DigitalBrain.Flows.RelationKind.Relates = 6 -> DigitalBrain.Flows.RelationKind
+DigitalBrain.Flows.RelationKind.Subtask = 4 -> DigitalBrain.Flows.RelationKind
+DigitalBrain.Flows.StepOutcome
+DigitalBrain.Flows.StepOutcome.Completed = 1 -> DigitalBrain.Flows.StepOutcome
+DigitalBrain.Flows.StepOutcome.Failed = 2 -> DigitalBrain.Flows.StepOutcome
+DigitalBrain.Flows.StepOutcome.Started = 0 -> DigitalBrain.Flows.StepOutcome
+DigitalBrain.Flows.StepResult<T>
+DigitalBrain.Flows.StepResult<T>.<Clone>$() -> DigitalBrain.Flows.StepResult<T>!
+DigitalBrain.Flows.StepResult<T>.Deconstruct(out T Next, out DigitalBrain.Flows.Waiting? Wait, out System.Collections.Generic.IReadOnlyList<DigitalBrain.Signal!>? Emits) -> void
+DigitalBrain.Flows.StepResult<T>.Emits.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Signal!>?
+DigitalBrain.Flows.StepResult<T>.Emits.init -> void
+DigitalBrain.Flows.StepResult<T>.Equals(DigitalBrain.Flows.StepResult<T>? other) -> bool
+DigitalBrain.Flows.StepResult<T>.Next.get -> T
+DigitalBrain.Flows.StepResult<T>.Next.init -> void
+DigitalBrain.Flows.StepResult<T>.StepResult(T Next, DigitalBrain.Flows.Waiting? Wait = null, System.Collections.Generic.IReadOnlyList<DigitalBrain.Signal!>? Emits = null) -> void
+DigitalBrain.Flows.StepResult<T>.Wait.get -> DigitalBrain.Flows.Waiting?
+DigitalBrain.Flows.StepResult<T>.Wait.init -> void
+DigitalBrain.Flows.WaitOutcome
+DigitalBrain.Flows.WaitOutcome.Approved = 0 -> DigitalBrain.Flows.WaitOutcome
+DigitalBrain.Flows.WaitOutcome.Arrived = 2 -> DigitalBrain.Flows.WaitOutcome
+DigitalBrain.Flows.WaitOutcome.Cancelled = 4 -> DigitalBrain.Flows.WaitOutcome
+DigitalBrain.Flows.WaitOutcome.Denied = 1 -> DigitalBrain.Flows.WaitOutcome
+DigitalBrain.Flows.WaitOutcome.Expired = 3 -> DigitalBrain.Flows.WaitOutcome
+DigitalBrain.Flows.WaitReason
+DigitalBrain.Flows.WaitReason.Approval = 0 -> DigitalBrain.Flows.WaitReason
+DigitalBrain.Flows.WaitReason.External = 1 -> DigitalBrain.Flows.WaitReason
+DigitalBrain.Flows.WaitReason.Schedule = 2 -> DigitalBrain.Flows.WaitReason
+DigitalBrain.Flows.Waiting
+DigitalBrain.Flows.Waiting.<Clone>$() -> DigitalBrain.Flows.Waiting!
+DigitalBrain.Flows.Waiting.ConfirmationPlanId.get -> string?
+DigitalBrain.Flows.Waiting.ConfirmationPlanId.init -> void
+DigitalBrain.Flows.Waiting.Deconstruct(out string! Step, out DigitalBrain.Flows.WaitReason Reason, out System.DateTimeOffset? Expires, out string? ConfirmationPlanId) -> void
+DigitalBrain.Flows.Waiting.Equals(DigitalBrain.Flows.Waiting? other) -> bool
+DigitalBrain.Flows.Waiting.Expires.get -> System.DateTimeOffset?
+DigitalBrain.Flows.Waiting.Expires.init -> void
+DigitalBrain.Flows.Waiting.Reason.get -> DigitalBrain.Flows.WaitReason
+DigitalBrain.Flows.Waiting.Reason.init -> void
+DigitalBrain.Flows.Waiting.Step.get -> string!
+DigitalBrain.Flows.Waiting.Step.init -> void
+DigitalBrain.Flows.Waiting.Waiting(string! Step, DigitalBrain.Flows.WaitReason Reason, System.DateTimeOffset? Expires, string? ConfirmationPlanId) -> void
+abstract DigitalBrain.Flows.Flow<T>.Run(string! step, T! inner, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Flows.StepResult<T!>!>!
+abstract DigitalBrain.Flows.Flow<T>.Steps.get -> System.Collections.Generic.IReadOnlyList<string!>!
+const DigitalBrain.Flows.Flow<T>.ExpiryReminder = "flow-expiry" -> string!
+const DigitalBrain.Flows.Flow<T>.NudgeReminder = "flow-nudge" -> string!
+override DigitalBrain.Flows.Flow<T>.OnActivate(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+override DigitalBrain.Flows.Flow<T>.OnDeactivate(DigitalBrain.DeactivationCause cause, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+override DigitalBrain.Flows.Flow<T>.OnReminder(string! name, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+override DigitalBrain.Flows.FlowDone.<Clone>$() -> DigitalBrain.Flows.FlowDone!
+override DigitalBrain.Flows.FlowDone.Equals(object? obj) -> bool
+override DigitalBrain.Flows.FlowDone.GetHashCode() -> int
+override DigitalBrain.Flows.FlowDone.ToString() -> string!
+override DigitalBrain.Flows.FlowRelation.Equals(object? obj) -> bool
+override DigitalBrain.Flows.FlowRelation.GetHashCode() -> int
+override DigitalBrain.Flows.FlowRelation.ToString() -> string!
+override DigitalBrain.Flows.FlowResolve.<Clone>$() -> DigitalBrain.Flows.FlowResolve!
+override DigitalBrain.Flows.FlowResolve.Equals(object? obj) -> bool
+override DigitalBrain.Flows.FlowResolve.GetHashCode() -> int
+override DigitalBrain.Flows.FlowResolve.ToString() -> string!
+override DigitalBrain.Flows.FlowStarted.<Clone>$() -> DigitalBrain.Flows.FlowStarted!
+override DigitalBrain.Flows.FlowStarted.Equals(object? obj) -> bool
+override DigitalBrain.Flows.FlowStarted.GetHashCode() -> int
+override DigitalBrain.Flows.FlowStarted.ToString() -> string!
+override DigitalBrain.Flows.FlowState<T>.Equals(object? obj) -> bool
+override DigitalBrain.Flows.FlowState<T>.GetHashCode() -> int
+override DigitalBrain.Flows.FlowState<T>.ToString() -> string!
+override DigitalBrain.Flows.FlowStep.<Clone>$() -> DigitalBrain.Flows.FlowStep!
+override DigitalBrain.Flows.FlowStep.Equals(object? obj) -> bool
+override DigitalBrain.Flows.FlowStep.GetHashCode() -> int
+override DigitalBrain.Flows.FlowStep.ToString() -> string!
+override DigitalBrain.Flows.FlowWaiting.<Clone>$() -> DigitalBrain.Flows.FlowWaiting!
+override DigitalBrain.Flows.FlowWaiting.Equals(object? obj) -> bool
+override DigitalBrain.Flows.FlowWaiting.GetHashCode() -> int
+override DigitalBrain.Flows.FlowWaiting.ToString() -> string!
+override DigitalBrain.Flows.StepResult<T>.Equals(object? obj) -> bool
+override DigitalBrain.Flows.StepResult<T>.GetHashCode() -> int
+override DigitalBrain.Flows.StepResult<T>.ToString() -> string!
+override DigitalBrain.Flows.Waiting.Equals(object? obj) -> bool
+override DigitalBrain.Flows.Waiting.GetHashCode() -> int
+override DigitalBrain.Flows.Waiting.ToString() -> string!
+override sealed DigitalBrain.Flows.FlowDone.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Flows.FlowResolve.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Flows.FlowStarted.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Flows.FlowStep.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Flows.FlowWaiting.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.Flows.FlowDone.operator !=(DigitalBrain.Flows.FlowDone? left, DigitalBrain.Flows.FlowDone? right) -> bool
+static DigitalBrain.Flows.FlowDone.operator ==(DigitalBrain.Flows.FlowDone? left, DigitalBrain.Flows.FlowDone? right) -> bool
+static DigitalBrain.Flows.FlowRelation.operator !=(DigitalBrain.Flows.FlowRelation? left, DigitalBrain.Flows.FlowRelation? right) -> bool
+static DigitalBrain.Flows.FlowRelation.operator ==(DigitalBrain.Flows.FlowRelation? left, DigitalBrain.Flows.FlowRelation? right) -> bool
+static DigitalBrain.Flows.FlowResolve.operator !=(DigitalBrain.Flows.FlowResolve? left, DigitalBrain.Flows.FlowResolve? right) -> bool
+static DigitalBrain.Flows.FlowResolve.operator ==(DigitalBrain.Flows.FlowResolve? left, DigitalBrain.Flows.FlowResolve? right) -> bool
+static DigitalBrain.Flows.FlowStarted.operator !=(DigitalBrain.Flows.FlowStarted? left, DigitalBrain.Flows.FlowStarted? right) -> bool
+static DigitalBrain.Flows.FlowStarted.operator ==(DigitalBrain.Flows.FlowStarted? left, DigitalBrain.Flows.FlowStarted? right) -> bool
+static DigitalBrain.Flows.FlowStep.operator !=(DigitalBrain.Flows.FlowStep? left, DigitalBrain.Flows.FlowStep? right) -> bool
+static DigitalBrain.Flows.FlowStep.operator ==(DigitalBrain.Flows.FlowStep? left, DigitalBrain.Flows.FlowStep? right) -> bool
+static DigitalBrain.Flows.FlowWaiting.operator !=(DigitalBrain.Flows.FlowWaiting? left, DigitalBrain.Flows.FlowWaiting? right) -> bool
+static DigitalBrain.Flows.FlowWaiting.operator ==(DigitalBrain.Flows.FlowWaiting? left, DigitalBrain.Flows.FlowWaiting? right) -> bool
+static DigitalBrain.Flows.StepResult<T>.operator !=(DigitalBrain.Flows.StepResult<T>? left, DigitalBrain.Flows.StepResult<T>? right) -> bool
+static DigitalBrain.Flows.StepResult<T>.operator ==(DigitalBrain.Flows.StepResult<T>? left, DigitalBrain.Flows.StepResult<T>? right) -> bool
+static DigitalBrain.Flows.Waiting.operator !=(DigitalBrain.Flows.Waiting? left, DigitalBrain.Flows.Waiting? right) -> bool
+static DigitalBrain.Flows.Waiting.operator ==(DigitalBrain.Flows.Waiting? left, DigitalBrain.Flows.Waiting? right) -> bool
+virtual DigitalBrain.Flows.Flow<T>.PlanFor(string! step, T! inner) -> DigitalBrain.Confirmation.ConfirmationPlan!
+virtual DigitalBrain.Flows.Flow<T>.Start(string! title, string! owner, string? parentFlowId, T! inner) -> System.Threading.Tasks.Task!
+~DigitalBrain.Flows.FlowState<T>.<Clone>$() -> DigitalBrain.Flows.FlowState<T>!
+~DigitalBrain.Flows.FlowState<T>.Equals(DigitalBrain.Flows.FlowState<T>? other) -> bool
+~static DigitalBrain.Flows.FlowState<T>.operator !=(DigitalBrain.Flows.FlowState<T>? left, DigitalBrain.Flows.FlowState<T>? right) -> bool
+~static DigitalBrain.Flows.FlowState<T>.operator ==(DigitalBrain.Flows.FlowState<T>? left, DigitalBrain.Flows.FlowState<T>? right) -> bool
+DigitalBrain.Flows.FlowRelated
+DigitalBrain.Flows.FlowRelated.Deconstruct(out string! FlowId, out DigitalBrain.Flows.FlowRelation! Relation) -> void
+DigitalBrain.Flows.FlowRelated.Equals(DigitalBrain.Flows.FlowRelated? other) -> bool
+DigitalBrain.Flows.FlowRelated.FlowId.get -> string!
+DigitalBrain.Flows.FlowRelated.FlowId.init -> void
+DigitalBrain.Flows.FlowRelated.FlowRelated(string! FlowId, DigitalBrain.Flows.FlowRelation! Relation) -> void
+DigitalBrain.Flows.FlowRelated.Relation.get -> DigitalBrain.Flows.FlowRelation!
+DigitalBrain.Flows.FlowRelated.Relation.init -> void
+DigitalBrain.Flows.IFlowCallbacks
+DigitalBrain.Flows.IFlowCallbacks.ConfirmationFailed(string! planId, string! detail, string! proof) -> System.Threading.Tasks.Task!
+override DigitalBrain.Flows.FlowRelated.<Clone>$() -> DigitalBrain.Flows.FlowRelated!
+override DigitalBrain.Flows.FlowRelated.Equals(object? obj) -> bool
+override DigitalBrain.Flows.FlowRelated.GetHashCode() -> int
+override DigitalBrain.Flows.FlowRelated.ToString() -> string!
+override sealed DigitalBrain.Flows.FlowRelated.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.Flows.FlowRelated.operator !=(DigitalBrain.Flows.FlowRelated? left, DigitalBrain.Flows.FlowRelated? right) -> bool
+static DigitalBrain.Flows.FlowRelated.operator ==(DigitalBrain.Flows.FlowRelated? left, DigitalBrain.Flows.FlowRelated? right) -> bool
+DigitalBrain.Flows.IFlowCallbacks.ConfirmationAnswered(string! planId, DigitalBrain.Confirmation.ConfirmationOutcome outcome, string! proof) -> System.Threading.Tasks.Task!
+DigitalBrain.Flows.IFlowCallbacks.Advance() -> System.Threading.Tasks.Task!
+DigitalBrain.Spi.INeuronContext.TraceId.get -> string?
+DigitalBrain.Flows.IFlowCallbacks.CancelRequested(string! reason, string! proof) -> System.Threading.Tasks.Task!
+DigitalBrain.Flows.StepOutcome.Interrupted = 3 -> DigitalBrain.Flows.StepOutcome
+DigitalBrain.Flows.FlowState<T>.Interruptions.get -> int
+DigitalBrain.Flows.FlowState<T>.Interruptions.init -> void

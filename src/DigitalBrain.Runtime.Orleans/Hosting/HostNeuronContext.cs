@@ -71,6 +71,9 @@ internal sealed class HostNeuronContext : INeuronContext, IHostNeuronContext
     /// <summary>Operations started by this neuron: entities <c>brain/runtime.operation/id</c> in its own brain, origin this neuron.</summary>
     public IOperations Operations => field ??= new RuntimeOperations(_services, Id.Brain, Id.ToString());
 
+    /// <summary>Read-only view of the operations of this neuron's brain.</summary>
+    public IOperationsQuery OperationsQuery => field ??= new RuntimeOperationsQuery(_services, Id.Brain);
+
     public ISynapses Synapses { get; }
 
     /// <summary>The activation's synapse engine, for runtime services (04-13) that use the alias and brain-wide forms.</summary>
@@ -88,6 +91,8 @@ internal sealed class HostNeuronContext : INeuronContext, IHostNeuronContext
     public DigitalBrain.Confirmation.IConfirmations Confirmations
         => _services.GetService<IConfirmationContexts>()?.For(Id.Brain, Id.ToString())
             ?? _services.GetService<DigitalBrain.Confirmation.IConfirmations>() ?? UnavailableConfirmations.Instance;
+
+    public string? TraceId => DigitalBrain.Runtime.Orleans.Synapses.CurrentCause.Stamp().TraceId;
 
     public string Caller => RequestContext.Get(CallerKey) as string ?? string.Empty;
 

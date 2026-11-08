@@ -149,7 +149,7 @@ internal sealed class SessionSynapseNeuron(IOptions<SessionSynapseOptions> optio
         }
         var encoded = payloads.EncodeSignal(item.Signal);
         using var json = JsonDocument.Parse(encoded.Json);
-        _pending.Add(new SessionSignal(item.Publisher.ToString(), item.Sequence, encoded.Type, json.RootElement.Clone(), item.At));
+        _pending.Add(new SessionSignal(item.Publisher.ToString(), item.Sequence, encoded.Type, json.RootElement.Clone(), item.At, item.TraceId, item.CausationId));
         Wake();
         return Task.CompletedTask;
     }

@@ -1,5 +1,6 @@
 using System.Text;
 using DigitalBrain.Capabilities;
+using DigitalBrain.Capabilities.Compute;
 using DigitalBrain.Capabilities.Connections.Broker;
 using DigitalBrain.Capabilities.Storage;
 using DigitalBrain.Contracts;
@@ -186,6 +187,57 @@ public sealed class OperationEntityFacts(OperationSilo silo) : IClassFixture<Ope
 
     private static async Task<OperationResult> Done(IOperation operation)
         => await ((RuntimeOperation)operation).Completion.WaitAsync(TimeSpan.FromSeconds(30));
+
+    private sealed record ProbePlan() : OperationPlan(false);
+
+    private static RuntimeOperationsQuery Query(OperationSilo silo, string brain) => new RuntimeOperationsQuery(silo.Services, new BrainId(brain));
+
+    [Fact]
+    public async Task RunningListsAStartedOperation()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var operation = await silo.Operations("op-q-running").Start(new ProbePlan(), ct);
+        await operation.Report(0.5);
+
+        var view = Assert.Single(await Query(silo, "op-q-running").Running(ct));
+        Assert.Equal(operation.Id, view.Id);
+        Assert.Equal("ProbePlan", view.Kind);
+        Assert.Equal("fact", view.Origin);
+        Assert.Equal(0.5, view.Fraction);
+        Assert.Null(view.Result);
+
+        await operation.Complete(new OperationResult.Succeeded());
+        Assert.Empty(await Query(silo, "op-q-running").Running(ct));
+    }
+
+    [Fact]
+    public async Task ReadReturnsResultAfterComplete()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var operation = await silo.Operations("op-q-read").Start(new ProbePlan(), ct);
+        Assert.Null((await Query(silo, "op-q-read").Read(operation.Id, ct))!.Result);
+
+        await operation.Complete(new OperationResult.Succeeded());
+        var view = (await Query(silo, "op-q-read").Read(operation.Id, ct))!;
+        Assert.IsType<OperationResult.Succeeded>(view.Result);
+        Assert.Equal(1d, view.Fraction);
+    }
+
+    [Fact]
+    public async Task ReadOfUnknownIdIsNull()
+        => Assert.Null(await Query(silo, "op-q-unknown").Read(new OperationId("op-nope"), TestContext.Current.CancellationToken));
+
+    [Fact]
+    public async Task ViewCarriesTraceIdOfStart()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var trace = new Trace { TraceId = "trace-of-start", PayerAccountId = "acct", BrainId = "op-q-trace", Origin = new NeuronId(new BrainId("op-q-trace"), "edge", "request") };
+        IOperation operation;
+        using (TraceContext.Enter(trace)) { operation = await silo.Operations("op-q-trace").Start(new ProbePlan(), ct); }
+
+        Assert.Equal("trace-of-start", (await Query(silo, "op-q-trace").Read(operation.Id, ct))!.TraceId);
+        Assert.Equal("trace-of-start", Assert.Single(await Query(silo, "op-q-trace").Running(ct)).TraceId);
+    }
 
     [Fact]
     public async Task Start_saves_the_entity_and_publishes_started_progress_and_done_in_order()

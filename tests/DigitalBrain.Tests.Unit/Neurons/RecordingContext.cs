@@ -19,7 +19,9 @@ internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronSta
 
     public NeuronId Id { get; } = id;
 
-    public IServiceProvider Services => throw new NotSupportedException();
+    public IServiceProvider? RecordedServices { get; set; }
+
+    public IServiceProvider Services => RecordedServices ?? throw new NotSupportedException();
 
     public TimeProvider Time { get; set; } = TimeProvider.System;
 
@@ -27,14 +29,20 @@ internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronSta
 
     public ITimers Timers => throw new NotSupportedException();
 
-    public IReminders Reminders => throw new NotSupportedException();
+    public IReminders? RecordedReminders { get; set; }
+
+    public IReminders Reminders => RecordedReminders ?? throw new NotSupportedException();
 
     public IOperations Operations => throw new NotSupportedException();
-    public DigitalBrain.Confirmation.IConfirmations Confirmations => throw new NotSupportedException();
+    public IOperationsQuery OperationsQuery => throw new NotSupportedException();
+    public DigitalBrain.Confirmation.IConfirmations? RecordedConfirmations { get; set; }
+    public DigitalBrain.Confirmation.IConfirmations Confirmations => RecordedConfirmations ?? throw new NotSupportedException();
 
     public ISynapses Synapses => this;
 
     public ISignalHistory History => this;
+
+    public string? TraceId { get; set; }
 
     public List<Synapse> SynapseList { get; } = [];
 
@@ -111,6 +119,9 @@ internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronSta
 
     public Task<SignalPage> Read(long since, int limit, CancellationToken ct)
         => Task.FromResult(Page(_ => true, since, limit));
+
+    public Task<SignalPage> ReadTrace(string traceId, long since, int limit, CancellationToken ct)
+        => string.IsNullOrEmpty(traceId) ? throw new ArgumentException("A trace id is required.", nameof(traceId)) : Task.FromResult(Page(entry => entry.TraceId == traceId, since, limit));
 
     private SignalPage Page(Func<JournaledSignal, bool> filter, long since, int limit)
     {

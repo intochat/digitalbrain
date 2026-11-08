@@ -81,6 +81,21 @@ public sealed class TestJournal : ISignalHistory
         }
     }
 
+    /// <inheritdoc />
+    public Task<SignalPage> ReadTrace(string traceId, long since, int limit, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(traceId);
+        SignalPage.CheckLimit(limit);
+        ct.ThrowIfCancellationRequested();
+        lock (_gate)
+        {
+            var floor = _brain.Count == 0 ? _position : _brain[0].Position - 1;
+            var page = _brain.Where(item => item.Position > since && item.Entry.TraceId == traceId).Take(limit)
+                .Select(item => item.Entry with { Sequence = item.Position }).ToList();
+            return Task.FromResult(new SignalPage(floor, _position, page));
+        }
+    }
+
     internal T? Load<T>(NeuronId id)
     {
         lock (_gate) { return _states.TryGetValue(id, out var json) ? json.Deserialize<T>(RuntimeProtocol.OptionsFor(typeof(T))) : default; }
@@ -135,10 +150,11 @@ public sealed class TestJournal : ISignalHistory
         if (publisher.Brain != Brain) { throw new UnauthorizedAccessException($"Neuron {publisher} may not write to brain {Brain}."); }
         if (!_logs.TryGetValue(publisher, out var log)) { _logs[publisher] = log = new Log(); }
         var now = _time.GetUtcNow();
+        var (traceId, causationId) = TestCause.Stamp();
         List<JournaledSignal> written = [];
         foreach (var signal in signals)
         {
-            var entry = new JournaledSignal(publisher, ++log.Last, signal, now);
+            var entry = new JournaledSignal(publisher, ++log.Last, signal, now, traceId, causationId);
             log.Entries.Add(entry);
             _brain.Add((++_position, entry));
             written.Add(entry);

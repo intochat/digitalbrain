@@ -2,6 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/DigitalBrain/DigitalBrain.csproj" />
     <ProjectReference Include="../../src/DigitalBrain.UI/DigitalBrain.UI.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="MovedTypes.json" CopyToOutputDirectory="PreserveNewest" />

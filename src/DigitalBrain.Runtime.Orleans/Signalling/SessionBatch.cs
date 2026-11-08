@@ -13,7 +13,10 @@ public sealed record SessionBatch(long Number, IReadOnlyList<SessionSignal> Sign
 /// <param name="Alias">The <c>[Signal]</c> alias; <c>synapse.gap</c> when history was trimmed past the session's cursor.</param>
 /// <param name="Payload">The signal as JSON (web defaults).</param>
 /// <param name="At">When it was published.</param>
-public sealed record SessionSignal(string Source, long Sequence, string Alias, JsonElement Payload, DateTimeOffset At);
+/// <param name="TraceId">The trace id it was journaled with, or null.</param>
+/// <param name="CausationId">The causation id it was journaled with, or null.</param>
+public sealed record SessionSignal(string Source, long Sequence, string Alias, JsonElement Payload, DateTimeOffset At,
+    string? TraceId = null, string? CausationId = null);
 
 /// <summary>A session already holds <see cref="SessionSynapseOptions.MaxSessionSynapses"/> synapses.</summary>
 public sealed class SessionLimitException : InvalidOperationException

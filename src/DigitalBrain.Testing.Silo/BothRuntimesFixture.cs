@@ -113,6 +113,8 @@ public abstract class BothRuntimesFixture : IAsyncLifetime
         public Task<IReadOnlyList<T>> Signals<T>(NeuronId publisher, CancellationToken ct) where T : Signal
             => Task.FromResult<IReadOnlyList<T>>([.. os.Journal(publisher.Brain).Signals(publisher).Select(entry => entry.Signal).OfType<T>()]);
 
+        public Task ApproveAsPerson(string planId, CancellationToken ct) => os.Confirmations.Approve(planId);
+
         public Task Restart(CancellationToken ct) => os.Restart();
 
         public ValueTask DisposeAsync() => os.DisposeAsync();
@@ -149,6 +151,15 @@ public abstract class BothRuntimesFixture : IAsyncLifetime
             var page = await journal.ReadSince(publisher.Brain.Value, publisher.ToString(), 0, 1_000, ct).ConfigureAwait(false);
             var alias = AliasOf(typeof(T));
             return [.. page.Signals.Where(entry => entry.Type == alias).Select(entry => JsonSerializer.Deserialize<T>(entry.Json.Span, RuntimeProtocol.Json)!)];
+        }
+
+        public async Task ApproveAsPerson(string planId, CancellationToken ct)
+        {
+            var inbox = SiloNeurons.Get<DigitalBrain.Confirmation.IConfirmationInbox>(host.Services,
+                new NeuronId(brain, "runtime.confirmations", DigitalBrain.Confirmation.IConfirmations.ConfirmationsNeuronKey));
+            using var stamp = DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.Stamp(
+                DigitalBrain.Capabilities.CapabilityCallers.Of("person", "person", brain.Value));
+            await inbox.Resolve(planId, approve: true).WaitAsync(ct).ConfigureAwait(false);
         }
 
         public Task Restart(CancellationToken ct) => host.Restart(ct);
