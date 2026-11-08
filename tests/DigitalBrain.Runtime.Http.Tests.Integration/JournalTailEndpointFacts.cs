@@ -64,6 +64,23 @@ public sealed class JournalTailEndpointFacts
         Assert.False(signal.TryGetProperty("signal", out _));
     }
 
+    [Fact]
+    public async Task MappingTheModuleSurfacesExposesTheTail()
+    {
+        var history = new LockedHistory();
+        history.Append(new Tick(1));
+        await using var app = await Start(history, surfaces: true);
+        using var client = Client(app);
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/brains/b1/journal/tail");
+        request.Headers.Add("X-Test-Caller", "user");
+        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, Ct);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var reader = new StreamReader(await response.Content.ReadAsStreamAsync(Ct));
+
+        var first = await NextEvent(reader);
+        Assert.Equal([1L], Sequences(first.Data));
+    }
+
     private static long[] Sequences(JsonDocument data)
         => [.. data.RootElement.GetProperty("signals").EnumerateArray().Select(item => item.GetProperty("seq").GetInt64())];
 
@@ -85,7 +102,7 @@ public sealed class JournalTailEndpointFacts
 
     private static HttpClient Client(WebApplication app) => new() { BaseAddress = new Uri(app.Urls.First()) };
 
-    private static async Task<WebApplication> Start(ISignalHistory history)
+    private static async Task<WebApplication> Start(ISignalHistory history, bool surfaces = false)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions
         {
@@ -106,7 +123,8 @@ public sealed class JournalTailEndpointFacts
             }
             await next(http);
         });
-        JournalTailEndpoints.Map(app);
+        if (surfaces) { app.MapModuleHttpSurfaces(); }
+        else { JournalTailEndpoints.Map(app); }
         await app.StartAsync();
         return app;
     }

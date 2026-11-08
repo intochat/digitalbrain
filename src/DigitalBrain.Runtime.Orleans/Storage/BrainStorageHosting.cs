@@ -45,6 +45,8 @@ public static class BrainStorageHosting
                 .Distinct()));
         services.TryAddSingleton<JournalPayloads>();
         services.TryAddSingleton<BrainSignalHistories>();
+        // The brain history the HTTP journal tail (DigitalBrain.Runtime.Http) resolves.
+        services.TryAddSingleton<Func<BrainId, DigitalBrain.Spi.ISignalHistory>>(sp => sp.GetRequiredService<BrainSignalHistories>().For);
         return services;
     }
 

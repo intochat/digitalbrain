@@ -15,8 +15,9 @@ namespace DigitalBrain.Runtime.Http.Surface;
 /// graph. Behind the <see cref="BrainRouteGroups.Brain"/> membership check like every brain read. Each event is
 /// <c>journaled-signal</c> with data <c>{"signals":[{seq,publisher,alias,traceId,causationId,at}]}</c>: the signals
 /// <see cref="ISignalHistory.Watch"/> yields after <c>since</c> (default 0), coalesced into batches at most
-/// <see cref="Window"/> apart. Payloads are not sent; a client reads one through the brain's history reads. The host registers a
-/// <see cref="Func{BrainId, ISignalHistory}"/> service; without one the route answers 503.
+/// <see cref="Window"/> apart. Payloads are not sent; a client reads one through the brain's history reads. Mapped by
+/// <see cref="ModuleHttpSurfaces.MapModuleHttpSurfaces"/>; the history is the <see cref="Func{BrainId, ISignalHistory}"/> service the
+/// Orleans runtime registers with its brain storage (503 when no runtime registered one).
 /// </summary>
 public static class JournalTailEndpoints
 {

@@ -56,7 +56,10 @@ public sealed class ModuleHttpSurfaceFacts
     public async Task Maps_the_26_auth_routes_with_explicit_anonymous_metadata()
     {
         await using var host = await Host.Start(services => services.AddModuleHttpSurface<AuthSurface>().AddModuleHttpSurface<AuthSurface>());
-        var endpoints = host.App.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>().ToList();
+        var all = host.App.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>().ToList();
+        // MapModuleHttpSurfaces also maps the brain journal tail.
+        Assert.Single(all, candidate => candidate.RoutePattern.RawText == "/brains/{brainId}/journal/tail");
+        var endpoints = all.Where(candidate => candidate.RoutePattern.RawText != "/brains/{brainId}/journal/tail").ToList();
         Assert.Equal(26, endpoints.Count);
         foreach (var (method, path, anonymous) in AuthSurface.Routes)
         {

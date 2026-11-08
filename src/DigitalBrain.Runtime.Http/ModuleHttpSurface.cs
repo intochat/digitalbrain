@@ -35,7 +35,7 @@ public static class ModuleHttpSurfaces
     }
 
     /// <summary>
-    /// Maps every registered surface onto one session-required group at the root of <paramref name="endpoints"/>: a request
+    /// Maps every registered surface, and the brain journal tail (<see cref="Surface.JournalTailEndpoints"/>), onto one session-required group at the root of <paramref name="endpoints"/>: a request
     /// without an authenticated user is answered 401 unless the endpoint allows anonymous callers (<c>.AllowAnonymous()</c>).
     /// </summary>
     /// <returns>The surface group, for host conventions (rate limits, filters).</returns>
@@ -45,6 +45,7 @@ public static class ModuleHttpSurfaces
         var group = endpoints.MapGroup("");
         group.AddEndpointFilter(RequireSession);
         foreach (var surface in endpoints.ServiceProvider.GetServices<IModuleHttpSurface>()) { surface.Map(group); }
+        Surface.JournalTailEndpoints.Map(group);
         return group;
     }
 
