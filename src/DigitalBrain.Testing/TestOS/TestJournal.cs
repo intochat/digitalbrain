@@ -148,10 +148,11 @@ public sealed class TestJournal : ISignalHistory
         if (publisher.Brain != Brain) { throw new UnauthorizedAccessException($"Neuron {publisher} may not write to brain {Brain}."); }
         if (!_logs.TryGetValue(publisher, out var log)) { _logs[publisher] = log = new Log(); }
         var now = _time.GetUtcNow();
+        var (traceId, causationId) = TestCause.Stamp();
         List<JournaledSignal> written = [];
         foreach (var signal in signals)
         {
-            var entry = new JournaledSignal(publisher, ++log.Last, signal, now);
+            var entry = new JournaledSignal(publisher, ++log.Last, signal, now, traceId, causationId);
             log.Entries.Add(entry);
             _brain.Add((++_position, entry));
             written.Add(entry);

@@ -49,6 +49,24 @@ public sealed class TraceStampingFacts(SynapseSilo silo) : IClassFixture<Synapse
     }
 
     [Fact]
+    public async Task CalledNeuronInheritsTraceAndCausationFromReaction()
+    {
+        // No request trace: the source save gets a fresh one, which the reaction carries into the neuron it calls.
+        const string Source = "b1/probe.counter/trace-call", Caller = "b1/probe.caller/trace-call", Called = "b1/probe.counter/trace-call-called";
+        await silo.Get<ICaller>(Caller).Follow(Source);
+        await silo.Get<ICounter>(Source).Add(1);
+
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        JournaledSignal[] called;
+        while ((called = await Journal(Called)).Length < 1 && DateTime.UtcNow < deadline) { await Task.Delay(50, Ct); }
+        var cause = Assert.Single(await Journal(Source));
+        var effect = Assert.Single(called);
+        Assert.NotNull(cause.TraceId);
+        Assert.Equal(cause.TraceId, effect.TraceId);
+        Assert.Equal(Causation.Address(NeuronId.Parse(Source), 1), effect.CausationId);
+    }
+
+    [Fact]
     public async Task SaveOutsideContextGetsFreshTrace()
     {
         const string Source = "b1/probe.counter/trace-fresh";
@@ -92,4 +110,19 @@ public sealed class RelayNeuron : Neuron<CounterState>, IRelay
 
     [On]
     public Task On(Counted signal) => Save(State with { Value = signal.Value }, new Noted("relayed:" + signal.Value));
+}
+
+public interface ICaller
+{
+    Task Follow(string source);
+}
+
+/// <summary>Reacts to each <see cref="Counted"/> by calling the counter keyed <c>{its key}-called</c>, which saves in the reaction's trace.</summary>
+[Neuron("probe.caller")]
+public sealed class CallerNeuron : Neuron, ICaller
+{
+    public Task Follow(string source) => Context.Synapses.Ensure<Counted>(NeuronId.Parse(source));
+
+    [On]
+    public Task On(Counted signal) => Get<ICounter>(new NeuronId(Id.Brain, "probe.counter", Id.Key + "-called")).Add(signal.Value);
 }
