@@ -6,7 +6,7 @@ namespace DigitalBrain;
 [NeuronAlias("synapse.sources")]
 public interface ISources
 {
-    /// <summary>Stores <paramref name="record"/>, replacing the record of its source key; journals <see cref="Deployed"/> when the hash is new.</summary>
+    /// <summary>Stores <paramref name="record"/>, replacing the record of its source key; journals <see cref="Deployed"/>.</summary>
     /// <param name="record">The record.</param>
     /// <param name="ct">Cancellation.</param>
     Task Put(SourceRecord record, CancellationToken ct);
@@ -50,11 +50,9 @@ public sealed class SourcesNeuron : Neuron<SourcesState>, ISources
     public Task Put(SourceRecord record, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(record);
-        var existing = Find(record.SourceKey);
         var next = State with { Records = [.. State.Records.Where(r => r.SourceKey != record.SourceKey), record] };
-        return existing is not null && existing.Hash == record.Hash
-            ? Save(next, [])
-            : Save(next, new Deployed(record.SourceKey, record.Hash, record.Aliases));
+        // A state change publishes a signal: a record of the same build (new bindings) is a deploy again.
+        return Save(next, new Deployed(record.SourceKey, record.Hash, record.Aliases));
     }
 
     /// <inheritdoc />

@@ -133,9 +133,10 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         try
         {
             entries.TryGetValue((brain, source.SourceKey), out var entry);
+            var effective = Effective(source, bindingsPerAlias);
             if (entry is not null && string.Equals(entry.Live.Hash, build.Hash, StringComparison.Ordinal))
             {
-                return new DeployOutcome(DeployStatus.Unchanged, build.Hash, build.Diagnostics, Empty(), null);
+                return await RebindOrKeep(brain, entry, source, build, effective, ct).ConfigureAwait(false);
             }
 
             if (string.Equals(entry?.Staged?.Loaded.Hash, build.Hash, StringComparison.Ordinal))
@@ -168,7 +169,7 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
                 }
             }
 
-            var pending = new Pending(loaded!, source, build, Bindings(aliases, bindingsPerAlias.Count > 0 ? bindingsPerAlias : source.Bindings ?? bindingsPerAlias));
+            var pending = new Pending(loaded!, source, build, Bindings(aliases, effective));
             if (changed.Count > 0)
             {
                 return await StageUpdate(brain, entry!, pending, changed, build.Diagnostics, ct).ConfigureAwait(false);
@@ -301,6 +302,40 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
     private static Dictionary<string, InstallOutcome> Empty() => new(StringComparer.Ordinal);
 
     private static List<string> AliasesOf(LoadedSource source) => [.. source.Catalog.States.Keys.Order(StringComparer.Ordinal)];
+
+    // The bindings a deploy installs with: a non-empty argument wins, otherwise the source's own.
+    private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> Effective(SynapseSource source, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> argument) =>
+        argument.Count > 0 ? argument : source.Bindings ?? argument;
+
+    private static bool SameBindings(List<string> aliases, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> left, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> right) =>
+        aliases.All(alias =>
+        {
+            var l = left.TryGetValue(alias, out var x) ? x : NoBindings;
+            var r = right.TryGetValue(alias, out var y) ? y : NoBindings;
+            return l.Count == r.Count && l.All(pair => r.TryGetValue(pair.Key, out var value) && string.Equals(value, pair.Value, StringComparison.Ordinal));
+        });
+
+    // The live build was deployed again: with the bindings it is stored with it is unchanged; with others the aliases are installed again
+    // under the new bindings (the person already approved these needs) and the record keeps them.
+    private async Task<DeployOutcome> RebindOrKeep(BrainId brain, Entry entry, SynapseSource source, SynapseBuild build, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> effective, CancellationToken ct)
+    {
+        var aliases = AliasesOf(entry.Live);
+        var stored = (await store.Get(brain, source.SourceKey, ct).ConfigureAwait(false))?.Bindings;
+        if (SameBindings(aliases, effective, stored ?? new Dictionary<string, IReadOnlyDictionary<string, string>>()))
+        {
+            return new DeployOutcome(DeployStatus.Unchanged, build.Hash, build.Diagnostics, Empty(), null);
+        }
+
+        var next = new Pending(entry.Live, source, build, Bindings(aliases, effective));
+        var outcomes = await InstallAll(brain, next, ct).ConfigureAwait(false);
+        if (aliases.FirstOrDefault(a => outcomes[a].Status is InstallStatus.Refused or InstallStatus.Denied) is { } refused)
+        {
+            return new DeployOutcome(DeployStatus.Refused, build.Hash, build.Diagnostics, outcomes, $"the install of '{refused}' was {outcomes[refused].Status.ToString().ToLowerInvariant()}: {outcomes[refused].Reason}");
+        }
+
+        await Store(brain, next, ct).ConfigureAwait(false);
+        return new DeployOutcome(DeployStatus.Deployed, build.Hash, build.Diagnostics, outcomes, null);
+    }
 
     private static Dictionary<string, IReadOnlyDictionary<string, string>> Bindings(List<string> aliases, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> given) =>
         aliases.ToDictionary(alias => alias, alias => given.TryGetValue(alias, out var bindings) ? bindings : NoBindings, StringComparer.Ordinal);
