@@ -85,17 +85,14 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
         return React(journaled.Signal, journaled.TraceId, journaled.CausationId, ct);
     }
 
-    // Runs every reaction the signal reaches, typed or by alias, in registration order; the envelope is built once, when first needed.
+    // Runs every reaction the signal reaches, typed or by alias, in registration order; an alias reaction's envelope is built inside
+    // its run (once, then reused), so a payload that cannot be serialised fails that reaction like any other failure.
     private async Task React(Signal signal, string? traceId, string? causationId, CancellationToken ct)
     {
         SignalEnvelope? envelope = null;
         foreach (var reaction in Reactions(signal))
         {
-            if (reaction.SignalAlias is not null)
-            {
-                envelope ??= Envelope(signal, traceId ?? Context.TraceId, causationId);
-            }
-
+            Func<SignalEnvelope>? build = reaction.SignalAlias is null ? null : () => envelope ??= Envelope(signal, traceId ?? Context.TraceId, causationId);
             await Run(reaction, signal, State, async result =>
             {
                 if (ReferenceEquals(result, State)) { return "unchanged"; }
@@ -109,23 +106,26 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
                 }
 
                 return "saved";
-            }, ct, reaction.SignalAlias is null ? null : envelope).ConfigureAwait(true);
+            }, ct, build).ConfigureAwait(true);
             await PendingViews().ConfigureAwait(true);
         }
     }
 
+    // An untyped signal (no loaded unit provides its type) carries the journal's raw JSON; a typed one is serialised with the journal's options.
     private static SignalEnvelope Envelope(Signal signal, string? traceId, string? causationId)
     {
+        if (signal is IUntypedSignal untyped) { return new SignalEnvelope(untyped.Alias, untyped.Payload, traceId, causationId); }
         var type = signal.GetType();
         return new SignalEnvelope(AliasOf(signal), JsonSerializer.SerializeToElement(signal, type, RuntimeProtocol.OptionsFor(type)), traceId, causationId);
     }
 
-    // The reactions of the signal: typed ones whose declared type it is, alias ones whose alias is its [Signal] alias.
+    // The reactions of the signal: typed ones whose declared type it is (never for an untyped signal), alias ones whose alias is its alias.
     private IEnumerable<SynapseDescriptor> Reactions(Signal signal)
     {
         var alias = AliasOf(signal);
+        var untyped = signal is IUntypedSignal;
         return Synapses().Where(d => d.Kind == SynapseKind.Reaction
-            && (d.SignalAlias is null ? d.Signal!.IsInstanceOfType(signal) : string.Equals(d.SignalAlias, alias, StringComparison.Ordinal)));
+            && (d.SignalAlias is null ? !untyped && d.Signal!.IsInstanceOfType(signal) : string.Equals(d.SignalAlias, alias, StringComparison.Ordinal)));
     }
 
     /// <inheritdoc />
@@ -277,7 +277,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
         _viewsPending |= !_journalingRefusal;
     }
 
-    private static string AliasOf(Signal signal) => signal.GetType().GetCustomAttribute<SignalAttribute>()?.Alias ?? signal.GetType().Name;
+    private static string AliasOf(Signal signal) => SignalAliases.Of(signal);
 
     // Remembers a flushed ticket, forgetting the oldest beyond the cap.
     private void Remember(Guid ticket)
@@ -331,9 +331,9 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
     }
 
     private IEnumerable<SynapseDescriptor> Matching(SynapseKind kind, Signal signal) =>
-        Synapses().Where(d => d.Kind == kind && d.SignalAlias is null && d.Signal!.IsInstanceOfType(signal));
+        Synapses().Where(d => d.Kind == kind && d.SignalAlias is null && signal is not IUntypedSignal && d.Signal!.IsInstanceOfType(signal));
 
-    private async Task Run(SynapseDescriptor synapse, Signal? signal, TState state, Func<object?, Task<string>> settle, CancellationToken ct, SignalEnvelope? envelope = null)
+    private async Task Run(SynapseDescriptor synapse, Signal? signal, TState state, Func<object?, Task<string>> settle, CancellationToken ct, Func<SignalEnvelope>? envelope = null)
     {
         var neuron = Id.ToString();
         var arriving = signal is null ? AliasIn(_catalog.Current) ?? Id.Type : AliasOf(signal);
@@ -342,7 +342,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver where
         string outcome;
         try
         {
-            outcome = await settle(await Invoke(synapse, signal, envelope, state, ct).ConfigureAwait(true)).ConfigureAwait(true);
+            outcome = await settle(await Invoke(synapse, signal, envelope?.Invoke(), state, ct).ConfigureAwait(true)).ConfigureAwait(true);
         }
         catch
         {

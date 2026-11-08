@@ -32,7 +32,12 @@ public interface ISynapses
     /// Ensures signals whose journal alias is one of <paramref name="signalAliases"/>, published by any other neuron of this brain, reach
     /// this neuron through its one brain-wide synapse; the subscriber needs no reference to the signal types. Calling it again adds aliases.
     /// </summary>
-    /// <exception cref="ArgumentException">No alias is given, or an alias is empty (or, on a runtime that resolves aliases, unknown).</exception>
+    /// <remarks>
+    /// An alias needs no payload type when the edge is made: no unit has to have registered it, and a publisher loaded later is heard
+    /// without re-wiring. The type is looked up at delivery; when no loaded unit provides it, a state neuron's alias reactions get the
+    /// journal's raw JSON as the <see cref="SignalEnvelope.Payload"/> (typed reactions and <c>[On]</c> methods never see such a signal).
+    /// </remarks>
+    /// <exception cref="ArgumentException">No alias is given, or an alias is empty.</exception>
     /// <exception cref="InvalidOperationException">This neuron is stateless.</exception>
     Task EnsureBrainWide(IReadOnlyList<string> signalAliases);
 

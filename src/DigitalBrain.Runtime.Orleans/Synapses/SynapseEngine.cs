@@ -456,13 +456,14 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
     /// <summary>Whether the brain-wide synapse exists.</summary>
     internal bool HasBrainSynapse => BrainEntry is not null;
 
-    private string[] CheckAliases(string[] aliases)
+    // A brain-wide alias needs no payload type until delivery (ISynapses.EnsureBrainWide(aliases)): only an empty alias is refused.
+    // Typed callers check their types before they get here (EnsureBrain(IReadOnlyList<Type>), the install hooks).
+    private static string[] CheckAliases(string[] aliases)
     {
         if (aliases.Length == 0) { throw new ArgumentException("A synapse names at least one signal alias.", nameof(aliases)); }
-        var map = _services.GetRequiredService<JournalPayloads>().Types;
         foreach (var alias in aliases)
         {
-            if (alias is null || !map.TryResolve(alias, out _)) { throw new ArgumentException($"'{alias}' is not a registered [Signal] alias.", nameof(aliases)); }
+            if (string.IsNullOrWhiteSpace(alias)) { throw new ArgumentException("A signal alias must not be empty.", nameof(aliases)); }
         }
         return [.. aliases.Distinct(StringComparer.Ordinal)];
     }
@@ -476,11 +477,16 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
         try
         {
             var map = _services.GetRequiredService<JournalPayloads>().Types;
-            var wanted = entry.Aliases.Select(alias => map.TryResolve(alias, out var type) ? type : null).OfType<Type>().ToArray();
             var history = History;
+            // An unknown-type signal stays in the page so an alias reaction on its alias hears it with the raw JSON (state neurons only).
+            var receiver = neuron is ISynapseReceiver;
             while (_state.Sources.Contains(entry))
             {
-                var page = await history.Read(entry.Cursor, SignalPage.MaxLimit, CancellationToken.None).ConfigureAwait(true);
+                // Types are looked up per page: a unit loaded after the edge was made is resolved from then on.
+                var wanted = entry.Aliases.Select(alias => map.TryResolve(alias, out var type) ? type : null).OfType<Type>().ToArray();
+                var page = await (receiver && history is BrainSignalHistory journal
+                    ? journal.Read(entry.Cursor, SignalPage.MaxLimit, keepUnknown: true, CancellationToken.None)
+                    : history.Read(entry.Cursor, SignalPage.MaxLimit, CancellationToken.None)).ConfigureAwait(true);
                 _counters.Read();
                 if (page.Floor > entry.Cursor)
                 {
@@ -494,7 +500,10 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
                 foreach (var item in due)
                 {
                     // A state neuron never reacts to its own signals: on StateChanged it would otherwise hear its own saves.
-                    if (!(neuron is ISynapseReceiver && item.Publisher == _id) && wanted.Any(type => type.IsInstanceOfType(item.Signal)))
+                    var heard = item.Signal is UnknownSignal unknown
+                        ? receiver && entry.Aliases.Contains(unknown.Type, StringComparer.Ordinal)
+                        : wanted.Any(type => type.IsInstanceOfType(item.Signal));
+                    if (!(receiver && item.Publisher == _id) && heard)
                     {
                         if (!await React(neuron, item, entry).ConfigureAwait(true)) { return; }
                     }

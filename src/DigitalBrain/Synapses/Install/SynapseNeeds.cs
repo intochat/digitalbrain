@@ -40,7 +40,7 @@ public sealed record SynapseNeeds(
             parts.Add(string.Create(CultureInfo.InvariantCulture, $"react to {typed} signal{(typed == 1 ? "" : "s")}"));
         }
 
-        parts.AddRange(Reactions.Where(r => r.StartsWith(AliasPrefix, StringComparison.Ordinal)).Select(r => $"reacts to {r[AliasPrefix.Length..]}"));
+        parts.AddRange(Reactions.Where(r => r.StartsWith(AliasPrefix, StringComparison.Ordinal)).Select(r => $"react to {r[AliasPrefix.Length..]}"));
 
         if (HasView)
         {

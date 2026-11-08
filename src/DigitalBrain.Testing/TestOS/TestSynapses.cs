@@ -158,7 +158,7 @@ internal sealed class SynapseRegistry(TestOS os)
         }
     }
 
-    private static string AliasOf(Type signal) => signal.GetCustomAttribute<SignalAttribute>(false)?.Alias ?? signal.Name;
+    private static string AliasOf(Type signal) => SignalAliases.Of(signal);
 
     public IReadOnlyList<Synapse> Of(NeuronId subscriber)
     {

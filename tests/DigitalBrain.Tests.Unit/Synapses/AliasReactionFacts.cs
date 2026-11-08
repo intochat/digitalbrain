@@ -43,7 +43,7 @@ public sealed class AliasReactionFacts
     {
         var needs = SynapseCatalog.Scan([typeof(Dash), typeof(Dashboard)]).NeedsOf("dash");
         Assert.Equal(["alias:x.polled"], needs.Reactions);
-        Assert.Contains("reacts to x.polled", needs.Sentence(), StringComparison.Ordinal);
+        Assert.Equal("dash wants to: react to x.polled.", needs.Sentence());
     }
 
     [Fact]
