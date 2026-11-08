@@ -36,7 +36,11 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
 
     private string FlowId => Id.ToString();
 
-    /// <summary>Starts the flow and runs its steps until it waits or ends. A flow that already started ignores it.</summary>
+    /// <summary>
+    /// Starts the flow. A flow that already started ignores it. Returns once the start is durable (saved <see cref="FlowStatus.Running"/>
+    /// with <see cref="FlowStarted"/>); steps run in later turns of this neuron, through a self-call deferred past this turn. A crash
+    /// before the first step is recovered on activation, which advances any running flow that does not wait.
+    /// </summary>
     /// <param name="title">The display title.</param>
     /// <param name="owner">Who the flow runs for.</param>
     /// <param name="parentFlowId">The parent flow's id, if any.</param>
@@ -59,8 +63,12 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
             Inner = inner,
         };
         await Save(next, new FlowStarted(FlowId, Id.Type, title)).ConfigureAwait(true);
-        await Advance().ConfigureAwait(true);
+        // A turn of its own, so the caller does not wait on the steps; lost with the activation, the start is recovered by OnActivate.
+        Context.Defer(() => Context.Get<IFlowCallbacks>(Id).Advance());
     }
+
+    /// <inheritdoc />
+    Task IFlowCallbacks.Advance() => State is { Status: FlowStatus.Running, Waiting: null } ? Advance() : Task.CompletedTask;
 
     /// <summary>
     /// Ends the wait of <paramref name="step"/>: <see cref="WaitOutcome.Approved"/> and <see cref="WaitOutcome.Arrived"/> complete the
@@ -145,6 +153,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         { RequiresPerson = true };
 
     /// <inheritdoc />
+    // Advances a running flow that does not wait, including one started but never advanced (Current null, Done empty).
     protected override async Task OnActivate(CancellationToken cancellationToken)
     {
         await Context.Synapses.EnsureBrainWide(typeof(ConfirmationResolved)).ConfigureAwait(true);
@@ -185,7 +194,9 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
             await Save(State with { Current = step }, new FlowStep(FlowId, step, StepOutcome.Started, null)).ConfigureAwait(true);
             StepResult<T> result;
             try { result = await Run(step, State.Inner, token).ConfigureAwait(true); }
-            catch (OperationCanceledException) when (token.IsCancellationRequested) { return; }
+            // Interrupted, not failed: a cancelled body (any token) or an ending activation leaves Current set and the flow
+            // running, so the next activation runs the step again.
+            catch (Exception error) when (error is OperationCanceledException || token.IsCancellationRequested) { return; }
             catch (Exception error) when (error is not OutOfMemoryException)
             {
                 if (State.Status != FlowStatus.Running) { return; }
@@ -293,6 +304,10 @@ public interface IFlowCallbacks
     /// <param name="planId">The plan id.</param>
     /// <param name="outcome">How it ended.</param>
     Task ConfirmationAnswered(string planId, ConfirmationOutcome outcome);
+
+    /// <summary>Runs the steps of a started flow that is running and not waiting; otherwise ignored. One-way: the self-call Start defers must not wait on its own turn.</summary>
+    [OneWayCall]
+    Task Advance();
 }
 
 internal static partial class FlowLog

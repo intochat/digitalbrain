@@ -53,6 +53,7 @@ public sealed class FlowRuntimeFacts(FlowRuntimeFixture fixture, FaultingConfirm
         await using var runtime = await fixture.Start(kind, Ct);
         var id = runtime.Id("test.flow", "survives");
         await runtime.Get<ITestFlow>(id).Start("Build", "ann", null, new FlowBox { AskFirst = true });
+        _ = await runtime.WaitForSignals<FlowWaiting>(id, 1, TimeSpan.FromSeconds(20), Ct);
         var waiting = await runtime.Get<ITestFlow>(id).Read();
         Assert.Equal(FlowStatus.Waiting, waiting.Status);
         Assert.Equal(["a"], waiting.Done);
@@ -69,6 +70,24 @@ public sealed class FlowRuntimeFacts(FlowRuntimeFixture fixture, FaultingConfirm
         Assert.Equal(["a", "b"], done.Done);
         var ended = await runtime.WaitForSignals<FlowDone>(id, 1, TimeSpan.FromSeconds(20), Ct);
         Assert.Equal(FlowOutcome.Completed, Assert.Single(ended).Outcome);
+    }
+
+    [Theory, MemberData(nameof(NeuronRuntimeKinds.Both), MemberType = typeof(NeuronRuntimeKinds))]
+    public async Task StartIsDurableAcrossRestartOnBothRuntimes(NeuronRuntimeKind kind)
+    {
+        await using var runtime = await fixture.Start(kind, Ct);
+        var id = runtime.Id("test.flow", "durable-start");
+        await runtime.Get<ITestFlow>(id).Start("Build", "ann", null, new FlowBox());
+        Assert.Single(await runtime.Signals<FlowStarted>(id, Ct));
+
+        await runtime.Restart(Ct);
+
+        _ = await runtime.Get<ITestFlow>(id).Read();
+        var ended = await runtime.WaitForSignals<FlowDone>(id, 1, TimeSpan.FromSeconds(20), Ct);
+        Assert.Equal(FlowOutcome.Completed, Assert.Single(ended).Outcome);
+        var done = await runtime.Get<ITestFlow>(id).Read();
+        Assert.Equal(["a", "b"], done.Done);
+        Assert.Equal(2, done.Runs);
     }
 
     [Theory, MemberData(nameof(NeuronRuntimeKinds.Both), MemberType = typeof(NeuronRuntimeKinds))]

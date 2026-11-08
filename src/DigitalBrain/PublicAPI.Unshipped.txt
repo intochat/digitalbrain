@@ -3231,3 +3231,4 @@ override sealed DigitalBrain.Flows.FlowRelated.Equals(DigitalBrain.Signal? other
 static DigitalBrain.Flows.FlowRelated.operator !=(DigitalBrain.Flows.FlowRelated? left, DigitalBrain.Flows.FlowRelated? right) -> bool
 static DigitalBrain.Flows.FlowRelated.operator ==(DigitalBrain.Flows.FlowRelated? left, DigitalBrain.Flows.FlowRelated? right) -> bool
 DigitalBrain.Flows.IFlowCallbacks.ConfirmationAnswered(string! planId, DigitalBrain.Confirmation.ConfirmationOutcome outcome) -> System.Threading.Tasks.Task!
+DigitalBrain.Flows.IFlowCallbacks.Advance() -> System.Threading.Tasks.Task!

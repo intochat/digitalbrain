@@ -31,6 +31,12 @@ public sealed class TwoStepFlow : Flow<Box>
 
     public static bool SawCancellation { get; set; }
 
+    /// <summary>When set, bodies wait for it before they run.</summary>
+    public static Task? Hold { get; set; }
+
+    /// <summary>The number of bodies still to throw an <see cref="OperationCanceledException"/> of a token not the flow's.</summary>
+    public static int ForeignCancelsLeft { get; set; }
+
     public FlowState<Box> Current => State;
 
     protected override IReadOnlyList<string> Steps => ["a", "b"];
@@ -38,6 +44,14 @@ public sealed class TwoStepFlow : Flow<Box>
     protected override async Task<StepResult<Box>> Run(string step, Box inner, CancellationToken ct)
     {
         lock (Gate) { Calls.Add(step); }
+        if (Hold is { } gate) { await gate; }
+        if (ForeignCancelsLeft > 0)
+        {
+            ForeignCancelsLeft--;
+            using var foreign = new CancellationTokenSource();
+            await foreign.CancelAsync();
+            foreign.Token.ThrowIfCancellationRequested();
+        }
         if (HangsLeft > 0)
         {
             HangsLeft--;
@@ -143,6 +157,8 @@ public sealed class FlowFacts
         TwoStepFlow.Calls.Clear();
         TwoStepFlow.HangsLeft = 0;
         TwoStepFlow.SawCancellation = false;
+        TwoStepFlow.Hold = null;
+        TwoStepFlow.ForeignCancelsLeft = 0;
     }
 
     private async Task<(TwoStepFlow Flow, RecordingContext Context)> Activated(object? stored = null, IConfirmations? confirmations = null)
@@ -156,6 +172,23 @@ public sealed class FlowFacts
         return (flow, context);
     }
 
+    // Runs the turns Start deferred (the self-call that advances the flow), as the runtime does after the turn ends.
+    private static async Task Drain(RecordingContext context)
+    {
+        while (context.Deferred.Count > 0)
+        {
+            var work = context.Deferred[0];
+            context.Deferred.RemoveAt(0);
+            await work();
+        }
+    }
+
+    private static async Task Started(TwoStepFlow flow, RecordingContext context, string title, string owner, string? parent, Box inner)
+    {
+        await flow.Start(title, owner, parent, inner);
+        await Drain(context);
+    }
+
     private static List<Signal> Signals(RecordingContext context) => [.. context.Writes.SelectMany(write => write.Signals)];
 
     private static ConfirmationResolved Resolution(string planId, ConfirmationOutcome outcome) => new(planId, ConfirmationAction.Other, "f", ConfirmationPrincipal.App("test.flow"),
@@ -167,7 +200,7 @@ public sealed class FlowFacts
     {
         var (flow, context) = await Activated();
 
-        await flow.Start("Build", "ann", null, new Box());
+        await Started(flow, context, "Build", "ann", null, new Box());
 
         var id = FlowId.ToString();
         Assert.Equal(
@@ -191,7 +224,7 @@ public sealed class FlowFacts
     {
         var (flow, context) = await Activated();
 
-        await flow.Start("Build", "ann", null, new Box { FailB = true });
+        await Started(flow, context, "Build", "ann", null, new Box { FailB = true });
 
         var id = FlowId.ToString();
         var signals = Signals(context);
@@ -206,7 +239,7 @@ public sealed class FlowFacts
     {
         var (flow, context) = await Activated();
 
-        await flow.Start("Build", "ann", null, new Box { AskFirst = true });
+        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true });
 
         var waiting = Assert.IsType<Waiting>(flow.Current.Waiting);
         var plan = Assert.Single(_confirmations.Asked);
@@ -234,7 +267,7 @@ public sealed class FlowFacts
     public async Task DenyCancels()
     {
         var (flow, context) = await Activated();
-        await flow.Start("Build", "ann", null, new Box { AskFirst = true });
+        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true });
         var plan = Assert.Single(_confirmations.Asked);
 
         await flow.Deliver(Resolution(plan.Id, ConfirmationOutcome.Denied));
@@ -252,7 +285,8 @@ public sealed class FlowFacts
     {
         var (first, context) = await Activated();
         TwoStepFlow.HangsLeft = 1;
-        var started = first.Start("Build", "ann", null, new Box());
+        await first.Start("Build", "ann", null, new Box());
+        var started = Drain(context);
         Assert.Contains(new FlowStep(FlowId.ToString(), "a", StepOutcome.Started, null), Signals(context));
 
         await NeuronAttachment.Deactivate(first, DeactivationCause.Idle, CancellationToken.None);
@@ -271,7 +305,7 @@ public sealed class FlowFacts
     public async Task UnknownOrRepeatedResolutionIsIgnored()
     {
         var (flow, context) = await Activated();
-        await flow.Start("Build", "ann", null, new Box { AskFirst = true });
+        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true });
         var plan = Assert.Single(_confirmations.Asked);
         var before = context.Writes.Count;
 
@@ -291,7 +325,7 @@ public sealed class FlowFacts
     public async Task ExpiryReminderExpiresWait()
     {
         var (flow, context) = await Activated();
-        await flow.Start("Build", "ann", null, new Box { AskFirst = true, Reason = WaitReason.External, ExpiresIn = TimeSpan.FromMinutes(10) });
+        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true, Reason = WaitReason.External, ExpiresIn = TimeSpan.FromMinutes(10) });
         Assert.Empty(_confirmations.Asked);
         Assert.Equal(TimeSpan.FromMinutes(10), _reminders.Started["flow-expiry"]);
 
@@ -313,9 +347,9 @@ public sealed class FlowFacts
     [Fact]
     public async Task ApprovalWaitUsesPlanExpiry()
     {
-        var (flow, _) = await Activated();
+        var (flow, context) = await Activated();
 
-        await flow.Start("Build", "ann", null, new Box { AskFirst = true, ExpiresIn = TimeSpan.FromMinutes(30) });
+        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true, ExpiresIn = TimeSpan.FromMinutes(30) });
 
         Assert.Equal(TimeSpan.FromMinutes(30), Assert.Single(_confirmations.Asked).Expiry);
         Assert.Empty(_reminders.Started);
@@ -326,7 +360,8 @@ public sealed class FlowFacts
     {
         var (flow, context) = await Activated();
         TwoStepFlow.HangsLeft = 1;
-        var started = flow.Start("Build", "ann", null, new Box());
+        await flow.Start("Build", "ann", null, new Box());
+        var started = Drain(context);
 
         await flow.Cancel("stop");
         await started;
@@ -340,8 +375,8 @@ public sealed class FlowFacts
     [Fact]
     public async Task CancelResolvesPendingApprovalPlan()
     {
-        var (flow, _) = await Activated();
-        await flow.Start("Build", "ann", null, new Box { AskFirst = true });
+        var (flow, context) = await Activated();
+        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true });
         var plan = Assert.Single(_confirmations.Asked);
 
         await flow.Cancel("stop");
@@ -354,7 +389,7 @@ public sealed class FlowFacts
     public async Task RelateAppendsRelation()
     {
         var (flow, context) = await Activated();
-        await flow.Start("Build", "ann", "parent", new Box { AskFirst = true });
+        await Started(flow, context, "Build", "ann", "parent", new Box { AskFirst = true });
         var relation = new FlowRelation("other", RelationKind.BlockedBy, null);
 
         await flow.Relate(relation);
@@ -369,7 +404,7 @@ public sealed class FlowFacts
     public async Task ScheduleWaitResumesOnExpiry()
     {
         var (flow, context) = await Activated();
-        await flow.Start("Build", "ann", null, new Box { AskFirst = true, Reason = WaitReason.Schedule, ExpiresIn = TimeSpan.FromMinutes(10) });
+        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true, Reason = WaitReason.Schedule, ExpiresIn = TimeSpan.FromMinutes(10) });
 
         _clock.Now += TimeSpan.FromMinutes(11);
         await flow.Tick("flow-expiry");
@@ -387,7 +422,7 @@ public sealed class FlowFacts
     {
         var (flow, context) = await Activated(confirmations: new ThrowingConfirmations());
 
-        await flow.Start("Build", "ann", null, new Box { AskFirst = true });
+        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true });
 
         var id = FlowId.ToString();
         var signals = Signals(context);
@@ -402,7 +437,7 @@ public sealed class FlowFacts
     {
         var (flow, context) = await Activated(confirmations: new SkippingConfirmations(ConfirmationOutcome.Approved));
 
-        await flow.Start("Build", "ann", null, new Box { AskFirst = true });
+        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true });
 
         var id = FlowId.ToString();
         Assert.Contains(new FlowResolve(id, "b", WaitOutcome.Approved, null), Signals(context));
@@ -414,9 +449,65 @@ public sealed class FlowFacts
     {
         var (flow, context) = await Activated(confirmations: new SkippingConfirmations(ConfirmationOutcome.Denied));
 
-        await flow.Start("Build", "ann", null, new Box { AskFirst = true });
+        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true });
 
         Assert.Contains(new FlowResolve(FlowId.ToString(), "b", WaitOutcome.Denied, null), Signals(context));
         Assert.Equal(FlowStatus.Cancelled, flow.Current.Status);
+    }
+
+    [Fact]
+    public async Task StartReturnsBeforeTheFirstStepRuns()
+    {
+        var (flow, context) = await Activated();
+        var gate = new TaskCompletionSource();
+        TwoStepFlow.Hold = gate.Task;
+
+        await flow.Start("Build", "ann", null, new Box());
+
+        Assert.Equal(FlowStatus.Running, flow.Current.Status);
+        Assert.Null(flow.Current.Current);
+        Assert.Empty(TwoStepFlow.Calls);
+        Assert.Equal([new FlowStarted(FlowId.ToString(), "test.flow", "Build")], Signals(context));
+        var advancing = Drain(context);
+        Assert.Equal("a", flow.Current.Current);
+        Assert.False(advancing.IsCompleted);
+
+        gate.SetResult();
+        await advancing;
+        Assert.Equal(FlowStatus.Completed, flow.Current.Status);
+    }
+
+    [Fact]
+    public async Task ActivationAdvancesAStartedFlowThatNeverRan()
+    {
+        var (first, context) = await Activated();
+        await first.Start("Build", "ann", null, new Box());
+        context.Deferred.Clear(); // the activation died before the deferred advance ran
+        Assert.Equal(FlowStatus.Running, first.Current.Status);
+        Assert.Empty(first.Current.Done);
+        Assert.Null(first.Current.Current);
+
+        var (second, _) = await Activated(context.Writes[^1].State);
+
+        Assert.Equal(["a", "b"], TwoStepFlow.Calls);
+        Assert.Equal(FlowStatus.Completed, second.Current.Status);
+    }
+
+    [Fact]
+    public async Task CancelledBodyIsNotFailed()
+    {
+        var (first, context) = await Activated();
+        TwoStepFlow.ForeignCancelsLeft = 1;
+
+        await Started(first, context, "Build", "ann", null, new Box());
+
+        Assert.Equal(FlowStatus.Running, first.Current.Status);
+        Assert.Equal("a", first.Current.Current);
+        Assert.DoesNotContain(Signals(context), signal => signal is FlowStep { Outcome: StepOutcome.Failed } or FlowDone);
+
+        var (second, _) = await Activated(context.Writes[^1].State);
+
+        Assert.Equal(["a", "a", "b"], TwoStepFlow.Calls);
+        Assert.Equal(FlowStatus.Completed, second.Current.Status);
     }
 }
