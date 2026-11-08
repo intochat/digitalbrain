@@ -11,9 +11,9 @@ namespace DigitalBrain.Testing;
 internal static class TestCause
 {
     private static readonly AsyncLocal<(string TraceId, string CausationId)?> Current = new();
-    private static readonly Lazy<PropertyInfo?> TraceCurrent = new(static () => AppDomain.CurrentDomain.GetAssemblies()
-        .FirstOrDefault(assembly => assembly.GetName().Name == "DigitalBrain.Capabilities.Compute")
-        ?.GetType("DigitalBrain.Capabilities.Compute.TraceContext")?.GetProperty("Current", BindingFlags.Public | BindingFlags.Static));
+
+    // Found once the Compute assembly is loaded; looked up again while it is not, so an early miss is not cached.
+    private static PropertyInfo? _traceCurrent;
 
     /// <summary>Makes the signal <paramref name="publisher"/> journaled at <paramref name="sequence"/> the cause of this flow.</summary>
     public static void Enter(NeuronId publisher, long sequence, string? traceId)
@@ -25,7 +25,17 @@ internal static class TestCause
 
     private static string? Request()
     {
-        var trace = TraceCurrent.Value?.GetValue(null);
+        var trace = TraceCurrent()?.GetValue(null);
         return trace?.GetType().GetProperty("TraceId")?.GetValue(trace) as string;
+    }
+
+    private static PropertyInfo? TraceCurrent()
+    {
+        if (Volatile.Read(ref _traceCurrent) is { } found) { return found; }
+        found = AppDomain.CurrentDomain.GetAssemblies()
+            .FirstOrDefault(assembly => assembly.GetName().Name == "DigitalBrain.Capabilities.Compute")
+            ?.GetType("DigitalBrain.Capabilities.Compute.TraceContext")?.GetProperty("Current", BindingFlags.Public | BindingFlags.Static);
+        if (found is not null) { Volatile.Write(ref _traceCurrent, found); }
+        return found;
     }
 }

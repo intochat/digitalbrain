@@ -431,11 +431,18 @@ internal static partial class FlowLog
 // SiloUnavailableException anywhere in the chain is the second signal: the silo refuses calls while it stops.
 internal static class HostShutdown
 {
-    private static readonly Lazy<(Type Lifetime, PropertyInfo Stopping)?> Lifetime = new(static () =>
+    // Found once Microsoft.Extensions.Hosting.Abstractions loads; looked up again while it has not, so an early miss is not cached.
+    private static Tuple<Type, PropertyInfo>? _lifetime;
+
+    private static Tuple<Type, PropertyInfo>? Lifetime()
     {
+        if (Volatile.Read(ref _lifetime) is { } found) { return found; }
         var type = Type.GetType("Microsoft.Extensions.Hosting.IHostApplicationLifetime, Microsoft.Extensions.Hosting.Abstractions", throwOnError: false);
-        return type?.GetProperty("ApplicationStopping") is { } stopping ? (type, stopping) : null;
-    });
+        if (type?.GetProperty("ApplicationStopping") is not { } stopping) { return null; }
+        found = Tuple.Create(type, stopping);
+        Volatile.Write(ref _lifetime, found);
+        return found;
+    }
 
     public static bool IsStopping(IServiceProvider services, Exception error)
     {
@@ -443,8 +450,8 @@ internal static class HostShutdown
         {
             if (current.GetType().FullName == "Orleans.Runtime.SiloUnavailableException") { return true; }
         }
-        if (Lifetime.Value is not { } lifetime) { return false; }
-        try { return services.GetService(lifetime.Lifetime) is { } host && lifetime.Stopping.GetValue(host) is CancellationToken { IsCancellationRequested: true }; }
+        if (Lifetime() is not { } lifetime) { return false; }
+        try { return services.GetService(lifetime.Item1) is { } host && lifetime.Item2.GetValue(host) is CancellationToken { IsCancellationRequested: true }; }
         catch (NotSupportedException) { return false; }
     }
 }
