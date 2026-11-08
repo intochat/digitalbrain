@@ -34,6 +34,10 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     // Cancelled when the flow is cancelled or the activation ends: the running body's token.
     private readonly CancellationTokenSource _activation = new();
 
+    // One-use proofs handed to the flow's own detached work for its call back: a callback without one is a foreign caller. Held in
+    // memory, so a callback that outlives its activation is refused and the durable paths (ConfirmationResolved, the nudge) recover.
+    private readonly HashSet<string> _proofs = new(StringComparer.Ordinal);
+
     /// <summary>The steps, in order. Step names are the keys of <see cref="FlowState{T}.Done"/> and never change.</summary>
     protected abstract IReadOnlyList<string> Steps { get; }
 
@@ -93,9 +97,11 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     /// <param name="step">The waiting step.</param>
     /// <param name="outcome">How the wait ended.</param>
     /// <param name="by">Who ended it, if known.</param>
+    /// <exception cref="InvalidOperationException">The flow waits on an approval: a person approves through the confirmations inbox only.</exception>
     public Task Resume(string step, WaitOutcome outcome, string? by)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(step);
+        if (State.Waiting is { Reason: WaitReason.Approval }) { throw new InvalidOperationException("approval waits are resolved by the confirmations inbox"); }
         return Resolve(step, outcome, by);
     }
 
@@ -147,8 +153,9 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     }
 
     /// <inheritdoc />
-    async Task IFlowCallbacks.ConfirmationFailed(string planId, string detail)
+    async Task IFlowCallbacks.ConfirmationFailed(string planId, string detail, string proof)
     {
+        Prove(proof);
         if (State is not { Status: FlowStatus.Waiting, Waiting: { Reason: WaitReason.Approval } waiting } || waiting.ConfirmationPlanId != planId) { return; }
         await Save(State with { Status = FlowStatus.Failed, Waiting = null, Ended = Context.Time.GetUtcNow() },
             [new FlowStep(FlowId, waiting.Step, StepOutcome.Failed, "confirmation: " + detail), new FlowDone(FlowId, FlowOutcome.Failed, "confirmation")]).ConfigureAwait(true);
@@ -156,8 +163,9 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     }
 
     /// <inheritdoc />
-    Task IFlowCallbacks.ConfirmationAnswered(string planId, ConfirmationOutcome outcome)
+    Task IFlowCallbacks.ConfirmationAnswered(string planId, ConfirmationOutcome outcome, string proof)
     {
+        Prove(proof);
         if (State is not { Status: FlowStatus.Waiting, Waiting: { Reason: WaitReason.Approval } waiting } || waiting.ConfirmationPlanId != planId) { return Task.CompletedTask; }
         return Resolve(waiting.Step, WaitOutcomeOf(outcome), null);
     }
@@ -264,20 +272,22 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     // Results go back through the neuron's own mailbox (a self-call), so they are saved in a turn, never from this detached task.
     private async Task Ask(ConfirmationPlan plan)
     {
-        Func<IFlowCallbacks, Task> relay;
+        Func<IFlowCallbacks, string, Task> relay;
         try
         {
             var result = await Context.Confirm(plan, CancellationToken.None).ConfigureAwait(true);
-            relay = self => self.ConfirmationAnswered(plan.Id, result.Outcome);
+            relay = (self, proof) => self.ConfirmationAnswered(plan.Id, result.Outcome, proof);
         }
         catch (Exception error) when (error is not OutOfMemoryException)
         {
             var detail = error.Message;
-            relay = self => self.ConfirmationFailed(plan.Id, detail);
+            relay = (self, proof) => self.ConfirmationFailed(plan.Id, detail, proof);
         }
-        try { await relay(Context.Get<IFlowCallbacks>(Id)).ConfigureAwait(true); }
+        var proof = Proof();
+        try { await relay(Context.Get<IFlowCallbacks>(Id), proof).ConfigureAwait(true); }
         catch (Exception error) when (error is not OutOfMemoryException)
         {
+            Forget(proof);
             // The flow stays waiting on the plan; the log is the only trace (IConfirmations has no read of pending plans).
             FlowLog.RelayFailed(Logger(), error, FlowId, plan.Id);
         }
@@ -309,6 +319,26 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         await Advance().ConfigureAwait(true);
     }
 
+    private string Proof()
+    {
+        var proof = Guid.NewGuid().ToString("N");
+        lock (_proofs) { _proofs.Add(proof); }
+        return proof;
+    }
+
+    private void Forget(string proof)
+    {
+        lock (_proofs) { _proofs.Remove(proof); }
+    }
+
+    // Spends a proof; a call without a live one is not the flow's own detached work.
+    private void Prove(string? proof)
+    {
+        bool known;
+        lock (_proofs) { known = proof is not null && _proofs.Remove(proof); }
+        if (!known) { throw new InvalidOperationException("only the flow's own detached work calls back on it"); }
+    }
+
     private Task StartNudge() => Context.Reminders.Start(NudgeReminder, NudgePeriod, NudgePeriod);
 
     private Task StopNudge() => Context.Reminders.Stop(NudgeReminder);
@@ -325,13 +355,18 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     private static TimeSpan Positive(TimeSpan span) => span > TimeSpan.Zero ? span : TimeSpan.FromSeconds(1);
 }
 
-/// <summary>What a flow's own detached work calls back on it, so results are saved in a turn. Not for other callers.</summary>
+/// <summary>
+/// What a flow's own detached work calls back on it, so results are saved in a turn. Not for other callers: each call but
+/// <see cref="Advance"/> carries a one-use proof the flow handed its detached work, and a call without a live one throws
+/// <see cref="InvalidOperationException"/>.
+/// </summary>
 public interface IFlowCallbacks
 {
     /// <summary>The confirmation plan <paramref name="planId"/> could not be raised; the waiting flow fails.</summary>
     /// <param name="planId">The plan id.</param>
     /// <param name="detail">Why.</param>
-    Task ConfirmationFailed(string planId, string detail);
+    /// <param name="proof">The proof the flow handed its detached work.</param>
+    Task ConfirmationFailed(string planId, string detail, string proof);
 
     /// <summary>
     /// <see cref="IConfirmations.Confirm"/> returned <paramref name="outcome"/> for <paramref name="planId"/>. It ends the wait like the
@@ -340,7 +375,8 @@ public interface IFlowCallbacks
     /// </summary>
     /// <param name="planId">The plan id.</param>
     /// <param name="outcome">How it ended.</param>
-    Task ConfirmationAnswered(string planId, ConfirmationOutcome outcome);
+    /// <param name="proof">The proof the flow handed its detached work.</param>
+    Task ConfirmationAnswered(string planId, ConfirmationOutcome outcome, string proof);
 
     /// <summary>Runs the steps of a started flow that is running and not waiting; otherwise ignored. One-way: the self-call Start defers must not wait on its own turn.</summary>
     [OneWayCall]

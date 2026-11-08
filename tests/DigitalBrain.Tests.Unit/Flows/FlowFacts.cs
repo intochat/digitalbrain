@@ -291,6 +291,36 @@ public sealed class FlowFacts
     }
 
     [Fact]
+    public async Task ResumeCannotApproveAnApprovalWait()
+    {
+        var (flow, context) = await Activated();
+        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true });
+        var before = context.Writes.Count;
+
+        var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => flow.Resume("b", WaitOutcome.Approved, "mallory"));
+
+        Assert.Equal("approval waits are resolved by the confirmations inbox", refused.Message);
+        Assert.Equal(before, context.Writes.Count);
+        Assert.Equal(FlowStatus.Waiting, flow.Current.Status);
+    }
+
+    [Fact]
+    public async Task AForeignCallerCannotAnswerAConfirmation()
+    {
+        var (flow, context) = await Activated();
+        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true });
+        var planId = Assert.IsType<string>(flow.Current.Waiting?.ConfirmationPlanId);
+        var before = context.Writes.Count;
+        IFlowCallbacks callbacks = flow;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => callbacks.ConfirmationAnswered(planId, ConfirmationOutcome.Approved, "forged"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => callbacks.ConfirmationFailed(planId, "x", "forged"));
+
+        Assert.Equal(before, context.Writes.Count);
+        Assert.Equal(FlowStatus.Waiting, flow.Current.Status);
+    }
+
+    [Fact]
     public async Task DenyCancels()
     {
         var (flow, context) = await Activated();
