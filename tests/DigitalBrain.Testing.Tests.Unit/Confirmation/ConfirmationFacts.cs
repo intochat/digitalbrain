@@ -168,35 +168,26 @@ public sealed class ConfirmationFacts
         Assert.Single(confirmations.Audit);
     }
 
-    // D-19: the buttons target the runtime confirmations neuron, never the app.
+    // D-19: the card resolves by plan id through the OS inbox surface; no Emit.
     [Fact]
-    public void Confirm_view_is_a_card_with_the_static_expiry_line_and_two_buttons_bound_to_the_confirmations_neuron()
+    public void Confirm_view_is_a_card_with_the_static_expiry_line_and_an_approval_node_resolving_the_plan()
     {
-        var card = ConfirmView.For("p7", "Delete a.txt?", "This removes a.txt from Drive. You cannot undo this.", "Delete", "Keep", TimeSpan.FromMinutes(5), viewerIsHuman: true);
+        var card = ConfirmView.For("p7", "Delete a.txt?", "This removes a.txt from Drive. You cannot undo this.", TimeSpan.FromMinutes(5), viewerIsHuman: true);
 
         Assert.Equal(("Delete a.txt?", "This removes a.txt from Drive. You cannot undo this."), (card.Title, card.Body));
         Assert.Equal("This request expires in 5 minutes.", Assert.IsType<Text>(card.Children[0]).Value);
-        var buttons = card.Children.OfType<Button>().ToList();
-        Assert.Equal(2, buttons.Count);
-        Assert.Equal(("Delete", ButtonTone.Accent, true), (buttons[0].Label, buttons[0].Tone, buttons[0].Enabled));
-        Assert.Equal(("Keep", ButtonTone.Neutral), (buttons[1].Label, buttons[1].Tone));
-        Assert.Equal(("approve", "deny"), (buttons[0].Key, buttons[1].Key));
-        Assert.Equal(ConfirmView.Resolve("p7", approve: true), buttons[0].Emit);
-        Assert.Equal("""{"planId":"p7","approve":false}""", buttons[1].Emit!.Args!.Value.GetRawText());
-        Assert.Equal(("confirmations", "Resolve"), (buttons[0].Emit!.Owner, buttons[0].Emit!.Signal));
-        Assert.Equal(IConfirmations.ConfirmationsNeuronKey, ConfirmView.ConfirmationsNeuronKey);
-        Assert.Equal(IConfirmations.ResolveOperation, ConfirmView.ResolveOperation);
+        var approval = Assert.IsType<ApprovalCardNode>(card.Children[1]);
+        Assert.Equal((ConfirmView.ApprovalKey, "p7", new Resolve("p7")), (approval.Key, approval.Id, approval.Resolve));
+        Assert.DoesNotContain(card.Children, node => node is Button);
     }
 
     [Fact]
-    public void Confirm_view_for_an_app_or_agent_viewer_disables_approve_and_says_it_waits()
+    public void Confirm_view_for_an_app_or_agent_viewer_cannot_resolve_and_says_it_waits()
     {
-        var card = ConfirmView.For("p8", "t", "b", "Delete", "Keep", TimeSpan.FromMinutes(5), viewerIsHuman: false);
+        var card = ConfirmView.For("p8", "t", "b", TimeSpan.FromMinutes(5), viewerIsHuman: false);
 
         Assert.Contains(card.Children, node => node is Text { Value: "Waiting for you to approve." });
-        var buttons = card.Children.OfType<Button>().ToList();
-        Assert.False(buttons[0].Enabled);
-        Assert.True(buttons[1].Enabled);
+        Assert.Null(Assert.IsType<ApprovalCardNode>(card.Children[2]).Resolve);
     }
 
     [Fact]
@@ -209,10 +200,10 @@ public sealed class ConfirmationFacts
         var asked = confirmer.Ask("p9", destructive: true);
         var request = await Waiting(os.Confirmations, "p9");
         Assert.Equal(PrincipalKind.App, request.Requester.Kind);
-        var card = ConfirmView.For(request.PlanId, request.Plan.Title, request.Plan.Body, request.Plan.ApproveLabel, request.Plan.DenyLabel, request.Plan.Expiry, viewerIsHuman: true);
+        var card = ConfirmView.For(request.PlanId, request.Plan.Title, request.Plan.Body, request.Plan.Expiry, viewerIsHuman: true);
 
         os.Confirmations.Current = ConfirmationPrincipal.Person("ada");
-        await os.Confirmations.Click(card.Children.OfType<Button>().First());
+        await os.Confirmations.Click(card.Children.OfType<ApprovalCardNode>().Single());
 
         Assert.Equal("Approved:None:False", await asked);
         Assert.Equal(ConfirmationPrincipal.Person("ada"), Assert.Single(os.Confirmations.Audit).Approver);

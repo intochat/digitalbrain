@@ -422,7 +422,7 @@ public sealed record ApprovalCardNode(
 }
 
 /// <summary>One numbered option inside a <see cref="ChoiceCardNode"/>.</summary>
-public sealed record ChoiceOptionNode(string Key, string Title, string? Detail = null, Emit? Emit = null, string? Icon = null);
+public sealed record ChoiceOptionNode(string Title, string? Detail = null, Button? Pick = null, string? Icon = null);
 
 /// <summary>Disambiguation choice card (2 to 5 options).</summary>
 public sealed record ChoiceCardNode(
@@ -445,7 +445,6 @@ public sealed record ChoiceCardNode(
 
 /// <summary>Pre-filled outbound message draft card (email, Slack, SMS).</summary>
 public sealed record DraftCardNode(
-    string Key,
     string Id,
     string Channel,
     string To,
@@ -453,21 +452,20 @@ public sealed record DraftCardNode(
     string From,
     string? Subject = null,
     string Status = "pending",
-    Emit? OnSend = null,
-    Emit? OnDiscard = null) : Node;
+    Button? Send = null,
+    Button? Discard = null) : Node;
 
 /// <summary>A key-value field in a <see cref="RecordCardNode"/>.</summary>
 public sealed record RecordFieldNode(string Label, string Value, bool Warn = false);
 
 /// <summary>Structured record summary card.</summary>
 public sealed record RecordCardNode(
-    string Key,
     string ObjectLabel,
     string Name,
     IReadOnlyList<RecordFieldNode> Fields,
     string? Subtitle = null,
     string LinkLabel = "Open Neuron",
-    Emit? OnOpen = null) : Node
+    Button? Open = null) : Node
 {
     /// <inheritdoc />
     public bool Equals(RecordCardNode? other) =>
@@ -476,7 +474,7 @@ public sealed record RecordCardNode(
         Name == other.Name &&
         Subtitle == other.Subtitle &&
         LinkLabel == other.LinkLabel &&
-        Equals(OnOpen, other.OnOpen) &&
+        Equals(Open, other.Open) &&
         Fields.SequenceEqual(other.Fields);
 
     /// <inheritdoc />
@@ -485,26 +483,24 @@ public sealed record RecordCardNode(
 
 /// <summary>Secure credential request card.</summary>
 public sealed record SecretCardNode(
-    string Key,
     string Name,
     string Why,
     string SavedIn = "Variables and secrets",
     string Status = "pending",
-    Emit? OnEnter = null,
-    Emit? OnSkip = null) : Node;
+    Button? Enter = null,
+    Button? Skip = null) : Node;
 
 /// <summary>A step in a <see cref="JobCardNode"/>.</summary>
 public sealed record JobStepNode(string Label, string Status = "waiting", string? Detail = null);
 
 /// <summary>Multi-step background job progress card.</summary>
 public sealed record JobCardNode(
-    string Key,
     string Title,
     IReadOnlyList<JobStepNode> Steps,
     double Progress = 0,
     string Status = "running",
     string? ResultText = null,
-    Emit? OnCancel = null) : Node
+    Button? Cancel = null) : Node
 {
     /// <inheritdoc />
     public bool Equals(JobCardNode? other) =>
@@ -513,7 +509,7 @@ public sealed record JobCardNode(
         Progress.Equals(other.Progress) &&
         Status == other.Status &&
         ResultText == other.ResultText &&
-        Equals(OnCancel, other.OnCancel) &&
+        Equals(Cancel, other.Cancel) &&
         Steps.SequenceEqual(other.Steps);
 
     /// <inheritdoc />
@@ -522,7 +518,6 @@ public sealed record JobCardNode(
 
 /// <summary>A 3D neuron node in a <see cref="BrainSceneNode"/>.</summary>
 public sealed record BrainGraphNode(
-    string Key,
     string Id,
     string Label,
     string Uri,
@@ -532,7 +527,7 @@ public sealed record BrainGraphNode(
     double Z,
     string Status = "idle",
     string? Subtitle = null,
-    Emit? OnSelect = null);
+    Button? Select = null);
 
 /// <summary>A directed synapse edge in a <see cref="BrainSceneNode"/>.</summary>
 public sealed record BrainGraphSynapse(

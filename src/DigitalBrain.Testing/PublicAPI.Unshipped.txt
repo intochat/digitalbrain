@@ -350,6 +350,7 @@ DigitalBrain.Testing.SiloHost
 DigitalBrain.Testing.TestClock
 DigitalBrain.Testing.TestClock.Advance(System.TimeSpan by) -> void
 DigitalBrain.Testing.TestClock.TestClock(System.DateTimeOffset? start = null) -> void
+DigitalBrain.Testing.TestConfirmations.Click(DigitalBrain.UI.ApprovalCardNode! card, bool approve = true) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.TestJournal
 DigitalBrain.Testing.TestJournal.Brain.get -> DigitalBrain.BrainId
 DigitalBrain.Testing.TestJournal.Floor(DigitalBrain.NeuronId publisher) -> long
@@ -524,7 +525,6 @@ DigitalBrain.Testing.FakeOperations.FakeOperations(DigitalBrain.Capabilities.Sto
 DigitalBrain.Testing.TestConfirmations
 DigitalBrain.Testing.TestConfirmations.Approve(string! planId) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.TestConfirmations.Audit.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Confirmation.ConfirmationResolved!>!
-DigitalBrain.Testing.TestConfirmations.Click(DigitalBrain.UI.Button! button) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.TestConfirmations.Current.get -> DigitalBrain.Confirmation.ConfirmationPrincipal!
 DigitalBrain.Testing.TestConfirmations.Current.set -> void
 DigitalBrain.Testing.TestConfirmations.Deny(string! planId) -> System.Threading.Tasks.Task!

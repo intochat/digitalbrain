@@ -72,21 +72,13 @@ public sealed class TestConfirmations
     /// <summary>Denies <paramref name="planId"/> as <see cref="Current"/>.</summary>
     public Task Deny(string planId) => Resolve(planId, approve: false, Current);
 
-    /// <summary>Clicks a rendered confirmation button as <see cref="Current"/>, as the shell dispatches it to the confirmations neuron.</summary>
-    /// <exception cref="ArgumentException">The button does not target <see cref="ConfirmView.ConfirmationsNeuronKey"/>/<see cref="ConfirmView.ResolveOperation"/>.</exception>
-    /// <exception cref="InvalidOperationException">The button is disabled.</exception>
-    public Task Click(Button button)
+    /// <summary>Approves or denies a rendered confirmation as <see cref="Current"/>, as the OS inbox surface does from the node's resolution.</summary>
+    /// <exception cref="InvalidOperationException">The card has no resolution: its viewer cannot resolve it.</exception>
+    public Task Click(ApprovalCardNode card, bool approve = true)
     {
-        ArgumentNullException.ThrowIfNull(button);
-        var emit = button.Emit;
-        if (emit is null || emit.Owner != IConfirmations.ConfirmationsNeuronKey || emit.Signal != IConfirmations.ResolveOperation
-            || emit.Args is not { ValueKind: System.Text.Json.JsonValueKind.Object } args
-            || !args.TryGetProperty("planId", out var planId) || !args.TryGetProperty("approve", out var approve))
-        {
-            throw new ArgumentException($"The button emits {emit?.Owner}/{emit?.Signal}, not the confirmations neuron.", nameof(button));
-        }
-        if (!button.Enabled) { throw new InvalidOperationException($"The button '{button.Label}' is disabled."); }
-        return Resolve(planId.GetString()!, approve.GetBoolean(), Current);
+        ArgumentNullException.ThrowIfNull(card);
+        if (card.Resolve is not { } resolve) { throw new InvalidOperationException($"The approval '{card.Key}' cannot be resolved by its viewer."); }
+        return Resolve(resolve.PlanId, approve, Current);
     }
 
     /// <summary>Answers <paramref name="planId"/> as <paramref name="approver"/>. The first answer wins; unknown or answered ids are ignored.</summary>

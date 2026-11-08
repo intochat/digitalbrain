@@ -9,21 +9,44 @@ public sealed class ViewModelJsonFacts
 {
     private static readonly string[] ActionMembers = ["Emit", "Intent", "Resolve", "OnSubmit"];
 
+    private static readonly Type[] ActionCarriers = [typeof(Button), typeof(TabItem), typeof(Switch), typeof(SelectOption), typeof(Field), typeof(ApprovalCardNode)];
+
+    private static bool CarriesAction(Type type) => type.GetProperties().Any(p => ActionMembers.Contains(p.Name)
+        || p.PropertyType == typeof(Emit) || Nullable.GetUnderlyingType(p.PropertyType) == typeof(Emit)
+        || p.PropertyType == typeof(Intent) || p.PropertyType == typeof(Resolve));
+
     [Fact]
     public void EveryInteractiveNodeHasAKey()
     {
-        var nodes = typeof(Node).GetCustomAttributes<JsonDerivedTypeAttribute>().Select(a => a.DerivedType).ToList();
-        var interactive = nodes.Where(type => type.GetProperties().Any(p => ActionMembers.Contains(p.Name)
-            || p.PropertyType == typeof(Emit) || Nullable.GetUnderlyingType(p.PropertyType) == typeof(Emit))).ToList();
-
-        Assert.Contains(typeof(Button), interactive);
-        Assert.Contains(typeof(Field), interactive);
-        Assert.Contains(typeof(Switch), interactive);
-        Assert.Contains(typeof(ApprovalCardNode), interactive);
-        foreach (var type in interactive)
+        foreach (var type in ActionCarriers)
         {
+            Assert.True(CarriesAction(type), $"{type.Name} carries no action.");
             Assert.True(type.GetProperty("Key")?.PropertyType == typeof(string), $"{type.Name} has no string Key.");
         }
+    }
+
+    [Fact]
+    public void OnlyTheSixInteractiveTypesDeclareAnAction()
+    {
+        var model = typeof(Node).Assembly.GetTypes().Where(t => t.Namespace == typeof(Node).Namespace && t.IsPublic && t != typeof(Emit) && t != typeof(Resolve) && t != typeof(Intent));
+
+        Assert.Equal(ActionCarriers.Select(t => t.Name).Order(StringComparer.Ordinal), model.Where(CarriesAction).Select(t => t.Name).Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void NoEmitTargetsTheConfirmationsResolve()
+    {
+        string? root = AppContext.BaseDirectory;
+        while (root is not null && !Directory.Exists(Path.Combine(root, "src", "DigitalBrain.UI"))) { root = Path.GetDirectoryName(root); }
+        Assert.NotNull(root);
+        var needle = "new Emit(\"" + "confirmations\"";
+        var sep = Path.DirectorySeparatorChar;
+        var offenders = new[] { "src" + sep + "DigitalBrain.UI", "src" + sep + "DigitalBrain.Testing", "tests" }
+            .SelectMany(dir => Directory.EnumerateFiles(Path.Combine(root!, dir), "*.cs", SearchOption.AllDirectories))
+            .Where(f => !f.Contains(sep + "obj" + sep) && !f.Contains(sep + "bin" + sep))
+            .Where(f => File.ReadAllText(f).Contains(needle, StringComparison.Ordinal))
+            .ToList();
+        Assert.Empty(offenders);
     }
 
     [Fact]

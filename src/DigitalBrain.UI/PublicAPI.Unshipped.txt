@@ -5,28 +5,25 @@ DigitalBrain.UI.ApprovalCardNode.Key.get -> string!
 DigitalBrain.UI.ApprovalCardNode.Key.init -> void
 DigitalBrain.UI.ApprovalCardNode.Resolve.get -> DigitalBrain.UI.Resolve?
 DigitalBrain.UI.ApprovalCardNode.Resolve.init -> void
-DigitalBrain.UI.BrainGraphNode.BrainGraphNode(string! Key, string! Id, string! Label, string! Uri, string! Kind, double X, double Y, double Z, string! Status = "idle", string? Subtitle = null, DigitalBrain.UI.Emit? OnSelect = null) -> void
-DigitalBrain.UI.BrainGraphNode.Deconstruct(out string! Key, out string! Id, out string! Label, out string! Uri, out string! Kind, out double X, out double Y, out double Z, out string! Status, out string? Subtitle, out DigitalBrain.UI.Emit? OnSelect) -> void
-DigitalBrain.UI.BrainGraphNode.Key.get -> string!
-DigitalBrain.UI.BrainGraphNode.Key.init -> void
-DigitalBrain.UI.BrainGraphNode.OnSelect.get -> DigitalBrain.UI.Emit?
+DigitalBrain.UI.BrainGraphNode.BrainGraphNode(string! Id, string! Label, string! Uri, string! Kind, double X, double Y, double Z, string! Status = "idle", string? Subtitle = null, DigitalBrain.UI.Button? Select = null) -> void
+DigitalBrain.UI.BrainGraphNode.Deconstruct(out string! Id, out string! Label, out string! Uri, out string! Kind, out double X, out double Y, out double Z, out string! Status, out string? Subtitle, out DigitalBrain.UI.Button? Select) -> void
+DigitalBrain.UI.BrainGraphNode.Select.get -> DigitalBrain.UI.Button?
+DigitalBrain.UI.BrainGraphNode.Select.init -> void
 DigitalBrain.UI.Button.Button(string! Key, string! Label, DigitalBrain.UI.Emit? Emit = null, DigitalBrain.UI.Intent? Intent = null, bool Enabled = true, string! Tone = "neutral") -> void
 DigitalBrain.UI.Button.Deconstruct(out string! Key, out string! Label, out DigitalBrain.UI.Emit? Emit, out DigitalBrain.UI.Intent? Intent, out bool Enabled, out string! Tone) -> void
 DigitalBrain.UI.Button.Intent.get -> DigitalBrain.UI.Intent?
 DigitalBrain.UI.Button.Intent.init -> void
 DigitalBrain.UI.Button.Key.get -> string!
-DigitalBrain.UI.ChoiceOptionNode.ChoiceOptionNode(string! Key, string! Title, string? Detail = null, DigitalBrain.UI.Emit? Emit = null, string? Icon = null) -> void
-DigitalBrain.UI.ChoiceOptionNode.Deconstruct(out string! Key, out string! Title, out string? Detail, out DigitalBrain.UI.Emit? Emit, out string? Icon) -> void
-DigitalBrain.UI.ChoiceOptionNode.Emit.get -> DigitalBrain.UI.Emit?
-DigitalBrain.UI.ChoiceOptionNode.Emit.init -> void
-DigitalBrain.UI.ChoiceOptionNode.Key.get -> string!
-DigitalBrain.UI.ChoiceOptionNode.Key.init -> void
-DigitalBrain.UI.DraftCardNode.Deconstruct(out string! Key, out string! Id, out string! Channel, out string! To, out string! Body, out string! From, out string? Subject, out string! Status, out DigitalBrain.UI.Emit? OnSend, out DigitalBrain.UI.Emit? OnDiscard) -> void
-DigitalBrain.UI.DraftCardNode.DraftCardNode(string! Key, string! Id, string! Channel, string! To, string! Body, string! From, string? Subject = null, string! Status = "pending", DigitalBrain.UI.Emit? OnSend = null, DigitalBrain.UI.Emit? OnDiscard = null) -> void
-DigitalBrain.UI.DraftCardNode.Key.get -> string!
-DigitalBrain.UI.DraftCardNode.Key.init -> void
-DigitalBrain.UI.DraftCardNode.OnDiscard.get -> DigitalBrain.UI.Emit?
-DigitalBrain.UI.DraftCardNode.OnSend.get -> DigitalBrain.UI.Emit?
+DigitalBrain.UI.ChoiceOptionNode.ChoiceOptionNode(string! Title, string? Detail = null, DigitalBrain.UI.Button? Pick = null, string? Icon = null) -> void
+DigitalBrain.UI.ChoiceOptionNode.Deconstruct(out string! Title, out string? Detail, out DigitalBrain.UI.Button? Pick, out string? Icon) -> void
+DigitalBrain.UI.ChoiceOptionNode.Pick.get -> DigitalBrain.UI.Button?
+DigitalBrain.UI.ChoiceOptionNode.Pick.init -> void
+DigitalBrain.UI.DraftCardNode.Deconstruct(out string! Id, out string! Channel, out string! To, out string! Body, out string! From, out string? Subject, out string! Status, out DigitalBrain.UI.Button? Send, out DigitalBrain.UI.Button? Discard) -> void
+DigitalBrain.UI.DraftCardNode.Discard.get -> DigitalBrain.UI.Button?
+DigitalBrain.UI.DraftCardNode.Discard.init -> void
+DigitalBrain.UI.DraftCardNode.DraftCardNode(string! Id, string! Channel, string! To, string! Body, string! From, string? Subject = null, string! Status = "pending", DigitalBrain.UI.Button? Send = null, DigitalBrain.UI.Button? Discard = null) -> void
+DigitalBrain.UI.DraftCardNode.Send.get -> DigitalBrain.UI.Button?
+DigitalBrain.UI.DraftCardNode.Send.init -> void
 DigitalBrain.UI.Field
 DigitalBrain.UI.Field.Deconstruct(out string! Key, out string! Name, out DigitalBrain.UI.FieldKind Kind, out string? Placeholder, out DigitalBrain.UI.Emit? OnSubmit) -> void
 DigitalBrain.UI.Field.Equals(DigitalBrain.UI.Field? other) -> bool
@@ -61,16 +58,14 @@ DigitalBrain.UI.IntentKind
 DigitalBrain.UI.IntentKind.Copy = 0 -> DigitalBrain.UI.IntentKind
 DigitalBrain.UI.IntentKind.OpenSettings = 2 -> DigitalBrain.UI.IntentKind
 DigitalBrain.UI.IntentKind.OpenWindow = 1 -> DigitalBrain.UI.IntentKind
-DigitalBrain.UI.JobCardNode.Deconstruct(out string! Key, out string! Title, out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.JobStepNode!>! Steps, out double Progress, out string! Status, out string? ResultText, out DigitalBrain.UI.Emit? OnCancel) -> void
-DigitalBrain.UI.JobCardNode.JobCardNode(string! Key, string! Title, System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.JobStepNode!>! Steps, double Progress = 0, string! Status = "running", string? ResultText = null, DigitalBrain.UI.Emit? OnCancel = null) -> void
-DigitalBrain.UI.JobCardNode.Key.get -> string!
-DigitalBrain.UI.JobCardNode.Key.init -> void
-DigitalBrain.UI.JobCardNode.OnCancel.get -> DigitalBrain.UI.Emit?
-DigitalBrain.UI.RecordCardNode.Deconstruct(out string! Key, out string! ObjectLabel, out string! Name, out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.RecordFieldNode!>! Fields, out string? Subtitle, out string! LinkLabel, out DigitalBrain.UI.Emit? OnOpen) -> void
-DigitalBrain.UI.RecordCardNode.Key.get -> string!
-DigitalBrain.UI.RecordCardNode.Key.init -> void
-DigitalBrain.UI.RecordCardNode.OnOpen.get -> DigitalBrain.UI.Emit?
-DigitalBrain.UI.RecordCardNode.RecordCardNode(string! Key, string! ObjectLabel, string! Name, System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.RecordFieldNode!>! Fields, string? Subtitle = null, string! LinkLabel = "Open Neuron", DigitalBrain.UI.Emit? OnOpen = null) -> void
+DigitalBrain.UI.JobCardNode.Cancel.get -> DigitalBrain.UI.Button?
+DigitalBrain.UI.JobCardNode.Cancel.init -> void
+DigitalBrain.UI.JobCardNode.Deconstruct(out string! Title, out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.JobStepNode!>! Steps, out double Progress, out string! Status, out string? ResultText, out DigitalBrain.UI.Button? Cancel) -> void
+DigitalBrain.UI.JobCardNode.JobCardNode(string! Title, System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.JobStepNode!>! Steps, double Progress = 0, string! Status = "running", string? ResultText = null, DigitalBrain.UI.Button? Cancel = null) -> void
+DigitalBrain.UI.RecordCardNode.Deconstruct(out string! ObjectLabel, out string! Name, out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.RecordFieldNode!>! Fields, out string? Subtitle, out string! LinkLabel, out DigitalBrain.UI.Button? Open) -> void
+DigitalBrain.UI.RecordCardNode.Open.get -> DigitalBrain.UI.Button?
+DigitalBrain.UI.RecordCardNode.Open.init -> void
+DigitalBrain.UI.RecordCardNode.RecordCardNode(string! ObjectLabel, string! Name, System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.RecordFieldNode!>! Fields, string? Subtitle = null, string! LinkLabel = "Open Neuron", DigitalBrain.UI.Button? Open = null) -> void
 DigitalBrain.UI.Resolve
 DigitalBrain.UI.Resolve.<Clone>$() -> DigitalBrain.UI.Resolve!
 DigitalBrain.UI.Resolve.Deconstruct(out string! PlanId) -> void
@@ -78,12 +73,12 @@ DigitalBrain.UI.Resolve.Equals(DigitalBrain.UI.Resolve? other) -> bool
 DigitalBrain.UI.Resolve.PlanId.get -> string!
 DigitalBrain.UI.Resolve.PlanId.init -> void
 DigitalBrain.UI.Resolve.Resolve(string! PlanId) -> void
-DigitalBrain.UI.SecretCardNode.Deconstruct(out string! Key, out string! Name, out string! Why, out string! SavedIn, out string! Status, out DigitalBrain.UI.Emit? OnEnter, out DigitalBrain.UI.Emit? OnSkip) -> void
-DigitalBrain.UI.SecretCardNode.Key.get -> string!
-DigitalBrain.UI.SecretCardNode.Key.init -> void
-DigitalBrain.UI.SecretCardNode.OnEnter.get -> DigitalBrain.UI.Emit?
-DigitalBrain.UI.SecretCardNode.OnSkip.get -> DigitalBrain.UI.Emit?
-DigitalBrain.UI.SecretCardNode.SecretCardNode(string! Key, string! Name, string! Why, string! SavedIn = "Variables and secrets", string! Status = "pending", DigitalBrain.UI.Emit? OnEnter = null, DigitalBrain.UI.Emit? OnSkip = null) -> void
+DigitalBrain.UI.SecretCardNode.Deconstruct(out string! Name, out string! Why, out string! SavedIn, out string! Status, out DigitalBrain.UI.Button? Enter, out DigitalBrain.UI.Button? Skip) -> void
+DigitalBrain.UI.SecretCardNode.Enter.get -> DigitalBrain.UI.Button?
+DigitalBrain.UI.SecretCardNode.Enter.init -> void
+DigitalBrain.UI.SecretCardNode.SecretCardNode(string! Name, string! Why, string! SavedIn = "Variables and secrets", string! Status = "pending", DigitalBrain.UI.Button? Enter = null, DigitalBrain.UI.Button? Skip = null) -> void
+DigitalBrain.UI.SecretCardNode.Skip.get -> DigitalBrain.UI.Button?
+DigitalBrain.UI.SecretCardNode.Skip.init -> void
 DigitalBrain.UI.SelectOption.Deconstruct(out string! Key, out string! Id, out string! Label, out DigitalBrain.UI.Emit? Emit) -> void
 DigitalBrain.UI.SelectOption.Emit.get -> DigitalBrain.UI.Emit?
 DigitalBrain.UI.SelectOption.Emit.init -> void
@@ -105,6 +100,7 @@ DigitalBrain.UI.TabItem.TabItem(string! Key, string! Id, string! Label, DigitalB
 abstract DigitalBrain.UI.Node.<Clone>$() -> DigitalBrain.UI.Node!
 const DigitalBrain.UI.ButtonTone.Accent = "accent" -> string!
 const DigitalBrain.UI.ButtonTone.Neutral = "neutral" -> string!
+const DigitalBrain.UI.Confirmation.ConfirmView.ApprovalKey = "confirm" -> string!
 const DigitalBrain.UI.Confirmation.ConfirmView.ConfirmationsNeuronKey = "confirmations" -> string!
 const DigitalBrain.UI.Confirmation.ConfirmView.ResolveOperation = "Resolve" -> string!
 const DigitalBrain.UI.Confirmation.ConfirmView.WaitingText = "Waiting for you to approve." -> string!
@@ -163,7 +159,6 @@ DigitalBrain.UI.BrainGraphNode.Kind.get -> string!
 DigitalBrain.UI.BrainGraphNode.Kind.init -> void
 DigitalBrain.UI.BrainGraphNode.Label.get -> string!
 DigitalBrain.UI.BrainGraphNode.Label.init -> void
-DigitalBrain.UI.BrainGraphNode.OnSelect.init -> void
 DigitalBrain.UI.BrainGraphNode.Status.get -> string!
 DigitalBrain.UI.BrainGraphNode.Status.init -> void
 DigitalBrain.UI.BrainGraphNode.Subtitle.get -> string?
@@ -325,8 +320,6 @@ DigitalBrain.UI.DraftCardNode.From.get -> string!
 DigitalBrain.UI.DraftCardNode.From.init -> void
 DigitalBrain.UI.DraftCardNode.Id.get -> string!
 DigitalBrain.UI.DraftCardNode.Id.init -> void
-DigitalBrain.UI.DraftCardNode.OnDiscard.init -> void
-DigitalBrain.UI.DraftCardNode.OnSend.init -> void
 DigitalBrain.UI.DraftCardNode.Status.get -> string!
 DigitalBrain.UI.DraftCardNode.Status.init -> void
 DigitalBrain.UI.DraftCardNode.Subject.get -> string?
@@ -383,7 +376,6 @@ DigitalBrain.UI.IPresenter.Present(DigitalBrain.UI.View? side, DigitalBrain.UI.V
 DigitalBrain.UI.IPresenter.Toast(DigitalBrain.UI.Toast! toast) -> void
 DigitalBrain.UI.JobCardNode
 DigitalBrain.UI.JobCardNode.Equals(DigitalBrain.UI.JobCardNode? other) -> bool
-DigitalBrain.UI.JobCardNode.OnCancel.init -> void
 DigitalBrain.UI.JobCardNode.Progress.get -> double
 DigitalBrain.UI.JobCardNode.Progress.init -> void
 DigitalBrain.UI.JobCardNode.ResultText.get -> string?
@@ -436,7 +428,6 @@ DigitalBrain.UI.RecordCardNode.Name.get -> string!
 DigitalBrain.UI.RecordCardNode.Name.init -> void
 DigitalBrain.UI.RecordCardNode.ObjectLabel.get -> string!
 DigitalBrain.UI.RecordCardNode.ObjectLabel.init -> void
-DigitalBrain.UI.RecordCardNode.OnOpen.init -> void
 DigitalBrain.UI.RecordCardNode.Subtitle.get -> string?
 DigitalBrain.UI.RecordCardNode.Subtitle.init -> void
 DigitalBrain.UI.RecordFieldNode
@@ -466,8 +457,6 @@ DigitalBrain.UI.SecretCardNode
 DigitalBrain.UI.SecretCardNode.Equals(DigitalBrain.UI.SecretCardNode? other) -> bool
 DigitalBrain.UI.SecretCardNode.Name.get -> string!
 DigitalBrain.UI.SecretCardNode.Name.init -> void
-DigitalBrain.UI.SecretCardNode.OnEnter.init -> void
-DigitalBrain.UI.SecretCardNode.OnSkip.init -> void
 DigitalBrain.UI.SecretCardNode.SavedIn.get -> string!
 DigitalBrain.UI.SecretCardNode.SavedIn.init -> void
 DigitalBrain.UI.SecretCardNode.Status.get -> string!
@@ -815,8 +804,7 @@ static DigitalBrain.UI.Collection.operator !=(DigitalBrain.UI.Collection? left, 
 static DigitalBrain.UI.Collection.operator ==(DigitalBrain.UI.Collection? left, DigitalBrain.UI.Collection? right) -> bool
 static DigitalBrain.UI.Column.operator !=(DigitalBrain.UI.Column? left, DigitalBrain.UI.Column? right) -> bool
 static DigitalBrain.UI.Column.operator ==(DigitalBrain.UI.Column? left, DigitalBrain.UI.Column? right) -> bool
-static DigitalBrain.UI.Confirmation.ConfirmView.For(string! planId, string! title, string! body, string! approveLabel, string! denyLabel, System.TimeSpan expiry, bool viewerIsHuman) -> DigitalBrain.UI.Card!
-static DigitalBrain.UI.Confirmation.ConfirmView.Resolve(string! planId, bool approve) -> DigitalBrain.UI.Emit!
+static DigitalBrain.UI.Confirmation.ConfirmView.For(string! planId, string! title, string! body, System.TimeSpan expiry, bool viewerIsHuman) -> DigitalBrain.UI.Card!
 static DigitalBrain.UI.DataTable.operator !=(DigitalBrain.UI.DataTable? left, DigitalBrain.UI.DataTable? right) -> bool
 static DigitalBrain.UI.DataTable.operator ==(DigitalBrain.UI.DataTable? left, DigitalBrain.UI.DataTable? right) -> bool
 static DigitalBrain.UI.Divider.operator !=(DigitalBrain.UI.Divider? left, DigitalBrain.UI.Divider? right) -> bool
