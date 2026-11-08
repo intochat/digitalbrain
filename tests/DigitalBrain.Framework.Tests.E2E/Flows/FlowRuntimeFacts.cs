@@ -1,5 +1,8 @@
 using DigitalBrain;
+using DigitalBrain.Confirmation;
 using DigitalBrain.Flows;
+using DigitalBrain.Runtime.Orleans.Operations;
+using Microsoft.Extensions.DependencyInjection;
 using DigitalBrain.Testing;
 
 namespace DigitalBrain.Framework.Tests.E2E.Flows;
@@ -10,7 +13,37 @@ public sealed class FlowRuntimeFixture : BothRuntimesFixture
 }
 
 /// <summary>A flow's steps and wait survive a restart on TestOS and on the silo.</summary>
-public sealed class FlowRuntimeFacts(FlowRuntimeFixture fixture) : IClassFixture<FlowRuntimeFixture>
+/// <summary>Both runtimes with a confirmation gate whose Confirm faults.</summary>
+public sealed class FaultingConfirmationsFixture : BothRuntimesFixture
+{
+    protected override IReadOnlyList<Type> Modules => [typeof(FlowRuntimeModule)];
+
+    protected override void ConfigureSilo(IServiceCollection services)
+    {
+        services.AddSingleton<IConfirmationContexts, FaultingConfirmations>();
+        services.AddSingleton<IConfirmations, FaultingConfirmations>();
+    }
+
+    protected override void ConfigureTestOS(IServiceCollection services) => services.AddSingleton<IConfirmations, FaultingConfirmations>();
+}
+
+public sealed class FaultingConfirmations : IConfirmations, IConfirmationContexts
+{
+    public ConfirmationPolicy Policy => ConfirmationPolicy.DestructiveOnly;
+
+    public IConfirmations For(BrainId brain, string requester) => this;
+
+    public async Task<ConfirmationResult> Confirm(ConfirmationPlan plan, CancellationToken ct = default)
+    {
+        await Task.Yield();
+        throw new InvalidOperationException("inbox down");
+    }
+
+    public Task Resolve(string planId, bool approve, CancellationToken ct = default) => Task.CompletedTask;
+}
+
+public sealed class FlowRuntimeFacts(FlowRuntimeFixture fixture, FaultingConfirmationsFixture faulting)
+    : IClassFixture<FlowRuntimeFixture>, IClassFixture<FaultingConfirmationsFixture>
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -55,6 +88,20 @@ public sealed class FlowRuntimeFacts(FlowRuntimeFixture fixture) : IClassFixture
         var resolved = Assert.Single(await runtime.Signals<FlowResolve>(id, Ct));
         Assert.Equal(WaitOutcome.Approved, resolved.Outcome);
         Assert.Equal(["a", "b"], (await runtime.Get<ITestFlow>(id).Read()).Done);
+    }
+
+    [Theory, MemberData(nameof(NeuronRuntimeKinds.Both), MemberType = typeof(NeuronRuntimeKinds))]
+    public async Task FailedConfirmationFailsTheFlowOnBothRuntimes(NeuronRuntimeKind kind)
+    {
+        var runtime = await faulting.Runtime(kind);
+        var id = runtime.Id("test.flow", "faulting");
+        await runtime.Get<ITestFlow>(id).Start("Build", "ann", null, new FlowBox { AskFirst = true, Approval = true });
+
+        var ended = await runtime.WaitForSignals<FlowDone>(id, 1, TimeSpan.FromSeconds(20), Ct);
+
+        Assert.Equal(new FlowDone(id.ToString(), FlowOutcome.Failed, "confirmation"), Assert.Single(ended));
+        Assert.Contains(new FlowStep(id.ToString(), "b", StepOutcome.Failed, "confirmation: inbox down"), await runtime.Signals<FlowStep>(id, Ct));
+        Assert.Equal(FlowStatus.Failed, (await runtime.Get<ITestFlow>(id).Read()).Status);
     }
 
     // The detached Confirm reaches the confirmations side asynchronously; approve once the plan is pending there.

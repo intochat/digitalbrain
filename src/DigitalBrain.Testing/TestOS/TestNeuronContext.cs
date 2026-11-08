@@ -17,7 +17,10 @@ internal sealed class TestNeuronContext : INeuronContext
         Timers = new HostTimers(host);
         Reminders = new HostReminders(host);
         Synapses = new TestSynapses(host);
-        Confirmations = host.OS.Confirmations.For(ConfirmationPrincipal.App(host.Id.ToString()), Publish);
+        // An IConfirmations in TestOSOptions.Services replaces the kit's gate (a fact substitutes a faulting one), as the silo's
+        // registered IConfirmations does.
+        Confirmations = host.OS.Services.GetService(typeof(IConfirmations)) as IConfirmations
+            ?? host.OS.Confirmations.For(ConfirmationPrincipal.App(host.Id.ToString()), Publish);
         var runner = TestOSOperations.Runner(host.OS.Services, host.Id.Brain);
         Operations = new FakeOperations(runner, Publish, (plan, ct) => StorageConfirmationGate.Check(runner, Confirmations, plan, ct));
     }

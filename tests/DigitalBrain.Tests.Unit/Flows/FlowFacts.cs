@@ -90,6 +90,17 @@ internal sealed class ThrowingConfirmations : IConfirmations
     public Task Resolve(string planId, bool approve, CancellationToken ct = default) => Task.CompletedTask;
 }
 
+// Answers at once, as a policy that skips the question does, and never publishes ConfirmationResolved.
+internal sealed class SkippingConfirmations(ConfirmationOutcome outcome) : IConfirmations
+{
+    public ConfirmationPolicy Policy => ConfirmationPolicy.Never;
+
+    public Task<ConfirmationResult> Confirm(ConfirmationPlan plan, CancellationToken ct = default)
+        => Task.FromResult(new ConfirmationResult(plan.Id, outcome, outcome == ConfirmationOutcome.Approved ? ConfirmationDenyReason.None : ConfirmationDenyReason.PlanInvalid, Skipped: true));
+
+    public Task Resolve(string planId, bool approve, CancellationToken ct = default) => Task.CompletedTask;
+}
+
 internal sealed class RecordingReminders : IReminders
 {
     public Dictionary<string, TimeSpan> Started { get; } = [];
@@ -384,5 +395,28 @@ public sealed class FlowFacts
         Assert.Equal(new FlowDone(id, FlowOutcome.Failed, "confirmation"), signals[^1]);
         Assert.Equal(FlowStatus.Failed, flow.Current.Status);
         Assert.Null(flow.Current.Waiting);
+    }
+
+    [Fact]
+    public async Task ConfirmResultWithoutResolutionResumesTheFlow()
+    {
+        var (flow, context) = await Activated(confirmations: new SkippingConfirmations(ConfirmationOutcome.Approved));
+
+        await flow.Start("Build", "ann", null, new Box { AskFirst = true });
+
+        var id = FlowId.ToString();
+        Assert.Contains(new FlowResolve(id, "b", WaitOutcome.Approved, null), Signals(context));
+        Assert.Equal(FlowStatus.Completed, flow.Current.Status);
+    }
+
+    [Fact]
+    public async Task ConfirmResultRefusedUpFrontCancelsTheFlow()
+    {
+        var (flow, context) = await Activated(confirmations: new SkippingConfirmations(ConfirmationOutcome.Denied));
+
+        await flow.Start("Build", "ann", null, new Box { AskFirst = true });
+
+        Assert.Contains(new FlowResolve(FlowId.ToString(), "b", WaitOutcome.Denied, null), Signals(context));
+        Assert.Equal(FlowStatus.Cancelled, flow.Current.Status);
     }
 }

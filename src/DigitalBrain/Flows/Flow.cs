@@ -1,5 +1,7 @@
 using System.Reflection;
 using DigitalBrain.Confirmation;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DigitalBrain.Flows;
 
@@ -116,13 +118,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         {
             return Task.CompletedTask;
         }
-        var outcome = resolved.Outcome switch
-        {
-            ConfirmationOutcome.Approved => WaitOutcome.Approved,
-            ConfirmationOutcome.Expired => WaitOutcome.Expired,
-            _ => WaitOutcome.Denied,
-        };
-        return Resolve(waiting.Step, outcome, resolved.Approver?.Id);
+        return Resolve(waiting.Step, WaitOutcomeOf(resolved.Outcome), resolved.Approver?.Id);
     }
 
     /// <inheritdoc />
@@ -131,6 +127,13 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         if (State is not { Status: FlowStatus.Waiting, Waiting: { Reason: WaitReason.Approval } waiting } || waiting.ConfirmationPlanId != planId) { return; }
         await Save(State with { Status = FlowStatus.Failed, Waiting = null, Ended = Context.Time.GetUtcNow() },
             [new FlowStep(FlowId, waiting.Step, StepOutcome.Failed, "confirmation: " + detail), new FlowDone(FlowId, FlowOutcome.Failed, "confirmation")]).ConfigureAwait(true);
+    }
+
+    /// <inheritdoc />
+    Task IFlowCallbacks.ConfirmationAnswered(string planId, ConfirmationOutcome outcome)
+    {
+        if (State is not { Status: FlowStatus.Waiting, Waiting: { Reason: WaitReason.Approval } waiting } || waiting.ConfirmationPlanId != planId) { return Task.CompletedTask; }
+        return Resolve(waiting.Step, WaitOutcomeOf(outcome), null);
     }
 
     /// <summary>The confirmation plan an approval wait of <paramref name="step"/> raises.</summary>
@@ -219,16 +222,30 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     }
 
     // Raises the plan without awaiting the answer inside the turn; the answer arrives as ConfirmationResolved.
+    // Results go back through the neuron's own mailbox (a self-call), so they are saved in a turn, never from this detached task.
     private async Task Ask(ConfirmationPlan plan)
     {
-        try { _ = await Context.Confirm(plan, CancellationToken.None).ConfigureAwait(true); }
+        Func<IFlowCallbacks, Task> relay;
+        try
+        {
+            var result = await Context.Confirm(plan, CancellationToken.None).ConfigureAwait(true);
+            relay = self => self.ConfirmationAnswered(plan.Id, result.Outcome);
+        }
         catch (Exception error) when (error is not OutOfMemoryException)
         {
-            // Back through the neuron's own mailbox: the failure is saved in a turn, never from this detached task.
-            try { await Context.Get<IFlowCallbacks>(Id).ConfirmationFailed(plan.Id, error.Message).ConfigureAwait(true); }
-            catch (Exception relay) when (relay is not OutOfMemoryException) { _ = relay; }
+            var detail = error.Message;
+            relay = self => self.ConfirmationFailed(plan.Id, detail);
+        }
+        try { await relay(Context.Get<IFlowCallbacks>(Id)).ConfigureAwait(true); }
+        catch (Exception error) when (error is not OutOfMemoryException)
+        {
+            // The flow stays waiting on the plan; the log is the only trace (IConfirmations has no read of pending plans).
+            FlowLog.RelayFailed(Logger(), error, FlowId, plan.Id);
         }
     }
+
+    private ILogger Logger()
+        => (Context.Services.GetService(typeof(ILoggerFactory)) as ILoggerFactory)?.CreateLogger("DigitalBrain.Flows") ?? NullLogger.Instance;
 
     private async Task Resolve(string step, WaitOutcome outcome, string? by)
     {
@@ -248,6 +265,13 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         await Advance().ConfigureAwait(true);
     }
 
+    private static WaitOutcome WaitOutcomeOf(ConfirmationOutcome outcome) => outcome switch
+    {
+        ConfirmationOutcome.Approved => WaitOutcome.Approved,
+        ConfirmationOutcome.Expired => WaitOutcome.Expired,
+        _ => WaitOutcome.Denied,
+    };
+
     private static bool Ended(FlowStatus status) => status is FlowStatus.Completed or FlowStatus.Failed or FlowStatus.Cancelled;
 
     private static TimeSpan Positive(TimeSpan span) => span > TimeSpan.Zero ? span : TimeSpan.FromSeconds(1);
@@ -260,6 +284,21 @@ public interface IFlowCallbacks
     /// <param name="planId">The plan id.</param>
     /// <param name="detail">Why.</param>
     Task ConfirmationFailed(string planId, string detail);
+
+    /// <summary>
+    /// <see cref="IConfirmations.Confirm"/> returned <paramref name="outcome"/> for <paramref name="planId"/>. It ends the wait like the
+    /// plan's <see cref="ConfirmationResolved"/> (whichever arrives first wins), so a result that comes back without that signal
+    /// (skipped by policy, refused up front) still resumes the flow.
+    /// </summary>
+    /// <param name="planId">The plan id.</param>
+    /// <param name="outcome">How it ended.</param>
+    Task ConfirmationAnswered(string planId, ConfirmationOutcome outcome);
+}
+
+internal static partial class FlowLog
+{
+    [LoggerMessage(Level = LogLevel.Error, Message = "Flow {FlowId} could not record the answer to confirmation plan {PlanId}; it stays waiting")]
+    public static partial void RelayFailed(ILogger logger, Exception exception, string flowId, string planId);
 }
 
 // The request's trace id. TraceContext lives in DigitalBrain.Capabilities.Compute, which this assembly does not reference, so it is
