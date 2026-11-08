@@ -9,8 +9,8 @@ namespace DigitalBrain.Flows;
 /// One durable unit of work: declared <see cref="Steps"/> run in order through <see cref="Run"/>, each between two saves (the step
 /// started, then the step done with the body's result). A body may ask to wait for an approval, an external signal or a time; the flow
 /// then rests in <see cref="FlowStatus.Waiting"/> until <see cref="Resume"/>, the plan's <see cref="ConfirmationResolved"/> or the
-/// <c>flow-expiry</c> reminder ends the wait. Bodies run at least once: a step interrupted mid-body (deactivation, crash) runs again,
-/// once, when the flow next activates or the <c>flow-nudge</c> reminder fires, so bodies must be idempotent: a duplicate activation
+/// <c>flow-expiry</c> reminder ends the wait. Bodies run at least once: a step interrupted mid-body (deactivation, crash) runs again
+/// when the flow next activates or the <c>flow-nudge</c> reminder fires, so bodies must be idempotent: a duplicate activation
 /// during a membership change can also run a step twice (the state's ETag stops the second save). A body that throws
 /// <see cref="OperationCanceledException"/> (any token) is interrupted, not failed, and runs again the same way. On Orleans the grain
 /// is not reentrant, so deactivation and shutdown cannot cancel a running body: shutdown waits for it or abandons it, and either way
@@ -20,6 +20,10 @@ namespace DigitalBrain.Flows;
 /// <para>
 /// A module hosting a flow must declare <c>Need.Reminders</c>: the <c>flow-nudge</c> and <c>flow-expiry</c> reminders are how it
 /// recovers and how its waits expire. Bodies run at least once and must be idempotent.
+/// </para>
+/// <para>
+/// A contract a flow implements that exposes <see cref="Cancel"/> must mark it <c>[Interleaves]</c>: a caller outside the host routes
+/// by the contract, so without it a cancel waits behind the running body. Activation logs a Warning, once per type, when it is missing.
 /// </para>
 /// </summary>
 /// <typeparam name="T">The flow's own state.</typeparam>
@@ -136,6 +140,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     /// the caller's job. This call interleaves with a running body, so it only fires the token and posts a self-call; the Cancelled
     /// save runs in a turn of its own once the body has stopped, and a step's result that arrives meanwhile is dropped.
     /// </summary>
+    /// <remarks>A contract that exposes this method must mark it <c>[Interleaves]</c> as well, or a cancel from outside the host waits behind the body.</remarks>
     /// <param name="reason">Why.</param>
     [Interleaves]
     public async Task Cancel(string reason)
@@ -235,6 +240,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     protected override async Task OnActivate(CancellationToken cancellationToken)
     {
         await Context.Synapses.EnsureBrainWide(typeof(ConfirmationResolved)).ConfigureAwait(true);
+        WarnOnNonInterleavingCancel();
         if (State.Status == FlowStatus.Running && State.Waiting is null) { await Advance().ConfigureAwait(true); }
         else if (State is { Status: FlowStatus.Waiting, Waiting.Reason: WaitReason.Approval })
         {
@@ -455,6 +461,22 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         await Advance().ConfigureAwait(true);
     }
 
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, bool> CancelChecked = new();
+
+    // A contract whose Cancel lacks [Interleaves] makes outside cancels wait behind the body: warn once per flow type.
+    private void WarnOnNonInterleavingCancel()
+    {
+        if (!CancelChecked.TryAdd(GetType(), true)) { return; }
+        foreach (var contract in GetType().GetInterfaces())
+        {
+            if (contract == typeof(IFlowCallbacks)) { continue; }
+            if (contract.GetMethod(nameof(Cancel), [typeof(string)]) is { } cancel && !cancel.IsDefined(typeof(InterleavesAttribute), false))
+            {
+                FlowLog.CancelNotInterleaved(Logger(), GetType().FullName ?? GetType().Name, contract.FullName ?? contract.Name);
+            }
+        }
+    }
+
     private string Proof()
     {
         var proof = Guid.NewGuid().ToString("N");
@@ -529,6 +551,9 @@ internal static partial class FlowLog
 {
     [LoggerMessage(Level = LogLevel.Error, Message = "Flow {FlowId} could not record the answer to confirmation plan {PlanId}; it stays waiting")]
     public static partial void RelayFailed(ILogger logger, Exception exception, string flowId, string planId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Flow {FlowType} implements {Contract}.Cancel without [Interleaves]; a cancel from outside the host waits behind the running body")]
+    public static partial void CancelNotInterleaved(ILogger logger, string flowType, string contract);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Flow {FlowId} could not post its cancel; the running body was interrupted and the flow runs on")]
     public static partial void CancelPostFailed(ILogger logger, Exception exception, string flowId);
