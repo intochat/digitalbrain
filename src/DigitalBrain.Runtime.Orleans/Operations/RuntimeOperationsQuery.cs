@@ -10,6 +10,7 @@ namespace DigitalBrain.Runtime.Orleans.Operations;
 /// </summary>
 internal sealed class RuntimeOperationsQuery(IServiceProvider services, BrainId brain) : IOperationsQuery
 {
+    /// <summary>The running operations of this brain driven on this silo. Operations driven elsewhere, or orphaned by a silo restart, are not listed; <see cref="Read"/> is the cross-silo path.</summary>
     public async Task<IReadOnlyList<OperationView>> Running(CancellationToken ct)
     {
         var registry = services.GetService<OperationRegistry>()

@@ -276,7 +276,7 @@ internal sealed class OperationRegistry
 
     public bool TryGet(OperationId id, out RuntimeOperation operation) => _running.TryGetValue(id, out operation!);
 
-    /// <summary>The ids of the operations of <paramref name="brain"/> running on this silo.</summary>
+    /// <summary>The ids of the operations of <paramref name="brain"/> driven on this silo. Operations driven elsewhere, or orphaned by a silo restart, are not listed; reading an entity by id is the cross-silo path.</summary>
     public IReadOnlyList<OperationId> Running(BrainId brain) => [.. _running.Values.Where(operation => operation.Brain == brain).Select(operation => operation.Id)];
 
     public void Remove(OperationId id) => _running.TryRemove(id, out _);
