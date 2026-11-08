@@ -27,11 +27,14 @@ internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronSta
 
     public ITimers Timers => throw new NotSupportedException();
 
-    public IReminders Reminders => throw new NotSupportedException();
+    public IReminders? RecordedReminders { get; set; }
+
+    public IReminders Reminders => RecordedReminders ?? throw new NotSupportedException();
 
     public IOperations Operations => throw new NotSupportedException();
     public IOperationsQuery OperationsQuery => throw new NotSupportedException();
-    public DigitalBrain.Confirmation.IConfirmations Confirmations => throw new NotSupportedException();
+    public DigitalBrain.Confirmation.IConfirmations? RecordedConfirmations { get; set; }
+    public DigitalBrain.Confirmation.IConfirmations Confirmations => RecordedConfirmations ?? throw new NotSupportedException();
 
     public ISynapses Synapses => this;
 
