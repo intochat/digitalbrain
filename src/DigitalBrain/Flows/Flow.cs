@@ -174,7 +174,12 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     /// <inheritdoc />
     async Task IFlowCallbacks.CancelRequested(string reason, string proof)
     {
-        Prove(proof);
+        try { Prove(proof); }
+        catch (InvalidOperationException error)
+        {
+            FlowLog.ForeignCancelRefused(Logger(), error, FlowId);
+            throw;
+        }
         if (Ended(State.Status)) { return; }
         var waiting = State.Waiting;
         await Save(State with { Status = FlowStatus.Cancelled, Waiting = null, Current = null, Ended = Context.Time.GetUtcNow() },
@@ -565,6 +570,9 @@ internal static partial class FlowLog
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Flow {FlowType} implements {Contract}.Cancel without [Interleaves]; a cancel from outside the host waits behind the running body")]
     public static partial void CancelNotInterleaved(ILogger logger, string flowType, string contract);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Flow {FlowId} refused a CancelRequested without a live proof")]
+    public static partial void ForeignCancelRefused(ILogger logger, Exception exception, string flowId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Flow {FlowId} could not post its cancel; the running body was interrupted and the flow runs on")]
     public static partial void CancelPostFailed(ILogger logger, Exception exception, string flowId);
