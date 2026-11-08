@@ -15,6 +15,8 @@
     <ProjectReference Include="../DigitalBrain.Capabilities.Identity/DigitalBrain.Capabilities.Identity.csproj" />
     <ProjectReference Include="../DigitalBrain.Capabilities.Connections/DigitalBrain.Capabilities.Connections.csproj" />
     <ProjectReference Include="../DigitalBrain.Runtime.Synapses/DigitalBrain.Runtime.Synapses.csproj" />
+    <ProjectReference Include="../DigitalBrain.Capabilities.Http/DigitalBrain.Capabilities.Http.csproj" />
+    <ProjectReference Include="../DigitalBrain.Capabilities.Tools/DigitalBrain.Capabilities.Tools.csproj" />
     <PackageReference Include="xunit.v3.extensibility.core" />
     <PackageReference Include="xunit.v3.assert" />
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />

@@ -715,3 +715,111 @@ DigitalBrain.Testing.FakeNeuronContext.TraceId.get -> string?
 DigitalBrain.Testing.FakeNeuronContext.TraceId.set -> void
 DigitalBrain.Testing.RecordingSynapses.BrainWideAliases.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
 DigitalBrain.Testing.RecordingSynapses.EnsureBrainWide(System.Collections.Generic.IReadOnlyList<string!>! signalAliases) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Synapses.ExpectSignal
+DigitalBrain.Testing.Synapses.ExpectSignal.Alias.get -> string!
+DigitalBrain.Testing.Synapses.ExpectSignal.Alias.init -> void
+DigitalBrain.Testing.Synapses.ExpectSignal.Deconstruct(out string! Alias) -> void
+DigitalBrain.Testing.Synapses.ExpectSignal.Equals(DigitalBrain.Testing.Synapses.ExpectSignal? other) -> bool
+DigitalBrain.Testing.Synapses.ExpectSignal.ExpectSignal(string! Alias) -> void
+DigitalBrain.Testing.Synapses.ExpectState
+DigitalBrain.Testing.Synapses.ExpectState.Alias.get -> string!
+DigitalBrain.Testing.Synapses.ExpectState.Alias.init -> void
+DigitalBrain.Testing.Synapses.ExpectState.Deconstruct(out string! Alias, out string! JsonPath, out System.Text.Json.JsonElement Expected) -> void
+DigitalBrain.Testing.Synapses.ExpectState.Equals(DigitalBrain.Testing.Synapses.ExpectState? other) -> bool
+DigitalBrain.Testing.Synapses.ExpectState.ExpectState(string! Alias, string! JsonPath, System.Text.Json.JsonElement Expected) -> void
+DigitalBrain.Testing.Synapses.ExpectState.Expected.get -> System.Text.Json.JsonElement
+DigitalBrain.Testing.Synapses.ExpectState.Expected.init -> void
+DigitalBrain.Testing.Synapses.ExpectState.JsonPath.get -> string!
+DigitalBrain.Testing.Synapses.ExpectState.JsonPath.init -> void
+DigitalBrain.Testing.Synapses.FakeSlots
+DigitalBrain.Testing.Synapses.FakeSlots.FakeSlots() -> void
+DigitalBrain.Testing.Synapses.FakeSlots.Http(string! slot, System.Func<string!, string!>! body) -> DigitalBrain.Testing.Synapses.FakeSlots!
+DigitalBrain.Testing.Synapses.FakeSlots.Slot<T>(string! slot, T! instance) -> DigitalBrain.Testing.Synapses.FakeSlots!
+DigitalBrain.Testing.Synapses.FakeSlots.Slots.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Testing.Synapses.FakeSlots.Tool(string! slot, System.Func<string!, System.Text.Json.JsonElement, System.Text.Json.JsonElement>! run) -> DigitalBrain.Testing.Synapses.FakeSlots!
+DigitalBrain.Testing.Synapses.Publish
+DigitalBrain.Testing.Synapses.Publish.Deconstruct(out string! SignalAlias, out System.Text.Json.JsonElement Payload) -> void
+DigitalBrain.Testing.Synapses.Publish.Equals(DigitalBrain.Testing.Synapses.Publish? other) -> bool
+DigitalBrain.Testing.Synapses.Publish.Payload.get -> System.Text.Json.JsonElement
+DigitalBrain.Testing.Synapses.Publish.Payload.init -> void
+DigitalBrain.Testing.Synapses.Publish.Publish(string! SignalAlias, System.Text.Json.JsonElement Payload) -> void
+DigitalBrain.Testing.Synapses.Publish.SignalAlias.get -> string!
+DigitalBrain.Testing.Synapses.Publish.SignalAlias.init -> void
+DigitalBrain.Testing.Synapses.ScenarioEvent
+DigitalBrain.Testing.Synapses.ScenarioEvent.<Clone>$() -> DigitalBrain.Testing.Synapses.ScenarioEvent!
+DigitalBrain.Testing.Synapses.ScenarioEvent.Deconstruct(out int Step, out DigitalBrain.JournaledSignal! Signal) -> void
+DigitalBrain.Testing.Synapses.ScenarioEvent.Equals(DigitalBrain.Testing.Synapses.ScenarioEvent? other) -> bool
+DigitalBrain.Testing.Synapses.ScenarioEvent.ScenarioEvent(int Step, DigitalBrain.JournaledSignal! Signal) -> void
+DigitalBrain.Testing.Synapses.ScenarioEvent.Signal.get -> DigitalBrain.JournaledSignal!
+DigitalBrain.Testing.Synapses.ScenarioEvent.Signal.init -> void
+DigitalBrain.Testing.Synapses.ScenarioEvent.Step.get -> int
+DigitalBrain.Testing.Synapses.ScenarioEvent.Step.init -> void
+DigitalBrain.Testing.Synapses.ScenarioStep
+DigitalBrain.Testing.Synapses.ScenarioStep.ScenarioStep() -> void
+DigitalBrain.Testing.Synapses.ScenarioStep.ScenarioStep(DigitalBrain.Testing.Synapses.ScenarioStep! original) -> void
+DigitalBrain.Testing.Synapses.ScenarioTranscript
+DigitalBrain.Testing.Synapses.ScenarioTranscript.<Clone>$() -> DigitalBrain.Testing.Synapses.ScenarioTranscript!
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Deconstruct(out bool Passed, out System.Collections.Generic.IReadOnlyList<DigitalBrain.Testing.Synapses.ScenarioEvent!>! Events, out System.Collections.Generic.IReadOnlyList<string!>! Failures) -> void
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Equals(DigitalBrain.Testing.Synapses.ScenarioTranscript? other) -> bool
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Events.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Testing.Synapses.ScenarioEvent!>!
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Events.init -> void
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Failures.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Failures.init -> void
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Passed.get -> bool
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Passed.init -> void
+DigitalBrain.Testing.Synapses.ScenarioTranscript.ScenarioTranscript(bool Passed, System.Collections.Generic.IReadOnlyList<DigitalBrain.Testing.Synapses.ScenarioEvent!>! Events, System.Collections.Generic.IReadOnlyList<string!>! Failures) -> void
+DigitalBrain.Testing.Synapses.Tick
+DigitalBrain.Testing.Synapses.Tick.At.get -> System.DateTimeOffset
+DigitalBrain.Testing.Synapses.Tick.At.init -> void
+DigitalBrain.Testing.Synapses.Tick.Deconstruct(out System.DateTimeOffset At) -> void
+DigitalBrain.Testing.Synapses.Tick.Equals(DigitalBrain.Testing.Synapses.Tick? other) -> bool
+DigitalBrain.Testing.Synapses.Tick.Tick(System.DateTimeOffset At) -> void
+DigitalBrain.Testing.Synapses.UnitScenario
+abstract DigitalBrain.Testing.Synapses.ScenarioStep.<Clone>$() -> DigitalBrain.Testing.Synapses.ScenarioStep!
+override DigitalBrain.Testing.Synapses.ExpectSignal.<Clone>$() -> DigitalBrain.Testing.Synapses.ExpectSignal!
+override DigitalBrain.Testing.Synapses.ExpectSignal.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.ExpectSignal.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.ExpectSignal.ToString() -> string!
+override DigitalBrain.Testing.Synapses.ExpectState.<Clone>$() -> DigitalBrain.Testing.Synapses.ExpectState!
+override DigitalBrain.Testing.Synapses.ExpectState.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.ExpectState.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.ExpectState.ToString() -> string!
+override DigitalBrain.Testing.Synapses.Publish.<Clone>$() -> DigitalBrain.Testing.Synapses.Publish!
+override DigitalBrain.Testing.Synapses.Publish.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.Publish.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.Publish.ToString() -> string!
+override DigitalBrain.Testing.Synapses.ScenarioEvent.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.ScenarioEvent.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.ScenarioEvent.ToString() -> string!
+override DigitalBrain.Testing.Synapses.ScenarioStep.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.ScenarioStep.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.ScenarioStep.ToString() -> string!
+override DigitalBrain.Testing.Synapses.ScenarioTranscript.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.ScenarioTranscript.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.ScenarioTranscript.ToString() -> string!
+override DigitalBrain.Testing.Synapses.Tick.<Clone>$() -> DigitalBrain.Testing.Synapses.Tick!
+override DigitalBrain.Testing.Synapses.Tick.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.Tick.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.Tick.ToString() -> string!
+override sealed DigitalBrain.Testing.Synapses.ExpectSignal.Equals(DigitalBrain.Testing.Synapses.ScenarioStep? other) -> bool
+override sealed DigitalBrain.Testing.Synapses.ExpectState.Equals(DigitalBrain.Testing.Synapses.ScenarioStep? other) -> bool
+override sealed DigitalBrain.Testing.Synapses.Publish.Equals(DigitalBrain.Testing.Synapses.ScenarioStep? other) -> bool
+override sealed DigitalBrain.Testing.Synapses.Tick.Equals(DigitalBrain.Testing.Synapses.ScenarioStep? other) -> bool
+static DigitalBrain.Testing.Synapses.ExpectSignal.operator !=(DigitalBrain.Testing.Synapses.ExpectSignal? left, DigitalBrain.Testing.Synapses.ExpectSignal? right) -> bool
+static DigitalBrain.Testing.Synapses.ExpectSignal.operator ==(DigitalBrain.Testing.Synapses.ExpectSignal? left, DigitalBrain.Testing.Synapses.ExpectSignal? right) -> bool
+static DigitalBrain.Testing.Synapses.ExpectState.operator !=(DigitalBrain.Testing.Synapses.ExpectState? left, DigitalBrain.Testing.Synapses.ExpectState? right) -> bool
+static DigitalBrain.Testing.Synapses.ExpectState.operator ==(DigitalBrain.Testing.Synapses.ExpectState? left, DigitalBrain.Testing.Synapses.ExpectState? right) -> bool
+static DigitalBrain.Testing.Synapses.Publish.operator !=(DigitalBrain.Testing.Synapses.Publish? left, DigitalBrain.Testing.Synapses.Publish? right) -> bool
+static DigitalBrain.Testing.Synapses.Publish.operator ==(DigitalBrain.Testing.Synapses.Publish? left, DigitalBrain.Testing.Synapses.Publish? right) -> bool
+static DigitalBrain.Testing.Synapses.ScenarioEvent.operator !=(DigitalBrain.Testing.Synapses.ScenarioEvent? left, DigitalBrain.Testing.Synapses.ScenarioEvent? right) -> bool
+static DigitalBrain.Testing.Synapses.ScenarioEvent.operator ==(DigitalBrain.Testing.Synapses.ScenarioEvent? left, DigitalBrain.Testing.Synapses.ScenarioEvent? right) -> bool
+static DigitalBrain.Testing.Synapses.ScenarioStep.operator !=(DigitalBrain.Testing.Synapses.ScenarioStep? left, DigitalBrain.Testing.Synapses.ScenarioStep? right) -> bool
+static DigitalBrain.Testing.Synapses.ScenarioStep.operator ==(DigitalBrain.Testing.Synapses.ScenarioStep? left, DigitalBrain.Testing.Synapses.ScenarioStep? right) -> bool
+static DigitalBrain.Testing.Synapses.ScenarioTranscript.operator !=(DigitalBrain.Testing.Synapses.ScenarioTranscript? left, DigitalBrain.Testing.Synapses.ScenarioTranscript? right) -> bool
+static DigitalBrain.Testing.Synapses.ScenarioTranscript.operator ==(DigitalBrain.Testing.Synapses.ScenarioTranscript? left, DigitalBrain.Testing.Synapses.ScenarioTranscript? right) -> bool
+static DigitalBrain.Testing.Synapses.Tick.operator !=(DigitalBrain.Testing.Synapses.Tick? left, DigitalBrain.Testing.Synapses.Tick? right) -> bool
+static DigitalBrain.Testing.Synapses.Tick.operator ==(DigitalBrain.Testing.Synapses.Tick? left, DigitalBrain.Testing.Synapses.Tick? right) -> bool
+static DigitalBrain.Testing.Synapses.UnitScenario.Run(DigitalBrain.SynapseSource! source, DigitalBrain.Testing.Synapses.FakeSlots! fakes, System.Collections.Generic.IReadOnlyList<DigitalBrain.Testing.Synapses.ScenarioStep!>! steps, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Testing.Synapses.ScenarioTranscript!>!
+virtual DigitalBrain.Testing.Synapses.ScenarioStep.EqualityContract.get -> System.Type!
+virtual DigitalBrain.Testing.Synapses.ScenarioStep.Equals(DigitalBrain.Testing.Synapses.ScenarioStep? other) -> bool
+virtual DigitalBrain.Testing.Synapses.ScenarioStep.PrintMembers(System.Text.StringBuilder! builder) -> bool
