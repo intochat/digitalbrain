@@ -128,11 +128,12 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
             return new DeployOutcome(DeployStatus.Failed, build.Hash, build.Diagnostics, Empty(), "the source does not compile");
         }
 
-        // DB0045 again on the emitted bytes, before anything loads or any staged build is touched: a build that skipped the
-        // analyzer is still refused, and a refused deploy leaves the live and staged versions as they were.
-        if (BannedReferences.First(build.Assembly) is { } banned)
+        // The boundary: every reference in the emitted bytes is on the allow-list, checked before anything loads or any staged
+        // build is touched. DB0045 in the compiler is advisory; a build that skipped it is still refused here, and a refused
+        // deploy leaves the live and staged versions as they were.
+        if (AllowedReferences.FirstDisallowed(build.Assembly) is { } disallowed)
         {
-            var reason = $"'{banned}' is banned in a synapse assembly";
+            var reason = $"'{disallowed}' is outside the surface a synapse assembly may reference";
             return new DeployOutcome(DeployStatus.Refused, build.Hash, [.. build.Diagnostics, new SynapseDiagnostic(source.SourceKey, "DB0045", 0, reason)], Empty(), reason);
         }
 

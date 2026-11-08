@@ -4,9 +4,9 @@ using System.Linq;
 namespace DigitalBrain.Analyzers.Synapses;
 
 /// <summary>
-/// The APIs a synapse assembly may not touch (DB0045): deny by namespace or type, with a short allow-list. The analyzer checks
-/// use sites; the synapse host checks the compiled assembly's type and member references against the same list, so a build
-/// that skipped the analyzer is still refused. Names are fully qualified with nested types joined by '.', generic arity
+/// The APIs DB0045 reports at authoring time: deny by namespace or type, with a short allow-list. This list is advisory, for
+/// messages at the use site; the boundary is the synapse host's allow-list (AllowedApis in DigitalBrain.Runtime.Synapses),
+/// which refuses any build referencing anything off it. Names are fully qualified with nested types joined by '.', generic arity
 /// dropped, and a member is "Type.Member" (constructors are ".ctor"; property accessors may be given by property name).
 /// </summary>
 internal static class BannedApis
@@ -34,9 +34,14 @@ internal static class BannedApis
         // The thread pool and threads of its own.
         "System.Threading.Thread",
         "System.Threading.ThreadPool",
+        "System.Threading.ThreadPoolBoundHandle",
         "System.Threading.Timer",
+        "System.Timers",
         "System.Threading.Tasks.Parallel",
         "System.Threading.Tasks.TaskFactory",
+        "System.Threading.Tasks.TaskScheduler",
+        // Expression trees compile and invoke members by name.
+        "System.Linq.Expressions",
     ];
 
     /// <summary>Types inside a banned namespace that stay allowed.</summary>
@@ -61,6 +66,9 @@ internal static class BannedApis
     [
         "System.Threading.Tasks.Task.Run",
         "System.Threading.Tasks.Task.Factory",
+        "System.Threading.Tasks.Task.Start",
+        "System.Threading.Tasks.Task.ContinueWith",
+        "System.Delegate.DynamicInvoke",
         "System.Type.GetType*",
         "System.Type.InvokeMember",
         "System.Delegate.CreateDelegate",

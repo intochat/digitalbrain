@@ -1,17 +1,24 @@
 using System.Collections.Immutable;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
-using DigitalBrain.Analyzers.Synapses;
 
 namespace DigitalBrain.Runtime.Synapses;
 
-/// <summary>DB0045 on the host side: reads the build's type and member references from the PE bytes (nothing is loaded) against <see cref="BannedApis"/>.</summary>
-internal static class BannedReferences
+/// <summary>
+/// The host's boundary for a synapse build: a closed world. Every type and member reference in the PE bytes (nothing is loaded)
+/// must be on <see cref="AllowedApis"/>, and the build may declare no P/Invoke. DB0045 in the analyzer is advisory; this is the check.
+/// </summary>
+internal static class AllowedReferences
 {
-    /// <summary>The first banned reference in the assembly, or null when it references none.</summary>
+    /// <summary>The first reference outside the allowed surface, or null when every reference is allowed.</summary>
     /// <param name="assembly">The PE image of the build.</param>
-    /// <returns>The fully qualified name of the first banned type or member.</returns>
-    public static string? First(byte[] assembly)
+    /// <returns>The fully qualified name of the first disallowed type or member.</returns>
+    public static string? FirstDisallowed(byte[] assembly) => Disallowed(assembly).FirstOrDefault();
+
+    /// <summary>Every reference outside the allowed surface, in metadata order.</summary>
+    /// <param name="assembly">The PE image of the build.</param>
+    /// <returns>The fully qualified names of the disallowed types and members.</returns>
+    public static IEnumerable<string> Disallowed(byte[] assembly)
     {
         using var pe = new PEReader(ImmutableArray.Create(assembly));
         var metadata = pe.GetMetadataReader();
@@ -23,45 +30,43 @@ internal static class BannedReferences
             if (!method.GetImport().Name.IsNil || (method.Attributes & System.Reflection.MethodAttributes.PinvokeImpl) != 0)
             {
                 var owner = metadata.GetTypeDefinition(method.GetDeclaringType());
-                return $"native import {metadata.GetString(owner.Name)}.{metadata.GetString(method.Name)}";
+                yield return $"native import {metadata.GetString(owner.Name)}.{metadata.GetString(method.Name)}";
             }
         }
 
         foreach (var handle in metadata.TypeReferences)
         {
-            var type = TypeName(metadata, handle);
-            if (BannedApis.IsBannedReference(type))
+            var (ns, type) = TypeName(metadata, handle);
+            if (!AllowedApis.IsAllowedType(ns, type))
             {
-                return type;
+                yield return type;
             }
         }
 
         foreach (var handle in metadata.MemberReferences)
         {
             var reference = metadata.GetMemberReference(handle);
-            if (Parent(metadata, reference.Parent) is not { } type)
+            if (Parent(metadata, reference.Parent) is not { } parent)
             {
                 continue;
             }
 
             var member = metadata.GetString(reference.Name);
-            if (BannedApis.IsBannedMember(type, member))
+            if (!AllowedApis.IsAllowedMember(parent.Namespace, parent.Type, member))
             {
-                return type + "." + member;
+                yield return parent.Type + "." + member;
             }
         }
-
-        return null;
     }
 
-    private static string? Parent(MetadataReader metadata, EntityHandle parent)
+    private static (string Namespace, string Type)? Parent(MetadataReader metadata, EntityHandle parent)
     {
         switch (parent.Kind)
         {
             case HandleKind.TypeReference:
                 return TypeName(metadata, (TypeReferenceHandle)parent);
             case HandleKind.TypeSpecification:
-                // A generic instantiation: the blob starts GENERICINST (0x15), CLASS|VALUETYPE, then the open type's coded handle.
+                // A generic instantiation: the blob starts GENERICINST, CLASS|VALUETYPE, then the open type's coded handle.
                 var blob = metadata.GetBlobReader(metadata.GetTypeSpecification((TypeSpecificationHandle)parent).Signature);
                 if (blob.ReadSignatureTypeCode() != SignatureTypeCode.GenericTypeInstance)
                 {
@@ -72,12 +77,13 @@ internal static class BannedReferences
                 var open = blob.ReadTypeHandle();
                 return open.Kind == HandleKind.TypeReference ? TypeName(metadata, (TypeReferenceHandle)open) : null;
             default:
+                // A TypeDef parent is the build's own type; a MethodDef parent is a vararg call into it.
                 return null;
         }
     }
 
-    // Namespace plus containing types, generic arity dropped: the same shape the analyzer reports.
-    private static string TypeName(MetadataReader metadata, TypeReferenceHandle handle)
+    // The outermost type's namespace and the full name with nested types joined by '.', generic arity dropped.
+    private static (string Namespace, string Type) TypeName(MetadataReader metadata, TypeReferenceHandle handle)
     {
         var reference = metadata.GetTypeReference(handle);
         var name = metadata.GetString(reference.Name);
@@ -89,10 +95,11 @@ internal static class BannedReferences
 
         if (reference.ResolutionScope.Kind == HandleKind.TypeReference)
         {
-            return TypeName(metadata, (TypeReferenceHandle)reference.ResolutionScope) + "." + name;
+            var (ns, outer) = TypeName(metadata, (TypeReferenceHandle)reference.ResolutionScope);
+            return (ns, outer + "." + name);
         }
 
-        var ns = metadata.GetString(reference.Namespace);
-        return ns.Length == 0 ? name : ns + "." + name;
+        var space = metadata.GetString(reference.Namespace);
+        return (space, space.Length == 0 ? name : space + "." + name);
     }
 }

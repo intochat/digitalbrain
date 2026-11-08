@@ -74,6 +74,22 @@ public sealed class BannedApiAnalyzerFacts
     }
 
     [Fact]
+    public Task TimersAndTaskStartAreDB0045()
+    {
+        var test = Verify<BannedApiAnalyzer>.Create(State + """
+
+            public static class Spawn
+            {
+                public static object Tick() => {|#0:new System.Timers.Timer(10)|};
+                public static void Go(System.Threading.Tasks.Task task) => {|#1:task.Start()|};
+            }
+            """);
+        test.ExpectedDiagnostics.Add(new DiagnosticResult("DB0045", DiagnosticSeverity.Error).WithLocation(0).WithArguments("System.Timers.Timer..ctor"));
+        test.ExpectedDiagnostics.Add(new DiagnosticResult("DB0045", DiagnosticSeverity.Error).WithLocation(1).WithArguments("System.Threading.Tasks.Task.Start"));
+        return test.RunAsync(TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
     public Task AnAssemblyWithoutStateIsIgnored() => Verify<BannedApiAnalyzer>.Diagnostics("""
         public static class Fetch
         {

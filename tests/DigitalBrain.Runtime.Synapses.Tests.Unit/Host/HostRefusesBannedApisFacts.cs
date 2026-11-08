@@ -22,13 +22,16 @@ public sealed class HostRefusesBannedApisFacts
     // Each is appended to the weekly cap source; the analyzer catches most of them, the host must catch all of them.
     public static TheoryData<string, string> Bypasses => new()
     {
-        { "System.Net", NetLeak },
-        { "System.Activator", "public static class Leak { public static object? Make() => Activator.CreateInstance(Type.GetType(\"System.Net.Http.HttpClient, System.Net.Http\")!); }" },
+        { "System.Net.Http.HttpClient", NetLeak },
+        { "System.Type.GetType", "public static class Leak { public static object? Make() => Activator.CreateInstance(Type.GetType(\"System.Net.Http.HttpClient, System.Net.Http\")!); }" },
         { "native import", "public static class Leak { [System.Runtime.InteropServices.DllImport(\"kernel32\")] public static extern int GetTickCount(); }" },
         { "System.Runtime.InteropServices.Marshal", "public static class Leak { public static IntPtr Grab() => System.Runtime.InteropServices.Marshal.AllocHGlobal(4); }" },
-        { "Microsoft.CSharp.RuntimeBinder", "public static class Leak { public static object Bind(dynamic x) => x.Anything; }" },
+        { "System.Runtime.CompilerServices.DynamicAttribute", "public static class Leak { public static object Bind(dynamic x) => x.Anything; }" },
         { "System.Threading.Tasks.TaskFactory", "public static class Leak { public static Task Spawn() => Task.Factory.StartNew(() => { }); }" },
-        { "System.Environment", "public static class Leak { public static string? Path() => Environment.GetEnvironmentVariable(\"PATH\"); }" },
+        { "System.Environment.GetEnvironmentVariable", "public static class Leak { public static string? Path() => Environment.GetEnvironmentVariable(\"PATH\"); }" },
+        { "System.Linq.Expressions", "public static class Leak { public static object? Exit() => System.Linq.Expressions.Expression.Lambda(System.Linq.Expressions.Expression.Call(typeof(Environment), \"Exit\", null, System.Linq.Expressions.Expression.Constant(0))).Compile().DynamicInvoke(); }" },
+        { "System.Threading.Tasks.Task.", "public static class Leak { public static void Spawn() => new Task(() => { }).Start(); }" },
+        { "System.Timers", "public static class Leak { public static object Tick() => new System.Timers.Timer(10); }" },
     };
 
     [Fact]
@@ -69,6 +72,47 @@ public sealed class HostRefusesBannedApisFacts
 
         Assert.True(outcome.Status == DeployStatus.Deployed, outcome.Reason);
     }
+
+    [Fact]
+    public async Task AUnitUsingCollectionExpressionsAndSpansDeploys()
+    {
+        await using var host = Host(new Installs());
+        var outcome = await host.Deploy(Brain("cx"), Source(SynapseCompilerFacts.Budget + """
+
+            [System.Runtime.CompilerServices.InlineArray(4)]
+            public struct Four { private int first; }
+
+            public sealed record Tag
+            {
+                public required string Name { get; init; }
+            }
+
+            public static class Shapes
+            {
+                public static int Sum(in Four four)
+                {
+                    ReadOnlySpan<int> span = [1, 2, 3];
+                    List<int> list = [.. span, 4];
+                    int[] array = [5, 6];
+                    IReadOnlyList<string> names = ["a", "b"];
+                    var copy = four;
+                    copy[0] = 7;
+                    var tag = new Tag { Name = $"t{list.Count}" };
+                    var size = tag switch { { Name.Length: > 1 } => 2, _ => 1 };
+                    var total = 0;
+                    foreach (var item in span) { total += item; }
+                    foreach (var item in copy) { total += item; }
+                    return total + list.Count + array.Length + names.Count + size + tag.GetHashCode() % 1;
+                }
+            }
+            """), None, Ct);
+
+        Assert.True(outcome.Status == DeployStatus.Deployed, outcome.Reason);
+    }
+
+    [Fact]
+    public Task AnUnlistedNamespaceIsRefused() =>
+        Refuses("System.Xml.Linq.", "public static class Leak { public static string Shape() => new System.Xml.Linq.XElement(\"a\").ToString(); }");
 
     [Fact]
     public async Task ARefusedDeployKeepsTheStagedBuild()
