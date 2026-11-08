@@ -47,7 +47,7 @@ internal static class AllowedApis
     /// catalog, views), neuron plumbing and privileged module types. The synapse surface (attributes, Reaction, SignalEnvelope,
     /// Check, view nodes, signals) stays.
     /// </summary>
-    public static readonly string[] RefusedDigitalBrainTypes =
+    internal static readonly string[] RefusedDigitalBrainTypes =
     [
         "DigitalBrain.ISynapseHost", "DigitalBrain.ISourceStore", "DigitalBrain.ISources", "DigitalBrain.SourcesNeuron", "DigitalBrain.SourcesState",
         "DigitalBrain.SourceRecord", "DigitalBrain.LoadedSource", "DigitalBrain.NoSynapseRestorer",
@@ -56,6 +56,47 @@ internal static class AllowedApis
         "DigitalBrain.IViewReader", "DigitalBrain.StateNeuron", "DigitalBrain.BddNeuron", "DigitalBrain.IBdd",
         "DigitalBrain.INeuronResolver", "DigitalBrain.IBrainSignalLog", "DigitalBrain.IPolicies", "DigitalBrain.PoliciesNeuron",
         "DigitalBrain.InProcessHostOptions", "DigitalBrain.ModuleAuth", "DigitalBrain.PrivilegedGrant", "DigitalBrain.Secret",
+        // App and module declaration, neuron base classes and grain-shape attributes, configuration wiring, catalog plumbing.
+        "DigitalBrain.App", "DigitalBrain.AppAttribute", "DigitalBrain.AppDefinition", "DigitalBrain.AppRequirements",
+        "DigitalBrain.AppSignalSubscription", "DigitalBrain.AppWatch", "DigitalBrain.WatchBuilder", "DigitalBrain.Module",
+        "DigitalBrain.ModuleAttribute", "DigitalBrain.ModuleDeclarations", "DigitalBrain.ModuleManifest", "DigitalBrain.CatalogGateIndex",
+        "DigitalBrain.RequestLedger", "DigitalBrain.Neuron", "DigitalBrain.RevisionedNeuron", "DigitalBrain.NeuronAttribute",
+        "DigitalBrain.StatelessNeuronAttribute", "DigitalBrain.ReentrantAttribute", "DigitalBrain.InterleavesAttribute",
+        "DigitalBrain.InterleavesWhenAttribute", "DigitalBrain.CallTimeoutAttribute", "DigitalBrain.OneWayCallAttribute",
+        "DigitalBrain.ReadOnlyCallAttribute", "DigitalBrain.PolicyGuard", "DigitalBrain.Setting", "DigitalBrain.ActivationRefusedException",
+    ];
+
+    /// <summary>
+    /// Public types in the exact <c>DigitalBrain</c> namespace a unit legitimately uses. Every exported type there is on this list or
+    /// on <see cref="RefusedDigitalBrainTypes"/> (an architecture fact checks it), so a new runtime type cannot slip in unruled.
+    /// </summary>
+    internal static readonly string[] UnitFacingDigitalBrainTypes =
+    [
+        // Synapse, signal, slot and state declarations; ids and addresses; the deploy/install/policy/BDD records units read.
+        "DigitalBrain.ActionDescriptor", "DigitalBrain.AppAddress", "DigitalBrain.AppError", "DigitalBrain.AppKey",
+        "DigitalBrain.AppNavigated", "DigitalBrain.BddReport", "DigitalBrain.BddState", "DigitalBrain.BddVerified", "DigitalBrain.BrainId",
+        "DigitalBrain.BrainInstance", "DigitalBrain.BrainType", "DigitalBrain.CallsAttribute", "DigitalBrain.CapabilityAttribute",
+        "DigitalBrain.Causation", "DigitalBrain.DeactivationCause", "DigitalBrain.DeadLetterEntry", "DigitalBrain.DeployOutcome",
+        "DigitalBrain.DeployStatus", "DigitalBrain.Deployed", "DigitalBrain.DeployedSource", "DigitalBrain.EphemeralSignalAttribute",
+        "DigitalBrain.Gap", "DigitalBrain.GateChanged", "DigitalBrain.IRevisioned", "DigitalBrain.InstallDenied",
+        "DigitalBrain.InstallOutcome", "DigitalBrain.InstallRecord", "DigitalBrain.InstallRequest", "DigitalBrain.InstallRequested",
+        "DigitalBrain.InstallStatus", "DigitalBrain.Installed", "DigitalBrain.JournaledSignal", "DigitalBrain.Need",
+        "DigitalBrain.NeedKind", "DigitalBrain.NeuronAddress", "DigitalBrain.NeuronId", "DigitalBrain.NeuronState",
+        "DigitalBrain.ObservedSynapse", "DigitalBrain.OnAttribute", "DigitalBrain.PendingInstall", "DigitalBrain.PendingProposal",
+        "DigitalBrain.PoliciesState", "DigitalBrain.PolicyAdopted", "DigitalBrain.PolicyCondition", "DigitalBrain.PolicyDecision",
+        "DigitalBrain.PolicyGrammar", "DigitalBrain.PolicyGrammarException", "DigitalBrain.PolicyMeasure", "DigitalBrain.PolicyOp",
+        "DigitalBrain.PolicyProposed", "DigitalBrain.PolicyRefused", "DigitalBrain.PolicyRetired", "DigitalBrain.PolicyRule",
+        "DigitalBrain.PolicyWindow", "DigitalBrain.PolicyWindowKind", "DigitalBrain.PrivilegeDenied", "DigitalBrain.ProposalOutcome",
+        "DigitalBrain.ProposalStatus", "DigitalBrain.PublishedView", "DigitalBrain.Reaction", "DigitalBrain.Reservation",
+        "DigitalBrain.Retired", "DigitalBrain.RevisionConflictException", "DigitalBrain.ScenarioAttribute",
+        "DigitalBrain.ScenarioStepVerdict", "DigitalBrain.ScenarioVerdict", "DigitalBrain.Signal", "DigitalBrain.SignalAttribute",
+        "DigitalBrain.SignalDelivery", "DigitalBrain.SignalEnvelope", "DigitalBrain.SignalPage", "DigitalBrain.SlotAttribute",
+        "DigitalBrain.SlotDescriptor", "DigitalBrain.SlotNeed", "DigitalBrain.SlotUnboundException", "DigitalBrain.Staged",
+        "DigitalBrain.StateAttribute", "DigitalBrain.StateChanged", "DigitalBrain.Synapse", "DigitalBrain.SynapseAttribute",
+        "DigitalBrain.SynapseDescriptor", "DigitalBrain.SynapseDiagnostic", "DigitalBrain.SynapseFinished", "DigitalBrain.SynapseKind",
+        "DigitalBrain.SynapseNeeds", "DigitalBrain.SynapseReasons", "DigitalBrain.SynapseRequest", "DigitalBrain.SynapseShape",
+        "DigitalBrain.SynapseShapeException", "DigitalBrain.SynapseSource", "DigitalBrain.SynapseStarted", "DigitalBrain.TypeKind",
+        "DigitalBrain.Undeployed", "DigitalBrain.ViewChanged",
     ];
 
     /// <summary>Types refused although their namespace is open.</summary>
@@ -74,8 +115,7 @@ internal static class AllowedApis
         "System.Threading.CancellationTokenSource",
         "System.Threading.Interlocked",
         "System.Threading.Volatile",
-        // lock(obj) compiles to Monitor.Enter/Exit; every other Monitor member is refused below.
-        "System.Threading.Monitor",
+        // lock on a Lock field compiles to Lock.EnterScope; System.Threading.Monitor (lock on a plain object) is refused.
         "System.Threading.Lock",
         "System.Threading.Tasks.Sources.ManualResetValueTaskSourceCore",
         "System.Threading.Tasks.Sources.IValueTaskSource",
@@ -171,7 +211,6 @@ internal static class AllowedApis
         "System.Threading.Tasks.ValueTask.Run",
         "System.Runtime.CompilerServices.Unsafe.*",
         "System.Runtime.InteropServices.MemoryMarshal.*",
-        "System.Threading.Monitor.*",
         "System.AppContext.*",
         "System.Buffers.ArrayPool.get_Shared",
         "System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject",
@@ -191,8 +230,6 @@ internal static class AllowedApis
         "System.Environment.get_NewLine",
         "System.Environment.get_TickCount64",
         "System.Environment.get_CurrentManagedThreadId",
-        "System.Threading.Monitor.Enter",
-        "System.Threading.Monitor.Exit",
         "System.Runtime.CompilerServices.Unsafe.As",
         "System.Runtime.CompilerServices.Unsafe.Add",
         "System.Runtime.InteropServices.MemoryMarshal.CreateSpan",

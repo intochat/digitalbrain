@@ -39,6 +39,8 @@ public sealed class HostRefusesBannedApisFacts
         { "System.Progress", "public static class Leak { public static object Report() => new Progress<int>(_ => { }); }" },
         { "System.Buffers.ArrayPool.get_Shared", "public static class Leak { public static int[] Rent() => System.Buffers.ArrayPool<int>.Shared.Rent(4); }" },
         { "System.Timers", "public static class Leak { public static object Tick() => new System.Timers.Timer(10); }" },
+        { "System.Threading.Monitor", "public static class Leak { public static void Hold() => System.Threading.Monitor.Enter(\"x\"); }" },
+        { "explicit layout Overlay", "[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Explicit)] public struct Overlay { [System.Runtime.InteropServices.FieldOffset(0)] public string Text; [System.Runtime.InteropServices.FieldOffset(0)] public int[] Numbers; }" },
     };
 
     [Fact]
@@ -130,7 +132,7 @@ public sealed class HostRefusesBannedApisFacts
 
             public static class Emitted
             {
-                private static readonly object Gate = new();
+                private static readonly System.Threading.Lock Gate = new();
 
                 public static async Task<int> Later(CancellationToken ct)
                 {

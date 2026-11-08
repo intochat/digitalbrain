@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 
 namespace DigitalBrain.Runtime.Synapses;
@@ -37,10 +38,39 @@ internal static class AllowedReferences
             }
         }
 
+        // Explicit layout overlaps fields: two references of different types at one offset is type confusion. It shows only in
+        // TypeDef flags and FieldLayout rows, never in a TypeRef.
+        foreach (var handle in metadata.TypeDefinitions)
+        {
+            var type = metadata.GetTypeDefinition(handle);
+            if ((type.Attributes & TypeAttributes.LayoutMask) == TypeAttributes.ExplicitLayout && !IsSizedBlob(metadata, type))
+            {
+                yield return $"explicit layout {metadata.GetString(type.Name)}";
+            }
+        }
+
+        if (metadata.GetTableRowCount(TableIndex.FieldLayout) > 0)
+        {
+            yield return "explicit field offsets";
+        }
+
+        // One resolution per referenced type per deploy: the loaded-assembly scan is not repeated for each member.
+        var loaded = AppDomain.CurrentDomain.GetAssemblies();
+        var capabilities = new Dictionary<TypeReferenceHandle, bool>();
+        bool IsCapability(TypeReferenceHandle reference)
+        {
+            if (!capabilities.TryGetValue(reference, out var capability))
+            {
+                capabilities[reference] = capability = IsCapabilityIn(loaded, metadata, reference);
+            }
+
+            return capability;
+        }
+
         foreach (var handle in metadata.TypeReferences)
         {
             var (ns, type) = TypeName(metadata, handle);
-            if (!AllowedApis.IsAllowedType(ns, type) && !IsCapability(metadata, handle))
+            if (!AllowedApis.IsAllowedType(ns, type) && !IsCapability(handle))
             {
                 yield return type;
             }
@@ -55,7 +85,7 @@ internal static class AllowedReferences
             }
 
             var member = metadata.GetString(reference.Name);
-            if (!AllowedApis.IsAllowedMember(parent.Namespace, parent.Type, member) && !IsCapability(metadata, parent.Handle))
+            if (!AllowedApis.IsAllowedMember(parent.Namespace, parent.Type, member) && !IsCapability(parent.Handle))
             {
                 yield return parent.Type + "." + member;
             }
@@ -69,7 +99,7 @@ internal static class AllowedReferences
 
     // A slot contract may live in any assembly the unit compiles against (a module's or a test's): the host resolves the
     // referenced type in the loaded assemblies and allows it when it is an interface marked [Capability].
-    private static bool IsCapability(MetadataReader metadata, TypeReferenceHandle handle)
+    private static bool IsCapabilityIn(Assembly[] loaded, MetadataReader metadata, TypeReferenceHandle handle)
     {
         var reference = metadata.GetTypeReference(handle);
         if (reference.ResolutionScope.Kind != HandleKind.AssemblyReference)
@@ -80,7 +110,7 @@ internal static class AllowedReferences
         var assemblyName = metadata.GetString(metadata.GetAssemblyReference((AssemblyReferenceHandle)reference.ResolutionScope).Name);
         var ns = metadata.GetString(reference.Namespace);
         var fullName = ns.Length == 0 ? metadata.GetString(reference.Name) : ns + "." + metadata.GetString(reference.Name);
-        var type = AppDomain.CurrentDomain.GetAssemblies()
+        var type = loaded
             .Where(a => string.Equals(a.GetName().Name, assemblyName, StringComparison.Ordinal))
             .Select(a => a.GetType(fullName, throwOnError: false))
             .FirstOrDefault(t => t is not null);
@@ -88,6 +118,19 @@ internal static class AllowedReferences
     }
 
     private const string Helpers = "<PrivateImplementationDetails>";
+
+    // The compiler sizes static array data with fieldless explicit-layout structs nested in <PrivateImplementationDetails>:
+    // nothing overlaps without fields.
+    private static bool IsSizedBlob(MetadataReader metadata, TypeDefinition type)
+    {
+        if (type.GetDeclaringType().IsNil || type.GetFields().Count > 0)
+        {
+            return false;
+        }
+
+        var owner = metadata.GetTypeDefinition(type.GetDeclaringType());
+        return owner.GetDeclaringType().IsNil && owner.Namespace.IsNil && metadata.GetString(owner.Name) == Helpers;
+    }
 
     private static readonly Dictionary<short, OperandType> Operands = typeof(OpCodes)
         .GetFields(BindingFlags.Public | BindingFlags.Static)
