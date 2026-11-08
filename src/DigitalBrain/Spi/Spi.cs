@@ -26,6 +26,9 @@ public interface INeuronContext
     /// <summary>Long-running operations.</summary>
     IOperations Operations { get; }
 
+    /// <summary>Read-only view of the operations of this brain.</summary>
+    IOperationsQuery OperationsQuery { get; }
+
     /// <summary>The synapses this neuron holds as a subscriber.</summary>
     ISynapses Synapses { get; }
 
@@ -105,6 +108,16 @@ public interface IOperations
 
     /// <summary>Requests cancellation of a running operation; its handle's <see cref="IOperation.Cancellation"/> fires.</summary>
     Task Cancel(DigitalBrain.Operations.OperationId id, CancellationToken ct);
+}
+
+/// <summary>Read-only view of operations, for an app that shows progress (for example a Tasks list) without starting or cancelling them.</summary>
+public interface IOperationsQuery
+{
+    /// <summary>The operations of this brain that are running now.</summary>
+    Task<IReadOnlyList<DigitalBrain.Operations.OperationView>> Running(CancellationToken ct);
+
+    /// <summary>The operation <paramref name="id"/>, running or done, or null when no operation of this brain has that id.</summary>
+    Task<DigitalBrain.Operations.OperationView?> Read(DigitalBrain.Operations.OperationId id, CancellationToken ct);
 }
 
 /// <summary>The handle of a running operation.</summary>

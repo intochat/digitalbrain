@@ -254,6 +254,8 @@ DigitalBrain.Testing.FakeOperation.Result.get -> DigitalBrain.Operations.Operati
 DigitalBrain.Testing.FakeOperations
 DigitalBrain.Testing.FakeOperations.All.get -> System.Collections.Generic.IReadOnlyDictionary<DigitalBrain.Operations.OperationId, DigitalBrain.Testing.FakeOperation!>!
 DigitalBrain.Testing.FakeOperations.Cancel(DigitalBrain.Operations.OperationId id, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.FakeOperations.Read(DigitalBrain.Operations.OperationId id, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Operations.OperationView?>!
+DigitalBrain.Testing.FakeOperations.Running(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Operations.OperationView!>!>!
 DigitalBrain.Testing.FakeOperations.FakeOperations() -> void
 DigitalBrain.Testing.FakeOperations.Start(DigitalBrain.Operations.OperationPlan! plan, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Spi.IOperation!>!
 DigitalBrain.Testing.FakeSecrets

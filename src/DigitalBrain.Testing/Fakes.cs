@@ -272,7 +272,7 @@ public sealed class InMemorySignalHistory : ISignalHistory
 /// fail by default, copy-verify-delete between connections) and <see cref="OperationStarted"/>, <see cref="OperationProgress"/>
 /// and <see cref="OperationDone"/> are published in order. In TestOS the write runs inside <see cref="Start"/>, in the caller's turn.
 /// </summary>
-public sealed class FakeOperations : IOperations
+public sealed class FakeOperations : IOperations, IOperationsQuery
 {
     private readonly ConcurrentDictionary<DigitalBrain.Operations.OperationId, FakeOperation> _operations = new();
     private readonly StorageWriteRunner? _runner;
@@ -312,7 +312,11 @@ public sealed class FakeOperations : IOperations
     {
         ArgumentNullException.ThrowIfNull(plan);
         var write = plan as WritePlan;
-        var operation = new FakeOperation(new DigitalBrain.Operations.OperationId($"op-{Interlocked.Increment(ref _next)}"), plan, _publish, write is not null && _runner is not null);
+        var operation = new FakeOperation(new DigitalBrain.Operations.OperationId($"op-{Interlocked.Increment(ref _next)}"), plan, _publish, write is not null && _runner is not null)
+        {
+            Started = DateTimeOffset.UtcNow,
+            TraceId = TestCause.Stamp().TraceId,
+        };
         _operations[operation.Id] = operation;
         if (write is not null && _publish is not null)
         {
@@ -335,6 +339,14 @@ public sealed class FakeOperations : IOperations
     /// <exception cref="KeyNotFoundException">No operation has this id.</exception>
     public Task Cancel(DigitalBrain.Operations.OperationId id, CancellationToken ct)
         => _operations.TryGetValue(id, out var operation) ? operation.Cancel() : throw new KeyNotFoundException($"No operation {id}.");
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<DigitalBrain.Operations.OperationView>> Running(CancellationToken ct)
+        => Task.FromResult<IReadOnlyList<DigitalBrain.Operations.OperationView>>([.. _operations.Values.Where(operation => operation.Result is null).Select(operation => operation.View())]);
+
+    /// <inheritdoc />
+    public Task<DigitalBrain.Operations.OperationView?> Read(DigitalBrain.Operations.OperationId id, CancellationToken ct)
+        => Task.FromResult(_operations.TryGetValue(id, out var operation) ? operation.View() : null);
 }
 
 /// <summary>An operation held in memory.</summary>
@@ -365,6 +377,15 @@ public sealed class FakeOperation : IOperation, IDisposable
 
     /// <summary>The result, or null while running.</summary>
     public DigitalBrain.Operations.OperationResult? Result { get; private set; }
+
+    /// <summary>When the operation started.</summary>
+    internal DateTimeOffset Started { get; init; }
+
+    /// <summary>The trace id current when the operation started.</summary>
+    internal string? TraceId { get; init; }
+
+    internal DigitalBrain.Operations.OperationView View()
+        => new(Id, Plan.GetType().Name, "test", Result is DigitalBrain.Operations.OperationResult.Succeeded ? 1d : _progress.Count == 0 ? 0d : _progress[^1], Result, Started, TraceId);
 
     /// <summary>Completes with the result once the operation ended.</summary>
     public Task<DigitalBrain.Operations.OperationResult> Completion => _done.Task;
@@ -508,6 +529,8 @@ public sealed class FakeNeuronContext : INeuronContext
     public FakeOperations Operations { get; } = new();
 
     IOperations INeuronContext.Operations => Operations;
+
+    IOperationsQuery INeuronContext.OperationsQuery => Operations;
 
     /// <summary>The recording synapses.</summary>
     public RecordingSynapses Synapses { get; }

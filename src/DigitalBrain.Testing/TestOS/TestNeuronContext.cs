@@ -38,6 +38,8 @@ internal sealed class TestNeuronContext : INeuronContext
 
     public IOperations Operations { get; }
 
+    public IOperationsQuery OperationsQuery => (FakeOperations)Operations;
+
     public ISynapses Synapses { get; }
 
     public ISignalHistory History => _host.OS.Journal(Id.Brain);

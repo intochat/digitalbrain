@@ -2955,3 +2955,31 @@ DigitalBrain.JournaledSignal.TraceId.get -> string?
 DigitalBrain.JournaledSignal.TraceId.init -> void
 DigitalBrain.JournaledSignal.CausationId.get -> string?
 DigitalBrain.JournaledSignal.CausationId.init -> void
+DigitalBrain.Operations.OperationView
+DigitalBrain.Operations.OperationView.Fraction.get -> double
+DigitalBrain.Operations.OperationView.Id.get -> DigitalBrain.Operations.OperationId
+DigitalBrain.Operations.OperationView.Kind.get -> string!
+DigitalBrain.Operations.OperationView.Origin.get -> string!
+DigitalBrain.Operations.OperationView.Result.get -> DigitalBrain.Operations.OperationResult?
+DigitalBrain.Operations.OperationView.Started.get -> System.DateTimeOffset
+DigitalBrain.Operations.OperationView.TraceId.get -> string?
+DigitalBrain.Spi.INeuronContext.OperationsQuery.get -> DigitalBrain.Spi.IOperationsQuery!
+DigitalBrain.Spi.IOperationsQuery
+DigitalBrain.Spi.IOperationsQuery.Read(DigitalBrain.Operations.OperationId id, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Operations.OperationView?>!
+DigitalBrain.Spi.IOperationsQuery.Running(System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Operations.OperationView!>!>!
+DigitalBrain.Operations.OperationView.Deconstruct(out DigitalBrain.Operations.OperationId Id, out string! Kind, out string! Origin, out double Fraction, out DigitalBrain.Operations.OperationResult? Result, out System.DateTimeOffset Started, out string? TraceId) -> void
+DigitalBrain.Operations.OperationView.Equals(DigitalBrain.Operations.OperationView? other) -> bool
+DigitalBrain.Operations.OperationView.OperationView(DigitalBrain.Operations.OperationId Id, string! Kind, string! Origin, double Fraction, DigitalBrain.Operations.OperationResult? Result, System.DateTimeOffset Started, string? TraceId) -> void
+DigitalBrain.Operations.OperationView.<Clone>$() -> DigitalBrain.Operations.OperationView!
+override DigitalBrain.Operations.OperationView.Equals(object? obj) -> bool
+override DigitalBrain.Operations.OperationView.GetHashCode() -> int
+override DigitalBrain.Operations.OperationView.ToString() -> string!
+static DigitalBrain.Operations.OperationView.operator !=(DigitalBrain.Operations.OperationView? left, DigitalBrain.Operations.OperationView? right) -> bool
+static DigitalBrain.Operations.OperationView.operator ==(DigitalBrain.Operations.OperationView? left, DigitalBrain.Operations.OperationView? right) -> bool
+DigitalBrain.Operations.OperationView.Id.init -> void
+DigitalBrain.Operations.OperationView.Kind.init -> void
+DigitalBrain.Operations.OperationView.Origin.init -> void
+DigitalBrain.Operations.OperationView.Fraction.init -> void
+DigitalBrain.Operations.OperationView.Result.init -> void
+DigitalBrain.Operations.OperationView.Started.init -> void
+DigitalBrain.Operations.OperationView.TraceId.init -> void

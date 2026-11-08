@@ -71,6 +71,9 @@ internal sealed class HostNeuronContext : INeuronContext, IHostNeuronContext
     /// <summary>Operations started by this neuron: entities <c>brain/runtime.operation/id</c> in its own brain, origin this neuron.</summary>
     public IOperations Operations => field ??= new RuntimeOperations(_services, Id.Brain, Id.ToString());
 
+    /// <summary>Read-only view of the operations of this neuron's brain.</summary>
+    public IOperationsQuery OperationsQuery => field ??= new RuntimeOperationsQuery(_services, Id.Brain);
+
     public ISynapses Synapses { get; }
 
     /// <summary>The activation's synapse engine, for runtime services (04-13) that use the alias and brain-wide forms.</summary>

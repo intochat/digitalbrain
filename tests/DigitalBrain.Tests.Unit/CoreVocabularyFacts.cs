@@ -108,6 +108,7 @@ public sealed class CoreVocabularyFacts
         public ITimers Timers => throw new NotSupportedException();
         public IReminders Reminders => throw new NotSupportedException();
         public IOperations Operations => throw new NotSupportedException();
+        public IOperationsQuery OperationsQuery => throw new NotSupportedException();
         public DigitalBrain.Confirmation.IConfirmations Confirmations => throw new NotSupportedException();
         public ISynapses Synapses => throw new NotSupportedException();
         public ISignalHistory History => throw new NotSupportedException();
