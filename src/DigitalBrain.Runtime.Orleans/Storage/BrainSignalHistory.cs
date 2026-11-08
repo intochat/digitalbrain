@@ -26,12 +26,12 @@ internal sealed partial class BrainSignalHistory(BrainLogs logs, BrainId brain, 
         return Without(Page(log.Payloads, slice, null, positions: true));
     }
 
-    public async Task<SignalPage> ReadTrace(string traceId, long since, int limit)
+    public async Task<SignalPage> ReadTrace(string traceId, long since, int limit, CancellationToken ct)
     {
         ArgumentException.ThrowIfNullOrEmpty(traceId);
         SignalPage.CheckLimit(limit);
         var log = await logs.For(Brain.Value);
-        var slice = await log.TraceSignals(traceId, Math.Max(0, since), limit, CancellationToken.None);
+        var slice = await log.TraceSignals(traceId, Math.Max(0, since), limit, ct);
         return Without(Page(log.Payloads, slice, null, positions: true));
     }
 

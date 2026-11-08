@@ -89,11 +89,13 @@ public sealed class TraceStampingFacts(SynapseSilo silo) : IClassFixture<Synapse
         using (TraceContext.Enter(trace)) { await silo.Get<ICounter>(Source).Add(1); }
         await silo.Get<ICounter>(Source).Add(1);
 
-        var page = await History.ReadTrace(trace.TraceId, 0, 100);
+        var page = await History.ReadTrace(trace.TraceId, 0, 100, Ct);
         var only = Assert.Single(page.Signals);
         Assert.Equal(trace.TraceId, only.TraceId);
         Assert.Equal(new Counted(2), only.Signal);
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => History.ReadTrace(trace.TraceId, 0, 0));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => History.ReadTrace(trace.TraceId, 0, 0, Ct));
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => History.ReadTrace(null!, 0, 100, Ct));
+        await Assert.ThrowsAnyAsync<ArgumentException>(() => History.ReadTrace(string.Empty, 0, 100, Ct));
     }
 }
 

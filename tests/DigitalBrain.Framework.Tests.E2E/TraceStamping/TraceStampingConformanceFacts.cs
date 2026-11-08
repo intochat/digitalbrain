@@ -173,7 +173,7 @@ public sealed class TraceReaderNeuron : Neuron, ITraceReader
     public async Task<Stamp[]> Journal(string publisher)
         => Of(await Context.History.Read(NeuronId.Parse(publisher), 0, 100, CancellationToken.None));
 
-    public async Task<Stamp[]> ReadTrace(string traceId) => Of(await Context.History.ReadTrace(traceId, 0, 100));
+    public async Task<Stamp[]> ReadTrace(string traceId) => Of(await Context.History.ReadTrace(traceId, 0, 100, CancellationToken.None));
 
     private static Stamp[] Of(SignalPage page) => [.. page.Signals.Select(item => new Stamp(item.TraceId, item.CausationId,
         item.Signal switch { TraceCounted counted => counted.Value, TraceRelayed relayed => relayed.Value, _ => -1 }))];

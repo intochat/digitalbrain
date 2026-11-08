@@ -2950,7 +2950,7 @@ static DigitalBrain.Confirmation.ConfirmationInbox.operator !=(DigitalBrain.Conf
 static DigitalBrain.Confirmation.ConfirmationInbox.operator ==(DigitalBrain.Confirmation.ConfirmationInbox? left, DigitalBrain.Confirmation.ConfirmationInbox? right) -> bool
 DigitalBrain.Causation
 static DigitalBrain.Causation.Address(DigitalBrain.NeuronId publisher, long sequence) -> string!
-DigitalBrain.Spi.ISignalHistory.ReadTrace(string! traceId, long since, int limit) -> System.Threading.Tasks.Task<DigitalBrain.SignalPage!>!
+DigitalBrain.Spi.ISignalHistory.ReadTrace(string! traceId, long since, int limit, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.SignalPage!>!
 DigitalBrain.JournaledSignal.TraceId.get -> string?
 DigitalBrain.JournaledSignal.TraceId.init -> void
 DigitalBrain.JournaledSignal.CausationId.get -> string?

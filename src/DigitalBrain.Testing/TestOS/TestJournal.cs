@@ -82,9 +82,11 @@ public sealed class TestJournal : ISignalHistory
     }
 
     /// <inheritdoc />
-    public Task<SignalPage> ReadTrace(string traceId, long since, int limit)
+    public Task<SignalPage> ReadTrace(string traceId, long since, int limit, CancellationToken ct)
     {
+        ArgumentException.ThrowIfNullOrEmpty(traceId);
         SignalPage.CheckLimit(limit);
+        ct.ThrowIfCancellationRequested();
         lock (_gate)
         {
             var floor = _brain.Count == 0 ? _position : _brain[0].Position - 1;
