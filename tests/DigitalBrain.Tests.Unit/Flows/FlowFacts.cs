@@ -510,4 +510,50 @@ public sealed class FlowFacts
         Assert.Equal(["a", "a", "b"], TwoStepFlow.Calls);
         Assert.Equal(FlowStatus.Completed, second.Current.Status);
     }
+
+    [Fact]
+    public async Task NudgeReminderRerunsAnInterruptedStep()
+    {
+        var (flow, context) = await Activated();
+        TwoStepFlow.ForeignCancelsLeft = 1;
+        await Started(flow, context, "Build", "ann", null, new Box());
+        Assert.Equal(FlowStatus.Running, flow.Current.Status);
+        Assert.Equal("a", flow.Current.Current);
+        Assert.Equal(TimeSpan.FromMinutes(1), _reminders.Started["flow-nudge"]);
+
+        await flow.Tick("flow-nudge");
+
+        Assert.Equal(["a", "a", "b"], TwoStepFlow.Calls);
+        Assert.Equal(FlowStatus.Completed, flow.Current.Status);
+        Assert.DoesNotContain("flow-nudge", _reminders.Started.Keys);
+
+        await flow.Tick("flow-nudge");
+        Assert.Equal(["a", "a", "b"], TwoStepFlow.Calls);
+    }
+
+    [Fact]
+    public async Task NudgeStopsWhileWaitingAndRestartsOnResume()
+    {
+        var (flow, context) = await Activated();
+        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true, Reason = WaitReason.External });
+        Assert.DoesNotContain("flow-nudge", _reminders.Started.Keys);
+
+        await flow.Resume("b", WaitOutcome.Arrived, "ann");
+
+        Assert.Equal(FlowStatus.Completed, flow.Current.Status);
+        Assert.Equal(2, _reminders.Stopped.Count(name => name == "flow-nudge"));
+    }
+
+    [Fact]
+    public async Task FailedAdvancePostDoesNotFailStart()
+    {
+        var (flow, context) = await Activated();
+        context.Neurons.Remove(FlowId); // the self-call cannot be posted
+
+        await Started(flow, context, "Build", "ann", null, new Box());
+
+        Assert.Equal(FlowStatus.Running, flow.Current.Status);
+        Assert.Empty(TwoStepFlow.Calls);
+        Assert.Contains("flow-nudge", _reminders.Started.Keys);
+    }
 }

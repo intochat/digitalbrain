@@ -82,8 +82,14 @@ public sealed class FlowRuntimeFacts(FlowRuntimeFixture fixture, FaultingConfirm
 
         await runtime.Restart(Ct);
 
-        _ = await runtime.Get<ITestFlow>(id).Read();
-        var ended = await runtime.WaitForSignals<FlowDone>(id, 1, TimeSpan.FromSeconds(20), Ct);
+        // No call reactivates the flow: the journal is polled while time passes, so only the flow's own recovery (the posted
+        // advance or the flow-nudge reminder) can complete it.
+        var deadline = DateTime.UtcNow.AddMinutes(3);
+        IReadOnlyList<FlowDone> ended;
+        while ((ended = await runtime.Signals<FlowDone>(id, Ct)).Count == 0 && DateTime.UtcNow < deadline)
+        {
+            await runtime.Elapse(TimeSpan.FromSeconds(5), Ct);
+        }
         Assert.Equal(FlowOutcome.Completed, Assert.Single(ended).Outcome);
         var done = await runtime.Get<ITestFlow>(id).Read();
         Assert.Equal(["a", "b"], done.Done);

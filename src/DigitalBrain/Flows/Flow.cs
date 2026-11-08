@@ -10,7 +10,11 @@ namespace DigitalBrain.Flows;
 /// started, then the step done with the body's result). A body may ask to wait for an approval, an external signal or a time; the flow
 /// then rests in <see cref="FlowStatus.Waiting"/> until <see cref="Resume"/>, the plan's <see cref="ConfirmationResolved"/> or the
 /// <c>flow-expiry</c> reminder ends the wait. Bodies run at least once: a step interrupted mid-body (deactivation, crash) runs again,
-/// once, when the flow next activates, so bodies are expected to be idempotent. Every change journals one of the <c>flow.*</c> signals.
+/// once, when the flow next activates or the <c>flow-nudge</c> reminder fires, so bodies must be idempotent: a duplicate activation
+/// during a membership change can also run a step twice (the state's ETag stops the second save). A body that throws
+/// <see cref="OperationCanceledException"/> (any token) is interrupted, not failed, and runs again the same way. On Orleans the grain
+/// is not reentrant, so deactivation and shutdown cannot cancel a running body: shutdown waits for it or abandons it, and either way
+/// the step runs again on activation. Every change journals one of the <c>flow.*</c> signals.
 /// </summary>
 /// <typeparam name="T">The flow's own state.</typeparam>
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "The activation token source holds no timer; OnDeactivate disposes it.")]
@@ -18,6 +22,11 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
 {
     /// <summary>The reminder that expires an external or schedule wait.</summary>
     public const string ExpiryReminder = "flow-expiry";
+
+    /// <summary>The reminder that advances a running flow that does not wait, so an interrupted or never-advanced flow recovers without outside traffic.</summary>
+    public const string NudgeReminder = "flow-nudge";
+
+    private static readonly TimeSpan NudgePeriod = TimeSpan.FromMinutes(1);
 
     // Approval waits expire through their plan; other waits through a reminder, re-checked every minute until they end.
     private static readonly TimeSpan ExpiryPeriod = TimeSpan.FromMinutes(1);
@@ -39,7 +48,8 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     /// <summary>
     /// Starts the flow. A flow that already started ignores it. Returns once the start is durable (saved <see cref="FlowStatus.Running"/>
     /// with <see cref="FlowStarted"/>); steps run in later turns of this neuron, through a self-call deferred past this turn. A crash
-    /// before the first step is recovered on activation, which advances any running flow that does not wait.
+    /// before the first step, a lost self-call or an interrupted step is recovered by the <c>flow-nudge</c> reminder started in this turn
+/// (every minute while the flow runs without waiting) or by the next activation, whichever comes first.
     /// </summary>
     /// <param name="title">The display title.</param>
     /// <param name="owner">Who the flow runs for.</param>
@@ -63,8 +73,14 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
             Inner = inner,
         };
         await Save(next, new FlowStarted(FlowId, Id.Type, title)).ConfigureAwait(true);
-        // A turn of its own, so the caller does not wait on the steps; lost with the activation, the start is recovered by OnActivate.
-        Context.Defer(() => Context.Get<IFlowCallbacks>(Id).Advance());
+        await StartNudge().ConfigureAwait(true);
+        // A turn of its own, so the caller does not wait on the steps. A failed post is logged, not thrown: the start is saved and
+        // the nudge or the next activation advances it.
+        Context.Defer(async () =>
+        {
+            try { await Context.Get<IFlowCallbacks>(Id).Advance().ConfigureAwait(true); }
+            catch (Exception error) when (error is not OutOfMemoryException) { FlowLog.AdvancePostFailed(Logger(), error, FlowId); }
+        });
     }
 
     /// <inheritdoc />
@@ -96,6 +112,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         var waiting = State.Waiting;
         await Save(State with { Status = FlowStatus.Cancelled, Waiting = null, Current = null, Ended = Context.Time.GetUtcNow() },
             new FlowDone(FlowId, FlowOutcome.Cancelled, reason)).ConfigureAwait(true);
+        await StopNudge().ConfigureAwait(true);
         await _activation.CancelAsync().ConfigureAwait(true);
         if (waiting is { Reason: WaitReason.Approval, ConfirmationPlanId: { } planId })
         {
@@ -135,6 +152,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         if (State is not { Status: FlowStatus.Waiting, Waiting: { Reason: WaitReason.Approval } waiting } || waiting.ConfirmationPlanId != planId) { return; }
         await Save(State with { Status = FlowStatus.Failed, Waiting = null, Ended = Context.Time.GetUtcNow() },
             [new FlowStep(FlowId, waiting.Step, StepOutcome.Failed, "confirmation: " + detail), new FlowDone(FlowId, FlowOutcome.Failed, "confirmation")]).ConfigureAwait(true);
+        await StopNudge().ConfigureAwait(true);
     }
 
     /// <inheritdoc />
@@ -170,6 +188,12 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     /// <inheritdoc />
     protected override async Task OnReminder(string name, CancellationToken cancellationToken)
     {
+        if (name == NudgeReminder)
+        {
+            if (State is { Status: FlowStatus.Running, Waiting: null }) { await Advance().ConfigureAwait(true); }
+            else { await StopNudge().ConfigureAwait(true); }
+            return;
+        }
         if (name != ExpiryReminder) { return; }
         if (State is { Status: FlowStatus.Waiting, Waiting: { Reason: not WaitReason.Approval, Expires: { } expires } waiting })
         {
@@ -189,19 +213,21 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
             {
                 await Save(State with { Status = FlowStatus.Completed, Current = null, Ended = Context.Time.GetUtcNow() },
                     new FlowDone(FlowId, FlowOutcome.Completed, null)).ConfigureAwait(true);
+                await StopNudge().ConfigureAwait(true);
                 return;
             }
             await Save(State with { Current = step }, new FlowStep(FlowId, step, StepOutcome.Started, null)).ConfigureAwait(true);
             StepResult<T> result;
             try { result = await Run(step, State.Inner, token).ConfigureAwait(true); }
             // Interrupted, not failed: a cancelled body (any token) or an ending activation leaves Current set and the flow
-            // running, so the next activation runs the step again.
+            // running, so the nudge or the next activation runs the step again.
             catch (Exception error) when (error is OperationCanceledException || token.IsCancellationRequested) { return; }
             catch (Exception error) when (error is not OutOfMemoryException)
             {
                 if (State.Status != FlowStatus.Running) { return; }
                 await Save(State with { Status = FlowStatus.Failed, Ended = Context.Time.GetUtcNow() },
                     [new FlowStep(FlowId, step, StepOutcome.Failed, error.Message), new FlowDone(FlowId, FlowOutcome.Failed, error.Message)]).ConfigureAwait(true);
+                await StopNudge().ConfigureAwait(true);
                 return;
             }
             // Cancelled while the body ran: its result is dropped.
@@ -228,6 +254,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         var waiting = wait with { Step = step, ConfirmationPlanId = plan?.Id };
         await Save(State with { Status = FlowStatus.Waiting, Waiting = waiting, Current = step, Inner = result.Next },
             [new FlowWaiting(FlowId, step, wait.Reason, plan?.Id), .. result.Emits ?? []]).ConfigureAwait(true);
+        await StopNudge().ConfigureAwait(true);
         if (plan is not null) { _ = Ask(plan); }
         else if (wait.Expires is { } expires) { await Context.Reminders.Start(ExpiryReminder, Positive(expires - now), ExpiryPeriod).ConfigureAwait(true); }
     }
@@ -255,8 +282,12 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         }
     }
 
+    // A runtime without services (a test context) logs nowhere rather than turning a logged failure into a thrown one.
     private ILogger Logger()
-        => (Context.Services.GetService(typeof(ILoggerFactory)) as ILoggerFactory)?.CreateLogger("DigitalBrain.Flows") ?? NullLogger.Instance;
+    {
+        try { return (Context.Services.GetService(typeof(ILoggerFactory)) as ILoggerFactory)?.CreateLogger("DigitalBrain.Flows") ?? NullLogger.Instance; }
+        catch (NotSupportedException) { return NullLogger.Instance; }
+    }
 
     private async Task Resolve(string step, WaitOutcome outcome, string? by)
     {
@@ -266,6 +297,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         {
             await Save(State with { Status = FlowStatus.Running, Waiting = null, Current = null, Done = State.Done.Add(step) },
                 [resolve, new FlowStep(FlowId, step, StepOutcome.Completed, null)]).ConfigureAwait(true);
+            await StartNudge().ConfigureAwait(true);
         }
         else
         {
@@ -275,6 +307,10 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         if (waiting is { Reason: not WaitReason.Approval, Expires: not null }) { await Context.Reminders.Stop(ExpiryReminder).ConfigureAwait(true); }
         await Advance().ConfigureAwait(true);
     }
+
+    private Task StartNudge() => Context.Reminders.Start(NudgeReminder, NudgePeriod, NudgePeriod);
+
+    private Task StopNudge() => Context.Reminders.Stop(NudgeReminder);
 
     private static WaitOutcome WaitOutcomeOf(ConfirmationOutcome outcome) => outcome switch
     {
@@ -314,6 +350,9 @@ internal static partial class FlowLog
 {
     [LoggerMessage(Level = LogLevel.Error, Message = "Flow {FlowId} could not record the answer to confirmation plan {PlanId}; it stays waiting")]
     public static partial void RelayFailed(ILogger logger, Exception exception, string flowId, string planId);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Flow {FlowId} could not post its first advance; the flow-nudge reminder or the next activation advances it")]
+    public static partial void AdvancePostFailed(ILogger logger, Exception exception, string flowId);
 }
 
 // The request's trace id. TraceContext lives in DigitalBrain.Capabilities.Compute, which this assembly does not reference, so it is

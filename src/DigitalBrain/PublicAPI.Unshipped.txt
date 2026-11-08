@@ -3151,6 +3151,7 @@ DigitalBrain.Flows.Waiting.Waiting(string! Step, DigitalBrain.Flows.WaitReason R
 abstract DigitalBrain.Flows.Flow<T>.Run(string! step, T! inner, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Flows.StepResult<T!>!>!
 abstract DigitalBrain.Flows.Flow<T>.Steps.get -> System.Collections.Generic.IReadOnlyList<string!>!
 const DigitalBrain.Flows.Flow<T>.ExpiryReminder = "flow-expiry" -> string!
+const DigitalBrain.Flows.Flow<T>.NudgeReminder = "flow-nudge" -> string!
 override DigitalBrain.Flows.Flow<T>.OnActivate(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 override DigitalBrain.Flows.Flow<T>.OnDeactivate(DigitalBrain.DeactivationCause cause, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 override DigitalBrain.Flows.Flow<T>.OnReminder(string! name, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
