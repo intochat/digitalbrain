@@ -87,11 +87,9 @@ public sealed class KernelConfirmations(IServiceProvider services, IOptions<Conf
             ct.ThrowIfCancellationRequested();
             await owner.EnsureListenerAsync().ConfigureAwait(false);
             var entity = Entity;
-            var tcs = new TaskCompletionSource<ConfirmationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-            if (!owner._pending.TryAdd(plan.Id, tcs))
-            {
-                throw new InvalidOperationException($"A confirmation for plan '{plan.Id}' is already pending.");
-            }
+            var created = new TaskCompletionSource<ConfirmationResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+            // A plan raised again while this host still waits on it (a flow recovering a lost ask) shares the one wait.
+            var tcs = owner._pending.GetOrAdd(plan.Id, created);
             try
             {
                 await entity.Begin(plan, requester).WaitAsync(ct).ConfigureAwait(false);

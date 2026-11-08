@@ -409,7 +409,30 @@ public sealed class FlowFacts
         await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true, ExpiresIn = TimeSpan.FromMinutes(30) });
 
         Assert.Equal(TimeSpan.FromMinutes(30), Assert.Single(_confirmations.Asked).Expiry);
-        Assert.Empty(_reminders.Started);
+        Assert.DoesNotContain("flow-expiry", _reminders.Started.Keys);
+        Assert.Contains("flow-nudge", _reminders.Started.Keys);
+    }
+
+    [Fact]
+    public async Task ActivationReRaisesALostApprovalPlan()
+    {
+        var (first, context) = await Activated();
+        await Started(first, context, "Build", "ann", null, new Box { AskFirst = true });
+        var lost = Assert.Single(_confirmations.Asked);
+        _confirmations.Asked.Clear(); // the ask never reached the confirmations side
+        await NeuronAttachment.Deactivate(first, DeactivationCause.Idle, CancellationToken.None);
+        _reminders.Started.Clear();
+
+        var (second, _) = await Activated(context.Writes[^1].State);
+
+        var raised = Assert.Single(_confirmations.Asked);
+        Assert.Equal(lost.Id, raised.Id);
+        Assert.Equal(lost.Id, second.Current.Waiting?.ConfirmationPlanId);
+        Assert.Contains("flow-nudge", _reminders.Started.Keys);
+
+        // The nudge does not raise a plan this activation is still asking.
+        await second.Tick("flow-nudge");
+        Assert.Single(_confirmations.Asked);
     }
 
     [Fact]

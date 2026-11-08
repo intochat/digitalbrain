@@ -36,11 +36,15 @@ public sealed class ConfirmationsNeuron(IOptions<ConfirmationOptions> options)
         ArgumentException.ThrowIfNullOrWhiteSpace(origin);
         if (plan.Id.Length > 128 || plan.Expiry <= TimeSpan.Zero) { throw new ArgumentException("Invalid confirmation plan.", nameof(plan)); }
         RequireOwnCaller(required: false);
-        if (State.Entries.Any(entry => entry.Request.PlanId == plan.Id))
-        { throw new InvalidOperationException("This confirmation plan was already requested."); }
+        var requester = Requester(origin);
+        // The same requester raising a plan again (a flow recovering a lost ask) is a no-op: Result reads the pending or given answer.
+        if (State.Entries.FirstOrDefault(entry => entry.Request.PlanId == plan.Id) is { } known)
+        {
+            if (known.Request.Requester == requester) { return; }
+            throw new InvalidOperationException("This confirmation plan was already requested.");
+        }
         if (State.Entries.Count(entry => entry.Result is null) >= PendingLimit)
         { throw new InvalidOperationException("This brain already has 20 confirmations waiting."); }
-        var requester = Requester(origin);
         var policy = ConfirmationPolicyPreference.For(options.Value, Id.Brain.Value);
         var expiry = plan.Expiry < ConfirmationRules.DefaultExpiry ? plan.Expiry : ConfirmationRules.DefaultExpiry;
         var request = new ConfirmationRequested(plan.Id, plan with { Expiry = expiry }, requester, policy, Clock.GetUtcNow() + expiry);

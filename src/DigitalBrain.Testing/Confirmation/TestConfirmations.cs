@@ -115,12 +115,27 @@ public sealed class TestConfirmations
 
         var request = new ConfirmationRequested(plan.Id, plan, requester, policy, _clock.GetUtcNow() + plan.Expiry);
         var pending = new Pending(request, publish);
+        Task<ConfirmationResult>? rejoined = null;
         lock (_gate)
         {
-            if (!_known.Add(plan.Id)) { throw new InvalidOperationException($"Confirmation plan '{plan.Id}' was already asked."); }
-            _pending[plan.Id] = pending;
-            _requested.Add(request);
+            // The same requester raising a plan again (a flow recovering a lost ask) re-joins it: the pending answer, or the one given.
+            if (_known.Contains(plan.Id))
+            {
+                if (_pending.TryGetValue(plan.Id, out var asked) && asked.Request.Requester == requester) { rejoined = asked.Done.Task; }
+                else if (_audit.FindLast(entry => entry.PlanId == plan.Id && entry.Requester == requester) is { } answered)
+                {
+                    rejoined = Task.FromResult(new ConfirmationResult(plan.Id, answered.Outcome, answered.Reason, answered.Skipped));
+                }
+                else { throw new InvalidOperationException($"Confirmation plan '{plan.Id}' was already asked."); }
+            }
+            else
+            {
+                _known.Add(plan.Id);
+                _pending[plan.Id] = pending;
+                _requested.Add(request);
+            }
         }
+        if (rejoined is not null) { return await rejoined.WaitAsync(ct).ConfigureAwait(false); }
         pending.Expiry = _clock.CreateTimer(_ => _ = End(plan.Id, null, ConfirmationOutcome.Expired, ConfirmationDenyReason.Expired),
             null, plan.Expiry, Timeout.InfiniteTimeSpan);
         if (publish is not null) { await publish(request).ConfigureAwait(false); }

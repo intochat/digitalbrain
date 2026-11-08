@@ -38,6 +38,9 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     // memory, so a callback that outlives its activation is refused and the durable paths (ConfirmationResolved, the nudge) recover.
     private readonly HashSet<string> _proofs = new(StringComparer.Ordinal);
 
+    // The plan an Ask of this activation is raising, so the nudge does not raise it twice.
+    private string? _asking;
+
     /// <summary>The steps, in order. Step names are the keys of <see cref="FlowState{T}.Done"/> and never change.</summary>
     protected abstract IReadOnlyList<string> Steps { get; }
 
@@ -184,6 +187,11 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     {
         await Context.Synapses.EnsureBrainWide(typeof(ConfirmationResolved)).ConfigureAwait(true);
         if (State.Status == FlowStatus.Running && State.Waiting is null) { await Advance().ConfigureAwait(true); }
+        else if (State is { Status: FlowStatus.Waiting, Waiting.Reason: WaitReason.Approval })
+        {
+            await StartNudge().ConfigureAwait(true);
+            ReRaise();
+        }
     }
 
     /// <inheritdoc />
@@ -199,6 +207,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         if (name == NudgeReminder)
         {
             if (State is { Status: FlowStatus.Running, Waiting: null }) { await Advance().ConfigureAwait(true); }
+            else if (State is { Status: FlowStatus.Waiting, Waiting.Reason: WaitReason.Approval }) { ReRaise(); }
             else { await StopNudge().ConfigureAwait(true); }
             return;
         }
@@ -258,19 +267,44 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         if (wait.Reason == WaitReason.Approval)
         {
             plan = PlanFor(step, result.Next);
-            if (wait.Expires is { } expires) { plan = plan with { Expiry = Positive(expires - now) }; }
+            if (wait.Expires is { } planExpires) { plan = plan with { Expiry = Positive(planExpires - now) }; }
         }
         var waiting = wait with { Step = step, ConfirmationPlanId = plan?.Id };
         await Save(State with { Status = FlowStatus.Waiting, Waiting = waiting, Current = step, Inner = result.Next },
             [new FlowWaiting(FlowId, step, wait.Reason, plan?.Id), .. result.Emits ?? []]).ConfigureAwait(true);
+        // An approval wait keeps the nudge: a plan lost before the confirmations side registered it is raised again.
+        if (plan is not null) { Raise(plan); return; }
         await StopNudge().ConfigureAwait(true);
-        if (plan is not null) { _ = Ask(plan); }
-        else if (wait.Expires is { } expires) { await Context.Reminders.Start(ExpiryReminder, Positive(expires - now), ExpiryPeriod).ConfigureAwait(true); }
+        if (wait.Expires is { } expires) { await Context.Reminders.Start(ExpiryReminder, Positive(expires - now), ExpiryPeriod).ConfigureAwait(true); }
+    }
+
+    // Raises the plan of the running approval wait again unless this activation is already asking it: a crash between the
+    // Waiting save and the plan reaching the confirmations side, or a lost relay, would otherwise leave the wait forever.
+    // IConfirmations.Confirm is idempotent on a plan id the same requester raised, so a plan that is known is only re-joined.
+    private void ReRaise()
+    {
+        if (State is not { Status: FlowStatus.Waiting, Waiting: { Reason: WaitReason.Approval, ConfirmationPlanId: { } planId } waiting }
+            || _asking == planId) { return; }
+        var plan = PlanFor(waiting.Step, State.Inner) with { Id = planId };
+        if (waiting.Expires is { } expires) { plan = plan with { Expiry = Positive(expires - Context.Time.GetUtcNow()) }; }
+        Raise(plan);
+    }
+
+    private void Raise(ConfirmationPlan plan)
+    {
+        _asking = plan.Id;
+        _ = Ask(plan);
     }
 
     // Raises the plan without awaiting the answer inside the turn; the answer arrives as ConfirmationResolved.
     // Results go back through the neuron's own mailbox (a self-call), so they are saved in a turn, never from this detached task.
     private async Task Ask(ConfirmationPlan plan)
+    {
+        try { await AskOnce(plan).ConfigureAwait(true); }
+        finally { if (_asking == plan.Id) { _asking = null; } }
+    }
+
+    private async Task AskOnce(ConfirmationPlan plan)
     {
         Func<IFlowCallbacks, string, Task> relay;
         try
@@ -288,7 +322,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         catch (Exception error) when (error is not OutOfMemoryException)
         {
             Forget(proof);
-            // The flow stays waiting on the plan; the log is the only trace (IConfirmations has no read of pending plans).
+            // The flow stays waiting on the plan; the nudge raises it again and re-joins its answer.
             FlowLog.RelayFailed(Logger(), error, FlowId, plan.Id);
         }
     }
