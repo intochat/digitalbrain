@@ -45,9 +45,9 @@ internal sealed class TestInstallHooks(TestOS os) : IInstallHooks
     public Task<string?> ValidateBinding(NeuronId state, SlotDescriptor slot, string binding, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(slot);
-        return Task.FromResult(os.Capabilities.Find(slot.Contract, binding) is null
-            ? $"slot '{slot.Name}': no {slot.Capability} fake named '{binding}'"
-            : null);
+        return os.Capabilities.Find(slot.Contract, binding) is not null
+            ? Task.FromResult<string?>(null)
+            : TestConnections.Problem(os.Options.Services, state, slot, binding, ct);
     }
 
     private ITime Time(BrainId brain) => os.Get<ITime>(new NeuronId(brain, TimeType, "default"));

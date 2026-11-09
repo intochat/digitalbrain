@@ -146,7 +146,8 @@ public sealed class CapabilityNotBoundException : InvalidOperationException
 
 // Neurons and apps resolve from this: capability contracts from the fakes, ICapabilityBroker over the fakes, the rest from the options' services.
 internal sealed class TestOSServices(CapabilityFakes fakes, IServiceProvider inner, DigitalBrain.Spi.IInstallHooks hooks, DigitalBrain.Spi.ISlotResolver slots,
-    ISynapseCatalogSource catalog, Func<IReadOnlyList<ActionDescriptor>> actions, Func<DigitalBrain.Spi.ISynapseRestorer>? restorer = null)
+    ISynapseCatalogSource catalog, Func<IReadOnlyList<ActionDescriptor>> actions, Func<DigitalBrain.Spi.ISynapseRestorer>? restorer = null,
+    Func<DigitalBrain.Runtime.Synapses.SynapseCompiler>? compiler = null, Func<ISynapseHost>? host = null)
     : IServiceProvider, ICapabilityBroker
 {
     public object? GetService(Type serviceType)
@@ -159,6 +160,9 @@ internal sealed class TestOSServices(CapabilityFakes fakes, IServiceProvider inn
         if (serviceType == typeof(DigitalBrain.Spi.ISlotResolver)) { return inner.GetService(serviceType) ?? slots; }
         if (serviceType == typeof(DigitalBrain.Spi.IInstallHooks)) { return inner.GetService(serviceType) ?? hooks; }
         if (serviceType == typeof(DigitalBrain.Spi.ISynapseRestorer)) { return inner.GetService(serviceType) ?? restorer?.Invoke(); }
+        // The TestOS's own compiler and synapse host, as the silo serves its singletons.
+        if (serviceType == typeof(DigitalBrain.Runtime.Synapses.SynapseCompiler)) { return inner.GetService(serviceType) ?? compiler?.Invoke(); }
+        if (serviceType == typeof(ISynapseHost) || serviceType == typeof(DigitalBrain.Runtime.Synapses.SynapseHost)) { return inner.GetService(serviceType) ?? host?.Invoke(); }
         if (CapabilityFakes.IsContract(serviceType)) { return fakes.Resolve(serviceType); }
         return CapabilityFakes.ListedContract(serviceType) is { } contract ? fakes.All(contract) : inner.GetService(serviceType);
     }
