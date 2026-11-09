@@ -96,6 +96,25 @@ public static class BlobSynapses
         new(new string('x', (int)s.Amount));
 }
 
+[State("evolve.tracker")]
+public sealed record TrackerStateV1(int Count)
+{
+    public TrackerStateV1() : this(0) { }
+}
+
+[State("evolve.tracker")]
+public sealed record TrackerStateV2(int Count, string Label = "upgraded")
+{
+    public TrackerStateV2() : this(0, "upgraded") { }
+}
+
+public static class TrackerSynapsesV2
+{
+    [Synapse(typeof(Charging), "evolve.tracker")]
+    public static TrackerStateV2 Bump(Charging s, TrackerStateV2 state) =>
+        state with { Count = state.Count + (int)s.Amount, Label = string.IsNullOrEmpty(state.Label) ? "upgraded" : state.Label };
+}
+
 public sealed class StateNeuronFacts
 {
     private static readonly NeuronId Id = new(new BrainId("alice"), "week", "default");
@@ -513,6 +532,23 @@ public sealed class StateNeuronFacts
         Assert.Equal(TimeSpan.FromSeconds(5), StateNeuron.ReactionTimeout);
         Assert.Equal(TimeSpan.FromSeconds(30), StateNeuron.SlotReactionTimeout);
         Assert.Equal(2 * 1024 * 1024, StateNeuron.MaxStateBytes);
+    }
+
+    [Fact]
+    public async Task StoredStateSurvivesAdditiveDay2SchemaEvolutionAcrossUnitUpgrade()
+    {
+        var v1Bytes = System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+            new StoredState<TrackerStateV1>(new TrackerStateV1(7), null),
+            DigitalBrain.Invocation.RuntimeProtocol.Json);
+        Context.Store(v1Bytes);
+
+        var n = Attach(new StateNeuron<TrackerStateV2>(Source(typeof(TrackerStateV2), typeof(TrackerSynapsesV2)), new UnboundSlotResolver()));
+        await NeuronAttachment.Activate(n, TestContext.Current.CancellationToken);
+        await n.Receive(new Charging(3m), TestContext.Current.CancellationToken);
+
+        var saved = Assert.IsType<TrackerStateV2>(Assert.Single(Context.Writes).State);
+        Assert.Equal(10, saved.Count);
+        Assert.Equal("upgraded", saved.Label);
     }
 
     private sealed class SteppedClock : TimeProvider

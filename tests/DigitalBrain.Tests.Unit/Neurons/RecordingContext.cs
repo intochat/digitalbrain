@@ -75,7 +75,16 @@ internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronSta
 
     public Task<T?> Load<T>()
     {
-        var value = _stored is T stored ? stored : default;
+        T? value = default;
+        if (_stored is T stored)
+        {
+            value = stored;
+        }
+        else if (_stored is byte[] utf8)
+        {
+            value = System.Text.Json.JsonSerializer.Deserialize<T>(utf8, DigitalBrain.Invocation.RuntimeProtocol.OptionsFor(typeof(T)));
+        }
+
         return LoadsOffThread ? Task.Run(async () => { await Task.Delay(20); return value; }) : Task.FromResult(value);
     }
 
