@@ -49,6 +49,18 @@ public sealed record ConfirmationPlan(
 
     /// <summary>True when only a person can decide: the question is asked under every policy except <see cref="ConfirmationPolicy.Never"/>.</summary>
     public bool RequiresPerson { get; init; }
+
+    /// <summary>
+    /// What kind of question this is, for consumers that route plans (for example <see cref="SynapseInstallKind"/>); null for an untyped
+    /// plan. Consumers match on this, never on the shape of <see cref="Id"/>.
+    /// </summary>
+    public string? Kind { get; init; }
+
+    /// <summary>What the question is about, in the terms of <see cref="Kind"/> (the alias of a <see cref="SynapseInstallKind"/> plan); null when untyped.</summary>
+    public string? Subject { get; init; }
+
+    /// <summary>The <see cref="Kind"/> of the plan that asks a person to approve a synapse app's needs; <see cref="Subject"/> is the alias.</summary>
+    public const string SynapseInstallKind = "synapse.install";
 }
 
 /// <summary>How <see cref="IConfirmations.Confirm"/> ended.</summary>

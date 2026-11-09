@@ -225,6 +225,20 @@ public sealed class SourceRestoreFacts
     }
 
     [Fact]
+    public async Task AnInstallPlanCarriesItsKindAndAlias()
+    {
+        await using var os = Start();
+        var outcome = await os.Synapses.Deploy(Brain("sr13"), HsSource.Of(HsSource.Budget), None, Ct);
+        await os.Idle();
+
+        var asked = Assert.Single(os.Confirmations.Waiting, r => r.PlanId == outcome.Installs["hs.week"].Reason);
+        Assert.Equal(DigitalBrain.Confirmation.ConfirmationPlan.SynapseInstallKind, asked.Plan.Kind);
+        Assert.Equal("synapse.install", asked.Plan.Kind);
+        Assert.Equal("hs.week", asked.Plan.Subject);
+        Assert.StartsWith("install:hs.week:", asked.PlanId, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ARestoreOfAnUnknownAliasIsFalse()
     {
         await using var os = Start();

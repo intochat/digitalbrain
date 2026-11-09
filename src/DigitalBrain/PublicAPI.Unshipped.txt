@@ -1992,6 +1992,11 @@ static DigitalBrain.StateChanged.operator !=(DigitalBrain.StateChanged? left, Di
 static DigitalBrain.StateChanged.operator ==(DigitalBrain.StateChanged? left, DigitalBrain.StateChanged? right) -> bool
 DigitalBrain.Confirmation.ConfirmationPlan.RequiresPerson.get -> bool
 DigitalBrain.Confirmation.ConfirmationPlan.RequiresPerson.init -> void
+DigitalBrain.Confirmation.ConfirmationPlan.Kind.get -> string?
+DigitalBrain.Confirmation.ConfirmationPlan.Kind.init -> void
+DigitalBrain.Confirmation.ConfirmationPlan.Subject.get -> string?
+DigitalBrain.Confirmation.ConfirmationPlan.Subject.init -> void
+const DigitalBrain.Confirmation.ConfirmationPlan.SynapseInstallKind = "synapse.install" -> string!
 DigitalBrain.GateChanged
 DigitalBrain.GateChanged.Brain.get -> string!
 DigitalBrain.GateChanged.Brain.init -> void
