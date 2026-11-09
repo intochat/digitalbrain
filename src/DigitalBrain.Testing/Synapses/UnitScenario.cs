@@ -36,6 +36,12 @@ public static class UnitScenario
             return Failed([.. build.Diagnostics.Select(d => $"compile {d.File}({d.Line}) {d.Id}: {d.Message}")]);
         }
 
+        // The boundary runs on the bytes before anything loads or is reflected over in this process.
+        if (SynapseCompiler.Verify(build) is { } outside)
+        {
+            return Failed([$"boundary: {outside}"]);
+        }
+
         IReadOnlyList<string> aliases;
         try { aliases = await StateAliases(build).ConfigureAwait(false); }
         catch (Exception e) when (e is InvalidOperationException or BadImageFormatException or TypeLoadException or System.Reflection.ReflectionTypeLoadException)

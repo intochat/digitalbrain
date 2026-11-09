@@ -64,6 +64,21 @@ public sealed class UnitScenarioFacts
     }
 
     [Fact]
+    public async Task AUnitOutsideTheBoundaryFailsBeforeItLoads()
+    {
+        // Cancel(bool) runs callbacks off the activation's turn: the analyzer does not flag it, the boundary does.
+        var leaky = XWatch + "\npublic static class Leak { public static void Go(CancellationTokenSource s) => s.Cancel(true); }";
+
+        var transcript = await UnitScenario.Run(Source(leaky), OnePost(), [new Tick(Start.AddMinutes(6))], Ct);
+
+        Assert.False(transcript.Passed);
+        var failure = Assert.Single(transcript.Failures);
+        Assert.StartsWith("boundary: ", failure, StringComparison.Ordinal);
+        Assert.Contains("System.Threading.CancellationTokenSource.Cancel", failure, StringComparison.Ordinal);
+        Assert.Empty(transcript.Events);
+    }
+
+    [Fact]
     public async Task TheTranscriptListsWhatWasConsented()
     {
         var transcript = await UnitScenario.Run(Source(XWatch), OnePost(), [], Ct);
