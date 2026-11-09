@@ -35,6 +35,36 @@ public static class Dash
     public static DashBoard Seen(SignalEnvelope s, DashBoard d) => new(s.Payload.GetProperty("count").GetInt32(), s.TraceId, s.Alias);
 }
 
+// A payload that cannot be serialised: its getter throws, so the alias reaction's envelope cannot be built.
+[Signal("x.unserialisable")]
+public sealed record Unserialisable(int Count) : Signal
+{
+    public int Broken => Count < 0 ? Count : throw new InvalidOperationException("no payload");
+}
+
+public interface IBadPoller
+{
+    Task Poll();
+}
+
+[Neuron("bad.poller")]
+public sealed class BadPoller : Neuron<PollerState>, IBadPoller
+{
+    public Task Poll() => Save(State with { Polls = State.Polls + 1 }, new Unserialisable(1));
+}
+
+[State("bad.dash")]
+public sealed record BadDash(int Count)
+{
+    public BadDash() : this(0) { }
+}
+
+public static class BadDashReactions
+{
+    [Synapse("x.unserialisable", "bad.dash")]
+    public static BadDash Seen(SignalEnvelope s, BadDash d) => d with { Count = d.Count + 1 };
+}
+
 public sealed class AliasReactionFacts
 {
     private static readonly NeuronId Installs = NeuronId.Parse("ar/synapse.installs/default");
@@ -62,5 +92,25 @@ public sealed class AliasReactionFacts
         Assert.NotNull(published.TraceId);
         Assert.Equal(published.TraceId, state?.GetProperty("traceId").GetString());
         Assert.Empty(os.Failures);
+    }
+
+    [Fact]
+    public async Task AnEnvelopeThatCannotBeBuiltFinishesTheSynapseAsFailed()
+    {
+        await using var os = OS.Local().Register(typeof(StateNeuronOnTestOSFacts).Assembly);
+        os.Confirmations.ApproveAll();
+        var finished = new System.Collections.Concurrent.ConcurrentQueue<SynapseFinished>();
+        await using var listener = await os.ClusterListeners.Listen<SynapseFinished>("bad", (_, signal, _) =>
+        {
+            finished.Enqueue(signal);
+            return Task.CompletedTask;
+        });
+        _ = await os.Get<IInstalls>(Installs).Install(new InstallRequest("bad.dash", new Dictionary<string, string>()), Ct);
+        await os.Idle();
+
+        try { await os.Get<IBadPoller>(NeuronId.Parse("ar/bad.poller/a")).Poll(); } catch (InvalidOperationException) { }
+        await os.Idle();
+
+        Assert.Contains(finished, f => f.Outcome == "failed" && f.Function.EndsWith(".Seen", StringComparison.Ordinal) && f.Neuron == "ar/bad.dash/default");
     }
 }
