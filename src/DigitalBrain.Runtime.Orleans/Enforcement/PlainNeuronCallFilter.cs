@@ -118,7 +118,7 @@ public sealed class PlainNeuronCallFilter(ICallFilter filter, ILogger<PlainNeuro
         }
     }
 
-    private static bool IsPlumbing(RuntimeInvocation call)
+    internal static bool IsPlumbing(RuntimeInvocation call)
         => ContractOf(call.Contract) is { } contract && (!contract.IsVisible || contract.IsDefined(typeof(InternalAttribute), inherit: false));
 
     private static AccessAttribute? Policy(RuntimeInvocation call) => Policies.GetOrAdd((call.Contract, call.Method, call.Arguments.Length), static key =>

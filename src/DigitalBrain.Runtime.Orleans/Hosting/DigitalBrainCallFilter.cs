@@ -30,6 +30,13 @@ public sealed class DigitalBrainCallFilter : IIncomingGrainCallFilter, IOutgoing
         // 2. Validate stamped caller context
         if (RuntimeCallerContext.TryGet(out var caller) && caller is not null)
         {
+            if (context.Grain is INeuronHost && context.Request is { } req && req.GetArgumentCount() > 0 && req.GetArgument(0) is Invocation.RuntimeInvocation call
+                && Enforcement.PlainNeuronCallFilter.IsPlumbing(call))
+            {
+                await context.Invoke();
+                return;
+            }
+
             var targetType = context.TargetId.Type.ToString();
             if (targetType is not null && targetType.StartsWith("neuron", StringComparison.OrdinalIgnoreCase))
             {
