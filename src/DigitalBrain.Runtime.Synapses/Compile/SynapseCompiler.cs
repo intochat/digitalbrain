@@ -115,6 +115,17 @@ public sealed class SynapseCompiler
             return new SynapseBuild(false, Map(diagnostics), [], [], hash, assemblyName);
         }
 
+        if (peStream.Length > MaxAssemblyBytes)
+        {
+            return new SynapseBuild(
+                false,
+                [new SynapseDiagnostic("", "DB0048", 0, $"Compiled assembly '{assemblyName}' is {peStream.Length} bytes, exceeding the {MaxAssemblyBytes}-byte cap")],
+                [],
+                [],
+                hash,
+                assemblyName);
+        }
+
         Interlocked.Increment(ref emits);
         var build = new SynapseBuild(true, Map(diagnostics), peStream.ToArray(), pdbStream.ToArray(), hash, assemblyName);
         lock (gate)
@@ -137,6 +148,9 @@ public sealed class SynapseCompiler
 
     /// <summary>The largest non-code file (in characters) a synapse source may carry beside its .cs files.</summary>
     public const int MaxSidecarChars = 256 * 1024;
+
+    /// <summary>The largest compiled PE assembly (in bytes, <c>1 MiB</c>) a synapse build may emit.</summary>
+    public const int MaxAssemblyBytes = 1024 * 1024;
 
     private static bool IsCode(string path) => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
 

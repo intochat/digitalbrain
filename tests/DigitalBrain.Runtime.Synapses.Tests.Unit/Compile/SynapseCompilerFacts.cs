@@ -254,6 +254,29 @@ public sealed class SynapseCompilerFacts
         Assert.Equal(first.Symbols, second.Symbols);
     }
 
+    [Fact]
+    public void OversizedCompiledAssemblyIsRefusedAsDB0048()
+    {
+        var largeLiteral = new string('A', (SynapseCompiler.MaxAssemblyBytes / 2) + 4096);
+        var sourceText = $$"""
+            namespace Me.Budget;
+
+            [State("week")]
+            public sealed record WeekSpend(decimal Spent = 0)
+            {
+                public WeekSpend() : this(0) { }
+                public static string Payload => "{{largeLiteral}}";
+            }
+            """;
+
+        var build = new SynapseCompiler(ReferenceSet.FromDefaultContext()).Compile(Source(sourceText, "Me.Oversized"));
+
+        Assert.False(build.Success);
+        Assert.Empty(build.Assembly);
+        var error = Assert.Single(build.Diagnostics, d => d.Id == "DB0048");
+        Assert.Contains("exceeding the 1048576-byte cap", error.Message, StringComparison.Ordinal);
+    }
+
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     private sealed class ThrowingAnalyzer : DiagnosticAnalyzer
     {
