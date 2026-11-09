@@ -67,8 +67,23 @@ public sealed class PlainNeuronCallFilter(ICallFilter filter, ILogger<PlainNeuro
         }
 
         await Authorize(filter, logger, caller, id, call);
+        var previousModuleCall = global::Orleans.Runtime.RequestContext.Get(RuntimeCallerContext.ModuleCallKey);
         global::Orleans.Runtime.RequestContext.Set(RuntimeCallerContext.ModuleCallKey, true);
-        await context.Invoke();
+        try
+        {
+            await context.Invoke();
+        }
+        finally
+        {
+            if (previousModuleCall is not null)
+            {
+                global::Orleans.Runtime.RequestContext.Set(RuntimeCallerContext.ModuleCallKey, previousModuleCall);
+            }
+            else
+            {
+                global::Orleans.Runtime.RequestContext.Remove(RuntimeCallerContext.ModuleCallKey);
+            }
+        }
     }
 
     private static (string? Scope, bool IsPublic) Classify(CapabilityCaller caller, DigitalBrain.NeuronId id, RuntimeInvocation call) => Policy(call) switch
