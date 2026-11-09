@@ -2,6 +2,7 @@
 DigitalBrain.Capabilities.Http.HostNotAllowedException
 DigitalBrain.Capabilities.Http.HostNotAllowedException.Host.get -> string!
 DigitalBrain.Capabilities.Http.HostNotAllowedException.HostNotAllowedException(string! host) -> void
+DigitalBrain.Capabilities.Http.HostNotAllowedException.HostNotAllowedException(string! host, string? scheme) -> void
 DigitalBrain.Capabilities.Http.HttpConnectionOptions
 DigitalBrain.Capabilities.Http.HttpConnectionOptions.AllowedHosts.get -> System.Collections.Generic.IReadOnlyList<string!>!
 DigitalBrain.Capabilities.Http.HttpConnectionOptions.AllowedHosts.init -> void

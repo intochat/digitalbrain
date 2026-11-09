@@ -61,4 +61,36 @@ public sealed class HttpCapabilityFacts
         if (allowed) { HttpHosts.Require(new Uri(url), hosts); }
         else { Assert.Throws<HostNotAllowedException>(() => HttpHosts.Require(new Uri(url), hosts)); }
     }
+
+    [Theory]
+    [InlineData("*.")]
+    [InlineData("*.org")]
+    [InlineData("*.*.example.org")]
+    [InlineData("*..example.org")]
+    [InlineData("*")]
+    public void AMalformedWildcardMatchesNothing(string entry)
+    {
+        Assert.Throws<HostNotAllowedException>(() => HttpHosts.Require(new Uri("https://api.example.org/a"), [entry]));
+        Assert.Throws<HostNotAllowedException>(() => HttpHosts.Require(new Uri("https://example.org/a"), [entry]));
+    }
+
+    [Fact]
+    public void HostsAreComparedInTheirIdnForm()
+    {
+        HttpHosts.Require(new Uri("https://xn--bcher-kva.example/a"), ["b\u00fccher.example"]);
+        HttpHosts.Require(new Uri("https://b\u00fccher.example/a"), ["xn--bcher-kva.example"]);
+        HttpHosts.Require(new Uri("https://api.b\u00fccher.example/a"), ["*.xn--bcher-kva.example"]);
+        Assert.Throws<HostNotAllowedException>(() => HttpHosts.Require(new Uri("https://bucher.example/a"), ["b\u00fccher.example"]));
+    }
+
+    [Fact]
+    public void TheRefusalCarriesSchemeAndHostOnly()
+    {
+        var e = Assert.Throws<HostNotAllowedException>(() => HttpHosts.Require(new Uri("https://evil.example/path?token=secret#frag"), ["api.example.org"]));
+
+        Assert.Equal("evil.example", e.Host);
+        Assert.Equal("http host-not-allowed: https://evil.example", e.Message);
+        Assert.DoesNotContain("secret", e.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("path", e.Message, StringComparison.Ordinal);
+    }
 }
