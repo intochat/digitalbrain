@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using DigitalBrain.Capabilities;
+using DigitalBrain.Runtime.Orleans.Capabilities;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Spi;
 using Microsoft.Extensions.DependencyInjection;
@@ -46,7 +48,11 @@ internal sealed class InstalledGates(InstalledGateIndex index, IServiceProvider 
         var generation = _generation.GetOrAdd(brain, 0);
         if (_loaded.TryGetValue(brain, out var loaded) && loaded == generation) { return; }
         var installs = NeuronHosting.Get<IInstalls>(services, new NeuronId(brain, OrleansInstallHooks.InstallsType, "default"));
-        var records = await installs.List(CancellationToken.None).ConfigureAwait(true);
+        // Runtime plumbing, not the caller's operation: the gate index reads the brain's installs as that brain's platform, whatever
+        // principal the publish that needs it was stamped with (a person of another brain would be refused by the call filter).
+        IReadOnlyList<InstallRecord> records;
+        using (RuntimeCallerContext.StampScope(CapabilityCallers.Platform(brain.Value, brain.Value, brain.Value)))
+        { records = await installs.List(CancellationToken.None).ConfigureAwait(true); }
         // An invalidation during the read leaves the brain unloaded, so the next lookup reads again.
         if (_generation.GetValueOrDefault(brain) != generation) { return; }
         index.Refresh(brain, records);
