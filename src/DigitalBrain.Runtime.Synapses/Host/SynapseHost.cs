@@ -256,18 +256,27 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
         await gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            return
-            [
-                .. entries.Where(e => e.Key.Brain == brain)
-                    .OrderBy(e => e.Key.SourceKey, StringComparer.Ordinal)
-                    .Select(e => new DeployedSource(
-                        e.Key.SourceKey,
-                        e.Value.Live.Hash,
-                        AliasesOf(e.Value.Live),
-                        e.Value.Staged is null ? DeployStatus.Deployed : DeployStatus.Staged,
-                        e.Value.Staged?.Loaded.Hash,
-                        e.Value.At)),
-            ];
+            var live = entries.Where(e => e.Key.Brain == brain)
+                .Select(e => new DeployedSource(
+                    e.Key.SourceKey,
+                    e.Value.Live.Hash,
+                    AliasesOf(e.Value.Live),
+                    e.Value.Staged is null ? DeployStatus.Deployed : DeployStatus.Staged,
+                    e.Value.Staged?.Loaded.Hash,
+                    e.Value.At))
+                .ToList();
+
+            // A stored version the restorer refuses (outside the current boundary, or slots without bindings) is listed so the person
+            // sees it needs a rebuild instead of it silently missing.
+            foreach (var record in await store.List(brain, ct).ConfigureAwait(false))
+            {
+                if (!live.Any(s => string.Equals(s.SourceKey, record.SourceKey, StringComparison.Ordinal)) && SynapseRestorer.RebuildReason(record) is { } reason)
+                {
+                    live.Add(new DeployedSource(record.SourceKey, record.Hash, record.Aliases, DeployStatus.RebuildRequired, null, record.DeployedAt, reason));
+                }
+            }
+
+            return [.. live.OrderBy(s => s.SourceKey, StringComparer.Ordinal)];
         }
         finally
         {

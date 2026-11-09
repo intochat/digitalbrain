@@ -47,6 +47,13 @@ public sealed class SynapseRestorer : ISynapseRestorer
             return false;
         }
 
+        // The boundary is re-run on the stored bytes: an upgrade that tightens it applies to units deployed before. A record that cannot
+        // be restored as it is stays unloaded; the host lists it as rebuild required.
+        if (RebuildReason(record) is not null)
+        {
+            return false;
+        }
+
         var key = (brain, record.SourceKey);
         var restore = restoring.GetOrAdd(key, _ => new Lazy<Task<bool>>(() => Restore(brain, record)));
         try
@@ -57,6 +64,29 @@ public sealed class SynapseRestorer : ISynapseRestorer
         {
             // Only a restore in flight is shared: once done the alias is registered, and a later miss (another restart) restores again.
             _ = restoring.TryRemove(new KeyValuePair<(BrainId Brain, string SourceKey), Lazy<Task<bool>>>(key, restore));
+        }
+    }
+
+    /// <summary>Why a stored record cannot be restored as it is, or null when it can.</summary>
+    /// <param name="record">The stored record.</param>
+    /// <returns>The reason, phrased for the person.</returns>
+    internal static string? RebuildReason(SourceRecord record)
+    {
+        try
+        {
+            if (AllowedReferences.FirstDisallowed(record.Assembly) is { } disallowed)
+            {
+                return $"'{disallowed}' is outside the surface a synapse assembly may reference; deploy the source again";
+            }
+
+            // A record written before bindings were kept would restore its slots unbound.
+            return record.Bindings is null && AllowedReferences.DeclaresSlots(record.Assembly)
+                ? "the stored version has no slot bindings; deploy the source again"
+                : null;
+        }
+        catch (BadImageFormatException error)
+        {
+            return $"the stored build does not read: {error.Message}";
         }
     }
 

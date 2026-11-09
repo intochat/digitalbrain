@@ -108,6 +108,19 @@ internal static class AllowedReferences
         }
     }
 
+    /// <summary>True when the build declares a [Slot] parameter anywhere.</summary>
+    /// <param name="assembly">The PE image of the build.</param>
+    public static bool DeclaresSlots(byte[] assembly)
+    {
+        using var pe = new PEReader(ImmutableArray.Create(assembly));
+        var metadata = pe.GetMetadataReader();
+        return metadata.CustomAttributes.Select(metadata.GetCustomAttribute).Any(attribute =>
+            attribute.Parent.Kind == HandleKind.Parameter
+            && attribute.Constructor.Kind == HandleKind.MemberReference
+            && metadata.GetMemberReference((MemberReferenceHandle)attribute.Constructor).Parent is { Kind: HandleKind.TypeReference } parent
+            && TypeName(metadata, (TypeReferenceHandle)parent).Type == "DigitalBrain.SlotAttribute");
+    }
+
     // The parameter types of a method reference (empty for a field), fully qualified with generic arity dropped.
     private static ImmutableArray<string> Parameters(MetadataReader metadata, MemberReference reference)
     {

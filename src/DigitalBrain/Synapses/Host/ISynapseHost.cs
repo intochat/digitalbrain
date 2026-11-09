@@ -22,6 +22,12 @@ public enum DeployStatus
 
     /// <summary>The source did not compile or load; nothing changed.</summary>
     Failed,
+
+    /// <summary>
+    /// The stored version can no longer be restored as it is (outside the current boundary, or a record from before slot bindings were
+    /// kept): it is not loaded, and the source must be deployed again. <see cref="DeployedSource.Reason"/> says why.
+    /// </summary>
+    RebuildRequired,
 }
 
 /// <summary>The result of <see cref="ISynapseHost.Deploy"/> or <see cref="ISynapseHost.Retire"/>.</summary>
@@ -41,10 +47,11 @@ public sealed record DeployOutcome(
 /// <param name="SourceKey">The source key.</param>
 /// <param name="Hash">The build hash of the live version.</param>
 /// <param name="Aliases">The state aliases the live version declares.</param>
-/// <param name="Status"><see cref="DeployStatus.Deployed"/>, or <see cref="DeployStatus.Staged"/> while a new version waits for approval.</param>
+/// <param name="Status"><see cref="DeployStatus.Deployed"/>, <see cref="DeployStatus.Staged"/> while a new version waits for approval, or <see cref="DeployStatus.RebuildRequired"/> for a stored version that cannot be restored.</param>
 /// <param name="StagedHash">The build hash of the staged version; null when none is staged.</param>
 /// <param name="At">When the live version was deployed.</param>
-public sealed record DeployedSource(string SourceKey, string Hash, IReadOnlyList<string> Aliases, DeployStatus Status, string? StagedHash, DateTimeOffset At);
+/// <param name="Reason">Why a <see cref="DeployStatus.RebuildRequired"/> source cannot be restored; null otherwise.</param>
+public sealed record DeployedSource(string SourceKey, string Hash, IReadOnlyList<string> Aliases, DeployStatus Status, string? StagedHash, DateTimeOffset At, string? Reason = null);
 
 /// <summary>Deploys, updates and retires generated synapse sources of a brain.</summary>
 [NeuronAlias("synapse.host")]

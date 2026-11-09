@@ -2479,6 +2479,7 @@ DigitalBrain.DeployOutcome.Status.init -> void
 DigitalBrain.DeployStatus
 DigitalBrain.DeployStatus.Deployed = 0 -> DigitalBrain.DeployStatus
 DigitalBrain.DeployStatus.Failed = 5 -> DigitalBrain.DeployStatus
+DigitalBrain.DeployStatus.RebuildRequired = 6 -> DigitalBrain.DeployStatus
 DigitalBrain.DeployStatus.Refused = 4 -> DigitalBrain.DeployStatus
 DigitalBrain.DeployStatus.Retired = 3 -> DigitalBrain.DeployStatus
 DigitalBrain.DeployStatus.Staged = 1 -> DigitalBrain.DeployStatus
@@ -2489,8 +2490,10 @@ DigitalBrain.DeployedSource.Aliases.get -> System.Collections.Generic.IReadOnlyL
 DigitalBrain.DeployedSource.Aliases.init -> void
 DigitalBrain.DeployedSource.At.get -> System.DateTimeOffset
 DigitalBrain.DeployedSource.At.init -> void
-DigitalBrain.DeployedSource.Deconstruct(out string! SourceKey, out string! Hash, out System.Collections.Generic.IReadOnlyList<string!>! Aliases, out DigitalBrain.DeployStatus Status, out string? StagedHash, out System.DateTimeOffset At) -> void
-DigitalBrain.DeployedSource.DeployedSource(string! SourceKey, string! Hash, System.Collections.Generic.IReadOnlyList<string!>! Aliases, DigitalBrain.DeployStatus Status, string? StagedHash, System.DateTimeOffset At) -> void
+DigitalBrain.DeployedSource.Deconstruct(out string! SourceKey, out string! Hash, out System.Collections.Generic.IReadOnlyList<string!>! Aliases, out DigitalBrain.DeployStatus Status, out string? StagedHash, out System.DateTimeOffset At, out string? Reason) -> void
+DigitalBrain.DeployedSource.DeployedSource(string! SourceKey, string! Hash, System.Collections.Generic.IReadOnlyList<string!>! Aliases, DigitalBrain.DeployStatus Status, string? StagedHash, System.DateTimeOffset At, string? Reason = null) -> void
+DigitalBrain.DeployedSource.Reason.get -> string?
+DigitalBrain.DeployedSource.Reason.init -> void
 DigitalBrain.DeployedSource.Equals(DigitalBrain.DeployedSource? other) -> bool
 DigitalBrain.DeployedSource.Hash.get -> string!
 DigitalBrain.DeployedSource.Hash.init -> void

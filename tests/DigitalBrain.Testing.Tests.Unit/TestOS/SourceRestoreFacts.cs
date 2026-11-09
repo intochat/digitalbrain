@@ -150,6 +150,62 @@ public sealed class SourceRestoreFacts
     }
 
     [Fact]
+    public async Task AStoredBuildOutsideTheBoundaryIsNotRestoredAndIsListedAsRebuildRequired()
+    {
+        await using var os = Start();
+        _ = await DeployApproved(os, "sr9");
+        var record = (await os.Store.Get(Brain("sr9"), HsSource.Key, Ct))!;
+
+        // A build stored before the boundary tightened: the analyzer is left out, so only the restorer's check stands in front of the load.
+        var leaky = new DigitalBrain.Runtime.Synapses.SynapseCompiler(DigitalBrain.Runtime.Synapses.ReferenceSet.FromDefaultContext(), [], withoutBannedApis: true)
+            .Compile(HsSource.Of(HsSource.Budget + "\npublic static class Leak { public static object Forge(byte[] b) => System.Runtime.CompilerServices.RuntimeHelpers.Box(ref b[0], default); }"));
+        Assert.True(leaky.Success);
+        await os.Store.Put(Brain("sr9"), record with { Assembly = leaky.Assembly, Symbols = leaky.Symbols, Hash = leaky.Hash, AssemblyName = leaky.AssemblyName }, Ct);
+        await os.Restart();
+
+        Assert.False(await os.Restorer.TryRestore(Brain("sr9"), "hs.week", Ct));
+
+        Assert.DoesNotContain("hs.week", os.Catalog.States.Keys);
+        var listed = Assert.Single(await os.Synapses.List(Brain("sr9"), Ct));
+        Assert.Equal(DeployStatus.RebuildRequired, listed.Status);
+        Assert.Contains("System.Runtime.CompilerServices.RuntimeHelpers.Box", listed.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ARecordWithSlotsButNoBindingsIsNotRestoredAndIsListedAsRebuildRequired()
+    {
+        await using var os = Start();
+        var bindings = new Dictionary<string, IReadOnlyDictionary<string, string>> { ["hs.week"] = new Dictionary<string, string> { ["Db"] = "analytics" } };
+        var outcome = await os.Synapses.Deploy(Brain("sr10"), HsSource.Of(HsSource.WithDb), bindings, Ct);
+        Assert.Equal(DeployStatus.Deployed, outcome.Status);
+        await os.Confirmations.Approve(outcome.Installs["hs.week"].Reason!);
+        await os.Idle();
+        var record = (await os.Store.Get(Brain("sr10"), HsSource.Key, Ct))!;
+        Assert.NotNull(record.Bindings);
+
+        // A record written before bindings were kept.
+        await os.Store.Put(Brain("sr10"), record with { Bindings = null }, Ct);
+        await os.Restart();
+
+        Assert.False(await os.Restorer.TryRestore(Brain("sr10"), "hs.week", Ct));
+        var listed = Assert.Single(await os.Synapses.List(Brain("sr10"), Ct));
+        Assert.Equal(DeployStatus.RebuildRequired, listed.Status);
+        Assert.Contains("no slot bindings", listed.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ARecordWithoutSlotsOrBindingsStillRestores()
+    {
+        await using var os = Start();
+        _ = await DeployApproved(os, "sr11");
+        var record = (await os.Store.Get(Brain("sr11"), HsSource.Key, Ct))!;
+        await os.Store.Put(Brain("sr11"), record with { Bindings = null }, Ct);
+        await os.Restart();
+
+        Assert.True(await os.Restorer.TryRestore(Brain("sr11"), "hs.week", Ct));
+    }
+
+    [Fact]
     public async Task ARestoreOfAnUnknownAliasIsFalse()
     {
         await using var os = Start();
