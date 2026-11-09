@@ -45,7 +45,7 @@ public readonly record struct CompoundGrainKey(BrainId Brain, string Type, strin
             return false;
         }
 
-        if (string.IsNullOrEmpty(keyPart) || keyPart.StartsWith('/') || keyPart.EndsWith('/') || keyPart.Contains("//", StringComparison.Ordinal) || keyPart.Any(char.IsControl))
+        if (string.IsNullOrWhiteSpace(keyPart) || keyPart.StartsWith('/') || keyPart.EndsWith('/') || keyPart.Contains("//", StringComparison.Ordinal) || keyPart.Any(char.IsControl))
         {
             return false;
         }
@@ -58,7 +58,7 @@ public readonly record struct CompoundGrainKey(BrainId Brain, string Type, strin
     {
         if (string.IsNullOrWhiteSpace(brain) || brain.Length > 200) return false;
         var span = brain.StartsWith('@') ? brain.AsSpan(1) : brain.AsSpan();
-        if (span.IsEmpty) return false;
+        if (span.IsEmpty || span.IsWhiteSpace()) return false;
         foreach (var c in span)
         {
             if (char.IsControl(c) || c is '/' or '\\' or ':' or '!' or '?' or '*' or '<' or '>' or '|' or '"' or '@')

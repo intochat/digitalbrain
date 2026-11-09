@@ -277,6 +277,30 @@ public sealed class SynapseCompilerFacts
         Assert.Contains("exceeding the 1048576-byte cap", error.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ConcurrentCompilationsAcrossMultipleThreadsSucceedWithoutContention()
+    {
+        var compiler = new SynapseCompiler(ReferenceSet.FromDefaultContext());
+        const int concurrency = 20;
+
+        Parallel.For(0, concurrency, i =>
+        {
+            var sourceText = $$"""
+                namespace Me.Budget{{i}};
+
+                [State("state{{i}}")]
+                public sealed record Spend{{i}}(decimal Spent = 0)
+                {
+                    public Spend{{i}}() : this(0) { }
+                }
+                """;
+            var build = compiler.Compile(Source(sourceText, $"Me.Budget{i}"));
+            Assert.True(build.Success, string.Join("\n", build.Diagnostics));
+        });
+
+        Assert.Equal(concurrency, compiler.Emits);
+    }
+
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     private sealed class ThrowingAnalyzer : DiagnosticAnalyzer
     {
