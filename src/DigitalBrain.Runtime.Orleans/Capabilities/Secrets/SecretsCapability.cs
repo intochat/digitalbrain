@@ -29,13 +29,20 @@ public sealed partial class SecretsCapability : ISecrets
     /// <summary>The module declarations named secrets are checked against; <see cref="ModuleDeclarations.None"/> by default.</summary>
     public ModuleDeclarations Declarations { get; init; } = ModuleDeclarations.None;
 
+    private static readonly CapabilityCaller PlatformCaller = CapabilityCallers.Platform("identity.vault", "system", "system");
+
     /// <inheritdoc />
     public async Task<SecretRef> Set(string name, string label, string value, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentNullException.ThrowIfNull(value);
         var caller = RuntimeCallerContext.Required(Capability.Secrets.V1Id);
-        var result = await _port.Set(caller, name, label ?? "", value, cancellationToken).ConfigureAwait(false);
+        SecretVaultResult result;
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            result = await _port.Set(caller, name, label ?? "", value, cancellationToken).ConfigureAwait(false);
+        }
+
         switch (result.Status)
         {
             case SecretVaultStatus.Ok when result.Secret is not null:
@@ -54,7 +61,12 @@ public sealed partial class SecretsCapability : ISecrets
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var caller = RuntimeCallerContext.Required(Capability.Secrets.V1Id);
-        var status = await _port.Remove(caller, name, cancellationToken).ConfigureAwait(false);
+        SecretVaultStatus status;
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            status = await _port.Remove(caller, name, cancellationToken).ConfigureAwait(false);
+        }
+
         if (status == SecretVaultStatus.Denied)
         {
             Refused(_logger, name, caller.PrincipalId);
@@ -71,7 +83,12 @@ public sealed partial class SecretsCapability : ISecrets
         var caller = RuntimeCallerContext.Required(Capability.Secrets.V1Id);
         var name = NameOf(secret);
         if (secret.IsNamed) { RequireDeclared(caller, name = secret.Reference[SecretRef.NamedPrefix.Length..]); }
-        var result = await _port.Resolve(caller, secret, cancellationToken).ConfigureAwait(false);
+        SecretVaultResult result;
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            result = await _port.Resolve(caller, secret, cancellationToken).ConfigureAwait(false);
+        }
+
         switch (result.Status)
         {
             case SecretVaultStatus.Ok when result.Value is not null:
@@ -90,7 +107,12 @@ public sealed partial class SecretsCapability : ISecrets
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(context);
         var caller = RuntimeCallerContext.Required(Capability.Secrets.V1Id);
-        var sealedSecret = await _port.Seal(caller, context, plaintext, cancellationToken).ConfigureAwait(false);
+        SealedSecret? sealedSecret;
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            sealedSecret = await _port.Seal(caller, context, plaintext, cancellationToken).ConfigureAwait(false);
+        }
+
         if (sealedSecret is null)
         {
             Refused(_logger, context, caller.PrincipalId);
@@ -106,7 +128,12 @@ public sealed partial class SecretsCapability : ISecrets
         ArgumentException.ThrowIfNullOrWhiteSpace(context);
         ArgumentNullException.ThrowIfNull(sealedSecret);
         var caller = RuntimeCallerContext.Required(Capability.Secrets.V1Id);
-        var plaintext = await _port.Open(caller, context, sealedSecret, cancellationToken).ConfigureAwait(false);
+        byte[]? plaintext;
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            plaintext = await _port.Open(caller, context, sealedSecret, cancellationToken).ConfigureAwait(false);
+        }
+
         if (plaintext is null)
         {
             Refused(_logger, context, caller.PrincipalId);
@@ -122,7 +149,11 @@ public sealed partial class SecretsCapability : ISecrets
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         var caller = RuntimeCallerContext.Required(Capability.Secrets.V1Id);
         RequireDeclared(caller, name);
-        var result = await _port.Named(caller, name, cancellationToken).ConfigureAwait(false);
+        SecretVaultResult result;
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            result = await _port.Named(caller, name, cancellationToken).ConfigureAwait(false);
+        }
         switch (result.Status)
         {
             case SecretVaultStatus.Ok when result.Secret is not null:

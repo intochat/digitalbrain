@@ -10,7 +10,7 @@ public sealed class ViewModelJsonFacts
 {
     private static readonly string[] ActionMembers = ["Emit", "Intent", "Resolve", "OnSubmit"];
 
-    private static readonly Type[] ActionCarriers = [typeof(Button), typeof(TabItem), typeof(Switch), typeof(SelectOption), typeof(Field), typeof(ApprovalCardNode)];
+    private static readonly Type[] ActionCarriers = [typeof(Button), typeof(TabItem), typeof(Switch), typeof(SelectOption), typeof(Field), typeof(ApprovalCardNode), typeof(NavItemNode)];
 
     private static bool CarriesAction(Type type) => type.GetProperties().Any(p => ActionMembers.Contains(p.Name)
         || p.PropertyType == typeof(Emit) || Nullable.GetUnderlyingType(p.PropertyType) == typeof(Emit)
@@ -27,7 +27,7 @@ public sealed class ViewModelJsonFacts
     }
 
     [Fact]
-    public void OnlyTheSixInteractiveTypesDeclareAnAction()
+    public void OnlyInteractiveTypesDeclareAnAction()
     {
         var model = typeof(Node).Assembly.GetTypes().Where(t => t.Namespace == typeof(Node).Namespace && t.IsPublic && t != typeof(Emit) && t != typeof(Resolve) && t != typeof(Intent));
 

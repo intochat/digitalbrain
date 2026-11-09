@@ -20,33 +20,58 @@ public sealed class GrantsCapability : IGrants
         _port = port;
     }
 
+    private static readonly CapabilityCaller PlatformCaller = CapabilityCallers.Platform("identity.grants", "system", "system");
+
     /// <inheritdoc />
-    public Task<CallDecision?> Authorize(CallRequest request, CancellationToken cancellationToken = default)
+    public async Task<CallDecision?> Authorize(CallRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
         var caller = RuntimeCallerContext.Current;
-        return caller is null
-            ? Task.FromResult<CallDecision?>(CallDecision.Deny(CallDenial.NotAuthenticated, "identity@1: the call carries no stamped caller."))
-            : _port.Authorize(caller, request, cancellationToken);
+        if (caller is null)
+        {
+            return CallDecision.Deny(CallDenial.NotAuthenticated, "identity@1: the call carries no stamped caller.");
+        }
+
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            return await _port.Authorize(caller, request, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<Grant>> ListGrants(string brainScopeId, CancellationToken cancellationToken = default) => _port.ListGrants(brainScopeId, cancellationToken);
+    public async Task<IReadOnlyList<Grant>> ListGrants(string brainScopeId, CancellationToken cancellationToken = default)
+    {
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            return await _port.ListGrants(brainScopeId, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     /// <inheritdoc />
     public async Task<Grant> GrantAsOwner(Grant grant, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(grant);
         var caller = RuntimeCallerContext.Required(Capability.Identity.V1Id);
-        return await _port.GrantAsOwner(caller, grant, cancellationToken).ConfigureAwait(false)
-            ?? throw new UnauthorizedAccessException($"{caller.PrincipalId} is not the owner of {grant.WorkspaceId}.");
+        Grant? result;
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            result = await _port.GrantAsOwner(caller, grant, cancellationToken).ConfigureAwait(false);
+        }
+
+        return result ?? throw new UnauthorizedAccessException($"{caller.PrincipalId} is not the owner of {grant.WorkspaceId}.");
     }
 
     /// <inheritdoc />
     public async Task RevokeAsOwner(string appId, string semanticTypeId, GrantMode mode, CancellationToken cancellationToken = default)
     {
         var caller = RuntimeCallerContext.Required(Capability.Identity.V1Id);
-        if (!await _port.RevokeAsOwner(caller, appId, semanticTypeId, mode, cancellationToken).ConfigureAwait(false))
+        bool revoked;
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            revoked = await _port.RevokeAsOwner(caller, appId, semanticTypeId, mode, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!revoked)
         {
             throw new UnauthorizedAccessException($"{caller.PrincipalId} is not the owner of {caller.BrainId}.");
         }

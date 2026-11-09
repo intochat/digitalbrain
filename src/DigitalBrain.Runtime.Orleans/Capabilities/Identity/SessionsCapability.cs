@@ -24,28 +24,39 @@ public sealed class SessionsCapability : ISessions, IIdentityProvider
         _declarations = declarations;
     }
 
+    private static readonly CapabilityCaller PlatformCaller = CapabilityCallers.Platform("identity.sessions", "system", "system");
+
     /// <inheritdoc />
-    public Task<SessionIssued> Issue(SessionRequest request, CancellationToken cancellationToken = default)
+    public async Task<SessionIssued> Issue(SessionRequest request, CancellationToken cancellationToken = default)
     {
         var caller = Privileged(nameof(Issue));
         SessionClaims.Validate(request);
-        return _port.Issue(caller, request, cancellationToken);
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            return await _port.Issue(caller, request, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc />
-    public Task End(string sessionId, CancellationToken cancellationToken = default)
+    public async Task End(string sessionId, CancellationToken cancellationToken = default)
     {
         var caller = Privileged(nameof(End));
         ArgumentNullException.ThrowIfNull(sessionId);
-        return _port.End(caller, sessionId, cancellationToken);
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            await _port.End(caller, sessionId, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc />
-    public Task<Member?> Validate(string sessionId, CancellationToken cancellationToken = default)
+    public async Task<Member?> Validate(string sessionId, CancellationToken cancellationToken = default)
     {
         Privileged(nameof(Validate));
         ArgumentNullException.ThrowIfNull(sessionId);
-        return _port.Validate(sessionId, cancellationToken);
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            return await _port.Validate(sessionId, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <inheritdoc />

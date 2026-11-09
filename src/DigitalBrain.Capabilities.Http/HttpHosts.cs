@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Net;
+using System.Net.Sockets;
 
 namespace DigitalBrain.Capabilities.Http;
 
@@ -8,10 +10,9 @@ public static class HttpHosts
     private static readonly IdnMapping Idn = new();
 
     /// <summary>
-    /// Passes when <paramref name="url"/> is http or https and its host equals an entry of <paramref name="allowed"/> or matches
-    /// a <c>*.example.org</c> entry (any depth below <c>example.org</c>, never <c>example.org</c> itself). Hosts and entries are
-    /// compared in their IDN (punycode) form, case-insensitively. A malformed entry (<c>*.</c> alone, a wildcard over a single label
-    /// such as <c>*.org</c>, a second <c>*</c>, an empty label) matches nothing.
+    /// Passes when <paramref name="url"/> is http or https, its host is public (never private, loopback, or link-local),
+    /// and its host equals an entry of <paramref name="allowed"/> or matches a <c>*.example.org</c> entry.
+    /// Hosts and entries are compared in their IDN (punycode) form, case-insensitively.
     /// </summary>
     /// <exception cref="HostNotAllowedException">Anything else; its message carries the scheme and host only, never the path or query.</exception>
     public static void Require(Uri url, IReadOnlyList<string> allowed)
@@ -20,10 +21,78 @@ public static class HttpHosts
         ArgumentNullException.ThrowIfNull(allowed);
         var host = url.IsAbsoluteUri ? url.IdnHost : string.Empty;
         var web = url.IsAbsoluteUri && (url.Scheme == Uri.UriSchemeHttp || url.Scheme == Uri.UriSchemeHttps);
-        if (!web || host.Length == 0 || !allowed.Any(entry => Matches(entry, host)))
+        if (!web || host.Length == 0)
         {
             throw new HostNotAllowedException(host.Length == 0 ? "(no host)" : host, url.IsAbsoluteUri ? url.Scheme : null);
         }
+
+        if (IsPrivateOrLoopback(host))
+        {
+            throw new HostNotAllowedException(host, url.IsAbsoluteUri ? url.Scheme : null);
+        }
+
+        if (!allowed.Any(entry => Matches(entry, host)))
+        {
+            throw new HostNotAllowedException(host, url.IsAbsoluteUri ? url.Scheme : null);
+        }
+    }
+
+    /// <summary>Determines whether a host name or IP string is private, loopback, or link-local.</summary>
+    public static bool IsPrivateOrLoopback(string host)
+    {
+        if (string.IsNullOrWhiteSpace(host))
+        {
+            return true;
+        }
+
+        var clean = host.Trim('[', ']');
+        if (string.Equals(clean, "localhost", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (IPAddress.TryParse(clean, out var ip))
+        {
+            return !IsPublic(ip);
+        }
+
+        return false;
+    }
+
+    /// <summary>Determines whether an IP address is private, loopback, or link-local.</summary>
+    public static bool IsPrivateOrLoopback(IPAddress address) => !IsPublic(address);
+
+    /// <summary>Determines whether an IP address is routable public Internet space.</summary>
+    public static bool IsPublic(IPAddress address)
+    {
+        ArgumentNullException.ThrowIfNull(address);
+        if (address.IsIPv4MappedToIPv6)
+        {
+            address = address.MapToIPv4();
+        }
+
+        if (IPAddress.IsLoopback(address) || address.Equals(IPAddress.Any) || address.Equals(IPAddress.IPv6Any))
+        {
+            return false;
+        }
+
+        var bytes = address.GetAddressBytes();
+        if (address.AddressFamily == AddressFamily.InterNetwork)
+        {
+            return !(bytes[0] is 0 or 10 or 127 || bytes[0] >= 224
+                || (bytes[0] == 169 && bytes[1] == 254)
+                || (bytes[0] == 100 && (bytes[1] & 0xC0) == 64)
+                || (bytes[0] == 198 && (bytes[1] & 0xFE) == 18)
+                || (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
+                || (bytes[0] == 192 && bytes[1] == 168));
+        }
+
+        if (address.AddressFamily == AddressFamily.InterNetworkV6)
+        {
+            return !(address.IsIPv6LinkLocal || address.IsIPv6SiteLocal || address.IsIPv6Multicast || (bytes[0] & 0xFE) == 0xFC);
+        }
+
+        return false;
     }
 
     private static bool Matches(string entry, string host)

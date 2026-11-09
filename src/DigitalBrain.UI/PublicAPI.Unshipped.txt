@@ -107,6 +107,7 @@ const DigitalBrain.UI.Confirmation.ConfirmView.WaitingText = "Waiting for you to
 const DigitalBrain.UI.SurfaceKind.Acrylic = "acrylic" -> string!
 const DigitalBrain.UI.SurfaceKind.Elevated = "elevated" -> string!
 const DigitalBrain.UI.SurfaceKind.Recessed = "recessed" -> string!
+const DigitalBrain.UI.SurfaceKind.Subtle = "subtle" -> string!
 DigitalBrain.UI.ApprovalCardNode
 DigitalBrain.UI.ApprovalCardNode.Equals(DigitalBrain.UI.ApprovalCardNode? other) -> bool
 DigitalBrain.UI.ApprovalCardNode.Id.get -> string!
@@ -895,7 +896,9 @@ DigitalBrain.UI.NavItemNode.Action.get -> string!
 DigitalBrain.UI.NavItemNode.Action.init -> void
 DigitalBrain.UI.NavItemNode.Badge.get -> string?
 DigitalBrain.UI.NavItemNode.Badge.init -> void
-DigitalBrain.UI.NavItemNode.Deconstruct(out string! Key, out string! Label, out string! Icon, out string! Action, out bool Selected, out string? Badge) -> void
+DigitalBrain.UI.NavItemNode.Deconstruct(out string! Key, out string! Label, out string! Icon, out string! Action, out bool Selected, out string? Badge, out DigitalBrain.UI.Emit? Emit) -> void
+DigitalBrain.UI.NavItemNode.Emit.get -> DigitalBrain.UI.Emit?
+DigitalBrain.UI.NavItemNode.Emit.init -> void
 DigitalBrain.UI.NavItemNode.Equals(DigitalBrain.UI.NavItemNode? other) -> bool
 DigitalBrain.UI.NavItemNode.Icon.get -> string!
 DigitalBrain.UI.NavItemNode.Icon.init -> void
@@ -903,7 +906,7 @@ DigitalBrain.UI.NavItemNode.Key.get -> string!
 DigitalBrain.UI.NavItemNode.Key.init -> void
 DigitalBrain.UI.NavItemNode.Label.get -> string!
 DigitalBrain.UI.NavItemNode.Label.init -> void
-DigitalBrain.UI.NavItemNode.NavItemNode(string! Key, string! Label, string! Icon, string! Action, bool Selected = false, string? Badge = null) -> void
+DigitalBrain.UI.NavItemNode.NavItemNode(string! Key, string! Label, string! Icon, string! Action, bool Selected = false, string? Badge = null, DigitalBrain.UI.Emit? Emit = null) -> void
 DigitalBrain.UI.NavItemNode.Selected.get -> bool
 DigitalBrain.UI.NavItemNode.Selected.init -> void
 DigitalBrain.UI.StatCardNode
@@ -945,7 +948,7 @@ static DigitalBrain.UI.NavItemNode.operator ==(DigitalBrain.UI.NavItemNode? left
 static DigitalBrain.UI.StatCardNode.operator !=(DigitalBrain.UI.StatCardNode? left, DigitalBrain.UI.StatCardNode? right) -> bool
 static DigitalBrain.UI.StatCardNode.operator ==(DigitalBrain.UI.StatCardNode? left, DigitalBrain.UI.StatCardNode? right) -> bool
 static DigitalBrain.UI.Ui.AppShell(string! key, DigitalBrain.UI.Node? sidebar, DigitalBrain.UI.Node! body, DigitalBrain.UI.Node? toolbar = null, DigitalBrain.UI.Node? inspector = null) -> DigitalBrain.UI.AppShellNode!
-static DigitalBrain.UI.Ui.NavItem(string! key, string! label, string! icon, string! action, bool selected = false, string? badge = null) -> DigitalBrain.UI.NavItemNode!
+static DigitalBrain.UI.Ui.NavItem(string! key, string! label, string! icon, string! action, bool selected = false, string? badge = null, DigitalBrain.UI.Emit? emit = null) -> DigitalBrain.UI.NavItemNode!
 static DigitalBrain.UI.Ui.StatCard(string! key, string! label, string! value, string? delta = null, DigitalBrain.UI.BadgeTone tone = DigitalBrain.UI.BadgeTone.Neutral, string? icon = null) -> DigitalBrain.UI.StatCardNode!
 
 DigitalBrain.UI.BrainSceneNode.PauseRotation.get -> bool

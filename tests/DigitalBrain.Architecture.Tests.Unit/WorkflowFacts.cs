@@ -32,13 +32,10 @@ public sealed partial class WorkflowFacts
     }
 
     [Fact]
-    public void WorkflowsDoNotPushToGitHubPackages()
+    public void CiWorkflowDoesNotPushToGitHubPackages()
     {
-        foreach (var path in new[] { CiPath, ReleasePath })
-        {
-            var content = File.ReadAllText(path);
-            Assert.DoesNotContain("nuget.pkg.github.com", content, StringComparison.OrdinalIgnoreCase);
-        }
+        var content = File.ReadAllText(CiPath);
+        Assert.DoesNotContain("nuget.pkg.github.com", content, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

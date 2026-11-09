@@ -109,6 +109,9 @@ public static class SurfaceKind
 
     /// <summary>Recessed / sunk well surface.</summary>
     public const string Recessed = "recessed";
+
+    /// <summary>Subtle inset / quiet well surface.</summary>
+    public const string Subtle = "subtle";
 }
 
 /// <summary>A glassmorphic, elevated, or recessed container surface.</summary>
@@ -611,7 +614,8 @@ public sealed record NavItemNode(
     string Icon,
     string Action,
     bool Selected = false,
-    string? Badge = null) : Node;
+    string? Badge = null,
+    Emit? Emit = null) : Node;
 
 /// <summary>Compact KPI / telemetry card with tabular-numeral (<c>tnum</c>) metric value and optional delta pill.</summary>
 public sealed record StatCardNode(
@@ -641,8 +645,9 @@ public static class Ui
         string icon,
         string action,
         bool selected = false,
-        string? badge = null) =>
-        new(key, label, icon, action, selected, badge);
+        string? badge = null,
+        Emit? emit = null) =>
+        new(key, label, icon, action, selected, badge, emit);
 
     /// <summary>Creates a tabular-numeral (<c>tnum</c>) KPI stat card with optional delta pill and semantic tone.</summary>
     public static StatCardNode StatCard(

@@ -20,56 +20,152 @@ public sealed class IdentityCapability : IIdentity
         _port = port;
     }
 
-    /// <inheritdoc />
-    public Task<Account?> ReadAccount(string accountId, CancellationToken cancellationToken = default) => _port.ReadAccount(accountId, cancellationToken);
+    private static readonly CapabilityCaller PlatformCaller = CapabilityCallers.Platform("identity.directory", "system", "system");
 
     /// <inheritdoc />
-    public Task<Account?> OwnerOfBrain(string brainId, CancellationToken cancellationToken = default) => _port.OwnerOfBrain(brainId, cancellationToken);
+    public async Task<Account?> ReadAccount(string accountId, CancellationToken cancellationToken = default)
+    {
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            return await _port.ReadAccount(accountId, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     /// <inheritdoc />
-    public Task EnsureAccount(Account account, CancellationToken cancellationToken = default) => _port.EnsureAccount(account, cancellationToken);
+    public async Task<Account?> OwnerOfBrain(string brainId, CancellationToken cancellationToken = default)
+    {
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            return await _port.OwnerOfBrain(brainId, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     /// <inheritdoc />
-    public Task<BrainProvision> CreateBrain(string accountId, string principalId, string operationId, string displayName, BrainKind kind, CancellationToken cancellationToken = default)
-        => _port.CreateBrain(accountId, principalId, operationId, displayName, kind, cancellationToken);
+    public async Task EnsureAccount(Account account, CancellationToken cancellationToken = default)
+    {
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            await _port.EnsureAccount(account, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     /// <inheritdoc />
-    public Task<BrainProvision> EnsureBrain(Member owner, CancellationToken cancellationToken = default) => _port.EnsureBrain(owner, cancellationToken);
+    public async Task<BrainProvision> CreateBrain(string accountId, string principalId, string operationId, string displayName, BrainKind kind, CancellationToken cancellationToken = default)
+    {
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            return await _port.CreateBrain(accountId, principalId, operationId, displayName, kind, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     /// <inheritdoc />
-    public Task<BrainProvision> ProvisionOwner(Member owner, CancellationToken cancellationToken = default) => _port.ProvisionOwner(owner, cancellationToken);
+    public async Task<BrainProvision> EnsureBrain(Member owner, CancellationToken cancellationToken = default)
+    {
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            return await _port.EnsureBrain(owner, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     /// <inheritdoc />
-    public Task<bool> IsRegistered(string principalId, CancellationToken cancellationToken = default) => _port.IsRegistered(principalId, cancellationToken);
+    public async Task<BrainProvision> ProvisionOwner(Member owner, CancellationToken cancellationToken = default)
+    {
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            return await _port.ProvisionOwner(owner, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     /// <inheritdoc />
-    public Task<BrainProvision> RegisterPrincipal(string principalId, string displayName, CancellationToken cancellationToken = default)
-        => _port.RegisterPrincipal(principalId, displayName, cancellationToken);
+    public async Task<bool> IsRegistered(string principalId, CancellationToken cancellationToken = default)
+    {
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            return await _port.IsRegistered(principalId, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     /// <inheritdoc />
-    public Task<BrainProvision?> CompleteRegistration(string principalId, CancellationToken cancellationToken = default) => _port.CompleteRegistration(principalId, cancellationToken);
+    public async Task<BrainProvision> RegisterPrincipal(string principalId, string displayName, CancellationToken cancellationToken = default)
+    {
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            return await _port.RegisterPrincipal(principalId, displayName, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<DigitalBrain.Capabilities.Identity.BrainEntry>> BrainsOf(string principalId, CancellationToken cancellationToken = default) => _port.BrainsOf(principalId, cancellationToken);
+    public async Task<BrainProvision?> CompleteRegistration(string principalId, CancellationToken cancellationToken = default)
+    {
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            return await _port.CompleteRegistration(principalId, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     /// <inheritdoc />
-    public Task<BrainKind> KindOf(string brainScopeId, CancellationToken cancellationToken = default) => _port.KindOf(brainScopeId, cancellationToken);
+    public async Task<IReadOnlyList<DigitalBrain.Capabilities.Identity.BrainEntry>> BrainsOf(string principalId, CancellationToken cancellationToken = default)
+    {
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            return await _port.BrainsOf(principalId, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     /// <inheritdoc />
-    public Task<bool> BrainExists(string brainScopeId, CancellationToken cancellationToken = default) => _port.BrainExists(brainScopeId, cancellationToken);
+    public async Task<BrainKind> KindOf(string brainScopeId, CancellationToken cancellationToken = default)
+    {
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            return await _port.KindOf(brainScopeId, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     /// <inheritdoc />
-    public Task<Member?> Membership(string brainScopeId, string principalId, CancellationToken cancellationToken = default) => _port.Membership(brainScopeId, principalId, cancellationToken);
+    public async Task<bool> BrainExists(string brainScopeId, CancellationToken cancellationToken = default)
+    {
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            return await _port.BrainExists(brainScopeId, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     /// <inheritdoc />
-    public Task<Member?> EnsureMember(Member member, CancellationToken cancellationToken = default)
-        => _port.EnsureMember(RuntimeCallerContext.Required(Capability.Identity.V1Id), member, cancellationToken);
+    public async Task<Member?> Membership(string brainScopeId, string principalId, CancellationToken cancellationToken = default)
+    {
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            return await _port.Membership(brainScopeId, principalId, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     /// <inheritdoc />
-    public Task RemoveMember(string brainScopeId, string accountId, CancellationToken cancellationToken = default)
-        => _port.RemoveMember(RuntimeCallerContext.Required(Capability.Identity.V1Id), brainScopeId, accountId, cancellationToken);
+    public async Task<Member?> EnsureMember(Member member, CancellationToken cancellationToken = default)
+    {
+        var caller = RuntimeCallerContext.Required(Capability.Identity.V1Id);
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            return await _port.EnsureMember(caller, member, cancellationToken).ConfigureAwait(false);
+        }
+    }
 
     /// <inheritdoc />
-    public Task RemovePrincipalMember(string brainScopeId, string principalId, CancellationToken cancellationToken = default)
-        => _port.RemovePrincipalMember(RuntimeCallerContext.Required(Capability.Identity.V1Id), brainScopeId, principalId, cancellationToken);
+    public async Task RemoveMember(string brainScopeId, string accountId, CancellationToken cancellationToken = default)
+    {
+        var caller = RuntimeCallerContext.Required(Capability.Identity.V1Id);
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            await _port.RemoveMember(caller, brainScopeId, accountId, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task RemovePrincipalMember(string brainScopeId, string principalId, CancellationToken cancellationToken = default)
+    {
+        var caller = RuntimeCallerContext.Required(Capability.Identity.V1Id);
+        using (RuntimeCallerContext.Stamp(PlatformCaller))
+        {
+            await _port.RemovePrincipalMember(caller, brainScopeId, principalId, cancellationToken).ConfigureAwait(false);
+        }
+    }
 }

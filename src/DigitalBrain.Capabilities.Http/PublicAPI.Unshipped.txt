@@ -19,4 +19,7 @@ override DigitalBrain.Capabilities.Http.HttpConnectionOptions.GetHashCode() -> i
 override DigitalBrain.Capabilities.Http.HttpConnectionOptions.ToString() -> string!
 static DigitalBrain.Capabilities.Http.HttpConnectionOptions.operator !=(DigitalBrain.Capabilities.Http.HttpConnectionOptions? left, DigitalBrain.Capabilities.Http.HttpConnectionOptions? right) -> bool
 static DigitalBrain.Capabilities.Http.HttpConnectionOptions.operator ==(DigitalBrain.Capabilities.Http.HttpConnectionOptions? left, DigitalBrain.Capabilities.Http.HttpConnectionOptions? right) -> bool
+static DigitalBrain.Capabilities.Http.HttpHosts.IsPrivateOrLoopback(string! host) -> bool
+static DigitalBrain.Capabilities.Http.HttpHosts.IsPrivateOrLoopback(System.Net.IPAddress! address) -> bool
+static DigitalBrain.Capabilities.Http.HttpHosts.IsPublic(System.Net.IPAddress! address) -> bool
 static DigitalBrain.Capabilities.Http.HttpHosts.Require(System.Uri! url, System.Collections.Generic.IReadOnlyList<string!>! allowed) -> void
