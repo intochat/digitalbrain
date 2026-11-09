@@ -75,6 +75,17 @@ internal static class BannedApis
         "System.Type.GetType*",
         "System.Type.InvokeMember",
         "System.Delegate.CreateDelegate",
+        // Advisory mirrors of the host's member allow-lists (AllowedApis.MemberAllowList): off the activation's turn, or forged references.
+        "System.Threading.Tasks.Task.ConfigureAwait",
+        "System.Threading.Tasks.ValueTask.ConfigureAwait",
+        "System.Threading.Tasks.Task.Yield",
+        "System.Threading.CancellationToken.Register",
+        "System.Threading.CancellationToken.UnsafeRegister",
+        "System.Threading.CancellationTokenSource.CancelAfter",
+        "System.Runtime.CompilerServices.RuntimeHelpers.Box",
+        "System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject",
+        "System.Type.TypeHandle",
+        "System.Type.MakeGenericType",
     ];
 
     // typeof(T) compiles to Type.GetTypeFromHandle, which records and nameof-free code still need.

@@ -3,6 +3,12 @@ namespace DigitalBrain.Runtime.Synapses;
 /// <summary>
 /// The surface a synapse build may reference (the host's allow-list). Names are fully qualified, nested types joined by '.',
 /// generic arity dropped; members are metadata names (constructors ".ctor", property accessors "get_X").
+/// <para>
+/// The principle: allow members, never types with member deny-lists. A pure data type (string, int, collections) is allowed whole;
+/// every other type that stays allowed (<see cref="MemberAllowList"/>: RuntimeHelpers, Type, Task, ValueTask, the awaiters and
+/// method builders, CancellationToken(Source)) is allowed member by member, so a member a later .NET adds is refused until ruled on.
+/// A deny-list inside an allowed type fails open (RuntimeHelpers.Box forged object references).
+/// </para>
 /// </summary>
 internal static class AllowedApis
 {
@@ -160,8 +166,6 @@ internal static class AllowedApis
         "System.Runtime.CompilerServices.AsyncIteratorMethodBuilder",
         "System.Runtime.CompilerServices.TaskAwaiter",
         "System.Runtime.CompilerServices.ValueTaskAwaiter",
-        "System.Runtime.CompilerServices.ConfiguredTaskAwaitable",
-        "System.Runtime.CompilerServices.ConfiguredValueTaskAwaitable",
         "System.Runtime.CompilerServices.ScopedRefAttribute",
         "System.Runtime.CompilerServices.ParamCollectionAttribute",
         "System.Runtime.CompilerServices.PreserveBaseOverridesAttribute",
@@ -169,7 +173,6 @@ internal static class AllowedApis
         "System.Runtime.CompilerServices.SwitchExpressionException",
         "System.Runtime.CompilerServices.RequiresLocationAttribute",
         "System.Runtime.CompilerServices.IsUnmanagedAttribute",
-        "System.Runtime.CompilerServices.YieldAwaitable",
         "System.Runtime.CompilerServices.ConfiguredCancelableAsyncEnumerable",
         "System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder",
         "System.Runtime.CompilerServices.InlineArray2",
@@ -193,8 +196,9 @@ internal static class AllowedApis
     /// <summary>Members refused on allowed types; a trailing '*' matches any member name with that prefix.</summary>
     public static readonly string[] RefusedMembers =
     [
-        "System.Type.GetType*",
-        "System.Type.InvokeMember",
+        // A resolver hands out JsonTypeInfo for any type; the Type-taking serializer overloads are refused by signature in AllowedReferences.
+        "System.Text.Json.JsonSerializerOptions.get_TypeInfoResolver*",
+        "System.Text.Json.JsonSerializerOptions.set_TypeInfoResolver*",
         "System.Activator.*",
         "System.Delegate.CreateDelegate",
         "System.Delegate.DynamicInvoke",
@@ -213,20 +217,90 @@ internal static class AllowedApis
         "System.Runtime.InteropServices.MemoryMarshal.*",
         "System.AppContext.*",
         "System.Buffers.ArrayPool.get_Shared",
-        "System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject",
-        "System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor",
-        "System.Runtime.CompilerServices.RuntimeHelpers.RunModuleConstructor",
-        "System.Runtime.CompilerServices.RuntimeHelpers.PrepareMethod",
-        "System.Runtime.CompilerServices.RuntimeHelpers.PrepareDelegate",
-        "System.Runtime.CompilerServices.RuntimeHelpers.AllocateTypeAssociatedMemory",
-        "System.Runtime.CompilerServices.RuntimeHelpers.GetObjectValue",
+    ];
+
+    // The awaiter and builder members the compiler emits for await, async methods and async iterators.
+    private static readonly string[] Awaiter = ["GetResult", "get_IsCompleted", "OnCompleted", "UnsafeOnCompleted"];
+    private static readonly string[] Builder =
+        ["Create", "Start", "SetResult", "SetException", "SetStateMachine", "get_Task", "AwaitOnCompleted", "AwaitUnsafeOnCompleted", "MoveNext", "Complete"];
+
+    /// <summary>
+    /// Types allowed member by member: only the listed members pass; every other member, and any a later .NET adds, is refused. An
+    /// entry "Name(T1,T2)" allows only the overload with exactly those parameter types; a plain "Name" allows every overload.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string[]> MemberAllowList = new Dictionary<string, string[]>(StringComparer.Ordinal)
+    {
+        // Only what the compiler emits (array initialisers, span literals, array ranges, record PrintMembers); Box and the rest are refused.
+        ["System.Runtime.CompilerServices.RuntimeHelpers"] = ["InitializeArray", "CreateSpan", "GetSubArray", "EnsureSufficientExecutionStack"],
+        // What typeof, records' EqualityContract and type comparisons need: no TypeHandle, GetType, members, attributes or generics.
+        ["System.Type"] =
+        [
+            "GetTypeFromHandle", "op_Equality", "op_Inequality", "get_Name", "get_FullName", "get_Namespace", "ToString", "Equals", "GetHashCode",
+            "IsAssignableFrom", "IsAssignableTo", "get_IsValueType", "get_IsEnum", "get_IsGenericType",
+        ],
+        // No Run, Factory, Start, ContinueWith, ConfigureAwait, Yield, Wait or constructors: a unit's code stays on the activation's turn.
+        ["System.Threading.Tasks.Task"] =
+        [
+            "get_CompletedTask", "FromResult", "FromException", "FromCanceled", "Delay", "WhenAll", "WhenAny", "GetAwaiter", "get_IsCompleted",
+            "get_IsCompletedSuccessfully", "get_IsFaulted", "get_IsCanceled", "get_Status", "get_Exception", "get_Result", "get_Id", "Dispose",
+            "ToString", "Equals", "GetHashCode",
+        ],
+        ["System.Threading.Tasks.ValueTask"] =
+        [
+            ".ctor", "get_CompletedTask", "FromResult", "FromException", "FromCanceled", "AsTask", "Preserve", "GetAwaiter", "get_IsCompleted",
+            "get_IsCompletedSuccessfully", "get_IsFaulted", "get_IsCanceled", "get_Result", "Equals", "GetHashCode", "op_Equality", "op_Inequality", "ToString",
+        ],
+        // No Register/UnsafeRegister: a registered callback runs on whichever thread cancels.
+        ["System.Threading.CancellationToken"] =
+        [
+            ".ctor", "get_None", "get_IsCancellationRequested", "get_CanBeCanceled", "ThrowIfCancellationRequested", "Equals", "GetHashCode",
+            "op_Equality", "op_Inequality",
+        ],
+        // No CancelAfter, no timed constructors and no Cancel(bool): each fires from a timer or runs callbacks off the turn.
+        ["System.Threading.CancellationTokenSource"] =
+            [".ctor()", "Cancel()", "get_Token", "get_IsCancellationRequested", "CreateLinkedTokenSource", "Dispose", "TryReset"],
+        ["System.Runtime.CompilerServices.TaskAwaiter"] = Awaiter,
+        ["System.Runtime.CompilerServices.ValueTaskAwaiter"] = Awaiter,
+        ["System.Runtime.CompilerServices.AsyncTaskMethodBuilder"] = Builder,
+        ["System.Runtime.CompilerServices.AsyncValueTaskMethodBuilder"] = Builder,
+        ["System.Runtime.CompilerServices.AsyncVoidMethodBuilder"] = Builder,
+        ["System.Runtime.CompilerServices.AsyncIteratorMethodBuilder"] = Builder,
+        ["System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder"] = Builder,
+        ["System.Threading.Tasks.Sources.ManualResetValueTaskSourceCore"] =
+        [
+            "get_Version", "GetResult", "GetStatus", "Reset", "SetResult", "SetException", "OnCompleted",
+            "get_RunContinuationsAsynchronously", "set_RunContinuationsAsynchronously",
+        ],
+        ["System.Threading.Tasks.Sources.IValueTaskSource"] = ["GetResult", "GetStatus", "OnCompleted"],
+    };
+
+    /// <summary>
+    /// Allowed members that pass only when every call site is in a compiler-generated state machine (a nested type the compiler names
+    /// &lt;Method&gt;d__N, unspeakable in C#): scheduling a continuation by hand is not a unit's business.
+    /// </summary>
+    public static readonly string[] StateMachineOnly =
+    [
+        "System.Runtime.CompilerServices.TaskAwaiter.OnCompleted",
+        "System.Runtime.CompilerServices.TaskAwaiter.UnsafeOnCompleted",
+        "System.Runtime.CompilerServices.ValueTaskAwaiter.OnCompleted",
+        "System.Runtime.CompilerServices.ValueTaskAwaiter.UnsafeOnCompleted",
+        "System.Runtime.CompilerServices.AsyncTaskMethodBuilder.AwaitOnCompleted",
+        "System.Runtime.CompilerServices.AsyncTaskMethodBuilder.AwaitUnsafeOnCompleted",
+        "System.Runtime.CompilerServices.AsyncValueTaskMethodBuilder.AwaitOnCompleted",
+        "System.Runtime.CompilerServices.AsyncValueTaskMethodBuilder.AwaitUnsafeOnCompleted",
+        "System.Runtime.CompilerServices.AsyncVoidMethodBuilder.AwaitOnCompleted",
+        "System.Runtime.CompilerServices.AsyncVoidMethodBuilder.AwaitUnsafeOnCompleted",
+        "System.Runtime.CompilerServices.AsyncIteratorMethodBuilder.AwaitOnCompleted",
+        "System.Runtime.CompilerServices.AsyncIteratorMethodBuilder.AwaitUnsafeOnCompleted",
+        "System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder.AwaitOnCompleted",
+        "System.Runtime.CompilerServices.PoolingAsyncValueTaskMethodBuilder.AwaitUnsafeOnCompleted",
+        "System.Threading.Tasks.Sources.ManualResetValueTaskSourceCore.OnCompleted",
+        "System.Threading.Tasks.Sources.IValueTaskSource.OnCompleted",
     ];
 
     /// <summary>Members exempt from <see cref="RefusedMembers"/>.</summary>
     public static readonly string[] ExemptMembers =
     [
-        // typeof(T) compiles to Type.GetTypeFromHandle.
-        "System.Type.GetTypeFromHandle",
         "System.Environment.get_NewLine",
         "System.Environment.get_TickCount64",
         "System.Environment.get_CurrentManagedThreadId",
@@ -266,11 +340,18 @@ internal static class AllowedApis
     /// <param name="ns">The outermost type's namespace.</param>
     /// <param name="type">The full type name.</param>
     /// <param name="member">The member's metadata name.</param>
-    public static bool IsAllowedMember(string ns, string type, string member)
+    /// <param name="parameters">The member's parameter types, comma-joined, matched by the overload entries of <see cref="MemberAllowList"/>.</param>
+    public static bool IsAllowedMember(string ns, string type, string member, string parameters = "")
     {
         if (!IsAllowedType(ns, type))
         {
             return false;
+        }
+
+        if (MemberAllowList.TryGetValue(type, out var members))
+        {
+            var overload = member + "(" + parameters + ")";
+            return members.Any(allowed => string.Equals(allowed, member, StringComparison.Ordinal) || string.Equals(allowed, overload, StringComparison.Ordinal));
         }
 
         var full = type + "." + member;

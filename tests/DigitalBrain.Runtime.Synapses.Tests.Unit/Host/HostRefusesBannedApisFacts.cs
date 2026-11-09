@@ -40,6 +40,26 @@ public sealed class HostRefusesBannedApisFacts
         { "System.Buffers.ArrayPool.get_Shared", "public static class Leak { public static int[] Rent() => System.Buffers.ArrayPool<int>.Shared.Rent(4); }" },
         { "System.Timers", "public static class Leak { public static object Tick() => new System.Timers.Timer(10); }" },
         { "System.Threading.Monitor", "public static class Leak { public static void Hold() => System.Threading.Monitor.Enter(\"x\"); }" },
+        // C1: RuntimeHelpers is allowed member by member; Box forges object references.
+        { "System.Runtime.CompilerServices.RuntimeHelpers.Box", "public static class Leak { public static object Forge(byte[] b) => System.Runtime.CompilerServices.RuntimeHelpers.Box(ref b[0], default); }" },
+        { "System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject", "public static class Leak { public static object Make() => System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(Leak)); }" },
+        // I3: System.Type is allowed member by member; Type-taking serializer overloads and typeof in attribute blobs are refused.
+        { "System.Type.get_TypeHandle", "public static class Leak { public static RuntimeTypeHandle Handle() => typeof(Leak).TypeHandle; }" },
+        { "System.Type.GetInterfaces", "public static class Leak { public static int Walk(object o) => o.GetType().GetInterfaces().Length; }" },
+        { "System.Type.MakeGenericType", "public static class Leak { public static Type Make() => typeof(List<>).MakeGenericType(typeof(int)); }" },
+        { "System.Text.Json.JsonSerializer.Deserialize(System.String,System.Type", "public static class Leak { public static object? Make(Type t) => System.Text.Json.JsonSerializer.Deserialize(\"{}\", t); }" },
+        { "System.Text.Json.JsonSerializer.Serialize(System.Object,System.Type", "public static class Leak { public static string Read(object o, Type t) => System.Text.Json.JsonSerializer.Serialize(o, t); }" },
+        { "typeof(System.Net.Http.HttpClient) in an attribute", "public sealed class TagAttribute(Type type) : Attribute { public Type Type { get; } = type; }\n[Tag(typeof(System.Net.Http.HttpClient))] public static class Leak { }" },
+        { "typeof(DigitalBrain.Runtime.Synapses.SynapseHost) in an attribute", "public sealed class TagAttribute : Attribute { public Type[] Types { get; set; } = []; }\n[Tag(Types = [typeof(int), typeof(DigitalBrain.Runtime.Synapses.SynapseHost)])] public static class Leak { }" },
+        // I4: nothing leaves the activation's turn.
+        { "System.Threading.Tasks.Task.ConfigureAwait", "public static class Leak { public static async Task Go() => await Task.Delay(1).ConfigureAwait(false); }" },
+        { "System.Threading.Tasks.ValueTask.ConfigureAwait", "public static class Leak { public static async Task Go() => await default(ValueTask).ConfigureAwait(false); }" },
+        { "System.Threading.Tasks.Task.Yield", "public static class Leak { public static async Task Go() => await Task.Yield(); }" },
+        { "System.Threading.CancellationToken.Register", "public static class Leak { public static object Go(CancellationToken ct) => ct.Register(() => { }); }" },
+        { "System.Threading.CancellationTokenSource.CancelAfter", "public static class Leak { public static void Go(CancellationTokenSource s) => s.CancelAfter(5); }" },
+        { "System.Threading.CancellationTokenSource.Cancel", "public static class Leak { public static void Go(CancellationTokenSource s) => s.Cancel(true); }" },
+        { "System.Threading.CancellationTokenSource..ctor", "public static class Leak { public static object Go() => new CancellationTokenSource(5); }" },
+        { "System.Runtime.CompilerServices.TaskAwaiter.OnCompleted called from Leak", "public static class Leak { public static void Go() => Task.Delay(1).GetAwaiter().OnCompleted(() => { }); }" },
         { "explicit layout Overlay", "[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Explicit)] public struct Overlay { [System.Runtime.InteropServices.FieldOffset(0)] public string Text; [System.Runtime.InteropServices.FieldOffset(0)] public int[] Numbers; }" },
     };
 
@@ -67,11 +87,21 @@ public sealed class HostRefusesBannedApisFacts
 
             public sealed record Note(string Text);
 
+            public sealed class TagAttribute : Attribute { public Type[] Types { get; set; } = []; }
+
+            [Tag(Types = [typeof(List<string>), typeof(Note), typeof(Signal), typeof(System.Threading.CancellationToken)])]
+            public static class Tagged { }
+
             public static class Allowed
             {
                 public static async Task<long> Measure(CancellationToken ct)
                 {
                     await Task.Delay(1, ct);
+                    using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    using var own = new CancellationTokenSource();
+                    own.Cancel();
+                    _ = typeof(Note).FullName + (typeof(Note) == typeof(Tagged) ? "" : "x");
+                    await new ValueTask(Task.CompletedTask);
                     using var buffer = new System.IO.MemoryStream(new byte[4]);
                     var note = new Note(nameof(Measure));
                     return buffer.Length + note.ToString().Length + (note == new Note("x") ? 1 : 0) + Environment.NewLine.Length;
@@ -210,7 +240,10 @@ public sealed class HostRefusesBannedApisFacts
         var outcome = await host.Deploy(Brain("ba"), source, None, Ct);
 
         Assert.Equal(DeployStatus.Refused, outcome.Status);
-        Assert.Contains(named, outcome.Reason, StringComparison.Ordinal);
+
+        // The reason names the first disallowed reference; the one this case is about is among every reference the boundary refuses.
+        var disallowed = AllowedReferences.Disallowed(host.Compiler.Compile(source).Assembly).ToList();
+        Assert.True(disallowed.Any(d => d.Contains(named, StringComparison.Ordinal)), $"{named} not in: {string.Join(" | ", disallowed)}");
         var diagnostic = Assert.Single(outcome.Diagnostics, d => d.Id == "DB0045");
         Assert.Equal(Key, diagnostic.File);
         Assert.Empty(await host.List(Brain("ba"), Ct));
