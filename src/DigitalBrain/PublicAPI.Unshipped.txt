@@ -3255,7 +3255,7 @@ DigitalBrain.ActivationRefusedException.ActivationRefusedException(string! messa
 DigitalBrain.ActivationRefusedException.ActivationRefusedException(string! reason) -> void
 DigitalBrain.ActivationRefusedException.Reason.get -> string!
 DigitalBrain.IViewReader
-DigitalBrain.IViewReader.Activate(string! alias, long generation, string! nodeKey, string? fieldValue) -> System.Threading.Tasks.Task!
+DigitalBrain.IViewReader.Activate(string! alias, long generation, string! nodeKey, string? fieldValue, string? by) -> System.Threading.Tasks.Task!
 DigitalBrain.IViewReader.Read(string! alias) -> System.Threading.Tasks.Task<DigitalBrain.PublishedView?>!
 DigitalBrain.PublishedView
 DigitalBrain.PublishedView.<Clone>$() -> DigitalBrain.PublishedView!
@@ -3268,7 +3268,7 @@ DigitalBrain.PublishedView.Generation.init -> void
 DigitalBrain.PublishedView.PublishedView(string! Alias, long Generation, System.Text.Json.JsonElement View) -> void
 DigitalBrain.PublishedView.View.get -> System.Text.Json.JsonElement
 DigitalBrain.PublishedView.View.init -> void
-DigitalBrain.StateNeuron<TState>.Activate(string! alias, long generation, string! nodeKey, string? fieldValue) -> System.Threading.Tasks.Task!
+DigitalBrain.StateNeuron<TState>.Activate(string! alias, long generation, string! nodeKey, string? fieldValue, string? by) -> System.Threading.Tasks.Task!
 DigitalBrain.StateNeuron<TState>.Read(string! alias) -> System.Threading.Tasks.Task<DigitalBrain.PublishedView?>!
 DigitalBrain.ViewChanged.Alias.get -> string!
 DigitalBrain.ViewChanged.Alias.init -> void

@@ -33,8 +33,13 @@ public interface IViewReader
     /// <param name="generation">The generation of the view the caller saw.</param>
     /// <param name="nodeKey">The key of the activated node.</param>
     /// <param name="fieldValue">The field value, if the node is a field.</param>
+    /// <param name="by">
+    /// Who activated the node (an opaque identity, e.g. a person id), set as the payload's reserved <c>"by"</c> member: stamped by the
+    /// host; a unit may trust it. Null leaves the payload without <c>"by"</c>. An author can never set it: a view whose emit args declare
+    /// <c>"by"</c> is refused at publish.
+    /// </param>
     /// <exception cref="ActivationRefusedException">The view is stale, the node is unknown or emits nothing, or its emit names another owner.</exception>
-    Task Activate(string alias, long generation, string nodeKey, string? fieldValue);
+    Task Activate(string alias, long generation, string nodeKey, string? fieldValue, string? by);
 }
 
 /// <summary>The stored view of a state alias.</summary>

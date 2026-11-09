@@ -335,8 +335,16 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
                 if (result is not null && result.GetType().FullName == ViewNodes.ViewType && AliasIn(_catalog.Current) is { } alias)
                 {
                     var type = result.GetType();
+                    var wire = JsonSerializer.SerializeToElement(result, type, RuntimeProtocol.OptionsFor(type));
+                    // "by" is stamped by the host on activation: a view whose emit declares it is refused, not published.
+                    if (ViewNodes.DeclaresBy(wire))
+                    {
+                        StateNeuronLog.ViewDeclaresBy(Logger(), view.Name);
+                        return "refused";
+                    }
+
                     var previous = _view;
-                    _view = new PublishedView(alias, (previous?.Generation ?? 0) + 1, JsonSerializer.SerializeToElement(result, type, RuntimeProtocol.OptionsFor(type)));
+                    _view = new PublishedView(alias, (previous?.Generation ?? 0) + 1, wire);
                     _savingView = true;
                     try { await Save(State, [new ViewChanged(alias, _view.Generation)]).ConfigureAwait(true); }
                     catch
@@ -367,7 +375,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
             : JsonSerializer.SerializeToElement<object?>(null));
 
     /// <inheritdoc />
-    public async Task Activate(string alias, long generation, string nodeKey, string? fieldValue)
+    public async Task Activate(string alias, long generation, string nodeKey, string? fieldValue, string? by)
     {
         ArgumentNullException.ThrowIfNull(alias);
         ArgumentNullException.ThrowIfNull(nodeKey);
@@ -381,7 +389,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
         if (!string.Equals(emit.Owner, alias, StringComparison.Ordinal)) { throw new ActivationRefusedException(ActivationRefusedException.ForeignOwner); }
 
         // Journaled from the state neuron with the caller's cause; a state neuron never hears its own signals, so it reacts here.
-        var signal = new EmittedSignal(emit.Signal, ViewNodes.Payload(emit.Args, fieldValue));
+        var signal = new EmittedSignal(emit.Signal, ViewNodes.Payload(emit.Args, fieldValue, by));
         // The neuron is the only writer of its own journal and this is its turn: its last sequence after the publish is the emit's.
         // (A runtime may leave a signal of no loaded type out of a read's page, but never out of the page's Last.)
         // The trace is taken before the publish, in this flow, so the publish's stamp and the envelope agree on a freshly minted one.
@@ -491,4 +499,8 @@ internal static partial class StateNeuronLog
     [Microsoft.Extensions.Logging.LoggerMessage(EventId = 4140, EventName = "ViewNotStored", Level = Microsoft.Extensions.Logging.LogLevel.Warning,
         Message = "View synapse {Synapse} returned {Type}, not a DigitalBrain.UI.View; its result is not stored or announced.")]
     public static partial void ViewNotStored(Microsoft.Extensions.Logging.ILogger logger, string synapse, string type);
+
+    [Microsoft.Extensions.Logging.LoggerMessage(EventId = 4141, EventName = "ViewDeclaresBy", Level = Microsoft.Extensions.Logging.LogLevel.Warning,
+        Message = "View synapse {Synapse} declares the host-reserved \"by\" in an emit's args; the view is refused and not published.")]
+    public static partial void ViewDeclaresBy(Microsoft.Extensions.Logging.ILogger logger, string synapse);
 }

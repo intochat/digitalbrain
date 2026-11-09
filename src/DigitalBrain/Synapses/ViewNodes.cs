@@ -50,12 +50,43 @@ internal static class ViewNodes
         return (owner.GetString()!, signal.GetString()!, args);
     }
 
-    // The emit's args (a JSON object, or none) with the field value added as "value".
-    public static JsonElement Payload(JsonElement? args, string? fieldValue)
+    // The member of a payload the host reserves for who activated the node; an author can never set it.
+    public const string By = "by";
+
+    // The emit's args (a JSON object, or none) with the field value added as "value" and the host-asserted activator as "by";
+    // without one, an author-declared "by" is removed.
+    public static JsonElement Payload(JsonElement? args, string? fieldValue, string? by)
     {
-        if (fieldValue is null && args is { } only) { return only.Clone(); }
+        if (fieldValue is null && by is null && args is { } only && !(only.ValueKind == JsonValueKind.Object && only.TryGetProperty(By, out _))) { return only.Clone(); }
         var payload = args is { ValueKind: JsonValueKind.Object } given ? JsonObject.Create(given) ?? [] : [];
         if (fieldValue is not null) { payload["value"] = fieldValue; }
+        payload.Remove(By);
+        if (by is not null) { payload[By] = by; }
         return JsonSerializer.SerializeToElement(payload);
+    }
+
+    // Whether any emit (or field onSubmit) in the view declares the host-reserved "by" in its args.
+    public static bool DeclaresBy(JsonElement root)
+    {
+        var pending = new Stack<JsonElement>([root]);
+        while (pending.Count > 0)
+        {
+            var element = pending.Pop();
+            if (element.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var property in element.EnumerateObject())
+                {
+                    if (property.Name is "emit" or "onSubmit" && property.Value.ValueKind == JsonValueKind.Object
+                        && property.Value.TryGetProperty("args", out var args) && args.ValueKind == JsonValueKind.Object && args.TryGetProperty(By, out _)) { return true; }
+                    pending.Push(property.Value);
+                }
+            }
+            else if (element.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in element.EnumerateArray()) { pending.Push(item); }
+            }
+        }
+
+        return false;
     }
 }
