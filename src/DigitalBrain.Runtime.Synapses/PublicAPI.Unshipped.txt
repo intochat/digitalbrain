@@ -51,3 +51,5 @@ DigitalBrain.Runtime.Synapses.SynapseHost.Adopt(DigitalBrain.BrainId brain, Digi
 DigitalBrain.Runtime.Synapses.SynapseRestorer
 DigitalBrain.Runtime.Synapses.SynapseRestorer.TryRestore(DigitalBrain.BrainId brain, string! alias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<bool>!
 DigitalBrain.Runtime.Synapses.SynapseRestorer.SynapseRestorer(DigitalBrain.Runtime.Synapses.SynapseLoader! loader, DigitalBrain.Spi.ISynapseRegistrar! registrar, DigitalBrain.ISourceStore! store, DigitalBrain.ISynapseCatalogSource! catalog, DigitalBrain.Runtime.Synapses.SynapseHost? host = null) -> void
+const DigitalBrain.Runtime.Synapses.SynapseCompiler.MaxSidecarChars = 262144 -> int
+static DigitalBrain.Runtime.Synapses.SynapseCompiler.Verify(DigitalBrain.Runtime.Synapses.SynapseBuild! build) -> string?

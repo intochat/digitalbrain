@@ -207,6 +207,38 @@ public sealed class HostRefusesBannedApisFacts
     }
 
     [Fact]
+    public async Task NonCodeFilesRideInTheSourceAndItsHashButDoNotCompile()
+    {
+        var store = new Store();
+        await using var host = Host(new Installs(), store);
+        var files = new Dictionary<string, string>
+        {
+            ["Budget.cs"] = SynapseCompilerFacts.Budget,
+            ["spec.md"] = "# Weekly cap\nnot C# at all {",
+            ["scenarios.json"] = "[{\"publish\": \"payments.charging\"}]",
+        };
+
+        var outcome = await host.Deploy(Brain("nc"), new SynapseSource(Key, files, null), None, Ct);
+
+        Assert.True(outcome.Status == DeployStatus.Deployed, outcome.Reason);
+        var record = Assert.Single(await store.List(Brain("nc"), Ct));
+        Assert.Equal(["Budget.cs", "scenarios.json", "spec.md"], record.Files.Keys.Order(StringComparer.Ordinal));
+        var changed = new Dictionary<string, string>(files) { ["spec.md"] = "# Weekly cap, revised" };
+        Assert.NotEqual(outcome.Hash, host.Compiler.Compile(new SynapseSource(Key, changed, null)).Hash);
+    }
+
+    [Fact]
+    public void AnOversizedNonCodeFileFailsTheBuild()
+    {
+        var files = new Dictionary<string, string> { ["Budget.cs"] = SynapseCompilerFacts.Budget, ["spec.md"] = new string('x', SynapseCompiler.MaxSidecarChars + 1) };
+
+        var build = new SynapseCompiler(ReferenceSet.FromDefaultContext()).Compile(new SynapseSource(Key, files, null));
+
+        Assert.False(build.Success);
+        Assert.Contains(build.Diagnostics, d => d.Id == "DB0047" && d.File == "spec.md");
+    }
+
+    [Fact]
     public Task AnUnlistedNamespaceIsRefused() =>
         Refuses("System.Xml.Linq.", "public static class Leak { public static string Shape() => new System.Xml.Linq.XElement(\"a\").ToString(); }");
 
@@ -254,7 +286,7 @@ public sealed class HostRefusesBannedApisFacts
     private static SynapseSource Source(string text) => new(Key, new Dictionary<string, string> { ["Budget.cs"] = text }, null);
 
     // The analyzer is left out, so only the host's own check stands in front of the load.
-    private static SynapseHost Host(Installs installs)
+    private static SynapseHost Host(Installs installs, Store? store = null)
     {
         var catalog = new SynapseCatalogSource(SynapseCatalog.Scan());
         return new(
@@ -263,7 +295,7 @@ public sealed class HostRefusesBannedApisFacts
             new Registrar(catalog),
             catalog,
             _ => installs,
-            new Store(),
+            store ?? new Store(),
             new Listeners());
     }
 

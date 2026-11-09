@@ -77,7 +77,21 @@ public sealed class SynapseCompiler
             }
         }
 
+        // Only .cs files compile; the rest (spec.md, scenarios.json) ride along in the source and its hash, size-capped.
+        var oversized = files.Where(file => !IsCode(file.Key) && file.Value.Length > MaxSidecarChars).ToList();
+        if (oversized.Count > 0)
+        {
+            return new SynapseBuild(
+                false,
+                [.. oversized.Select(file => new SynapseDiagnostic(file.Key, "DB0047", 0, $"'{file.Key}' is larger than {MaxSidecarChars} characters; a non-code file in a synapse source is capped"))],
+                [],
+                [],
+                hash,
+                assemblyName);
+        }
+
         var trees = files
+            .Where(file => IsCode(file.Key))
             .Select(file => CSharpSyntaxTree.ParseText(file.Value, ParseOptions, file.Key, Encoding.UTF8))
             .Append(CSharpSyntaxTree.ParseText(GlobalUsings, ParseOptions, GlobalUsingsPath, Encoding.UTF8));
         var compilation = CSharpCompilation.Create(
@@ -119,6 +133,25 @@ public sealed class SynapseCompiler
         }
 
         return build;
+    }
+
+    /// <summary>The largest non-code file (in characters) a synapse source may carry beside its .cs files.</summary>
+    public const int MaxSidecarChars = 256 * 1024;
+
+    private static bool IsCode(string path) => path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Checks a build against the host boundary without loading it: every type and member it references must be on the allow-list.
+    /// The synapse host runs the same check on every deploy and restore.
+    /// </summary>
+    /// <param name="build">A successful build.</param>
+    /// <returns>Why the build is refused, or null when it is inside the boundary.</returns>
+    public static string? Verify(SynapseBuild build)
+    {
+        ArgumentNullException.ThrowIfNull(build);
+        return AllowedReferences.FirstDisallowed(build.Assembly) is { } disallowed
+            ? $"'{disallowed}' is outside the surface a synapse assembly may reference"
+            : null;
     }
 
     private string Hash(string sourceKey, List<KeyValuePair<string, string>> files)
