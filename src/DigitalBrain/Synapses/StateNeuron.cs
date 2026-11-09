@@ -17,6 +17,15 @@ public static class StateNeuron
     /// the next gate call, so a publisher that died between its gate and its append does not hold the gate forever.
     /// </summary>
     public static readonly TimeSpan ProvisionalLease = TimeSpan.FromSeconds(30);
+
+    /// <summary>The maximum wall-clock duration a pure synapse (gate, reaction, or view with no bound capability slots) may run on one turn.</summary>
+    public static readonly TimeSpan ReactionTimeout = TimeSpan.FromSeconds(5);
+
+    /// <summary>The maximum wall-clock duration a synapse with bound capability slots may run on one turn.</summary>
+    public static readonly TimeSpan SlotReactionTimeout = TimeSpan.FromSeconds(30);
+
+    /// <summary>The maximum serialized UTF-8 byte size (<c>2 MiB</c>) of a state record saved by a state neuron.</summary>
+    public const int MaxStateBytes = 2 * 1024 * 1024;
 }
 
 /// <summary>The neuron that runs the gate, reaction and view synapses of one <c>[State]</c> record.</summary>
@@ -417,6 +426,13 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
 
     internal override async Task StoreState(TState next, IReadOnlyList<Signal> signals)
     {
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(next, RuntimeProtocol.OptionsFor(typeof(TState)));
+        if (bytes.Length > StateNeuron.MaxStateBytes)
+        {
+            throw new InvalidOperationException(
+                $"State '{typeof(TState).Name}' of neuron '{Id}' serialized to {bytes.Length} bytes, exceeding the {StateNeuron.MaxStateBytes}-byte cap.");
+        }
+
         await Context.State.Save(new StoredState<TState>(next, _view), signals).ConfigureAwait(true);
         _stored = true;
     }
@@ -453,12 +469,16 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
     // Slots are resolved sequentially in parameter order, once per call. An unbound slot refuses a gate by name; any other synapse fails.
     private async Task<object?> Invoke(SynapseDescriptor synapse, Signal? signal, SignalEnvelope? envelope, TState state, CancellationToken ct)
     {
+        var budget = synapse.Slots.Count > 0 ? StateNeuron.SlotReactionTimeout : StateNeuron.ReactionTimeout;
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(budget);
+        var linkedCt = timeoutCts.Token;
         var parameters = synapse.Function.GetParameters();
         var arguments = new object?[parameters.Length];
         for (var i = 0; i < parameters.Length; i++)
         {
             var type = parameters[i].ParameterType;
-            arguments[i] = type == typeof(CancellationToken) ? ct
+            arguments[i] = type == typeof(CancellationToken) ? linkedCt
                 : type == typeof(SignalEnvelope) ? envelope
                 : typeof(Signal).IsAssignableFrom(type) ? signal
                 : state;
@@ -466,7 +486,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
 
         foreach (var slot in synapse.Slots.OrderBy(slot => slot.ParameterIndex))
         {
-            try { arguments[slot.ParameterIndex] = await _slots.Resolve(Id, slot, ct).ConfigureAwait(true); }
+            try { arguments[slot.ParameterIndex] = await _slots.Resolve(Id, slot, linkedCt).ConfigureAwait(true); }
             catch (SlotUnboundException) when (synapse.Kind == SynapseKind.Gate)
             {
                 return Verdict.Reject($"slot '{slot.Name}' is not bound");
@@ -483,7 +503,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
 
         if (returned is Task task)
         {
-            await task.ConfigureAwait(true);
+            await task.WaitAsync(linkedCt).ConfigureAwait(true);
             return task.GetType().GetProperty("Result")!.GetValue(task);
         }
 

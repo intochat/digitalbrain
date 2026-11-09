@@ -1,4 +1,7 @@
 #nullable enable
+const DigitalBrain.StateNeuron.MaxStateBytes = 2097152 -> int
+static readonly DigitalBrain.StateNeuron.ReactionTimeout -> System.TimeSpan
+static readonly DigitalBrain.StateNeuron.SlotReactionTimeout -> System.TimeSpan
 
 ~DigitalBrain.Capabilities.CapabilityConnection<TCapability>.<Clone>$() -> DigitalBrain.Capabilities.CapabilityConnection<TCapability>!
 ~DigitalBrain.Capabilities.CapabilityConnection<TCapability>.Equals(DigitalBrain.Capabilities.CapabilityConnection<TCapability>? other) -> bool

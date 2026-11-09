@@ -83,6 +83,19 @@ public static class Fragile
         w.Spent == 0m ? throw new InvalidOperationException("zero base") : Check.Allow(w);
 }
 
+[State("blob")]
+public sealed record BlobState(string Data)
+{
+    public BlobState() : this("") { }
+}
+
+public static class BlobSynapses
+{
+    [Synapse(typeof(Charging), "blob")]
+    public static BlobState Inflate(Charging s, BlobState state) =>
+        new(new string('x', (int)s.Amount));
+}
+
 public sealed class StateNeuronFacts
 {
     private static readonly NeuronId Id = new(new BrainId("alice"), "week", "default");
@@ -480,6 +493,26 @@ public sealed class StateNeuronFacts
         await Assert.ThrowsAsync<ArgumentException>(() => n.Gate(new Charging(1m), Guid.Empty, TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<ArgumentException>(() => n.Aborted(new Charging(1m), Guid.Empty));
         await Assert.ThrowsAsync<ArgumentException>(() => n.Committed(new Charging(1m), new Check.Allowed(new WeekSpend(Spent: 1m))));
+    }
+
+    [Fact]
+    public async Task StateExceedingMaxStateBytesIsRefusedBeforeSaving()
+    {
+        var n = Attach(new StateNeuron<BlobState>(Source(typeof(BlobState), typeof(BlobSynapses)), new UnboundSlotResolver()));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => n.Receive(new Charging(StateNeuron.MaxStateBytes + 128), TestContext.Current.CancellationToken));
+
+        Assert.Contains("exceeding the 2097152-byte cap", ex.Message, StringComparison.Ordinal);
+        Assert.Empty(Context.Writes);
+    }
+
+    [Fact]
+    public void StateNeuronExposesResourceGovernanceLimits()
+    {
+        Assert.Equal(TimeSpan.FromSeconds(5), StateNeuron.ReactionTimeout);
+        Assert.Equal(TimeSpan.FromSeconds(30), StateNeuron.SlotReactionTimeout);
+        Assert.Equal(2 * 1024 * 1024, StateNeuron.MaxStateBytes);
     }
 
     private sealed class SteppedClock : TimeProvider
