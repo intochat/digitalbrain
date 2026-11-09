@@ -173,7 +173,9 @@ internal static class AllowedReferences
                 {
                     var isOwn = (assembly is null || string.Equals(assembly, assemblyName, StringComparison.Ordinal)) && own.Contains(name);
                     var dot = outer.LastIndexOf('.');
-                    if (!isOwn && !AllowedApis.IsAllowedType(dot < 0 ? "" : outer[..dot], name))
+                    // The same surface as a type reference: allowed, or a [Capability] interface (a slot contract) of a loaded assembly.
+                    if (!isOwn && !AllowedApis.IsAllowedType(dot < 0 ? "" : outer[..dot], name)
+                        && (assembly is null || !IsCapabilityNamed(AppDomain.CurrentDomain.GetAssemblies(), assembly, name)))
                     {
                         refused.Add($"typeof({name}) in an attribute");
                     }
@@ -342,6 +344,12 @@ internal static class AllowedReferences
         var assemblyName = metadata.GetString(metadata.GetAssemblyReference((AssemblyReferenceHandle)reference.ResolutionScope).Name);
         var ns = metadata.GetString(reference.Namespace);
         var fullName = ns.Length == 0 ? metadata.GetString(reference.Name) : ns + "." + metadata.GetString(reference.Name);
+        return IsCapabilityNamed(loaded, assemblyName, fullName);
+    }
+
+    // The type the assembly and full name name is an interface marked [Capability] in a loaded assembly.
+    private static bool IsCapabilityNamed(Assembly[] loaded, string assemblyName, string fullName)
+    {
         var type = loaded
             .Where(a => string.Equals(a.GetName().Name, assemblyName, StringComparison.Ordinal))
             .Select(a => a.GetType(fullName, throwOnError: false))

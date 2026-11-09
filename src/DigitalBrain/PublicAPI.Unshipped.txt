@@ -3295,3 +3295,5 @@ static DigitalBrain.Capabilities.Capability.Tools.V1.get -> DigitalBrain.Capabil
 DigitalBrain.IStateReader
 DigitalBrain.IStateReader.Read(string! alias) -> System.Threading.Tasks.Task<System.Text.Json.JsonElement>!
 DigitalBrain.Spi.ISignalHistory.Watch(long since, System.Threading.CancellationToken ct) -> System.Collections.Generic.IAsyncEnumerable<DigitalBrain.JournaledSignal!>!
+DigitalBrain.IInstallsCallbacks
+DigitalBrain.IInstallsCallbacks.Restored(string! proof) -> System.Threading.Tasks.Task!

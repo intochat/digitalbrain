@@ -218,6 +218,9 @@ public sealed class SourceRestoreFacts
         await os.Confirmations.Approve(outcome.Installs["hs.week"].Reason!);
         await os.Idle();
 
+        // The restore runs detached from the installs turn; its callback judges the answer in a later turn.
+        for (var i = 0; i < 300 && !os.Journal(Brain("sr12")).Signals(NeuronId.Parse("sr12/synapse.installs/default")).Any(s => s.Signal is Installed); i++) { await Task.Delay(100, Ct); }
+
         var journal = os.Journal(Brain("sr12")).Signals(NeuronId.Parse("sr12/synapse.installs/default"));
         Assert.DoesNotContain(journal, s => s.Signal is InstallDenied);
         Assert.Contains(journal, s => s.Signal is Installed { Alias: "hs.week" });

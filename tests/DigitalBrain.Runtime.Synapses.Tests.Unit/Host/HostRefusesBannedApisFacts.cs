@@ -89,8 +89,25 @@ public sealed class HostRefusesBannedApisFacts
 
             public sealed class TagAttribute : Attribute { public Type[] Types { get; set; } = []; }
 
-            [Tag(Types = [typeof(List<string>), typeof(Note), typeof(Signal), typeof(System.Threading.CancellationToken)])]
+            [Tag(Types = [typeof(List<string>), typeof(Note), typeof(Signal), typeof(System.Threading.CancellationToken), typeof(DigitalBrain.Runtime.Synapses.Tests.Unit.Host.IStageRead)])]
             public static class Tagged { }
+
+            public static class Streams
+            {
+                public static async IAsyncEnumerable<int> Numbers()
+                {
+                    await Task.Delay(1);
+                    yield return 1;
+                    yield return 2;
+                }
+
+                public static async Task<int> Sum()
+                {
+                    var total = 0;
+                    await foreach (var n in Numbers()) { total += n; }
+                    return total;
+                }
+            }
 
             public static class Allowed
             {

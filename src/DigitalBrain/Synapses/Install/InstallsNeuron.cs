@@ -18,8 +18,11 @@ namespace DigitalBrain;
 /// </param>
 /// <param name="hooks">The host's install hooks.</param>
 [Neuron("synapse.installs")]
-public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks hooks) : Neuron<InstallsState>, IInstalls
+public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks hooks) : Neuron<InstallsState>, IInstalls, IInstallsCallbacks
 {
+    // Approvals waiting for their alias's source to be restored, by the one-use proof handed to the detached restore.
+    private readonly Dictionary<string, ConfirmationResolved> _restoring = new(StringComparer.Ordinal);
+
     /// <inheritdoc />
     public async Task<InstallOutcome> Install(InstallRequest request, CancellationToken ct)
     {
@@ -101,9 +104,31 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
     /// <param name="resolved">The resolution.</param>
     /// <param name="ct">Cancellation.</param>
     [On]
-    public async Task OnResolved(ConfirmationResolved resolved, CancellationToken ct)
+    public Task OnResolved(ConfirmationResolved resolved, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(resolved);
+        return Judge(resolved, restore: true, ct);
+    }
+
+    /// <inheritdoc />
+    async Task IInstallsCallbacks.Restored(string proof)
+    {
+        ConfirmationResolved? resolved;
+        lock (_restoring)
+        {
+            resolved = _restoring.Remove(proof ?? "", out var found) ? found : null;
+        }
+
+        if (resolved is null)
+        {
+            throw new InvalidOperationException("Restored was called without a live proof.");
+        }
+
+        await Judge(resolved, restore: false, CancellationToken.None).ConfigureAwait(true);
+    }
+
+    private async Task Judge(ConfirmationResolved resolved, bool restore, CancellationToken ct)
+    {
         ArgumentNullException.ThrowIfNull(catalog);
         if (State.Pending.FirstOrDefault(p => p.PlanId == resolved.PlanId) is not { } pending) { return; }
         var rest = State.Pending.Where(p => p.PlanId != pending.PlanId).ToList();
@@ -115,12 +140,16 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
             return;
         }
 
-        // After a restart the alias's source may not be live yet: it is restored from the brain's record before the answer is judged,
-        // so approving an ask raised before the restart never denies it as unknown.
-        if (!catalog.ForNeeds(alias).States.ContainsKey(alias))
+        // After a restart the alias's source may not be live yet. The restore takes the synapse host's gate, and a deploy holding that gate
+        // may be waiting on this neuron, so the turn never awaits it: the ask stays pending, a detached restore runs, and its one-way
+        // callback judges the recorded answer again in a turn of its own. Approving an ask raised before a restart is never denied as unknown.
+        if (restore && !catalog.ForNeeds(alias).States.ContainsKey(alias))
         {
             var restorer = Context.Services.GetService(typeof(ISynapseRestorer)) as ISynapseRestorer ?? NoSynapseRestorer.Instance;
-            await InstallRestore.EnsureInstalledAliases(catalog, [alias], restorer, Id.Brain, ct).ConfigureAwait(true);
+            var proof = Guid.NewGuid().ToString("N");
+            lock (_restoring) { _restoring[proof] = resolved; }
+            _ = RestoreThenJudge(restorer, alias, proof);
+            return;
         }
 
         // The catalog may have changed since the ask (a new build without the app): the ask is dropped, not left pending.
@@ -194,6 +223,21 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
     {
         try { _ = await Context.Confirm(plan, CancellationToken.None).ConfigureAwait(true); }
         catch (Exception error) when (error is not OutOfMemoryException) { _ = error; }
+    }
+
+    // Detached from the turn: restores the alias, then posts the recorded answer back through the neuron's own mailbox.
+    private async Task RestoreThenJudge(ISynapseRestorer restorer, string alias, string proof)
+    {
+        try { await InstallRestore.EnsureInstalledAliases(catalog, [alias], restorer, Id.Brain, CancellationToken.None).ConfigureAwait(true); }
+        catch (Exception error) when (error is not OutOfMemoryException) { _ = error; } // judged as it is: an alias still missing is denied as unknown
+
+        try { await Context.Get<IInstallsCallbacks>(Id).Restored(proof).ConfigureAwait(true); }
+        catch (Exception error) when (error is not OutOfMemoryException)
+        {
+            // The ask stays pending; a later answer to a new ask of the alias completes it.
+            _ = error;
+            lock (_restoring) { _restoring.Remove(proof); }
+        }
     }
 
     private static bool SameBindings(IReadOnlyDictionary<string, string> left, IReadOnlyDictionary<string, string> right)

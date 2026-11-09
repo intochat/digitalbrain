@@ -57,7 +57,7 @@ internal static class AllowedApis
     [
         "DigitalBrain.ISynapseHost", "DigitalBrain.ISourceStore", "DigitalBrain.ISources", "DigitalBrain.SourcesNeuron", "DigitalBrain.SourcesState",
         "DigitalBrain.SourceRecord", "DigitalBrain.LoadedSource", "DigitalBrain.NoSynapseRestorer",
-        "DigitalBrain.IInstalls", "DigitalBrain.InstallsNeuron", "DigitalBrain.InstallsState", "DigitalBrain.InstalledGateIndex", "DigitalBrain.InstallRestore",
+        "DigitalBrain.IInstalls", "DigitalBrain.IInstallsCallbacks", "DigitalBrain.InstallsNeuron", "DigitalBrain.InstallsState", "DigitalBrain.InstalledGateIndex", "DigitalBrain.InstallRestore",
         "DigitalBrain.ISynapseCatalogSource", "DigitalBrain.SynapseCatalogSource", "DigitalBrain.SynapseCatalog", "DigitalBrain.UnboundSlotResolver",
         "DigitalBrain.IViewReader", "DigitalBrain.IStateReader", "DigitalBrain.StateNeuron", "DigitalBrain.BddNeuron", "DigitalBrain.IBdd",
         "DigitalBrain.INeuronResolver", "DigitalBrain.IBrainSignalLog", "DigitalBrain.IPolicies", "DigitalBrain.PoliciesNeuron",
@@ -178,6 +178,8 @@ internal static class AllowedApis
         "System.Runtime.CompilerServices.InlineArray2",
         "System.Runtime.CompilerServices.InlineArray3",
         "System.Runtime.CompilerServices.DecimalConstantAttribute",
+        // await foreach and await in a finally rethrow through it (compiler-emitted; Capture and Throw only, below).
+        "System.Runtime.ExceptionServices.ExceptionDispatchInfo",
         // Inline arrays and span collection expressions compile to Unsafe.As/Add and MemoryMarshal.CreateSpan inside
         // <PrivateImplementationDetails>; every other member is refused below, and those four only pass from there (CompilerOnly).
         "System.Runtime.CompilerServices.Unsafe",
@@ -272,6 +274,7 @@ internal static class AllowedApis
             "get_RunContinuationsAsynchronously", "set_RunContinuationsAsynchronously",
         ],
         ["System.Threading.Tasks.Sources.IValueTaskSource"] = ["GetResult", "GetStatus", "OnCompleted"],
+        ["System.Runtime.ExceptionServices.ExceptionDispatchInfo"] = ["Capture", "Throw"],
     };
 
     /// <summary>
