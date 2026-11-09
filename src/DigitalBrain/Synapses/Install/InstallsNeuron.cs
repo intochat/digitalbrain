@@ -115,6 +115,14 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
             return;
         }
 
+        // After a restart the alias's source may not be live yet: it is restored from the brain's record before the answer is judged,
+        // so approving an ask raised before the restart never denies it as unknown.
+        if (!catalog.ForNeeds(alias).States.ContainsKey(alias))
+        {
+            var restorer = Context.Services.GetService(typeof(ISynapseRestorer)) as ISynapseRestorer ?? NoSynapseRestorer.Instance;
+            await InstallRestore.EnsureInstalledAliases(catalog, [alias], restorer, Id.Brain, ct).ConfigureAwait(true);
+        }
+
         // The catalog may have changed since the ask (a new build without the app): the ask is dropped, not left pending.
         var source = catalog.ForNeeds(alias);
         if (!source.States.ContainsKey(alias))

@@ -78,7 +78,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         Clock = new TestClock(options.Start);
         Capabilities = new CapabilityFakes();
         Source = new SynapseCatalogSource(SynapseCatalog.Scan());
-        Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance, new TestInstallHooks(this), new TestSlotResolver(this), Source, () => [.. _actions.Values]);
+        Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance, new TestInstallHooks(this), new TestSlotResolver(this), Source, () => [.. _actions.Values], () => Restorer);
         Delivery = new SynapseRegistry(this);
         Confirmations = new TestConfirmations(Clock);
         Listeners = new TestClusterListeners(this);

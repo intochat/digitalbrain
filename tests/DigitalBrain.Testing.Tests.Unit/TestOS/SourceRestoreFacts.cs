@@ -206,6 +206,25 @@ public sealed class SourceRestoreFacts
     }
 
     [Fact]
+    public async Task ApprovingAnAskRaisedBeforeARestartRestoresTheAliasAndInstallsIt()
+    {
+        await using var os = Start();
+        var outcome = await os.Synapses.Deploy(Brain("sr12"), HsSource.Of(HsSource.Budget), None, Ct);
+        Assert.Equal(InstallStatus.Pending, outcome.Installs["hs.week"].Status);
+        await os.Idle();
+
+        await os.Restart();
+        Assert.DoesNotContain("hs.week", os.Catalog.States.Keys);
+        await os.Confirmations.Approve(outcome.Installs["hs.week"].Reason!);
+        await os.Idle();
+
+        var journal = os.Journal(Brain("sr12")).Signals(NeuronId.Parse("sr12/synapse.installs/default"));
+        Assert.DoesNotContain(journal, s => s.Signal is InstallDenied);
+        Assert.Contains(journal, s => s.Signal is Installed { Alias: "hs.week" });
+        Assert.Contains("hs.week", os.Catalog.States.Keys);
+    }
+
+    [Fact]
     public async Task ARestoreOfAnUnknownAliasIsFalse()
     {
         await using var os = Start();
