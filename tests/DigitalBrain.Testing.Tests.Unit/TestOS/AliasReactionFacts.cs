@@ -95,6 +95,20 @@ public sealed class AliasReactionFacts
     }
 
     [Fact]
+    public async Task SeededStoredStateIsLoadedOnActivation()
+    {
+        await using var os = OS.Local().Register(typeof(StateNeuronOnTestOSFacts).Assembly);
+        var poller = NeuronId.Parse("seed/poller/a");
+        os.SeedStoredState(poller, """{"polls":5}""");
+
+        await os.Get<IPoller>(poller).Poll(1);
+        await os.Idle();
+
+        var state = await ((IBrainObserver)os).State(poller, Ct);
+        Assert.Equal(6, state?.GetProperty("polls").GetInt32());
+    }
+
+    [Fact]
     public async Task AnEnvelopeThatCannotBeBuiltFinishesTheSynapseAsFailed()
     {
         await using var os = OS.Local().Register(typeof(StateNeuronOnTestOSFacts).Assembly);

@@ -321,6 +321,19 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         }
     }
 
+    /// <summary>
+    /// Seeds the raw stored state of <paramref name="id"/>, as a store written by an earlier version would hold it: the neuron loads it on
+    /// its next activation (seed before it activates, or after <see cref="Restart"/>). No signal is journaled.
+    /// </summary>
+    /// <param name="id">The neuron.</param>
+    /// <param name="json">The stored state as JSON, in the wire shape the runtime saves (camelCase).</param>
+    public void SeedStoredState(NeuronId id, string json)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+        using var document = JsonDocument.Parse(json);
+        Journal(id.Brain).Seed(id, document.RootElement);
+    }
+
     /// <summary>The journal of <paramref name="brain"/>.</summary>
     public TestJournal Journal(BrainId brain) => _journals.GetOrAdd(brain, key => new TestJournal(key, Clock));
 

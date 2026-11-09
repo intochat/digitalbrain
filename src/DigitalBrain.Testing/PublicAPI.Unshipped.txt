@@ -380,6 +380,7 @@ DigitalBrain.Testing.TestOS.Instances(string? type, System.Threading.Cancellatio
 DigitalBrain.Testing.TestOS.Instances<T>(System.Threading.CancellationToken cancellationToken) -> System.Collections.Generic.IAsyncEnumerable<DigitalBrain.BrainInstance!>!
 DigitalBrain.Testing.TestOS.IsActive(DigitalBrain.NeuronId id) -> bool
 DigitalBrain.Testing.TestOS.Journal(DigitalBrain.BrainId brain) -> DigitalBrain.Testing.TestJournal!
+DigitalBrain.Testing.TestOS.SeedStoredState(DigitalBrain.NeuronId id, string! json) -> void
 DigitalBrain.Testing.TestOS.Options.get -> DigitalBrain.Testing.TestOSOptions!
 DigitalBrain.Testing.TestOS.Register(System.Reflection.Assembly! assembly) -> DigitalBrain.Testing.TestOS!
 DigitalBrain.Testing.TestOS.Register<TNeuron>() -> DigitalBrain.Testing.TestOS!

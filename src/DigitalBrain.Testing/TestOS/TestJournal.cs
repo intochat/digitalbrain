@@ -124,6 +124,11 @@ public sealed class TestJournal : ISignalHistory
         lock (_gate) { return AppendLocked(publisher, signals); }
     }
 
+    internal void Seed(NeuronId id, JsonElement state)
+    {
+        lock (_gate) { _states[id] = state.Clone(); }
+    }
+
     internal void Clear(NeuronId id)
     {
         lock (_gate) { _states.Remove(id); }
