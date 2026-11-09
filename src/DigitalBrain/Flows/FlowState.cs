@@ -82,7 +82,10 @@ public sealed record FlowRelation(string TargetFlowId, RelationKind Kind, TimeSp
 /// <param name="Step">The waiting step.</param>
 /// <param name="Reason">What it waits for.</param>
 /// <param name="Expires">When the wait ends as expired; null for never.</param>
-/// <param name="ConfirmationPlanId">The confirmation plan of an <see cref="WaitReason.Approval"/> wait; the base sets it.</param>
+/// <param name="ConfirmationPlanId">
+/// The confirmation plan of an <see cref="WaitReason.Approval"/> wait, which the base sets; on an <see cref="WaitReason.External"/> wait a
+/// caller-supplied plan id is kept as given (the flow does not resolve it); null on any other wait.
+/// </param>
 public sealed record Waiting(string Step, WaitReason Reason, DateTimeOffset? Expires, string? ConfirmationPlanId);
 
 /// <summary>What a step body returns.</summary>

@@ -393,9 +393,11 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
             plan = PlanFor(step, result.Next);
             if (wait.Expires is { } planExpires) { plan = plan with { Expiry = Positive(planExpires - now) }; }
         }
-        var waiting = wait with { Step = step, ConfirmationPlanId = plan?.Id };
+        // An external wait keeps a caller-supplied plan id (a plan another neuron raised for this wait); an approval wait gets the base's.
+        var planId = plan?.Id ?? (wait.Reason == WaitReason.External ? wait.ConfirmationPlanId : null);
+        var waiting = wait with { Step = step, ConfirmationPlanId = planId };
         await Save(State with { Status = FlowStatus.Waiting, Waiting = waiting, Current = step, Inner = result.Next },
-            [new FlowWaiting(FlowId, step, wait.Reason, plan?.Id), .. result.Emits ?? []]).ConfigureAwait(true);
+            [new FlowWaiting(FlowId, step, wait.Reason, planId), .. result.Emits ?? []]).ConfigureAwait(true);
         // An approval wait keeps the nudge: a plan lost before the confirmations side registered it is raised again.
         if (plan is not null) { Raise(plan); return; }
         await StopNudge().ConfigureAwait(true);

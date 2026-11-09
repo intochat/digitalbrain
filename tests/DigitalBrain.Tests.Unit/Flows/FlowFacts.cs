@@ -18,6 +18,8 @@ public sealed class Box
     public bool FailB { get; init; }
 
     public int Runs { get; init; }
+
+    public string? PlanId { get; init; }
 }
 
 /// <summary>Two steps; "b" waits when <see cref="Box.AskFirst"/>, fails when <see cref="Box.FailB"/>.</summary>
@@ -68,12 +70,12 @@ public sealed class TwoStepFlow : Flow<Box>
             try { await Task.Delay(Timeout.Infinite, ct); }
             catch (OperationCanceledException) { SawCancellation = true; throw; }
         }
-        var next = new Box { AskFirst = inner.AskFirst, Reason = inner.Reason, ExpiresIn = inner.ExpiresIn, FailB = inner.FailB, Runs = inner.Runs + 1 };
+        var next = new Box { AskFirst = inner.AskFirst, Reason = inner.Reason, ExpiresIn = inner.ExpiresIn, FailB = inner.FailB, Runs = inner.Runs + 1, PlanId = inner.PlanId };
         if (step == "b" && inner.FailB) { throw new FlowFailed("b", "x"); }
         if (step == "b" && inner.AskFirst)
         {
             var expires = inner.ExpiresIn is { } span ? Context.Time.GetUtcNow() + span : (DateTimeOffset?)null;
-            return new StepResult<Box>(next, new Waiting("b", inner.Reason, expires, null));
+            return new StepResult<Box>(next, new Waiting("b", inner.Reason, expires, inner.PlanId));
         }
         return new StepResult<Box>(next);
     }
@@ -708,6 +710,18 @@ public sealed class FlowFacts
         Assert.Contains(new FlowStep(id, "a", StepOutcome.Failed, "interrupted 20 times"), Signals(context));
         Assert.Equal(new FlowDone(id, FlowOutcome.Failed, "interrupted 20 times"), Signals(context)[^1]);
         Assert.Equal(20, TwoStepFlow.Calls.Count);
+    }
+
+    [Fact]
+    public async Task AnExternalWaitKeepsTheCallerSuppliedPlanId()
+    {
+        var (flow, context) = await Activated();
+
+        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true, Reason = WaitReason.External, PlanId = "studio:plan-7" });
+
+        Assert.Equal("studio:plan-7", flow.Current.Waiting?.ConfirmationPlanId);
+        Assert.Contains(new FlowWaiting(FlowId.ToString(), "b", WaitReason.External, "studio:plan-7"), Signals(context));
+        Assert.Empty(_confirmations.Asked);
     }
 
     [Fact]
