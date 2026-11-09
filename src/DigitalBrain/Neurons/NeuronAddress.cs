@@ -21,6 +21,10 @@ public readonly record struct NeuronAddress(string NeuronType, string Key)
     public static string? ScopeOf(string key)
     {
         ArgumentNullException.ThrowIfNull(key);
+        if (Identity.CompoundGrainKey.TryParse(key, out var compound))
+        {
+            return compound.Brain.Value;
+        }
         var separator = key.IndexOf('/', StringComparison.Ordinal);
         return separator > 0 && IsBrainId(key[..separator]) ? key[..separator] : null;
     }

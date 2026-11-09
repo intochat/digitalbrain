@@ -6,6 +6,10 @@ public static class BrainKey
     public static string BrainOf(string key)
     {
         ArgumentNullException.ThrowIfNull(key);
+        if (Identity.CompoundGrainKey.TryParse(key, out var compound))
+        {
+            return compound.Brain.Value;
+        }
         var separator = key.IndexOf('/', StringComparison.Ordinal);
         return separator < 0 ? key : key[..separator];
     }

@@ -96,7 +96,7 @@ public static class BlobSynapses
         new(new string('x', (int)s.Amount));
 }
 
-[State("evolve.tracker")]
+// TrackerStateV1 simulates an earlier schema version payload; no [State] attribute to avoid duplicate state alias in assembly scan
 public sealed record TrackerStateV1(int Count)
 {
     public TrackerStateV1() : this(0) { }

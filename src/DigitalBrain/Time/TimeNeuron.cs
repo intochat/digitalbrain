@@ -5,8 +5,8 @@ namespace DigitalBrain.Time;
 /// share it, and publishes one durable <see cref="Tick"/> per firing.
 /// </summary>
 /// <remarks>
-/// Daily and weekly schedules use a fixed period of one day or seven days after the first firing, so they drift by the host reminder
-/// jitter and do not follow clock changes; this is accepted.
+/// Daily and weekly schedules re-anchor their dueTime to the next true UTC boundary on every tick,
+/// eliminating reminder drift and keeping ticks aligned with calendar time.
 /// </remarks>
 [Neuron("time")]
 public sealed class TimeNeuron : Neuron<TimeState>, ITime
@@ -54,7 +54,17 @@ public sealed class TimeNeuron : Neuron<TimeState>, ITime
     {
         if (State.Registrations.Any(r => r.Schedule == name))
         {
-            await Publish(new Tick(name, Context.Time.GetUtcNow())).ConfigureAwait(true);
+            var now = Context.Time.GetUtcNow();
+            await Publish(new Tick(name, now)).ConfigureAwait(true);
+            try
+            {
+                var schedule = Schedule.Parse(name);
+                var dueTime = schedule.NextAfter(now) - now;
+                await Context.Reminders.Start(schedule.Text, dueTime, schedule.Period).ConfigureAwait(true);
+            }
+            catch (FormatException)
+            {
+            }
         }
     }
 

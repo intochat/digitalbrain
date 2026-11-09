@@ -991,3 +991,16 @@ static DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationPolicyPreference.F
 static DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState.operator !=(DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState? left, DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState? right) -> bool
 static DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState.operator ==(DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState? left, DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState? right) -> bool
 static DigitalBrain.Runtime.Orleans.Enforcement.PlainNeuronCallFilter.Authorize(DigitalBrain.Runtime.Orleans.Enforcement.ICallFilter! filter, Microsoft.Extensions.Logging.ILogger! logger, DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.NeuronId id, DigitalBrain.Invocation.RuntimeInvocation! call) -> System.Threading.Tasks.Task!
+
+DigitalBrain.Runtime.Orleans.Hosting.DigitalBrainCallFilter
+DigitalBrain.Runtime.Orleans.Hosting.DigitalBrainCallFilter.DigitalBrainCallFilter() -> void
+DigitalBrain.Runtime.Orleans.Hosting.DigitalBrainCallFilter.Invoke(Orleans.IIncomingGrainCallContext! context) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Orleans.Hosting.DigitalBrainCallFilter.Invoke(Orleans.IOutgoingGrainCallContext! context) -> System.Threading.Tasks.Task!
+static DigitalBrain.Runtime.Orleans.RuntimeSiloBuilderExtensions.AddDigitalBrainCallFilter(this Orleans.Hosting.ISiloBuilder! silo) -> Orleans.Hosting.ISiloBuilder!
+
+DigitalBrain.Identity.CompoundGrainKeyOrleansExtensions
+static DigitalBrain.Identity.CompoundGrainKeyOrleansExtensions.Parse(Orleans.Runtime.IdSpan span) -> DigitalBrain.Identity.CompoundGrainKey
+static DigitalBrain.Identity.CompoundGrainKeyOrleansExtensions.ToCompoundGrainKey(this Orleans.Runtime.IdSpan span) -> DigitalBrain.Identity.CompoundGrainKey
+static DigitalBrain.Identity.CompoundGrainKeyOrleansExtensions.ToIdSpan(this DigitalBrain.Identity.CompoundGrainKey key) -> Orleans.Runtime.IdSpan
+static DigitalBrain.Identity.CompoundGrainKeyOrleansExtensions.ToIdSpan(this DigitalBrain.NeuronId neuronId) -> Orleans.Runtime.IdSpan
+static DigitalBrain.Identity.CompoundGrainKeyOrleansExtensions.TryParse(Orleans.Runtime.IdSpan span, out DigitalBrain.Identity.CompoundGrainKey key) -> bool

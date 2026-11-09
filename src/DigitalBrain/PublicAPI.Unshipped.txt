@@ -3300,3 +3300,23 @@ DigitalBrain.IStateReader.Read(string! alias) -> System.Threading.Tasks.Task<Sys
 DigitalBrain.Spi.ISignalHistory.Watch(long since, System.Threading.CancellationToken ct) -> System.Collections.Generic.IAsyncEnumerable<DigitalBrain.JournaledSignal!>!
 DigitalBrain.IInstallsCallbacks
 DigitalBrain.IInstallsCallbacks.Restored(string! proof) -> System.Threading.Tasks.Task!
+
+DigitalBrain.Identity.CompoundGrainKey
+DigitalBrain.Identity.CompoundGrainKey.CompoundGrainKey() -> void
+DigitalBrain.Identity.CompoundGrainKey.CompoundGrainKey(DigitalBrain.BrainId Brain, string! Type, string! Key) -> void
+DigitalBrain.Identity.CompoundGrainKey.Brain.get -> DigitalBrain.BrainId
+DigitalBrain.Identity.CompoundGrainKey.Type.get -> string!
+DigitalBrain.Identity.CompoundGrainKey.Key.get -> string!
+static DigitalBrain.Identity.CompoundGrainKey.Create(string! brainId, string! type, string! key) -> DigitalBrain.Identity.CompoundGrainKey
+static DigitalBrain.Identity.CompoundGrainKey.Parse(string! text) -> DigitalBrain.Identity.CompoundGrainKey
+static DigitalBrain.Identity.CompoundGrainKey.TryParse(string? text, out DigitalBrain.Identity.CompoundGrainKey key) -> bool
+DigitalBrain.Identity.CompoundGrainKey.ToNeuronId() -> DigitalBrain.NeuronId
+static DigitalBrain.Identity.CompoundGrainKey.FromNeuronId(DigitalBrain.NeuronId neuronId) -> DigitalBrain.Identity.CompoundGrainKey
+DigitalBrain.Identity.CompoundGrainKey.Deconstruct(out DigitalBrain.BrainId Brain, out string! Type, out string! Key) -> void
+DigitalBrain.Identity.CompoundGrainKey.Equals(DigitalBrain.Identity.CompoundGrainKey other) -> bool
+override DigitalBrain.Identity.CompoundGrainKey.ToString() -> string!
+override DigitalBrain.Identity.CompoundGrainKey.GetHashCode() -> int
+~override DigitalBrain.Identity.CompoundGrainKey.Equals(object obj) -> bool
+static DigitalBrain.Identity.CompoundGrainKey.operator ==(DigitalBrain.Identity.CompoundGrainKey left, DigitalBrain.Identity.CompoundGrainKey right) -> bool
+static DigitalBrain.Identity.CompoundGrainKey.operator !=(DigitalBrain.Identity.CompoundGrainKey left, DigitalBrain.Identity.CompoundGrainKey right) -> bool
+DigitalBrain.NeuronId.ToCompoundGrainKey() -> DigitalBrain.Identity.CompoundGrainKey

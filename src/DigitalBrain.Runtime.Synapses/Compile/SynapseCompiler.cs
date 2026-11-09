@@ -34,9 +34,7 @@ public sealed class SynapseCompiler
 
     private readonly ReferenceSet references;
     private readonly ImmutableArray<DiagnosticAnalyzer> analyzers;
-    private readonly Lock gate = new();
-    private readonly Dictionary<string, LinkedListNode<SynapseBuild>> cache = new(StringComparer.Ordinal);
-    private readonly LinkedList<SynapseBuild> recency = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, SynapseBuild> cache = new(StringComparer.Ordinal);
     private int emits;
 
     /// <summary>Creates a compiler over the given references.</summary>
@@ -67,14 +65,9 @@ public sealed class SynapseCompiler
         var hash = Hash(source.SourceKey, files);
         var assemblyName = $"synapse.{source.SourceKey}.{hash[..8]}";
 
-        lock (gate)
+        if (cache.TryGetValue(hash, out var hit))
         {
-            if (cache.TryGetValue(hash, out var hit))
-            {
-                recency.Remove(hit);
-                recency.AddFirst(hit);
-                return hit.Value;
-            }
+            return hit;
         }
 
         // Only .cs files compile; the rest (spec.md, scenarios.json) ride along in the source and its hash, size-capped.
@@ -128,22 +121,12 @@ public sealed class SynapseCompiler
 
         Interlocked.Increment(ref emits);
         var build = new SynapseBuild(true, Map(diagnostics), peStream.ToArray(), pdbStream.ToArray(), hash, assemblyName);
-        lock (gate)
+        if (cache.Count >= Capacity)
         {
-            if (cache.TryGetValue(hash, out var raced))
-            {
-                return raced.Value;
-            }
-
-            cache[hash] = recency.AddFirst(build);
-            if (cache.Count > Capacity)
-            {
-                cache.Remove(recency.Last!.Value.Hash);
-                recency.RemoveLast();
-            }
+            cache.Clear();
         }
 
-        return build;
+        return cache.GetOrAdd(hash, build);
     }
 
     /// <summary>The largest non-code file (in characters) a synapse source may carry beside its .cs files.</summary>

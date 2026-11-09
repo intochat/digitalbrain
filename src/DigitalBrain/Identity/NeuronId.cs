@@ -39,6 +39,9 @@ public readonly record struct NeuronId
         key = Key;
     }
 
+    /// <summary>Converts this neuron id to an Orleans compound grain key.</summary>
+    public Identity.CompoundGrainKey ToCompoundGrainKey() => Identity.CompoundGrainKey.FromNeuronId(this);
+
     /// <summary>Parses <c>brain/type/key</c>. System scopes do not parse.</summary>
     /// <exception cref="FormatException"><paramref name="text"/> does not have the shape.</exception>
     public static NeuronId Parse(string text)
@@ -48,17 +51,12 @@ public readonly record struct NeuronId
     public static bool TryParse([NotNullWhen(true)] string? text, out NeuronId id)
     {
         id = default;
-        if (string.IsNullOrEmpty(text)) { return false; }
-        var first = text.IndexOf('/', StringComparison.Ordinal);
-        if (first <= 0) { return false; }
-        var second = text.IndexOf('/', first + 1);
-        if (second < 0) { return false; }
-        var brain = text[..first];
-        var type = text[(first + 1)..second];
-        var key = text[(second + 1)..];
-        if (!BrainId.IsValid(brain) || !IsType(type) || key.Length == 0 || key.Any(char.IsControl)) { return false; }
-        id = new NeuronId(new BrainId(brain), type, key);
-        return true;
+        if (Identity.CompoundGrainKey.TryParse(text, out var compound) && !compound.Brain.IsSystem && IsType(compound.Type))
+        {
+            id = compound.ToNeuronId();
+            return true;
+        }
+        return false;
     }
 
     /// <inheritdoc />

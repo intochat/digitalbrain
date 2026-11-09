@@ -1,6 +1,7 @@
 using System.Text.Json;
 using DigitalBrain.Invocation;
 using Orleans;
+using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 
 namespace DigitalBrain.Runtime.Orleans.Hosting;
@@ -10,6 +11,7 @@ namespace DigitalBrain.Runtime.Orleans.Hosting;
 /// <c>neuron.host</c> (brain-affine), <c>neuron.host.reentrant</c> and <c>neuron.host.stateless</c>.
 /// </summary>
 [Alias("neuron.host")]
+[Version(1)]
 public interface INeuronHost : IGrainWithStringKey
 {
     /// <summary>Whether the bound call permits interleaving on the serving host's neuron class. Runs no neuron method.</summary>

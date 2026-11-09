@@ -46,11 +46,18 @@ public static class SiloNeurons
         ArgumentException.ThrowIfNullOrWhiteSpace(fullKey);
         var type = contract.GetCustomAttribute<DefaultNeuronTypeAttribute>(inherit: false)?.Type
             ?? throw new ArgumentException($"{contract.Name} is not a plain neuron contract.", nameof(contract));
-        var separator = fullKey.IndexOf('/', StringComparison.Ordinal);
-        if (separator <= 0 || !BrainId.IsValid(fullKey[..separator]))
-        { throw new ArgumentException($"'{fullKey}' names no brain: a plain neuron key is {{brain}}/{{key}}.", nameof(fullKey)); }
-        var brain = fullKey[..separator];
-        return new NeuronId(new BrainId(brain), type, fullKey[(brain.Length + 1)..]);
+        var brain = BrainAddressOf(fullKey);
+        return new Identity.CompoundGrainKey(new BrainId(brain), type, fullKey[(brain.Length + 1)..]).ToNeuronId();
+    }
+
+    private static string BrainAddressOf(string fullKey)
+    {
+        var brain = DigitalBrain.Brains.BrainKey.BrainOf(fullKey);
+        if (!BrainId.IsValid(brain) || fullKey.Length <= brain.Length + 1)
+        {
+            throw new ArgumentException($"'{fullKey}' names no brain: a plain neuron key is {{brain}}/{{key}}.", nameof(fullKey));
+        }
+        return brain;
     }
 
     /// <summary>

@@ -94,7 +94,18 @@ public static class RuntimeSiloBuilderExtensions
         silo.AddRuntimeServices();
         silo.Services.AddCapabilityBroker();
         silo.Services.TryAddSingleton<Operations.IConfirmationContexts, Confirmations.KernelConfirmations>();
+        silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IIncomingGrainCallFilter, DigitalBrainCallFilter>());
+        silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IOutgoingGrainCallFilter, DigitalBrainCallFilter>());
         silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IOutgoingGrainCallFilter, TraceOutgoingFilter>());
+        return silo;
+    }
+
+    /// <summary>Registers the DigitalBrainCallFilter incoming and outgoing filters.</summary>
+    public static ISiloBuilder AddDigitalBrainCallFilter(this ISiloBuilder silo)
+    {
+        ArgumentNullException.ThrowIfNull(silo);
+        silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IIncomingGrainCallFilter, DigitalBrainCallFilter>());
+        silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IOutgoingGrainCallFilter, DigitalBrainCallFilter>());
         return silo;
     }
 

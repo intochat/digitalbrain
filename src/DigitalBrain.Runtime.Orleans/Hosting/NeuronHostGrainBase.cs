@@ -59,9 +59,36 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
         _neuron = neuron;
         _synapses = synapses;
         synapses.Neuron = neuron;
+        RegisterExtensions(neuron, neuronClass);
         // Load persisted synapse subscription state and catch up any sources on activation (04 D-12).
         await synapses.Load().ConfigureAwait(true);
         await synapses.CatchUp().ConfigureAwait(true);
+    }
+
+    private void RegisterExtensions(Neuron neuron, Type neuronClass)
+    {
+        foreach (var iface in neuronClass.GetInterfaces())
+        {
+            if (typeof(IGrainExtension).IsAssignableFrom(iface) && iface != typeof(IGrainExtension))
+            {
+                RegisterExtension(iface, neuron);
+            }
+        }
+    }
+
+    private void RegisterExtension(Type extensionType, object extension)
+    {
+        var nonGeneric = typeof(IGrainContext).GetMethod(nameof(IGrainContext.SetComponent), [typeof(Type), typeof(object)]);
+        if (nonGeneric is not null)
+        {
+            nonGeneric.Invoke(GrainContext, [extensionType, extension]);
+        }
+        else
+        {
+            var generic = typeof(IGrainContext).GetMethods()
+                .First(m => m.Name == nameof(IGrainContext.SetComponent) && m.IsGenericMethodDefinition);
+            generic.MakeGenericMethod(extensionType).Invoke(GrainContext, [extension]);
+        }
     }
 
     // ActivatorUtilities caches constructors per type in a process-wide map, which would pin the load context of a generated

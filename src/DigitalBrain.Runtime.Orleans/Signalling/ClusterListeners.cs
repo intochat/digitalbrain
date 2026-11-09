@@ -20,7 +20,7 @@ namespace DigitalBrain.Runtime.Orleans.Signalling;
 internal sealed partial class ClusterListeners(IServiceProvider services) : IClusterListeners, IAsyncDisposable
 {
     private readonly ConcurrentDictionary<(string Listener, Type Signal), Handler> _handlers = new();
-    private readonly Channel<(NeuronId Publisher, Signal Signal, CapabilityCaller? Caller)> _queue = Channel.CreateUnbounded<(NeuronId, Signal, CapabilityCaller?)>(new UnboundedChannelOptions { SingleReader = true });
+    private readonly Channel<(NeuronId Publisher, Signal Signal, CapabilityCaller? Caller)> _queue = Channel.CreateBounded<(NeuronId, Signal, CapabilityCaller?)>(new BoundedChannelOptions(10_000) { FullMode = BoundedChannelFullMode.DropOldest, SingleReader = true, SingleWriter = false });
     private readonly CancellationTokenSource _stopping = new();
     private readonly ILogger _log = services.GetService<ILoggerFactory>()?.CreateLogger<ClusterListeners>() ?? NullLogger<ClusterListeners>.Instance;
     private Task? _pump;
