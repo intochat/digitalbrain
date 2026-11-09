@@ -809,14 +809,9 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
                 continue;
             }
 
+            // The pending rebind is dropped only once the approved bindings are stored: a failed Put keeps it, so the next resolution
+            // (or a retry) can still store them.
             var bindings = rebind.Bindings[alias];
-            _ = rebind.Waiting.Remove(alias);
-            _ = rebind.Bindings.Remove(alias);
-            if (rebind.Waiting.Count == 0)
-            {
-                entry.Rebind = null;
-            }
-
             if (signal is Installed && await store.Get(brain, key, CancellationToken.None).ConfigureAwait(false) is { } record)
             {
                 var merged = new Dictionary<string, IReadOnlyDictionary<string, string>>(record.Bindings ?? new Dictionary<string, IReadOnlyDictionary<string, string>>(), StringComparer.Ordinal)
@@ -824,6 +819,13 @@ public sealed partial class SynapseHost : ISynapseHost, IAsyncDisposable
                     [alias] = bindings,
                 };
                 await store.Put(brain, record with { Bindings = merged }, CancellationToken.None).ConfigureAwait(false);
+            }
+
+            _ = rebind.Waiting.Remove(alias);
+            _ = rebind.Bindings.Remove(alias);
+            if (rebind.Waiting.Count == 0)
+            {
+                entry.Rebind = null;
             }
 
             return;
