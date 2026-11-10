@@ -85,7 +85,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     /// Starts the flow. A flow that already started ignores it. Returns once the start is durable (saved <see cref="FlowStatus.Running"/>
     /// with <see cref="FlowStarted"/>); steps run in later turns of this neuron, through a self-call deferred past this turn. A crash
     /// before the first step, a lost self-call or an interrupted step is recovered by the <c>flow-nudge</c> reminder started in this turn
-/// (every minute while the flow runs without waiting) or by the next activation, whichever comes first.
+    /// (every minute while the flow runs without waiting) or by the next activation, whichever comes first.
     /// </summary>
     /// <param name="title">The display title.</param>
     /// <param name="owner">Who the flow runs for.</param>

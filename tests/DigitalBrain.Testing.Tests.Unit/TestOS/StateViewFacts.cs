@@ -19,8 +19,14 @@ public static class ViewBoardUnit
 
     [Synapse("x.refresh", "vw")]
     public static ViewBoard Refreshed(SignalEnvelope s, ViewBoard b)
-        => b with { Refreshes = b.Refreshes + 1, Value = s.Payload.TryGetProperty("value", out var v) ? v.GetString() : null, TraceId = s.TraceId, CausationId = s.CausationId,
-            By = s.Payload.TryGetProperty("by", out var by) ? by.GetString() : null };
+        => b with
+        {
+            Refreshes = b.Refreshes + 1,
+            Value = s.Payload.TryGetProperty("value", out var v) ? v.GetString() : null,
+            TraceId = s.TraceId,
+            CausationId = s.CausationId,
+            By = s.Payload.TryGetProperty("by", out var by) ? by.GetString() : null
+        };
 
     [Synapse("x.boom", "vw")]
     public static ViewBoard Boom(SignalEnvelope s, ViewBoard b) => throw new InvalidOperationException("boom");
