@@ -829,3 +829,31 @@ DigitalBrain.Testing.Synapses.ScenarioTranscript.ScenarioTranscript(bool Passed,
 DigitalBrain.Testing.Synapses.ScenarioTranscript.Views.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.PublishedView!>!
 DigitalBrain.Testing.Synapses.ScenarioTranscript.Views.init -> void
 DigitalBrain.Testing.TestJournal.Watch(long since, System.Threading.CancellationToken ct) -> System.Collections.Generic.IAsyncEnumerable<DigitalBrain.JournaledSignal!>!
+DigitalBrain.Testing.Synapses.ExpectNoSignal
+DigitalBrain.Testing.Synapses.ExpectNoSignal.Alias.get -> string!
+DigitalBrain.Testing.Synapses.ExpectNoSignal.Alias.init -> void
+DigitalBrain.Testing.Synapses.ExpectNoSignal.Deconstruct(out string! Alias) -> void
+DigitalBrain.Testing.Synapses.ExpectNoSignal.Equals(DigitalBrain.Testing.Synapses.ExpectNoSignal? other) -> bool
+DigitalBrain.Testing.Synapses.ExpectNoSignal.ExpectNoSignal(string! Alias) -> void
+DigitalBrain.Testing.Synapses.ExpectView
+DigitalBrain.Testing.Synapses.ExpectView.Alias.get -> string!
+DigitalBrain.Testing.Synapses.ExpectView.Alias.init -> void
+DigitalBrain.Testing.Synapses.ExpectView.Contains.get -> string!
+DigitalBrain.Testing.Synapses.ExpectView.Contains.init -> void
+DigitalBrain.Testing.Synapses.ExpectView.Deconstruct(out string! Alias, out string! Contains) -> void
+DigitalBrain.Testing.Synapses.ExpectView.Equals(DigitalBrain.Testing.Synapses.ExpectView? other) -> bool
+DigitalBrain.Testing.Synapses.ExpectView.ExpectView(string! Alias, string! Contains) -> void
+override DigitalBrain.Testing.Synapses.ExpectNoSignal.<Clone>$() -> DigitalBrain.Testing.Synapses.ExpectNoSignal!
+override DigitalBrain.Testing.Synapses.ExpectNoSignal.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.ExpectNoSignal.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.ExpectNoSignal.ToString() -> string!
+override DigitalBrain.Testing.Synapses.ExpectView.<Clone>$() -> DigitalBrain.Testing.Synapses.ExpectView!
+override DigitalBrain.Testing.Synapses.ExpectView.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.ExpectView.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.ExpectView.ToString() -> string!
+override sealed DigitalBrain.Testing.Synapses.ExpectNoSignal.Equals(DigitalBrain.Testing.Synapses.ScenarioStep? other) -> bool
+override sealed DigitalBrain.Testing.Synapses.ExpectView.Equals(DigitalBrain.Testing.Synapses.ScenarioStep? other) -> bool
+static DigitalBrain.Testing.Synapses.ExpectNoSignal.operator !=(DigitalBrain.Testing.Synapses.ExpectNoSignal? left, DigitalBrain.Testing.Synapses.ExpectNoSignal? right) -> bool
+static DigitalBrain.Testing.Synapses.ExpectNoSignal.operator ==(DigitalBrain.Testing.Synapses.ExpectNoSignal? left, DigitalBrain.Testing.Synapses.ExpectNoSignal? right) -> bool
+static DigitalBrain.Testing.Synapses.ExpectView.operator !=(DigitalBrain.Testing.Synapses.ExpectView? left, DigitalBrain.Testing.Synapses.ExpectView? right) -> bool
+static DigitalBrain.Testing.Synapses.ExpectView.operator ==(DigitalBrain.Testing.Synapses.ExpectView? left, DigitalBrain.Testing.Synapses.ExpectView? right) -> bool

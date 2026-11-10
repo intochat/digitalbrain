@@ -23,3 +23,12 @@ public sealed record ExpectState(string Alias, string JsonPath, JsonElement Expe
 /// <summary>Expects a signal with <paramref name="Alias"/> to have been journaled by the stimulus step before it.</summary>
 /// <param name="Alias">The signal alias.</param>
 public sealed record ExpectSignal(string Alias) : ScenarioStep;
+
+/// <summary>Expects some string value anywhere in the published view of <paramref name="Alias"/> to contain <paramref name="Contains"/> (ordinal).</summary>
+/// <param name="Alias">The state alias.</param>
+/// <param name="Contains">The substring expected in at least one string value of the view.</param>
+public sealed record ExpectView(string Alias, string Contains) : ScenarioStep;
+
+/// <summary>Expects no signal with <paramref name="Alias"/> to have been journaled from the first step up to this one.</summary>
+/// <param name="Alias">The signal alias.</param>
+public sealed record ExpectNoSignal(string Alias) : ScenarioStep;

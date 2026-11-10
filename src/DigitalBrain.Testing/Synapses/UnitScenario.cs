@@ -113,6 +113,24 @@ public static class UnitScenario
                         }
 
                         break;
+                    case ExpectView expect:
+                        if (await os.Get<IViewReader>(NeuronId.Parse($"{Brain}/{expect.Alias}/default")).Read(expect.Alias).ConfigureAwait(false) is not { } view)
+                        {
+                            failures.Add($"step {i} ExpectView {expect.Alias}: no view published");
+                        }
+                        else if (!ContainsText(view.View, expect.Contains))
+                        {
+                            failures.Add($"step {i} ExpectView {expect.Alias}: no text contains \"{expect.Contains}\"");
+                        }
+
+                        break;
+                    case ExpectNoSignal expect:
+                        if (events.FirstOrDefault(e => string.Equals(SignalAliases.Of(e.Signal.Signal), expect.Alias, StringComparison.Ordinal)) is { } found)
+                        {
+                            failures.Add($"step {i} ExpectNoSignal {expect.Alias}: journaled at step {found.Step}");
+                        }
+
+                        break;
                     default:
                         failures.Add($"step {i} {step.GetType().Name}: unknown step");
                         break;
@@ -196,6 +214,14 @@ public static class UnitScenario
         var text = json.GetRawText();
         return text.Length <= 200 ? text : string.Concat(text.AsSpan(0, 200), "...");
     }
+
+    private static bool ContainsText(JsonElement node, string contains) => node.ValueKind switch
+    {
+        JsonValueKind.String => node.GetString()?.Contains(contains, StringComparison.Ordinal) == true,
+        JsonValueKind.Array => node.EnumerateArray().Any(item => ContainsText(item, contains)),
+        JsonValueKind.Object => node.EnumerateObject().Any(property => ContainsText(property.Value, contains)),
+        _ => false,
+    };
 
     // Every alias the source declares binds every fake by its slot name; a binding the alias does not use is ignored. The source's own
     // bindings stay for the slots no fake names.

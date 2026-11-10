@@ -181,4 +181,19 @@ public sealed class UnitScenarioFacts
         Assert.All(traces.Values, ids => Assert.NotNull(Assert.Single(ids)));
         Assert.NotEqual(traces[0][0], traces[1][0]);
     }
+
+    [Fact]
+    public async Task ViewAndAbsenceStepsPassAndFailByName()
+    {
+        var passing = await UnitScenario.Run(Source(XWatch), OnePost(),
+            [new Tick(Start.AddMinutes(6)), new ExpectView("x.watch", "Unseen"), new ExpectView("x.watch", "1"), new ExpectNoSignal("x.seen")], Ct);
+        Assert.True(passing.Passed, string.Join("; ", passing.Failures));
+
+        var failing = await UnitScenario.Run(Source(XWatch), OnePost(),
+            [new ExpectView("x.watch", "1"), new Tick(Start.AddMinutes(6)), new ExpectView("x.watch", "nope"), new ExpectNoSignal("x.polled")], Ct);
+        Assert.Equal(
+            ["step 0 ExpectView x.watch: no view published",
+             "step 2 ExpectView x.watch: no text contains \"nope\"",
+             "step 3 ExpectNoSignal x.polled: journaled at step 1"], failing.Failures);
+    }
 }
