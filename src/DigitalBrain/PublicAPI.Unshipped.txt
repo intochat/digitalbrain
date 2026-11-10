@@ -3343,3 +3343,104 @@ override DigitalBrain.SynapseFailed.ToString() -> string!
 override sealed DigitalBrain.SynapseFailed.Equals(DigitalBrain.Signal? other) -> bool
 static DigitalBrain.SynapseFailed.operator !=(DigitalBrain.SynapseFailed? left, DigitalBrain.SynapseFailed? right) -> bool
 static DigitalBrain.SynapseFailed.operator ==(DigitalBrain.SynapseFailed? left, DigitalBrain.SynapseFailed? right) -> bool
+~DigitalBrain.Asks<TContract>.Equals(DigitalBrain.Asks<TContract> other) -> bool
+~override DigitalBrain.Asks<TContract>.Equals(object obj) -> bool
+~override DigitalBrain.Asks<TContract>.ToString() -> string
+~static DigitalBrain.Asks<TContract>.operator !=(DigitalBrain.Asks<TContract> left, DigitalBrain.Asks<TContract> right) -> bool
+~static DigitalBrain.Asks<TContract>.operator ==(DigitalBrain.Asks<TContract> left, DigitalBrain.Asks<TContract> right) -> bool
+const DigitalBrain.AskLimits.AnswersPerSignal = 25 -> int
+const DigitalBrain.AskLimits.Concurrency = 4 -> int
+const DigitalBrain.AskLimits.MaxArgumentsBytes = 16384 -> int
+const DigitalBrain.AskLimits.MaxAsksPerHour = 2000 -> int
+const DigitalBrain.AskLimits.MaxAsksPerReaction = 1000 -> int
+const DigitalBrain.AskLimits.MaxAttempts = 3 -> int
+const DigitalBrain.AskLimits.MaxBatchBytes = 1048576 -> int
+const DigitalBrain.AskLimits.MaxKeyLength = 128 -> int
+const DigitalBrain.AskLimits.MaxOpenAsks = 2000 -> int
+const DigitalBrain.AskLimits.MaxResultBytes = 262144 -> int
+DigitalBrain.Answer
+DigitalBrain.Answer.<Clone>$() -> DigitalBrain.Answer!
+DigitalBrain.Answer.Answer(string! Slot, string! Operation, string! Key, DigitalBrain.AnswerStatus Status, System.Text.Json.JsonElement Result, string? Error, int Remaining) -> void
+DigitalBrain.Answer.Deconstruct(out string! Slot, out string! Operation, out string! Key, out DigitalBrain.AnswerStatus Status, out System.Text.Json.JsonElement Result, out string? Error, out int Remaining) -> void
+DigitalBrain.Answer.Equals(DigitalBrain.Answer? other) -> bool
+DigitalBrain.Answer.Error.get -> string?
+DigitalBrain.Answer.Error.init -> void
+DigitalBrain.Answer.Key.get -> string!
+DigitalBrain.Answer.Key.init -> void
+DigitalBrain.Answer.Ok.get -> bool
+DigitalBrain.Answer.Operation.get -> string!
+DigitalBrain.Answer.Operation.init -> void
+DigitalBrain.Answer.Remaining.get -> int
+DigitalBrain.Answer.Remaining.init -> void
+DigitalBrain.Answer.Result.get -> System.Text.Json.JsonElement
+DigitalBrain.Answer.Result.init -> void
+DigitalBrain.Answer.Slot.get -> string!
+DigitalBrain.Answer.Slot.init -> void
+DigitalBrain.Answer.Status.get -> DigitalBrain.AnswerStatus
+DigitalBrain.Answer.Status.init -> void
+DigitalBrain.Answered
+DigitalBrain.Answered.Answered(string! Unit, System.Collections.Generic.IReadOnlyList<DigitalBrain.Answer!>! Answers) -> void
+DigitalBrain.Answered.Answers.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Answer!>!
+DigitalBrain.Answered.Answers.init -> void
+DigitalBrain.Answered.Deconstruct(out string! Unit, out System.Collections.Generic.IReadOnlyList<DigitalBrain.Answer!>! Answers) -> void
+DigitalBrain.Answered.Equals(DigitalBrain.Answered? other) -> bool
+DigitalBrain.Answered.Unit.get -> string!
+DigitalBrain.Answered.Unit.init -> void
+DigitalBrain.AnswerStatus
+DigitalBrain.AnswerStatus.Cancelled = 4 -> DigitalBrain.AnswerStatus
+DigitalBrain.AnswerStatus.Expired = 3 -> DigitalBrain.AnswerStatus
+DigitalBrain.AnswerStatus.Failed = 1 -> DigitalBrain.AnswerStatus
+DigitalBrain.AnswerStatus.Ok = 0 -> DigitalBrain.AnswerStatus
+DigitalBrain.AnswerStatus.Refused = 2 -> DigitalBrain.AnswerStatus
+DigitalBrain.AnswerStatus.Unknown = 5 -> DigitalBrain.AnswerStatus
+DigitalBrain.Ask
+DigitalBrain.Ask.<Clone>$() -> DigitalBrain.Ask!
+DigitalBrain.Ask.Arguments.get -> System.Text.Json.JsonElement
+DigitalBrain.Ask.Arguments.init -> void
+DigitalBrain.Ask.Ask(string! Slot, string! Operation, System.Text.Json.JsonElement Arguments, string! Key) -> void
+DigitalBrain.Ask.Deconstruct(out string! Slot, out string! Operation, out System.Text.Json.JsonElement Arguments, out string! Key) -> void
+DigitalBrain.Ask.Equals(DigitalBrain.Ask? other) -> bool
+DigitalBrain.Ask.Key.get -> string!
+DigitalBrain.Ask.Key.init -> void
+DigitalBrain.Ask.Operation.get -> string!
+DigitalBrain.Ask.Operation.init -> void
+DigitalBrain.Ask.Repeatable.get -> bool
+DigitalBrain.Ask.Repeatable.init -> void
+DigitalBrain.Ask.Slot.get -> string!
+DigitalBrain.Ask.Slot.init -> void
+DigitalBrain.Ask.Timeout.get -> System.TimeSpan?
+DigitalBrain.Ask.Timeout.init -> void
+DigitalBrain.AskLimits
+DigitalBrain.Asks<TContract>
+DigitalBrain.Asks<TContract>.Asks() -> void
+DigitalBrain.Asks<TContract>.Asks(string! Slot) -> void
+DigitalBrain.Asks<TContract>.Call(string! operation, string! key, System.Text.Json.JsonElement arguments) -> DigitalBrain.Ask!
+DigitalBrain.Asks<TContract>.Deconstruct(out string! Slot) -> void
+DigitalBrain.Asks<TContract>.Slot.get -> string!
+DigitalBrain.Asks<TContract>.Slot.init -> void
+DigitalBrain.Reaction<TState>.Ask(DigitalBrain.Ask! ask) -> DigitalBrain.Reaction<TState>!
+DigitalBrain.Reaction<TState>.AskEach<T>(System.Collections.Generic.IEnumerable<T>! items, System.Func<T, DigitalBrain.Ask!>! ask) -> DigitalBrain.Reaction<TState>!
+DigitalBrain.Reaction<TState>.Asks.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Ask!>!
+DigitalBrain.Reaction<TState>.Asks.init -> void
+override DigitalBrain.Answer.Equals(object? obj) -> bool
+override DigitalBrain.Answer.GetHashCode() -> int
+override DigitalBrain.Answer.ToString() -> string!
+override DigitalBrain.Answered.<Clone>$() -> DigitalBrain.Answered!
+override DigitalBrain.Answered.Equals(object? obj) -> bool
+override DigitalBrain.Answered.GetHashCode() -> int
+override DigitalBrain.Answered.ToString() -> string!
+override DigitalBrain.Ask.Equals(object? obj) -> bool
+override DigitalBrain.Ask.GetHashCode() -> int
+override DigitalBrain.Ask.ToString() -> string!
+override DigitalBrain.Asks<TContract>.GetHashCode() -> int
+override sealed DigitalBrain.Answered.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.Answer.operator !=(DigitalBrain.Answer? left, DigitalBrain.Answer? right) -> bool
+static DigitalBrain.Answer.operator ==(DigitalBrain.Answer? left, DigitalBrain.Answer? right) -> bool
+static DigitalBrain.Answered.operator !=(DigitalBrain.Answered? left, DigitalBrain.Answered? right) -> bool
+static DigitalBrain.Answered.operator ==(DigitalBrain.Answered? left, DigitalBrain.Answered? right) -> bool
+static DigitalBrain.Ask.operator !=(DigitalBrain.Ask? left, DigitalBrain.Ask? right) -> bool
+static DigitalBrain.Ask.operator ==(DigitalBrain.Ask? left, DigitalBrain.Ask? right) -> bool
+static readonly DigitalBrain.AskLimits.AnswerFlush -> System.TimeSpan
+static readonly DigitalBrain.AskLimits.DefaultTimeout -> System.TimeSpan
+static readonly DigitalBrain.AskLimits.MaxAge -> System.TimeSpan
+static readonly DigitalBrain.AskLimits.MaxTimeout -> System.TimeSpan

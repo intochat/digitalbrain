@@ -79,8 +79,10 @@ internal static class AllowedApis
     internal static readonly string[] UnitFacingDigitalBrainTypes =
     [
         // Synapse, signal, slot and state declarations; ids and addresses; the deploy/install/policy/BDD records units read.
-        "DigitalBrain.ActionDescriptor", "DigitalBrain.AppAddress", "DigitalBrain.AppError", "DigitalBrain.AppKey",
-        "DigitalBrain.AppNavigated", "DigitalBrain.BddReport", "DigitalBrain.BddState", "DigitalBrain.BddVerified", "DigitalBrain.BrainId",
+        "DigitalBrain.ActionDescriptor", "DigitalBrain.Answer", "DigitalBrain.AnswerStatus", "DigitalBrain.Answered",
+        "DigitalBrain.AppAddress", "DigitalBrain.AppError", "DigitalBrain.AppKey",
+        "DigitalBrain.AppNavigated", "DigitalBrain.Ask", "DigitalBrain.AskLimits", "DigitalBrain.Asks",
+        "DigitalBrain.BddReport", "DigitalBrain.BddState", "DigitalBrain.BddVerified", "DigitalBrain.BrainId",
         "DigitalBrain.BrainInstance", "DigitalBrain.BrainType", "DigitalBrain.CallsAttribute", "DigitalBrain.CapabilityAttribute",
         "DigitalBrain.Causation", "DigitalBrain.DeactivationCause", "DigitalBrain.DeadLetterEntry", "DigitalBrain.DeployOutcome",
         "DigitalBrain.DeployStatus", "DigitalBrain.Deployed", "DigitalBrain.DeployedSource", "DigitalBrain.EphemeralSignalAttribute",
