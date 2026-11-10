@@ -16,19 +16,27 @@ public sealed class UnitScenarioFacts
         public sealed record Polled(int Fresh) : Signal;
 
         [State("x.watch")]
-        public sealed record Watch(int Unseen = 0)
+        public sealed record Watch(int Unseen = 0, string LastId = "")
         {
-            public Watch() : this(0) { }
+            public Watch() : this(0, "") { }
         }
 
         public static class XWatch
         {
+            // The feed is newest first; LastId is the newest post already counted, so a post is counted once.
             [Synapse(typeof(Tick), "x.watch", Every = "every 6m")]
             public static async Task<Reaction<Watch>> Poll(Tick t, Watch w, [Slot] IHttpRead Http, CancellationToken ct)
             {
                 var feed = await Http.GetJson("https://api.x.com/2/users/me/mentions", ct);
-                var fresh = feed.GetProperty("data").GetArrayLength();
-                return Reaction<Watch>.Of(w with { Unseen = w.Unseen + fresh }, new Polled(fresh));
+                var posts = feed.GetProperty("data");
+                var fresh = 0;
+                foreach (var post in posts.EnumerateArray())
+                {
+                    if (post.GetProperty("id").GetString() == w.LastId) { break; }
+                    fresh++;
+                }
+                var lastId = fresh > 0 ? posts[0].GetProperty("id").GetString() ?? w.LastId : w.LastId;
+                return Reaction<Watch>.Of(w with { Unseen = w.Unseen + fresh, LastId = lastId }, new Polled(fresh));
             }
 
             [Synapse("x.seen", "x.watch")]
@@ -103,10 +111,26 @@ public sealed class UnitScenarioFacts
     }
 
     [Fact]
-    public async Task TwoTicksFireTwice()
+    public async Task TwoPollsOfOnePostCountItOnce()
     {
         var transcript = await UnitScenario.Run(Source(XWatch), OnePost(),
-            [new Tick(Start.AddMinutes(6)), new Tick(Start.AddMinutes(12)), new ExpectState("x.watch", "Unseen", Json("2"))], Ct);
+            [new Tick(Start.AddMinutes(6)), new Tick(Start.AddMinutes(12)), new ExpectState("x.watch", "Unseen", Json("1"))], Ct);
+
+        Assert.True(transcript.Passed, string.Join("; ", transcript.Failures));
+        Assert.Equal([0, 1], transcript.Events.Where(e => SignalAliases.Of(e.Signal.Signal) == "x.polled").Select(e => e.Step));
+    }
+
+    [Fact]
+    public async Task ASecondPostIsCountedOnce()
+    {
+        var calls = 0;
+        var growing = new FakeSlots().Http("Http", _ => ++calls == 1
+            ? """{"data":[{"id":"1","text":"a"}]}"""
+            : """{"data":[{"id":"2","text":"b"},{"id":"1","text":"a"}]}""");
+
+        var transcript = await UnitScenario.Run(Source(XWatch), growing,
+            [new Tick(Start.AddMinutes(6)), new Tick(Start.AddMinutes(12)), new Tick(Start.AddMinutes(18)),
+             new ExpectState("x.watch", "Unseen", Json("2")), new ExpectState("x.watch", "LastId", Json("\"2\""))], Ct);
 
         Assert.True(transcript.Passed, string.Join("; ", transcript.Failures));
     }
