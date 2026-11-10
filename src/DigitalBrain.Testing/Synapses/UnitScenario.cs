@@ -73,12 +73,19 @@ public static class UnitScenario
         var failures = new List<string>();
         var input = os.Get<IScenarioInput>(NeuronId.Parse($"{Brain}/{ScenarioInput.Alias}/default"));
         var window = 0; // the first event of the last stimulus step
+        var stimulusFailureStart = 0;
+        var stimulusFailureCount = 0;
 
         for (var i = 0; i < steps.Count; i++)
         {
             ct.ThrowIfCancellationRequested();
             var step = steps[i];
-            if (step is Publish or Tick) { window = events.Count; }
+            if (step is Publish or Tick)
+            {
+                window = events.Count;
+                stimulusFailureStart = failures.Count;
+                stimulusFailureCount = 0;
+            }
 
             try
             {
@@ -131,6 +138,23 @@ public static class UnitScenario
                         }
 
                         break;
+                    case ExpectFailure expect:
+                        var failed = events.Skip(window).Select(e => e.Signal.Signal).OfType<SynapseFailed>().ToList();
+                        if (failed.Count == 0)
+                        {
+                            failures.Add($"step {i} ExpectFailure: no reaction failed since the previous step");
+                        }
+                        else if (expect.Function is { } fn && !failed.Any(f => string.Equals(f.Function, fn, StringComparison.Ordinal) || f.Function.EndsWith("." + fn, StringComparison.Ordinal)))
+                        {
+                            failures.Add($"step {i} ExpectFailure {fn}: the functions that failed were {string.Join(", ", failed.Select(f => f.Function))}");
+                        }
+                        else
+                        {
+                            failures.RemoveRange(stimulusFailureStart, stimulusFailureCount);
+                            stimulusFailureCount = 0;
+                        }
+
+                        break;
                     default:
                         failures.Add($"step {i} {step.GetType().Name}: unknown step");
                         break;
@@ -143,6 +167,7 @@ public static class UnitScenario
 
             foreach (var error in os.Failures.Skip(seenFailures)) { failures.Add($"step {i} {step.GetType().Name}: {error.GetType().Name}: {error.Message}"); }
             seenFailures = os.Failures.Count;
+            if (step is Publish or Tick) { stimulusFailureCount = failures.Count - stimulusFailureStart; }
             position = await Drain(journal, position, i, events, ct).ConfigureAwait(false);
         }
 

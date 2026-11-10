@@ -32,3 +32,7 @@ public sealed record ExpectView(string Alias, string Contains) : ScenarioStep;
 /// <summary>Expects no signal with <paramref name="Alias"/> to have been journaled from the first step up to this one.</summary>
 /// <param name="Alias">The signal alias.</param>
 public sealed record ExpectNoSignal(string Alias) : ScenarioStep;
+
+/// <summary>Expects a reaction to have failed since the stimulus step before it: a journaled <c>synapse.failed</c>, of <paramref name="Function"/> when given (the function name, with or without its type).</summary>
+/// <param name="Function">The function name, with or without its type.</param>
+public sealed record ExpectFailure(string? Function = null) : ScenarioStep;

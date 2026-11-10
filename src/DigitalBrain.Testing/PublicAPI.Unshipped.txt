@@ -922,3 +922,16 @@ static DigitalBrain.Testing.Synapses.WorldCall.operator ==(DigitalBrain.Testing.
 virtual DigitalBrain.Testing.Synapses.WorldAnswer.EqualityContract.get -> System.Type!
 virtual DigitalBrain.Testing.Synapses.WorldAnswer.Equals(DigitalBrain.Testing.Synapses.WorldAnswer? other) -> bool
 virtual DigitalBrain.Testing.Synapses.WorldAnswer.PrintMembers(System.Text.StringBuilder! builder) -> bool
+DigitalBrain.Testing.Synapses.ExpectFailure
+DigitalBrain.Testing.Synapses.ExpectFailure.Deconstruct(out string? Function) -> void
+DigitalBrain.Testing.Synapses.ExpectFailure.Equals(DigitalBrain.Testing.Synapses.ExpectFailure? other) -> bool
+DigitalBrain.Testing.Synapses.ExpectFailure.ExpectFailure(string? Function = null) -> void
+DigitalBrain.Testing.Synapses.ExpectFailure.Function.get -> string?
+DigitalBrain.Testing.Synapses.ExpectFailure.Function.init -> void
+override DigitalBrain.Testing.Synapses.ExpectFailure.<Clone>$() -> DigitalBrain.Testing.Synapses.ExpectFailure!
+override DigitalBrain.Testing.Synapses.ExpectFailure.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.ExpectFailure.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.ExpectFailure.ToString() -> string!
+override sealed DigitalBrain.Testing.Synapses.ExpectFailure.Equals(DigitalBrain.Testing.Synapses.ScenarioStep? other) -> bool
+static DigitalBrain.Testing.Synapses.ExpectFailure.operator !=(DigitalBrain.Testing.Synapses.ExpectFailure? left, DigitalBrain.Testing.Synapses.ExpectFailure? right) -> bool
+static DigitalBrain.Testing.Synapses.ExpectFailure.operator ==(DigitalBrain.Testing.Synapses.ExpectFailure? left, DigitalBrain.Testing.Synapses.ExpectFailure? right) -> bool

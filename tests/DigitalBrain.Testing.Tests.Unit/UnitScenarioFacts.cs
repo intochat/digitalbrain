@@ -241,4 +241,24 @@ public sealed class UnitScenarioFacts
 
         Assert.Contains("the world has no answer for Http.GetJson", Assert.Single(transcript.Failures), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task AnExpectedFailurePassesTheScenarioAndAnUnexpectedOneStillFailsIt()
+    {
+        FakeSlots Down() => new FakeSlots().World<IHttpRead>("Http", new World().On("Http", "GetJson", WorldAnswer.Status(503), WorldAnswer.Json(Posts("1"))));
+
+        var expected = await UnitScenario.Run(Source(XWatch), Down(),
+            [new Tick(Start.AddMinutes(6)), new ExpectFailure("Poll"), new Tick(Start.AddMinutes(12)), new ExpectState("x.watch", "Unseen", Json("1"))], Ct);
+        Assert.True(expected.Passed, string.Join("; ", expected.Failures));
+
+        var unexpected = await UnitScenario.Run(Source(XWatch), Down(), [new Tick(Start.AddMinutes(6)), new Tick(Start.AddMinutes(12))], Ct);
+        Assert.StartsWith("step 0 Tick: HttpRequestException", Assert.Single(unexpected.Failures), StringComparison.Ordinal);
+
+        var none = await UnitScenario.Run(Source(XWatch), OnePost(), [new Tick(Start.AddMinutes(6)), new ExpectFailure()], Ct);
+        Assert.Equal("step 1 ExpectFailure: no reaction failed since the previous step", Assert.Single(none.Failures));
+
+        var other = await UnitScenario.Run(Source(XWatch), Down(), [new Tick(Start.AddMinutes(6)), new ExpectFailure("Seen")], Ct);
+        Assert.Equal(2, other.Failures.Count);
+        Assert.StartsWith("step 1 ExpectFailure Seen: the functions that failed were", other.Failures[1], StringComparison.Ordinal);
+    }
 }
