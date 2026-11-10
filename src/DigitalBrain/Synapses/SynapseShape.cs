@@ -41,6 +41,9 @@ public sealed record SynapseDescriptor(
     /// <summary>The journal alias an alias reaction is fed by (its <see cref="Signal"/> is <see cref="SignalEnvelope"/>); null otherwise.</summary>
     public string? SignalAlias { get; init; }
 
+    /// <summary>True when the function takes an <see cref="Answer"/>: the kernel calls it once per answer of an <see cref="Answered"/> signal and saves once.</summary>
+    public bool PerAnswer { get; init; }
+
     /// <summary>The qualified function name.</summary>
     public string Name => Function.DeclaringType!.FullName + "." + Function.Name;
 }
@@ -50,7 +53,11 @@ public sealed record SynapseDescriptor(
 /// <param name="Contract">The capability interface type.</param>
 /// <param name="Capability">The capability the contract declares.</param>
 /// <param name="ParameterIndex">The zero-based parameter position.</param>
-public sealed record SlotDescriptor(string Name, Type Contract, CapabilityId Capability, int ParameterIndex);
+public sealed record SlotDescriptor(string Name, Type Contract, CapabilityId Capability, int ParameterIndex)
+{
+    /// <summary>True for an <c>Asks&lt;TContract&gt;</c> slot: the function gets a handle that builds asks, and the capability is resolved only when the kernel carries an ask out.</summary>
+    public bool Deferred { get; init; }
+}
 
 /// <summary>The refusal fragments <see cref="SynapseShape"/> puts in its messages, shared so analyzers can mirror them.</summary>
 public static class SynapseReasons
@@ -90,6 +97,15 @@ public static class SynapseReasons
 
     /// <summary>The catalog found one slot name bound to two contracts.</summary>
     public const string SlotBoundTwice = "slot";
+
+    /// <summary>An <c>Asks&lt;&gt;</c> slot on a function that is not a synchronous reaction.</summary>
+    public const string AsksNeedSyncReaction = "Asks<> slot needs a synchronous reaction";
+
+    /// <summary>An <c>Asks&lt;&gt;</c> slot and a calling <c>[Slot]</c> on the same function.</summary>
+    public const string AsksExcludeCallingSlot = "Asks<> slot cannot share a function with a calling slot";
+
+    /// <summary>An <see cref="Answer"/> parameter outside a synchronous reaction to <see cref="Answered"/> without calling slots, or more than one <see cref="Answer"/> parameter.</summary>
+    public const string AnswerNeedsAnswered = "Answer parameter needs a synchronous reaction to Answered";
 }
 
 /// <summary>Reads the shape of a synapse function.</summary>
@@ -132,6 +148,7 @@ public static class SynapseShape
         var envelopes = 0;
         var stateCount = 0;
         var tokens = 0;
+        var answers = 0;
         var unknown = false;
         var parameters = function.GetParameters();
         var misplacedToken = false;
@@ -141,13 +158,15 @@ public static class SynapseShape
             var type = parameters[i].ParameterType;
             if (parameters[i].GetCustomAttribute<SlotAttribute>() is { } slot)
             {
-                var capability = type.IsInterface ? type.GetCustomAttribute<CapabilityAttribute>() : null;
+                var deferred = type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Asks<>);
+                var contract = deferred ? type.GetGenericArguments()[0] : type;
+                var capability = contract.IsInterface ? contract.GetCustomAttribute<CapabilityAttribute>() : null;
                 if (capability is null)
                 {
                     throw new SynapseShapeException($"{name}: a {SynapseReasons.SlotContractNeedsCapability} (parameter '{parameters[i].Name}').");
                 }
 
-                slots.Add(new SlotDescriptor(slot.Name ?? parameters[i].Name!, type, capability.Id, i));
+                slots.Add(new SlotDescriptor(slot.Name ?? parameters[i].Name!, contract, capability.Id, i) { Deferred = deferred });
             }
             else if (typeof(Signal).IsAssignableFrom(type))
             {
@@ -162,6 +181,10 @@ public static class SynapseShape
             {
                 tokens++;
                 misplacedToken |= i != parameters.Length - 1;
+            }
+            else if (type == typeof(Answer))
+            {
+                answers++;
             }
             else if (state is not null && type == state)
             {
@@ -197,6 +220,23 @@ public static class SynapseShape
         var kind = returned == typeof(Rules.Check) ? SynapseKind.Gate
             : returned == state || returned == typeof(Reaction<>).MakeGenericType(state) ? SynapseKind.Reaction
             : SynapseKind.View;
+        var isAsync = returned != function.ReturnType;
+        var hasDeferred = slots.Any(s => s.Deferred);
+        var hasCalling = slots.Any(s => !s.Deferred);
+        if (hasDeferred && (kind != SynapseKind.Reaction || isAsync || tokens > 0))
+        {
+            throw new SynapseShapeException($"{name}: an {SynapseReasons.AsksNeedSyncReaction}.");
+        }
+
+        if (hasDeferred && hasCalling)
+        {
+            throw new SynapseShapeException($"{name}: an {SynapseReasons.AsksExcludeCallingSlot}.");
+        }
+
+        if (answers > 0 && (answers > 1 || attribute.Signal != typeof(Answered) || kind != SynapseKind.Reaction || isAsync || tokens > 0 || hasCalling))
+        {
+            throw new SynapseShapeException($"{name}: an {SynapseReasons.AnswerNeedsAnswered}.");
+        }
 
         if (attribute.SignalAlias is { } signalAlias)
         {
@@ -210,7 +250,7 @@ public static class SynapseShape
                 throw new SynapseShapeException($"{name}: {SynapseReasons.EveryNeedsTick}.");
             }
 
-            return new SynapseDescriptor(kind, function, typeof(SignalEnvelope), state, alias, attribute.Key, tokens == 1, slots, null) { SignalAlias = signalAlias };
+            return new SynapseDescriptor(kind, function, typeof(SignalEnvelope), state, alias, attribute.Key, tokens == 1, slots, null) { SignalAlias = signalAlias, PerAnswer = answers == 1 };
         }
 
         if (kind == SynapseKind.View)
@@ -248,7 +288,7 @@ public static class SynapseShape
             }
         }
 
-        return new SynapseDescriptor(kind, function, signal, state, alias, attribute.Key, tokens == 1, slots, every);
+        return new SynapseDescriptor(kind, function, signal, state, alias, attribute.Key, tokens == 1, slots, every) { PerAnswer = answers == 1 };
     }
 
     private static Type Unwrap(Type returned) =>

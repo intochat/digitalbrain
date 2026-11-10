@@ -71,6 +71,30 @@ public sealed class Shapes
     public static WeekSpend Daily(Tick t, WeekSpend w) => w;
 
     public static Check TickGate(Tick t, WeekSpend w) => Check.Allow(w);
+
+    public static Reaction<WeekSpend> AsksOnAlias(SignalEnvelope s, WeekSpend w, [Slot] Asks<IProbe> feed) => Reaction<WeekSpend>.Of(w);
+
+    public static Reaction<WeekSpend> AnswerOnAlias(SignalEnvelope s, Answer one, WeekSpend w) => Reaction<WeekSpend>.Of(w);
+
+    public static Reaction<WeekSpend> AsksPoll(Charging s, WeekSpend w, [Slot] Asks<IProbe> feed) => Reaction<WeekSpend>.Of(w);
+
+    public static Task<Reaction<WeekSpend>> AsksAsync(Charging s, WeekSpend w, [Slot] Asks<IProbe> feed) => Task.FromResult(Reaction<WeekSpend>.Of(w));
+
+    public static Reaction<WeekSpend> AsksWithToken(Charging s, WeekSpend w, [Slot] Asks<IProbe> feed, CancellationToken ct) => Reaction<WeekSpend>.Of(w);
+
+    public static Check AsksGate(Charging s, WeekSpend w, [Slot] Asks<IProbe> feed) => Check.Allow(w);
+
+    public static Reaction<WeekSpend> AsksAndCalling(Charging s, WeekSpend w, [Slot] Asks<IProbe> feed, [Slot] ISqlRead db) => Reaction<WeekSpend>.Of(w);
+
+    public static Reaction<WeekSpend> AsksOfPlainInterface(Charging s, WeekSpend w, [Slot] Asks<IDisposable> d) => Reaction<WeekSpend>.Of(w);
+
+    public static Reaction<WeekSpend> PerAnswer(Answered all, Answer one, WeekSpend w) => Reaction<WeekSpend>.Of(w);
+
+    public static Reaction<WeekSpend> AnswerOnCharging(Charging s, Answer one, WeekSpend w) => Reaction<WeekSpend>.Of(w);
+
+    public static Reaction<WeekSpend> TwoAnswers(Answered all, Answer a, Answer b, WeekSpend w) => Reaction<WeekSpend>.Of(w);
+
+    public static Task<Reaction<WeekSpend>> AnswerAsync(Answered all, Answer one, WeekSpend w) => Task.FromResult(Reaction<WeekSpend>.Of(w));
 }
 
 public sealed class SynapseShapeFacts
@@ -81,8 +105,14 @@ public sealed class SynapseShapeFacts
 
     private static SynapseDescriptor Read(string name)
     {
-        var view = name is nameof(Shapes.View) or nameof(Shapes.NoSignal);
-        var attribute = view ? new SynapseAttribute("week") : new SynapseAttribute(typeof(Charging), "week");
+        var attribute = name switch
+        {
+            nameof(Shapes.View) or nameof(Shapes.NoSignal) => new SynapseAttribute("week"),
+            nameof(Shapes.AsksOnAlias) => new SynapseAttribute("x.go", "week"),
+            nameof(Shapes.AnswerOnAlias) => new SynapseAttribute("unit.answered", "week"),
+            nameof(Shapes.PerAnswer) or nameof(Shapes.TwoAnswers) or nameof(Shapes.AnswerAsync) => new SynapseAttribute(typeof(Answered), "week"),
+            _ => new SynapseAttribute(typeof(Charging), "week"),
+        };
         return SynapseShape.Of(typeof(Shapes).GetMethod(name, Flags)!, States, attribute);
     }
 
@@ -193,7 +223,43 @@ public sealed class SynapseShapeFacts
         Assert.Equal("every needs a Tick reaction", SynapseReasons.EveryNeedsTick);
         Assert.Equal("slot", SynapseReasons.SlotBoundTwice);
         Assert.Equal("alias reaction takes a SignalEnvelope, not a signal type", SynapseReasons.AliasNeedsEnvelope);
+        Assert.Equal("Asks<> slot needs a synchronous reaction", SynapseReasons.AsksNeedSyncReaction);
+        Assert.Equal("Asks<> slot cannot share a function with a calling slot", SynapseReasons.AsksExcludeCallingSlot);
+        Assert.Equal("Answer parameter needs a synchronous reaction to Answered", SynapseReasons.AnswerNeedsAnswered);
     }
+
+    [Fact]
+    public void AnAsksSlotIsADeferredSlotOfItsContract()
+    {
+        var d = Read(nameof(Shapes.AsksPoll));
+        var slot = Assert.Single(d.Slots);
+        Assert.Equal(("feed", typeof(IProbe), new CapabilityId("probe", 1), true), (slot.Name, slot.Contract, slot.Capability, slot.Deferred));
+        Assert.Equal(SynapseKind.Reaction, d.Kind);
+        Assert.False(d.PerAnswer);
+    }
+
+    [Fact]
+    public void AReactionToAnsweredMayTakeOneAnswer() => Assert.True(Read(nameof(Shapes.PerAnswer)).PerAnswer);
+
+    [Fact]
+    public void AnAliasReactionMayTakeAnAsksSlot()
+    {
+        var d = Read(nameof(Shapes.AsksOnAlias));
+        Assert.Equal(("x.go", true, false), (d.SignalAlias, Assert.Single(d.Slots).Deferred, d.PerAnswer));
+    }
+
+    [Theory]
+    [InlineData(nameof(Shapes.AnswerOnAlias), "Answer parameter needs a synchronous reaction to Answered")]
+    [InlineData(nameof(Shapes.AsksAsync), "Asks<> slot needs a synchronous reaction")]
+    [InlineData(nameof(Shapes.AsksWithToken), "Asks<> slot needs a synchronous reaction")]
+    [InlineData(nameof(Shapes.AsksGate), "Asks<> slot needs a synchronous reaction")]
+    [InlineData(nameof(Shapes.AsksAndCalling), "Asks<> slot cannot share a function with a calling slot")]
+    [InlineData(nameof(Shapes.AsksOfPlainInterface), "slot contract needs [Capability]")]
+    [InlineData(nameof(Shapes.AnswerOnCharging), "Answer parameter needs a synchronous reaction to Answered")]
+    [InlineData(nameof(Shapes.TwoAnswers), "Answer parameter needs a synchronous reaction to Answered")]
+    [InlineData(nameof(Shapes.AnswerAsync), "Answer parameter needs a synchronous reaction to Answered")]
+    public void TheAskShapesThatAreRefused(string name, string fragment) =>
+        Assert.Contains(fragment, Assert.Throws<SynapseShapeException>(() => Read(name)).Message, StringComparison.Ordinal);
 
     [Fact]
     public void ADeclaredSignalThatDoesNotFitTheParameterIsRefused()

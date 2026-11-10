@@ -16,6 +16,12 @@ public sealed class SynapseShapeAnalyzerFacts
         [State("week")] public sealed record WeekSpend(decimal Spent = 0);
         [Signal("test.charging")] public sealed record Charging(decimal Amount) : Signal;
         [Capability("sql-read", 1)] public interface ISqlRead { }
+        namespace DigitalBrain
+        {
+            public readonly record struct Asks<TContract>(string Slot) where TContract : class;
+            public sealed record Answer;
+            [Signal("unit.answered")] public sealed record Answered : Signal;
+        }
         """;
 
     private const string NotPublicStatic = "a synapse function must be public static.";
@@ -37,6 +43,9 @@ public sealed class SynapseShapeAnalyzerFacts
     [InlineData("[Synapse(typeof(Tick), \"week\", Every = \"Mon 07:00\")] public static WeekSpend {|#0:Weekly|}(Tick t, WeekSpend w) => w;")]
     [InlineData("[Synapse(typeof(Tick), \"week\", Every = \"every 5m\")] public static WeekSpend {|#0:Interval|}(Tick t, WeekSpend w) => w;")]
     [InlineData("[Synapse(\"x.polled\", \"week\")] public static WeekSpend {|#0:ByAlias|}(SignalEnvelope s, WeekSpend w) => w;")]
+    [InlineData("[Synapse(typeof(Charging), \"week\")] public static Reaction<WeekSpend> {|#0:AsksPoll|}(Charging s, WeekSpend w, [Slot] Asks<ISqlRead> db) => default!;")]
+    [InlineData("[Synapse(typeof(Answered), \"week\")] public static Reaction<WeekSpend> {|#0:PerAnswer|}(Answered all, Answer one, WeekSpend w) => default!;")]
+    [InlineData("[Synapse(\"x.go\", \"week\")] public static Reaction<WeekSpend> {|#0:AsksOnAlias|}(SignalEnvelope s, WeekSpend w, [Slot] Asks<ISqlRead> db) => default!;")]
     public Task Recognised_shapes_report_nothing(string method) => Run(method, null);
 
     [Theory]
@@ -73,6 +82,12 @@ public sealed class SynapseShapeAnalyzerFacts
     [InlineData("[Synapse(\"x.polled\", \"week\")] public static Check {|#0:GateOnAlias|}(SignalEnvelope s, WeekSpend w) => default!;", "GateOnAlias",
         "an alias reaction takes a SignalEnvelope, not a signal type.")]
     [InlineData("[Synapse(typeof(Charging), \"week\")] public static WeekSpend {|#0:EnvelopeOnType|}(SignalEnvelope s, WeekSpend w) => w;", "EnvelopeOnType", UnknownParameter)]
+    [InlineData("[Synapse(typeof(Charging), \"week\")] public static Task<Reaction<WeekSpend>> {|#0:AsksAsync|}(Charging s, WeekSpend w, [Slot] Asks<ISqlRead> db) => default!;", "AsksAsync",
+        "an Asks<> slot needs a synchronous reaction.")]
+    [InlineData("[Synapse(typeof(Charging), \"week\")] public static Reaction<WeekSpend> {|#0:AsksAndCalling|}(Charging s, WeekSpend w, [Slot] Asks<ISqlRead> a, [Slot] ISqlRead b) => default!;", "AsksAndCalling",
+        "an Asks<> slot cannot share a function with a calling slot.")]
+    [InlineData("[Synapse(typeof(Charging), \"week\")] public static Reaction<WeekSpend> {|#0:AnswerOnCharging|}(Charging s, Answer one, WeekSpend w) => default!;", "AnswerOnCharging",
+        "an Answer parameter needs a synchronous reaction to Answered.")]
     public Task Refused_shapes_report_DB0041_with_the_reason(string method, string name, string reason) => Run(method, ("Shapes." + name, reason));
 
     [Fact]
@@ -114,6 +129,9 @@ public sealed class SynapseShapeAnalyzerFacts
         Assert.Equal("slot contract needs [Capability]", Rules.SynapseReasons.SlotContractNeedsCapability);
         Assert.Equal("schedule", Rules.SynapseReasons.Schedule);
         Assert.Equal("every needs a Tick reaction", Rules.SynapseReasons.EveryNeedsTick);
+        Assert.Equal("Asks<> slot needs a synchronous reaction", Rules.SynapseReasons.AsksNeedSyncReaction);
+        Assert.Equal("Asks<> slot cannot share a function with a calling slot", Rules.SynapseReasons.AsksExcludeCallingSlot);
+        Assert.Equal("Answer parameter needs a synchronous reaction to Answered", Rules.SynapseReasons.AnswerNeedsAnswered);
     }
 
     private static DiagnosticResult Expect(string name, string reason) =>

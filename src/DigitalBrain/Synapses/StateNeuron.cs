@@ -403,6 +403,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
 
         foreach (var slot in synapse.Slots.OrderBy(slot => slot.ParameterIndex))
         {
+            if (slot.Deferred) { throw new NotSupportedException($"slot '{slot.Name}' is an Asks<> slot; this build cannot carry out asks"); }
             try { arguments[slot.ParameterIndex] = await _slots.Resolve(Id, slot, linkedCt).ConfigureAwait(true); }
             catch (SlotUnboundException) when (synapse.Kind == SynapseKind.Gate)
             {

@@ -3444,3 +3444,10 @@ static readonly DigitalBrain.AskLimits.AnswerFlush -> System.TimeSpan
 static readonly DigitalBrain.AskLimits.DefaultTimeout -> System.TimeSpan
 static readonly DigitalBrain.AskLimits.MaxAge -> System.TimeSpan
 static readonly DigitalBrain.AskLimits.MaxTimeout -> System.TimeSpan
+const DigitalBrain.SynapseReasons.AnswerNeedsAnswered = "Answer parameter needs a synchronous reaction to Answered" -> string!
+const DigitalBrain.SynapseReasons.AsksExcludeCallingSlot = "Asks<> slot cannot share a function with a calling slot" -> string!
+const DigitalBrain.SynapseReasons.AsksNeedSyncReaction = "Asks<> slot needs a synchronous reaction" -> string!
+DigitalBrain.SlotDescriptor.Deferred.get -> bool
+DigitalBrain.SlotDescriptor.Deferred.init -> void
+DigitalBrain.SynapseDescriptor.PerAnswer.get -> bool
+DigitalBrain.SynapseDescriptor.PerAnswer.init -> void

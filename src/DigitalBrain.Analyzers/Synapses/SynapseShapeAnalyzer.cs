@@ -14,6 +14,9 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
     private const string TaskType = "System.Threading.Tasks.Task`1";
     private const string ReactionType = "DigitalBrain.Reaction`1";
     private const string EnvelopeType = "DigitalBrain.SignalEnvelope";
+    private const string AsksType = "DigitalBrain.Asks`1";
+    private const string AnswerType = "DigitalBrain.Answer";
+    private const string AnsweredType = "DigitalBrain.Answered";
 
     // Mirrors DigitalBrain.Time.Schedule: HH:mm, Day HH:mm, every Nm / every Nh (N from 1 to 999999).
     private static readonly Regex ScheduleRule = new Regex(
@@ -79,6 +82,9 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
         var envelopes = 0;
         var stateCount = 0;
         var tokens = 0;
+        var deferredSlots = 0;
+        var callingSlots = 0;
+        var answers = 0;
         var unknown = false;
         var misplacedToken = false;
         var hasSignalParameter = false;
@@ -88,10 +94,15 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
             var type = method.Parameters[i].Type;
             if (Rules.Has(method.Parameters[i], Rules.SlotAttribute))
             {
-                if (type.TypeKind != TypeKind.Interface || !Rules.Has(type, Rules.CapabilityAttribute))
+                var deferred = type is INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 1 } asks
+                    && Rules.FullName(asks.OriginalDefinition) == AsksType;
+                var contract = deferred ? ((INamedTypeSymbol)type).TypeArguments[0] : type;
+                if (contract.TypeKind != TypeKind.Interface || !Rules.Has(contract, Rules.CapabilityAttribute))
                 {
                     return $"a {Rules.SynapseReasons.SlotContractNeedsCapability}.";
                 }
+
+                if (deferred) { deferredSlots++; } else { callingSlots++; }
             }
             else if (Rules.IsOrDerivesFrom(type, Rules.SignalType))
             {
@@ -107,6 +118,10 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
             {
                 tokens++;
                 misplacedToken |= i != method.Parameters.Length - 1;
+            }
+            else if (Rules.FullName(type as INamedTypeSymbol) == AnswerType)
+            {
+                answers++;
             }
             else if (state is not null && SymbolEqualityComparer.Default.Equals(type, state))
             {
@@ -144,6 +159,22 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
             || (returned is INamedTypeSymbol { IsGenericType: true } generic
                 && Rules.FullName(generic.OriginalDefinition) == ReactionType
                 && SymbolEqualityComparer.Default.Equals(generic.TypeArguments[0], state));
+        var isAsync = !SymbolEqualityComparer.Default.Equals(returned, method.ReturnType);
+        if (deferredSlots > 0 && (!isReaction || isAsync || tokens > 0))
+        {
+            return $"an {Rules.SynapseReasons.AsksNeedSyncReaction}.";
+        }
+
+        if (deferredSlots > 0 && callingSlots > 0)
+        {
+            return $"an {Rules.SynapseReasons.AsksExcludeCallingSlot}.";
+        }
+
+        var declared = hasSignal && !byAlias ? args[0].Value as INamedTypeSymbol : null;
+        if (answers > 0 && (answers > 1 || Rules.FullName(declared) != AnsweredType || !isReaction || isAsync || tokens > 0 || callingSlots > 0))
+        {
+            return $"an {Rules.SynapseReasons.AnswerNeedsAnswered}.";
+        }
 
         if (byAlias)
         {
@@ -165,7 +196,6 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
             return $"a {Rules.SynapseReasons.GateNeedsSignal} (a reaction as well), declared by [Synapse] and taken as a parameter.";
         }
 
-        var declared = args[0].Value as INamedTypeSymbol;
         if (declared is not null && signalParameter is INamedTypeSymbol parameter
             && !Rules.IsOrDerivesFrom(declared, Rules.FullName(parameter)))
         {

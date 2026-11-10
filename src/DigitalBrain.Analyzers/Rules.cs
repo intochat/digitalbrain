@@ -106,6 +106,9 @@ internal static class Rules
         public const string Schedule = "schedule";
         public const string EveryNeedsTick = "every needs a Tick reaction";
         public const string AliasNeedsEnvelope = "alias reaction takes a SignalEnvelope, not a signal type";
+        public const string AsksNeedSyncReaction = "Asks<> slot needs a synchronous reaction";
+        public const string AsksExcludeCallingSlot = "Asks<> slot cannot share a function with a calling slot";
+        public const string AnswerNeedsAnswered = "Answer parameter needs a synchronous reaction to Answered";
     }
 
     public static readonly ImmutableHashSet<string> IdentityAttributes = ImmutableHashSet.Create(

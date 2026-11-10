@@ -23,6 +23,12 @@ public static class SlotFunctions
     public static Task<Check> Guard(SlotPoke s, Slotted state, [Slot] ISqlRead db) => Task.FromResult(Check.Allow(state));
 }
 
+public static class AskingSlotFunctions
+{
+    [Synapse(typeof(SlotPoke), "slotted")]
+    public static Reaction<Slotted> Ask(SlotPoke s, [Slot] Asks<ISqlRead> db, Slotted state) => Reaction<Slotted>.Of(state);
+}
+
 public sealed class FakeSqlRead(int value) : ISqlRead
 {
     public Task<T> Scalar<T>(string sql, object? args, CancellationToken ct) => Task.FromResult((T)(object)value);
@@ -87,5 +93,18 @@ public sealed class StateNeuronSlotFacts
 
         Assert.Empty(Context.Writes);
         Assert.Contains(Context.Published, p => p is SynapseFinished { Outcome: "failed" } f && f.Function.EndsWith(".Read", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AnAsksSlotFailsLoudlyUntilTheExecutorShips()
+    {
+        var resolver = new FakeSlotResolver(new() { ["db"] = new FakeSqlRead(7) });
+        var n = Attach(typeof(AskingSlotFunctions), resolver);
+
+        var e = await Assert.ThrowsAsync<NotSupportedException>(() => n.Receive(new SlotPoke(), TestContext.Current.CancellationToken));
+
+        Assert.Contains("slot 'db'", e.Message, StringComparison.Ordinal);
+        Assert.Empty(Context.Writes);
+        Assert.Equal(0, resolver.Calls);
     }
 }

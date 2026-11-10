@@ -28,6 +28,24 @@ public static class MorningStats
     public static string Show(StatsState s) => s.Runs.ToString(System.Globalization.CultureInfo.InvariantCulture);
 }
 
+[State("need.same")]
+public sealed record NeedState(int X = 0)
+{
+    public NeedState() : this(0) { }
+}
+
+public static class NeedCalling
+{
+    [Synapse(typeof(Tick), "need.same", Every = "every 6m")]
+    public static Task<NeedState> Poll(Tick t, NeedState s, [Slot] IProbe feed, CancellationToken ct) => Task.FromResult(s);
+}
+
+public static class NeedAsking
+{
+    [Synapse(typeof(Tick), "need.same", Every = "every 6m")]
+    public static Reaction<NeedState> Poll(Tick t, NeedState s, [Slot] Asks<IProbe> feed) => Reaction<NeedState>.Of(s);
+}
+
 public sealed class SynapseCatalogFacts
 {
     // A second record with a taken alias would poison the assembly-wide scans, so it lives in a throwaway dynamic assembly.
@@ -139,6 +157,17 @@ public sealed class SynapseCatalogFacts
         var merged = a.Merge(SynapseCatalog.Scan([typeof(OtherState)]));
         Assert.Equal(2, merged.States.Count);
         Assert.Equal(3, merged.Synapses.Count);
+    }
+
+    [Fact]
+    public void AnAsksSlotNeedsExactlyWhatACallingSlotNeeds()
+    {
+        var calling = SynapseCatalog.Scan([typeof(NeedState), typeof(NeedCalling)]).NeedsOf("need.same");
+        var asking = SynapseCatalog.Scan([typeof(NeedState), typeof(NeedAsking)]).NeedsOf("need.same");
+
+        Assert.Equal(calling.Sentence(), asking.Sentence());
+        Assert.Equal(calling.Hash(), asking.Hash());
+        Assert.Contains("through feed", asking.Sentence(), StringComparison.Ordinal);
     }
 }
 
