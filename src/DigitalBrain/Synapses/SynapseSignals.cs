@@ -23,6 +23,16 @@ public sealed record SynapseStarted(string Neuron, string Function, string Signa
 [EphemeralSignal]
 public sealed record SynapseFinished(string Neuron, string Function, string Outcome, double ElapsedMs) : Signal;
 
+/// <summary>A reaction or view synapse of a state neuron threw. Journaled once, by the state neuron, in place of the change it did not make.</summary>
+/// <param name="Alias">The state alias (the unit).</param>
+/// <param name="Function">The synapse function name.</param>
+/// <param name="Cause">The alias of the arriving signal; the state alias for a view.</param>
+/// <param name="CauseId">The <see cref="Causation.Address"/> (publisher:sequence) of the arriving signal, or null when it was not journaled.</param>
+/// <param name="Error">The exception type name.</param>
+/// <param name="Message">The exception message, at most 500 characters.</param>
+[Signal("synapse.failed")]
+public sealed record SynapseFailed(string Alias, string Function, string Cause, string? CauseId, string Error, string Message) : Signal;
+
 /// <summary>A state neuron saved a new state; durable, because a state neuron publishes what it did, not what it heard.</summary>
 /// <param name="Neuron">The neuron key.</param>
 /// <param name="Cause">The <c>[Signal]</c> alias (or type name) of the signal that caused the change.</param>

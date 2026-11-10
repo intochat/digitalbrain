@@ -3320,3 +3320,26 @@ override DigitalBrain.Identity.CompoundGrainKey.GetHashCode() -> int
 static DigitalBrain.Identity.CompoundGrainKey.operator ==(DigitalBrain.Identity.CompoundGrainKey left, DigitalBrain.Identity.CompoundGrainKey right) -> bool
 static DigitalBrain.Identity.CompoundGrainKey.operator !=(DigitalBrain.Identity.CompoundGrainKey left, DigitalBrain.Identity.CompoundGrainKey right) -> bool
 DigitalBrain.NeuronId.ToCompoundGrainKey() -> DigitalBrain.Identity.CompoundGrainKey
+DigitalBrain.SynapseFailed
+DigitalBrain.SynapseFailed.Alias.get -> string!
+DigitalBrain.SynapseFailed.Alias.init -> void
+DigitalBrain.SynapseFailed.Cause.get -> string!
+DigitalBrain.SynapseFailed.Cause.init -> void
+DigitalBrain.SynapseFailed.CauseId.get -> string?
+DigitalBrain.SynapseFailed.CauseId.init -> void
+DigitalBrain.SynapseFailed.Deconstruct(out string! Alias, out string! Function, out string! Cause, out string? CauseId, out string! Error, out string! Message) -> void
+DigitalBrain.SynapseFailed.Equals(DigitalBrain.SynapseFailed? other) -> bool
+DigitalBrain.SynapseFailed.Error.get -> string!
+DigitalBrain.SynapseFailed.Error.init -> void
+DigitalBrain.SynapseFailed.Function.get -> string!
+DigitalBrain.SynapseFailed.Function.init -> void
+DigitalBrain.SynapseFailed.Message.get -> string!
+DigitalBrain.SynapseFailed.Message.init -> void
+DigitalBrain.SynapseFailed.SynapseFailed(string! Alias, string! Function, string! Cause, string? CauseId, string! Error, string! Message) -> void
+override DigitalBrain.SynapseFailed.<Clone>$() -> DigitalBrain.SynapseFailed!
+override DigitalBrain.SynapseFailed.Equals(object? obj) -> bool
+override DigitalBrain.SynapseFailed.GetHashCode() -> int
+override DigitalBrain.SynapseFailed.ToString() -> string!
+override sealed DigitalBrain.SynapseFailed.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.SynapseFailed.operator !=(DigitalBrain.SynapseFailed? left, DigitalBrain.SynapseFailed? right) -> bool
+static DigitalBrain.SynapseFailed.operator ==(DigitalBrain.SynapseFailed? left, DigitalBrain.SynapseFailed? right) -> bool

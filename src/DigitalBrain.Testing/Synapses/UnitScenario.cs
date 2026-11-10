@@ -141,7 +141,7 @@ public static class UnitScenario
                 failures.Add($"step {i} {step.GetType().Name}: {e.GetType().Name}: {e.Message}");
             }
 
-            foreach (var error in os.Failures.Skip(seenFailures).DistinctBy(e => (e.GetType(), e.Message))) { failures.Add($"step {i} {step.GetType().Name}: {error.GetType().Name}: {error.Message}"); }
+            foreach (var error in os.Failures.Skip(seenFailures)) { failures.Add($"step {i} {step.GetType().Name}: {error.GetType().Name}: {error.Message}"); }
             seenFailures = os.Failures.Count;
             position = await Drain(journal, position, i, events, ct).ConfigureAwait(false);
         }

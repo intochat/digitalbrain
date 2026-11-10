@@ -51,6 +51,18 @@ public static class Faulty
     public static Check Broken(Charging s, WeekSpend w) => throw new InvalidOperationException("broken");
 }
 
+public static class Shaky
+{
+    [Synapse(typeof(Charging), "ledger")]
+    public static Ledger Boom(Charging s, Ledger w) => throw new InvalidOperationException(new string('x', 600));
+}
+
+public static class Echoing
+{
+    [Synapse(typeof(SynapseFailed), "ledger")]
+    public static Ledger Again(SynapseFailed s, Ledger w) => throw new InvalidOperationException("again");
+}
+
 [State("balance")]
 public sealed record Balance(decimal Amount)
 {
@@ -216,7 +228,38 @@ public sealed class StateNeuronFacts
         await Assert.ThrowsAsync<InvalidOperationException>(() => n.Gate(new Charging(1m), Guid.NewGuid(), TestContext.Current.CancellationToken));
 
         Assert.Empty(Context.Writes);
+        Assert.Empty(Context.Published.OfType<SynapseFailed>());
         Assert.Contains(Context.Published, p => p is SynapseFinished { Outcome: "failed" } f && f.Function.EndsWith(".Broken", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AThrowingReactionJournalsOneSynapseFailedAndRethrows()
+    {
+        var n = Attach(new StateNeuron<Ledger>(Source(typeof(Ledger), typeof(Shaky)), new UnboundSlotResolver()));
+        var arriving = new JournaledSignal(NeuronId.Parse("alice/pay/one"), 7, new Charging(5m), DateTimeOffset.UnixEpoch);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => n.Receive(arriving, TestContext.Current.CancellationToken));
+
+        var failed = Assert.Single(Context.Published.OfType<SynapseFailed>());
+        Assert.Equal("ledger", failed.Alias);
+        Assert.EndsWith(".Boom", failed.Function, StringComparison.Ordinal);
+        Assert.Equal(SignalAliases.Of(arriving.Signal), failed.Cause);
+        Assert.Equal(Causation.Address(arriving.Publisher, 7), failed.CauseId);
+        Assert.Equal("InvalidOperationException", failed.Error);
+        Assert.Equal(500, failed.Message.Length);
+        Assert.Empty(Context.Writes);
+        Assert.Contains(Context.Published, p => p is SynapseFinished { Outcome: "failed" });
+    }
+
+    [Fact]
+    public async Task AFailureWhileReactingToSynapseFailedIsNotJournaled()
+    {
+        var n = Attach(new StateNeuron<Ledger>(Source(typeof(Ledger), typeof(Echoing)), new UnboundSlotResolver()));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => n.Receive(new SynapseFailed("other", "X.Y", "time.tick", null, "E", "m"), TestContext.Current.CancellationToken));
+
+        Assert.Empty(Context.Published.OfType<SynapseFailed>());
     }
 
     [Fact]

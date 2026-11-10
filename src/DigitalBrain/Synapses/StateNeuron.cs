@@ -69,7 +69,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
     public Task Receive(Signal signal, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(signal);
-        return React(signal, null, null, ct);
+        return React(signal, null, null, null, ct);
     }
 
     /// <inheritdoc />
@@ -77,10 +77,10 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
     public Task Receive(JournaledSignal journaled, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(journaled);
-        return React(journaled.Signal, journaled.TraceId, journaled.CausationId, ct);
+        return React(journaled.Signal, journaled.TraceId, journaled.CausationId, Causation.Address(journaled.Publisher, journaled.Sequence), ct);
     }
 
-    private async Task React(Signal signal, string? traceId, string? causationId, CancellationToken ct)
+    private async Task React(Signal signal, string? traceId, string? causationId, string? causeId, CancellationToken ct)
     {
         SignalEnvelope? envelope = null;
         foreach (var reaction in Reactions(signal))
@@ -99,7 +99,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
                 }
 
                 return "saved";
-            }, ct, build).ConfigureAwait(true);
+            }, ct, build, causeId).ConfigureAwait(true);
             await PendingViews().ConfigureAwait(true);
         }
     }
@@ -314,7 +314,8 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
         var trace = Context.TraceId;
         await Publish(signal).ConfigureAwait(true);
         var sequence = (await Context.History.Read(Id, long.MaxValue, 1, CancellationToken.None).ConfigureAwait(true)).Last;
-        await React(signal, trace, Causation.Address(Id, sequence), CancellationToken.None).ConfigureAwait(true);
+        var address = Causation.Address(Id, sequence);
+        await React(signal, trace, address, address, CancellationToken.None).ConfigureAwait(true);
     }
 
     internal override async Task<TState?> LoadState()
@@ -354,7 +355,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
     private IEnumerable<SynapseDescriptor> Matching(SynapseKind kind, Signal signal) =>
         Synapses().Where(d => d.Kind == kind && d.SignalAlias is null && signal is not IUntypedSignal && d.Signal!.IsInstanceOfType(signal));
 
-    private async Task Run(SynapseDescriptor synapse, Signal? signal, TState state, Func<object?, Task<string>> settle, CancellationToken ct, Func<SignalEnvelope>? envelope = null)
+    private async Task Run(SynapseDescriptor synapse, Signal? signal, TState state, Func<object?, Task<string>> settle, CancellationToken ct, Func<SignalEnvelope>? envelope = null, string? causeId = null)
     {
         var neuron = Id.ToString();
         var arriving = signal is null ? AliasIn(_catalog.Current) ?? Id.Type : AliasOf(signal);
@@ -365,9 +366,18 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
         {
             outcome = await settle(await Invoke(synapse, signal, envelope?.Invoke(), state, ct).ConfigureAwait(true)).ConfigureAwait(true);
         }
-        catch
+        catch (Exception error)
         {
             await PublishEphemeral(new SynapseFinished(neuron, synapse.Name, "failed", clock.Elapsed.TotalMilliseconds)).ConfigureAwait(true);
+            if (synapse.Kind is SynapseKind.Reaction or SynapseKind.View && !string.Equals(arriving, "synapse.failed", StringComparison.Ordinal))
+            {
+                var message = error.Message.Length > 500 ? error.Message[..500] : error.Message;
+#pragma warning disable CA1031
+                try { await Publish(new SynapseFailed(AliasIn(_catalog.Current) ?? Id.Type, synapse.Name, arriving, causeId, error.GetType().Name, message)).ConfigureAwait(true); }
+                catch (Exception) { }
+#pragma warning restore CA1031
+            }
+
             throw;
         }
 

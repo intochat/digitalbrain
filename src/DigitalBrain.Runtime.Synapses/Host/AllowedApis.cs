@@ -99,7 +99,7 @@ internal static class AllowedApis
         "DigitalBrain.SignalDelivery", "DigitalBrain.SignalEnvelope", "DigitalBrain.SignalPage", "DigitalBrain.SlotAttribute",
         "DigitalBrain.SlotDescriptor", "DigitalBrain.SlotNeed", "DigitalBrain.SlotUnboundException", "DigitalBrain.Staged",
         "DigitalBrain.StateAttribute", "DigitalBrain.StateChanged", "DigitalBrain.Synapse", "DigitalBrain.SynapseAttribute",
-        "DigitalBrain.SynapseDescriptor", "DigitalBrain.SynapseDiagnostic", "DigitalBrain.SynapseFinished", "DigitalBrain.SynapseKind",
+        "DigitalBrain.SynapseDescriptor", "DigitalBrain.SynapseDiagnostic", "DigitalBrain.SynapseFailed", "DigitalBrain.SynapseFinished", "DigitalBrain.SynapseKind",
         "DigitalBrain.SynapseNeeds", "DigitalBrain.SynapseReasons", "DigitalBrain.SynapseRequest", "DigitalBrain.SynapseShape",
         "DigitalBrain.SynapseShapeException", "DigitalBrain.SynapseSource", "DigitalBrain.SynapseStarted", "DigitalBrain.TypeKind",
         "DigitalBrain.Undeployed", "DigitalBrain.ViewChanged",

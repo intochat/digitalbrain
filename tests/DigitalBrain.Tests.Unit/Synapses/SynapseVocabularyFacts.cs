@@ -57,6 +57,8 @@ public sealed class SynapseVocabularyFacts
         Assert.Equal("synapse.view-changed", typeof(ViewChanged).GetCustomAttribute<SignalAttribute>()!.Alias);
         Assert.True(typeof(SynapseStarted).IsDefined(typeof(EphemeralSignalAttribute), false));
         Assert.True(typeof(SynapseFinished).IsDefined(typeof(EphemeralSignalAttribute), false));
+        Assert.Equal("synapse.failed", typeof(SynapseFailed).GetCustomAttribute<SignalAttribute>()!.Alias);
+        Assert.False(typeof(SynapseFailed).IsDefined(typeof(EphemeralSignalAttribute), false));
     }
 
     [Fact]

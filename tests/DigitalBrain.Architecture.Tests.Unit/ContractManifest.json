@@ -76,6 +76,7 @@
       "policy.refused",
       "policy.retired",
       "synapse.deployed",
+      "synapse.failed",
       "synapse.finished",
       "synapse.gap",
       "synapse.gate-changed",
