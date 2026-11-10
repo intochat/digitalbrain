@@ -91,7 +91,9 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
                 if (ReferenceEquals(result, State)) { return "unchanged"; }
                 if (result is Reaction<TState> r)
                 {
-                    await Save(r.Next, r.Signals.Count == 0 ? [Changed(signal)] : r.Signals).ConfigureAwait(true);
+                    IReadOnlyList<Signal> signals = r.Signals.Count == 0 ? [Changed(signal)] : r.Signals;
+                    if (r.Asks.Count > 0) { signals = [.. signals, new Asked(Id.Type, Guid.NewGuid().ToString("N"), AskRules.Checked(r.Asks, Synapses()))]; }
+                    await Save(r.Next, signals).ConfigureAwait(true);
                 }
                 else
                 {
@@ -386,7 +388,7 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
 
     private async Task<object?> Invoke(SynapseDescriptor synapse, Signal? signal, SignalEnvelope? envelope, TState state, CancellationToken ct)
     {
-        var budget = synapse.Slots.Count > 0 ? StateNeuron.SlotReactionTimeout : StateNeuron.ReactionTimeout;
+        var budget = synapse.Slots.Any(slot => !slot.Deferred) ? StateNeuron.SlotReactionTimeout : StateNeuron.ReactionTimeout;
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeoutCts.CancelAfter(budget);
         var linkedCt = timeoutCts.Token;
@@ -403,7 +405,12 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
 
         foreach (var slot in synapse.Slots.OrderBy(slot => slot.ParameterIndex))
         {
-            if (slot.Deferred) { throw new NotSupportedException($"slot '{slot.Name}' is an Asks<> slot; this build cannot carry out asks"); }
+            if (slot.Deferred)
+            {
+                arguments[slot.ParameterIndex] = Activator.CreateInstance(typeof(Asks<>).MakeGenericType(slot.Contract), slot.Name);
+                continue;
+            }
+
             try { arguments[slot.ParameterIndex] = await _slots.Resolve(Id, slot, linkedCt).ConfigureAwait(true); }
             catch (SlotUnboundException) when (synapse.Kind == SynapseKind.Gate)
             {
