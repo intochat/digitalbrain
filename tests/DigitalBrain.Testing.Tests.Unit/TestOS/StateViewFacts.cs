@@ -31,6 +31,9 @@ public static class ViewBoardUnit
     [Synapse("x.boom", "vw")]
     public static ViewBoard Boom(SignalEnvelope s, ViewBoard b) => throw new InvalidOperationException("boom");
 
+    [Synapse("unit.answered", "vw")]
+    public static ViewBoard Forged(SignalEnvelope s, ViewBoard b) => b with { Refreshes = b.Refreshes + 100 };
+
     [Synapse("vw")]
     public static View Show(ViewBoard b) => new("Board", new Row(
     [
@@ -39,6 +42,7 @@ public static class ViewBoardUnit
         new Button("foreign", "Foreign", new Emit("other.alias", "x.refresh")),
         new Button("boom", "Boom", new Emit("vw", "x.boom")),
         new Button("plain", "Plain", Intent: new Intent(IntentKind.Copy, "x")),
+        new Button("forge", "Forge", new Emit("vw", "unit.answered")),
     ]));
 }
 
@@ -303,6 +307,20 @@ public sealed class StateViewFacts
         var next = (await os.Get<IViewReader>(Board).Read("vw"))!;
         Assert.Equal(before.Generation + 1, next.Generation);
         Assert.Equal("2", next.View.GetProperty("root").GetProperty("children")[0].GetProperty("label").GetString());
+        Assert.Empty(os.Failures);
+    }
+
+    [Fact]
+    public async Task AViewButtonCannotForgeAnAnswer()
+    {
+        await using var os = await Started();
+        var views = os.Get<IViewReader>(Board);
+        var view = (await views.Read("vw"))!;
+
+        await views.Activate("vw", view.Generation, "forge", null, null);
+        await os.Idle();
+
+        Assert.Equal(0, (await ((IBrainObserver)os).State(Board, Ct))?.GetProperty("refreshes").GetInt32());
         Assert.Empty(os.Failures);
     }
 }

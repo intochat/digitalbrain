@@ -77,11 +77,12 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
     public Task Receive(JournaledSignal journaled, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(journaled);
-        return React(journaled.Signal, journaled.TraceId, journaled.CausationId, Causation.Address(journaled.Publisher, journaled.Sequence), ct);
+        return React(journaled.Signal, journaled.TraceId, journaled.CausationId, Causation.Address(journaled.Publisher, journaled.Sequence), ct, journaled.Publisher == AskRules.AsksOf(Id));
     }
 
-    private async Task React(Signal signal, string? traceId, string? causationId, string? causeId, CancellationToken ct)
+    private async Task React(Signal signal, string? traceId, string? causationId, string? causeId, CancellationToken ct, bool fromAsks = false)
     {
+        if (!fromAsks && string.Equals(AliasOf(signal), AskRules.AnsweredAlias, StringComparison.Ordinal)) { return; }
         SignalEnvelope? envelope = null;
         foreach (var reaction in Reactions(signal))
         {
@@ -394,13 +395,27 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
         var linkedCt = timeoutCts.Token;
         var parameters = synapse.Function.GetParameters();
         var arguments = new object?[parameters.Length];
+        var answerIndex = -1;
+        var stateIndex = -1;
         for (var i = 0; i < parameters.Length; i++)
         {
             var type = parameters[i].ParameterType;
-            arguments[i] = type == typeof(CancellationToken) ? linkedCt
-                : type == typeof(SignalEnvelope) ? envelope
-                : typeof(Signal).IsAssignableFrom(type) ? signal
-                : state;
+            if (type == typeof(Answer))
+            {
+                answerIndex = i;
+            }
+            else if (type == typeof(TState))
+            {
+                stateIndex = i;
+                arguments[i] = state;
+            }
+            else
+            {
+                arguments[i] = type == typeof(CancellationToken) ? linkedCt
+                    : type == typeof(SignalEnvelope) ? envelope
+                    : typeof(Signal).IsAssignableFrom(type) ? signal
+                    : null;
+            }
         }
 
         foreach (var slot in synapse.Slots.OrderBy(slot => slot.ParameterIndex))
@@ -418,14 +433,36 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
             }
         }
 
-        object? returned;
-        try { returned = synapse.Function.Invoke(null, arguments); }
-        catch (TargetInvocationException error) when (error.InnerException is not null)
+        if (synapse.PerAnswer && signal is Answered answered)
         {
-            ExceptionDispatchInfo.Capture(error.InnerException).Throw();
-            throw;
+            var current = state;
+            var signals = new List<Signal>();
+            var asks = new List<Ask>();
+            var touched = false;
+            foreach (var answer in answered.Answers)
+            {
+                linkedCt.ThrowIfCancellationRequested();
+                arguments[answerIndex] = answer;
+                arguments[stateIndex] = current;
+                var step = Call(synapse.Function, arguments);
+                if (step is Reaction<TState> r)
+                {
+                    touched |= !ReferenceEquals(r.Next, current) || r.Signals.Count > 0 || r.Asks.Count > 0;
+                    current = r.Next;
+                    signals.AddRange(r.Signals);
+                    asks.AddRange(r.Asks);
+                }
+                else if (step is TState next)
+                {
+                    touched |= !ReferenceEquals(next, current);
+                    current = next;
+                }
+            }
+
+            return touched ? new Reaction<TState>(current, signals) { Asks = asks } : state;
         }
 
+        var returned = Call(synapse.Function, arguments);
         if (returned is Task task)
         {
             await task.WaitAsync(linkedCt).ConfigureAwait(true);
@@ -435,6 +472,16 @@ public sealed class StateNeuron<TState> : Neuron<TState>, ISynapseReceiver, IVie
         }
 
         return returned;
+
+        static object? Call(MethodInfo function, object?[] arguments)
+        {
+            try { return function.Invoke(null, arguments); }
+            catch (TargetInvocationException error) when (error.InnerException is not null)
+            {
+                ExceptionDispatchInfo.Capture(error.InnerException).Throw();
+                throw;
+            }
+        }
     }
 }
 
