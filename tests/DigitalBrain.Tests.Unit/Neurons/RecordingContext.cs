@@ -29,7 +29,9 @@ internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronSta
 
     public INeuronState State => this;
 
-    public ITimers Timers => throw new NotSupportedException();
+    public ITimers? RecordedTimers { get; set; }
+
+    public ITimers Timers => RecordedTimers ?? throw new NotSupportedException();
 
     public IReminders? RecordedReminders { get; set; }
 

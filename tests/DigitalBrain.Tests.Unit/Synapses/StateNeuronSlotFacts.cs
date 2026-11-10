@@ -31,10 +31,12 @@ public sealed class FakeSqlRead(int value) : ISqlRead
 public sealed class FakeSlotResolver(Dictionary<string, object> bound) : ISlotResolver
 {
     public int Calls { get; private set; }
+    public NeuronId? LastState { get; private set; }
 
     public Task<object> Resolve(NeuronId state, SlotDescriptor slot, CancellationToken ct)
     {
         Calls++;
+        LastState = state;
         return bound.TryGetValue(slot.Name, out var value) ? Task.FromResult(value) : throw new SlotUnboundException(state.Type, slot.Name);
     }
 }

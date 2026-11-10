@@ -85,7 +85,7 @@ public sealed partial class RuntimeTypeFacts
         // Runtime neuron types and the framework's own signals are the ones pinned; module neurons belong to modules.
         return kind switch
         {
-            "neurons" => new(names.Where(name => name.StartsWith("runtime.", StringComparison.Ordinal) || name == "policies"), StringComparer.Ordinal),
+            "neurons" => new(names.Where(name => name.StartsWith("runtime.", StringComparison.Ordinal) || name.StartsWith("unit.", StringComparison.Ordinal) || name == "policies"), StringComparer.Ordinal),
             "signals" => new(names.Where(name => name.StartsWith("synapse.", StringComparison.Ordinal)
                 || name.StartsWith("brain.", StringComparison.Ordinal)
                 || name.StartsWith("kernel.", StringComparison.Ordinal)

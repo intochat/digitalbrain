@@ -63,7 +63,8 @@
       "policies",
       "runtime.listener",
       "runtime.operation",
-      "runtime.session"
+      "runtime.session",
+      "unit.ask.batch"
     ],
     "signals": [
       "brain.activated",
