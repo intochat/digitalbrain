@@ -3,6 +3,7 @@ DigitalBrain.Capabilities.Http.HostNotAllowedException
 DigitalBrain.Capabilities.Http.HostNotAllowedException.Host.get -> string!
 DigitalBrain.Capabilities.Http.HostNotAllowedException.HostNotAllowedException(string! host) -> void
 DigitalBrain.Capabilities.Http.HostNotAllowedException.HostNotAllowedException(string! host, string? scheme) -> void
+DigitalBrain.Capabilities.Http.HttpAsks
 DigitalBrain.Capabilities.Http.HttpConnectionOptions
 DigitalBrain.Capabilities.Http.HttpConnectionOptions.AllowedHosts.get -> System.Collections.Generic.IReadOnlyList<string!>!
 DigitalBrain.Capabilities.Http.HttpConnectionOptions.AllowedHosts.init -> void
@@ -17,6 +18,8 @@ DigitalBrain.Capabilities.Http.IHttpRead.GetText(string! url, System.Threading.C
 override DigitalBrain.Capabilities.Http.HttpConnectionOptions.Equals(object? obj) -> bool
 override DigitalBrain.Capabilities.Http.HttpConnectionOptions.GetHashCode() -> int
 override DigitalBrain.Capabilities.Http.HttpConnectionOptions.ToString() -> string!
+static DigitalBrain.Capabilities.Http.HttpAsks.GetJson(this DigitalBrain.Asks<DigitalBrain.Capabilities.Http.IHttpRead!> http, string! url, string? key = null) -> DigitalBrain.Ask!
+static DigitalBrain.Capabilities.Http.HttpAsks.GetText(this DigitalBrain.Asks<DigitalBrain.Capabilities.Http.IHttpRead!> http, string! url, string? key = null) -> DigitalBrain.Ask!
 static DigitalBrain.Capabilities.Http.HttpConnectionOptions.operator !=(DigitalBrain.Capabilities.Http.HttpConnectionOptions? left, DigitalBrain.Capabilities.Http.HttpConnectionOptions? right) -> bool
 static DigitalBrain.Capabilities.Http.HttpConnectionOptions.operator ==(DigitalBrain.Capabilities.Http.HttpConnectionOptions? left, DigitalBrain.Capabilities.Http.HttpConnectionOptions? right) -> bool
 static DigitalBrain.Capabilities.Http.HttpHosts.IsPrivateOrLoopback(string! host) -> bool
