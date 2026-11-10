@@ -27,13 +27,38 @@ public sealed class AsksNeuronFacts
     private FakeBatch B2 { get; } = new();
     private FakeBatch B3 { get; } = new();
     private SynapseCatalogSource Catalog { get; } = new(SynapseCatalog.Scan([typeof(Asker), typeof(AskerFunctions)]));
+    private AsksNeuron? _asks;
 
     private static Ask Ask(string key, string slot = "feed") => new(slot, "Get", JsonElement.Parse("""{"id":"1"}"""), key);
 
     private static Asked Batch(string id, int count) =>
         new("asker", id, [.. Enumerable.Range(0, count).Select(i => Ask($"k{i}"))]);
 
+    private static AskSettlement Settle(
+        string batch,
+        int index,
+        int attempt,
+        AnswerStatus status = AnswerStatus.Ok,
+        bool transient = false,
+        bool repeatable = false,
+        string? error = null,
+        JsonElement? result = null) =>
+        new(
+            batch,
+            index,
+            attempt,
+            "feed",
+            "Get",
+            $"k{index}",
+            repeatable,
+            status,
+            result ?? (status == AnswerStatus.Ok ? JsonElement.Parse("""{"id":"1"}""") : AskRules.NoResult),
+            error,
+            transient);
+
     private void Seed(AsksState state) => Context.Store(state);
+
+    private Task Fire(string name) => _asks!.Remind(name, Ct);
 
     private List<Answer> Sent() =>
         [.. Context.Writes.SelectMany(w => w.Signals.OfType<Answered>()).SelectMany(a => a.Answers)];
@@ -43,6 +68,7 @@ public sealed class AsksNeuronFacts
         var asks = new AsksNeuron(Catalog);
         NeuronAttachment.Attach(asks, Context);
         await NeuronAttachment.Activate(asks, Ct);
+        _asks = asks;
         return asks;
     }
 
@@ -122,6 +148,152 @@ public sealed class AsksNeuronFacts
         await asks.Attach(Ct);
         var synapse = Assert.Single(Context.SynapseList);
         Assert.Equal((new NeuronId(Id.Brain, "asker", "default"), typeof(Asked)), (synapse.From, synapse.Signal));
+    }
+
+    [Fact]
+    public async Task ASettlementForAnAttemptNotInFlightIsIgnored()
+    {
+        var asks = await Activated();
+        await asks.OnAsked(Batch("b1", 1), Ct);
+        var writes = Context.Writes.Count;
+        await asks.Settled(Settle("b1", 0, attempt: 2));
+        await asks.Settled(Settle("b9", 0, attempt: 1));
+        await asks.Settled(Settle("b1", 5, attempt: 1));
+        Assert.Equal(writes, Context.Writes.Count);
+
+        await asks.Settled(Settle("b1", 0, attempt: 1));
+        await asks.Settled(Settle("b1", 0, attempt: 1));                          // a second copy
+        var answer = Assert.Single(Sent());
+        Assert.Equal(("feed", "Get", "k0", AnswerStatus.Ok, 0), (answer.Slot, answer.Operation, answer.Key, answer.Status, answer.Remaining));
+        Assert.True(B1.Dropped);
+        Assert.Contains("asks-nudge", Timers.StoppedReminders);
+    }
+
+    [Fact]
+    public async Task AnswersLeaveInGroupsOfTwentyFive()
+    {
+        var asks = await Activated();
+        await asks.OnAsked(Batch("b1", 30), Ct);
+        for (var i = 0; i < 30; i++) { await asks.Settled(Settle("b1", i, 1)); }
+
+        Assert.Equal([25, 5], Context.Writes.SelectMany(w => w.Signals.OfType<Answered>()).Select(a => a.Answers.Count));
+        Assert.Equal(Enumerable.Range(0, 30).Select(i => $"k{i}"), Sent().Select(a => a.Key));
+        Assert.Equal(0, Sent()[^1].Remaining);
+    }
+
+    [Fact]
+    public async Task AGroupClosesBeforeExceedingTheResultByteCap()
+    {
+        var asks = await Activated();
+        await asks.OnAsked(Batch("b1", 3), Ct);
+        var half = JsonElement.Parse("\"" + new string('a', (AskLimits.MaxResultBytes / 2) - 2) + "\"");
+        var extra = JsonElement.Parse("""{"id":"2"}""");
+        await asks.Settled(Settle("b1", 0, 1, result: half));
+        await asks.Settled(Settle("b1", 1, 1, result: half));
+        await asks.Settled(Settle("b1", 2, 1, result: extra));
+
+        Assert.Equal([2, 1], Context.Writes.SelectMany(w => w.Signals.OfType<Answered>()).Select(a => a.Answers.Count));
+    }
+
+    [Fact]
+    public async Task AfterOneSecondWaitingAnswersAreSent()
+    {
+        var asks = await Activated();
+        await asks.OnAsked(Batch("b1", 6), Ct);
+        await asks.Settled(Settle("b1", 0, 1));
+        Assert.Empty(Sent());                                                     // four are still flying
+        Clock.Now += AskLimits.AnswerFlush;
+        await Fire("asks-due");
+        Assert.Equal("k0", Assert.Single(Sent()).Key);
+    }
+
+    [Fact]
+    public async Task ATransientFailureOfARepeatableAskIsRetriedAfterTwoThenTenSecondsThenFailed()
+    {
+        var asks = await Activated();
+        await asks.OnAsked(Batch("b1", 1), Ct);
+        await asks.Settled(Settle("b1", 0, 1, AnswerStatus.Failed, transient: true, repeatable: true, error: "down"));
+        Assert.Equal([(0, 1)], B1.Runs);
+        Clock.Now += TimeSpan.FromSeconds(2);
+        await Fire("asks-due");
+        Assert.Equal([(0, 1), (0, 2)], B1.Runs);
+        await asks.Settled(Settle("b1", 0, 2, AnswerStatus.Failed, transient: true, repeatable: true, error: "down"));
+        Clock.Now += TimeSpan.FromSeconds(10);
+        await Fire("asks-due");
+        Assert.Equal([(0, 1), (0, 2), (0, 3)], B1.Runs);
+        Assert.Empty(Sent());
+        await asks.Settled(Settle("b1", 0, 3, AnswerStatus.Failed, transient: true, repeatable: true, error: "down"));
+
+        Assert.Equal((AnswerStatus.Failed, "down"), (Assert.Single(Sent()).Status, Sent()[0].Error));
+        Assert.Equal(AskLimits.MaxAttempts, B1.Runs.Count);
+    }
+
+    [Fact]
+    public async Task ACommandOrAFailureThatIsNotTransientIsAnsweredAtOnce()
+    {
+        var asks = await Activated();
+        await asks.OnAsked(Batch("b1", 2), Ct);
+        await asks.Settled(Settle("b1", 0, 1, AnswerStatus.Failed, transient: true, repeatable: false, error: "down"));
+        await asks.Settled(Settle("b1", 1, 1, AnswerStatus.Failed, transient: false, repeatable: true, error: "unbound"));
+
+        Assert.Equal(["down", "unbound"], Sent().Select(a => a.Error));
+        Assert.Equal(2, B1.Runs.Count);
+    }
+
+    [Fact]
+    public async Task AFlyingAskPastItsDueIsAnsweredUnknownOrRetried()
+    {
+        var asks = await Activated();
+        await asks.OnAsked(new Asked("asker", "b1", [Ask("cmd"), Ask("read") with { Repeatable = true }]), Ct);
+        Clock.Now += AskLimits.DefaultTimeout + AsksNeuron.Grace;
+        await Fire("asks-nudge");                                                 // cmd is answered Unknown (waits to be sent: read is waiting), read waits two seconds
+        Assert.DoesNotContain((1, 2), B1.Runs);
+        Clock.Now += TimeSpan.FromSeconds(2);
+        await Fire("asks-due");
+
+        Assert.Contains((1, 2), B1.Runs);
+        var unknown = Assert.Single(Sent());
+        Assert.Equal(("cmd", AnswerStatus.Unknown, "timeout", JsonValueKind.Null), (unknown.Key, unknown.Status, unknown.Error, unknown.Result.ValueKind));
+        await asks.Settled(Settle("b1", 0, 1));                                   // the lost attempt reports after all: ignored
+        Assert.Single(Sent());
+    }
+
+    [Fact]
+    public async Task ABatchOlderThanTwentyFourHoursExpiresEveryOpenAsk()
+    {
+        var asks = await Activated();
+        await asks.OnAsked(Batch("b1", 8), Ct);
+        Clock.Now += AskLimits.MaxAge;
+        await Fire("asks-nudge");
+
+        Assert.Equal(8, Sent().Count);
+        Assert.All(Sent(), a => Assert.Equal((AnswerStatus.Expired, "expired"), (a.Status, a.Error)));
+        Assert.True(B1.Dropped);
+    }
+
+    [Fact]
+    public async Task AFreshActivationResumesOpenBatches()
+    {
+        Seed(new AsksState([new OpenBatch("b1", 2, 0, [], [], 0, AskLimits.DefaultTimeout, Clock.Now)], [], null, Clock.Now.ToUnixTimeSeconds() / 3600, 2, false));
+        B1.Stored = [Ask("k0"), Ask("k1")];
+        _ = await Activated();
+
+        Assert.Equal([(0, 1), (1, 1)], B1.Runs);
+        Assert.Contains(("asks-nudge", TimeSpan.FromMinutes(1)), Timers.Reminders);
+    }
+
+    [Fact]
+    public async Task DetachDropsEverythingWithoutAnswers()
+    {
+        var asks = await Activated();
+        await asks.OnAsked(Batch("b1", 3), Ct);
+        await asks.Detach(Ct);
+        await asks.Settled(Settle("b1", 0, 1));
+
+        Assert.Empty(Sent());
+        Assert.True(B1.Dropped);
+        Assert.Contains(new NeuronId(Id.Brain, "asker", "default"), Context.Removed);
+        Assert.Contains("asks-nudge", Timers.StoppedReminders);
     }
 
     private sealed class TestClock : TimeProvider

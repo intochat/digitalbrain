@@ -1,3 +1,6 @@
+using System.Text;
+using System.Text.Json;
+
 namespace DigitalBrain;
 
 [Neuron(AskRules.AsksNeuronType)]
@@ -11,8 +14,36 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog) : Neuron, IAsks
 
     private AsksState _state = new();
 
-    protected override async Task OnActivate(CancellationToken cancellationToken) =>
+    protected override async Task OnActivate(CancellationToken cancellationToken)
+    {
+        _ = cancellationToken;
         _state = await Context.State.Load<AsksState>().ConfigureAwait(true) ?? new AsksState();
+        if (_state.Batches.Count > 0)
+        {
+            await Context.Reminders.Start(NudgeReminder, Nudge, Nudge).ConfigureAwait(true);
+            await Sweep().ConfigureAwait(true);
+            await Pump().ConfigureAwait(true);
+            await Flush().ConfigureAwait(true);
+        }
+        else if (_state.Unsent.Count > 0)
+        {
+            await Flush().ConfigureAwait(true);
+        }
+    }
+
+    protected override async Task OnReminder(string name, CancellationToken cancellationToken)
+    {
+        _ = cancellationToken;
+        if (!string.Equals(name, DueTimer, StringComparison.Ordinal)
+            && !string.Equals(name, NudgeReminder, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        await Sweep().ConfigureAwait(true);
+        await Pump().ConfigureAwait(true);
+        await Flush().ConfigureAwait(true);
+    }
 
     [On]
     public async Task OnAsked(Asked asked, CancellationToken ct)
@@ -22,7 +53,7 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog) : Neuron, IAsks
             || !string.Equals(asked.Unit, Id.Key, StringComparison.Ordinal)
             || string.IsNullOrEmpty(asked.Batch)
             || asked.Asks is not { Count: > 0 }
-            || HasBatch(_state.Batches, asked.Batch))
+            || FindBatchIndex(_state.Batches, asked.Batch) >= 0)
         {
             return;
         }
@@ -134,11 +165,207 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog) : Neuron, IAsks
     public Task Attach(CancellationToken ct) =>
         Context.Synapses.Ensure<Asked>(new NeuronId(Id.Brain, Id.Key, "default"));
 
-    public Task Detach(CancellationToken ct) => Task.CompletedTask;
+    public async Task Detach(CancellationToken ct)
+    {
+        _ = ct;
+        var batches = _state.Batches;
+        for (var i = 0; i < batches.Count; i++)
+        {
+            await Get<IAskBatch>(AskRules.BatchOf(Id, batches[i].Id)).Drop().ConfigureAwait(true);
+        }
 
-    public Task Settled(AskSettlement settlement) => Task.CompletedTask;
+        await Context.Synapses.Remove(new NeuronId(Id.Brain, Id.Key, "default")).ConfigureAwait(true);
+        Context.Timers.Stop(DueTimer);
+        await Context.Reminders.Stop(NudgeReminder).ConfigureAwait(true);
+        await Save(new AsksState(), []).ConfigureAwait(true);
+    }
+
+    public async Task Settled(AskSettlement settlement)
+    {
+        if (settlement is null || string.IsNullOrEmpty(settlement.Batch))
+        {
+            return;
+        }
+
+        var batchIndex = FindBatchIndex(_state.Batches, settlement.Batch);
+        if (batchIndex < 0)
+        {
+            return;
+        }
+
+        var batch = _state.Batches[batchIndex];
+        var flyingIndex = FindFlyingIndex(batch.Flying, settlement.Index, settlement.Attempt);
+        if (flyingIndex < 0)
+        {
+            return;
+        }
+
+        var now = Context.Time.GetUtcNow();
+        var nextFlying = RemoveAt(batch.Flying, flyingIndex);
+        var nextBatches = new List<OpenBatch>(_state.Batches.Count);
+
+        if (settlement.Transient && settlement.Repeatable && settlement.Attempt < AskLimits.MaxAttempts)
+        {
+            var delay = Backoff[Math.Clamp(settlement.Attempt - 1, 0, Backoff.Length - 1)];
+            IReadOnlyList<WaitingAsk> nextWaiting = [.. batch.Waiting, new WaitingAsk(settlement.Index, settlement.Attempt + 1, now + delay)];
+            for (var i = 0; i < _state.Batches.Count; i++)
+            {
+                nextBatches.Add(i == batchIndex ? batch with { Flying = nextFlying, Waiting = nextWaiting } : _state.Batches[i]);
+            }
+
+            await Save(_state with { Batches = nextBatches }, []).ConfigureAwait(true);
+        }
+        else
+        {
+            var nextSettled = batch.Settled + 1;
+            var remaining = OpenCount(_state.Batches) - 1;
+            var answer = new Answer(settlement.Slot, settlement.Operation, settlement.Key, settlement.Status, settlement.Result, settlement.Error, remaining);
+            IReadOnlyList<Answer> nextUnsent = [.. _state.Unsent, answer];
+            var nextUnsentSince = _state.Unsent.Count == 0 ? now : _state.UnsentSince ?? now;
+            var closed = nextSettled == batch.Count && nextFlying.Count == 0 && batch.Waiting.Count == 0;
+
+            for (var i = 0; i < _state.Batches.Count; i++)
+            {
+                if (i == batchIndex)
+                {
+                    if (!closed)
+                    {
+                        nextBatches.Add(batch with { Flying = nextFlying, Settled = nextSettled });
+                    }
+                }
+                else
+                {
+                    nextBatches.Add(_state.Batches[i]);
+                }
+            }
+
+            await Save(_state with { Batches = nextBatches, Unsent = nextUnsent, UnsentSince = nextUnsentSince }, []).ConfigureAwait(true);
+            if (closed)
+            {
+                await Get<IAskBatch>(AskRules.BatchOf(Id, batch.Id)).Drop().ConfigureAwait(true);
+            }
+        }
+
+        await Pump().ConfigureAwait(true);
+        await Flush().ConfigureAwait(true);
+    }
 
     public Task Wake() => Task.CompletedTask;
+
+    private async Task Sweep()
+    {
+        if (_state.Batches.Count == 0)
+        {
+            return;
+        }
+
+        var now = Context.Time.GetUtcNow();
+        var openRemaining = OpenCount(_state.Batches);
+        var nextBatches = new List<OpenBatch>(_state.Batches.Count);
+        var nextUnsent = new List<Answer>(_state.Unsent);
+        var nextUnsentSince = _state.UnsentSince;
+        List<string>? droppedBatchIds = null;
+        var changed = false;
+
+        for (var i = 0; i < _state.Batches.Count; i++)
+        {
+            var batch = _state.Batches[i];
+            if (batch.AskedAt + AskLimits.MaxAge <= now)
+            {
+                changed = true;
+                var asks = await Get<IAskBatch>(AskRules.BatchOf(Id, batch.Id)).All().ConfigureAwait(true);
+                var unsettled = UnsettledIndexes(batch);
+                for (var j = 0; j < unsettled.Count; j++)
+                {
+                    var index = unsettled[j];
+                    openRemaining--;
+                    if ((uint)index < (uint)asks.Count)
+                    {
+                        var ask = asks[index];
+                        if (nextUnsent.Count == 0)
+                        {
+                            nextUnsentSince = now;
+                        }
+
+                        nextUnsent.Add(new Answer(ask.Slot, ask.Operation, ask.Key, AnswerStatus.Expired, AskRules.NoResult, "expired", openRemaining));
+                    }
+                }
+
+                (droppedBatchIds ??= []).Add(batch.Id);
+                continue;
+            }
+
+            if (!HasDueFlying(batch.Flying, now))
+            {
+                nextBatches.Add(batch);
+                continue;
+            }
+
+            changed = true;
+            var storedAsks = await Get<IAskBatch>(AskRules.BatchOf(Id, batch.Id)).All().ConfigureAwait(true);
+            var nextFlying = new List<FlyingAsk>(batch.Flying.Count);
+            var nextWaiting = new List<WaitingAsk>(batch.Waiting);
+            var nextSettled = batch.Settled;
+
+            for (var j = 0; j < batch.Flying.Count; j++)
+            {
+                var flying = batch.Flying[j];
+                if (flying.Due > now)
+                {
+                    nextFlying.Add(flying);
+                    continue;
+                }
+
+                if ((uint)flying.Index < (uint)storedAsks.Count)
+                {
+                    var ask = storedAsks[flying.Index];
+                    if (ask.Repeatable && flying.Attempt < AskLimits.MaxAttempts)
+                    {
+                        var delay = Backoff[Math.Clamp(flying.Attempt - 1, 0, Backoff.Length - 1)];
+                        nextWaiting.Add(new WaitingAsk(flying.Index, flying.Attempt + 1, now + delay));
+                    }
+                    else
+                    {
+                        nextSettled++;
+                        openRemaining--;
+                        if (nextUnsent.Count == 0)
+                        {
+                            nextUnsentSince = now;
+                        }
+
+                        var status = ask.Repeatable ? AnswerStatus.Failed : AnswerStatus.Unknown;
+                        nextUnsent.Add(new Answer(ask.Slot, ask.Operation, ask.Key, status, AskRules.NoResult, "timeout", openRemaining));
+                    }
+                }
+                else
+                {
+                    nextSettled++;
+                    openRemaining--;
+                }
+            }
+
+            if (nextSettled == batch.Count && nextFlying.Count == 0 && nextWaiting.Count == 0)
+            {
+                (droppedBatchIds ??= []).Add(batch.Id);
+            }
+            else
+            {
+                nextBatches.Add(batch with { Flying = nextFlying, Waiting = nextWaiting, Settled = nextSettled });
+            }
+        }
+
+        if (changed)
+        {
+            await Save(_state with { Batches = nextBatches, Unsent = nextUnsent, UnsentSince = nextUnsentSince }, []).ConfigureAwait(true);
+            if (droppedBatchIds is not null)
+            {
+                for (var i = 0; i < droppedBatchIds.Count; i++)
+                {
+                    await Get<IAskBatch>(AskRules.BatchOf(Id, droppedBatchIds[i])).Drop().ConfigureAwait(true);
+                }
+            }
+        }
+    }
 
     private async Task Pump()
     {
@@ -161,15 +388,7 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog) : Neuron, IAsks
                 if (waitingIndex >= 0)
                 {
                     var waiting = batch.Waiting[waitingIndex];
-                    var nextWaiting = new List<WaitingAsk>(batch.Waiting.Count - 1);
-                    for (var j = 0; j < batch.Waiting.Count; j++)
-                    {
-                        if (j != waitingIndex)
-                        {
-                            nextWaiting.Add(batch.Waiting[j]);
-                        }
-                    }
-
+                    var nextWaiting = RemoveAt(batch.Waiting, waitingIndex);
                     IReadOnlyList<FlyingAsk> nextFlying = [.. batch.Flying, new FlyingAsk(waiting.Index, waiting.Attempt, now + batch.Timeout + Grace)];
                     batches[i] = batch with { Flying = nextFlying, Waiting = nextWaiting };
                     (started ??= []).Add((batch.Id, waiting.Index, waiting.Attempt));
@@ -205,17 +424,13 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog) : Neuron, IAsks
                 await Get<IAskBatch>(AskRules.BatchOf(Id, batchId)).Run(index, attempt).ConfigureAwait(true);
             }
         }
-
-        ScheduleDue(now);
     }
 
     private async Task Flush(bool now = false)
     {
-        _ = now;
-        var flushed = false;
-        while (_state.Unsent.Count > 0)
+        while (_state.Unsent.Count > 0 && ShouldFlush(now, Context.Time.GetUtcNow()))
         {
-            var count = Math.Min(_state.Unsent.Count, AskLimits.AnswersPerSignal);
+            var count = GroupSize(_state.Unsent);
             IReadOnlyList<Answer> group = [.. _state.Unsent.Take(count)];
             IReadOnlyList<Answer> remaining = count == _state.Unsent.Count ? [] : [.. _state.Unsent.Skip(count)];
             var next = _state with
@@ -224,14 +439,25 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog) : Neuron, IAsks
                 UnsentSince = remaining.Count == 0 ? null : _state.UnsentSince,
             };
             await Save(next, [new Answered(Id.Key, group)]).ConfigureAwait(true);
-            flushed = true;
         }
 
-        if (flushed)
+        if (_state.Batches.Count == 0 && _state.Unsent.Count == 0)
+        {
+            Context.Timers.Stop(DueTimer);
+            await Context.Reminders.Stop(NudgeReminder).ConfigureAwait(true);
+        }
+        else
         {
             ScheduleDue(Context.Time.GetUtcNow());
         }
     }
+
+    private bool ShouldFlush(bool now, DateTimeOffset clockNow) =>
+        now
+        || _state.Unsent.Count >= AskLimits.AnswersPerSignal
+        || !HasFlyingOrWaiting(_state.Batches)
+        || _state.UnsentSince is not { } since
+        || clockNow >= since + AskLimits.AnswerFlush;
 
     private async Task Save(AsksState next, IReadOnlyList<Signal> signals)
     {
@@ -241,6 +467,12 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog) : Neuron, IAsks
 
     private void ScheduleDue(DateTimeOffset now)
     {
+        var flyingCount = 0;
+        for (var i = 0; i < _state.Batches.Count; i++)
+        {
+            flyingCount += _state.Batches[i].Flying.Count;
+        }
+
         DateTimeOffset? earliest = null;
         for (var i = 0; i < _state.Batches.Count; i++)
         {
@@ -250,9 +482,12 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog) : Neuron, IAsks
                 earliest = Earlier(earliest, batch.Flying[j].Due);
             }
 
-            for (var j = 0; j < batch.Waiting.Count; j++)
+            if (flyingCount < AskLimits.Concurrency)
             {
-                earliest = Earlier(earliest, batch.Waiting[j].NotBefore);
+                for (var j = 0; j < batch.Waiting.Count; j++)
+                {
+                    earliest = Earlier(earliest, batch.Waiting[j].NotBefore);
+                }
             }
         }
 
@@ -311,11 +546,51 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog) : Neuron, IAsks
         return keys;
     }
 
-    private static bool HasBatch(IReadOnlyList<OpenBatch> batches, string batchId)
+    private static int FindBatchIndex(IReadOnlyList<OpenBatch> batches, string batchId)
     {
         for (var i = 0; i < batches.Count; i++)
         {
             if (string.Equals(batches[i].Id, batchId, StringComparison.Ordinal))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static int FindFlyingIndex(IReadOnlyList<FlyingAsk> flying, int index, int attempt)
+    {
+        for (var i = 0; i < flying.Count; i++)
+        {
+            if (flying[i].Index == index && flying[i].Attempt == attempt)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private static List<T> RemoveAt<T>(IReadOnlyList<T> items, int removeIndex)
+    {
+        var next = new List<T>(items.Count - 1);
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (i != removeIndex)
+            {
+                next.Add(items[i]);
+            }
+        }
+
+        return next;
+    }
+
+    private static bool HasDueFlying(IReadOnlyList<FlyingAsk> flying, DateTimeOffset now)
+    {
+        for (var i = 0; i < flying.Count; i++)
+        {
+            if (flying[i].Due <= now)
             {
                 return true;
             }
@@ -323,6 +598,74 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog) : Neuron, IAsks
 
         return false;
     }
+
+    private static bool HasFlyingOrWaiting(IReadOnlyList<OpenBatch> batches)
+    {
+        for (var i = 0; i < batches.Count; i++)
+        {
+            if (batches[i].Flying.Count > 0 || batches[i].Waiting.Count > 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static List<int> UnsettledIndexes(OpenBatch batch)
+    {
+        var indexes = new List<int>(batch.Flying.Count + batch.Waiting.Count + Math.Max(0, batch.Count - batch.Next));
+        for (var i = 0; i < batch.Flying.Count; i++)
+        {
+            indexes.Add(batch.Flying[i].Index);
+        }
+
+        for (var i = 0; i < batch.Waiting.Count; i++)
+        {
+            indexes.Add(batch.Waiting[i].Index);
+        }
+
+        for (var index = batch.Next; index < batch.Count; index++)
+        {
+            indexes.Add(index);
+        }
+
+        indexes.Sort();
+        for (var i = indexes.Count - 1; i > 0; i--)
+        {
+            if (indexes[i] == indexes[i - 1])
+            {
+                indexes.RemoveAt(i);
+            }
+        }
+
+        return indexes;
+    }
+
+    private static int GroupSize(IReadOnlyList<Answer> unsent)
+    {
+        var max = Math.Min(unsent.Count, AskLimits.AnswersPerSignal);
+        var bytes = ResultBytes(unsent[0]);
+        var count = 1;
+        while (count < max)
+        {
+            var nextBytes = ResultBytes(unsent[count]);
+            if (bytes + nextBytes > AskLimits.MaxResultBytes)
+            {
+                break;
+            }
+
+            bytes += nextBytes;
+            count++;
+        }
+
+        return count;
+    }
+
+    private static int ResultBytes(Answer answer) =>
+        answer.Result.ValueKind == JsonValueKind.Undefined
+            ? 0
+            : Encoding.UTF8.GetByteCount(answer.Result.GetRawText());
 
     private static int OpenCount(IReadOnlyList<OpenBatch> batches)
     {
