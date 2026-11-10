@@ -857,3 +857,68 @@ static DigitalBrain.Testing.Synapses.ExpectNoSignal.operator !=(DigitalBrain.Tes
 static DigitalBrain.Testing.Synapses.ExpectNoSignal.operator ==(DigitalBrain.Testing.Synapses.ExpectNoSignal? left, DigitalBrain.Testing.Synapses.ExpectNoSignal? right) -> bool
 static DigitalBrain.Testing.Synapses.ExpectView.operator !=(DigitalBrain.Testing.Synapses.ExpectView? left, DigitalBrain.Testing.Synapses.ExpectView? right) -> bool
 static DigitalBrain.Testing.Synapses.ExpectView.operator ==(DigitalBrain.Testing.Synapses.ExpectView? left, DigitalBrain.Testing.Synapses.ExpectView? right) -> bool
+DigitalBrain.Testing.Synapses.FakeSlots.World<TContract>(string! slot, DigitalBrain.Testing.Synapses.World! world) -> DigitalBrain.Testing.Synapses.FakeSlots!
+DigitalBrain.Testing.Synapses.World
+DigitalBrain.Testing.Synapses.World.As<TContract>(DigitalBrain.Testing.TestOS! os, string! slot) -> TContract!
+DigitalBrain.Testing.Synapses.World.Calls.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Testing.Synapses.WorldCall!>!
+DigitalBrain.Testing.Synapses.World.On(string! slot, string! operation, System.Func<System.Text.Json.JsonElement, DigitalBrain.Testing.Synapses.WorldAnswer!>! answer) -> DigitalBrain.Testing.Synapses.World!
+DigitalBrain.Testing.Synapses.World.On(string! slot, string! operation, params DigitalBrain.Testing.Synapses.WorldAnswer![]! answers) -> DigitalBrain.Testing.Synapses.World!
+DigitalBrain.Testing.Synapses.World.World() -> void
+DigitalBrain.Testing.Synapses.WorldAnswer
+DigitalBrain.Testing.Synapses.WorldAnswer.Fail
+DigitalBrain.Testing.Synapses.WorldAnswer.Fail.Deconstruct(out System.Exception! Error) -> void
+DigitalBrain.Testing.Synapses.WorldAnswer.Fail.Equals(DigitalBrain.Testing.Synapses.WorldAnswer.Fail? other) -> bool
+DigitalBrain.Testing.Synapses.WorldAnswer.Fail.Error.get -> System.Exception!
+DigitalBrain.Testing.Synapses.WorldAnswer.Fail.Error.init -> void
+DigitalBrain.Testing.Synapses.WorldAnswer.Fail.Fail(System.Exception! Error) -> void
+DigitalBrain.Testing.Synapses.WorldAnswer.Ok
+DigitalBrain.Testing.Synapses.WorldAnswer.Ok.Deconstruct(out System.Text.Json.JsonElement Result) -> void
+DigitalBrain.Testing.Synapses.WorldAnswer.Ok.Equals(DigitalBrain.Testing.Synapses.WorldAnswer.Ok? other) -> bool
+DigitalBrain.Testing.Synapses.WorldAnswer.Ok.Ok(System.Text.Json.JsonElement Result) -> void
+DigitalBrain.Testing.Synapses.WorldAnswer.Ok.Result.get -> System.Text.Json.JsonElement
+DigitalBrain.Testing.Synapses.WorldAnswer.Ok.Result.init -> void
+DigitalBrain.Testing.Synapses.WorldAnswer.WorldAnswer() -> void
+DigitalBrain.Testing.Synapses.WorldAnswer.WorldAnswer(DigitalBrain.Testing.Synapses.WorldAnswer! original) -> void
+DigitalBrain.Testing.Synapses.WorldCall
+DigitalBrain.Testing.Synapses.WorldCall.<Clone>$() -> DigitalBrain.Testing.Synapses.WorldCall!
+DigitalBrain.Testing.Synapses.WorldCall.Arguments.get -> System.Text.Json.JsonElement
+DigitalBrain.Testing.Synapses.WorldCall.Arguments.init -> void
+DigitalBrain.Testing.Synapses.WorldCall.Deconstruct(out string! Slot, out string! Operation, out System.Text.Json.JsonElement Arguments) -> void
+DigitalBrain.Testing.Synapses.WorldCall.Equals(DigitalBrain.Testing.Synapses.WorldCall? other) -> bool
+DigitalBrain.Testing.Synapses.WorldCall.Operation.get -> string!
+DigitalBrain.Testing.Synapses.WorldCall.Operation.init -> void
+DigitalBrain.Testing.Synapses.WorldCall.Slot.get -> string!
+DigitalBrain.Testing.Synapses.WorldCall.Slot.init -> void
+DigitalBrain.Testing.Synapses.WorldCall.WorldCall(string! Slot, string! Operation, System.Text.Json.JsonElement Arguments) -> void
+abstract DigitalBrain.Testing.Synapses.WorldAnswer.<Clone>$() -> DigitalBrain.Testing.Synapses.WorldAnswer!
+override DigitalBrain.Testing.Synapses.WorldAnswer.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.WorldAnswer.Fail.<Clone>$() -> DigitalBrain.Testing.Synapses.WorldAnswer.Fail!
+override DigitalBrain.Testing.Synapses.WorldAnswer.Fail.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.WorldAnswer.Fail.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.WorldAnswer.Fail.ToString() -> string!
+override DigitalBrain.Testing.Synapses.WorldAnswer.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.WorldAnswer.Ok.<Clone>$() -> DigitalBrain.Testing.Synapses.WorldAnswer.Ok!
+override DigitalBrain.Testing.Synapses.WorldAnswer.Ok.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.WorldAnswer.Ok.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.WorldAnswer.Ok.ToString() -> string!
+override DigitalBrain.Testing.Synapses.WorldAnswer.ToString() -> string!
+override DigitalBrain.Testing.Synapses.WorldCall.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.WorldCall.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.WorldCall.ToString() -> string!
+override sealed DigitalBrain.Testing.Synapses.WorldAnswer.Fail.Equals(DigitalBrain.Testing.Synapses.WorldAnswer? other) -> bool
+override sealed DigitalBrain.Testing.Synapses.WorldAnswer.Ok.Equals(DigitalBrain.Testing.Synapses.WorldAnswer? other) -> bool
+static DigitalBrain.Testing.Synapses.WorldAnswer.Fail.operator !=(DigitalBrain.Testing.Synapses.WorldAnswer.Fail? left, DigitalBrain.Testing.Synapses.WorldAnswer.Fail? right) -> bool
+static DigitalBrain.Testing.Synapses.WorldAnswer.Fail.operator ==(DigitalBrain.Testing.Synapses.WorldAnswer.Fail? left, DigitalBrain.Testing.Synapses.WorldAnswer.Fail? right) -> bool
+static DigitalBrain.Testing.Synapses.WorldAnswer.Json(string! json) -> DigitalBrain.Testing.Synapses.WorldAnswer!
+static DigitalBrain.Testing.Synapses.WorldAnswer.Ok.operator !=(DigitalBrain.Testing.Synapses.WorldAnswer.Ok? left, DigitalBrain.Testing.Synapses.WorldAnswer.Ok? right) -> bool
+static DigitalBrain.Testing.Synapses.WorldAnswer.Ok.operator ==(DigitalBrain.Testing.Synapses.WorldAnswer.Ok? left, DigitalBrain.Testing.Synapses.WorldAnswer.Ok? right) -> bool
+static DigitalBrain.Testing.Synapses.WorldAnswer.Status(int status) -> DigitalBrain.Testing.Synapses.WorldAnswer!
+static DigitalBrain.Testing.Synapses.WorldAnswer.Text(string! text) -> DigitalBrain.Testing.Synapses.WorldAnswer!
+static DigitalBrain.Testing.Synapses.WorldAnswer.TimedOut() -> DigitalBrain.Testing.Synapses.WorldAnswer!
+static DigitalBrain.Testing.Synapses.WorldAnswer.operator !=(DigitalBrain.Testing.Synapses.WorldAnswer? left, DigitalBrain.Testing.Synapses.WorldAnswer? right) -> bool
+static DigitalBrain.Testing.Synapses.WorldAnswer.operator ==(DigitalBrain.Testing.Synapses.WorldAnswer? left, DigitalBrain.Testing.Synapses.WorldAnswer? right) -> bool
+static DigitalBrain.Testing.Synapses.WorldCall.operator !=(DigitalBrain.Testing.Synapses.WorldCall? left, DigitalBrain.Testing.Synapses.WorldCall? right) -> bool
+static DigitalBrain.Testing.Synapses.WorldCall.operator ==(DigitalBrain.Testing.Synapses.WorldCall? left, DigitalBrain.Testing.Synapses.WorldCall? right) -> bool
+virtual DigitalBrain.Testing.Synapses.WorldAnswer.EqualityContract.get -> System.Type!
+virtual DigitalBrain.Testing.Synapses.WorldAnswer.Equals(DigitalBrain.Testing.Synapses.WorldAnswer? other) -> bool
+virtual DigitalBrain.Testing.Synapses.WorldAnswer.PrintMembers(System.Text.StringBuilder! builder) -> bool

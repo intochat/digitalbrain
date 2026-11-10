@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DigitalBrain.Capabilities.Http;
 using DigitalBrain.Testing.Synapses;
 
 namespace DigitalBrain.Testing.Tests.Unit;
@@ -55,6 +56,9 @@ public sealed class UnitScenarioFacts
         new("Me.XWatch", new Dictionary<string, string> { ["XWatch.cs"] = text }, null, null);
 
     private static FakeSlots OnePost() => new FakeSlots().Http("Http", _ => """{"data":[{"id":"1","text":"hi"}]}""");
+
+    private static string Posts(params string[] ids) =>
+        JsonSerializer.Serialize(new { data = ids.Select(id => new { id, text = id }) });
 
     private static JsonElement Json(string text) => JsonElement.Parse(text);
 
@@ -195,5 +199,46 @@ public sealed class UnitScenarioFacts
             ["step 0 ExpectView x.watch: no view published",
              "step 2 ExpectView x.watch: no text contains \"nope\"",
              "step 3 ExpectNoSignal x.polled: journaled at step 1"], failing.Failures);
+    }
+
+    [Fact]
+    public async Task AScriptedWorldAnswersEachCallInOrderAndRepeatsTheLast()
+    {
+        var world = new World().On("Http", "GetJson", WorldAnswer.Json(Posts("1")), WorldAnswer.Json(Posts("2", "1")));
+        var transcript = await UnitScenario.Run(Source(XWatch), new FakeSlots().World<IHttpRead>("Http", world),
+            [new Tick(Start.AddMinutes(6)), new ExpectState("x.watch", "Unseen", Json("1")),
+             new Tick(Start.AddMinutes(12)), new ExpectState("x.watch", "Unseen", Json("2")),
+             new Tick(Start.AddMinutes(18)), new ExpectState("x.watch", "Unseen", Json("2"))], Ct);
+
+        Assert.True(transcript.Passed, string.Join("; ", transcript.Failures));
+        Assert.Equal(3, world.Calls.Count);
+        Assert.Equal(("Http", "GetJson"), (world.Calls[0].Slot, world.Calls[0].Operation));
+        Assert.Equal("https://api.x.com/2/users/me/mentions", world.Calls[0].Arguments.GetProperty("url").GetString());
+    }
+
+    [Fact]
+    public async Task AFailingAnswerFailsTheStepWithWhatTheConnectionThrows()
+    {
+        var world = new World().On("Http", "GetJson", WorldAnswer.Status(503));
+        var transcript = await UnitScenario.Run(Source(XWatch), new FakeSlots().World<IHttpRead>("Http", world), [new Tick(Start.AddMinutes(6))], Ct);
+
+        Assert.False(transcript.Passed);
+        Assert.StartsWith("step 0 Tick: HttpRequestException", Assert.Single(transcript.Failures), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ANonJsonBodyThrowsWhatTheRealConnectionThrows()
+    {
+        var transcript = await UnitScenario.Run(Source(XWatch), new FakeSlots().Http("Http", _ => "<html>"), [new Tick(Start.AddMinutes(6))], Ct);
+
+        Assert.Equal("step 0 Tick: HttpRequestException: api.x.com did not return JSON", Assert.Single(transcript.Failures));
+    }
+
+    [Fact]
+    public async Task AnUnscriptedOperationNamesTheSlotAndTheOperation()
+    {
+        var transcript = await UnitScenario.Run(Source(XWatch), new FakeSlots().World<IHttpRead>("Http", new World()), [new Tick(Start.AddMinutes(6))], Ct);
+
+        Assert.Contains("the world has no answer for Http.GetJson", Assert.Single(transcript.Failures), StringComparison.Ordinal);
     }
 }

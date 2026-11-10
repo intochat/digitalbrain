@@ -47,6 +47,19 @@ public sealed class FakeSlots
         return this;
     }
 
+    /// <summary>Binds <paramref name="slot"/> to <paramref name="world"/> as the capability <typeparamref name="TContract"/>.</summary>
+    /// <typeparam name="TContract">The <c>[Capability]</c> contract.</typeparam>
+    /// <param name="slot">The slot name.</param>
+    /// <param name="world">The scripted world.</param>
+    /// <returns>This instance.</returns>
+    public FakeSlots World<TContract>(string slot, World world) where TContract : class
+    {
+        ArgumentException.ThrowIfNullOrEmpty(slot);
+        ArgumentNullException.ThrowIfNull(world);
+        _slots.Add((slot, os => os.With(slot, world.As<TContract>(os, slot))));
+        return this;
+    }
+
     internal void BindTo(TestOS os)
     {
         foreach (var (_, bind) in _slots) { bind(os); }
@@ -54,7 +67,11 @@ public sealed class FakeSlots
 
     private sealed class FakeHttp(Func<string, string> body) : IHttpRead
     {
-        public Task<JsonElement> GetJson(string url, CancellationToken ct) => Task.FromResult(JsonElement.Parse(body(url)));
+        public Task<JsonElement> GetJson(string url, CancellationToken ct)
+        {
+            try { return Task.FromResult(JsonElement.Parse(body(url))); }
+            catch (JsonException error) { throw new HttpRequestException($"{new Uri(url).Host} did not return JSON", error); }
+        }
 
         public Task<string> GetText(string url, CancellationToken ct) => Task.FromResult(body(url));
     }
