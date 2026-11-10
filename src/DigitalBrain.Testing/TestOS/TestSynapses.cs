@@ -286,7 +286,15 @@ internal sealed class SynapseRegistry(TestOS os)
             {
                 bool wanted;
                 lock (_gate) { wanted = Wants(entry, item.Signal); }
-                if (wanted) { await React(subscriber, item.Signal, entry, item.Sequence, entry.Source, item.TraceId, item).ConfigureAwait(false); }
+                if (wanted)
+                {
+                    try { await React(subscriber, item.Signal, entry, item.Sequence, entry.Source, item.TraceId, item).ConfigureAwait(false); }
+                    catch when (typeof(ISynapseReceiver).IsAssignableFrom(subscriber.Class))
+                    {
+                        Advance(entry, item.Sequence);
+                        throw;
+                    }
+                }
                 Advance(entry, item.Sequence);
             }
         }
@@ -312,7 +320,15 @@ internal sealed class SynapseRegistry(TestOS os)
             {
                 bool wanted;
                 lock (_gate) { wanted = !(deaf && item.Publisher == subscriber.Id) && Wants(entry, item.Signal); }
-                if (wanted) { await React(subscriber, item.Signal, entry, item.Sequence, item.Publisher, item.TraceId, item).ConfigureAwait(false); }
+                if (wanted)
+                {
+                    try { await React(subscriber, item.Signal, entry, item.Sequence, item.Publisher, item.TraceId, item).ConfigureAwait(false); }
+                    catch when (deaf)
+                    {
+                        Advance(entry, item.Sequence);
+                        throw;
+                    }
+                }
                 Advance(entry, item.Sequence);
             }
         }

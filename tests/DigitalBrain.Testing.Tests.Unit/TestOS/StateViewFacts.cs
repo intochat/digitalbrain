@@ -272,6 +272,7 @@ public sealed class StateViewFacts
         await os.Idle();
 
         Assert.Single(os.Journal(Board.Brain).Signals(Board), item => SignalAliases.Of(item.Signal) == "x.boom");
+        Assert.Single(os.Journal(Board.Brain).Signals(Board), item => SignalAliases.Of(item.Signal) == "synapse.failed");
         Assert.Equal(before?.GetRawText(), (await ((IBrainObserver)os).State(Board, Ct))?.GetRawText());
         Assert.Contains(finished, f => f.Function.EndsWith(".Boom", StringComparison.Ordinal) && f.Outcome == "failed");
     }

@@ -192,7 +192,7 @@ internal static partial class GateRunner
 
     // The signals no gate runs on (see the type summary).
     private static bool Ungated(Signal signal)
-        => signal is StateChanged or Rejected or DigitalBrain.Time.Tick or Installed or Retired or InstallRequested or InstallDenied or Deployed or Staged or Undeployed or DigitalBrain.Time.Registered or DigitalBrain.Time.Unregistered or PolicyProposed or PolicyAdopted or PolicyRefused or PolicyRetired;
+        => signal is StateChanged or Rejected or DigitalBrain.Time.Tick or Installed or Retired or InstallRequested or InstallDenied or Deployed or Staged or Undeployed or DigitalBrain.Time.Registered or DigitalBrain.Time.Unregistered or PolicyProposed or PolicyAdopted or PolicyRefused or PolicyRetired or SynapseFailed;
 
     // The publishers along the current call chain that are blocked in Run or Commit.
     private static string[] Chain()

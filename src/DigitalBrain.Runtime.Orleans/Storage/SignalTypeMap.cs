@@ -21,6 +21,7 @@ internal sealed class SignalTypeMap
         Add(typeof(Gap));
         Add(typeof(DigitalBrain.Rules.Rejected));
         Add(typeof(StateChanged));
+        Add(typeof(SynapseFailed));
         // The installs and time neurons every silo hosts (NeuronTypeRegistry) publish these.
         Add(typeof(Installed));
         Add(typeof(Retired));

@@ -318,6 +318,12 @@ internal sealed partial class SynapseEngine : IAsyncObserver<SignalReference>
         {
             _counters.Failure();
             LogReactionFailed(_log, error, _id.ToString(), entry.Source, item.Sequence);
+            if (neuron is ISynapseReceiver)
+            {
+                if (scope.Cursor.Written) { _etag = scope.Cursor.ETag; }
+                else { await Persist().ConfigureAwait(true); }
+                return true;
+            }
             if (scope.Cursor.Written)
             {
                 _etag = scope.Cursor.ETag;

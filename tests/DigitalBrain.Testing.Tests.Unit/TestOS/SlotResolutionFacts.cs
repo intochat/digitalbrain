@@ -179,6 +179,7 @@ public sealed class SlotResolutionFacts
         await os.Idle();
 
         Assert.Contains(finished, f => f.Outcome == "failed" && f.Function.EndsWith(".Refresh", StringComparison.Ordinal) && f.Neuron == Stats.ToString());
+        Assert.Single(os.Journal(Stats.Brain).Signals(Stats), item => SignalAliases.Of(item.Signal) == "synapse.failed");
         Assert.DoesNotContain(os.Journal(Stats.Brain).Signals(Stats), s => s.Signal is StateChanged);
         Assert.Contains("slot 'Db' is not bound", e.Rejected.Messages[0], StringComparison.Ordinal);
         Assert.Contains(os.Journal(Stats.Brain).Signals(NeuronId.Parse("sr/slot.guard/default")), s => s.Signal is Rejected);

@@ -188,6 +188,53 @@ public static class SbOddGates
     public static Check Never(StateChanged s, SbSkip state) => Check.Reject("never runs");
 }
 
+[Signal("test.sb.poke")]
+public sealed record SbPoke(bool Boom) : Signal;
+
+[State("sb.fragile")]
+public sealed record SbFragile(int Value)
+{
+    public SbFragile() : this(0) { }
+}
+
+[State("sb.echo")]
+public sealed record SbEcho(int Value)
+{
+    public SbEcho() : this(0) { }
+}
+
+[State("sb.nofail")]
+public sealed record SbNoFail(int Value)
+{
+    public SbNoFail() : this(0) { }
+}
+
+public static class SbFragileUnit
+{
+    [Synapse(typeof(SbPoke), "sb.fragile")]
+    public static SbFragile Count(SbPoke p, SbFragile c) => p.Boom ? throw new InvalidOperationException("boom") : c with { Value = c.Value + 1 };
+
+    [Synapse(typeof(SynapseFailed), "sb.echo")]
+    public static SbEcho Echo(SynapseFailed f, SbEcho e) => throw new InvalidOperationException("echo");
+
+    [Synapse(typeof(SbPoke), "sb.echo")]
+    public static SbEcho Heard(SbPoke p, SbEcho e) => e with { Value = e.Value + 1 };
+
+    [Synapse(typeof(SynapseFailed), "sb.nofail")]
+    public static Check NoFailures(SynapseFailed f, SbNoFail g) => Check.Reject("failures are not gated");
+}
+
+public interface ISbPoker
+{
+    Task Poke(bool boom);
+}
+
+[Neuron("sb.poker")]
+public sealed class SbPoker : Neuron<SbFragile>, ISbPoker
+{
+    public Task Poke(bool boom) => Save(State with { Value = State.Value + 1 }, new SbPoke(boom));
+}
+
 public interface ISbPayments
 {
     Task Charge(decimal amount);
@@ -422,6 +469,29 @@ public sealed class StateNeuronSiloFacts(StatefulSilo silo) : IClassFixture<Stat
         await Until(() => Task.FromResult(heard.Contains("sb.week")), ct);
 
         Assert.Contains("sb.week", heard);
+    }
+
+    [Fact]
+    public async Task AFailedReactionIsRecordedOnceAndTheNextSignalStillRunsOnTheSilo()
+    {
+        await Install(silo.Services, "sbf", "sb.fragile", "sb.echo", "sb.nofail");
+        var ct = TestContext.Current.CancellationToken;
+        var poker = silo.Get<ISbPoker>("sbf/sb.poker/a");
+
+        await poker.Poke(true);
+        await poker.Poke(false);
+        await Until(async () => await ValueOf("sbf/sb.fragile/default", ct) == 1 && await ValueOf("sbf/sb.echo/default", ct) == 2, ct);
+
+        Assert.Equal(1, await ValueOf("sbf/sb.fragile/default", ct));
+        Assert.Equal(2, await ValueOf("sbf/sb.echo/default", ct));
+        Assert.Equal(1, (await silo.History("sbf").Read(NeuronId.Parse("sbf/sb.fragile/default"), 0, 100, ct)).Signals.Count(s => s.Signal is SynapseFailed));
+    }
+
+    private async Task<int> ValueOf(string id, CancellationToken ct)
+    {
+        var host = silo.Services.GetRequiredService<IGrainFactory>().GetGrain<INeuronHost>(GrainId.Create(NeuronTypeRegistry.AffineGrainType, id));
+        var state = await host.InspectState(ct);
+        return state is { } json && json.TryGetProperty("value", out var value) ? value.GetInt32() : 0;
     }
 
     // Reaction edges and gates come from the install: each fact installs the aliases it charges in its brain (approved by the fixture).
