@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 
 namespace DigitalBrain;
@@ -10,6 +11,7 @@ namespace DigitalBrain;
 /// </remarks>
 public readonly record struct BrainId
 {
+    private static readonly SearchValues<char> DisallowedCompoundChars = SearchValues.Create("!?*<>|\"@");
     /// <summary>The reserved scope of neurons that belong to no person's brain.</summary>
     public static BrainId Kernel { get; } = System("kernel");
 
@@ -50,6 +52,25 @@ public readonly record struct BrainId
     public static bool IsValid([NotNullWhen(true)] string? value)
         => !string.IsNullOrWhiteSpace(value) && value.Length <= 200 && value[0] != '@'
             && !value.Any(c => char.IsControl(c) || c is '/' or '\\' or ':');
+
+    /// <summary>True when <paramref name="value"/> is either a valid user brain id or a valid <c>@system</c> brain id.</summary>
+    internal static bool IsValidUserOrSystem([NotNullWhen(true)] string? value)
+        => !string.IsNullOrWhiteSpace(value) && value[0] == '@'
+            ? value.Length <= 200 && IsValid(value[1..]) && !value.AsSpan(1).ContainsAny(DisallowedCompoundChars)
+            : IsValid(value) && !value.AsSpan().ContainsAny(DisallowedCompoundChars);
+
+    /// <summary>Parses a user or <c>@system</c> brain id.</summary>
+    internal static bool TryParseUserOrSystem([NotNullWhen(true)] string? value, out BrainId brain)
+    {
+        brain = default;
+        if (!IsValidUserOrSystem(value))
+        {
+            return false;
+        }
+
+        brain = value[0] == '@' ? System(value[1..]) : new BrainId(value);
+        return true;
+    }
 
     /// <inheritdoc />
     public override string ToString() => Value ?? string.Empty;

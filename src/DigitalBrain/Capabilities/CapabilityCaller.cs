@@ -1,3 +1,5 @@
+using DigitalBrain.Brains;
+
 namespace DigitalBrain.Capabilities;
 
 /// <summary>
@@ -40,6 +42,26 @@ public sealed record CapabilityCaller(string PrincipalId, string AccountId, stri
 
     /// <summary>Optional delegated principal when acting on behalf of another principal.</summary>
     public string? OnBehalfOf { get; init; }
+
+    /// <summary>Whether this caller represents an installed or sandboxed app rather than a person, agent, scheduler, or platform.</summary>
+    internal bool IsAppCaller => Kind == CallerKind.App || StampedBy == TrustedEdge.AppProxy || AppPrincipal.IsApp(PrincipalId);
+
+    /// <summary>Whether this caller is admitted to touch <paramref name="brainId"/> (and optionally <paramref name="appId"/>).</summary>
+    internal bool CanTouchBrain(string brainId, string? appId = null)
+    {
+        var sameBrain = string.Equals(BrainId, brainId, StringComparison.Ordinal);
+        return Kind switch
+        {
+            CallerKind.Platform => true,
+            CallerKind.User or CallerKind.Agent => sameBrain,
+            CallerKind.App => appId is not null && sameBrain && string.Equals(AppId, appId, StringComparison.Ordinal),
+            _ => false,
+        };
+    }
+
+    /// <summary>Whether this caller is a non-app member of <paramref name="brainId"/>.</summary>
+    internal bool IsNonAppMemberOf(string brainId)
+        => !IsAppCaller && BrainScope.Create(AccountId, BrainId).Id == brainId;
 
     /// <summary>The stamp shape of an app: the app's own principal and key, with no account or brain until the runtime stamps them.</summary>
     public static CapabilityCaller App(string appKey)

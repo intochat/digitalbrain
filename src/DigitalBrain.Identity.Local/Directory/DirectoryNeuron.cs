@@ -163,6 +163,206 @@ public sealed record DirectoryState
 
     /// <summary>Completed brain creation operations.</summary>
     public BrainOperation[] Operations { get; init; } = [];
+
+    internal Account? AccountOf(string accountId)
+        => Accounts.FirstOrDefault(a => a.AccountId == accountId);
+
+    internal PrincipalRow? PrincipalOf(string principalId)
+        => Principals.FirstOrDefault(p => p.PrincipalId == principalId);
+
+    internal BrainRow? BrainOf(string brainId)
+        => Brains.FirstOrDefault(b => b.BrainId == brainId);
+
+    internal Member? OwnerMemberOf(string brainId)
+        => Members.FirstOrDefault(m => m.BrainId == brainId && m.Role == MemberRole.Owner);
+
+    internal Member? MemberOf(string brainScopeId, string principalId)
+        => Members.FirstOrDefault(m => m.BrainId == brainScopeId && m.PrincipalId == principalId);
+
+    internal Account? OwnerAccountOf(string brainId)
+    {
+        var accountId = BrainOf(brainId)?.AccountId ?? OwnerMemberOf(brainId)?.AccountId;
+        return accountId is null ? null : AccountOf(accountId);
+    }
+
+    internal bool IsOwner(CapabilityCaller caller, string brainId)
+    {
+        if (!string.IsNullOrWhiteSpace(caller.AppId))
+        {
+            return false;
+        }
+
+        var owner = OwnerMemberOf(brainId);
+        return owner is not null && owner.PrincipalId == caller.PrincipalId;
+    }
+
+    internal void RequireOwner(CapabilityCaller caller, string brainId)
+    {
+        if (!IsOwner(caller, brainId))
+        {
+            throw new UnauthorizedAccessException($"{caller.PrincipalId} is not the owner of {brainId}.");
+        }
+    }
+
+    internal DirectoryState EnsureAccount(string accountId, string name, string ownerPrincipalId, DateTimeOffset createdAt, TimeProvider clock)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountId);
+        if (AccountOf(accountId) is not null)
+        {
+            return this;
+        }
+
+        var account = new Account
+        {
+            AccountId = accountId,
+            Name = name,
+            OwnerPrincipalId = ownerPrincipalId,
+            CreatedAt = createdAt == default ? clock.GetUtcNow() : createdAt,
+        };
+        return this with { Accounts = [.. Accounts, account] };
+    }
+
+    internal (DirectoryState Next, BrainProvision Provision) EnsureBrain(Member owner, TimeProvider clock)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner.BrainId);
+        if (OwnerMemberOf(owner.BrainId) is { } existing)
+        {
+            return (this, new BrainProvision(existing, false));
+        }
+
+        var stamped = owner with
+        {
+            Role = MemberRole.Owner,
+            JoinedAt = owner.JoinedAt == default ? clock.GetUtcNow() : owner.JoinedAt,
+        };
+        var brains = BrainOf(owner.BrainId) is null
+            ? [.. Brains, new BrainRow { BrainId = owner.BrainId, AccountId = owner.AccountId, Kind = BrainKind.Personal }]
+            : Brains;
+        var next = this with
+        {
+            Brains = brains,
+            Members = [.. Members, stamped],
+        };
+        return (next, new BrainProvision(stamped, true));
+    }
+
+    internal BrainEntry[] BrainsOf(string principalId)
+        => Members
+            .Where(m => m.PrincipalId == principalId)
+            .Select(m => m.BrainId)
+            .Distinct(StringComparer.Ordinal)
+            .Select(brainId => new BrainEntry(brainId, BrainOf(brainId)?.Kind ?? BrainKind.Personal))
+            .OrderBy(entry => entry.Id, StringComparer.Ordinal)
+            .ToArray();
+
+    internal (DirectoryState Next, CallDecision Decision) Authorize(CapabilityCaller caller, CallRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(caller.AppId))
+        {
+            return (this, CallDecision.Allow());
+        }
+
+        var consumesOnce = false;
+        var consumedIndices = new HashSet<int>();
+        foreach (var type in request.SemanticTypeIds)
+        {
+            var matchedIndex = -1;
+            for (var i = 0; i < Grants.Length; i++)
+            {
+                if (Grants[i].Covers(caller.AppId, type, caller.BrainId, caller.ConversationId))
+                {
+                    matchedIndex = i;
+                    break;
+                }
+            }
+
+            if (matchedIndex < 0)
+            {
+                return (this, CallDecision.Deny(CallDenial.MissingGrant, $"app {caller.AppId} has no grant for {type}"));
+            }
+
+            if (Grants[matchedIndex].Mode == GrantMode.Once)
+            {
+                consumesOnce = true;
+                consumedIndices.Add(matchedIndex);
+            }
+        }
+
+        var next = this;
+        if (consumesOnce)
+        {
+            var nextGrants = (Grant[])Grants.Clone();
+            foreach (var index in consumedIndices)
+            {
+                nextGrants[index] = nextGrants[index] with { Revoked = true };
+            }
+
+            next = this with { Grants = nextGrants };
+        }
+
+        return (next, CallDecision.Allow() with { ConsumesOnce = consumesOnce });
+    }
+
+    internal (DirectoryState Next, Grant? Stored, string Scope) TryGrantAsOwner(CapabilityCaller caller, Grant grant, DateTimeOffset grantedAt)
+    {
+        var brainId = string.IsNullOrWhiteSpace(grant.WorkspaceId) ? caller.BrainId : grant.WorkspaceId;
+        if (!IsOwner(caller, brainId))
+        {
+            return (this, null, brainId);
+        }
+
+        var stored = grant with { WorkspaceId = brainId, GrantedAt = grantedAt, Revoked = false };
+        var nextGrants = Grants
+            .Where(existing => !(existing.AppId == stored.AppId
+                && existing.SemanticTypeId == stored.SemanticTypeId
+                && existing.Mode == stored.Mode
+                && existing.WorkspaceId == stored.WorkspaceId
+                && existing.ConversationId == stored.ConversationId))
+            .Append(stored)
+            .ToArray();
+        return (this with { Grants = nextGrants }, stored, brainId);
+    }
+
+    internal (DirectoryState Next, bool Allowed) TryRevokeAsOwner(CapabilityCaller caller, string appId, string semanticTypeId, GrantMode mode)
+    {
+        if (!IsOwner(caller, caller.BrainId))
+        {
+            return (this, false);
+        }
+
+        var changed = false;
+        var nextGrants = new Grant[Grants.Length];
+        for (var i = 0; i < Grants.Length; i++)
+        {
+            var grant = Grants[i];
+            if (grant.WorkspaceId == caller.BrainId
+                && grant.AppId == appId
+                && grant.SemanticTypeId == semanticTypeId
+                && grant.Mode == mode
+                && !grant.Revoked)
+            {
+                nextGrants[i] = grant with { Revoked = true };
+                changed = true;
+            }
+            else
+            {
+                nextGrants[i] = grant;
+            }
+        }
+
+        return (changed ? this with { Grants = nextGrants } : this, true);
+    }
+
+    internal Member? ValidateSession(string sessionId, DateTimeOffset utcNow)
+    {
+        var session = Sessions.FirstOrDefault(s => s.SessionId == sessionId);
+        if (session is null || session.ExpiresAt <= utcNow)
+        {
+            return null;
+        }
+
+        return MemberOf(session.Member.BrainId, session.Member.PrincipalId);
+    }
 }
 
 /// <summary>Plain neuron hosting the local identity directory, grants and sessions.</summary>
@@ -174,26 +374,18 @@ public sealed class DirectoryNeuron(TimeProvider? clock = null) : Neuron<Directo
 
     /// <inheritdoc />
     public Task<Account?> ReadAccount(string accountId)
-        => Task.FromResult(AccountOf(State, accountId));
+        => Task.FromResult(State.AccountOf(accountId));
 
     /// <inheritdoc />
     public Task<Account?> OwnerOfBrain(string brainId)
-    {
-        var accountId = BrainOf(State, brainId)?.AccountId ?? OwnerMemberOf(State, brainId)?.AccountId;
-        return Task.FromResult(accountId is null ? null : AccountOf(State, accountId));
-    }
+        => Task.FromResult(State.OwnerAccountOf(brainId));
 
     /// <inheritdoc />
     public async Task EnsureAccount(Account account)
     {
         ArgumentNullException.ThrowIfNull(account);
         ArgumentException.ThrowIfNullOrWhiteSpace(account.AccountId);
-        if (AccountOf(State, account.AccountId) is not null)
-        {
-            return;
-        }
-
-        var next = EnsureAccountState(State, account.AccountId, account.Name, account.OwnerPrincipalId, account.CreatedAt);
+        var next = State.EnsureAccount(account.AccountId, account.Name, account.OwnerPrincipalId, account.CreatedAt, _clock);
         await Commit(next, account.AccountId).ConfigureAwait(true);
     }
 
@@ -213,7 +405,7 @@ public sealed class DirectoryNeuron(TimeProvider? clock = null) : Neuron<Directo
             return new BrainProvision(existing.Member, false);
         }
 
-        var next = EnsureAccountState(State, accountId, displayName, principalId, default);
+        var next = State.EnsureAccount(accountId, displayName, principalId, default, _clock);
         var brainId = $"brain-{Guid.NewGuid():N}";
         var owner = new Member
         {
@@ -238,31 +430,25 @@ public sealed class DirectoryNeuron(TimeProvider? clock = null) : Neuron<Directo
     public async Task<BrainProvision> EnsureBrain(Member owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
-        var next = EnsureAccountState(State, owner.AccountId, owner.DisplayName, owner.PrincipalId, owner.JoinedAt);
-        var (provisioned, provision) = EnsureBrainState(next, owner);
+        var next = State.EnsureAccount(owner.AccountId, owner.DisplayName, owner.PrincipalId, owner.JoinedAt, _clock);
+        var (provisioned, provision) = next.EnsureBrain(owner, _clock);
         await Commit(provisioned, provision.Member.BrainId).ConfigureAwait(true);
         return provision;
     }
 
     /// <inheritdoc />
-    public async Task<BrainProvision> ProvisionOwner(Member owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
-        var next = EnsureAccountState(State, owner.AccountId, owner.DisplayName, owner.PrincipalId, owner.JoinedAt);
-        var (provisioned, provision) = EnsureBrainState(next, owner);
-        await Commit(provisioned, provision.Member.BrainId).ConfigureAwait(true);
-        return provision;
-    }
+    public Task<BrainProvision> ProvisionOwner(Member owner)
+        => EnsureBrain(owner);
 
     /// <inheritdoc />
     public Task<bool> IsRegistered(string principalId)
-        => Task.FromResult(PrincipalOf(State, principalId)?.RegistrationComplete == true);
+        => Task.FromResult(State.PrincipalOf(principalId)?.RegistrationComplete == true);
 
     /// <inheritdoc />
     public async Task<BrainProvision> RegisterPrincipal(string principalId, string displayName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(principalId);
-        if (PrincipalOf(State, principalId) is { RegistrationComplete: true, DefaultMembership: { } existing })
+        if (State.PrincipalOf(principalId) is { RegistrationComplete: true, DefaultMembership: { } existing })
         {
             return new BrainProvision(existing, false);
         }
@@ -276,8 +462,8 @@ public sealed class DirectoryNeuron(TimeProvider? clock = null) : Neuron<Directo
             DisplayName = string.IsNullOrWhiteSpace(displayName) ? principalId : displayName,
             JoinedAt = _clock.GetUtcNow(),
         };
-        var next = EnsureAccountState(State, owner.AccountId, owner.DisplayName, principalId, owner.JoinedAt);
-        var (provisioned, provision) = EnsureBrainState(next, owner);
+        var next = State.EnsureAccount(owner.AccountId, owner.DisplayName, principalId, owner.JoinedAt, _clock);
+        var (provisioned, provision) = next.EnsureBrain(owner, _clock);
         var row = new PrincipalRow
         {
             PrincipalId = principalId,
@@ -295,42 +481,33 @@ public sealed class DirectoryNeuron(TimeProvider? clock = null) : Neuron<Directo
     /// <inheritdoc />
     public Task<BrainProvision?> CompleteRegistration(string principalId)
         => Task.FromResult(
-            PrincipalOf(State, principalId) is { RegistrationComplete: true, DefaultMembership: { } member }
+            State.PrincipalOf(principalId) is { RegistrationComplete: true, DefaultMembership: { } member }
                 ? new BrainProvision(member, false)
                 : null);
 
     /// <inheritdoc />
     public Task<BrainEntry[]> BrainsOf(string principalId)
-    {
-        var entries = State.Members
-            .Where(m => m.PrincipalId == principalId)
-            .Select(m => m.BrainId)
-            .Distinct(StringComparer.Ordinal)
-            .Select(brainId => new BrainEntry(brainId, BrainOf(State, brainId)?.Kind ?? BrainKind.Personal))
-            .OrderBy(entry => entry.Id, StringComparer.Ordinal)
-            .ToArray();
-        return Task.FromResult(entries);
-    }
+        => Task.FromResult(State.BrainsOf(principalId));
 
     /// <inheritdoc />
     public Task<BrainKind> KindOf(string brainScopeId)
-        => Task.FromResult(BrainOf(State, brainScopeId)?.Kind ?? BrainKind.Personal);
+        => Task.FromResult(State.BrainOf(brainScopeId)?.Kind ?? BrainKind.Personal);
 
     /// <inheritdoc />
     public Task<bool> BrainExists(string brainScopeId)
-        => Task.FromResult(BrainOf(State, brainScopeId) is not null);
+        => Task.FromResult(State.BrainOf(brainScopeId) is not null);
 
     /// <inheritdoc />
     public Task<Member?> Membership(string brainScopeId, string principalId)
-        => Task.FromResult(State.Members.FirstOrDefault(m => m.BrainId == brainScopeId && m.PrincipalId == principalId));
+        => Task.FromResult(State.MemberOf(brainScopeId, principalId));
 
     /// <inheritdoc />
     public async Task<Member?> EnsureMember(CapabilityCaller caller, Member member)
     {
         ArgumentNullException.ThrowIfNull(caller);
         ArgumentNullException.ThrowIfNull(member);
-        RequireOwner(State, caller, member.BrainId);
-        if (State.Members.FirstOrDefault(m => m.BrainId == member.BrainId && m.PrincipalId == member.PrincipalId) is { } existing)
+        State.RequireOwner(caller, member.BrainId);
+        if (State.MemberOf(member.BrainId, member.PrincipalId) is { } existing)
         {
             return existing;
         }
@@ -349,7 +526,7 @@ public sealed class DirectoryNeuron(TimeProvider? clock = null) : Neuron<Directo
     public async Task RemoveMember(CapabilityCaller caller, string brainScopeId, string accountId)
     {
         ArgumentNullException.ThrowIfNull(caller);
-        RequireOwner(State, caller, brainScopeId);
+        State.RequireOwner(caller, brainScopeId);
         if (State.Members.Any(m => m.BrainId == brainScopeId && m.AccountId == accountId && m.Role == MemberRole.Owner))
         {
             throw new InvalidOperationException($"Owner of {brainScopeId} cannot be removed.");
@@ -368,8 +545,8 @@ public sealed class DirectoryNeuron(TimeProvider? clock = null) : Neuron<Directo
         ArgumentNullException.ThrowIfNull(caller);
         ArgumentException.ThrowIfNullOrWhiteSpace(brainScopeId);
         ArgumentException.ThrowIfNullOrWhiteSpace(principalId);
-        RequireOwner(State, caller, brainScopeId);
-        var target = State.Members.FirstOrDefault(m => m.BrainId == brainScopeId && m.PrincipalId == principalId);
+        State.RequireOwner(caller, brainScopeId);
+        var target = State.MemberOf(brainScopeId, principalId);
         if (target is null)
         {
             return;
@@ -389,49 +566,9 @@ public sealed class DirectoryNeuron(TimeProvider? clock = null) : Neuron<Directo
     {
         ArgumentNullException.ThrowIfNull(caller);
         ArgumentNullException.ThrowIfNull(request);
-        if (string.IsNullOrWhiteSpace(caller.AppId))
-        {
-            return CallDecision.Allow();
-        }
-
-        var consumesOnce = false;
-        var consumedIndices = new HashSet<int>();
-        foreach (var type in request.SemanticTypeIds)
-        {
-            var matchedIndex = -1;
-            for (var i = 0; i < State.Grants.Length; i++)
-            {
-                if (State.Grants[i].Covers(caller.AppId, type, caller.BrainId, caller.ConversationId))
-                {
-                    matchedIndex = i;
-                    break;
-                }
-            }
-
-            if (matchedIndex < 0)
-            {
-                return CallDecision.Deny(CallDenial.MissingGrant, $"app {caller.AppId} has no grant for {type}");
-            }
-
-            if (State.Grants[matchedIndex].Mode == GrantMode.Once)
-            {
-                consumesOnce = true;
-                consumedIndices.Add(matchedIndex);
-            }
-        }
-
-        if (consumesOnce)
-        {
-            var nextGrants = (Grant[])State.Grants.Clone();
-            foreach (var index in consumedIndices)
-            {
-                nextGrants[index] = nextGrants[index] with { Revoked = true };
-            }
-
-            await Commit(State with { Grants = nextGrants }, caller.BrainId).ConfigureAwait(true);
-        }
-
-        return CallDecision.Allow() with { ConsumesOnce = consumesOnce };
+        var (next, decision) = State.Authorize(caller, request);
+        await Commit(next, caller.BrainId).ConfigureAwait(true);
+        return decision;
     }
 
     /// <inheritdoc />
@@ -443,22 +580,13 @@ public sealed class DirectoryNeuron(TimeProvider? clock = null) : Neuron<Directo
     {
         ArgumentNullException.ThrowIfNull(caller);
         ArgumentNullException.ThrowIfNull(grant);
-        var brainId = string.IsNullOrWhiteSpace(grant.WorkspaceId) ? caller.BrainId : grant.WorkspaceId;
-        if (!IsOwner(State, caller, brainId))
+        var (next, stored, scope) = State.TryGrantAsOwner(caller, grant, _clock.GetUtcNow());
+        if (stored is null)
         {
             return null;
         }
 
-        var stored = grant with { WorkspaceId = brainId, GrantedAt = _clock.GetUtcNow(), Revoked = false };
-        var nextGrants = State.Grants
-            .Where(existing => !(existing.AppId == stored.AppId
-                && existing.SemanticTypeId == stored.SemanticTypeId
-                && existing.Mode == stored.Mode
-                && existing.WorkspaceId == stored.WorkspaceId
-                && existing.ConversationId == stored.ConversationId))
-            .Append(stored)
-            .ToArray();
-        await Commit(State with { Grants = nextGrants }, brainId).ConfigureAwait(true);
+        await Commit(next, scope).ConfigureAwait(true);
         return stored;
     }
 
@@ -466,36 +594,13 @@ public sealed class DirectoryNeuron(TimeProvider? clock = null) : Neuron<Directo
     public async Task<bool> RevokeAsOwner(CapabilityCaller caller, string appId, string semanticTypeId, GrantMode mode)
     {
         ArgumentNullException.ThrowIfNull(caller);
-        if (!IsOwner(State, caller, caller.BrainId))
+        var (next, allowed) = State.TryRevokeAsOwner(caller, appId, semanticTypeId, mode);
+        if (!allowed)
         {
             return false;
         }
 
-        var changed = false;
-        var nextGrants = new Grant[State.Grants.Length];
-        for (var i = 0; i < State.Grants.Length; i++)
-        {
-            var grant = State.Grants[i];
-            if (grant.WorkspaceId == caller.BrainId
-                && grant.AppId == appId
-                && grant.SemanticTypeId == semanticTypeId
-                && grant.Mode == mode
-                && !grant.Revoked)
-            {
-                nextGrants[i] = grant with { Revoked = true };
-                changed = true;
-            }
-            else
-            {
-                nextGrants[i] = grant;
-            }
-        }
-
-        if (changed)
-        {
-            await Commit(State with { Grants = nextGrants }, caller.BrainId).ConfigureAwait(true);
-        }
-
+        await Commit(next, caller.BrainId).ConfigureAwait(true);
         return true;
     }
 
@@ -504,7 +609,7 @@ public sealed class DirectoryNeuron(TimeProvider? clock = null) : Neuron<Directo
     {
         SessionClaims.Validate(request);
         var member = request.Member;
-        var current = State.Members.FirstOrDefault(m => m.BrainId == member.BrainId && m.PrincipalId == member.PrincipalId);
+        var current = State.MemberOf(member.BrainId, member.PrincipalId);
         if (current is null || current.AccountId != member.AccountId)
         {
             throw new InvalidOperationException($"{member.PrincipalId} is not a member of {member.BrainId}; no session is issued.");
@@ -538,62 +643,7 @@ public sealed class DirectoryNeuron(TimeProvider? clock = null) : Neuron<Directo
     public Task<Member?> Validate(string sessionId)
     {
         ArgumentNullException.ThrowIfNull(sessionId);
-        var session = State.Sessions.FirstOrDefault(s => s.SessionId == sessionId);
-        if (session is null || session.ExpiresAt <= _clock.GetUtcNow())
-        {
-            return Task.FromResult<Member?>(null);
-        }
-
-        var current = State.Members.FirstOrDefault(
-            m => m.BrainId == session.Member.BrainId && m.PrincipalId == session.Member.PrincipalId);
-        return Task.FromResult(current);
-    }
-
-    private DirectoryState EnsureAccountState(
-        DirectoryState state,
-        string accountId,
-        string name,
-        string ownerPrincipalId,
-        DateTimeOffset createdAt)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(accountId);
-        if (AccountOf(state, accountId) is not null)
-        {
-            return state;
-        }
-
-        var account = new Account
-        {
-            AccountId = accountId,
-            Name = name,
-            OwnerPrincipalId = ownerPrincipalId,
-            CreatedAt = createdAt == default ? _clock.GetUtcNow() : createdAt,
-        };
-        return state with { Accounts = [.. state.Accounts, account] };
-    }
-
-    private (DirectoryState Next, BrainProvision Provision) EnsureBrainState(DirectoryState state, Member owner)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(owner.BrainId);
-        if (OwnerMemberOf(state, owner.BrainId) is { } existing)
-        {
-            return (state, new BrainProvision(existing, false));
-        }
-
-        var stamped = owner with
-        {
-            Role = MemberRole.Owner,
-            JoinedAt = owner.JoinedAt == default ? _clock.GetUtcNow() : owner.JoinedAt,
-        };
-        var brains = BrainOf(state, owner.BrainId) is null
-            ? [.. state.Brains, new BrainRow { BrainId = owner.BrainId, AccountId = owner.AccountId, Kind = BrainKind.Personal }]
-            : state.Brains;
-        var next = state with
-        {
-            Brains = brains,
-            Members = [.. state.Members, stamped],
-        };
-        return (next, new BrainProvision(stamped, true));
+        return Task.FromResult(State.ValidateSession(sessionId, _clock.GetUtcNow()));
     }
 
     private async Task Commit(DirectoryState next, string scope)
@@ -605,35 +655,4 @@ public sealed class DirectoryNeuron(TimeProvider? clock = null) : Neuron<Directo
 
         await Save(next, new DirectoryChanged(scope)).ConfigureAwait(true);
     }
-
-    private static void RequireOwner(DirectoryState state, CapabilityCaller caller, string brainId)
-    {
-        if (!IsOwner(state, caller, brainId))
-        {
-            throw new UnauthorizedAccessException($"{caller.PrincipalId} is not the owner of {brainId}.");
-        }
-    }
-
-    private static bool IsOwner(DirectoryState state, CapabilityCaller caller, string brainId)
-    {
-        if (!string.IsNullOrWhiteSpace(caller.AppId))
-        {
-            return false;
-        }
-
-        var owner = OwnerMemberOf(state, brainId);
-        return owner is not null && owner.PrincipalId == caller.PrincipalId;
-    }
-
-    private static Account? AccountOf(DirectoryState state, string accountId)
-        => state.Accounts.FirstOrDefault(a => a.AccountId == accountId);
-
-    private static PrincipalRow? PrincipalOf(DirectoryState state, string principalId)
-        => state.Principals.FirstOrDefault(p => p.PrincipalId == principalId);
-
-    private static BrainRow? BrainOf(DirectoryState state, string brainId)
-        => state.Brains.FirstOrDefault(b => b.BrainId == brainId);
-
-    private static Member? OwnerMemberOf(DirectoryState state, string brainId)
-        => state.Members.FirstOrDefault(m => m.BrainId == brainId && m.Role == MemberRole.Owner);
 }

@@ -18,7 +18,7 @@ public sealed class PolicyGrammarException : Exception
 /// <summary>Parses and renders <see cref="PolicyRule"/> rows against a declared <see cref="ActionDescriptor"/>.</summary>
 public static class PolicyGrammar
 {
-    private static readonly TimeSpan MinimumRollingSpan = TimeSpan.FromHours(1);
+    private static readonly TimeSpan MinimumRollingSpan = PolicyWindow.MinimumRollingSpan;
 
     /// <summary>Validates a policy row against <paramref name="declared"/> and renders its canonical sentence.</summary>
     /// <param name="id">The rule id.</param>

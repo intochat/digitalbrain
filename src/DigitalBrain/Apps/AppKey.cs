@@ -33,7 +33,7 @@ public readonly record struct AppKey
     public IReadOnlyList<string> Parts => Path is null ? [] : Path.Split('/');
 
     /// <summary>The app id, the first part.</summary>
-    public string App => Path is null ? string.Empty : Path.Split('/')[0];
+    public string App => Path is null ? string.Empty : Path.IndexOf('/', StringComparison.Ordinal) is > 0 and var slash ? Path[..slash] : Path;
 
     /// <summary>The key one part below this one.</summary>
     /// <exception cref="ArgumentException"><paramref name="part"/> is empty or holds '/' or a control character.</exception>

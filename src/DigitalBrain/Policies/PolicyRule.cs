@@ -32,7 +32,27 @@ public enum PolicyWindowKind
 /// <summary>The window over which a <see cref="PolicyRule"/> accumulates reservations.</summary>
 /// <param name="Kind">The window kind.</param>
 /// <param name="Span">The rolling span when <paramref name="Kind"/> is <see cref="PolicyWindowKind.Rolling"/>; null otherwise.</param>
-public sealed record PolicyWindow(PolicyWindowKind Kind, TimeSpan? Span);
+public sealed record PolicyWindow(PolicyWindowKind Kind, TimeSpan? Span)
+{
+    internal static readonly TimeSpan MinimumRollingSpan = TimeSpan.FromHours(1);
+
+    internal bool Contains(DateTimeOffset reservationAt, DateTimeOffset utcNow) => Kind switch
+    {
+        PolicyWindowKind.None => false,
+        PolicyWindowKind.Day => reservationAt >= new DateTimeOffset(utcNow.Year, utcNow.Month, utcNow.Day, 0, 0, 0, TimeSpan.Zero),
+        PolicyWindowKind.Week => reservationAt >= StartOfUtcWeek(utcNow),
+        PolicyWindowKind.Month => reservationAt >= new DateTimeOffset(utcNow.Year, utcNow.Month, 1, 0, 0, 0, TimeSpan.Zero),
+        PolicyWindowKind.Rolling => reservationAt > utcNow - (Span ?? TimeSpan.Zero),
+        _ => false,
+    };
+
+    private static DateTimeOffset StartOfUtcWeek(DateTimeOffset utcNow)
+    {
+        var diff = ((int)utcNow.DayOfWeek + 6) % 7;
+        var monday = utcNow.UtcDateTime.Date.AddDays(-diff);
+        return new DateTimeOffset(monday, TimeSpan.Zero);
+    }
+}
 
 /// <summary>The string comparison operator of a <see cref="PolicyCondition"/>.</summary>
 public enum PolicyOp
@@ -54,7 +74,25 @@ public enum PolicyOp
 /// <param name="Fact">The fact key to inspect.</param>
 /// <param name="Op">The string operator.</param>
 /// <param name="Value">The value compared against the fact.</param>
-public sealed record PolicyCondition(string Fact, PolicyOp Op, string Value);
+public sealed record PolicyCondition(string Fact, PolicyOp Op, string Value)
+{
+    internal bool Matches(IReadOnlyDictionary<string, string>? facts)
+    {
+        if (facts is null || !facts.TryGetValue(Fact, out var actual) || actual is null)
+        {
+            return true;
+        }
+
+        return Op switch
+        {
+            PolicyOp.Equals => string.Equals(actual, Value, StringComparison.Ordinal),
+            PolicyOp.Contains => actual.Contains(Value, StringComparison.Ordinal),
+            PolicyOp.StartsWith => actual.StartsWith(Value, StringComparison.Ordinal),
+            PolicyOp.EndsWith => actual.EndsWith(Value, StringComparison.Ordinal),
+            _ => false,
+        };
+    }
+}
 
 /// <summary>A promise rule constraining a module action.</summary>
 /// <param name="Id">The rule id.</param>
@@ -73,4 +111,11 @@ public sealed record PolicyRule(
     decimal Limit,
     PolicyCondition? Condition,
     string Text,
-    DateTimeOffset AdoptedAt);
+    DateTimeOffset AdoptedAt)
+{
+    internal decimal IncrementFor(decimal amount) => Measure == PolicyMeasure.Count ? 1m : amount;
+
+    internal bool AppliesTo(string action, IReadOnlyDictionary<string, string>? facts)
+        => string.Equals(Action, action, StringComparison.Ordinal)
+            && (Condition is null || Condition.Matches(facts));
+}

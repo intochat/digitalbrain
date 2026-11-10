@@ -13,6 +13,12 @@ internal static class TaskBoxing
     public static async Task<object?> ResultAsync(Task task, Type? resultType)
     {
         if (resultType is null) { await task.ConfigureAwait(true); return null; }
+        if (resultType.IsCollectible)
+        {
+            await task.ConfigureAwait(true);
+            return task.GetType().GetProperty("Result")!.GetValue(task);
+        }
+
         var box = Boxes.GetOrAdd(resultType, static result => BoxMethod.MakeGenericMethod(result).CreateDelegate<Func<Task, Task<object?>>>());
         return await box(task).ConfigureAwait(true);
     }

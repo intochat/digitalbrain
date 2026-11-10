@@ -58,15 +58,7 @@ public static class CallerAdmission
     public static void RequireSameBrain(string brainId, string? appId = null, string? target = null)
     {
         if (!TryGetCaller(out var caller)) { return; }
-        var sameBrain = string.Equals(caller.BrainId, brainId, StringComparison.Ordinal);
-        var admitted = caller.Kind switch
-        {
-            CallerKind.Platform => true,
-            CallerKind.User or CallerKind.Agent => sameBrain,
-            CallerKind.App => appId is not null && sameBrain && string.Equals(caller.AppId, appId, StringComparison.Ordinal),
-            _ => false,
-        };
-        if (!admitted)
+        if (!caller.CanTouchBrain(brainId, appId))
         {
             throw new UnauthorizedAccessException($"A {caller.Kind} caller of brain {caller.BrainId} may not touch {target ?? brainId}.");
         }
@@ -75,7 +67,7 @@ public static class CallerAdmission
     public static void RequirePerson(string message)
     {
         var caller = TryGetCaller(out var stamped) ? stamped : throw new UnauthorizedAccessException("A circle acts only on a stamped caller.");
-        if (caller.Kind == CallerKind.App || caller.StampedBy == TrustedEdge.AppProxy || AppPrincipal.IsApp(caller.PrincipalId))
+        if (caller.IsAppCaller)
         {
             throw new UnauthorizedAccessException(message);
         }
@@ -87,8 +79,7 @@ public static class CallerAdmission
         {
             throw new UnauthorizedAccessException("No caller context was stamped at a trusted edge.");
         }
-        if (caller.Kind == CallerKind.App || caller.StampedBy == TrustedEdge.AppProxy || AppPrincipal.IsApp(caller.PrincipalId)
-            || BrainScope.Create(caller.AccountId, caller.BrainId).Id != brainId)
+        if (!caller.IsNonAppMemberOf(brainId))
         {
             throw new UnauthorizedAccessException(message);
         }
@@ -96,8 +87,7 @@ public static class CallerAdmission
 
     public static void RequireNotAppCaller(string message)
     {
-        if (TryGetCaller(out var caller)
-            && (caller.Kind == CallerKind.App || caller.StampedBy == TrustedEdge.AppProxy || AppPrincipal.IsApp(caller.PrincipalId)))
+        if (TryGetCaller(out var caller) && caller.IsAppCaller)
         {
             throw new UnauthorizedAccessException(message);
         }

@@ -37,15 +37,13 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
         var bindings = request.Bindings ?? new Dictionary<string, string>();
         var needs = catalog.ForNeeds(alias).NeedsOf(alias);
         var hash = needs.Hash();
-        var existing = Find(alias);
+        var existing = State.FindRecord(alias);
         if (existing is not null && existing.NeedsHash == hash)
         {
             var status = InstallStatus.Unchanged;
-            if (!SameBindings(existing.Bindings, bindings))
+            if (!InstallsState.HasSameBindings(existing.Bindings, bindings))
             {
-                // The person approved these needs; a new binding of the same slots is saved without asking again.
-                var rebound = existing with { Bindings = new Dictionary<string, string>(bindings, StringComparer.Ordinal) };
-                await Save(State with { Records = [.. State.Records.Where(r => r.Alias != alias), rebound] }, [new Installed(alias, hash)]).ConfigureAwait(true);
+                await Save(State.Rebind(existing, bindings), [new Installed(alias, hash)]).ConfigureAwait(true);
                 status = InstallStatus.Updated;
             }
 
@@ -57,8 +55,7 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
             ApproveLabel: "Allow", DenyLabel: "Deny", TargetLabel: alias)
         { RequiresPerson = true, Kind = ConfirmationPlan.SynapseInstallKind, Subject = alias };
         var pending = new PendingInstall(plan.Id, alias, new Dictionary<string, string>(bindings, StringComparer.Ordinal), hash, sentence);
-        // A newer ask of an alias replaces the older one; the older plan's answer is then ignored.
-        await Save(State with { Pending = [.. State.Pending.Where(p => p.Alias != alias), pending] }, [new InstallRequested(alias, plan.Id)]).ConfigureAwait(true);
+        await Save(State.StagePending(pending), [new InstallRequested(alias, plan.Id)]).ConfigureAwait(true);
         _ = Ask(plan);
         return new InstallOutcome(InstallStatus.Pending, sentence, plan.Id);
     }
@@ -130,13 +127,12 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
     private async Task Judge(ConfirmationResolved resolved, bool restore, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(catalog);
-        if (State.Pending.FirstOrDefault(p => p.PlanId == resolved.PlanId) is not { } pending) { return; }
-        var rest = State.Pending.Where(p => p.PlanId != pending.PlanId).ToList();
+        if (State.FindPendingByPlan(resolved.PlanId) is not { } pending) { return; }
         var alias = pending.Alias;
         if (resolved.Outcome != ConfirmationOutcome.Approved)
         {
             var reason = resolved.Outcome == ConfirmationOutcome.Expired ? ConfirmationDenyReason.Expired.ToString() : resolved.Reason.ToString();
-            await Save(State with { Pending = rest }, [new InstallDenied(alias, pending.PlanId, reason)]).ConfigureAwait(true);
+            await Save(State.RemovePendingPlan(pending.PlanId), [new InstallDenied(alias, pending.PlanId, reason)]).ConfigureAwait(true);
             return;
         }
 
@@ -152,30 +148,26 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
             return;
         }
 
-        // The catalog may have changed since the ask (a new build without the app): the ask is dropped, not left pending.
         var source = catalog.ForNeeds(alias);
         if (!source.States.ContainsKey(alias))
         {
-            await Save(State with { Pending = rest }, [new InstallDenied(alias, pending.PlanId, "unknown alias")]).ConfigureAwait(true);
+            await Save(State.RemovePendingPlan(pending.PlanId), [new InstallDenied(alias, pending.PlanId, "unknown alias")]).ConfigureAwait(true);
             return;
         }
 
         var needs = source.NeedsOf(alias);
-        var record = new InstallRecord(alias, pending.NeedsHash, pending.Bindings, [.. needs.Schedules.Select(s => s.Text)], Context.Time.GetUtcNow());
-        await Save(new InstallsState([.. State.Records.Where(r => r.Alias != alias), record], rest), [new Installed(alias, pending.NeedsHash)]).ConfigureAwait(true);
-        await GateChanged().ConfigureAwait(true);
-        // A failing hook leaves the record standing; the next Install of the alias (Unchanged) runs the hooks again and reports it.
         _ = await Wire(alias, needs, ct).ConfigureAwait(true);
+        await Save(State.CompleteInstall(pending, needs, Context.Time.GetUtcNow()), [new Installed(alias, pending.NeedsHash)]).ConfigureAwait(true);
+        await GateChanged().ConfigureAwait(true);
     }
 
     /// <inheritdoc />
     public async Task CancelPending(string alias, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(alias);
-        var cancelled = State.Pending.Where(p => p.Alias == alias).ToList();
-        if (cancelled.Count == 0) { return; }
-        await Save(State with { Pending = [.. State.Pending.Where(p => p.Alias != alias)] },
-            [.. cancelled.Select(p => (Signal)new InstallDenied(alias, p.PlanId, "superseded"))]).ConfigureAwait(true);
+        var (next, signals) = State.CancelPendingForAlias(alias, "superseded");
+        if (signals.Length == 0) { return; }
+        await Save(next, signals).ConfigureAwait(true);
     }
 
     /// <inheritdoc />
@@ -186,16 +178,14 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
     public async Task Retire(string alias, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(hooks);
-        // Every pending ask of the alias is cancelled, record or not; a later answer to it is then ignored.
-        var cancelled = State.Pending.Where(p => p.Alias == alias).ToList();
-        if (cancelled.Count > 0)
+        var (afterPending, signals) = State.CancelPendingForAlias(alias, "retired");
+        if (signals.Length > 0)
         {
-            await Save(State with { Pending = [.. State.Pending.Where(p => p.Alias != alias)] },
-                [.. cancelled.Select(p => (Signal)new InstallDenied(alias, p.PlanId, "retired"))]).ConfigureAwait(true);
+            await Save(afterPending, signals).ConfigureAwait(true);
         }
 
-        if (Find(alias) is null) { return; }
-        await Save(State with { Records = [.. State.Records.Where(r => r.Alias != alias)] }, [new Retired(alias)]).ConfigureAwait(true);
+        if (State.FindRecord(alias) is null) { return; }
+        await Save(State.RemoveRecord(alias), [new Retired(alias)]).ConfigureAwait(true);
         await GateChanged().ConfigureAwait(true);
         var state = StateOf(alias);
         try
@@ -207,7 +197,7 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
     }
 
     /// <inheritdoc />
-    public Task<InstallRecord?> Describe(string alias, CancellationToken ct) => Task.FromResult(Find(alias));
+    public Task<InstallRecord?> Describe(string alias, CancellationToken ct) => Task.FromResult(State.FindRecord(alias));
 
     /// <inheritdoc />
     public Task<IReadOnlyList<InstallRecord>> List(CancellationToken ct) => Task.FromResult(State.Records);
@@ -239,11 +229,6 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
             lock (_restoring) { _restoring.Remove(proof); }
         }
     }
-
-    private static bool SameBindings(IReadOnlyDictionary<string, string> left, IReadOnlyDictionary<string, string> right)
-        => left.Count == right.Count && left.All(pair => right.TryGetValue(pair.Key, out var value) && value == pair.Value);
-
-    private InstallRecord? Find(string alias) => State.Records.FirstOrDefault(r => r.Alias == alias);
 
     private NeuronId StateOf(string alias) => new(Id.Brain, alias, "default");
 
