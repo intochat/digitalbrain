@@ -1,6 +1,7 @@
+﻿using DigitalBrain.Units;
 using DigitalBrain.Confirmation;
 using DigitalBrain.Flows;
-using DigitalBrain.Spi;
+using DigitalBrain.Neurons;
 using DigitalBrain.Tests.Unit.Neurons;
 using System.Text.Json;
 using Microsoft.Extensions.Hosting;
@@ -85,15 +86,48 @@ public sealed class TwoStepFlow : Flow<Box>
     public Task Tick(string name) => NeuronAttachment.Remind(this, name, CancellationToken.None);
 }
 
-internal sealed class RecordingConfirmations : IConfirmations
+internal sealed class RecordingConfirmations : IConfirmationRequests, IConfirmations
 {
+    public TwoStepFlow? Flow { get; set; }
+
     public List<ConfirmationPlan> Asked { get; } = [];
 
     public List<(string PlanId, bool Approve)> Resolved { get; } = [];
 
+    public List<string> Withdrawn { get; } = [];
+
     public ConfirmationPolicy Policy => ConfirmationPolicy.DestructiveOnly;
 
+    private readonly Dictionary<string, ConfirmationResult> _outcomes = [];
     private readonly Dictionary<string, TaskCompletionSource<ConfirmationResult>> _answers = [];
+
+    public Task<ConfirmationResult?> Request(ConfirmationPlan plan)
+    {
+        Asked.Add(plan);
+        if (_outcomes.TryGetValue(plan.Id, out var outcome)) { return Task.FromResult<ConfirmationResult?>(outcome); }
+        if (!_answers.TryGetValue(plan.Id, out var answer))
+        {
+            _answers[plan.Id] = answer = new TaskCompletionSource<ConfirmationResult>();
+        }
+        return Task.FromResult<ConfirmationResult?>(null);
+    }
+
+    public Task<ConfirmationResult?> Outcome(string planId)
+    {
+        if (_outcomes.TryGetValue(planId, out var outcome)) { return Task.FromResult<ConfirmationResult?>(outcome); }
+        if (_answers.TryGetValue(planId, out var answer) && answer.Task.IsCompleted)
+        {
+            return Task.FromResult<ConfirmationResult?>(answer.Task.Result);
+        }
+        return Task.FromResult<ConfirmationResult?>(null);
+    }
+
+    public Task Withdraw(string planId)
+    {
+        Withdrawn.Add(planId);
+        Resolved.Add((planId, false));
+        return Task.CompletedTask;
+    }
 
     // Answers only through Answer: the flow must not await it inside the turn. A plan asked again re-joins its answer.
     public Task<ConfirmationResult> Confirm(ConfirmationPlan plan, CancellationToken ct = default)
@@ -104,8 +138,20 @@ internal sealed class RecordingConfirmations : IConfirmations
     }
 
     // The confirmations side answers planId (continuations run inline, so the flow has resumed when this returns).
-    public void Answer(string planId, ConfirmationOutcome outcome)
-        => _answers[planId].TrySetResult(new ConfirmationResult(planId, outcome, outcome == ConfirmationOutcome.Approved ? ConfirmationDenyReason.None : ConfirmationDenyReason.ByPerson, false));
+    public void Answer(string planId, ConfirmationOutcome outcome, ConfirmationPrincipal? approver = null)
+    {
+        var result = new ConfirmationResult(planId, outcome, outcome == ConfirmationOutcome.Approved ? ConfirmationDenyReason.None : ConfirmationDenyReason.ByPerson, false)
+        {
+            Approver = approver ?? (outcome == ConfirmationOutcome.Approved ? ConfirmationPrincipal.Person("ann") : null)
+        };
+        _outcomes[planId] = result;
+        if (!_answers.TryGetValue(planId, out var answer)) { _answers[planId] = answer = new TaskCompletionSource<ConfirmationResult>(); }
+        answer.TrySetResult(result);
+        if (Flow is not null)
+        {
+            _ = Flow.Deliver(FlowFacts.Resolution(planId, outcome));
+        }
+    }
 
     public Task Resolve(string planId, bool approve, CancellationToken ct = default)
     {
@@ -114,9 +160,15 @@ internal sealed class RecordingConfirmations : IConfirmations
     }
 }
 
-internal sealed class ThrowingConfirmations : IConfirmations
+internal sealed class ThrowingConfirmations : IConfirmationRequests, IConfirmations
 {
     public ConfirmationPolicy Policy => ConfirmationPolicy.DestructiveOnly;
+
+    public Task<ConfirmationResult?> Request(ConfirmationPlan plan) => throw new InvalidOperationException("inbox down");
+
+    public Task<ConfirmationResult?> Outcome(string planId) => Task.FromResult<ConfirmationResult?>(null);
+
+    public Task Withdraw(string planId) => Task.CompletedTask;
 
     public Task<ConfirmationResult> Confirm(ConfirmationPlan plan, CancellationToken ct = default) => throw new InvalidOperationException("inbox down");
 
@@ -124,9 +176,17 @@ internal sealed class ThrowingConfirmations : IConfirmations
 }
 
 // Answers at once, as a policy that skips the question does, and never publishes ConfirmationResolved.
-internal sealed class SkippingConfirmations(ConfirmationOutcome outcome) : IConfirmations
+internal sealed class SkippingConfirmations(ConfirmationOutcome outcome) : IConfirmationRequests, IConfirmations
 {
     public ConfirmationPolicy Policy => ConfirmationPolicy.Never;
+
+    public Task<ConfirmationResult?> Request(ConfirmationPlan plan)
+        => Task.FromResult<ConfirmationResult?>(new ConfirmationResult(plan.Id, outcome, outcome == ConfirmationOutcome.Approved ? ConfirmationDenyReason.None : ConfirmationDenyReason.PlanInvalid, Skipped: true));
+
+    public Task<ConfirmationResult?> Outcome(string planId)
+        => Task.FromResult<ConfirmationResult?>(new ConfirmationResult(planId, outcome, outcome == ConfirmationOutcome.Approved ? ConfirmationDenyReason.None : ConfirmationDenyReason.PlanInvalid, Skipped: true));
+
+    public Task Withdraw(string planId) => Task.CompletedTask;
 
     public Task<ConfirmationResult> Confirm(ConfirmationPlan plan, CancellationToken ct = default)
         => Task.FromResult(new ConfirmationResult(plan.Id, outcome, outcome == ConfirmationOutcome.Approved ? ConfirmationDenyReason.None : ConfirmationDenyReason.PlanInvalid, Skipped: true));
@@ -199,9 +259,15 @@ public sealed class FlowFacts
 
     private async Task<(TwoStepFlow Flow, RecordingContext Context)> Activated(object? stored = null, IConfirmations? confirmations = null, IServiceProvider? services = null)
     {
-        var context = new RecordingContext(FlowId) { RecordedConfirmations = confirmations ?? _confirmations, RecordedReminders = _reminders, Time = _clock, RecordedServices = services };
+        var conf = confirmations ?? _confirmations;
+        var context = new RecordingContext(FlowId) { RecordedConfirmations = conf, RecordedReminders = _reminders, Time = _clock, RecordedServices = services };
+        if (conf is IConfirmationRequests requests)
+        {
+            context.Neurons[IConfirmationRequests.Of(FlowId.Brain)] = requests;
+        }
         if (stored is not null) { context.Store(stored); }
         var flow = new TwoStepFlow();
+        if (conf is RecordingConfirmations recording) { recording.Flow = flow; }
         NeuronAttachment.Attach(flow, context);
         context.Neurons[FlowId] = flow;
         await NeuronAttachment.Activate(flow, CancellationToken.None);
@@ -225,16 +291,16 @@ public sealed class FlowFacts
         await Drain(context);
     }
 
-    // A real resolution: the signal arrives, then the confirmations side gives the answer the flow verifies it against.
+    // A real resolution: the confirmations side answers, then the signal arrives and the flow verifies it.
     private async Task Resolved(TwoStepFlow flow, string planId, ConfirmationOutcome outcome)
     {
-        await flow.Deliver(Resolution(planId, outcome));
         _confirmations.Answer(planId, outcome);
+        await flow.Deliver(Resolution(planId, outcome));
     }
 
     private static List<Signal> Signals(RecordingContext context) => [.. context.Writes.SelectMany(write => write.Signals)];
 
-    private static ConfirmationResolved Resolution(string planId, ConfirmationOutcome outcome) => new(planId, ConfirmationAction.Other, "f", ConfirmationPrincipal.App("test.flow"),
+    internal static ConfirmationResolved Resolution(string planId, ConfirmationOutcome outcome) => new(planId, ConfirmationAction.Other, "f", ConfirmationPrincipal.App("test.flow"),
         outcome == ConfirmationOutcome.Approved ? ConfirmationPrincipal.Person("ann") : null, ConfirmationPolicy.DestructiveOnly, outcome,
         outcome == ConfirmationOutcome.Approved ? ConfirmationDenyReason.None : ConfirmationDenyReason.ByPerson, false, DateTimeOffset.UnixEpoch);
 
@@ -327,22 +393,6 @@ public sealed class FlowFacts
         var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => flow.Resume("b", WaitOutcome.Approved, "mallory"));
 
         Assert.Equal("approval waits are resolved by the confirmations inbox", refused.Message);
-        Assert.Equal(before, context.Writes.Count);
-        Assert.Equal(FlowStatus.Waiting, flow.Current.Status);
-    }
-
-    [Fact]
-    public async Task AForeignCallerCannotAnswerAConfirmation()
-    {
-        var (flow, context) = await Activated();
-        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true });
-        var planId = Assert.IsType<string>(flow.Current.Waiting?.ConfirmationPlanId);
-        var before = context.Writes.Count;
-        IFlowCallbacks callbacks = flow;
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => callbacks.ConfirmationAnswered(planId, ConfirmationOutcome.Approved, "forged"));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => callbacks.ConfirmationFailed(planId, "x", "forged"));
-
         Assert.Equal(before, context.Writes.Count);
         Assert.Equal(FlowStatus.Waiting, flow.Current.Status);
     }

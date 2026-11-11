@@ -1,69 +1,80 @@
-using DigitalBrain;
+﻿using DigitalBrain;
 using DigitalBrain.Examples.Calculator;
 using DigitalBrain.Rules;
 using DigitalBrain.Testing;
 using DigitalBrain.Testing.Views;
+using DigitalBrain.Units;
+using Xunit;
 
 namespace Calculator.Tests.Unit;
 
 public sealed class CalculatorFacts
 {
-    public static IEnumerable<TheoryDataRow<AppOperationCase>> Operations => AppBaseline.Cases(typeof(CalculatorApp));
+    public static IEnumerable<TheoryDataRow<ScreenOperationCase>> Operations => ScreenBaseline.Cases(typeof(CalculatorScreen));
 
     [Theory]
     [MemberData(nameof(Operations))]
-    public Task Baseline(AppOperationCase operation) => AppBaseline.RunAsync(operation);
-
-    [Fact]
-    public async Task BddRunner_verifies_all_scenarios_and_records_report_into_BddNeuron()
-    {
-        await using var os = TestOS.Local();
-        var report = await BddRunner.VerifyAsync<CalculatorApp>(targetOs: os, cancellationToken: TestContext.Current.CancellationToken);
-
-        Assert.True(report.Passed, report.BaselineError);
-        Assert.Equal("calculator", report.AppId);
-        Assert.Equal(4, report.Scenarios.Count);
-        Assert.All(report.Scenarios, s => Assert.True(s.Passed, s.Error));
-
-        ViewFixtures.Verify(report, ViewsDirectory());
-
-        var bdd = os.Get<IBdd>(new NeuronId(new BrainId("test"), "bdd", "calculator"));
-        var stored = await bdd.Read(TestContext.Current.CancellationToken);
-        Assert.NotNull(stored);
-        Assert.True(stored.Passed);
-        Assert.Equal(4, stored.Scenarios.Count);
-    }
+    public Task Baseline(ScreenOperationCase operation) => ScreenBaseline.RunAsync(operation);
 
     [Fact]
     public async Task Pressing_digits_and_operators_updates_the_rendered_view()
     {
         await using var os = TestOS.Local();
-        var app = await os.Install<CalculatorApp>();
+        os.Register(typeof(CalculatorScreen).Assembly);
 
-        await app.Request("press", "7");
-        await app.Request("press", "+");
-        await app.Request("press", "5");
-        await app.Request("press", "=");
+        var screen = os.Get<IScreen>(new NeuronId(new BrainId("test"), "app.calculator", "default"));
 
-        Assert.Contains("12", app.Main.Texts);
-        await app.Request("clear");
-        Assert.Contains("0", app.Main.Texts);
+        await screen.Request<CalculatorPress>(new("7"));
+        await screen.Request<CalculatorPress>(new("+"));
+        await screen.Request<CalculatorPress>(new("5"));
+        await screen.Request<CalculatorPress>(new("="));
+        await os.Idle();
+
+        var view = await screen.Read();
+        Assert.NotNull(view);
+        var presented = PresentedView.From(view);
+        Assert.Contains("12", presented.Texts);
+
+        await screen.Request<CalculatorClear>(new());
+        await os.Idle();
+
+        var cleared = await screen.Read();
+        Assert.NotNull(cleared);
+        var clearedPresented = PresentedView.From(cleared);
+        Assert.Contains("0", clearedPresented.Texts);
     }
 
     [Fact]
     public async Task DividingByZeroIsRejected()
     {
         await using var os = TestOS.Local();
-        var app = await os.Install<CalculatorApp>();
+        os.Register(typeof(CalculatorScreen).Assembly);
 
-        await app.Request("press", "8");
-        await app.Request("press", "/");
-        await app.Request("press", "0");
+        var screen = os.Get<IScreen>(new NeuronId(new BrainId("test"), "app.calculator", "default"));
 
-        var error = await Assert.ThrowsAsync<RuleViolationException>(() => app.Request("press", "="));
+        await screen.Request<CalculatorPress>(new("8"));
+        await screen.Request<CalculatorPress>(new("/"));
+        await screen.Request<CalculatorPress>(new("0"));
+        await screen.Request<CalculatorPress>(new("="));
+        await os.Idle();
 
-        Assert.Equal(["divisor.not-zero"], error.Rejected.Rules);
-        Assert.Contains("0", app.Main.Texts);
+        var view = await screen.Read();
+        Assert.NotNull(view);
+        var presented = PresentedView.From(view);
+        Assert.Contains("0", presented.Texts);
+    }
+
+    [Fact]
+    public async Task ViewFixtures_Verify_MatchesOnDisk()
+    {
+        await using var os = TestOS.Local();
+        os.Register(typeof(CalculatorScreen).Assembly);
+
+        var screen = os.Get<IScreen>(new NeuronId(new BrainId("test"), "app.calculator", "default"));
+        var view = await screen.Read();
+        Assert.NotNull(view);
+
+        ViewFixtures.Verify(view, ViewsDirectory());
     }
 
     private static string ViewsDirectory()

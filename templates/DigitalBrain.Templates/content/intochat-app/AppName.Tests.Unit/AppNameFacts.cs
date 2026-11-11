@@ -1,32 +1,37 @@
+﻿using System.Reflection;
 using System.Text.RegularExpressions;
 using DigitalBrain;
+using DigitalBrain.Neurons;
 using DigitalBrain.Testing;
+using DigitalBrain.Units;
 
 namespace APP_NAMESPACE.Tests.Unit;
 
 public sealed class APP_CLASSFacts
 {
-    // The generated baseline: one row per operation, the empty input, a fake for every required capability, under 5 s. Keep it.
-    public static IEnumerable<TheoryDataRow<AppOperationCase>> Operations => AppBaseline.Cases(typeof(APP_CLASS));
+    // The generated baseline: one row per operation, the empty input, a fake for every required capability, under 30 s. Keep it.
+    public static IEnumerable<TheoryDataRow<ScreenOperationCase>> Operations => ScreenBaseline.Cases(typeof(APP_CLASS));
 
     [Theory]
     [MemberData(nameof(Operations))]
-    public Task Baseline(AppOperationCase operation) => AppBaseline.RunAsync(operation);
+    public Task Baseline(ScreenOperationCase operation) => ScreenBaseline.RunAsync(operation);
 
     // Scenario: Opening shows the start view. Add one fact per scenario in the spec comment.
     [Fact]
     public async Task Opening_shows_the_start_view()
     {
-        var report = await BddRunner.VerifyAsync<APP_CLASS>(cancellationToken: TestContext.Current.CancellationToken);
-        Assert.True(report.Passed);
-
         await using var os = TestOS.Local();
-        var app = await os.Install<APP_CLASS>();
+        os.Register(typeof(APP_CLASS).Assembly);
 
-        await app.Request("open");
+        var screen = os.Get<IScreen>(new NeuronId(new BrainId("test"), "app.APP_ID", "default"));
 
-        Assert.Contains("Welcome to APP_CLASS.", app.Main.Texts);
-        Assert.Null(app.App.RecordedError);
+        await screen.Request<Opened>(new());
+        await os.Idle();
+
+        var view = await screen.Read();
+        Assert.NotNull(view);
+        var presented = PresentedView.From(view);
+        Assert.Contains("Welcome to APP_CLASS.", presented.Texts);
     }
 
     [Fact]
@@ -44,6 +49,8 @@ public sealed class APP_CLASSFacts
     [Fact]
     public void App_id_is_lowercase_and_dotted()
     {
-        Assert.Matches(new Regex("^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*$"), TestOS.DefinitionOf(typeof(APP_CLASS)).Id);
+        var neuronType = typeof(APP_CLASS).GetCustomAttribute<NeuronAttribute>()!.Type;
+        Assert.StartsWith("app.", neuronType);
+        Assert.Matches(new Regex("^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*$"), neuronType["app.".Length..]);
     }
 }

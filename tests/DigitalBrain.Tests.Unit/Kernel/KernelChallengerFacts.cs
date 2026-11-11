@@ -1,6 +1,8 @@
 #pragma warning disable CA2201
 #pragma warning disable CA1822
 #pragma warning disable CA1040
+using DigitalBrain.Contracts;
+using DigitalBrain.Neurons;
 using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Emit;

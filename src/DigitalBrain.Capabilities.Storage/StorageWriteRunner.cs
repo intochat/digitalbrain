@@ -1,7 +1,6 @@
 using System.Globalization;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Operations;
-using DigitalBrain.Spi;
 
 namespace DigitalBrain.Capabilities.Storage;
 

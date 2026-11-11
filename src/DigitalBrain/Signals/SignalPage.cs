@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Kernel;
 
 /// <summary>A signal as journaled: its publisher, its sequence and when it was published.</summary>
 /// <param name="TraceId">The operation the signal belongs to; null for entries journaled before trace ids.</param>

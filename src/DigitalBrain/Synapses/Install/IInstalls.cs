@@ -1,6 +1,6 @@
 using DigitalBrain.Contracts;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>How an install ended.</summary>
 public enum InstallStatus

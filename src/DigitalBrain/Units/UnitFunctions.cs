@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 using DigitalBrain.Invocation;
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Units;
 

@@ -1,4 +1,4 @@
-using DigitalBrain.Spi;
+using DigitalBrain.Neurons;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 

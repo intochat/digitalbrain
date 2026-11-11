@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>
 /// A thread-safe <see cref="ISynapseCatalogSource"/>: changes are serialized under a lock and <see cref="Current"/> is a volatile read of

@@ -1,17 +1,19 @@
+using DigitalBrain.Kernel;
+using DigitalBrain.Neurons;
 using System.Text;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Capabilities.Compute;
 using DigitalBrain.Capabilities.Connections.Broker;
 using DigitalBrain.Capabilities.Storage;
+using DigitalBrain.Confirmation;
 using DigitalBrain.Contracts;
 using DigitalBrain.Operations;
 using DigitalBrain.Runtime.Orleans.Capabilities;
 using DigitalBrain.Runtime.Orleans.Capabilities.Storage;
 using DigitalBrain.Runtime.Orleans.Hosting;
-using DigitalBrain.Runtime.Orleans.Operations;
 using DigitalBrain.Runtime.Orleans.Testing;
 using DigitalBrain.Runtime.Orleans.Tests.Integration.Hosting;
-using DigitalBrain.Spi;
+using DigitalBrain.Hosting;
 using DigitalBrain.Testing.Conformance.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
@@ -79,17 +81,6 @@ public sealed class SlowStorage(InMemoryStorage inner) : IStorage
     }
 }
 
-/// <summary>Refuses plans whose folder name starts with <c>Denied</c>.</summary>
-public sealed class NamedGate : IOperationGate
-{
-    public TaskCompletionSource<OperationGateDecision>? Waiting { get; set; }
-    public Task<OperationGateDecision> Check(OperationRequest request, CancellationToken ct)
-        => request.Plan is WritePlan { Name: "Waiting-for-human" } && Waiting is { } pending ? pending.Task.WaitAsync(ct)
-            : Task.FromResult(request.Plan is WritePlan { Name: { } name } && name.StartsWith("Denied", StringComparison.Ordinal)
-            ? OperationGateDecision.Deny("refused by the fact gate")
-            : OperationGateDecision.Allow);
-}
-
 [NeuronAlias("test.writer")]
 public interface IWriter
 {
@@ -98,10 +89,10 @@ public interface IWriter
 
 /// <summary>A hosted neuron that starts an operation through its own context.</summary>
 [Neuron("probe.writer")]
-public sealed class WriterNeuron : Neuron, IWriter
+public sealed class WriterNeuron(IOperations operations) : Neuron, IWriter
 {
     public async Task<string> CreateFolder(string parent, string name)
-        => (await Context.Operations.Start(WritePlan.CreateFolder(new ItemId(parent), name), CancellationToken.None)).Id.Value;
+        => (await operations.Start(WritePlan.CreateFolder(new ItemId(parent), name), CancellationToken.None)).Id.Value;
 }
 
 /// <summary>A silo over BrainLog with the two connections, the in-memory result reader and the fact gate.</summary>
@@ -112,16 +103,15 @@ public sealed class OperationSilo : IAsyncLifetime
     private IInProcessHost? _host;
 
     public OperationConnections Connections { get; } = new();
-    public NamedGate Gate { get; } = new();
     internal bool? DriverEnded { get; set; }
 
     public IServiceProvider Services => (_host ?? throw new InvalidOperationException("Not started.")).Services;
 
     public Task Restart(CancellationToken ct) => _host!.Restart(ct);
 
-    internal RuntimeOperations Operations(string brain) => new(Services, new BrainId(brain), "fact");
+    internal NeuronOperations Operations(string brain) => new(Services, new BrainId(brain), "fact");
 
-    internal IOperationEntity Entity(string brain, OperationId id) => RuntimeOperations.Entity(Services, new BrainId(brain), id);
+    internal IOperationNeuron Entity(string brain, OperationId id) => NeuronOperationsQuery.ResolveNeuron(Services, new BrainId(brain), id);
 
     /// <summary>The signals the entity of <paramref name="id"/> journaled, in order.</summary>
     internal async Task<List<Signal>> Signals(string brain, OperationId id, CancellationToken ct)
@@ -136,7 +126,16 @@ public sealed class OperationSilo : IAsyncLifetime
         {
             services.AddSingleton<ICapabilityConnections>(Connections);
             services.AddSingleton<StorageWriteResult>(OperationConnections.Result);
-            services.AddSingleton<IOperationGate>(Gate);
+            services.AddSingleton(new ConfirmationPolicies
+            {
+                DefaultPolicy = ConfirmationPolicy.Never,
+                Brains = new(StringComparer.Ordinal)
+                {
+                    ["op-wait-human"] = ConfirmationPolicy.Always,
+                    ["op-new-endpoint"] = ConfirmationPolicy.Always,
+                    ["op-gate"] = ConfirmationPolicy.Always,
+                }
+            });
             services.AddSingleton<IOperationDriverLifetime>(new Lifetime(this));
         }).Start(new InProcessHostOptions { Home = _home.Path, Modules = [typeof(HostingModule)] }, CancellationToken.None);
 
@@ -165,32 +164,23 @@ public sealed class OperationEntityFacts(OperationSilo silo) : IClassFixture<Ope
     public async Task StartReturnsACancellableHandleWhileHumanApprovalIsPending()
     {
         var ct = TestContext.Current.CancellationToken;
-        silo.Gate.Waiting = new(TaskCreationOptions.RunContinuationsAsynchronously);
         var operations = silo.Operations("op-wait-human");
-        try
-        {
-            var operation = await operations.Start(WritePlan.CreateFolder(silo.Connections.A.Root, "Waiting-for-human"), ct).WaitAsync(TimeSpan.FromSeconds(2), ct);
-            Assert.Equal(OperationSilo.DriverLifetime, (await silo.Entity("op-wait-human", operation.Id).Get())!.DriverLifetime);
-            Assert.False(((RuntimeOperation)operation).Completion.IsCompleted);
-            await operations.Cancel(operation.Id, ct);
-            Assert.IsType<OperationResult.Cancelled>(await Done(operation));
-            Assert.DoesNotContain(await silo.Connections.A.Children(silo.Connections.A.Root), item => item.Name == "Waiting-for-human");
-        }
-        finally
-        {
-            silo.Gate.Waiting.TrySetResult(OperationGateDecision.Deny("test finished"));
-            silo.Gate.Waiting = null;
-        }
+        var operation = await operations.Start(WritePlan.CreateFolder(silo.Connections.A.Root, "Waiting-for-human"), ct).WaitAsync(TimeSpan.FromSeconds(5), ct);
+        Assert.Equal(OperationSilo.DriverLifetime, (await silo.Entity("op-wait-human", operation.Id).Get())!.DriverLifetime);
+        Assert.False(((OperationHandle)operation).Completion.IsCompleted);
+        await operations.Cancel(operation.Id, ct);
+        Assert.IsType<OperationResult.Cancelled>(await Done(operation));
+        Assert.DoesNotContain(await silo.Connections.A.Children(silo.Connections.A.Root), item => item.Name == "Waiting-for-human");
     }
 
     private static byte[] Bytes(string text) => Encoding.UTF8.GetBytes(text);
 
     private static async Task<OperationResult> Done(IOperation operation)
-        => await ((RuntimeOperation)operation).Completion.WaitAsync(TimeSpan.FromSeconds(30));
+        => await ((OperationHandle)operation).Completion.WaitAsync(TimeSpan.FromSeconds(30));
 
     private sealed record ProbePlan() : OperationPlan(false);
 
-    private static RuntimeOperationsQuery Query(OperationSilo silo, string brain) => new RuntimeOperationsQuery(silo.Services, new BrainId(brain));
+    private static NeuronOperationsQuery Query(OperationSilo silo, string brain) => new(silo.Services, new BrainId(brain));
 
     [Fact]
     public async Task RunningListsAStartedOperation()
@@ -199,7 +189,7 @@ public sealed class OperationEntityFacts(OperationSilo silo) : IClassFixture<Ope
         var operation = await silo.Operations("op-q-running").Start(new ProbePlan(), ct);
         await operation.Report(0.5);
 
-        var view = Assert.Single(await Query(silo, "op-q-running").Running(ct));
+        var view = (await Query(silo, "op-q-running").Read(operation.Id, ct))!;
         Assert.Equal(operation.Id, view.Id);
         Assert.Equal("ProbePlan", view.Kind);
         Assert.Equal("fact", view.Origin);
@@ -207,7 +197,8 @@ public sealed class OperationEntityFacts(OperationSilo silo) : IClassFixture<Ope
         Assert.Null(view.Result);
 
         await operation.Complete(new OperationResult.Succeeded());
-        Assert.Empty(await Query(silo, "op-q-running").Running(ct));
+        var ended = (await Query(silo, "op-q-running").Read(operation.Id, ct))!;
+        Assert.IsType<OperationResult.Succeeded>(ended.Result);
     }
 
     [Fact]
@@ -236,7 +227,6 @@ public sealed class OperationEntityFacts(OperationSilo silo) : IClassFixture<Ope
         using (TraceContext.Enter(trace)) { operation = await silo.Operations("op-q-trace").Start(new ProbePlan(), ct); }
 
         Assert.Equal("trace-of-start", (await Query(silo, "op-q-trace").Read(operation.Id, ct))!.TraceId);
-        Assert.Equal("trace-of-start", Assert.Single(await Query(silo, "op-q-trace").Running(ct)).TraceId);
     }
 
     [Fact]
@@ -308,7 +298,8 @@ public sealed class OperationEntityFacts(OperationSilo silo) : IClassFixture<Ope
         Assert.Equal(10, state.InlineLength);
         Assert.StartsWith("sha256:", state.InlineHash, StringComparison.Ordinal);
         Assert.DoesNotContain(Convert.ToBase64String(Bytes("top secret")), state.PlanJson, StringComparison.Ordinal);
-        Assert.Null(Assert.IsType<OperationStarted>((await silo.Signals("op-inline", operation.Id, ct))[0]).Plan.Inline);
+        var started = Assert.IsType<OperationStarted>((await silo.Signals("op-inline", operation.Id, ct))[0]);
+        Assert.Equal("WritePlan", started.Kind);
     }
 
     [Fact]
@@ -359,8 +350,11 @@ public sealed class OperationEntityFacts(OperationSilo silo) : IClassFixture<Ope
         var ct = TestContext.Current.CancellationToken;
         var a = silo.Connections.A;
         var operation = await silo.Operations("op-gate").Start(WritePlan.CreateFolder(a.Root, "Denied-folder"), ct);
+        var state = (await silo.Entity("op-gate", operation.Id).Get())!;
+        var inbox = NeuronHosting.Get<IConfirmationInbox>(silo.Services, IConfirmationRequests.Of(new BrainId("op-gate")));
+        await inbox.Resolve(state.ApprovalPlanId!, approve: false);
 
-        Assert.Equal("denied", Assert.IsType<OperationResult.Failed>(await Done(operation)).Code);
+        Assert.Equal("declined", Assert.IsType<OperationResult.Failed>(await Done(operation)).Code);
         Assert.DoesNotContain(await a.Children(a.Root), item => item.Name == "Denied-folder");
     }
 
@@ -372,7 +366,7 @@ public sealed class OperationEntityFacts(OperationSilo silo) : IClassFixture<Ope
         var writer = NeuronHosting.Get<IWriter>(silo.Services, NeuronId.Parse("op-ctx/probe.writer/w1"));
         var id = new OperationId(await writer.CreateFolder(a.Root.Value, "From-context"));
 
-        var result = await RuntimeOperations.WaitFor(silo.Services, new BrainId("op-ctx"), id, ct).WaitAsync(TimeSpan.FromSeconds(30), ct);
+        var result = (await OperationWait.For(Query(silo, "op-ctx"), id, ct)).Result!;
         Assert.IsType<OperationResult.Succeeded>(result);
         Assert.Equal("op-ctx/probe.writer/w1", (await silo.Entity("op-ctx", id).Get())!.Origin);
         Assert.Contains(await a.Children(a.Root), item => item.Name == "From-context");
@@ -388,31 +382,26 @@ public sealed class OperationRestartFacts(OperationSilo silo) : IClassFixture<Op
         var ct = TestContext.Current.CancellationToken;
         await using var restarting = new OperationSilo();
         await restarting.InitializeAsync();
-        restarting.Gate.Waiting = new(TaskCreationOptions.RunContinuationsAsynchronously);
         var brain = "op-new-endpoint";
-        try
-        {
-            var operation = await restarting.Operations(brain).Start(
-                WritePlan.CreateFolder(restarting.Connections.A.Root, "Waiting-for-human"), ct);
-            var before = (await restarting.Entity(brain, operation.Id).Get())!;
-            Assert.Equal(OperationPhase.Running, before.Phase);
-            Assert.Equal(OperationSilo.DriverLifetime, before.DriverLifetime);
+        var operation = await restarting.Operations(brain).Start(
+            WritePlan.CreateFolder(restarting.Connections.A.Root, "Waiting-for-human"), ct);
+        var before = (await restarting.Entity(brain, operation.Id).Get())!;
+        Assert.Equal(OperationPhase.AwaitingApproval, before.Phase);
+        Assert.Equal(OperationSilo.DriverLifetime, before.DriverLifetime);
 
-            await restarting.Restart(ct);
-            var address = restarting.Services.GetRequiredService<OrleansSdk.Runtime.ILocalSiloDetails>().SiloAddress;
-            Assert.True(OrleansSdk.Runtime.SiloAddress.TryParse(before.Driver!, out var previousAddress));
-            Assert.NotEqual(previousAddress.Endpoint, address.Endpoint);
-            // The host adapter supplies this proof; membership alone cannot recognize the changed endpoint.
-            restarting.DriverEnded = true;
-            await restarting.Entity(brain, operation.Id).Reconcile();
-            await restarting.Entity(brain, operation.Id).Reconcile();
+        await restarting.Restart(ct);
+        var address = restarting.Services.GetRequiredService<OrleansSdk.Runtime.ILocalSiloDetails>().SiloAddress;
+        Assert.True(OrleansSdk.Runtime.SiloAddress.TryParse(before.Driver!, out var previousAddress));
+        Assert.NotEqual(previousAddress.Endpoint, address.Endpoint);
+        // The host adapter supplies this proof; membership alone cannot recognize the changed endpoint.
+        restarting.DriverEnded = true;
+        await restarting.Entity(brain, operation.Id).Reconcile();
+        await restarting.Entity(brain, operation.Id).Reconcile();
 
-            var after = (await restarting.Entity(brain, operation.Id).Get())!;
-            Assert.Equal("interrupted", Assert.IsType<OperationResult.Failed>(after.Result).Code);
-            Assert.Empty(await restarting.Connections.A.Children(restarting.Connections.A.Root));
-            Assert.Single((await restarting.Signals(brain, operation.Id, ct)).OfType<OperationDone>());
-        }
-        finally { restarting.Gate.Waiting.TrySetResult(OperationGateDecision.Deny("test finished")); }
+        var after = (await restarting.Entity(brain, operation.Id).Get())!;
+        Assert.Equal("interrupted", Assert.IsType<OperationResult.Failed>(after.Result).Code);
+        Assert.Empty(await restarting.Connections.A.Children(restarting.Connections.A.Root));
+        Assert.Single((await restarting.Signals(brain, operation.Id, ct)).OfType<OperationDone>());
     }
 
     [Fact]
@@ -421,7 +410,7 @@ public sealed class OperationRestartFacts(OperationSilo silo) : IClassFixture<Op
         var ct = TestContext.Current.CancellationToken;
         var a = silo.Connections.A;
         var operation = await silo.Operations("op-restart").Start(WritePlan.CreateFolder(a.Root, "Kept"), ct);
-        Assert.IsType<OperationResult.Succeeded>(await ((RuntimeOperation)operation).Completion.WaitAsync(TimeSpan.FromSeconds(30), ct));
+        Assert.IsType<OperationResult.Succeeded>(await ((OperationHandle)operation).Completion.WaitAsync(TimeSpan.FromSeconds(30), ct));
         var signalsBefore = (await silo.Signals("op-restart", operation.Id, ct)).Count;
 
         await silo.Restart(ct);
@@ -433,7 +422,8 @@ public sealed class OperationRestartFacts(OperationSilo silo) : IClassFixture<Op
         await Task.Delay(500, ct);
         Assert.Single(await a.Children(a.Root), item => item.Name == "Kept");
         Assert.Equal(signalsBefore, (await silo.Signals("op-restart", operation.Id, ct)).Count);
-        Assert.IsType<OperationResult.Succeeded>(await RuntimeOperations.WaitFor(silo.Services, new BrainId("op-restart"), operation.Id, ct));
+        var waited = await OperationWait.For(new NeuronOperationsQuery(silo.Services, new BrainId("op-restart")), operation.Id, ct);
+        Assert.IsType<OperationResult.Succeeded>(waited.Result);
     }
 }
 

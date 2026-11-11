@@ -1,3 +1,4 @@
+using DigitalBrain.Contracts;
 using Xunit;
 
 namespace DigitalBrain.Testing.Conformance.Host;

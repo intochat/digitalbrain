@@ -1,7 +1,8 @@
 using System.Text.Json;
 using DigitalBrain.Contracts;
+using DigitalBrain.Kernel;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>
 /// The current view of a state alias, read and activated at that alias's state neuron (<c>{brain}/{alias}/default</c>).

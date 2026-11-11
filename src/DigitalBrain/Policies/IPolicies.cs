@@ -1,6 +1,6 @@
 using DigitalBrain.Contracts;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Limits;
 
 /// <summary>The policies neuron of one brain, at <c>{brain}/policies/default</c>.</summary>
 [NeuronAlias("policies"), DefaultNeuronType("policies")]

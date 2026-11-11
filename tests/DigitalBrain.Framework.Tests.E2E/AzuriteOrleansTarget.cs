@@ -5,7 +5,7 @@ using Azure.Storage.Blobs;
 using DigitalBrain.Runtime.Orleans;
 using DigitalBrain.Runtime.Orleans.Azure;
 using DigitalBrain.Runtime.Orleans.Azure.Tests.Integration;
-using DigitalBrain.Spi;
+using DigitalBrain.Hosting;
 using DigitalBrain.Testing.Conformance.Host;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

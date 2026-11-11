@@ -32,44 +32,11 @@ public sealed class ModuleShapeAnalyzerFacts
         """);
 }
 
-public sealed class AppSchedulingAnalyzerFacts
-{
-    [Fact]
-    public Task Scheduling_attributes_in_app_class_report_DB0002() => Verify<AppSchedulingAnalyzer>.Diagnostics("""
-        using DigitalBrain;
-        [{|DB0002:Reentrant|}] public sealed class A : App
-        {
-            [{|DB0002:ReadOnlyCall|}] public void R() { }
-            [{|DB0002:OneWayCall|}] public void O() { }
-            [{|DB0002:Interleaves|}] public void I() { }
-            [{|DB0002:InterleavesWhen("P")|}] public void W() { }
-            [{|DB0002:CallTimeout(10)|}] public void T() { }
-        }
-        """);
-
-    [Fact]
-    public Task Scheduling_attribute_in_marked_app_class_reports_DB0002() => Verify<AppSchedulingAnalyzer>.Diagnostics("""
-        using DigitalBrain;
-        [App("a")] public sealed class A { [{|DB0002:ReadOnlyCall|}] public void R() { } }
-        """);
-
-    [Fact]
-    public Task Scheduling_attributes_on_neuron_report_nothing() => Verify<AppSchedulingAnalyzer>.Diagnostics("""
-        using DigitalBrain;
-        [Neuron("n"), Reentrant] public sealed class N : Neuron
-        {
-            [ReadOnlyCall] public void R() { }
-            [CallTimeout(10)] public void T() { }
-        }
-        """);
-}
-
 public sealed class OrleansAttributeAnalyzerFacts
 {
     [Theory]
     [InlineData("[Neuron(\"n\")]")]
     [InlineData("[Signal(\"s\")]")]
-    [InlineData("[App(\"a\")]")]
     [InlineData("[Module(\"m\")]")]
     public Task Orleans_attribute_on_identity_type_reports_DB0003(string identity) => Verify<OrleansAttributeAnalyzer>.Diagnostics($$"""
         using DigitalBrain;

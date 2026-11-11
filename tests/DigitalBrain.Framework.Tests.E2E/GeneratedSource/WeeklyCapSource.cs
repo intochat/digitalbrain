@@ -11,6 +11,7 @@ internal static class WeeklyCapSource
     internal const string Budget = """
         namespace Me.GeneratedBudget;
 
+        using DigitalBrain.Modules;
         using DigitalBrain.UI;
 
         [Signal("gs.charging")]

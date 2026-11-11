@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 internal static class AskRules
 {

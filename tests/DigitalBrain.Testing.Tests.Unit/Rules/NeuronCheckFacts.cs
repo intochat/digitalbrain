@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using System.Collections.Concurrent;
 using DigitalBrain.Rules;
 using OS = DigitalBrain.Testing.TestOS;

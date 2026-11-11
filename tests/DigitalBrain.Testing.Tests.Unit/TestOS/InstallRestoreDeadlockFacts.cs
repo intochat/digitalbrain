@@ -1,4 +1,4 @@
-using DigitalBrain.Spi;
+using DigitalBrain.Units;
 using DigitalBrain.Time;
 using DigitalBrain.Testing.Tests.Unit.Slots;
 using OS = DigitalBrain.Testing.TestOS;

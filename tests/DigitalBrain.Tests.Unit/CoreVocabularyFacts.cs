@@ -1,4 +1,6 @@
-using DigitalBrain.Spi;
+﻿using DigitalBrain.Contracts;
+using DigitalBrain.Kernel;
+using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Tests.Unit;
 
@@ -6,46 +8,36 @@ public sealed class CoreVocabularyFacts
 {
     [Theory]
     [InlineData("DigitalBrain.Signal")]
-    [InlineData("DigitalBrain.Synapse")]
-    [InlineData("DigitalBrain.Neuron")]
-    [InlineData("DigitalBrain.Neuron`1")]
+    [InlineData("DigitalBrain.Kernel.Synapse")]
+    [InlineData("DigitalBrain.Neurons.Neuron")]
+    [InlineData("DigitalBrain.Neurons.Neuron`1")]
     [InlineData("DigitalBrain.BrainId")]
     [InlineData("DigitalBrain.NeuronId")]
-    [InlineData("DigitalBrain.DeactivationCause")]
-    [InlineData("DigitalBrain.NeuronAttribute")]
+    [InlineData("DigitalBrain.Neurons.DeactivationCause")]
+    [InlineData("DigitalBrain.Neurons.NeuronAttribute")]
     [InlineData("DigitalBrain.SignalAttribute")]
-    [InlineData("DigitalBrain.OnAttribute")]
-    [InlineData("DigitalBrain.AppAttribute")]
+    [InlineData("DigitalBrain.Neurons.OnAttribute")]
+    [InlineData("DigitalBrain.IScreen")]
+    [InlineData("DigitalBrain.Screen`1")]
     [InlineData("DigitalBrain.CapabilityAttribute")]
-    [InlineData("DigitalBrain.InterleavesAttribute")]
-    [InlineData("DigitalBrain.InterleavesWhenAttribute")]
-    [InlineData("DigitalBrain.ReadOnlyCallAttribute")]
-    [InlineData("DigitalBrain.OneWayCallAttribute")]
-    [InlineData("DigitalBrain.CallTimeoutAttribute")]
-    [InlineData("DigitalBrain.ReentrantAttribute")]
-    [InlineData("DigitalBrain.Spi.INeuronContext")]
-    [InlineData("DigitalBrain.Spi.INeuronState")]
-    [InlineData("DigitalBrain.Spi.ITimers")]
-    [InlineData("DigitalBrain.Spi.IReminders")]
-    [InlineData("DigitalBrain.Spi.IOperations")]
-    [InlineData("DigitalBrain.Spi.ISynapses")]
-    [InlineData("DigitalBrain.Spi.INeuronProxies")]
+    [InlineData("DigitalBrain.Contracts.InterleavesAttribute")]
+    [InlineData("DigitalBrain.Neurons.InterleavesWhenAttribute")]
+    [InlineData("DigitalBrain.Contracts.ReadOnlyCallAttribute")]
+    [InlineData("DigitalBrain.Contracts.OneWayCallAttribute")]
+    [InlineData("DigitalBrain.Contracts.CallTimeoutAttribute")]
+    [InlineData("DigitalBrain.Neurons.ReentrantAttribute")]
+    [InlineData("DigitalBrain.Neurons.INeuronContext")]
+    [InlineData("DigitalBrain.Neurons.ITimers")]
+    [InlineData("DigitalBrain.Neurons.IReminders")]
+    [InlineData("DigitalBrain.Operations.IOperations")]
+    [InlineData("DigitalBrain.Kernel.ISynapses")]
+    [InlineData("DigitalBrain.Neurons.INeuronProxies")]
     public void Core_exports_the_vocabulary(string name)
     {
         var type = typeof(Signal).Assembly.GetType(name);
 
         Assert.NotNull(type);
         Assert.True(type.IsPublic, name);
-    }
-
-    [Fact]
-    public void Spi_is_interfaces_only()
-    {
-        var spi = typeof(Signal).Assembly.GetExportedTypes().Where(t => t.Namespace == "DigitalBrain.Spi").ToList();
-
-        Assert.NotEmpty(spi);
-        // Interfaces, plus static entry points a runtime calls (NeuronAttachment).
-        Assert.All(spi, t => Assert.True(t.IsInterface || (t.IsAbstract && t.IsSealed), t.FullName));
     }
 
     [Fact]
@@ -99,23 +91,23 @@ public sealed class CoreVocabularyFacts
         public NeuronId Identity => Id;
     }
 
-    private sealed class NullContext : INeuronContext
+    private sealed class NullContext : INeuronContext, INeuronSeat
     {
         public NeuronId Id => NeuronId.Parse("b1/counter/a");
-        public IServiceProvider Services => throw new NotSupportedException();
+        public DigitalBrain.Access.Caller? Caller => null;
         public TimeProvider Time => TimeProvider.System;
-        public INeuronState State => throw new NotSupportedException();
         public ITimers Timers => throw new NotSupportedException();
         public IReminders Reminders => throw new NotSupportedException();
-        public IOperations Operations => throw new NotSupportedException();
-        public IOperationsQuery OperationsQuery => throw new NotSupportedException();
-        public DigitalBrain.Confirmation.IConfirmations Confirmations => throw new NotSupportedException();
         public ISynapses Synapses => throw new NotSupportedException();
-        public ISignalHistory History => throw new NotSupportedException();
 
         public string? TraceId => null;
         public Task Publish(Signal signal) => Task.CompletedTask;
         public T Get<T>(NeuronId id) where T : class => throw new NotSupportedException();
         public void Defer(Func<Task> work) => throw new NotSupportedException();
+
+        public IServiceProvider Services => throw new NotSupportedException();
+        public Task<T?> Load<T>() where T : class => Task.FromResult<T?>(null);
+        public Task Save<T>(T next, IReadOnlyList<Signal> signals) where T : class => Task.CompletedTask;
+        public Task Clear() => Task.CompletedTask;
     }
 }

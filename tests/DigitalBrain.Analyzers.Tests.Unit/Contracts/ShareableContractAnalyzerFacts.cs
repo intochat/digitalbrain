@@ -25,7 +25,7 @@ public sealed class ShareableContractAnalyzerFacts
         using System.Threading.Tasks;
         using DigitalBrain;
         public interface IUnshareable { Task DoWork(); }
-        public sealed class Caller : App
+        public sealed class Caller : Neuron
         {
             public Task Invoke() => {|DB0031:Get<IUnshareable>("brain:other-brain")|}.DoWork();
         }
@@ -36,7 +36,7 @@ public sealed class ShareableContractAnalyzerFacts
         using System.Threading.Tasks;
         using DigitalBrain;
         public interface ILocalService { Task DoWork(); }
-        public sealed class Caller : App
+        public sealed class Caller : Neuron
         {
             public Task Invoke() => Get<ILocalService>("local-service").DoWork();
         }

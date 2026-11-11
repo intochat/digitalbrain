@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Signals.Watch;
 

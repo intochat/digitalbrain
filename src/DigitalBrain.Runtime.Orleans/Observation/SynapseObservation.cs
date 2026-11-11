@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
+using DigitalBrain.Kernel;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Synapses;
-using DigitalBrain.Spi;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Runtime.Orleans;

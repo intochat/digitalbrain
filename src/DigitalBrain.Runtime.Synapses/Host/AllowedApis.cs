@@ -31,8 +31,12 @@ internal static class AllowedApis
         "System.Buffers",
     ];
 
-    /// <summary>DigitalBrain namespaces a unit may reference (matched exactly), less <see cref="RefusedDigitalBrainTypes"/>.</summary>
-    public static readonly string[] DigitalBrainNamespaces =
+    /// <summary>
+    /// The published language: the DigitalBrain namespaces written for unit authors, matched exactly. Every public type declared in
+    /// one of them is open to a unit (members still pass <see cref="RefusedMembers"/>); every other DigitalBrain namespace is closed.
+    /// There is no list of types: AuthoringSurfaceFacts proves that nothing declared here hands a unit a closed type.
+    /// </summary>
+    public static readonly string[] AuthoringNamespaces =
     [
         "DigitalBrain",
         "DigitalBrain.Rules",
@@ -46,65 +50,6 @@ internal static class AllowedApis
         "DigitalBrain.Capabilities.Secrets",
         "DigitalBrain.Capabilities.Storage",
         "DigitalBrain.Capabilities.Tools",
-    ];
-
-    /// <summary>
-    /// Types in <see cref="DigitalBrainNamespaces"/> a unit may not reference: the synapse runtime (the host, sources, installs,
-    /// catalog, views), neuron plumbing and privileged module types. The synapse surface (attributes, Reaction, SignalEnvelope,
-    /// Check, view nodes, signals) stays.
-    /// </summary>
-    internal static readonly string[] RefusedDigitalBrainTypes =
-    [
-        "DigitalBrain.ISynapseHost", "DigitalBrain.ISourceStore", "DigitalBrain.ISources", "DigitalBrain.SourcesNeuron", "DigitalBrain.SourcesState",
-        "DigitalBrain.SourceRecord", "DigitalBrain.LoadedSource", "DigitalBrain.NoSynapseRestorer",
-        "DigitalBrain.IInstalls", "DigitalBrain.IInstallsCallbacks", "DigitalBrain.InstallsNeuron", "DigitalBrain.InstallsState", "DigitalBrain.InstalledGateIndex", "DigitalBrain.InstallRestore",
-        "DigitalBrain.ISynapseCatalogSource", "DigitalBrain.SynapseCatalogSource", "DigitalBrain.SynapseCatalog", "DigitalBrain.UnboundSlotResolver",
-        "DigitalBrain.IViewReader", "DigitalBrain.IStateReader", "DigitalBrain.StateNeuron", "DigitalBrain.BddNeuron", "DigitalBrain.IBdd",
-        "DigitalBrain.INeuronResolver", "DigitalBrain.IBrainSignalLog", "DigitalBrain.IPolicies", "DigitalBrain.PoliciesNeuron",
-        "DigitalBrain.InProcessHostOptions", "DigitalBrain.ModuleAuth", "DigitalBrain.PrivilegedGrant", "DigitalBrain.Secret",
-        // App and module declaration, neuron base classes and grain-shape attributes, configuration wiring, catalog plumbing.
-        "DigitalBrain.App", "DigitalBrain.AppAttribute", "DigitalBrain.AppDefinition", "DigitalBrain.AppRequirements",
-        "DigitalBrain.AppSignalSubscription", "DigitalBrain.AppWatch", "DigitalBrain.WatchBuilder", "DigitalBrain.Module",
-        "DigitalBrain.ModuleAttribute", "DigitalBrain.ModuleDeclarations", "DigitalBrain.ModuleManifest", "DigitalBrain.CatalogGateIndex",
-        "DigitalBrain.RequestLedger", "DigitalBrain.Neuron", "DigitalBrain.RevisionedNeuron", "DigitalBrain.NeuronAttribute",
-        "DigitalBrain.StatelessNeuronAttribute", "DigitalBrain.ReentrantAttribute", "DigitalBrain.InterleavesAttribute",
-        "DigitalBrain.InterleavesWhenAttribute", "DigitalBrain.CallTimeoutAttribute", "DigitalBrain.OneWayCallAttribute",
-        "DigitalBrain.ReadOnlyCallAttribute", "DigitalBrain.PolicyGuard", "DigitalBrain.Setting", "DigitalBrain.ActivationRefusedException",
-    ];
-
-    /// <summary>
-    /// Public types in the exact <c>DigitalBrain</c> namespace a unit legitimately uses. Every exported type there is on this list or
-    /// on <see cref="RefusedDigitalBrainTypes"/> (an architecture fact checks it), so a new runtime type cannot slip in unruled.
-    /// </summary>
-    internal static readonly string[] UnitFacingDigitalBrainTypes =
-    [
-        // Synapse, signal, slot and state declarations; ids and addresses; the deploy/install/policy/BDD records units read.
-        "DigitalBrain.ActionDescriptor", "DigitalBrain.Answer", "DigitalBrain.AnswerStatus", "DigitalBrain.Answered",
-        "DigitalBrain.AppAddress", "DigitalBrain.AppError", "DigitalBrain.AppKey",
-        "DigitalBrain.AppNavigated", "DigitalBrain.Ask", "DigitalBrain.AskLimits", "DigitalBrain.Asks",
-        "DigitalBrain.BddReport", "DigitalBrain.BddState", "DigitalBrain.BddVerified", "DigitalBrain.BrainId",
-        "DigitalBrain.BrainInstance", "DigitalBrain.BrainType", "DigitalBrain.CallsAttribute", "DigitalBrain.CapabilityAttribute",
-        "DigitalBrain.Causation", "DigitalBrain.DeactivationCause", "DigitalBrain.DeadLetterEntry", "DigitalBrain.DeployOutcome",
-        "DigitalBrain.DeployStatus", "DigitalBrain.Deployed", "DigitalBrain.DeployedSource", "DigitalBrain.EphemeralSignalAttribute",
-        "DigitalBrain.Gap", "DigitalBrain.GateChanged", "DigitalBrain.IRevisioned", "DigitalBrain.InstallDenied",
-        "DigitalBrain.InstallOutcome", "DigitalBrain.InstallRecord", "DigitalBrain.InstallRequest", "DigitalBrain.InstallRequested",
-        "DigitalBrain.InstallStatus", "DigitalBrain.Installed", "DigitalBrain.JournaledSignal", "DigitalBrain.Need",
-        "DigitalBrain.NeedKind", "DigitalBrain.NeuronAddress", "DigitalBrain.NeuronId", "DigitalBrain.NeuronState",
-        "DigitalBrain.ObservedSynapse", "DigitalBrain.OnAttribute", "DigitalBrain.PendingInstall", "DigitalBrain.PendingProposal",
-        "DigitalBrain.PoliciesState", "DigitalBrain.PolicyAdopted", "DigitalBrain.PolicyCondition", "DigitalBrain.PolicyDecision",
-        "DigitalBrain.PolicyGrammar", "DigitalBrain.PolicyGrammarException", "DigitalBrain.PolicyMeasure", "DigitalBrain.PolicyOp",
-        "DigitalBrain.PolicyProposed", "DigitalBrain.PolicyRefused", "DigitalBrain.PolicyRetired", "DigitalBrain.PolicyRule",
-        "DigitalBrain.PolicyWindow", "DigitalBrain.PolicyWindowKind", "DigitalBrain.PrivilegeDenied", "DigitalBrain.ProposalOutcome",
-        "DigitalBrain.ProposalStatus", "DigitalBrain.PublishedView", "DigitalBrain.Reaction", "DigitalBrain.Reservation",
-        "DigitalBrain.Retired", "DigitalBrain.RevisionConflictException", "DigitalBrain.ScenarioAttribute",
-        "DigitalBrain.ScenarioStepVerdict", "DigitalBrain.ScenarioVerdict", "DigitalBrain.Signal", "DigitalBrain.SignalAttribute",
-        "DigitalBrain.SignalDelivery", "DigitalBrain.SignalEnvelope", "DigitalBrain.SignalPage", "DigitalBrain.SlotAttribute",
-        "DigitalBrain.SlotDescriptor", "DigitalBrain.SlotNeed", "DigitalBrain.SlotUnboundException", "DigitalBrain.Staged",
-        "DigitalBrain.StateAttribute", "DigitalBrain.StateChanged", "DigitalBrain.Synapse", "DigitalBrain.SynapseAttribute",
-        "DigitalBrain.SynapseDescriptor", "DigitalBrain.SynapseDiagnostic", "DigitalBrain.SynapseFailed", "DigitalBrain.SynapseFinished", "DigitalBrain.SynapseKind",
-        "DigitalBrain.SynapseNeeds", "DigitalBrain.SynapseReasons", "DigitalBrain.SynapseRequest", "DigitalBrain.SynapseShape",
-        "DigitalBrain.SynapseShapeException", "DigitalBrain.SynapseSource", "DigitalBrain.SynapseStarted", "DigitalBrain.TypeKind",
-        "DigitalBrain.Undeployed", "DigitalBrain.ViewChanged",
     ];
 
     /// <summary>Types refused although their namespace is open.</summary>
@@ -329,12 +274,14 @@ internal static class AllowedApis
     /// <param name="type">The full type name.</param>
     public static bool IsAllowedType(string ns, string type)
     {
-        if (Within(type, RefusedTypes) || Within(type, RefusedDigitalBrainTypes))
+        if (Within(type, RefusedTypes))
         {
             return false;
         }
 
-        return DigitalBrainNamespaces.Contains(ns, StringComparer.Ordinal) || Namespaces.Contains(ns, StringComparer.Ordinal) || Within(type, Types);
+        return AuthoringNamespaces.Contains(ns, StringComparer.Ordinal)
+            || Namespaces.Contains(ns, StringComparer.Ordinal)
+            || Within(type, Types);
     }
 
     // The type is one of the names or nested in one.

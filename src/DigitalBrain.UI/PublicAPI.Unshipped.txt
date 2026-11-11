@@ -372,9 +372,6 @@ DigitalBrain.UI.InfoBar.Title.get -> string!
 DigitalBrain.UI.InfoBar.Title.init -> void
 DigitalBrain.UI.InfoBar.Tone.get -> string!
 DigitalBrain.UI.InfoBar.Tone.init -> void
-DigitalBrain.UI.IPresenter
-DigitalBrain.UI.IPresenter.Present(DigitalBrain.UI.View? side, DigitalBrain.UI.View? main) -> void
-DigitalBrain.UI.IPresenter.Toast(DigitalBrain.UI.Toast! toast) -> void
 DigitalBrain.UI.JobCardNode
 DigitalBrain.UI.JobCardNode.Equals(DigitalBrain.UI.JobCardNode? other) -> bool
 DigitalBrain.UI.JobCardNode.Progress.get -> double

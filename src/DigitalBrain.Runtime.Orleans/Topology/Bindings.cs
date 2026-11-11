@@ -1,3 +1,5 @@
+using DigitalBrain.Modules;
+
 namespace DigitalBrain.Runtime.Orleans;
 
 /// <summary>How the cluster finds its members.</summary>

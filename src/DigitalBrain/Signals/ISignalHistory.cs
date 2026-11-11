@@ -1,4 +1,4 @@
-namespace DigitalBrain.Spi;
+namespace DigitalBrain.Kernel;
 
 /// <summary>
 /// The brain's journal of published signals, read in sequence order. Entries below the floor have been trimmed;

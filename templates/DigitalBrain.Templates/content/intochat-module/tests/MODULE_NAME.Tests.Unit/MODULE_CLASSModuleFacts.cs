@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using System.Text.RegularExpressions;
 using DigitalBrain;
 

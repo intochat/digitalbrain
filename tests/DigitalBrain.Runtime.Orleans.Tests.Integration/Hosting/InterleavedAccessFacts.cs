@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DigitalBrain.Hosting;
 using DigitalBrain.Invocation;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Testing;

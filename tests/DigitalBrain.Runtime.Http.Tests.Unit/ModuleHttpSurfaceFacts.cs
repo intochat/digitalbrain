@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Security.Claims;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Capabilities.Identity;

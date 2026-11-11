@@ -3,4 +3,4 @@ DigitalBrain.Capabilities.Tools.ITool
 DigitalBrain.Capabilities.Tools.ITool.List() -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string!>!>!
 DigitalBrain.Capabilities.Tools.ITool.Run(string! tool, System.Text.Json.JsonElement args, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Text.Json.JsonElement>!
 DigitalBrain.Capabilities.Tools.ToolAsks
-static DigitalBrain.Capabilities.Tools.ToolAsks.Run(this DigitalBrain.Asks<DigitalBrain.Capabilities.Tools.ITool!> tools, string! tool, System.Text.Json.JsonElement args, string! key, bool repeatable = false) -> DigitalBrain.Ask!
+static DigitalBrain.Capabilities.Tools.ToolAsks.Run(this DigitalBrain.Units.Asks<DigitalBrain.Capabilities.Tools.ITool!> tools, string! tool, System.Text.Json.JsonElement args, string! key, bool repeatable = false) -> DigitalBrain.Units.Ask!

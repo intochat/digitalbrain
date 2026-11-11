@@ -1,3 +1,5 @@
+using DigitalBrain.Modules;
+
 namespace DigitalBrain.Graph;
 
 /// <summary>The module that hosts the <c>brain.graph</c> neuron. It provides and requires no capability.</summary>

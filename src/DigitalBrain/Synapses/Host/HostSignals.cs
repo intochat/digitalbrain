@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>A generated source went live for the brain (new, or a changed build).</summary>
 /// <param name="SourceKey">The source key.</param>

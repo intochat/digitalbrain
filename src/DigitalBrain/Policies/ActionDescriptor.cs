@@ -1,4 +1,6 @@
-namespace DigitalBrain;
+using DigitalBrain.Modules;
+
+namespace DigitalBrain.Limits;
 
 /// <summary>A promise-able action declared by a module in its <see cref="ModuleManifest"/>.</summary>
 /// <param name="Name">The action identifier (<c>{module}.{verb}</c>).</param>

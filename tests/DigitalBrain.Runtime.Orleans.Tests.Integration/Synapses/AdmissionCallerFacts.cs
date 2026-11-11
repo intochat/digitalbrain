@@ -1,3 +1,6 @@
+using DigitalBrain.Kernel;
+using DigitalBrain.Neurons;
+using DigitalBrain.Units;
 using System.Collections.Concurrent;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Runtime.Orleans.Capabilities;

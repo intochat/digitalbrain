@@ -1,3 +1,5 @@
+﻿using DigitalBrain.Neurons;
+
 namespace DigitalBrain.Graph.Tests.Unit;
 
 public sealed class AlgorithmFacts

@@ -1,5 +1,7 @@
+using DigitalBrain.Neurons;
 using DigitalBrain.Framework.Tests.E2E.MorningStats;
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
+using DigitalBrain.Units;
 using DigitalBrain.Testing;
 using OS = DigitalBrain.Testing.TestOS;
 
@@ -12,12 +14,12 @@ public interface IGsPayments
 
 // Publishes the live generated Charging signal: its type is read from the catalog on each call, as the source declares it.
 [Neuron("gs.payments")]
-public sealed class GsPayments : Neuron<GsPayments.Count>, IGsPayments
+public sealed class GsPayments(ISynapseCatalogSource? source = null) : Neuron<GsPayments.Count>, IGsPayments
 {
     public Task Charge(decimal amount)
     {
-        var source = (ISynapseCatalogSource)(Context.Services.GetService(typeof(ISynapseCatalogSource)) ?? throw new InvalidOperationException("no catalog"));
-        var type = source.Current.For(WeeklyCapSource.Week).FirstOrDefault(d => d.Kind == SynapseKind.Reaction)?.Signal
+        var catalogSource = source ?? throw new InvalidOperationException("no catalog");
+        var type = catalogSource.Current.For(WeeklyCapSource.Week).FirstOrDefault(d => d.Kind == SynapseKind.Reaction)?.Signal
             ?? throw new InvalidOperationException("no reaction is installed");
         return Save(State with { N = State.N + 1 }, (Signal)Activator.CreateInstance(type, amount)!);
     }

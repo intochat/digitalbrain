@@ -1,5 +1,4 @@
 using DigitalBrain.Operations;
-using DigitalBrain.Spi;
 
 namespace DigitalBrain.Tests.Unit;
 

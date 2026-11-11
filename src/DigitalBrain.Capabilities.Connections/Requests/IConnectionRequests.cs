@@ -1,3 +1,5 @@
+using DigitalBrain.Modules;
+using DigitalBrain.Neurons;
 using DigitalBrain.Contracts;
 
 namespace DigitalBrain.Capabilities.Connections.Requests;

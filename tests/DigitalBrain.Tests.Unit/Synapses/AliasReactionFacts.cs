@@ -1,3 +1,5 @@
+using DigitalBrain.Units;
+
 namespace DigitalBrain.Tests.Unit.Synapses;
 
 [State("dash")]

@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using DigitalBrain.Capabilities;
 
 namespace DigitalBrain.Capabilities.Secrets;

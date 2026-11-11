@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Modules;
 
 /// <summary>What kind of runtime resource a <see cref="Need"/> names.</summary>
 public enum NeedKind

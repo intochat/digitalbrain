@@ -1,3 +1,5 @@
+using DigitalBrain.Modules;
+
 namespace DigitalBrain.Modules.Options;
 
 public static class ModuleSettingsValidation

@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>The live synapse catalog of a host: neurons read <see cref="Current"/> on each turn, so a change reaches active neurons.</summary>
 public interface ISynapseCatalogSource

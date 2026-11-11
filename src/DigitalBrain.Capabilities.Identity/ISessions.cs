@@ -1,3 +1,5 @@
+using DigitalBrain.Modules;
+
 namespace DigitalBrain.Capabilities.Identity;
 
 /// <summary>

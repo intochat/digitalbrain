@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using System.Diagnostics.CodeAnalysis;
 
 namespace DigitalBrain.Signals.Watch;

@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using DigitalBrain.Runtime.Orleans.Placement;
 using Orleans;
 

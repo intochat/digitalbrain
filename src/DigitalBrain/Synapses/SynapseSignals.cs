@@ -1,3 +1,6 @@
+using DigitalBrain.Neurons;
+using DigitalBrain.Units;
+
 namespace DigitalBrain;
 
 /// <summary>A state alias stored a new view; journaled, read it with <see cref="IViewReader.Read"/>.</summary>

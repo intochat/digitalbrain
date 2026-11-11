@@ -1,7 +1,8 @@
+using DigitalBrain.Neurons;
 using System.Collections.Concurrent;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Testing;
-using DigitalBrain.Spi;
+using DigitalBrain.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 

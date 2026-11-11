@@ -1,3 +1,6 @@
+using DigitalBrain.Kernel;
+using DigitalBrain.Neurons;
+using DigitalBrain.Units;
 using System.Text.Json;
 using DigitalBrain.Capabilities.Http;
 using DigitalBrain.Testing.Synapses;

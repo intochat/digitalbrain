@@ -1,4 +1,3 @@
-using DigitalBrain.Spi;
 
 namespace DigitalBrain.Kernel;
 

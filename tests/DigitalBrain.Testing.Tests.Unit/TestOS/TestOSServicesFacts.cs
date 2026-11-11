@@ -1,7 +1,9 @@
+using DigitalBrain.Neurons;
+using DigitalBrain.Units;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Capabilities.Connections.Broker;
 using DigitalBrain.Runtime.Synapses;
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
 using DigitalBrain.Testing;
 using DigitalBrain.Testing.Tests.Unit.Slots;
 using OS = DigitalBrain.Testing.TestOS;
@@ -20,15 +22,15 @@ public interface IDeployer
 
 // A product neuron that compiles and deploys a unit through the services the host serves it, as an os studio does on the silo.
 [Neuron("svc.deployer")]
-public sealed class Deployer : Neuron<DeployerState>, IDeployer
+public sealed class Deployer(SynapseCompiler? compiler = null, ISynapseHost? host = null) : Neuron<DeployerState>, IDeployer
 {
     public async Task<string> Deploy(string text)
     {
-        var compiler = Context.Services.GetService(typeof(SynapseCompiler)) as SynapseCompiler ?? throw new InvalidOperationException("no compiler");
-        var host = Context.Services.GetService(typeof(ISynapseHost)) as ISynapseHost ?? throw new InvalidOperationException("no synapse host");
+        var resolvedCompiler = compiler ?? throw new InvalidOperationException("no compiler");
+        var resolvedHost = host ?? throw new InvalidOperationException("no synapse host");
         var source = new SynapseSource(HsSource.Key, new Dictionary<string, string> { ["Budget.cs"] = text }, null);
-        if (!compiler.Compile(source).Success) { return "compile failed"; }
-        var outcome = await host.Deploy(Id.Brain, source, new Dictionary<string, IReadOnlyDictionary<string, string>>(), CancellationToken.None);
+        if (!resolvedCompiler.Compile(source).Success) { return "compile failed"; }
+        var outcome = await resolvedHost.Deploy(Id.Brain, source, new Dictionary<string, IReadOnlyDictionary<string, string>>(), CancellationToken.None);
         return outcome.Status.ToString();
     }
 }

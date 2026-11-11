@@ -1,5 +1,8 @@
+using DigitalBrain.Modules;
+using DigitalBrain.Neurons;
 using DigitalBrain;
 using DigitalBrain.Capabilities.Compute;
+using DigitalBrain.Kernel;
 using DigitalBrain.Testing;
 
 namespace DigitalBrain.Framework.Tests.E2E.TraceStamping;
@@ -168,12 +171,12 @@ public sealed class TraceCallerNeuron : Neuron, ITraceFollower
 
 /// <summary>Reads the journal of the brain for the facts.</summary>
 [Neuron("trace.reader"), StatelessNeuron]
-public sealed class TraceReaderNeuron : Neuron, ITraceReader
+public sealed class TraceReaderNeuron(ISignalHistory history) : Neuron, ITraceReader
 {
     public async Task<Stamp[]> Journal(string publisher)
-        => Of(await Context.History.Read(NeuronId.Parse(publisher), 0, 100, CancellationToken.None));
+        => Of(await history.Read(NeuronId.Parse(publisher), 0, 100, CancellationToken.None));
 
-    public async Task<Stamp[]> ReadTrace(string traceId) => Of(await Context.History.ReadTrace(traceId, 0, 100, CancellationToken.None));
+    public async Task<Stamp[]> ReadTrace(string traceId) => Of(await history.ReadTrace(traceId, 0, 100, CancellationToken.None));
 
     private static Stamp[] Of(SignalPage page) => [.. page.Signals.Select(item => new Stamp(item.TraceId, item.CausationId,
         item.Signal switch { TraceCounted counted => counted.Value, TraceRelayed relayed => relayed.Value, _ => -1 }))];

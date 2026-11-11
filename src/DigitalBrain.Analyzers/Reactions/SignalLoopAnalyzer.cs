@@ -28,7 +28,7 @@ public sealed class SignalLoopAnalyzer : DiagnosticAnalyzer
         if (!loop.AwaitKeyword.IsKind(SyntaxKind.AwaitKeyword)) { return; }
 
         var type = context.ContainingSymbol?.ContainingType;
-        if (type is null || !(Rules.DerivesFrom(type, Rules.NeuronType) || Rules.IsOrDerivesFrom(type.BaseType, Rules.AppType))) { return; }
+        if (type is null || !Rules.DerivesFrom(type, Rules.NeuronType)) { return; }
 
         var info = context.SemanticModel.GetForEachStatementInfo(loop);
         if (!Rules.IsOrDerivesFrom(info.ElementType, Rules.SignalType)) { return; }

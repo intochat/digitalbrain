@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using System.Reflection;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Capabilities.Identity;

@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using DigitalBrain;
 using MODULE_NAMESPACE.Contracts;
 

@@ -1,3 +1,5 @@
+using DigitalBrain.Neurons;
+
 namespace DigitalBrain.Kernel;
 
 /// <summary>How a contract call is scheduled by the neuron host.</summary>

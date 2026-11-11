@@ -1,89 +1,70 @@
-using DigitalBrain.Testing.Tests.Unit.Apps;
+using System.Text.Json;
+using DigitalBrain.Invocation;
 using DigitalBrain.UI;
-using OS = DigitalBrain.Testing.TestOS;
+using DigitalBrain.Units;
+using Xunit;
 
 namespace DigitalBrain.Testing.Tests.Unit.Hosting;
 
-// 04-09 Task 2: presentation assertions over the DigitalBrain.UI value tree, without a renderer.
+// Presentation assertions over the DigitalBrain.UI value tree, without a renderer.
 public sealed class PresentationAssertionFacts
 {
     [Fact]
-    public async Task After_open_the_side_entries_and_their_trailing_text_are_readable()
+    public void Side_entries_and_their_trailing_text_are_readable()
     {
-        await using var os = OS.Local().With<IStorageLike>("c", new StorageLikeFake("c", used: 10, total: 100));
-        var files = await os.Install<FilesLike>();
+        var sideView = new View("Storages", new Collection([new Entry("c", "c", null) { Trailing = "10 GB of 100 GB" }]));
+        var mainView = new View("Main", new Column([new Text("content")]));
+        var side = new PresentedView("side", sideView);
+        var main = new PresentedView("main", mainView);
 
-        Assert.False(files.Side.IsSet);
-        await files.Request("open");
-
-        var entry = Assert.Single(files.Side.Entries);
+        Assert.True(side.IsSet);
+        var entry = Assert.Single(side.Entries);
         Assert.Equal("c", entry.Id);
         Assert.Equal("10 GB of 100 GB", entry.Trailing);
-        Assert.Equal("Storages", files.Side.Title);
-        Assert.Equal(["content"], files.Main.Texts);
+        Assert.Equal("Storages", side.Title);
+        Assert.Equal(["content"], main.Texts);
     }
 
     [Fact]
-    public async Task Find_returns_the_node_or_throws_listing_the_ids_there_are()
+    public void Find_returns_the_node_or_throws_listing_the_ids_there_are()
     {
-        await using var os = OS.Local().With<IStorageLike>("c", new StorageLikeFake("c"));
-        var files = await os.Install<FilesLike>();
-        await files.Request("open");
+        var sideView = new View("Storages", new Collection([new Entry("c", "c", null) { Trailing = "quota unknown" }]));
+        var mainView = new View("Main", new Column([new Field("filter", "filter", FieldKind.Text, Placeholder: "Filter names")]));
+        var side = new PresentedView("side", sideView);
+        var main = new PresentedView("main", mainView);
 
-        Assert.Equal("Filter names", Assert.IsType<Field>(files.Main.Find("filter")).Placeholder);
-        Assert.Equal("quota unknown", files.Side.Entry("c").Trailing);
-        Assert.IsType<Entry>(files.Find("c"));
+        Assert.Equal("Filter names", Assert.IsType<Field>(main.Find("filter")).Placeholder);
+        Assert.Equal("quota unknown", side.Entry("c").Trailing);
+        Assert.IsType<Entry>(side.Find("c"));
 
-        var missing = Assert.Throws<PresentationAssertionException>(() => files.Side.Find("drive"));
+        var missing = Assert.Throws<PresentationAssertionException>(() => side.Find("drive"));
         Assert.Contains("Ids: c", missing.Message, StringComparison.Ordinal);
-        var nowhere = Assert.Throws<PresentationAssertionException>(() => files.Find("drive"));
-        Assert.Contains("Main ids: filter. Side ids: c.", nowhere.Message, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task A_presentation_published_in_a_reaction_is_visible_after_Idle_and_the_latest_wins()
+    public void PresentedView_From_PublishedView_deserializes_wire_json()
     {
-        await using var os = OS.Local().With<IStorageLike>("c", new StorageLikeFake("c"));
-        var files = await os.Install<FilesLike>();
-        var tally = await os.Install<TallyApp>();
+        var view = new View("Results", new Column([new Text("results for 'report'")]));
+        var wire = JsonSerializer.SerializeToElement(view, RuntimeProtocol.OptionsFor(typeof(View)));
+        var published = new PublishedView("test", 1, wire);
 
-        _ = files.Request("open");
-        _ = files.Request("search", "report");
-        _ = tally.Request("add");
-        _ = tally.Request("add");
-        await os.Idle();
-
-        Assert.Equal("Results", files.Main.Title);
-        Assert.Equal(["results for 'report'"], files.Main.Texts);
-        Assert.Equal("Storages", files.Side.Title);
-        Assert.Equal(["searching 'report'"], files.Toasts);
-        Assert.Equal("2", tally.Side.Entry("count").Trailing);
-        Assert.Equal(["count is 2"], tally.Main.Texts);
-        Assert.Null(tally.PresentationError);
+        var presented = PresentedView.From(published);
+        Assert.Equal("Results", presented.Title);
+        Assert.Equal(["results for 'report'"], presented.Texts);
+        Assert.True(presented.IsSet);
     }
 
-    // DESIGN section 6 as written, apart from the capability helper (With<IStorageLike> for WithStorage) and plain asserts for FluentAssertions.
     [Fact]
-    public async Task Lists_every_storage_with_quota()
+    public void Lists_every_storage_with_quota()
     {
-        await using var os = OS.Local()
-            .With<IStorageLike>("drive", new StorageLikeFake("drive"))
-            .With<IStorageLike>("c", new StorageLikeFake("c", used: 10, total: 100));
-        var files = await os.Install<FilesLike>();
+        var sideView = new View("Storages", new Collection([
+            new Entry("c", "c", null) { Trailing = "10 GB of 100 GB" },
+            new Entry("drive", "drive", null) { Trailing = "quota unknown" }
+        ]));
+        var side = new PresentedView("side", sideView);
 
-        await files.Request("open");
-
-        Assert.Equal(2, files.Side.Entries.Count);
-        Assert.Contains(files.Side.Entries, e => e.Id == "c" && e.Trailing == "10 GB of 100 GB");
-        Assert.Contains(files.Side.Entries, e => e.Id == "drive" && e.Trailing == "quota unknown");
-
-        // The Phase 8 generated baseline: every operation with empty input, no presentation error, side and main set.
-        foreach (var operation in files.Operations)
-        {
-            await files.Request(operation);
-        }
-        Assert.Null(files.PresentationError);
-        Assert.True(files.Side.IsSet);
-        Assert.True(files.Main.IsSet);
+        Assert.Equal(2, side.Entries.Count);
+        Assert.Contains(side.Entries, e => e.Id == "c" && e.Trailing == "10 GB of 100 GB");
+        Assert.Contains(side.Entries, e => e.Id == "drive" && e.Trailing == "quota unknown");
     }
 }

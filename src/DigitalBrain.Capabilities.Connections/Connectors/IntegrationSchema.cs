@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using System.Text.RegularExpressions;
 using DigitalBrain.Modules.Configuration;
 

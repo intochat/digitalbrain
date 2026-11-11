@@ -1,5 +1,9 @@
+using DigitalBrain.Modules;
+using DigitalBrain.Units;
 using System.Reflection;
 using DigitalBrain.Confirmation;
+using DigitalBrain.Contracts;
+using DigitalBrain.Neurons;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -57,18 +61,14 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     // 1 once OnDeactivate disposed _activation: a late (interleaved) Cancel must not touch it.
     private int _disposed;
 
-    // One-use proofs handed to the flow's own detached work for its call back: a callback without one is a foreign caller. Held in
-    // memory, so a callback that outlives its activation is refused and the durable paths (ConfirmationResolved, the nudge) recover.
+    // One-use proofs handed to the flow's own cancel post: a callback without one is a foreign caller.
     private readonly HashSet<string> _proofs = new(StringComparer.Ordinal);
-
-    // The plan an Ask of this activation is raising, so the nudge does not raise it twice.
-    private string? _asking;
-
-    // What ConfirmationResolved signals claimed per plan: the approver is named only when the verified outcome agrees.
-    private readonly Dictionary<string, (ConfirmationOutcome Outcome, string? By)> _claimed = new(StringComparer.Ordinal);
 
     // Set by Cancel (which interleaves) until the Cancelled save, made in a turn of its own: nothing else saves meanwhile.
     private string? _cancelRequested;
+
+    // The approval plan id currently asked by this activation.
+    private string? _askedPlanId;
 
     /// <summary>The steps, in order. Step names are the keys of <see cref="FlowState{T}.Done"/> and never change.</summary>
     protected abstract IReadOnlyList<string> Steps { get; }
@@ -80,6 +80,10 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     protected abstract Task<StepResult<T>> Run(string step, T inner, CancellationToken ct);
 
     private string FlowId => Id.ToString();
+
+    private IConfirmationRequests ConfirmationRequests =>
+        Seat.Services.GetService(typeof(IConfirmationRequests)) as IConfirmationRequests
+        ?? Context.Get<IConfirmationRequests>(IConfirmationRequests.Of(Id.Brain));
 
     /// <summary>
     /// Starts the flow. A flow that already started ignores it. Returns once the start is durable (saved <see cref="FlowStatus.Running"/>
@@ -96,19 +100,9 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
         ArgumentException.ThrowIfNullOrWhiteSpace(owner);
         ArgumentNullException.ThrowIfNull(inner);
-        if (State.Status != FlowStatus.Pending) { return; }
-        var next = State with
-        {
-            FlowId = FlowId,
-            Title = title,
-            Owner = owner,
-            TraceId = Context.TraceId ?? Guid.NewGuid().ToString("N"),
-            Status = FlowStatus.Running,
-            ParentFlowId = parentFlowId,
-            Started = Context.Time.GetUtcNow(),
-            Inner = inner,
-        };
-        await Save(next, new FlowStarted(FlowId, Id.Type, title)).ConfigureAwait(true);
+        var transition = State.Start(title, owner, parentFlowId, inner, Context.Time.GetUtcNow(), Context.TraceId, Id.Type, FlowId);
+        if (transition is null) { return; }
+        await Save(transition.Value.Next, transition.Value.Signals).ConfigureAwait(true);
         await StartNudge().ConfigureAwait(true);
         // A turn of its own, so the caller does not wait on the steps. A failed post is logged, not thrown: the start is saved and
         // the nudge or the next activation advances it.
@@ -149,7 +143,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     public async Task Cancel(string reason)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
-        if (Ended(State.Status) || _cancelRequested is not null) { return; }
+        if (State.IsOver || _cancelRequested is not null) { return; }
         _cancelRequested = reason;
         var posted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         _cancelPosted = posted.Task;
@@ -180,14 +174,18 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
             FlowLog.ForeignCancelRefused(Logger(), error, FlowId);
             throw;
         }
-        if (Ended(State.Status)) { return; }
+        if (State.IsOver) { return; }
         var waiting = State.Waiting;
-        await Save(State with { Status = FlowStatus.Cancelled, Waiting = null, Current = null, Ended = Context.Time.GetUtcNow() },
-            new FlowDone(FlowId, FlowOutcome.Cancelled, reason)).ConfigureAwait(true);
+        var transition = State.RequestCancel(reason, Context.Time.GetUtcNow());
+        if (transition is not null)
+        {
+            await Save(transition.Value.Next, transition.Value.Signals).ConfigureAwait(true);
+        }
         await StopNudge().ConfigureAwait(true);
         if (waiting is { Reason: WaitReason.Approval, ConfirmationPlanId: { } planId })
         {
-            await Context.Confirmations.Resolve(planId, approve: false).ConfigureAwait(true);
+            var requests = ConfirmationRequests;
+            await requests.Withdraw(planId).ConfigureAwait(true);
         }
         else if (waiting is { Expires: not null })
         {
@@ -200,47 +198,31 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     public async Task Relate(FlowRelation relation)
     {
         ArgumentNullException.ThrowIfNull(relation);
-        if (State.Relations.Contains(relation)) { return; }
-        await Save(State with { Relations = State.Relations.Add(relation) }, new FlowRelated(FlowId, relation)).ConfigureAwait(true);
+        var transition = State.Relate(relation);
+        if (transition is null) { return; }
+        await Save(transition.Value.Next, transition.Value.Signals).ConfigureAwait(true);
     }
 
     /// <summary>
-    /// Checks an approval wait when its plan is reported resolved; other plans are ignored. Any neuron can journal a
-    /// <see cref="ConfirmationResolved"/>, so the signal is not trusted: it re-joins the plan through <see cref="IConfirmations.Confirm"/>
-    /// (idempotent for this requester), and the answer the confirmations side gives ends the wait.
+    /// Checks an approval wait when its plan is reported resolved; other plans are ignored.
+    /// Resolves the authoritative answer directly through <see cref="IConfirmationRequests.Outcome"/>.
     /// </summary>
     /// <param name="resolved">The resolution.</param>
     [On]
-    protected Task OnConfirmation(ConfirmationResolved resolved)
+    protected async Task OnConfirmation(ConfirmationResolved resolved)
     {
         ArgumentNullException.ThrowIfNull(resolved);
-        if (State.Waiting is not { Reason: WaitReason.Approval, ConfirmationPlanId: { } planId } || planId != resolved.PlanId)
+        if (State.Waiting is not { Reason: WaitReason.Approval, ConfirmationPlanId: { } planId } waiting || planId != resolved.PlanId)
         {
-            return Task.CompletedTask;
+            return;
         }
-        // Kept only to name the approver when the verified answer agrees with the signal.
-        _claimed[planId] = (resolved.Outcome, resolved.Approver?.Id);
-        ReRaise();
-        return Task.CompletedTask;
-    }
-
-    /// <inheritdoc />
-    async Task IFlowCallbacks.ConfirmationFailed(string planId, string detail, string proof)
-    {
-        Prove(proof);
-        if (State is not { Status: FlowStatus.Waiting, Waiting: { Reason: WaitReason.Approval } waiting } || waiting.ConfirmationPlanId != planId) { return; }
-        await Save(State with { Status = FlowStatus.Failed, Waiting = null, Ended = Context.Time.GetUtcNow() },
-            [new FlowStep(FlowId, waiting.Step, StepOutcome.Failed, "confirmation: " + detail), new FlowDone(FlowId, FlowOutcome.Failed, "confirmation")]).ConfigureAwait(true);
-        await StopNudge().ConfigureAwait(true);
-    }
-
-    /// <inheritdoc />
-    Task IFlowCallbacks.ConfirmationAnswered(string planId, ConfirmationOutcome outcome, string proof)
-    {
-        Prove(proof);
-        if (State is not { Status: FlowStatus.Waiting, Waiting: { Reason: WaitReason.Approval } waiting } || waiting.ConfirmationPlanId != planId) { return Task.CompletedTask; }
-        var by = _claimed.Remove(planId, out var claim) && claim.Outcome == outcome ? claim.By : null;
-        return Resolve(waiting.Step, WaitOutcomeOf(outcome), by);
+        var requests = ConfirmationRequests;
+        var outcome = await requests.Outcome(planId).ConfigureAwait(true);
+        if (outcome is { } answer)
+        {
+            var approver = answer.Approver?.Id ?? (answer.Outcome == resolved.Outcome ? resolved.Approver?.Id : null);
+            await Resolve(waiting.Step, WaitOutcomeOf(answer.Outcome), approver).ConfigureAwait(true);
+        }
     }
 
     /// <summary>The confirmation plan an approval wait of <paramref name="step"/> raises.</summary>
@@ -255,13 +237,13 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     // Advances a running flow that does not wait, including one started but never advanced (Current null, Done empty).
     protected override async Task OnActivate(CancellationToken cancellationToken)
     {
-        await Context.Synapses.EnsureBrainWide(typeof(ConfirmationResolved)).ConfigureAwait(true);
+        await Context.Synapses.Ensure<ConfirmationResolved>(IConfirmationRequests.Of(Id.Brain)).ConfigureAwait(true);
         WarnOnNonInterleavingCancel();
         if (State.Status == FlowStatus.Running && State.Waiting is null) { await Advance().ConfigureAwait(true); }
         else if (State is { Status: FlowStatus.Waiting, Waiting.Reason: WaitReason.Approval })
         {
             await StartNudge().ConfigureAwait(true);
-            ReRaise();
+            await ReRaise().ConfigureAwait(true);
         }
     }
 
@@ -300,7 +282,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         if (name == NudgeReminder)
         {
             if (State is { Status: FlowStatus.Running, Waiting: null }) { await Advance().ConfigureAwait(true); }
-            else if (State is { Status: FlowStatus.Waiting, Waiting.Reason: WaitReason.Approval }) { ReRaise(); }
+            else if (State is { Status: FlowStatus.Waiting, Waiting.Reason: WaitReason.Approval }) { await ReRaise().ConfigureAwait(true); }
             else { await StopNudge().ConfigureAwait(true); }
             return;
         }
@@ -319,14 +301,16 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         var token = ActivationToken();
         while (State is { Status: FlowStatus.Running, Waiting: null } && !token.IsCancellationRequested && _cancelRequested is null)
         {
-            if (Steps.FirstOrDefault(candidate => !State.Done.Contains(candidate)) is not { } step)
+            var stepTransition = State.StartStep(Steps, Context.Time.GetUtcNow());
+            if (stepTransition is null) { return; }
+            if (stepTransition.Value.Next.Status == FlowStatus.Completed)
             {
-                await Save(State with { Status = FlowStatus.Completed, Current = null, Ended = Context.Time.GetUtcNow() },
-                    new FlowDone(FlowId, FlowOutcome.Completed, null)).ConfigureAwait(true);
+                await Save(stepTransition.Value.Next, stepTransition.Value.Signals).ConfigureAwait(true);
                 await StopNudge().ConfigureAwait(true);
                 return;
             }
-            await Save(State with { Current = step }, new FlowStep(FlowId, step, StepOutcome.Started, null)).ConfigureAwait(true);
+            await Save(stepTransition.Value.Next, stepTransition.Value.Signals).ConfigureAwait(true);
+            var step = stepTransition.Value.Next.Current!;
             if (_cancelRequested is not null) { return; }
             StepResult<T> result;
             using var run = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -335,7 +319,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
             // Interrupted, not failed: a cancelled body (any token) or an ending activation leaves Current set and the flow
             // running, so the nudge or the next activation runs the step again.
             // A host that is stopping can refuse the body's calls before it cancels the activation: that is an interruption too.
-            catch (Exception error) when (error is OperationCanceledException || run.IsCancellationRequested || HostShutdown.IsStopping(Context.Services, error))
+            catch (Exception error) when (error is OperationCanceledException || run.IsCancellationRequested || Context.Interrupts(error))
             {
                 _running = null;
                 // A cancel whose post failed leaves only an interruption behind.
@@ -346,8 +330,11 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
             catch (Exception error) when (error is not OutOfMemoryException)
             {
                 if (State.Status != FlowStatus.Running || _cancelRequested is not null) { return; }
-                await Save(State with { Status = FlowStatus.Failed, Ended = Context.Time.GetUtcNow() },
-                    [new FlowStep(FlowId, step, StepOutcome.Failed, error.Message), new FlowDone(FlowId, FlowOutcome.Failed, error.Message)]).ConfigureAwait(true);
+                var failTransition = State.Fail(step, error.Message, Context.Time.GetUtcNow());
+                if (failTransition is not null)
+                {
+                    await Save(failTransition.Value.Next, failTransition.Value.Signals).ConfigureAwait(true);
+                }
                 await StopNudge().ConfigureAwait(true);
                 return;
             }
@@ -359,8 +346,11 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
                 await Wait(step, result, wait).ConfigureAwait(true);
                 return;
             }
-            await Save(State with { Done = State.Done.Add(step), Current = null, Inner = result.Next, Interruptions = 0 },
-                [new FlowStep(FlowId, step, StepOutcome.Completed, null), .. result.Emits ?? []]).ConfigureAwait(true);
+            var completeTransition = State.Complete(step, result);
+            if (completeTransition is not null)
+            {
+                await Save(completeTransition.Value.Next, completeTransition.Value.Signals).ConfigureAwait(true);
+            }
         }
     }
 
@@ -368,18 +358,17 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     // stays current and runs again either way.
     private async Task Interrupted(string step, string detail)
     {
-        var count = State.Interruptions + 1;
         try
         {
-            if (count >= MaxInterruptions)
+            var transition = State.Interrupted(step, detail, Context.Time.GetUtcNow(), MaxInterruptions);
+            if (transition is not null)
             {
-                var failure = $"interrupted {MaxInterruptions} times";
-                await Save(State with { Status = FlowStatus.Failed, Interruptions = count, Ended = Context.Time.GetUtcNow() },
-                    [new FlowStep(FlowId, step, StepOutcome.Failed, failure), new FlowDone(FlowId, FlowOutcome.Failed, failure)]).ConfigureAwait(true);
-                await StopNudge().ConfigureAwait(true);
-                return;
+                await Save(transition.Value.Next, transition.Value.Signals).ConfigureAwait(true);
+                if (transition.Value.Next.Status == FlowStatus.Failed)
+                {
+                    await StopNudge().ConfigureAwait(true);
+                }
             }
-            await Save(State with { Interruptions = count }, new FlowStep(FlowId, step, StepOutcome.Interrupted, detail)).ConfigureAwait(true);
         }
         catch (Exception error) when (error is not OutOfMemoryException) { FlowLog.InterruptionNotSaved(Logger(), error, FlowId, step); }
     }
@@ -395,85 +384,83 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         }
         // An external wait keeps a caller-supplied plan id (a plan another neuron raised for this wait); an approval wait gets the base's.
         var planId = plan?.Id ?? (wait.Reason == WaitReason.External ? wait.ConfirmationPlanId : null);
-        var waiting = wait with { Step = step, ConfirmationPlanId = planId };
-        await Save(State with { Status = FlowStatus.Waiting, Waiting = waiting, Current = step, Inner = result.Next },
-            [new FlowWaiting(FlowId, step, wait.Reason, planId), .. result.Emits ?? []]).ConfigureAwait(true);
+        var transition = State.Wait(step, result, wait, planId);
+        if (transition is null) { return; }
+        await Save(transition.Value.Next, transition.Value.Signals).ConfigureAwait(true);
+
         // An approval wait keeps the nudge: a plan lost before the confirmations side registered it is raised again.
-        if (plan is not null) { Raise(plan); return; }
+        if (plan is not null)
+        {
+            try
+            {
+                var requests = ConfirmationRequests;
+                var immediate = await requests.Request(plan).ConfigureAwait(true);
+                _askedPlanId = plan.Id;
+                if (immediate is { } answer)
+                {
+                    await Resolve(step, WaitOutcomeOf(answer.Outcome), answer.Approver?.Id).ConfigureAwait(true);
+                }
+            }
+            catch (Exception error) when (error is not OutOfMemoryException)
+            {
+                var failTransition = State.Fail(step, "confirmation: " + error.Message, now, doneDetail: "confirmation");
+                if (failTransition is not null)
+                {
+                    await Save(failTransition.Value.Next, failTransition.Value.Signals).ConfigureAwait(true);
+                }
+                await StopNudge().ConfigureAwait(true);
+            }
+            return;
+        }
+
         await StopNudge().ConfigureAwait(true);
         if (wait.Expires is { } expires) { await Context.Reminders.Start(ExpiryReminder, Positive(expires - now), ExpiryPeriod).ConfigureAwait(true); }
     }
 
-    // Raises the plan of the running approval wait again unless this activation is already asking it: a crash between the
-    // Waiting save and the plan reaching the confirmations side, or a lost relay, would otherwise leave the wait forever.
-    // IConfirmations.Confirm is idempotent on a plan id the same requester raised, so a plan that is known is only re-joined.
-    private void ReRaise()
+    private async Task ReRaise()
     {
-        if (State is not { Status: FlowStatus.Waiting, Waiting: { Reason: WaitReason.Approval, ConfirmationPlanId: { } planId } waiting }
-            || _asking == planId) { return; }
+        if (State is not { Status: FlowStatus.Waiting, Waiting: { Reason: WaitReason.Approval, ConfirmationPlanId: { } planId } waiting }) { return; }
+        if (string.Equals(_askedPlanId, planId, StringComparison.Ordinal)) { return; }
         var plan = PlanFor(waiting.Step, State.Inner) with { Id = planId };
         if (waiting.Expires is { } expires) { plan = plan with { Expiry = Positive(expires - Context.Time.GetUtcNow()) }; }
-        Raise(plan);
-    }
-
-    private void Raise(ConfirmationPlan plan)
-    {
-        _asking = plan.Id;
-        _ = Ask(plan);
-    }
-
-    // Raises the plan without awaiting the answer inside the turn; the answer arrives as ConfirmationResolved.
-    // Results go back through the neuron's own mailbox (a self-call), so they are saved in a turn, never from this detached task.
-    private async Task Ask(ConfirmationPlan plan)
-    {
-        try { await AskOnce(plan).ConfigureAwait(true); }
-        finally { if (_asking == plan.Id) { _asking = null; } }
-    }
-
-    private async Task AskOnce(ConfirmationPlan plan)
-    {
-        Func<IFlowCallbacks, string, Task> relay;
         try
         {
-            var result = await Context.Confirm(plan, CancellationToken.None).ConfigureAwait(true);
-            relay = (self, proof) => self.ConfirmationAnswered(plan.Id, result.Outcome, proof);
+            var requests = ConfirmationRequests;
+            var immediate = await requests.Request(plan).ConfigureAwait(true);
+            _askedPlanId = planId;
+            if (immediate is { } answer)
+            {
+                await Resolve(waiting.Step, WaitOutcomeOf(answer.Outcome), answer.Approver?.Id).ConfigureAwait(true);
+            }
         }
         catch (Exception error) when (error is not OutOfMemoryException)
         {
-            var detail = error.Message;
-            relay = (self, proof) => self.ConfirmationFailed(plan.Id, detail, proof);
-        }
-        var proof = Proof();
-        try { await relay(Context.Get<IFlowCallbacks>(Id), proof).ConfigureAwait(true); }
-        catch (Exception error) when (error is not OutOfMemoryException)
-        {
-            Forget(proof);
-            // The flow stays waiting on the plan; the nudge raises it again and re-joins its answer.
-            FlowLog.RelayFailed(Logger(), error, FlowId, plan.Id);
+            var failTransition = State.Fail(waiting.Step, "confirmation: " + error.Message, Context.Time.GetUtcNow(), doneDetail: "confirmation");
+            if (failTransition is not null)
+            {
+                await Save(failTransition.Value.Next, failTransition.Value.Signals).ConfigureAwait(true);
+            }
+            await StopNudge().ConfigureAwait(true);
         }
     }
 
     // A runtime without services (a test context) logs nowhere rather than turning a logged failure into a thrown one.
     private ILogger Logger()
     {
-        try { return (Context.Services.GetService(typeof(ILoggerFactory)) as ILoggerFactory)?.CreateLogger("DigitalBrain.Flows") ?? NullLogger.Instance; }
+        try { return (Seat.Services.GetService(typeof(ILoggerFactory)) as ILoggerFactory)?.CreateLogger("DigitalBrain.Flows") ?? NullLogger.Instance; }
         catch (NotSupportedException) { return NullLogger.Instance; }
     }
 
     private async Task Resolve(string step, WaitOutcome outcome, string? by)
     {
         if (State is not { Status: FlowStatus.Waiting, Waiting: { } waiting } || waiting.Step != step || _cancelRequested is not null) { return; }
-        var resolve = new FlowResolve(FlowId, step, outcome, by);
+        _askedPlanId = null;
+        var transition = State.Resolve(step, outcome, by, Context.Time.GetUtcNow());
+        if (transition is null) { return; }
+        await Save(transition.Value.Next, transition.Value.Signals).ConfigureAwait(true);
         if (outcome is WaitOutcome.Approved or WaitOutcome.Arrived)
         {
-            await Save(State with { Status = FlowStatus.Running, Waiting = null, Current = null, Done = State.Done.Add(step), Interruptions = 0 },
-                [resolve, new FlowStep(FlowId, step, StepOutcome.Completed, null)]).ConfigureAwait(true);
             await StartNudge().ConfigureAwait(true);
-        }
-        else
-        {
-            await Save(State with { Status = FlowStatus.Cancelled, Waiting = null, Current = null, Ended = Context.Time.GetUtcNow() },
-                [resolve, new FlowDone(FlowId, FlowOutcome.Cancelled, outcome.ToString())]).ConfigureAwait(true);
         }
         if (waiting is { Reason: not WaitReason.Approval, Expires: not null }) { await Context.Reminders.Stop(ExpiryReminder).ConfigureAwait(true); }
         await Advance().ConfigureAwait(true);
@@ -507,7 +494,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         lock (_proofs) { _proofs.Remove(proof); }
     }
 
-    // Spends a proof; a call without a live one is not the flow's own detached work.
+    // Spends a proof; a call without a live one is not the flow's own cancel post.
     private void Prove(string? proof)
     {
         bool known;
@@ -526,8 +513,6 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         _ => WaitOutcome.Denied,
     };
 
-    private static bool Ended(FlowStatus status) => status is FlowStatus.Completed or FlowStatus.Failed or FlowStatus.Cancelled;
-
     private static TimeSpan Positive(TimeSpan span) => span > TimeSpan.Zero ? span : TimeSpan.FromSeconds(1);
 }
 
@@ -538,22 +523,6 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
 /// </summary>
 public interface IFlowCallbacks
 {
-    /// <summary>The confirmation plan <paramref name="planId"/> could not be raised; the waiting flow fails.</summary>
-    /// <param name="planId">The plan id.</param>
-    /// <param name="detail">Why.</param>
-    /// <param name="proof">The proof the flow handed its detached work.</param>
-    Task ConfirmationFailed(string planId, string detail, string proof);
-
-    /// <summary>
-    /// <see cref="IConfirmations.Confirm"/> returned <paramref name="outcome"/> for <paramref name="planId"/>. It ends the wait like the
-    /// plan's <see cref="ConfirmationResolved"/> (whichever arrives first wins), so a result that comes back without that signal
-    /// (skipped by policy, refused up front) still resumes the flow.
-    /// </summary>
-    /// <param name="planId">The plan id.</param>
-    /// <param name="outcome">How it ended.</param>
-    /// <param name="proof">The proof the flow handed its detached work.</param>
-    Task ConfirmationAnswered(string planId, ConfirmationOutcome outcome, string proof);
-
     /// <summary>A cancel the flow's <see cref="Flow{T}.Cancel"/> posted: saves the flow Cancelled in a turn, after the running body stopped.</summary>
     /// <param name="reason">Why.</param>
     /// <param name="proof">The proof the flow handed its own cancel.</param>
@@ -567,9 +536,6 @@ public interface IFlowCallbacks
 
 internal static partial class FlowLog
 {
-    [LoggerMessage(Level = LogLevel.Error, Message = "Flow {FlowId} could not record the answer to confirmation plan {PlanId}; it stays waiting")]
-    public static partial void RelayFailed(ILogger logger, Exception exception, string flowId, string planId);
-
     [LoggerMessage(Level = LogLevel.Warning, Message = "Flow {FlowType} implements {Contract}.Cancel without [Interleaves]; a cancel from outside the host waits behind the running body")]
     public static partial void CancelNotInterleaved(ILogger logger, string flowType, string contract);
 
@@ -584,34 +550,4 @@ internal static partial class FlowLog
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Flow {FlowId} could not post its first advance; the flow-nudge reminder or the next activation advances it")]
     public static partial void AdvancePostFailed(ILogger logger, Exception exception, string flowId);
-}
-
-// Whether the host is shutting down. IHostApplicationLifetime lives in Microsoft.Extensions.Hosting.Abstractions, which this assembly
-// does not reference (its packages are pinned), so the lifetime is found by reflection. An Orleans
-// SiloUnavailableException anywhere in the chain is the second signal: the silo refuses calls while it stops.
-internal static class HostShutdown
-{
-    // Found once Microsoft.Extensions.Hosting.Abstractions loads; looked up again while it has not, so an early miss is not cached.
-    private static Tuple<Type, PropertyInfo>? _lifetime;
-
-    private static Tuple<Type, PropertyInfo>? Lifetime()
-    {
-        if (Volatile.Read(ref _lifetime) is { } found) { return found; }
-        var type = Type.GetType("Microsoft.Extensions.Hosting.IHostApplicationLifetime, Microsoft.Extensions.Hosting.Abstractions", throwOnError: false);
-        if (type?.GetProperty("ApplicationStopping") is not { } stopping) { return null; }
-        found = Tuple.Create(type, stopping);
-        Volatile.Write(ref _lifetime, found);
-        return found;
-    }
-
-    public static bool IsStopping(IServiceProvider services, Exception error)
-    {
-        for (var current = error; current is not null; current = current.InnerException)
-        {
-            if (current.GetType().FullName == "Orleans.Runtime.SiloUnavailableException") { return true; }
-        }
-        if (Lifetime() is not { } lifetime) { return false; }
-        try { return services.GetService(lifetime.Item1) is { } host && lifetime.Item2.GetValue(host) is CancellationToken { IsCancellationRequested: true }; }
-        catch (NotSupportedException) { return false; }
-    }
 }

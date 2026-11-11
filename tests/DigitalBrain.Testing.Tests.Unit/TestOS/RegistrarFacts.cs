@@ -1,3 +1,5 @@
+using DigitalBrain.Neurons;
+using DigitalBrain.Units;
 using System.Reflection;
 using DigitalBrain.Rules;
 using DigitalBrain.Runtime.Synapses;

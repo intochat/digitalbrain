@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>A synapse app was installed with the needs that were approved.</summary>
 /// <param name="Alias">The state alias.</param>

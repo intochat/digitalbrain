@@ -1,3 +1,5 @@
+using DigitalBrain.Brains;
+
 namespace DigitalBrain.Tests.Unit;
 
 public sealed class BrainIdFacts

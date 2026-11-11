@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Neurons;
 
 /// <summary>
 /// A neuron with persisted state. State is immutable to user code: the only way to change it is
@@ -6,25 +6,29 @@ namespace DigitalBrain;
 /// There is no save without a signal; <c>Publish</c> alone is for stateless reactions.
 /// </summary>
 /// <typeparam name="TState">An immutable state record with a parameterless constructor for the empty state.</typeparam>
-public abstract class Neuron<TState> : Neuron, Spi.IStateInspectable where TState : class, new()
+public abstract class Neuron<TState> : Neuron, IStateInspectable where TState : class, new()
 {
     /// <summary>The current state; loaded by the runtime before <c>OnActivate</c>.</summary>
     protected TState State { get; private set; } = new();
 
-    Task<System.Text.Json.JsonElement?> Spi.IStateInspectable.InspectState(CancellationToken cancellationToken)
+    Task<System.Text.Json.JsonElement?> IStateInspectable.InspectState(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult<System.Text.Json.JsonElement?>(System.Text.Json.JsonSerializer.SerializeToElement(State, Invocation.RuntimeProtocol.OptionsFor(typeof(TState))));
     }
 
+    internal virtual Task<TState?> LoadState() => Seat.Load<TState>();
+
+    internal virtual Task StoreState(TState next, IReadOnlyList<Signal> signals) => Seat.Save(next, signals);
+
     internal override async Task Load()
-        => State = await Context.State.Load<TState>().ConfigureAwait(true) ?? new TState();
+        => State = await LoadState().ConfigureAwait(true) ?? new TState();
 
     /// <summary>Stores <paramref name="next"/> without publishing any signals.</summary>
     protected async Task Store(TState next)
     {
         ArgumentNullException.ThrowIfNull(next);
-        await Context.State.Store(next).ConfigureAwait(true);
+        await StoreState(next, []).ConfigureAwait(true);
         State = next;
         OnCommitted();
     }
@@ -44,7 +48,7 @@ public abstract class Neuron<TState> : Neuron, Spi.IStateInspectable where TStat
         ArgumentNullException.ThrowIfNull(signals);
         if (signals.Count == 0) { throw new ArgumentException("A state change publishes at least one signal.", nameof(signals)); }
         if (signals.Any(signal => signal is null)) { throw new ArgumentException("A signal is null.", nameof(signals)); }
-        await Context.State.Save(next, signals).ConfigureAwait(true);
+        await StoreState(next, signals).ConfigureAwait(true);
         State = next;
         OnCommitted();
     }

@@ -113,6 +113,15 @@ public sealed partial class TestTierFacts
     }
 
     [Fact]
+    public void SimulationShipsNoTestFramework()
+    {
+        var simulation = Repository.ProjectNamed("DigitalBrain.Simulation").Path;
+        Assert.DoesNotContain(Repository.PackageReferences(simulation), package => package.StartsWith("xunit", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(Repository.ProjectReferences(simulation), reference => reference.StartsWith("DigitalBrain.Testing", StringComparison.Ordinal));
+        Assert.DoesNotContain(Repository.ProjectReferences(simulation), reference => reference.StartsWith("DigitalBrain.Runtime.Orleans", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void NoTestProjectIsEmpty()
     {
         var testProjects = Repository.Projects.Values

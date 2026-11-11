@@ -1,4 +1,6 @@
-namespace DigitalBrain;
+using DigitalBrain.Neurons;
+
+namespace DigitalBrain.Kernel;
 
 /// <summary>A neuron that exists: it has persisted state. The kernel directory's row.</summary>
 /// <param name="Type">The neuron's grain type.</param>

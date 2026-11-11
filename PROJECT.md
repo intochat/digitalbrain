@@ -37,10 +37,10 @@ This Domain-Driven Design (DDD) refactoring restructures the kernel so that Digi
 |---|------|-------|-------------|--------|
 | M1 | Ruthless Legacy Elimination & Dead Code Purge | Delete R01 dead fossil types, dead signal log engine, dead client/edge projects, and R03 two-phase gate saga | none | DONE |
 | M2 | Pure Kernel Rules & Static Call Catalog | Implement pure kernel rules (`CallPolicy`, `ReactionTable`, `RetentionMath`, `ScheduleDiff`) and static `CallCatalog` (R02, R06) | M1 | DONE |
-| M3 | Atomic Journal Write Protocol & Delivery Stream Elimination | Implement `IBrainJournal.Commit` atomic protocol and journal-backed `Delivery` replacing Orleans streams (R04, R05) | M2 | PLANNED |
-| M4 | Unforgeable Caller Context & StateNeuron Decomposition | Implement closed `Actor`/`Caller` hierarchy, `AccessGate`, and decompose `StateNeuron` into pure `UnitMachine` (R07, R08, F9) | M3 | PLANNED |
-| M5 | Standalone Simulation Package & Twin Test Elimination | Extract `DigitalBrain.Simulation` without xUnit dependency, eliminate 13 twin `*SiloFacts`, and introduce `SiloSmoke` (R14) | M4 | PLANNED |
-| M6 | Complete Solution Verification & Forensic Audit | End-to-end `dotnet build` and `dotnet test` validation, independent Reviewer & Challenger verification, and Forensic Integrity Audit | M5 | PLANNED |
+| M3 | Atomic Journal Write Protocol & Delivery Stream Elimination | Implement `IBrainJournal.Commit` atomic protocol and journal-backed `Delivery` replacing Orleans streams (R04, R05) | M2 | DONE |
+| M4 | Unforgeable Caller Context & StateNeuron Decomposition | Implement closed `Actor`/`Caller` hierarchy, `AccessGate`, and decompose `StateNeuron` into pure `UnitMachine` (R07, R08, F9) | M3 | DONE |
+| M5 | Standalone Simulation Package & Twin Test Elimination | Extract `DigitalBrain.Simulation` without xUnit dependency, eliminate 13 twin `*SiloFacts`, and introduce `SiloSmoke` (R14) | M4 | DONE |
+| M6 | Complete Solution Verification & Forensic Audit | End-to-end `dotnet build` and `dotnet test` validation, independent Reviewer & Challenger verification, and Forensic Integrity Audit | M5 | DONE |
 
 ---
 

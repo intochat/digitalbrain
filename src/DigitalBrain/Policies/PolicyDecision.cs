@@ -1,6 +1,7 @@
+using DigitalBrain.Units;
 using DigitalBrain.Rules;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Limits;
 
 /// <summary>The verdict of <see cref="IPolicies.Allow"/> for an action call.</summary>
 /// <param name="Allowed">True when every matching policy rule allowed the reservation; false when a rule refused it.</param>

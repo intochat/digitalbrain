@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Kernel;
 
 /// <summary>
 /// A journaled signal whose payload type no loaded unit provides: a runtime hands it to alias reactions with the journal's raw JSON.

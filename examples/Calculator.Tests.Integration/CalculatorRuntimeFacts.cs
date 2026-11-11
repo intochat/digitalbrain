@@ -1,9 +1,10 @@
-using DigitalBrain;
+﻿using DigitalBrain;
 using DigitalBrain.Examples.Calculator;
 using DigitalBrain.Identity.Local;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
 namespace Calculator.Tests.Integration;
 
@@ -11,7 +12,7 @@ public sealed class CalculatorRuntimeFixture : BothRuntimesFixture
 {
     private readonly string _home = Path.Combine(Path.GetTempPath(), "db-calc-" + Guid.NewGuid().ToString("N"));
 
-    protected override IReadOnlyList<Type> Modules => [typeof(CalculatorApp)];
+    protected override IReadOnlyList<Type> Modules => [typeof(CalculatorScreen)];
 
     protected override void ConfigureSilo(IServiceCollection services)
         => services.AddLocalIdentity(SiloNeurons.Get, _home);
@@ -20,29 +21,32 @@ public sealed class CalculatorRuntimeFixture : BothRuntimesFixture
 public sealed class CalculatorRuntimeFacts(CalculatorRuntimeFixture fixture) : IClassFixture<CalculatorRuntimeFixture>
 {
     [Theory, MemberData(nameof(NeuronRuntimeKinds.Both), MemberType = typeof(NeuronRuntimeKinds))]
-    public async Task CalculatorScenariosAgreeOnBothRuntimes(NeuronRuntimeKind kind)
+    public async Task CalculatorScreenAgreesOnBothRuntimes(NeuronRuntimeKind kind)
     {
-        var ct = TestContext.Current.CancellationToken;
         var runtime = await fixture.Runtime(kind);
 
-        var report = await BddRunner.VerifyAsync<CalculatorApp>(cancellationToken: ct);
-        Assert.True(report.Passed, report.BaselineError);
-        Assert.Equal(4, report.Scenarios.Count);
+        var calcId = runtime.Id("app.calculator", "default");
+        var screen = runtime.Get<IScreen>(calcId);
 
-        var bddId = runtime.Id("bdd", "calculator");
-        var bdd = runtime.Get<IBdd>(bddId);
-        await bdd.Record(report, ct);
+        var initialView = await screen.Read();
+        Assert.NotNull(initialView);
+        Assert.Contains("0", initialView.View.GetRawText());
+
+        await screen.Request<CalculatorPress>(new("7"));
+        await screen.Request<CalculatorPress>(new("+"));
+        await screen.Request<CalculatorPress>(new("5"));
+        await screen.Request<CalculatorPress>(new("="));
         await runtime.Idle();
 
-        var stored = await bdd.Read(ct);
-        Assert.NotNull(stored);
-        Assert.True(stored.Passed);
-        Assert.Equal("calculator", stored.AppId);
-        Assert.Equal(4, stored.Scenarios.Count);
+        var view = await screen.Read();
+        Assert.NotNull(view);
+        Assert.Contains("12", view.View.GetRawText());
 
-        var signals = await runtime.WaitForSignals<BddVerified>(bddId, 1, TimeSpan.FromSeconds(10), ct);
-        var verified = Assert.Single(signals);
-        Assert.Equal("calculator", verified.AppId);
-        Assert.True(verified.Passed);
+        await screen.Request<CalculatorClear>(new());
+        await runtime.Idle();
+
+        var cleared = await screen.Read();
+        Assert.NotNull(cleared);
+        Assert.Contains("0", cleared.View.GetRawText());
     }
 }

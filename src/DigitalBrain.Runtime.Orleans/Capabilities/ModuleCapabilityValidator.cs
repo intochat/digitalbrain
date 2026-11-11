@@ -1,3 +1,5 @@
+using DigitalBrain.Modules;
+using DigitalBrain.Neurons;
 using System.Reflection;
 using DigitalBrain.Capabilities;
 

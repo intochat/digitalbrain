@@ -1,3 +1,7 @@
+using DigitalBrain.Kernel;
+using DigitalBrain.Limits;
+using DigitalBrain.Neurons;
+using DigitalBrain.Units;
 using System.Reflection;
 using DigitalBrain.Access;
 using DigitalBrain.Runtime.Orleans.Access;
@@ -61,8 +65,8 @@ public static class RuntimeSiloBuilderExtensions
         // The live catalog, seeded from the startup scan; state neurons, the installs neuron and the gate index read it per call.
         silo.Services.TryAddSingleton(sp => new SynapseCatalogSource(sp.GetRequiredService<NeuronTypeRegistry>().Catalog));
         silo.Services.TryAddSingleton<ISynapseCatalogSource>(sp => sp.GetRequiredService<SynapseCatalogSource>());
-        silo.Services.TryAddSingleton<DigitalBrain.Spi.IInstallHooks, OrleansInstallHooks>();
-        silo.Services.TryAddSingleton<DigitalBrain.Spi.ISynapseRegistrar, OrleansSynapseRegistrar>();
+        silo.Services.TryAddSingleton<DigitalBrain.Units.IInstallHooks, OrleansInstallHooks>();
+        silo.Services.TryAddSingleton<DigitalBrain.Units.ISynapseRegistrar, OrleansSynapseRegistrar>();
         // The synapse host: compiles, loads and deploys generated sources; each brain's sources neuron keeps them, and the restorer
         // brings one back when an activation or the gate path misses its alias (as after a restart).
         silo.Services.TryAddSingleton(_ => new SynapseCompiler(ReferenceSet.FromDefaultContext()));
@@ -72,16 +76,16 @@ public static class RuntimeSiloBuilderExtensions
         silo.Services.TryAddSingleton(sp => new SynapseHost(
             sp.GetRequiredService<SynapseCompiler>(),
             sp.GetRequiredService<SynapseLoader>(),
-            sp.GetRequiredService<DigitalBrain.Spi.ISynapseRegistrar>(),
+            sp.GetRequiredService<DigitalBrain.Units.ISynapseRegistrar>(),
             sp.GetRequiredService<ISynapseCatalogSource>(),
             brain => NeuronHosting.Get<IInstalls>(sp, new NeuronId(brain, OrleansInstallHooks.InstallsType, "default")),
             sp.GetRequiredService<ISourceStore>(),
-            sp.GetRequiredService<DigitalBrain.Spi.IClusterListeners>(),
+            sp.GetRequiredService<DigitalBrain.Kernel.IClusterListeners>(),
             sp.GetService<ILogger<SynapseHost>>()));
-        silo.Services.TryAddSingleton<ISynapseHost>(sp => sp.GetRequiredService<SynapseHost>());
-        silo.Services.TryAddSingleton<DigitalBrain.Spi.ISynapseRestorer>(sp => new SynapseRestorer(
+        silo.Services.TryAddSingleton<DigitalBrain.Units.ISynapseHost>(sp => sp.GetRequiredService<SynapseHost>());
+        silo.Services.TryAddSingleton<DigitalBrain.Units.ISynapseRestorer>(sp => new SynapseRestorer(
             sp.GetRequiredService<SynapseLoader>(),
-            sp.GetRequiredService<DigitalBrain.Spi.ISynapseRegistrar>(),
+            sp.GetRequiredService<DigitalBrain.Units.ISynapseRegistrar>(),
             sp.GetRequiredService<ISourceStore>(),
             sp.GetRequiredService<ISynapseCatalogSource>(),
             sp.GetRequiredService<SynapseHost>()));
@@ -89,14 +93,13 @@ public static class RuntimeSiloBuilderExtensions
         silo.Services.TryAddSingleton<DigitalBrain.Kernel.INudge, GrainNudge>();
         silo.Services.TryAddSingleton<DigitalBrain.Kernel.IAdmission, GrainAdmission>();
         silo.Services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SubscriptionSweep>();
-        silo.Services.TryAddSingleton<DigitalBrain.Spi.ISlotResolver, BrokerSlotResolver>();
+        silo.Services.TryAddSingleton<DigitalBrain.Units.ISlotResolver, BrokerSlotResolver>();
         silo.Services.TryAddSingleton<PublishFaults>();
         silo.Services.AddSingleton<SynapseCounters>();
         silo.Services.AddSingleton<DigitalBrain.Kernel.DeliveryCounters>(sp => sp.GetRequiredService<SynapseCounters>());
         silo.AddSynapseRetention();
         silo.AddRuntimeServices();
         silo.Services.AddCapabilityBroker();
-        silo.Services.TryAddSingleton<Operations.IConfirmationContexts, Confirmations.KernelConfirmations>();
         silo.Services.TryAddSingleton<ICallerAmbient>(OrleansCallerAmbient.Instance);
         silo.Services.TryAddSingleton<ICallerCarrier>(OrleansCallerAmbient.Instance);
         silo.Services.TryAddSingleton(new AccessOptions());

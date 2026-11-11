@@ -10,7 +10,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace DigitalBrain.Analyzers.Neurons;
 
 /// <summary>
-/// Records, as <c>[assembly: DigitalBrain.Calls(from, to)]</c>, every contract a <c>[Neuron]</c> or <c>[App]</c> class calls through
+/// Records, as <c>[assembly: DigitalBrain.Calls(from, to)]</c>, every contract a <c>[Neuron]</c> or <c>[Screen]</c> class calls through
 /// <c>Get&lt;T&gt;(…)</c>. The brain graph reads the attributes to draw <c>calls</c> edges and find call cycles.
 /// </summary>
 [Generator(LanguageNames.CSharp)]
@@ -39,7 +39,7 @@ public sealed class CallsGenerator : IIncrementalGenerator
         if (name is null || name.Identifier.ValueText != "Get" || name.TypeArgumentList.Arguments.Count != 1) { return null; }
         var info = context.SemanticModel.GetSymbolInfo(invocation, cancellationToken);
         if ((info.Symbol ?? info.CandidateSymbols.FirstOrDefault()) is not IMethodSymbol { TypeArguments.Length: 1 } method) { return null; }
-        if (!IsNeuronOrAppGet(method)) { return null; }
+        if (!IsNeuronOrScreenGet(method)) { return null; }
         var owner = invocation.Ancestors().OfType<TypeDeclarationSyntax>().FirstOrDefault();
         if (owner is null || context.SemanticModel.GetDeclaredSymbol(owner, cancellationToken) is not INamedTypeSymbol type) { return null; }
         var from = NameOf(type);
@@ -49,12 +49,12 @@ public sealed class CallsGenerator : IIncrementalGenerator
         return (from, alias ?? contract.Name);
     }
 
-    // The Get of Neuron, App or their contexts: the method lives on a type named Neuron, App, INeuronContext or a base of one of them.
-    private static bool IsNeuronOrAppGet(IMethodSymbol method)
+    // The Get of Neuron, Screen or their contexts: the method lives on a type named Neuron, Screen, INeuronContext or a base of one of them.
+    private static bool IsNeuronOrScreenGet(IMethodSymbol method)
     {
         for (var type = method.ContainingType; type is not null; type = type.BaseType)
         {
-            if (type.Name is "Neuron" or "App" or "INeuronContext" && type.ContainingNamespace?.ToDisplayString().StartsWith("DigitalBrain", StringComparison.Ordinal) == true) { return true; }
+            if (type.Name is "Neuron" or "Screen" or "INeuronContext" && type.ContainingNamespace?.ToDisplayString().StartsWith("DigitalBrain", StringComparison.Ordinal) == true) { return true; }
         }
         return false;
     }
@@ -65,7 +65,7 @@ public sealed class CallsGenerator : IIncrementalGenerator
         {
             foreach (var attribute in current.GetAttributes())
             {
-                if (attribute.AttributeClass?.Name is "NeuronAttribute" or "AppAttribute" && attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is string name)
+                if (attribute.AttributeClass?.Name is "NeuronAttribute" && attribute.ConstructorArguments.Length > 0 && attribute.ConstructorArguments[0].Value is string name)
                 { return name; }
             }
         }

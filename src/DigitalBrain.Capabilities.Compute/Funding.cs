@@ -1,3 +1,5 @@
+﻿using DigitalBrain.Neurons;
+
 namespace DigitalBrain.Capabilities.Compute;
 
 public enum FundingKind

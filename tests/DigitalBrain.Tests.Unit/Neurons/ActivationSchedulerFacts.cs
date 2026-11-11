@@ -1,4 +1,4 @@
-using DigitalBrain.Spi;
+using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Tests.Unit.Neurons;
 

@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using DigitalBrain.Brains;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Runtime.Orleans.Capabilities;
@@ -10,9 +11,9 @@ namespace DigitalBrain.Runtime.Orleans.Brain;
 /// The brain's first neuron: its state, its creation and its lifecycle signals, a plain neuron
 /// keyed {brain}/main. It also publishes the kernel's instance and type signals, so they arrive with the brain as publisher.
 /// </summary>
-[DigitalBrain.Neuron(IBrain.Type, State = "brain")]
+[Neuron(IBrain.Type, State = "brain")]
 public sealed class BrainNeuron
-    : DigitalBrain.Neuron<BrainStorage>, IBrain, IBrainAnnouncer
+    : Neuron<BrainStorage>, IBrain, IBrainAnnouncer
 {
     private readonly IEnumerable<ICreationHandler> creation;
     private readonly ILogger<BrainNeuron> logger;

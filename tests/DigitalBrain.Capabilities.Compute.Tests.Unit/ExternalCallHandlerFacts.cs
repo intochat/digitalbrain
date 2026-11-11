@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using DigitalBrain.Capabilities.Compute;
 
 namespace DigitalBrain.Capabilities.Compute.Tests.Unit;

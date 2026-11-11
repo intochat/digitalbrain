@@ -1,3 +1,5 @@
+using DigitalBrain.Kernel;
+using DigitalBrain.Neurons;
 using DigitalBrain.Capabilities.Storage;
 using DigitalBrain.Contracts;
 using DigitalBrain.Operations;
@@ -13,9 +15,9 @@ public interface IOpWriter
 
 public sealed record WriteRequest(string Kind, string? Source, string? Folder, string? Name, string? Text, ConflictPolicy Conflict, bool DryRun);
 
-/// <summary>Starts a write plan through its own context and returns the result kind and code.</summary>
+/// <summary>Starts a write plan through injected IOperations and returns the result kind and code.</summary>
 [Neuron("test.op-writer")]
-public sealed class OpWriterNeuron : Neuron, IOpWriter
+public sealed class OpWriterNeuron(IOperations operations) : Neuron, IOpWriter
 {
     public async Task<string> Run(WriteRequest request)
     {
@@ -27,7 +29,7 @@ public sealed class OpWriterNeuron : Neuron, IOpWriter
             _ => WritePlan.Move(new ItemId(request.Source!), new ItemId(request.Folder!), request.Conflict),
         } with
         { DryRun = request.DryRun };
-        var operation = (FakeOperation)await Context.Operations.Start(plan, CancellationToken.None);
+        var operation = (FakeOperation)await operations.Start(plan, CancellationToken.None);
         var result = await operation.Completion;
         return result switch
         {

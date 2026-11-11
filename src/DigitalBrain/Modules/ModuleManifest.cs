@@ -1,7 +1,8 @@
 using System.Reflection;
 using DigitalBrain.Capabilities;
+using DigitalBrain.Limits;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Modules;
 
 /// <summary>Declares the OAuth / auth scheme and scopes required by a module.</summary>
 /// <param name="Scheme">The auth scheme id (e.g. <c>google</c>, <c>github</c>).</param>

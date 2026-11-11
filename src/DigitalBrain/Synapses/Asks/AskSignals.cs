@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>The asks of one reaction, journaled in the same save as its next state.</summary>
 /// <param name="Unit">The state alias of the unit that asked.</param>

@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using Microsoft.AspNetCore.Builder;
 
 namespace DigitalBrain.Runtime.Http.Surface;

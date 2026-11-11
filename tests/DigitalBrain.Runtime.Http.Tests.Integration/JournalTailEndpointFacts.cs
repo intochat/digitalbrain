@@ -5,7 +5,7 @@ using DigitalBrain;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Capabilities.Identity;
 using DigitalBrain.Runtime.Http.Surface;
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
 using DigitalBrain.Testing;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;

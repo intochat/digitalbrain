@@ -1,6 +1,7 @@
+using DigitalBrain.Neurons;
 using DigitalBrain.Kernel;
 using DigitalBrain.Runtime.Orleans.Synapses;
-using DigitalBrain.Spi;
+using DigitalBrain.Units;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Runtime.Orleans.Hosting;

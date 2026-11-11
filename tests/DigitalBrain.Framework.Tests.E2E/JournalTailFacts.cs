@@ -1,4 +1,7 @@
+using DigitalBrain.Modules;
+using DigitalBrain.Neurons;
 using DigitalBrain;
+using DigitalBrain.Kernel;
 using DigitalBrain.Testing;
 
 namespace DigitalBrain.Framework.Tests.E2E;
@@ -71,15 +74,15 @@ public sealed class TailCounterNeuron : Neuron<TailCount>, ITailCounter
 
 /// <summary>Tails the brain journal for the facts.</summary>
 [Neuron("tail.watcher"), StatelessNeuron]
-public sealed class TailWatcherNeuron : Neuron, ITailWatcher
+public sealed class TailWatcherNeuron(ISignalHistory history) : Neuron, ITailWatcher
 {
-    public async Task<long> Last() => (await Context.History.Read(long.MaxValue, 1, CancellationToken.None)).Last;
+    public async Task<long> Last() => (await history.Read(long.MaxValue, 1, CancellationToken.None)).Last;
 
     public async Task<Tailed[]> Watch(long since, int count)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         List<Tailed> seen = [];
-        await foreach (var item in Context.History.Watch(since, timeout.Token))
+        await foreach (var item in history.Watch(since, timeout.Token))
         {
             if (item.Signal is TailCounted counted) { seen.Add(new Tailed(item.Sequence, counted.Value)); }
             if (seen.Count == count) { break; }

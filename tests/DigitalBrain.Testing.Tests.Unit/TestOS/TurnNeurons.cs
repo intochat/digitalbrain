@@ -1,6 +1,7 @@
+using DigitalBrain.Contracts;
 using System.Collections.Concurrent;
 using DigitalBrain.Invocation;
-using DigitalBrain.Spi;
+using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Testing.Tests.Unit.Hosting;
 

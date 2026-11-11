@@ -1,8 +1,10 @@
+using DigitalBrain.Neurons;
 using System.Collections.Concurrent;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Synapses;
 using DigitalBrain.Runtime.Orleans.Testing;
-using DigitalBrain.Spi;
+using DigitalBrain.Hosting;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Hosting;
@@ -39,7 +41,6 @@ public sealed class StatefulSilo : IAsyncLifetime
         {
             silo.AddBrainStorage(typeof(HostingModule).Assembly);
             silo.Configure<ReminderOptions>(options => options.MinimumReminderPeriod = TimeSpan.FromSeconds(1));
-            silo.Services.AddSingleton<DigitalBrain.Runtime.Orleans.Operations.IConfirmationContexts>(sp => new ApprovingConfirmations(sp));
         }
     }
 }
@@ -95,7 +96,7 @@ public sealed class HostStateFacts(StatefulSilo silo) : IClassFixture<StatefulSi
     public async Task Publish_ephemeral_delivers_to_listeners_without_journal_append()
     {
         var ct = TestContext.Current.CancellationToken;
-        var clusterListeners = silo.Services.GetRequiredService<DigitalBrain.Spi.IClusterListeners>();
+        var clusterListeners = silo.Services.GetRequiredService<DigitalBrain.Kernel.IClusterListeners>();
         var heard = new ConcurrentQueue<string>();
         await using var reg = await clusterListeners.Listen<EphemeralPing>("test-ephemeral", (_, signal, _) =>
         {

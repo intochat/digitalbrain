@@ -1,9 +1,10 @@
+using DigitalBrain.Kernel;
+using DigitalBrain.Neurons;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Contracts;
 using DigitalBrain.Invocation;
 using DigitalBrain.Runtime.Orleans.Hosting;
-using DigitalBrain.Spi;
 
 namespace DigitalBrain.Runtime.Orleans.Tests.Integration.Hosting;
 
@@ -284,8 +285,10 @@ internal static class CounterLog
 }
 
 [Neuron("probe.counter", State = "count")]
-public sealed class CounterNeuron : Neuron<CounterState>, ICounter
+public sealed class CounterNeuron(ISignalHistory? history = null) : Neuron<CounterState>, ICounter
 {
+    private readonly ISignalHistory? _history = history;
+
     public async Task<int> Add(int by)
     {
         var next = State with { Value = State.Value + by };
@@ -316,13 +319,13 @@ public sealed class CounterNeuron : Neuron<CounterState>, ICounter
     {
         try
         {
-            _ = await Context.History.Read(NeuronId.Parse(publisher), 0, 10, CancellationToken.None);
+            _ = await (_history ?? throw new InvalidOperationException("ISignalHistory not injected")).Read(NeuronId.Parse(publisher), 0, 10, CancellationToken.None);
             return "read";
         }
         catch (UnauthorizedAccessException) { return "refused"; }
     }
 
-    public async Task<long> HistoryLast() => (await Context.History.Read(Id, 0, 10, CancellationToken.None)).Last;
+    public async Task<long> HistoryLast() => (await (_history ?? throw new InvalidOperationException("ISignalHistory not injected")).Read(Id, 0, 10, CancellationToken.None)).Last;
 
     protected override async Task OnReminder(string name, CancellationToken cancellationToken)
     {

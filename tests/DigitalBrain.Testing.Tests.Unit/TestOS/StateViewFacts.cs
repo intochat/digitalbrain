@@ -1,4 +1,5 @@
-using DigitalBrain.Spi;
+using DigitalBrain.Units;
+using DigitalBrain.Kernel;
 using DigitalBrain.UI;
 using OS = DigitalBrain.Testing.TestOS;
 
@@ -230,6 +231,33 @@ public sealed class StateViewFacts
         Assert.False(ViewNodes.Payload(args, "v", null).TryGetProperty("by", out _));
         Assert.Equal("p1", ViewNodes.Payload(args, null, "p1").GetProperty("by").GetString());
         Assert.Equal(1, ViewNodes.Payload(args, null, "p1").GetProperty("x").GetInt32());
+    }
+
+    [Fact]
+    public void AnAuthorDeclaredByWithCasingVariationsNeverSurvives()
+    {
+        var argsUpper = System.Text.Json.JsonElement.Parse("""{"BY":"admin","x":1}""");
+        var argsMixed = System.Text.Json.JsonElement.Parse("""{"By":"admin","x":1}""");
+        var argsInverted = System.Text.Json.JsonElement.Parse("""{"bY":"admin","x":1}""");
+        var argsLower = System.Text.Json.JsonElement.Parse("""{"by":"admin","x":1}""");
+
+        Assert.False(ViewNodes.Payload(argsUpper, null, null).TryGetProperty("by", out _));
+        Assert.False(ViewNodes.Payload(argsUpper, null, null).TryGetProperty("BY", out _));
+        Assert.False(ViewNodes.Payload(argsMixed, null, null).TryGetProperty("by", out _));
+        Assert.False(ViewNodes.Payload(argsMixed, null, null).TryGetProperty("By", out _));
+        Assert.False(ViewNodes.Payload(argsInverted, null, null).TryGetProperty("by", out _));
+        Assert.False(ViewNodes.Payload(argsInverted, null, null).TryGetProperty("bY", out _));
+        Assert.False(ViewNodes.Payload(argsLower, null, null).TryGetProperty("by", out _));
+
+        var withHostBy = ViewNodes.Payload(argsInverted, null, "p1");
+        Assert.Equal("p1", withHostBy.GetProperty("by").GetString());
+        Assert.False(withHostBy.TryGetProperty("bY", out _));
+        Assert.Equal(1, withHostBy.GetProperty("x").GetInt32());
+
+        Assert.True(ViewNodes.DeclaresBy(System.Text.Json.JsonElement.Parse("""{"root":{"kind":"button","emit":{"owner":"a","signal":"s","args":{"by":"x"}}}}""")));
+        Assert.True(ViewNodes.DeclaresBy(System.Text.Json.JsonElement.Parse("""{"root":{"kind":"button","emit":{"owner":"a","signal":"s","args":{"By":"x"}}}}""")));
+        Assert.True(ViewNodes.DeclaresBy(System.Text.Json.JsonElement.Parse("""{"root":{"kind":"button","emit":{"owner":"a","signal":"s","args":{"BY":"x"}}}}""")));
+        Assert.True(ViewNodes.DeclaresBy(System.Text.Json.JsonElement.Parse("""{"root":{"kind":"button","emit":{"owner":"a","signal":"s","args":{"bY":"x"}}}}""")));
     }
 
     [Fact]

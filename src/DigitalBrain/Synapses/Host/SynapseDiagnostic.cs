@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>One compiler or analyzer diagnostic.</summary>
 /// <param name="File">The source file path, or empty when the diagnostic has no location.</param>

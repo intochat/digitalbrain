@@ -2,6 +2,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/DigitalBrain/DigitalBrain.csproj" />
     <ProjectReference Include="../../src/DigitalBrain.UI/DigitalBrain.UI.csproj" />
+    <ProjectReference Include="../../src/DigitalBrain.Simulation/DigitalBrain.Simulation.csproj" />
     <ProjectReference Include="../../src/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
     <ProjectReference Include="../../src/DigitalBrain.Capabilities.Storage/DigitalBrain.Capabilities.Storage.csproj" />
     <ProjectReference Include="../../src/DigitalBrain.Capabilities.Secrets/DigitalBrain.Capabilities.Secrets.csproj" />

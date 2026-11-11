@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using System.Reflection;
 using DigitalBrain.Kernel;
 

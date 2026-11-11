@@ -1,3 +1,4 @@
+using DigitalBrain.Units;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Runtime.Synapses.Tests.Unit.Compile;
 

@@ -1,4 +1,5 @@
-using DigitalBrain.Spi;
+using DigitalBrain.Units;
+using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Runtime.Orleans.Hosting;
 

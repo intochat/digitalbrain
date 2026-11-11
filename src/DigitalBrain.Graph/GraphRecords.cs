@@ -1,3 +1,5 @@
+﻿using DigitalBrain.Neurons;
+
 namespace DigitalBrain.Graph;
 
 /// <summary>What a node of the brain graph is.</summary>

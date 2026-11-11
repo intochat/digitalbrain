@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Neurons;
 
 /// <summary>Why a neuron's activation ends.</summary>
 public enum DeactivationCause

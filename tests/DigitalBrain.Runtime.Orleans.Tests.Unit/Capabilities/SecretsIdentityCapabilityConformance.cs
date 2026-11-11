@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using System.Collections.Concurrent;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Runtime.Orleans.Capabilities;

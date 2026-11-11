@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.Reflection;
 using DigitalBrain.Access;
+using DigitalBrain.Contracts;
 using DigitalBrain.Invocation;
+using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Kernel;
 

@@ -1,4 +1,4 @@
-using DigitalBrain.Spi;
+using DigitalBrain.Hosting;
 
 namespace DigitalBrain.Testing;
 

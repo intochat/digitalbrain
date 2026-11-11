@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Limits;
 
 /// <summary>How a <see cref="PolicyRule"/> measures an action against its limit.</summary>
 public enum PolicyMeasure

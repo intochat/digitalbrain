@@ -1,6 +1,7 @@
 using DigitalBrain.Contracts;
+using DigitalBrain.Neurons;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>The deployed generated sources of one brain, at <c>{brain}/synapse.sources/default</c>.</summary>
 [NeuronAlias("synapse.sources")]

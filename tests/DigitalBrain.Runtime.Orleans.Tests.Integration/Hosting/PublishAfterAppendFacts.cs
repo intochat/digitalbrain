@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using DigitalBrain.Kernel;
 using DigitalBrain.Runtime.Orleans.Synapses;
-using DigitalBrain.Spi;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Runtime.Orleans.Tests.Integration.Hosting;

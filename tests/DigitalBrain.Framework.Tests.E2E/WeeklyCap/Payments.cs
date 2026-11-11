@@ -1,4 +1,5 @@
-using DigitalBrain.Spi;
+
+using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Framework.Tests.E2E.WeeklyCap;
 

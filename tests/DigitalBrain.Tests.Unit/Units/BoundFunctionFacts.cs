@@ -1,4 +1,3 @@
-using DigitalBrain.Spi;
 using DigitalBrain.Units;
 
 namespace DigitalBrain.Tests.Unit.Units;

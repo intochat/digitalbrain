@@ -1,5 +1,6 @@
 // xUnit1051: the proxy facts pass their own tokens on purpose.
 #pragma warning disable xUnit1051
+using DigitalBrain.Units;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using DigitalBrain.Contracts;

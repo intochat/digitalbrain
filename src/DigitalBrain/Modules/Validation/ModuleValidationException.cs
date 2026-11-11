@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using DigitalBrain.Rules;
 
 namespace DigitalBrain.Modules.Validation;

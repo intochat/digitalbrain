@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/DigitalBrain/DigitalBrain.csproj" />
+    <Project Path="src/DigitalBrain.Simulation/DigitalBrain.Simulation.csproj" />
     <Project Path="src/DigitalBrain.UI/DigitalBrain.UI.csproj" />
     <Project Path="src/DigitalBrain.Testing/DigitalBrain.Testing.csproj" />
     <Project Path="src/DigitalBrain.Testing.Silo/DigitalBrain.Testing.Silo.csproj" />

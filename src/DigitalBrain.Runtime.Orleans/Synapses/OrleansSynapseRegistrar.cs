@@ -1,6 +1,6 @@
 using DigitalBrain.Invocation;
 using DigitalBrain.Runtime.Orleans.Hosting;
-using DigitalBrain.Spi;
+using DigitalBrain.Units;
 using Orleans;
 using Orleans.Runtime;
 

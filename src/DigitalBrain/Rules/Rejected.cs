@@ -1,3 +1,5 @@
+using DigitalBrain.Neurons;
+
 namespace DigitalBrain.Rules;
 
 /// <summary>

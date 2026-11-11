@@ -1,3 +1,5 @@
+using DigitalBrain.Kernel;
+using DigitalBrain.Neurons;
 using System.Text.Json;
 using DigitalBrain.Runtime.Orleans.Synapses;
 using Microsoft.Extensions.DependencyInjection;

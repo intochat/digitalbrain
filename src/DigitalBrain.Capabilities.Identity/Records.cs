@@ -1,3 +1,4 @@
+﻿
 namespace DigitalBrain.Capabilities.Identity;
 
 /// <summary>A member's role in a brain.</summary>

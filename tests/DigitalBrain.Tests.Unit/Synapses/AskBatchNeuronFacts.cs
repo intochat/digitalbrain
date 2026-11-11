@@ -1,5 +1,6 @@
+using DigitalBrain.Units;
 using System.Text.Json;
-using DigitalBrain.Spi;
+using DigitalBrain.Neurons;
 using DigitalBrain.Tests.Unit.Neurons;
 
 namespace DigitalBrain.Tests.Unit.Synapses;

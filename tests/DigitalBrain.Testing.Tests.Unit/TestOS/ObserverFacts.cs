@@ -1,4 +1,4 @@
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
 using OS = DigitalBrain.Testing.TestOS;
 
 namespace DigitalBrain.Testing.Tests.Unit.Hosting;

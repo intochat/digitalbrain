@@ -1,3 +1,5 @@
+using DigitalBrain.Modules;
+using DigitalBrain.Neurons;
 using DigitalBrain.Access;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Contracts;
@@ -5,7 +7,7 @@ using DigitalBrain.Runtime.Orleans.Brain;
 using DigitalBrain.Runtime.Orleans.Capabilities;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Testing;
-using DigitalBrain.Spi;
+using DigitalBrain.Hosting;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -20,8 +22,8 @@ public interface ITestUserSettings
     Task<string> Read();
 }
 
-[DigitalBrain.Neuron("test.settings", State = "settings")]
-public sealed class TestUserSettingsNeuron : DigitalBrain.Neuron<TestUserSettingsState>, ITestUserSettings
+[Neuron("test.settings", State = "settings")]
+public sealed class TestUserSettingsNeuron : Neuron<TestUserSettingsState>, ITestUserSettings
 {
     public Task<string> SetProfile(string name)
     {

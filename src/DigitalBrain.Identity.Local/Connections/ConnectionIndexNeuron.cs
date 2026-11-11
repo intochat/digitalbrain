@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using DigitalBrain.Capabilities.Connections;
 using DigitalBrain.Rules;
 
@@ -41,11 +42,7 @@ public sealed class ConnectionIndexNeuron : Neuron<ConnectionIndexState>, IConne
         await Persist(new ConnectionIndexState { Keys = [.. State.Keys.Where(key => key != connectionKey)] }).ConfigureAwait(true);
     }
 
-    private async Task Persist(ConnectionIndexState next)
-    {
-        await Context.State.Store(next).ConfigureAwait(true);
-        State.Keys = next.Keys;
-    }
+    private Task Persist(ConnectionIndexState next) => Store(next);
 
     private Task Require(string operation, string connectionKey)
         => Check(operation, new ConnectionBelongsToBrain(ConnectionKeys.Parse(connectionKey).BrainId, Id.Brain.Value));

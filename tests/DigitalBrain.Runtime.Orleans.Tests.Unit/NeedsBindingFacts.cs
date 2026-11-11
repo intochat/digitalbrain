@@ -1,3 +1,5 @@
+using DigitalBrain.Modules;
+
 namespace DigitalBrain.Runtime.Orleans.Tests.Unit;
 
 public sealed class NeedsBindingFacts

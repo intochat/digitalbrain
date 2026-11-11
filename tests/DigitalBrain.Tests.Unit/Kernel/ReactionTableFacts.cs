@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Tests.Unit.Kernel;

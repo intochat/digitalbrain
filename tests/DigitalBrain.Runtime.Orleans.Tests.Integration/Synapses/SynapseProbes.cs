@@ -1,9 +1,11 @@
+using DigitalBrain.Neurons;
 using System.Collections.Concurrent;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Synapses;
 using DigitalBrain.Runtime.Orleans.Testing;
 using DigitalBrain.Runtime.Orleans.Tests.Integration.Hosting;
-using DigitalBrain.Spi;
+using DigitalBrain.Hosting;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Configuration;
@@ -131,7 +133,7 @@ public class SynapseSilo : IAsyncLifetime
 
     public Task Restart(CancellationToken ct) => _host!.Restart(ct);
 
-    public DigitalBrain.Spi.ISignalHistory History(string brain) => Services.GetRequiredService<BrainSignalHistories>().For(new BrainId(brain));
+    public DigitalBrain.Kernel.ISignalHistory History(string brain) => Services.GetRequiredService<BrainSignalHistories>().For(new BrainId(brain));
 
     internal SynapseCounters Counters => Services.GetRequiredService<SynapseCounters>();
 

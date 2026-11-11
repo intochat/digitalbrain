@@ -1,4 +1,7 @@
-using DigitalBrain.Spi;
+using DigitalBrain.Modules;
+using DigitalBrain.Neurons;
+using DigitalBrain.Kernel;
+using DigitalBrain.Units;
 using DigitalBrain.Testing;
 using DigitalBrain.Testing.Tests.Unit.Slots;
 using OS = DigitalBrain.Testing.TestOS;
@@ -75,13 +78,12 @@ public interface IHsPayments
 
 // Publishes the live generated Charging signal: its type is read from the catalog on each call, so no fact pins an old context.
 [Neuron("hs.payments")]
-public sealed class HsPayments : Neuron<HsPayments.Count>, IHsPayments
+public sealed class HsPayments(ISynapseCatalogSource? catalogSource = null) : Neuron<HsPayments.Count>, IHsPayments
 {
     public Task Charge(decimal amount)
     {
-        var type = Context.Services.GetService(typeof(ISynapseCatalogSource)) is ISynapseCatalogSource source
-            ? source.Current.For("hs.week").First(d => d.Kind == SynapseKind.Reaction).Signal!
-            : throw new InvalidOperationException("no catalog");
+        var type = (catalogSource ?? throw new InvalidOperationException("no catalog"))
+            .Current.For("hs.week").First(d => d.Kind == SynapseKind.Reaction).Signal!;
         return Save(State with { N = State.N + 1 }, (Signal)Activator.CreateInstance(type, amount)!);
     }
 

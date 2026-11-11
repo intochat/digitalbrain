@@ -1,6 +1,6 @@
 using DigitalBrain.Contracts;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>How a deploy or retire of a synapse source ended, or where a deployed source stands.</summary>
 public enum DeployStatus

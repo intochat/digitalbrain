@@ -1,5 +1,6 @@
+using DigitalBrain.Kernel;
+using DigitalBrain.Units;
 using DigitalBrain.Runtime.Synapses.Tests.Unit.Compile;
-using DigitalBrain.Spi;
 
 namespace DigitalBrain.Runtime.Synapses.Tests.Unit.Host;
 
@@ -33,7 +34,7 @@ public sealed class HostRefusesBannedApisFacts
         { "System.Threading.Tasks.Task.", "public static class Leak { public static void Spawn() => new Task(() => { }).Start(); }" },
         { "System.Runtime.CompilerServices.Unsafe.As called from Leak", "public static class Leak { public static long Cast(object o) => System.Runtime.CompilerServices.Unsafe.As<object, long>(ref o); }" },
         { "System.Runtime.InteropServices.MemoryMarshal.CreateSpan called from Leak", "public static class Leak { public static int Poke(ref int x) => System.Runtime.InteropServices.MemoryMarshal.CreateSpan(ref x, 64)[63]; }" },
-        { "DigitalBrain.ISynapseHost", "public static class Leak { public static object? Host(IServiceProvider services) => services.GetService(typeof(ISynapseHost)); }" },
+        { "DigitalBrain.Units.ISynapseHost", "public static class Leak { public static object? Host(IServiceProvider services) => services.GetService(typeof(DigitalBrain.Units.ISynapseHost)); }" },
         { "DigitalBrain.Runtime.Synapses.SynapseHost", "public static class Leak { public static Type Host() => typeof(DigitalBrain.Runtime.Synapses.SynapseHost); }" },
         { "System.AppContext.", "public static class Leak { public static object? Data() => AppContext.GetData(\"x\"); }" },
         { "System.Progress", "public static class Leak { public static object Report() => new Progress<int>(_ => { }); }" },

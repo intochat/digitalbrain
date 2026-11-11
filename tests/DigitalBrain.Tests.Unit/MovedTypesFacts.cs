@@ -1,3 +1,4 @@
+using DigitalBrain.Brains;
 using System.Text.Json;
 
 namespace DigitalBrain.Tests.Unit;
@@ -18,7 +19,7 @@ public sealed class MovedTypesFacts
         ["IntoChat.OS.SourceSet"] = "DigitalBrain.Signals.Watch.SourceSet",
         ["IntoChat.OS.Sources"] = "DigitalBrain.Signals.Watch.Sources",
         ["IntoChat.OS.WatchStream`1"] = "DigitalBrain.Signals.Watch.WatchStream`1",
-        ["IntoChat.OS.Runtime.NeuronAddress"] = "DigitalBrain.NeuronAddress",
+        ["IntoChat.OS.Runtime.NeuronAddress"] = "DigitalBrain.Brains.NeuronAddress",
     };
 
     private sealed record Inventory(string Method, Entry[] Types);

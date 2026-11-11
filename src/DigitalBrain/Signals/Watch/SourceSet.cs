@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using System.Threading.Channels;
 
 namespace DigitalBrain.Signals.Watch;

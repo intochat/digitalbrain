@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Modules;
 
 /// <summary>A named secret a module reads.</summary>
 public sealed record Secret

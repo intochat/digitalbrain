@@ -2,8 +2,8 @@ using System.Collections.Immutable;
 using System.Net;
 using DigitalBrain.Capabilities.Storage;
 using DigitalBrain.Operations;
-using DigitalBrain.Runtime.Orleans.Operations;
-using DigitalBrain.Spi;
+using DigitalBrain.Runtime.Orleans.Hosting;
+using DigitalBrain.Neurons;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
@@ -15,42 +15,55 @@ public sealed class OperationRecoveryFacts
     private static readonly SiloAddress Driver = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 10);
     private static readonly SiloAddress Other = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 22222), 20);
 
+    private sealed class FakeSiloDetails(SiloAddress address) : ILocalSiloDetails
+    {
+        public SiloAddress SiloAddress => address;
+        public SiloAddress GatewayAddress => address;
+        public string Name => "test";
+        public string ClusterId => "test";
+        public string DnsHostName => "localhost";
+    }
+
     [Theory]
     [InlineData(SiloStatus.Active)]
     [InlineData(SiloStatus.Joining)]
     [InlineData(SiloStatus.ShuttingDown)]
     [InlineData(SiloStatus.Stopping)]
     public void ARemoteDriverIsNotInterruptedWhileItsExactIncarnationIsStillAlive(SiloStatus status)
-        => Assert.False(OperationNeuron.DriverHasEnded(Driver.ToParsableString(), Snapshot((Driver, status), (Other, SiloStatus.Active))));
+        => Assert.False(SiloDriverLifetime.DriverHasEnded(Driver.ToParsableString(), Snapshot((Driver, status), (Other, SiloStatus.Active))));
 
     [Fact]
     public void UnknownDriverAndUnrelatedLiveSilosDoNotProveInterruption()
     {
-        Assert.False(OperationNeuron.DriverHasEnded(Driver.ToParsableString(), Snapshot()));
-        Assert.False(OperationNeuron.DriverHasEnded(Driver.ToParsableString(), Snapshot((Other, SiloStatus.Active))));
-        Assert.False(OperationNeuron.DriverHasEnded("legacy-or-invalid", Snapshot((Other, SiloStatus.Active))));
+        Assert.False(SiloDriverLifetime.DriverHasEnded(Driver.ToParsableString(), Snapshot()));
+        Assert.False(SiloDriverLifetime.DriverHasEnded(Driver.ToParsableString(), Snapshot((Other, SiloStatus.Active))));
+        Assert.False(SiloDriverLifetime.DriverHasEnded("legacy-or-invalid", Snapshot((Other, SiloStatus.Active))));
     }
 
     [Fact]
     public void OnlyAnExplicitDeathOrANewerActiveIncarnationProvesInterruption()
     {
-        Assert.True(OperationNeuron.DriverHasEnded(Driver.ToParsableString(), Snapshot((Driver, SiloStatus.Dead), (Other, SiloStatus.Active))));
+        Assert.True(SiloDriverLifetime.DriverHasEnded(Driver.ToParsableString(), Snapshot((Driver, SiloStatus.Dead), (Other, SiloStatus.Active))));
         var next = SiloAddress.New(Driver.Endpoint, Driver.Generation + 1);
-        Assert.True(OperationNeuron.DriverHasEnded(Driver.ToParsableString(), Snapshot((next, SiloStatus.Active))));
-        Assert.False(OperationNeuron.DriverHasEnded(Driver.ToParsableString(), Snapshot((next, SiloStatus.Joining))));
-        Assert.False(OperationNeuron.DriverHasEnded(next.ToParsableString(), Snapshot((Driver, SiloStatus.Active))));
+        Assert.True(SiloDriverLifetime.DriverHasEnded(Driver.ToParsableString(), Snapshot((next, SiloStatus.Active))));
+        Assert.False(SiloDriverLifetime.DriverHasEnded(Driver.ToParsableString(), Snapshot((next, SiloStatus.Joining))));
+        Assert.False(SiloDriverLifetime.DriverHasEnded(next.ToParsableString(), Snapshot((Driver, SiloStatus.Active))));
     }
 
     [Fact]
     public async Task ReconciliationJournalsOneFailureAndNeverTurnsItIntoSuccess()
     {
         var membership = new Membership { CurrentSnapshot = Snapshot((Driver, SiloStatus.Active)) };
-        using var services = new ServiceCollection().AddSingleton<IClusterMembershipService>(membership).BuildServiceProvider();
+        var siloDetails = new FakeSiloDetails(Other);
+        using var services = new ServiceCollection()
+            .AddSingleton<IClusterMembershipService>(membership)
+            .AddSingleton<IOperationDriverLifetime>(new SiloDriverLifetime(siloDetails, membership))
+            .BuildServiceProvider();
         var context = new FakeNeuronContext(new(new("owner"), "runtime.operation", "pending"), services);
         var neuron = new OperationNeuron();
         NeuronAttachment.Attach(neuron, context);
         await neuron.Begin(new("pending", "owner", "files", "primitive", "{}", null, null, OperationPhase.Running,
-            false, 0, null, context.Time.GetUtcNow(), context.Time.GetUtcNow(), Driver.ToParsableString()));
+            false, 0, null, context.Time.GetUtcNow(), context.Time.GetUtcNow(), DriverLifetime: Driver.ToParsableString()));
         // Ordinary entity eviction on another live silo must not affect the driver.
         var replacement = new OperationNeuron();
         NeuronAttachment.Attach(replacement, context);
@@ -87,8 +100,9 @@ public sealed class OperationRecoveryFacts
         var context = new FakeNeuronContext(new(new("owner"), "runtime.operation", "process"), services);
         var neuron = new OperationNeuron();
         NeuronAttachment.Attach(neuron, context);
-        await neuron.Begin(new("process", "owner", "files", "primitive", "{}", null, null, OperationPhase.Running,
-            false, 0, null, context.Time.GetUtcNow(), context.Time.GetUtcNow(), Driver.ToParsableString(), "exact-process"));
+        await context.MemoryState.Save(new OperationState("process", "owner", "files", "primitive", "{}", null, null, OperationPhase.Running,
+            false, 0, null, context.Time.GetUtcNow(), context.Time.GetUtcNow(), Driver.ToParsableString(), "exact-process"), []);
+        await NeuronAttachment.Activate(neuron, TestContext.Current.CancellationToken);
 
         await neuron.Reconcile();
         await neuron.Reconcile();

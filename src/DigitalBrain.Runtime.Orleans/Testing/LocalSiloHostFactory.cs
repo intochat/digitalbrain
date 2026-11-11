@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
-using DigitalBrain.Spi;
+using DigitalBrain.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

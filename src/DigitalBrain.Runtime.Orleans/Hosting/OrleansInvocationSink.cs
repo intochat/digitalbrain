@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using DigitalBrain.Access;
@@ -26,6 +27,7 @@ internal sealed class OrleansInvocationSink(
     // Async methods: the RequestContext change stays inside the call and never leaks back into the caller's flow.
     public async Task<JsonElement?> Invoke(NeuronId target, RuntimeInvocation call, CancellationToken cancellationToken)
     {
+        using var _ = InProcessCallerScope.Enter();
         var (host, neuronClass) = await Host(target, call, cancellationToken).ConfigureAwait(false);
         Hop(target);
         var invocation = Stamped(call);
@@ -37,6 +39,7 @@ internal sealed class OrleansInvocationSink(
 
     public async Task Post(NeuronId target, RuntimeInvocation call)
     {
+        using var _ = InProcessCallerScope.Enter();
         var (host, neuronClass) = await Host(target, call, CancellationToken.None).ConfigureAwait(false);
         Hop(target);
         var invocation = Stamped(call);
@@ -48,6 +51,7 @@ internal sealed class OrleansInvocationSink(
 
     public async IAsyncEnumerable<JsonElement> Stream(NeuronId target, RuntimeInvocation call, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
+        using var _ = InProcessCallerScope.Enter();
         var (host, _) = await Host(target, call, cancellationToken).ConfigureAwait(false);
         Hop(target);
         if (beforeStream is not null) { await beforeStream(target, call).ConfigureAwait(false); }
@@ -86,6 +90,7 @@ internal sealed class OrleansInvocationSink(
     private void Hop(NeuronId target)
     {
         var current = asKernel ? Caller.OfKernel(target.Brain) : _callers.Current;
-        _ = _callers.Enter(current?.Hop(via: caller, inside: caller is not null));
+        var inside = caller is not null || (current?.Inside ?? false) || (current?.Actor is Actor.Kernel or Actor.Scheduler or Actor.Module);
+        _ = _callers.Enter(current?.Hop(via: caller, inside: inside));
     }
 }

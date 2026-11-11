@@ -1,6 +1,7 @@
 using System.Reflection;
+using DigitalBrain.Modules;
+using DigitalBrain.Neurons;
 using Xunit;
-using DigitalBrain;
 
 namespace DigitalBrain.Testing;
 
@@ -8,7 +9,7 @@ namespace DigitalBrain.Testing;
 // declared type (unique, scheduling markers valid), and every os contract a class implements binds a TestOS proxy, so the call
 // shape (JSON arguments and results, one Task per member) holds without Orleans. A module subclasses it once in its
 // <Module>.Tests.Unit; behaviour facts sit beside it (BothRuntimesFixture).
-public abstract class ModuleOnTestOSFacts<TModule> where TModule : DigitalBrain.Module
+public abstract class ModuleOnTestOSFacts<TModule> where TModule : DigitalBrain.Modules.Module
 {
     private static readonly MethodInfo GetProxy = typeof(TestOS).GetMethod(nameof(TestOS.Get))!;
 
@@ -36,14 +37,15 @@ public abstract class ModuleOnTestOSFacts<TModule> where TModule : DigitalBrain.
         }
     }
 
-    // A neuron contract: a public interface carrying [NeuronAlias] or outside System/Microsoft/DigitalBrain.Spi whose members all return tasks.
+    // A neuron contract: a public interface carrying [NeuronAlias] or outside System/Microsoft/DigitalBrain.Neurons/DigitalBrain.Kernel whose members all return tasks.
     private static bool Contract(Type type)
         => type is { IsInterface: true, IsPublic: true, IsGenericTypeDefinition: false }
             && (type.IsDefined(typeof(DigitalBrain.Contracts.NeuronAliasAttribute), inherit: false)
                 || (type.Namespace is { } ns
                     && !ns.StartsWith("System", StringComparison.Ordinal)
                     && !ns.StartsWith("Microsoft", StringComparison.Ordinal)
-                    && !ns.StartsWith("DigitalBrain.Spi", StringComparison.Ordinal)))
+                    && !ns.StartsWith("DigitalBrain.Neurons", StringComparison.Ordinal)
+                    && !ns.StartsWith("DigitalBrain.Kernel", StringComparison.Ordinal)))
             && type.GetMethods().Length > 0
             && type.GetMethods().All(method => typeof(Task).IsAssignableFrom(method.ReturnType) || method.ReturnType.Name.StartsWith("IAsyncEnumerable", StringComparison.Ordinal));
 }

@@ -1,4 +1,6 @@
+using DigitalBrain.Neurons;
 using System.Reflection;
+using DigitalBrain.Brains;
 
 namespace DigitalBrain.Contracts;
 

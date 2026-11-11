@@ -77,7 +77,7 @@ const DigitalBrain.Runtime.Http.Storage.StorageContentGateway.MaxBytes = 2147483
 const DigitalBrain.Runtime.Http.Storage.UploadTicket.Purpose = "DigitalBrain.Runtime.Http.Storage.UploadTicket" -> string!
 DigitalBrain.Runtime.Http.Storage.ContentUploadLog
 DigitalBrain.Runtime.Http.Storage.ContentUploadLog.ContentUploadLog() -> void
-DigitalBrain.Runtime.Http.Storage.ContentUploadLog.Done.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Storage.OperationDone!>!
+DigitalBrain.Runtime.Http.Storage.ContentUploadLog.Done.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Operations.OperationDone!>!
 DigitalBrain.Runtime.Http.Storage.ContentUploadLog.Failed(DigitalBrain.Operations.OperationId id) -> void
 DigitalBrain.Runtime.Http.Storage.Download
 DigitalBrain.Runtime.Http.Storage.Download.Content.get -> System.IO.Stream?

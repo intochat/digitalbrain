@@ -1,6 +1,7 @@
+using DigitalBrain.Units;
 using System.Reflection;
 using System.Reflection.Emit;
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
 using DigitalBrain.Testing.Tests.Unit.Synapses;
 using OS = DigitalBrain.Testing.TestOS;
 

@@ -1,3 +1,7 @@
+using DigitalBrain.Limits;
+using DigitalBrain.Modules;
+using DigitalBrain.Neurons;
+using DigitalBrain.Scheduling;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
@@ -53,7 +57,7 @@ internal sealed class NeuronTypeRegistry
     /// <exception cref="InvalidOperationException">Two classes claim one type name, or a <c>[Neuron]</c> class is an app.</exception>
     /// <exception cref="SynapseShapeException">A state alias is declared twice, or a synapse function has an unsupported shape.</exception>
     public NeuronTypeRegistry(IEnumerable<Assembly> assemblies)
-        : this(Listed(assemblies).SelectMany(Loadable).Concat([typeof(InstallsNeuron), typeof(SourcesNeuron), typeof(PoliciesNeuron), typeof(DigitalBrain.Time.TimeNeuron)]))
+        : this(Listed(assemblies).SelectMany(Loadable).Concat([typeof(InstallsNeuron), typeof(SourcesNeuron), typeof(PoliciesNeuron), typeof(DigitalBrain.Scheduling.TimeNeuron), typeof(DigitalBrain.Operations.OperationNeuron), typeof(DigitalBrain.Confirmation.ConfirmationsNeuron)]))
     {
         var listed = Listed(assemblies);
         Catalog = SynapseCatalog.Scan(listed);
@@ -69,17 +73,13 @@ internal sealed class NeuronTypeRegistry
         }
     }
 
-    /// <exception cref="InvalidOperationException">Two classes claim one type name, or a <c>[Neuron]</c> class is an app.</exception>
+    /// <exception cref="InvalidOperationException">Two classes claim one type name.</exception>
     internal NeuronTypeRegistry(IEnumerable<Type> candidates)
     {
         ArgumentNullException.ThrowIfNull(candidates);
         foreach (var type in candidates.Distinct())
         {
             if (!type.IsClass || type.GetCustomAttribute<NeuronAttribute>(inherit: false) is not { } neuron) { continue; }
-            if (typeof(App).IsAssignableFrom(type))
-            {
-                throw new InvalidOperationException($"{type.FullName} is marked [Neuron(\"{neuron.Type}\")] but derives App: script apps run in the sandbox, not in the silo.");
-            }
             if (type.IsAbstract || type.IsGenericTypeDefinition || !typeof(Neuron).IsAssignableFrom(type)) { continue; }
             if (_types.TryGetValue(neuron.Type, out var other) && other.Class != type)
             {
@@ -185,7 +185,7 @@ internal sealed class NeuronTypeRegistry
     private static IReadOnlyList<ActionDescriptor> ScanActions(IEnumerable<Assembly> assemblies)
     {
         var actions = new Dictionary<string, ActionDescriptor>(StringComparer.Ordinal);
-        foreach (var type in assemblies.SelectMany(Loadable).Where(t => t is { IsAbstract: false, IsClass: true } && typeof(Module).IsAssignableFrom(t) && t.IsDefined(typeof(ModuleAttribute), false)))
+        foreach (var type in assemblies.SelectMany(Loadable).Where(t => t is { IsAbstract: false, IsClass: true } && typeof(DigitalBrain.Modules.Module).IsAssignableFrom(t) && t.IsDefined(typeof(ModuleAttribute), false)))
         {
             try
             {

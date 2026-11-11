@@ -47,11 +47,11 @@ public sealed class VocabularyRingFacts
         Assert.Empty(Repository.ProjectReferences(Repository.ProjectNamed("DigitalBrain.UI").Path));
     }
 
-    // 03-04: the core's only project reference is the analyzer, analyzer-only (no assembly reference).
+    // R10: the core's project references are the analyzer (analyzer-only) and the UI project.
     [Fact]
     public void Core_references_only_the_analyzer_as_analyzer()
     {
-        Assert.Equal(["DigitalBrain.Analyzers"], Repository.ProjectReferences(Repository.ProjectNamed("DigitalBrain").Path));
+        Assert.Equal(["DigitalBrain.Analyzers", "DigitalBrain.UI"], Repository.ProjectReferences(Repository.ProjectNamed("DigitalBrain").Path).Order(StringComparer.Ordinal));
     }
 
     [Theory]
@@ -69,7 +69,7 @@ public sealed class VocabularyRingFacts
 // V-02: no Orleans library anywhere in the restore graph of the core-side projects.
 public sealed class CoreHasNoOrleansFacts
 {
-    public static readonly TheoryData<string> CoreProjects = new() { "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Analyzers", "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity", "DigitalBrain.Capabilities.Compute", "DigitalBrain.Capabilities.Connections", "DigitalBrain.Capabilities.Http", "DigitalBrain.Capabilities.Tools", "DigitalBrain.Identity.Local", "DigitalBrain.Runtime.Http" };
+    public static readonly TheoryData<string> CoreProjects = new() { "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Simulation", "DigitalBrain.Testing", "DigitalBrain.Analyzers", "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity", "DigitalBrain.Capabilities.Compute", "DigitalBrain.Capabilities.Connections", "DigitalBrain.Capabilities.Http", "DigitalBrain.Capabilities.Tools", "DigitalBrain.Identity.Local", "DigitalBrain.Runtime.Http" };
 
     [Theory]
     [MemberData(nameof(CoreProjects))]
@@ -89,13 +89,14 @@ public sealed class CoreHasNoOrleansFacts
     }
 
     // 04-03 (CORE-01, T-04-08): the built core assemblies reference no Orleans assembly and declare no Orleans namespace.
-    public static readonly TheoryData<string> CoreAssemblies = new() { "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity", "DigitalBrain.Capabilities.Compute", "DigitalBrain.Capabilities.Connections", "DigitalBrain.Capabilities.Http", "DigitalBrain.Capabilities.Tools", "DigitalBrain.Identity.Local", "DigitalBrain.Runtime.Http" };
+    public static readonly TheoryData<string> CoreAssemblies = new() { "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Simulation", "DigitalBrain.Testing", "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity", "DigitalBrain.Capabilities.Compute", "DigitalBrain.Capabilities.Connections", "DigitalBrain.Capabilities.Http", "DigitalBrain.Capabilities.Tools", "DigitalBrain.Identity.Local", "DigitalBrain.Runtime.Http" };
 
     private static Assembly Anchor(string name) => name switch
     {
         "DigitalBrain" => typeof(Signal).Assembly,
         "DigitalBrain.UI" => typeof(DigitalBrain.UI.View).Assembly,
-        "DigitalBrain.Testing" => typeof(DigitalBrain.Testing.ManualTime).Assembly,
+        "DigitalBrain.Simulation" => typeof(DigitalBrain.Testing.TestOS).Assembly,
+        "DigitalBrain.Testing" => typeof(DigitalBrain.Testing.SiloHost).Assembly,
         "DigitalBrain.Capabilities.Storage" => typeof(DigitalBrain.Capabilities.Storage.IStorage).Assembly, // 05-02, D-15
         "DigitalBrain.Capabilities.Secrets" => typeof(DigitalBrain.Capabilities.Secrets.ISecrets).Assembly, // 05-03, D-15
         "DigitalBrain.Capabilities.Identity" => typeof(DigitalBrain.Capabilities.Identity.IIdentity).Assembly, // 05-03, D-15

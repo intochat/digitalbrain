@@ -2,7 +2,7 @@ using System.ComponentModel;
 using System.Reflection;
 using System.Text;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>The state records and synapse functions found in a set of assemblies.</summary>
 public sealed class SynapseCatalog

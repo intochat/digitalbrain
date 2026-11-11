@@ -7,8 +7,9 @@ using DigitalBrain.Identity.Local.Directory;
 using DigitalBrain.Runtime.Orleans.Capabilities;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Testing;
-using DigitalBrain.Spi;
+using DigitalBrain.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
 namespace Calculator.Tests.Integration;
 
@@ -51,7 +52,7 @@ public sealed class StandaloneIdentityFacts
                     var decision = await grants.Authorize(
                         new CallRequest
                         {
-                            TargetNeuron = $"{owner.BrainId}/bdd/calculator",
+                            TargetNeuron = $"{owner.BrainId}/app.calculator/default",
                             Operation = "Record",
                             SemanticTypeIds = ["calculator.history"],
                         },
@@ -77,5 +78,5 @@ public sealed class StandaloneIdentityFacts
 
     private static Task<IInProcessHost> StartHost(string home, CancellationToken ct)
         => new LocalSiloHostFactory(null, services => services.AddLocalIdentity(SiloNeurons.Get, home))
-            .Start(new InProcessHostOptions { Home = home, Modules = [typeof(CalculatorApp)] }, ct);
+            .Start(new InProcessHostOptions { Home = home, Modules = [typeof(CalculatorScreen)] }, ct);
 }

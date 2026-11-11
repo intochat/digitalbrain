@@ -1,5 +1,6 @@
 using DigitalBrain.Runtime.Synapses.Tests.Unit.Compile;
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
+using DigitalBrain.Units;
 
 namespace DigitalBrain.Runtime.Synapses.Tests.Unit.Host;
 

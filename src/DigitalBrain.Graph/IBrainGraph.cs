@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using System.ComponentModel;
 using DigitalBrain.Contracts;
 

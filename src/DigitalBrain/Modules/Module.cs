@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Modules;
 
 /// <summary>
 /// The unit of composition. A module class is marked <c>[Module(id)]</c> and declares

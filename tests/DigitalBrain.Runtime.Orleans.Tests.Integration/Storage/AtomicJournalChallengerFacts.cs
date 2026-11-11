@@ -1,6 +1,9 @@
 #pragma warning disable CA2201
 #pragma warning disable CA1822
 #pragma warning disable CA1040
+using DigitalBrain.Modules;
+using DigitalBrain.Neurons;
+using DigitalBrain.Units;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Runtime.Loader;

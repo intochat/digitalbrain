@@ -13,10 +13,11 @@ public sealed class SynapseShapeAnalyzerFacts
         using DigitalBrain;
         using DigitalBrain.Time;
         using DigitalBrain.Rules;
+        using DigitalBrain.Units;
         [State("week")] public sealed record WeekSpend(decimal Spent = 0);
         [Signal("test.charging")] public sealed record Charging(decimal Amount) : Signal;
         [Capability("sql-read", 1)] public interface ISqlRead { }
-        namespace DigitalBrain
+        namespace DigitalBrain.Units
         {
             public readonly record struct Asks<TContract>(string Slot) where TContract : class;
             public sealed record Answer;

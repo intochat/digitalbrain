@@ -12,7 +12,18 @@ public readonly record struct OperationId(string Value)
 
 /// <summary>What an operation will do. Concrete plans (copy, move, write) derive from it.</summary>
 /// <param name="DryRun">When true the operation only plans and completes with <see cref="OperationResult.Planned"/>.</param>
-public abstract record OperationPlan(bool DryRun);
+public abstract record OperationPlan(bool DryRun)
+{
+    /// <summary>Bytes the plan carries that are never persisted or journaled; null for none.</summary>
+    [JsonIgnore]
+    public virtual ReadOnlyMemory<byte>? Payload => null;
+
+    /// <summary>Returns a copy of the plan without in-memory payload bytes, safe for persistence and journaling.</summary>
+    public virtual OperationPlan Persisted() => this;
+
+    /// <summary>Returns a copy of the plan with the given in-memory payload bytes attached.</summary>
+    public virtual OperationPlan WithPayload(ReadOnlyMemory<byte> payload) => this;
+}
 
 /// <summary>How an operation ended. Persisted and journaled as JSON with a <c>$kind</c> discriminator.</summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "$kind")]
@@ -48,4 +59,15 @@ public abstract record OperationResult
 /// <param name="Result">How it ended, or null while it runs.</param>
 /// <param name="Started">When it started.</param>
 /// <param name="TraceId">The trace id current when it started, if any.</param>
-public sealed record OperationView(OperationId Id, string Kind, string Origin, double Fraction, OperationResult? Result, DateTimeOffset Started, string? TraceId);
+/// <param name="Phase">The current lifecycle phase of the operation.</param>
+/// <param name="ApprovalPlanId">The confirmation plan id if awaiting approval.</param>
+public sealed record OperationView(
+    OperationId Id,
+    string Kind,
+    string Origin,
+    double Fraction,
+    OperationResult? Result,
+    DateTimeOffset Started,
+    string? TraceId,
+    OperationPhase Phase = OperationPhase.Running,
+    string? ApprovalPlanId = null);

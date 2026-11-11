@@ -1,4 +1,6 @@
-using DigitalBrain.Spi;
+using DigitalBrain.Neurons;
+using DigitalBrain.Units;
+using DigitalBrain.Kernel;
 using OS = DigitalBrain.Testing.TestOS;
 
 namespace DigitalBrain.Testing.Tests.Unit.Synapses;

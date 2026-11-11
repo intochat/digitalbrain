@@ -1,3 +1,4 @@
+using DigitalBrain.Kernel;
 using DigitalBrain.Capabilities;
 
 namespace DigitalBrain.Capabilities.Connections.Integrations;

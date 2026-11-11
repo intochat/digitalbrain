@@ -12,7 +12,7 @@ namespace DigitalBrain.Analyzers.Neurons;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class ReentrancyJustificationAnalyzer : DiagnosticAnalyzer
 {
-    private const string ReentrantAttribute = "DigitalBrain.ReentrantAttribute";
+    private const string ReentrantAttribute = "DigitalBrain.Neurons.ReentrantAttribute";
 
     /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rules.ReentrancyJustification);
@@ -28,7 +28,7 @@ public sealed class ReentrancyJustificationAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeNamedType(SymbolAnalysisContext context)
     {
         var type = (INamedTypeSymbol)context.Symbol;
-        if (!Rules.Has(type, ReentrantAttribute))
+        if (!Rules.Has(type, ReentrantAttribute) && !Rules.Has(type, "DigitalBrain.ReentrantAttribute"))
         {
             return;
         }

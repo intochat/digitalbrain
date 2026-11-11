@@ -1,3 +1,4 @@
+﻿using DigitalBrain.Modules;
 using Orleans;
 using Orleans.Runtime;
 
@@ -18,8 +19,9 @@ internal sealed class CallerEdgeFilter : IIncomingGrainCallFilter
         {
             var isInternalGrain = context.SourceId is { } source
                 && !source.Type.ToString()!.StartsWith("sys.client", StringComparison.OrdinalIgnoreCase);
+            var isInternal = isInternalGrain || InProcessCallerScope.IsActive;
 
-            if (!isInternalGrain)
+            if (!isInternal)
             {
                 // External client: cannot forge Inside or Via
                 wire.Inside = false;
@@ -34,8 +36,13 @@ internal sealed class CallerEdgeFilter : IIncomingGrainCallFilter
             }
             else
             {
-                // Internal grain: always inside
-                wire.Inside = true;
+                // Internal cluster grain or privileged in-process host call:
+                // If from an internal grain or claiming internal actor authority, mark inside.
+                // Otherwise (e.g. human person calling through in-process host edge), preserve direct client provenance.
+                if (isInternalGrain || wire.Actor is CallerWire.ActorKernel or CallerWire.ActorScheduler or CallerWire.ActorModule)
+                {
+                    wire.Inside = true;
+                }
             }
         }
 

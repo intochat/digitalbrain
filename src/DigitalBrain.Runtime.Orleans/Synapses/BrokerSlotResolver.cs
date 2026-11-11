@@ -4,7 +4,7 @@ using DigitalBrain.Capabilities.Connections.Broker;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Runtime.Orleans.Capabilities;
 using DigitalBrain.Runtime.Orleans.Hosting;
-using DigitalBrain.Spi;
+using DigitalBrain.Units;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Runtime.Orleans.Synapses;

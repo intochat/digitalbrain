@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text.Json;
@@ -6,7 +7,7 @@ using DigitalBrain.Invocation;
 using DigitalBrain.Runtime.Orleans;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Testing;
-using DigitalBrain.Spi;
+using DigitalBrain.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -45,7 +46,7 @@ public abstract class BothRuntimesFixture : IAsyncLifetime
     // A runtime of kind that the caller disposes; home keeps the silo's state folder (null: a fresh temporary one) and
     // siloServices runs after ConfigureSilo (fault injection, controls).
     [Module("both-runtimes-core")]
-    private sealed class CoreModule : Module
+    private sealed class CoreModule : DigitalBrain.Modules.Module
     {
         public static ModuleManifest Manifest { get; } = new([], [], [], [], []);
     }

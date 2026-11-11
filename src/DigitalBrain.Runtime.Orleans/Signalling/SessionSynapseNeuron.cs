@@ -1,10 +1,11 @@
+using DigitalBrain.Neurons;
 using System.Text.Json;
 using System.Security.Cryptography;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Runtime.Orleans.Capabilities;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Synapses;
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.Options;
 using OrleansSdk = Orleans;
 

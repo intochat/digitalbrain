@@ -1,7 +1,8 @@
+using DigitalBrain.Neurons;
 using DigitalBrain.Contracts;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Synapses;
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Runtime.Orleans.Signalling;

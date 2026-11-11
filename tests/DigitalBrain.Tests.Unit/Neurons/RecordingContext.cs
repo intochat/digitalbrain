@@ -1,9 +1,11 @@
-using DigitalBrain.Spi;
+using DigitalBrain.Confirmation;
+using DigitalBrain.Kernel;
+using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Tests.Unit.Neurons;
 
 // Records what a neuron asks of its runtime: state writes, publishes and Get calls.
-internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronState, ISynapses, ISignalHistory
+internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronSeat, ISynapses, ISignalHistory
 {
     private object? _stored;
 
@@ -23,11 +25,9 @@ internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronSta
 
     public IServiceProvider? RecordedServices { get; set; }
 
-    public IServiceProvider Services => RecordedServices ?? throw new NotSupportedException();
+    public IServiceProvider Services => RecordedServices ?? new RecordingServiceProvider(this);
 
     public TimeProvider Time { get; set; } = TimeProvider.System;
-
-    public INeuronState State => this;
 
     public ITimers? RecordedTimers { get; set; }
 
@@ -37,16 +37,15 @@ internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronSta
 
     public IReminders Reminders => RecordedReminders ?? throw new NotSupportedException();
 
-    public IOperations Operations => throw new NotSupportedException();
-    public IOperationsQuery OperationsQuery => throw new NotSupportedException();
-    public DigitalBrain.Confirmation.IConfirmations? RecordedConfirmations { get; set; }
-    public DigitalBrain.Confirmation.IConfirmations Confirmations => RecordedConfirmations ?? throw new NotSupportedException();
+    public IConfirmations? RecordedConfirmations { get; set; }
 
     public ISynapses Synapses => this;
 
     public ISignalHistory History => this;
 
     public string? TraceId { get; set; }
+
+    public DigitalBrain.Access.Caller? Caller => null;
 
     public List<Synapse> SynapseList { get; } = [];
 
@@ -72,10 +71,20 @@ internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronSta
 
     public void Defer(Func<Task> work) => Deferred.Add(work);
 
+    public bool Interrupts(Exception error)
+    {
+        for (var current = error; current is not null; current = current.InnerException)
+        {
+            if (current.GetType().FullName == "Orleans.Runtime.SiloUnavailableException") { return true; }
+        }
+        var stopping = (RecordedServices?.GetService(typeof(Microsoft.Extensions.Hosting.IHostApplicationLifetime)) as Microsoft.Extensions.Hosting.IHostApplicationLifetime)?.ApplicationStopping;
+        return stopping?.IsCancellationRequested == true;
+    }
+
     /// <summary>When set, <see cref="Load{T}"/> completes later on a thread-pool thread, as a real store's read can.</summary>
     public bool LoadsOffThread { get; set; }
 
-    public Task<T?> Load<T>()
+    public Task<T?> Load<T>() where T : class
     {
         T? value = default;
         if (_stored is T stored)
@@ -90,7 +99,7 @@ internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronSta
         return LoadsOffThread ? Task.Run(async () => { await Task.Delay(20); return value; }) : Task.FromResult(value);
     }
 
-    public Task Save<T>(T next, IReadOnlyList<Signal> signals)
+    public Task Save<T>(T next, IReadOnlyList<Signal> signals) where T : class
     {
         // A unit neuron stores its record with its view beside it: the record is what a write is about. A save that only journals a
         // stored view (ViewChanged) is recorded in ViewWrites, so the facts about state writes count state changes only.
@@ -146,8 +155,19 @@ internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronSta
 
     private SignalPage Page(Func<JournaledSignal, bool> filter, long since, int limit)
     {
-        SignalPage.CheckLimit(limit);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(limit, 1000);
         var last = Journal.Count == 0 ? Floor - 1 : Journal.Max(entry => entry.Sequence);
         return new SignalPage(Floor, last, [.. Journal.Where(entry => entry.Sequence > since && filter(entry)).OrderBy(entry => entry.Sequence).Take(limit)]);
+    }
+
+    private sealed class RecordingServiceProvider(RecordingContext context) : IServiceProvider
+    {
+        public object? GetService(Type serviceType)
+        {
+            if (serviceType == typeof(IConfirmations)) { return context.RecordedConfirmations; }
+            if (serviceType == typeof(ISignalHistory)) { return context; }
+            return null;
+        }
     }
 }

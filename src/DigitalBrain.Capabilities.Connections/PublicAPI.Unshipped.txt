@@ -1,10 +1,4 @@
 #nullable enable
-abstract DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.ProbeAsync(DigitalBrain.Capabilities.Connections.Credential! credential, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.ConnectionProbeResult!>!
-const DigitalBrain.Capabilities.Connections.ConnectionKeys.NeuronScheme = "neuron://" -> string!
-const DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.OtlpEndpointVariable = "OTEL_EXPORTER_OTLP_ENDPOINT" -> string!
-const DigitalBrain.Capabilities.Connections.IConnectionCatalogUpdates.TypeName = "integrations.accounts" -> string!
-const DigitalBrain.Capabilities.Connections.IConnectionIndex.TypeName = "connection.index" -> string!
-const DigitalBrain.Capabilities.Connections.Sealing.BrainSeal.KeyPrefix = "brain:" -> string!
 DigitalBrain.Capabilities.Connections.Broker.BrainConnection
 DigitalBrain.Capabilities.Connections.Broker.BrainConnection.<Clone>$() -> DigitalBrain.Capabilities.Connections.Broker.BrainConnection!
 DigitalBrain.Capabilities.Connections.Broker.BrainConnection.BrainConnection(string! Key, string! Label, bool Connected, System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.CapabilityId>! Provides, string? Root) -> void
@@ -188,10 +182,34 @@ DigitalBrain.Capabilities.Connections.Connectors.ConnectorDefinition.Signals.get
 DigitalBrain.Capabilities.Connections.Connectors.ConnectorDefinition.Signals.init -> void
 DigitalBrain.Capabilities.Connections.Connectors.ConnectorDefinition.Validate() -> void
 DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema
 DigitalBrain.Capabilities.Connections.Connectors.IOAuthTokenExchange
 DigitalBrain.Capabilities.Connections.Connectors.IOAuthTokenExchange.ExchangeCodeAsync(string! connectionKey, string! authMethodId, string! code, string! codeVerifier, string! redirectUri, string? target, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.OAuthGrant!>!
 DigitalBrain.Capabilities.Connections.Connectors.IOAuthTokenExchange.RefreshAsync(string! connectionKey, string! authMethodId, string! refreshToken, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.OAuthGrant!>!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.<Clone>$() -> DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.AllFields.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Deconstruct(out string! Id, out string! DisplayName, out string![]! SecretFields, out string![]! SettingFields) -> void
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.DisplayName.get -> string!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.DisplayName.init -> void
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Equals(DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema? other) -> bool
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Id.get -> string!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Id.init -> void
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.IntegrationSchema(string! Id, string! DisplayName, string![]! SecretFields, string![]! SettingFields) -> void
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.IsSetting(string! field) -> bool
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Key(string! field) -> string!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.OffersSecret(string! field) -> DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.OffersSetting(string! field) -> DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.OptionalSecretFields.get -> string![]!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.OptionalSecretFields.init -> void
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.OptionalSettingFields.get -> string![]!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.OptionalSettingFields.init -> void
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.RequiredFields.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.RequiresSecret(string! field) -> DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.RequiresSetting(string! field) -> DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.SecretFields.get -> string![]!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.SecretFields.init -> void
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.SettingFields.get -> string![]!
+DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.SettingFields.init -> void
 DigitalBrain.Capabilities.Connections.Connectors.OAuthExternalOperations
 DigitalBrain.Capabilities.Connections.Connectors.OAuthExternalOperations.<Clone>$() -> DigitalBrain.Capabilities.Connections.Connectors.OAuthExternalOperations!
 DigitalBrain.Capabilities.Connections.Connectors.OAuthExternalOperations.CodeExchange.get -> string!
@@ -292,6 +310,8 @@ DigitalBrain.Capabilities.Connections.Integrations.IIntegrationStartup
 DigitalBrain.Capabilities.Connections.Integrations.IIntegrationStartup.InitializeAsync(System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 DigitalBrain.Capabilities.Connections.Integrations.IModuleIntegrations<TModule>
 DigitalBrain.Capabilities.Connections.Integrations.IModuleIntegrations<TModule>.Get(string! integrationId) -> DigitalBrain.Capabilities.Connections.Integrations.IIntegrationHandle!
+DigitalBrain.Capabilities.Connections.Integrations.IRuntimeCapabilitySource
+DigitalBrain.Capabilities.Connections.Integrations.IRuntimeCapabilitySource.Read(string! brainId, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Connections.Integrations.NeuronType!>!>!
 DigitalBrain.Capabilities.Connections.Integrations.IntegrationCapability
 DigitalBrain.Capabilities.Connections.Integrations.IntegrationCapability.<Clone>$() -> DigitalBrain.Capabilities.Connections.Integrations.IntegrationCapability!
 DigitalBrain.Capabilities.Connections.Integrations.IntegrationCapability.Deconstruct(out string! IntegrationId, out string! Kind, out string! Id, out string! Display) -> void
@@ -323,8 +343,6 @@ DigitalBrain.Capabilities.Connections.Integrations.IntegrationStatus
 DigitalBrain.Capabilities.Connections.Integrations.IntegrationStatus.Partial = 1 -> DigitalBrain.Capabilities.Connections.Integrations.IntegrationStatus
 DigitalBrain.Capabilities.Connections.Integrations.IntegrationStatus.Ready = 2 -> DigitalBrain.Capabilities.Connections.Integrations.IntegrationStatus
 DigitalBrain.Capabilities.Connections.Integrations.IntegrationStatus.Unconfigured = 0 -> DigitalBrain.Capabilities.Connections.Integrations.IntegrationStatus
-DigitalBrain.Capabilities.Connections.Integrations.IRuntimeCapabilitySource
-DigitalBrain.Capabilities.Connections.Integrations.IRuntimeCapabilitySource.Read(string! brainId, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Connections.Integrations.NeuronType!>!>!
 DigitalBrain.Capabilities.Connections.Integrations.NeuronType
 DigitalBrain.Capabilities.Connections.Integrations.NeuronType.<Clone>$() -> DigitalBrain.Capabilities.Connections.Integrations.NeuronType!
 DigitalBrain.Capabilities.Connections.Integrations.NeuronType.Contract.get -> string!
@@ -399,12 +417,6 @@ DigitalBrain.Capabilities.Connections.Requests.ConnectionRequested.Id.get -> str
 DigitalBrain.Capabilities.Connections.Requests.ConnectionRequested.Id.init -> void
 DigitalBrain.Capabilities.Connections.Requests.ConnectionRequested.Kind.get -> string!
 DigitalBrain.Capabilities.Connections.Requests.ConnectionRequested.Kind.init -> void
-DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged
-DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.ConnectionsChanged(long Revision) -> void
-DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.Deconstruct(out long Revision) -> void
-DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.Equals(DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged? other) -> bool
-DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.Revision.get -> long
-DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.Revision.init -> void
 DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary
 DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary.<Clone>$() -> DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary!
 DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary.Account.get -> string?
@@ -426,6 +438,12 @@ DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary.Provides.get ->
 DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary.Provides.init -> void
 DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary.Status.get -> string!
 DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary.Status.init -> void
+DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged
+DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.ConnectionsChanged(long Revision) -> void
+DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.Deconstruct(out long Revision) -> void
+DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.Equals(DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged? other) -> bool
+DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.Revision.get -> long
+DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.Revision.init -> void
 DigitalBrain.Capabilities.Connections.Requests.ConnectorKind
 DigitalBrain.Capabilities.Connections.Requests.ConnectorKind.<Clone>$() -> DigitalBrain.Capabilities.Connections.Requests.ConnectorKind!
 DigitalBrain.Capabilities.Connections.Requests.ConnectorKind.ConnectorKind(string! Id, string! DisplayName) -> void
@@ -463,6 +481,12 @@ DigitalBrain.Capabilities.Connections.Sealing.IBrainSecretSealer.Seal(string! br
 DigitalBrain.Capabilities.Connections.Sealing.ISecretSealer
 DigitalBrain.Capabilities.Connections.Sealing.ISecretSealer.Open(DigitalBrain.Capabilities.Secrets.SealedSecret! secret) -> string!
 DigitalBrain.Capabilities.Connections.Sealing.ISecretSealer.Seal(string! name, string! plaintext) -> DigitalBrain.Capabilities.Secrets.SealedSecret!
+abstract DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.ProbeAsync(DigitalBrain.Capabilities.Connections.Credential! credential, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.ConnectionProbeResult!>!
+const DigitalBrain.Capabilities.Connections.ConnectionKeys.NeuronScheme = "neuron://" -> string!
+const DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.OtlpEndpointVariable = "OTEL_EXPORTER_OTLP_ENDPOINT" -> string!
+const DigitalBrain.Capabilities.Connections.IConnectionCatalogUpdates.TypeName = "integrations.accounts" -> string!
+const DigitalBrain.Capabilities.Connections.IConnectionIndex.TypeName = "connection.index" -> string!
+const DigitalBrain.Capabilities.Connections.Sealing.BrainSeal.KeyPrefix = "brain:" -> string!
 override DigitalBrain.Capabilities.Connections.Broker.BrainConnection.Equals(object? obj) -> bool
 override DigitalBrain.Capabilities.Connections.Broker.BrainConnection.GetHashCode() -> int
 override DigitalBrain.Capabilities.Connections.Broker.BrainConnection.ToString() -> string!
@@ -495,6 +519,9 @@ override DigitalBrain.Capabilities.Connections.ConnectionView.ToString() -> stri
 override DigitalBrain.Capabilities.Connections.Connectors.ConnectorDefinition.Equals(object? obj) -> bool
 override DigitalBrain.Capabilities.Connections.Connectors.ConnectorDefinition.GetHashCode() -> int
 override DigitalBrain.Capabilities.Connections.Connectors.ConnectorDefinition.ToString() -> string!
+override DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.GetHashCode() -> int
+override DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.ToString() -> string!
 override DigitalBrain.Capabilities.Connections.Connectors.OAuthExternalOperations.Equals(object? obj) -> bool
 override DigitalBrain.Capabilities.Connections.Connectors.OAuthExternalOperations.GetHashCode() -> int
 override DigitalBrain.Capabilities.Connections.Connectors.OAuthExternalOperations.ToString() -> string!
@@ -532,13 +559,13 @@ override DigitalBrain.Capabilities.Connections.Requests.ConnectionRequested.<Clo
 override DigitalBrain.Capabilities.Connections.Requests.ConnectionRequested.Equals(object? obj) -> bool
 override DigitalBrain.Capabilities.Connections.Requests.ConnectionRequested.GetHashCode() -> int
 override DigitalBrain.Capabilities.Connections.Requests.ConnectionRequested.ToString() -> string!
+override DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary.GetHashCode() -> int
+override DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary.ToString() -> string!
 override DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.<Clone>$() -> DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged!
 override DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.Equals(object? obj) -> bool
 override DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.GetHashCode() -> int
 override DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.ToString() -> string!
-override DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary.Equals(object? obj) -> bool
-override DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary.GetHashCode() -> int
-override DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary.ToString() -> string!
 override DigitalBrain.Capabilities.Connections.Requests.ConnectorKind.Equals(object? obj) -> bool
 override DigitalBrain.Capabilities.Connections.Requests.ConnectorKind.GetHashCode() -> int
 override DigitalBrain.Capabilities.Connections.Requests.ConnectorKind.ToString() -> string!
@@ -586,14 +613,17 @@ static DigitalBrain.Capabilities.Connections.Connectors.ConnectorDefinition.oper
 static DigitalBrain.Capabilities.Connections.Connectors.ConnectorDefinition.operator ==(DigitalBrain.Capabilities.Connections.Connectors.ConnectorDefinition? left, DigitalBrain.Capabilities.Connections.Connectors.ConnectorDefinition? right) -> bool
 static DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.ConnectionString(this Microsoft.Extensions.Configuration.IConfiguration! configuration, string! name) -> string?
 static DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.HostKey(this Microsoft.Extensions.Configuration.IConfiguration! configuration, string! key, string? legacyKey = null) -> string?
-static DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.IntegrationValue(this Microsoft.Extensions.Configuration.IConfiguration! configuration, string! integrationId, string! field) -> string?
 static DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.IntegrationValue(this Microsoft.Extensions.Configuration.IConfiguration! configuration, DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema! schema, string! field) -> string?
+static DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.IntegrationValue(this Microsoft.Extensions.Configuration.IConfiguration! configuration, string! integrationId, string! field) -> string?
 static DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.IsModuleOptionSet(this Microsoft.Extensions.Configuration.IConfiguration! configuration, string! moduleId, string! optionName) -> bool
 static DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.OtlpEndpoint(this Microsoft.Extensions.Configuration.IConfiguration! configuration) -> string?
 static DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.Parameter(this Microsoft.Extensions.Configuration.IConfiguration! configuration, string! name) -> string?
 static DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.Variable(this Microsoft.Extensions.Configuration.IConfiguration! configuration, string! name) -> string?
+static DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.For(string! id, string! displayName) -> DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema!
 static DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Key(string! id, string! field) -> string!
 static DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.SectionName.get -> string!
+static DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.operator !=(DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema? left, DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema? right) -> bool
+static DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.operator ==(DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema? left, DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema? right) -> bool
 static DigitalBrain.Capabilities.Connections.Connectors.OAuthExternalOperations.operator !=(DigitalBrain.Capabilities.Connections.Connectors.OAuthExternalOperations? left, DigitalBrain.Capabilities.Connections.Connectors.OAuthExternalOperations? right) -> bool
 static DigitalBrain.Capabilities.Connections.Connectors.OAuthExternalOperations.operator ==(DigitalBrain.Capabilities.Connections.Connectors.OAuthExternalOperations? left, DigitalBrain.Capabilities.Connections.Connectors.OAuthExternalOperations? right) -> bool
 static DigitalBrain.Capabilities.Connections.Connectors.OAuthMethod.operator !=(DigitalBrain.Capabilities.Connections.Connectors.OAuthMethod? left, DigitalBrain.Capabilities.Connections.Connectors.OAuthMethod? right) -> bool
@@ -606,7 +636,7 @@ static DigitalBrain.Capabilities.Connections.Integrations.IntegrationCapability.
 static DigitalBrain.Capabilities.Connections.Integrations.IntegrationCapability.operator ==(DigitalBrain.Capabilities.Connections.Integrations.IntegrationCapability? left, DigitalBrain.Capabilities.Connections.Integrations.IntegrationCapability? right) -> bool
 static DigitalBrain.Capabilities.Connections.Integrations.IntegrationSnapshot.operator !=(DigitalBrain.Capabilities.Connections.Integrations.IntegrationSnapshot? left, DigitalBrain.Capabilities.Connections.Integrations.IntegrationSnapshot? right) -> bool
 static DigitalBrain.Capabilities.Connections.Integrations.IntegrationSnapshot.operator ==(DigitalBrain.Capabilities.Connections.Integrations.IntegrationSnapshot? left, DigitalBrain.Capabilities.Connections.Integrations.IntegrationSnapshot? right) -> bool
-static DigitalBrain.Capabilities.Connections.Integrations.NeuronType.From(DigitalBrain.BrainType! entry) -> DigitalBrain.Capabilities.Connections.Integrations.NeuronType!
+static DigitalBrain.Capabilities.Connections.Integrations.NeuronType.From(DigitalBrain.Kernel.BrainType! entry) -> DigitalBrain.Capabilities.Connections.Integrations.NeuronType!
 static DigitalBrain.Capabilities.Connections.Integrations.NeuronType.operator !=(DigitalBrain.Capabilities.Connections.Integrations.NeuronType? left, DigitalBrain.Capabilities.Connections.Integrations.NeuronType? right) -> bool
 static DigitalBrain.Capabilities.Connections.Integrations.NeuronType.operator ==(DigitalBrain.Capabilities.Connections.Integrations.NeuronType? left, DigitalBrain.Capabilities.Connections.Integrations.NeuronType? right) -> bool
 static DigitalBrain.Capabilities.Connections.Integrations.NeuronTypeHit.operator !=(DigitalBrain.Capabilities.Connections.Integrations.NeuronTypeHit? left, DigitalBrain.Capabilities.Connections.Integrations.NeuronTypeHit? right) -> bool
@@ -619,10 +649,10 @@ static DigitalBrain.Capabilities.Connections.Requests.ConnectionRef.operator !=(
 static DigitalBrain.Capabilities.Connections.Requests.ConnectionRef.operator ==(DigitalBrain.Capabilities.Connections.Requests.ConnectionRef? left, DigitalBrain.Capabilities.Connections.Requests.ConnectionRef? right) -> bool
 static DigitalBrain.Capabilities.Connections.Requests.ConnectionRequested.operator !=(DigitalBrain.Capabilities.Connections.Requests.ConnectionRequested? left, DigitalBrain.Capabilities.Connections.Requests.ConnectionRequested? right) -> bool
 static DigitalBrain.Capabilities.Connections.Requests.ConnectionRequested.operator ==(DigitalBrain.Capabilities.Connections.Requests.ConnectionRequested? left, DigitalBrain.Capabilities.Connections.Requests.ConnectionRequested? right) -> bool
-static DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.operator !=(DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged? left, DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged? right) -> bool
-static DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.operator ==(DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged? left, DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged? right) -> bool
 static DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary.operator !=(DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary? left, DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary? right) -> bool
 static DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary.operator ==(DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary? left, DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary? right) -> bool
+static DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.operator !=(DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged? left, DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged? right) -> bool
+static DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged.operator ==(DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged? left, DigitalBrain.Capabilities.Connections.Requests.ConnectionsChanged? right) -> bool
 static DigitalBrain.Capabilities.Connections.Requests.ConnectorKind.operator !=(DigitalBrain.Capabilities.Connections.Requests.ConnectorKind? left, DigitalBrain.Capabilities.Connections.Requests.ConnectorKind? right) -> bool
 static DigitalBrain.Capabilities.Connections.Requests.ConnectorKind.operator ==(DigitalBrain.Capabilities.Connections.Requests.ConnectorKind? left, DigitalBrain.Capabilities.Connections.Requests.ConnectorKind? right) -> bool
 static DigitalBrain.Capabilities.Connections.Requests.ConnectorOffer.operator !=(DigitalBrain.Capabilities.Connections.Requests.ConnectorOffer? left, DigitalBrain.Capabilities.Connections.Requests.ConnectorOffer? right) -> bool
@@ -635,34 +665,3 @@ virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.Activated
 virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.OnConnectedAsync() -> System.Threading.Tasks.Task!
 virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.OnDisconnectedAsync() -> System.Threading.Tasks.Task!
 virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.RefreshAsync(DigitalBrain.Capabilities.Connections.Credential! credential, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.OAuthGrant!>!
-
-static DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.For(string! id, string! displayName) -> DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema!
-static DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.operator !=(DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema? left, DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema? right) -> bool
-static DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.operator ==(DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema? left, DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema? right) -> bool
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.<Clone>$() -> DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema!
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.AllFields.get -> System.Collections.Generic.IReadOnlyList<string!>!
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Deconstruct(out string! Id, out string! DisplayName, out string![]! SecretFields, out string![]! SettingFields) -> void
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.DisplayName.get -> string!
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.DisplayName.init -> void
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Equals(DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema? other) -> bool
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Id.get -> string!
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Id.init -> void
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.IntegrationSchema(string! Id, string! DisplayName, string![]! SecretFields, string![]! SettingFields) -> void
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.IsSetting(string! field) -> bool
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Key(string! field) -> string!
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.OffersSecret(string! field) -> DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema!
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.OffersSetting(string! field) -> DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema!
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.OptionalSecretFields.get -> string![]!
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.OptionalSecretFields.init -> void
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.OptionalSettingFields.get -> string![]!
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.OptionalSettingFields.init -> void
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.RequiredFields.get -> System.Collections.Generic.IReadOnlyList<string!>!
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.RequiresSecret(string! field) -> DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema!
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.RequiresSetting(string! field) -> DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema!
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.SecretFields.get -> string![]!
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.SecretFields.init -> void
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.SettingFields.get -> string![]!
-DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.SettingFields.init -> void
-override DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.Equals(object? obj) -> bool
-override DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.GetHashCode() -> int
-override DigitalBrain.Capabilities.Connections.Connectors.IntegrationSchema.ToString() -> string!

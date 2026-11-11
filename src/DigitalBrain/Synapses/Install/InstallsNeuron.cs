@@ -1,7 +1,7 @@
 using DigitalBrain.Confirmation;
-using DigitalBrain.Spi;
+using DigitalBrain.Neurons;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>
 /// The installs neuron of a brain: derives an app's needs from the catalog, asks a person once per distinct needs, records the
@@ -55,7 +55,22 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
         { RequiresPerson = true, Kind = ConfirmationPlan.SynapseInstallKind, Subject = alias };
         var pending = new PendingInstall(plan.Id, alias, new Dictionary<string, string>(bindings, StringComparer.Ordinal), hash, sentence);
         await Save(State.StagePending(pending), [new InstallRequested(alias, plan.Id)]).ConfigureAwait(true);
-        _ = Ask(plan);
+        var requests = Context.Get<IConfirmationRequests>(IConfirmationRequests.Of(Id.Brain));
+        var immediate = await requests.Request(plan).ConfigureAwait(true);
+        if (immediate is not null)
+        {
+            if (!immediate.Approved)
+            {
+                var reason = immediate.Outcome == ConfirmationOutcome.Expired ? ConfirmationDenyReason.Expired.ToString() : immediate.Reason.ToString();
+                await Save(State.RemovePendingPlan(pending.PlanId), [new InstallDenied(alias, pending.PlanId, reason)]).ConfigureAwait(true);
+                return new InstallOutcome(InstallStatus.Denied, sentence, reason);
+            }
+            var source = catalog.ForNeeds(alias);
+            var needsResolved = source.NeedsOf(alias);
+            _ = await Wire(alias, needsResolved, ct).ConfigureAwait(true);
+            await Save(State.CompleteInstall(pending, needsResolved, Context.Time.GetUtcNow()), [new Installed(alias, pending.NeedsHash)]).ConfigureAwait(true);
+            return new InstallOutcome(InstallStatus.Installed, sentence, null);
+        }
         return new InstallOutcome(InstallStatus.Pending, sentence, plan.Id);
     }
 
@@ -128,9 +143,14 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
         ArgumentNullException.ThrowIfNull(catalog);
         if (State.FindPendingByPlan(resolved.PlanId) is not { } pending) { return; }
         var alias = pending.Alias;
-        if (resolved.Outcome != ConfirmationOutcome.Approved)
+
+        var requests = Context.Get<IConfirmationRequests>(IConfirmationRequests.Of(Id.Brain));
+        var outcome = await requests.Outcome(resolved.PlanId).ConfigureAwait(true);
+        if (outcome is null) { return; }
+
+        if (!outcome.Approved)
         {
-            var reason = resolved.Outcome == ConfirmationOutcome.Expired ? ConfirmationDenyReason.Expired.ToString() : resolved.Reason.ToString();
+            var reason = outcome.Outcome == ConfirmationOutcome.Expired ? ConfirmationDenyReason.Expired.ToString() : outcome.Reason.ToString();
             await Save(State.RemovePendingPlan(pending.PlanId), [new InstallDenied(alias, pending.PlanId, reason)]).ConfigureAwait(true);
             return;
         }
@@ -140,7 +160,7 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
         // callback judges the recorded answer again in a turn of its own. Approving an ask raised before a restart is never denied as unknown.
         if (restore && !catalog.ForNeeds(alias).States.ContainsKey(alias))
         {
-            var restorer = Context.Services.GetService(typeof(ISynapseRestorer)) as ISynapseRestorer ?? NoSynapseRestorer.Instance;
+            var restorer = Seat.Services.GetService(typeof(ISynapseRestorer)) as ISynapseRestorer ?? NoSynapseRestorer.Instance;
             var proof = Guid.NewGuid().ToString("N");
             lock (_restoring) { _restoring[proof] = resolved; }
             _ = RestoreThenJudge(restorer, alias, proof);
@@ -203,14 +223,8 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
     public Task<IReadOnlyList<PendingInstall>> Pending(CancellationToken ct) => Task.FromResult(State.Pending);
 
     /// <inheritdoc />
-    protected override Task OnActivate(CancellationToken cancellationToken) => Context.Synapses.EnsureBrainWide(typeof(ConfirmationResolved));
-
-    // The answer arrives as ConfirmationResolved; the awaited result is not used, and a failing ask leaves the install pending.
-    private async Task Ask(ConfirmationPlan plan)
-    {
-        try { _ = await Context.Confirm(plan, CancellationToken.None).ConfigureAwait(true); }
-        catch (Exception error) when (error is not OutOfMemoryException) { _ = error; }
-    }
+    protected override Task OnActivate(CancellationToken cancellationToken)
+        => Context.Synapses.Ensure<ConfirmationResolved>(IConfirmationRequests.Of(Id.Brain));
 
     // Detached from the turn: restores the alias, then posts the recorded answer back through the neuron's own mailbox.
     private async Task RestoreThenJudge(ISynapseRestorer restorer, string alias, string proof)

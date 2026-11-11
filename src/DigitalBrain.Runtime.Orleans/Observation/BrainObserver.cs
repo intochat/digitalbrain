@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Contracts;
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 

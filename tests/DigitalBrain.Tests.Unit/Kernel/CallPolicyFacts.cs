@@ -1,4 +1,6 @@
 #pragma warning disable CA2201
+using DigitalBrain.Contracts;
+using DigitalBrain.Neurons;
 using DigitalBrain.Access;
 using DigitalBrain.Invocation;
 using DigitalBrain.Kernel;

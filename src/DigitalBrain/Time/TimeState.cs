@@ -1,4 +1,6 @@
-namespace DigitalBrain.Time;
+using DigitalBrain.Time;
+
+namespace DigitalBrain.Scheduling;
 
 /// <summary>The state of the time neuron.</summary>
 /// <param name="Registrations">Who registered which schedule.</param>

@@ -1,6 +1,6 @@
 using DigitalBrain.Capabilities;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Modules;
 
 /// <summary>
 /// What the composed modules declared, by module id: their privileged grants (<see cref="ModuleManifest.Privileged"/>) and the

@@ -1,8 +1,6 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Hosting;
 
-// A class, so it lives outside DigitalBrain.Spi: DigitalBrain.Spi stays interfaces only.
-
-/// <summary>How to start an in-process host (<see cref="Spi.IInProcessHostFactory"/>).</summary>
+/// <summary>How to start an in-process host (<see cref="IInProcessHostFactory"/>).</summary>
 public sealed class InProcessHostOptions
 {
     /// <summary>The home folder; null starts in a fresh temporary folder.</summary>

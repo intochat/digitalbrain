@@ -1,3 +1,5 @@
+using DigitalBrain.Modules;
+using DigitalBrain.Neurons;
 using System.Reflection;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Capabilities.Connections;
@@ -115,7 +117,7 @@ public sealed class LocalConnectionsConformance : ConnectionsConformance<LocalCo
     }
 
     [Module("kit-connector-module")]
-    private sealed class KitConnectorModule : Module
+    private sealed class KitConnectorModule : DigitalBrain.Modules.Module
     {
         public static ModuleManifest Manifest { get; } = new([Capability.Storage.V1], [], [], [], [])
         {

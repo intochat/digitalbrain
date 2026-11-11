@@ -1,34 +1,36 @@
 using System.Text;
-using DigitalBrain;
-using DigitalBrain.Examples.Calculator;
-using DigitalBrain.Testing;
+using System.Text.Json;
+using DigitalBrain.Invocation;
 using DigitalBrain.Testing.Views;
+using DigitalBrain.UI;
+using DigitalBrain.Units;
+using Xunit;
 
 namespace DigitalBrain.Testing.Tests.Unit.Views;
 
 public sealed class ViewFixturesFacts
 {
+    private static PublishedView SampleView(string alias = "app.test", string text = "hello")
+    {
+        var view = new View(alias, new Column([new Text(text)]));
+        var wire = JsonSerializer.SerializeToElement(view, RuntimeProtocol.OptionsFor(typeof(View)));
+        return new PublishedView(alias, 1, wire);
+    }
+
     [Fact]
-    public async Task WritesOneFilePerScenario()
+    public async Task WritesOneFilePerScreenAlias()
     {
         var tempDir = Path.Combine(Path.GetTempPath(), $"db-views-{Guid.NewGuid():N}");
         try
         {
-            var report = await BddRunner.VerifyAsync<CalculatorApp>(cancellationToken: TestContext.Current.CancellationToken);
-            ViewFixtures.Write(report, tempDir);
+            var view = SampleView("app.sample", "12");
+            ViewFixtures.Write(view, tempDir);
 
             var files = Directory.GetFiles(tempDir, "*.json").Select(Path.GetFileName).Order(StringComparer.Ordinal).ToArray();
-            Assert.Equal(
-                [
-                    "7-5-12.json",
-                    "clear-resets-display-to-0.json",
-                    "dividing-by-zero-is-rejected.json",
-                    "opening-shows-0.json",
-                ],
-                files);
+            Assert.Equal(["app-sample.json"], files);
 
-            var sevenPlusFive = await File.ReadAllTextAsync(Path.Combine(tempDir, "7-5-12.json"), TestContext.Current.CancellationToken);
-            Assert.Contains("\"value\": \"12\"", sevenPlusFive, StringComparison.Ordinal);
+            var content = await File.ReadAllTextAsync(Path.Combine(tempDir, "app-sample.json"), TestContext.Current.CancellationToken);
+            Assert.Contains("\"value\": \"12\"", content, StringComparison.Ordinal);
         }
         finally
         {
@@ -46,11 +48,11 @@ public sealed class ViewFixturesFacts
         var dirB = Path.Combine(Path.GetTempPath(), $"db-views-b-{Guid.NewGuid():N}");
         try
         {
-            var reportA = await BddRunner.VerifyAsync<CalculatorApp>(cancellationToken: TestContext.Current.CancellationToken);
-            var reportB = await BddRunner.VerifyAsync<CalculatorApp>(cancellationToken: TestContext.Current.CancellationToken);
+            var viewA = SampleView("app.sample", "stable");
+            var viewB = SampleView("app.sample", "stable");
 
-            ViewFixtures.Write(reportA, dirA);
-            ViewFixtures.Write(reportB, dirB);
+            ViewFixtures.Write(viewA, dirA);
+            ViewFixtures.Write(viewB, dirB);
 
             var filesA = Directory.GetFiles(dirA, "*.json").Order(StringComparer.Ordinal).ToArray();
             var filesB = Directory.GetFiles(dirB, "*.json").Order(StringComparer.Ordinal).ToArray();
@@ -76,17 +78,17 @@ public sealed class ViewFixturesFacts
         var tempDir = Path.Combine(Path.GetTempPath(), $"db-views-diff-{Guid.NewGuid():N}");
         try
         {
-            var report = await BddRunner.VerifyAsync<CalculatorApp>(cancellationToken: TestContext.Current.CancellationToken);
-            ViewFixtures.Write(report, tempDir);
+            var view = SampleView("app.sample", "12");
+            ViewFixtures.Write(view, tempDir);
 
-            var targetFile = Path.Combine(tempDir, "7-5-12.json");
+            var targetFile = Path.Combine(tempDir, "app-sample.json");
             var content = await File.ReadAllTextAsync(targetFile, Encoding.UTF8, TestContext.Current.CancellationToken);
             var mutated = content.Replace("\"value\": \"12\"", "\"value\": \"99\"", StringComparison.Ordinal);
             await File.WriteAllTextAsync(targetFile, mutated, new UTF8Encoding(false), TestContext.Current.CancellationToken);
 
             Environment.SetEnvironmentVariable("DIGITALBRAIN_UPDATE_VIEWS", null);
-            var ex = Assert.Throws<ViewFixtureMismatchException>(() => ViewFixtures.Verify(report, tempDir));
-            Assert.Contains("7 + 5 = 12", ex.Message, StringComparison.Ordinal);
+            var ex = Assert.Throws<ViewFixtureMismatchException>(() => ViewFixtures.Verify(view, tempDir));
+            Assert.Contains("app.sample", ex.Message, StringComparison.Ordinal);
             Assert.Contains("99", ex.Message, StringComparison.Ordinal);
             Assert.Contains("12", ex.Message, StringComparison.Ordinal);
         }
@@ -106,15 +108,15 @@ public sealed class ViewFixturesFacts
         var previous = Environment.GetEnvironmentVariable("DIGITALBRAIN_UPDATE_VIEWS");
         try
         {
-            var report = await BddRunner.VerifyAsync<CalculatorApp>(cancellationToken: TestContext.Current.CancellationToken);
-            ViewFixtures.Write(report, tempDir);
+            var view = SampleView("app.sample", "12");
+            ViewFixtures.Write(view, tempDir);
 
-            var targetFile = Path.Combine(tempDir, "7-5-12.json");
+            var targetFile = Path.Combine(tempDir, "app-sample.json");
             var original = await File.ReadAllTextAsync(targetFile, Encoding.UTF8, TestContext.Current.CancellationToken);
             await File.WriteAllTextAsync(targetFile, original.Replace("\"12\"", "\"99\"", StringComparison.Ordinal), new UTF8Encoding(false), TestContext.Current.CancellationToken);
 
             Environment.SetEnvironmentVariable("DIGITALBRAIN_UPDATE_VIEWS", "1");
-            ViewFixtures.Verify(report, tempDir);
+            ViewFixtures.Verify(view, tempDir);
 
             var rewritten = await File.ReadAllTextAsync(targetFile, Encoding.UTF8, TestContext.Current.CancellationToken);
             Assert.Equal(original, rewritten);
@@ -127,5 +129,12 @@ public sealed class ViewFixturesFacts
                 Directory.Delete(tempDir, recursive: true);
             }
         }
+    }
+
+    [Fact]
+    public void Slug_NormalizesKebabCase()
+    {
+        Assert.Equal("hello-world", ViewFixtures.Slug("Hello World!"));
+        Assert.Equal("app-calculator", ViewFixtures.Slug("app.calculator"));
     }
 }

@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;

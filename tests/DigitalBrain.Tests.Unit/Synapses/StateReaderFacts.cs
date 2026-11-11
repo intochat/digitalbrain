@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Text.Json;
 using DigitalBrain.Contracts;
-using DigitalBrain.Spi;
+using DigitalBrain.Neurons;
 using DigitalBrain.Tests.Unit.Neurons;
 using DigitalBrain.Units;
 

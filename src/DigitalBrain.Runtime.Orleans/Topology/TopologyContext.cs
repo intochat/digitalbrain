@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using Microsoft.Extensions.Configuration;
 
 namespace DigitalBrain.Runtime.Orleans;

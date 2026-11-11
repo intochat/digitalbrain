@@ -14,7 +14,7 @@ public sealed class IntochatAppTemplateFacts
 {
     private static readonly string[] Packed =
     [
-        "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Testing.Silo", "DigitalBrain.Runtime.Orleans",
+        "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Simulation", "DigitalBrain.Testing", "DigitalBrain.Testing.Silo", "DigitalBrain.Runtime.Orleans",
         "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity",
         "DigitalBrain.Capabilities.Compute", "DigitalBrain.Capabilities.Connections", "DigitalBrain.Identity.Local", "DigitalBrain.Runtime.Synapses",
         "DigitalBrain.Capabilities.Http", "DigitalBrain.Capabilities.Tools",
@@ -47,7 +47,7 @@ public sealed class IntochatAppTemplateFacts
             Assert.True(File.Exists(Path.Combine(app, name, "views", ".gitkeep")), "views/.gitkeep");
             Assert.True(File.Exists(Path.Combine(app, name + ".Tests.Unit", name + "Facts.cs")), name + "Facts.cs");
             Assert.True(File.Exists(Path.Combine(app, name + ".Tests.Integration", name + "RuntimeFacts.cs")), name + "RuntimeFacts.cs");
-            Assert.Contains($"[App(\"{expectedId}\")]", await File.ReadAllTextAsync(source, ct), StringComparison.Ordinal);
+            Assert.Contains($"[Neuron(\"app.{expectedId}\")]", await File.ReadAllTextAsync(source, ct), StringComparison.Ordinal);
 
             await File.WriteAllTextAsync(Path.Combine(app, "nuget.config"), Config(feed), ct);
             var packages = Path.Combine(work, "packages");
@@ -59,12 +59,12 @@ public sealed class IntochatAppTemplateFacts
             Assert.Contains("succeeded: 2", integrationTest, StringComparison.Ordinal);
             Assert.Contains("failed: 0", integrationTest, StringComparison.Ordinal);
 
-            // The analyzers run in the instance: defining multiple [App] classes fails the build with DB0030.
+            // The analyzers run in the instance: an empty catch block in a screen fails the build with DB0022.
             var code = await File.ReadAllTextAsync(source, ct);
-            var at = code.LastIndexOf('}');
-            await File.WriteAllTextAsync(source, code[..at] + "\n[App(\"extra\")]\npublic sealed class ExtraApp : App { }\n}\n", ct);
+            var at = code.LastIndexOf("=>", StringComparison.Ordinal);
+            await File.WriteAllTextAsync(source, code[..at] + "{ try { } catch { } return Task.CompletedTask; }\n" + code[(code.IndexOf(';', at) + 1)..], ct);
             var probe = await Dotnet(app, packages, ["build", Path.Combine(name, name + ".csproj"), "-c", "Release"], ct, expectSuccess: false);
-            Assert.Contains("DB0030", probe, StringComparison.Ordinal);
+            Assert.Contains("DB0022", probe, StringComparison.Ordinal);
         }
         finally
         {

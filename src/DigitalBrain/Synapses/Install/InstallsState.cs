@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>The state of the installs neuron: one record per installed alias and the asks waiting for the person.</summary>
 /// <param name="Records">The installed apps.</param>

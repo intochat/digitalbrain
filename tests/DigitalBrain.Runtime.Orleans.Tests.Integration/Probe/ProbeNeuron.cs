@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using DigitalBrain.Invocation;

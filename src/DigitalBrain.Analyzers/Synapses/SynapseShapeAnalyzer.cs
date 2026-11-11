@@ -14,9 +14,9 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
     private const string TaskType = "System.Threading.Tasks.Task`1";
     private const string ReactionType = "DigitalBrain.Reaction`1";
     private const string EnvelopeType = "DigitalBrain.SignalEnvelope";
-    private const string AsksType = "DigitalBrain.Asks`1";
-    private const string AnswerType = "DigitalBrain.Answer";
-    private const string AnsweredType = "DigitalBrain.Answered";
+    private const string AsksType = "DigitalBrain.Units.Asks`1";
+    private const string AnswerType = "DigitalBrain.Units.Answer";
+    private const string AnsweredType = "DigitalBrain.Units.Answered";
 
     // Mirrors DigitalBrain.Time.Schedule: HH:mm, Day HH:mm, every Nm / every Nh (N from 1 to 999999).
     private static readonly Regex ScheduleRule = new Regex(

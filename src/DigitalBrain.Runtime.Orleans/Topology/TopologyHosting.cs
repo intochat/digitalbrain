@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.Configuration.Memory;
@@ -105,7 +106,7 @@ public static class TopologyHosting
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(modules);
-        var moduleTypes = modules.Where(static t => !typeof(App).IsAssignableFrom(t)).ToArray();
+        var moduleTypes = modules.Where(static t => typeof(Module).IsAssignableFrom(t)).ToArray();
         var selected = builder.UseTopology([.. moduleTypes.Select(ModuleManifest.Of)], retired, additional);
         builder.Services.AddSingleton(new ModuleAssemblies([.. modules.Select(module => module.Assembly).Distinct()], moduleTypes));
         return selected;

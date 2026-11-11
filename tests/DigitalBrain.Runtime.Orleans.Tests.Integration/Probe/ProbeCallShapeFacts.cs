@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using DigitalBrain.Invocation;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Tests.Integration.Hosting;

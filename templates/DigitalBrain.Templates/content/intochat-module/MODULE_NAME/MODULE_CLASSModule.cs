@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using DigitalBrain;
 
 namespace MODULE_NAMESPACE;

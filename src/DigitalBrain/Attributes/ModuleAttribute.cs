@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Modules;
 
 /// <summary>Marks a module class. The id is frozen.</summary>
 [AttributeUsage(AttributeTargets.Class, Inherited = false)]

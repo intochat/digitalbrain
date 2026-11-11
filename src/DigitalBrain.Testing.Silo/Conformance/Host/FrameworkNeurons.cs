@@ -1,5 +1,7 @@
+using DigitalBrain.Contracts;
+using DigitalBrain.Modules;
+using DigitalBrain.Neurons;
 using System.Collections.Concurrent;
-using DigitalBrain.Spi;
 
 namespace DigitalBrain.Testing.Conformance.Host;
 

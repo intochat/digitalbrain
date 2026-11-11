@@ -1,5 +1,7 @@
+using DigitalBrain.Neurons;
+using DigitalBrain.Units;
 using System.Collections.Concurrent;
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
 using OS = DigitalBrain.Testing.TestOS;
 
 namespace DigitalBrain.Testing.Tests.Unit.Synapses;

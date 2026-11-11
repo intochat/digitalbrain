@@ -1,5 +1,7 @@
 using OS = DigitalBrain.Testing.TestOS;
 
+using DigitalBrain.Contracts;
+
 namespace DigitalBrain.Testing.Tests.Unit.Hosting;
 
 // 04-08 Task 1: TestOS turn semantics, plus the ported os InMemoryRuntimeFacts and DeferFacts behaviours (Watch facts are gone with Phase 4).
@@ -183,6 +185,72 @@ public sealed class TurnFacts : IAsyncLifetime
         await held;
         await _os.Idle();
         Assert.Equal(["start:w", "end:w", "note:n"], _probe.Log);
+    }
+
+    [Fact]
+    public async Task Consecutive_one_way_calls_execute_in_strict_fifo_order()
+    {
+        var probe = _os.Get<ITurnProbe>(Id("turn.probe"));
+        for (var i = 1; i <= 20; i++)
+        {
+            await probe.Note($"n{i}");
+        }
+        await _os.Idle();
+
+        var expected = Enumerable.Range(1, 20).Select(i => $"note:n{i}").ToArray();
+        Assert.Equal(expected, _probe.Log);
+    }
+
+    [Fact]
+    public async Task One_hundred_consecutive_one_way_calls_execute_in_strict_fifo_order()
+    {
+        var probe = _os.Get<ITurnProbe>(Id("turn.probe", "fifo-100"));
+        for (var i = 1; i <= 100; i++)
+        {
+            await probe.Note($"f{i}");
+        }
+        await _os.Idle();
+
+        var expected = Enumerable.Range(1, 100).Select(i => $"note:f{i}").ToArray();
+        var actual = _probe.Log.Where(l => l.StartsWith("note:f", StringComparison.Ordinal)).ToArray();
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public async Task One_hundred_consecutive_one_way_calls_from_distinct_threadpool_threads_execute_in_strict_fifo_order()
+    {
+        var probe = _os.Get<ITurnProbe>(Id("turn.probe", "distinct-threads-100"));
+        for (var i = 1; i <= 100; i++)
+        {
+            var tag = $"t{i}";
+            await Task.Run(async () => await probe.Note(tag), TestContext.Current.CancellationToken);
+        }
+        await _os.Idle();
+
+        var expected = Enumerable.Range(1, 100).Select(i => $"note:t{i}").ToArray();
+        var actual = _probe.Log.Where(l => l.StartsWith("note:t", StringComparison.Ordinal)).ToArray();
+        Assert.Equal(expected, actual);
+    }
+
+    [Fact]
+    public async Task One_hundred_concurrent_one_way_tasks_execute_all_turns_without_loss()
+    {
+        var probe = _os.Get<ITurnProbe>(Id("turn.probe", "burst-100"));
+        const int count = 100;
+        using var barrier = new Barrier(count);
+
+        var tasks = Enumerable.Range(1, count).Select(i => Task.Run(async () =>
+        {
+            barrier.SignalAndWait(TestContext.Current.CancellationToken);
+            await probe.Note($"burst:{i}");
+        }, TestContext.Current.CancellationToken)).ToArray();
+
+        await Task.WhenAll(tasks);
+        await _os.Idle();
+
+        var loggedNotes = _probe.Log.Where(l => l.StartsWith("note:burst:", StringComparison.Ordinal)).ToList();
+        Assert.Equal(count, loggedNotes.Count);
+        Assert.Equal(count, loggedNotes.Distinct().Count());
     }
 
     // Ported: ACallCycleFailsAtTheDefaultTimeoutInsteadOfHanging

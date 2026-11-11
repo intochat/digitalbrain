@@ -2,7 +2,7 @@ using System.Reflection;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Time;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>What a synapse function does with the signal and the state.</summary>
 public enum SynapseKind

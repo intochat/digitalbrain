@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Modules;
 
 // The rule for names that later become store names, folder names and container names (T-03-12).
 internal static partial class Names

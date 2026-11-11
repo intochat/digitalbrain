@@ -1,3 +1,4 @@
+using DigitalBrain.Kernel;
 using System.Reflection;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Synapses;
@@ -47,7 +48,7 @@ public static class BrainStorageHosting
         services.TryAddSingleton<JournalPayloads>();
         services.TryAddSingleton<BrainSignalHistories>();
         // The brain history the HTTP journal tail (DigitalBrain.Runtime.Http) resolves.
-        services.TryAddSingleton<Func<BrainId, DigitalBrain.Spi.ISignalHistory>>(sp => sp.GetRequiredService<BrainSignalHistories>().For);
+        services.TryAddSingleton<Func<BrainId, DigitalBrain.Kernel.ISignalHistory>>(sp => sp.GetRequiredService<BrainSignalHistories>().For);
         return services;
     }
 

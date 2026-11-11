@@ -1,4 +1,4 @@
-using DigitalBrain.Spi;
+using DigitalBrain.Neurons;
 using DigitalBrain.Tests.Unit.Neurons;
 using DigitalBrain.Units;
 

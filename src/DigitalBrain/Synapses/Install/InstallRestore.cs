@@ -1,6 +1,4 @@
-using DigitalBrain.Spi;
-
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>The install restore hook: an installed alias missing from the live catalog (as after a restart) is restored.</summary>
 public static class InstallRestore

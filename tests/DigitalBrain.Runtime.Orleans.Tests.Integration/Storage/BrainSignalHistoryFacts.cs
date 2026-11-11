@@ -1,3 +1,5 @@
+using DigitalBrain.Hosting;
+using DigitalBrain.Kernel;
 using DigitalBrain.Runtime.Orleans.Synapses;
 using DigitalBrain.Runtime.Orleans.Testing;
 using DigitalBrain.Testing;

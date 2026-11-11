@@ -1,3 +1,5 @@
+﻿using DigitalBrain.Neurons;
+using DigitalBrain.Units;
 using System.Collections.Immutable;
 using DigitalBrain.Runtime.Synapses;
 using Microsoft.CodeAnalysis;
@@ -154,6 +156,8 @@ public sealed class SynapseCompilerFacts
         const string text = """
             namespace Me.Budget;
 
+            using DigitalBrain.Neurons;
+
             [State("week")]
             public sealed record WeekSpend(decimal Spent = 0)
             {
@@ -174,13 +178,14 @@ public sealed class SynapseCompilerFacts
     }
 
     [Fact]
-    public void AnAppClassIsRefused()
+    public void AScreenClassWithoutSpecIsRefused()
     {
         const string text = """
             namespace Me.Budget;
 
-            public sealed class Sneaky : App
+            public sealed class Sneaky : Screen<object>
             {
+                protected override View Render(object state) => new("test", new Column([]));
             }
             """;
 

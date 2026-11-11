@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using Microsoft.Extensions.DependencyInjection;
 using DigitalBrain.Capabilities;
 using Orleans;

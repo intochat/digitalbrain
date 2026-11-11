@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Testing.Conformance;
 using DigitalBrain.Testing.Conformance.Identity;

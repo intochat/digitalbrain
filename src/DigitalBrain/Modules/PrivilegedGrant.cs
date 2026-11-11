@@ -1,6 +1,6 @@
 using DigitalBrain.Capabilities;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Modules;
 
 /// <summary>
 /// A module's grant to call one privileged member of a capability, declared on <see cref="ModuleManifest.Privileged"/>

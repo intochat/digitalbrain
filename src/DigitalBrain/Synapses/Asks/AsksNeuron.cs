@@ -1,7 +1,8 @@
 using System.Text;
 using System.Text.Json;
+using DigitalBrain.Neurons;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 [Neuron(AskRules.AsksNeuronType)]
 internal sealed class AsksNeuron(ISynapseCatalogSource catalog) : Neuron, IAsks
@@ -17,7 +18,7 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog) : Neuron, IAsks
     protected override async Task OnActivate(CancellationToken cancellationToken)
     {
         _ = cancellationToken;
-        _state = await Context.State.Load<AsksState>().ConfigureAwait(true) ?? new AsksState();
+        _state = await Seat.Load<AsksState>().ConfigureAwait(true) ?? new AsksState();
         if (_state.Batches.Count > 0)
         {
             await Context.Reminders.Start(NudgeReminder, Nudge, Nudge).ConfigureAwait(true);
@@ -461,7 +462,7 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog) : Neuron, IAsks
 
     private async Task Save(AsksState next, IReadOnlyList<Signal> signals)
     {
-        await Context.State.Save(next, signals).ConfigureAwait(true);
+        await Seat.Save(next, signals).ConfigureAwait(true);
         _state = next;
     }
 

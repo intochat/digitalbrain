@@ -1,4 +1,4 @@
-using DigitalBrain.Runtime.Orleans.Operations;
+using DigitalBrain.Runtime.Orleans.Capabilities.Storage;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DigitalBrain.Runtime.Orleans.Tests.Unit.Operations;

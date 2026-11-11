@@ -1,3 +1,5 @@
+using DigitalBrain.Neurons;
+
 namespace DigitalBrain.Signals.Watch;
 
 // A set of neurons for ISignalWatch.On<T>(Sources) and React<T>(Sources, …). Fixed, or named by

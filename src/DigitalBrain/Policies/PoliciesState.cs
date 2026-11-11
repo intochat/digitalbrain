@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Limits;
 
 /// <summary>A reservation recorded against an adopted <see cref="PolicyRule"/>.</summary>
 /// <param name="DecisionId">The decision id shared by all reservations of one <see cref="IPolicies.Allow"/> call.</param>

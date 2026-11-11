@@ -1,3 +1,5 @@
+using DigitalBrain.Units;
+
 namespace DigitalBrain;
 
 /// <summary>The outcome of a reaction synapse: the next state and the signals to publish with it.</summary>

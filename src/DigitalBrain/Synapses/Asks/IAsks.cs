@@ -1,7 +1,7 @@
 using System.Text.Json;
 using DigitalBrain.Contracts;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 [NeuronAlias(AskRules.AsksNeuronType)]
 internal interface IAsks

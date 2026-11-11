@@ -1,5 +1,7 @@
+using DigitalBrain.Neurons;
 using DigitalBrain.Rules;
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
+using DigitalBrain.Units;
 using DigitalBrain.Testing.Tests.Unit.Slots;
 using OS = DigitalBrain.Testing.TestOS;
 
@@ -145,7 +147,7 @@ public sealed class SourceRestoreFacts
     }
 
     // Fails the first activation, then passes through.
-    private sealed class FailOnce(DigitalBrain.Spi.ISynapseRegistrar inner) : DigitalBrain.Spi.ISynapseRegistrar
+    private sealed class FailOnce(DigitalBrain.Units.ISynapseRegistrar inner) : DigitalBrain.Units.ISynapseRegistrar
     {
         private int calls;
 
@@ -263,14 +265,13 @@ public sealed record ChargeAsked(decimal Amount) : Signal;
 // As HsPayments, but it first journals that a charge was asked: that publish passes the gate path, which restores the installed
 // alias missing after a restart, so the generated Charging type is in the catalog when the charge is made.
 [Neuron("sr.payments")]
-public sealed class SrPayments : Neuron<HsPayments.Count>, IHsPayments
+public sealed class SrPayments(ISynapseCatalogSource? catalogSource = null) : Neuron<HsPayments.Count>, IHsPayments
 {
     public async Task Charge(decimal amount)
     {
         await Save(State, new ChargeAsked(amount));
-        var type = Context.Services.GetService(typeof(ISynapseCatalogSource)) is ISynapseCatalogSource source
-            ? source.Current.For("hs.week").First(d => d.Kind == SynapseKind.Reaction).Signal!
-            : throw new InvalidOperationException("no catalog");
+        var type = (catalogSource ?? throw new InvalidOperationException("no catalog"))
+            .Current.For("hs.week").First(d => d.Kind == SynapseKind.Reaction).Signal!;
         await Save(State with { N = State.N + 1 }, (Signal)Activator.CreateInstance(type, amount)!);
     }
 }

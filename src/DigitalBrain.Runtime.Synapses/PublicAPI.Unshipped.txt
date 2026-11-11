@@ -1,4 +1,11 @@
 #nullable enable
+DigitalBrain.Runtime.Synapses.NeuronSourceStore
+DigitalBrain.Runtime.Synapses.NeuronSourceStore.Get(DigitalBrain.BrainId brain, string! sourceKey, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Units.SourceRecord?>!
+DigitalBrain.Runtime.Synapses.NeuronSourceStore.List(DigitalBrain.BrainId brain, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Units.SourceRecord!>!>!
+DigitalBrain.Runtime.Synapses.NeuronSourceStore.NeuronSourceStore(System.Func<DigitalBrain.BrainId, DigitalBrain.Units.ISources!>! sources) -> void
+DigitalBrain.Runtime.Synapses.NeuronSourceStore.Put(DigitalBrain.BrainId brain, DigitalBrain.Units.SourceRecord! record, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Synapses.NeuronSourceStore.Remove(DigitalBrain.BrainId brain, string! sourceKey, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Runtime.Synapses.NeuronSourceStore.Stage(DigitalBrain.BrainId brain, string! sourceKey, string! hash, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
 DigitalBrain.Runtime.Synapses.ReferenceSet
 DigitalBrain.Runtime.Synapses.ReferenceSet.Fingerprint.get -> string!
 DigitalBrain.Runtime.Synapses.ReferenceSet.References.get -> System.Collections.Generic.IReadOnlyList<Microsoft.CodeAnalysis.MetadataReference!>!
@@ -8,8 +15,8 @@ DigitalBrain.Runtime.Synapses.SynapseBuild.Assembly.get -> byte[]!
 DigitalBrain.Runtime.Synapses.SynapseBuild.Assembly.init -> void
 DigitalBrain.Runtime.Synapses.SynapseBuild.AssemblyName.get -> string!
 DigitalBrain.Runtime.Synapses.SynapseBuild.AssemblyName.init -> void
-DigitalBrain.Runtime.Synapses.SynapseBuild.Deconstruct(out bool Success, out System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseDiagnostic!>! Diagnostics, out byte[]! Assembly, out byte[]! Symbols, out string! Hash, out string! AssemblyName) -> void
-DigitalBrain.Runtime.Synapses.SynapseBuild.Diagnostics.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseDiagnostic!>!
+DigitalBrain.Runtime.Synapses.SynapseBuild.Deconstruct(out bool Success, out System.Collections.Generic.IReadOnlyList<DigitalBrain.Units.SynapseDiagnostic!>! Diagnostics, out byte[]! Assembly, out byte[]! Symbols, out string! Hash, out string! AssemblyName) -> void
+DigitalBrain.Runtime.Synapses.SynapseBuild.Diagnostics.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Units.SynapseDiagnostic!>!
 DigitalBrain.Runtime.Synapses.SynapseBuild.Diagnostics.init -> void
 DigitalBrain.Runtime.Synapses.SynapseBuild.Equals(DigitalBrain.Runtime.Synapses.SynapseBuild? other) -> bool
 DigitalBrain.Runtime.Synapses.SynapseBuild.Hash.get -> string!
@@ -18,39 +25,32 @@ DigitalBrain.Runtime.Synapses.SynapseBuild.Success.get -> bool
 DigitalBrain.Runtime.Synapses.SynapseBuild.Success.init -> void
 DigitalBrain.Runtime.Synapses.SynapseBuild.Symbols.get -> byte[]!
 DigitalBrain.Runtime.Synapses.SynapseBuild.Symbols.init -> void
-DigitalBrain.Runtime.Synapses.SynapseBuild.SynapseBuild(bool Success, System.Collections.Generic.IReadOnlyList<DigitalBrain.SynapseDiagnostic!>! Diagnostics, byte[]! Assembly, byte[]! Symbols, string! Hash, string! AssemblyName) -> void
+DigitalBrain.Runtime.Synapses.SynapseBuild.SynapseBuild(bool Success, System.Collections.Generic.IReadOnlyList<DigitalBrain.Units.SynapseDiagnostic!>! Diagnostics, byte[]! Assembly, byte[]! Symbols, string! Hash, string! AssemblyName) -> void
 DigitalBrain.Runtime.Synapses.SynapseCompiler
-DigitalBrain.Runtime.Synapses.SynapseCompiler.Compile(DigitalBrain.SynapseSource! source) -> DigitalBrain.Runtime.Synapses.SynapseBuild!
+DigitalBrain.Runtime.Synapses.SynapseCompiler.Compile(DigitalBrain.Units.SynapseSource! source) -> DigitalBrain.Runtime.Synapses.SynapseBuild!
 DigitalBrain.Runtime.Synapses.SynapseCompiler.SynapseCompiler(DigitalBrain.Runtime.Synapses.ReferenceSet! references) -> void
+DigitalBrain.Runtime.Synapses.SynapseHost
+DigitalBrain.Runtime.Synapses.SynapseHost.Adopt(DigitalBrain.BrainId brain, DigitalBrain.Units.LoadedSource! loaded, DigitalBrain.Units.SourceRecord! record, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Runtime.Synapses.SynapseHost.Deploy(DigitalBrain.BrainId brain, DigitalBrain.Units.SynapseSource! source, System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyDictionary<string!, string!>!>! bindingsPerAlias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Units.DeployOutcome!>!
+DigitalBrain.Runtime.Synapses.SynapseHost.DisposeAsync() -> System.Threading.Tasks.ValueTask
+DigitalBrain.Runtime.Synapses.SynapseHost.Leaked.get -> System.Collections.Generic.IReadOnlyList<(string! SourceKey, string! Hash)>!
+DigitalBrain.Runtime.Synapses.SynapseHost.List(DigitalBrain.BrainId brain, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Units.DeployedSource!>!>!
+DigitalBrain.Runtime.Synapses.SynapseHost.Retire(DigitalBrain.BrainId brain, string! sourceKey, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Units.DeployOutcome!>!
+DigitalBrain.Runtime.Synapses.SynapseHost.SynapseHost(DigitalBrain.Runtime.Synapses.SynapseCompiler! compiler, DigitalBrain.Runtime.Synapses.SynapseLoader! loader, DigitalBrain.Units.ISynapseRegistrar! registrar, DigitalBrain.Units.ISynapseCatalogSource! catalog, System.Func<DigitalBrain.BrainId, DigitalBrain.Units.IInstalls!>! installs, DigitalBrain.Units.ISourceStore! store, DigitalBrain.Kernel.IClusterListeners! listeners, Microsoft.Extensions.Logging.ILogger<DigitalBrain.Runtime.Synapses.SynapseHost!>? logger = null, System.Action<System.Threading.Tasks.Task!>? track = null) -> void
+DigitalBrain.Runtime.Synapses.SynapseLoader
+DigitalBrain.Runtime.Synapses.SynapseLoader.Load(DigitalBrain.Runtime.Synapses.SynapseBuild! build) -> DigitalBrain.Units.LoadedSource!
+DigitalBrain.Runtime.Synapses.SynapseLoader.RetryUnload(string! sourceKey, string! hash, int gcRounds = 10) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Runtime.Synapses.SynapseLoader.SynapseLoader() -> void
+DigitalBrain.Runtime.Synapses.SynapseLoader.Unload(DigitalBrain.Units.LoadedSource! loaded, int gcRounds = 10) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Runtime.Synapses.SynapseRestorer
+DigitalBrain.Runtime.Synapses.SynapseRestorer.SynapseRestorer(DigitalBrain.Runtime.Synapses.SynapseLoader! loader, DigitalBrain.Units.ISynapseRegistrar! registrar, DigitalBrain.Units.ISourceStore! store, DigitalBrain.Units.ISynapseCatalogSource! catalog, DigitalBrain.Runtime.Synapses.SynapseHost? host = null) -> void
+DigitalBrain.Runtime.Synapses.SynapseRestorer.TryRestore(DigitalBrain.BrainId brain, string! alias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<bool>!
+const DigitalBrain.Runtime.Synapses.SynapseCompiler.MaxAssemblyBytes = 1048576 -> int
+const DigitalBrain.Runtime.Synapses.SynapseCompiler.MaxSidecarChars = 262144 -> int
 override DigitalBrain.Runtime.Synapses.SynapseBuild.Equals(object? obj) -> bool
 override DigitalBrain.Runtime.Synapses.SynapseBuild.GetHashCode() -> int
 override DigitalBrain.Runtime.Synapses.SynapseBuild.ToString() -> string!
 static DigitalBrain.Runtime.Synapses.ReferenceSet.FromDefaultContext() -> DigitalBrain.Runtime.Synapses.ReferenceSet!
 static DigitalBrain.Runtime.Synapses.SynapseBuild.operator !=(DigitalBrain.Runtime.Synapses.SynapseBuild? left, DigitalBrain.Runtime.Synapses.SynapseBuild? right) -> bool
 static DigitalBrain.Runtime.Synapses.SynapseBuild.operator ==(DigitalBrain.Runtime.Synapses.SynapseBuild? left, DigitalBrain.Runtime.Synapses.SynapseBuild? right) -> bool
-DigitalBrain.Runtime.Synapses.SynapseLoader
-DigitalBrain.Runtime.Synapses.SynapseLoader.Load(DigitalBrain.Runtime.Synapses.SynapseBuild! build) -> DigitalBrain.LoadedSource!
-DigitalBrain.Runtime.Synapses.SynapseLoader.SynapseLoader() -> void
-DigitalBrain.Runtime.Synapses.SynapseLoader.Unload(DigitalBrain.LoadedSource! loaded, int gcRounds = 10) -> System.Threading.Tasks.Task<bool>!
-DigitalBrain.Runtime.Synapses.SynapseLoader.RetryUnload(string! sourceKey, string! hash, int gcRounds = 10) -> System.Threading.Tasks.Task<bool>!
-DigitalBrain.Runtime.Synapses.SynapseHost
-DigitalBrain.Runtime.Synapses.SynapseHost.Deploy(DigitalBrain.BrainId brain, DigitalBrain.SynapseSource! source, System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyDictionary<string!, string!>!>! bindingsPerAlias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.DeployOutcome!>!
-DigitalBrain.Runtime.Synapses.SynapseHost.Leaked.get -> System.Collections.Generic.IReadOnlyList<(string! SourceKey, string! Hash)>!
-DigitalBrain.Runtime.Synapses.SynapseHost.List(DigitalBrain.BrainId brain, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.DeployedSource!>!>!
-DigitalBrain.Runtime.Synapses.SynapseHost.Retire(DigitalBrain.BrainId brain, string! sourceKey, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.DeployOutcome!>!
-DigitalBrain.Runtime.Synapses.SynapseHost.DisposeAsync() -> System.Threading.Tasks.ValueTask
-DigitalBrain.Runtime.Synapses.SynapseHost.SynapseHost(DigitalBrain.Runtime.Synapses.SynapseCompiler! compiler, DigitalBrain.Runtime.Synapses.SynapseLoader! loader, DigitalBrain.Spi.ISynapseRegistrar! registrar, DigitalBrain.ISynapseCatalogSource! catalog, System.Func<DigitalBrain.BrainId, DigitalBrain.IInstalls!>! installs, DigitalBrain.ISourceStore! store, DigitalBrain.Spi.IClusterListeners! listeners, Microsoft.Extensions.Logging.ILogger<DigitalBrain.Runtime.Synapses.SynapseHost!>? logger = null, System.Action<System.Threading.Tasks.Task!>? track = null) -> void
-DigitalBrain.Runtime.Synapses.NeuronSourceStore
-DigitalBrain.Runtime.Synapses.NeuronSourceStore.Get(DigitalBrain.BrainId brain, string! sourceKey, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.SourceRecord?>!
-DigitalBrain.Runtime.Synapses.NeuronSourceStore.List(DigitalBrain.BrainId brain, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.SourceRecord!>!>!
-DigitalBrain.Runtime.Synapses.NeuronSourceStore.NeuronSourceStore(System.Func<DigitalBrain.BrainId, DigitalBrain.ISources!>! sources) -> void
-DigitalBrain.Runtime.Synapses.NeuronSourceStore.Put(DigitalBrain.BrainId brain, DigitalBrain.SourceRecord! record, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
-DigitalBrain.Runtime.Synapses.NeuronSourceStore.Remove(DigitalBrain.BrainId brain, string! sourceKey, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
-DigitalBrain.Runtime.Synapses.NeuronSourceStore.Stage(DigitalBrain.BrainId brain, string! sourceKey, string! hash, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
-DigitalBrain.Runtime.Synapses.SynapseHost.Adopt(DigitalBrain.BrainId brain, DigitalBrain.LoadedSource! loaded, DigitalBrain.SourceRecord! record, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<bool>!
-DigitalBrain.Runtime.Synapses.SynapseRestorer
-DigitalBrain.Runtime.Synapses.SynapseRestorer.TryRestore(DigitalBrain.BrainId brain, string! alias, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<bool>!
-DigitalBrain.Runtime.Synapses.SynapseRestorer.SynapseRestorer(DigitalBrain.Runtime.Synapses.SynapseLoader! loader, DigitalBrain.Spi.ISynapseRegistrar! registrar, DigitalBrain.ISourceStore! store, DigitalBrain.ISynapseCatalogSource! catalog, DigitalBrain.Runtime.Synapses.SynapseHost? host = null) -> void
-const DigitalBrain.Runtime.Synapses.SynapseCompiler.MaxAssemblyBytes = 1048576 -> int
-const DigitalBrain.Runtime.Synapses.SynapseCompiler.MaxSidecarChars = 262144 -> int
 static DigitalBrain.Runtime.Synapses.SynapseCompiler.Verify(DigitalBrain.Runtime.Synapses.SynapseBuild! build) -> string?

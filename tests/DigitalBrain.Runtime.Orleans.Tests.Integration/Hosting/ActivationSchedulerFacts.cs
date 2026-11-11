@@ -1,4 +1,6 @@
 
+using DigitalBrain.Neurons;
+
 namespace DigitalBrain.Runtime.Orleans.Tests.Integration.Hosting;
 
 // 04-20: activation (load, OnActivate) runs on the grain scheduler, so grain-context APIs work there.

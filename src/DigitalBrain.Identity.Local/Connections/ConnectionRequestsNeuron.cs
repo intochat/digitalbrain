@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using DigitalBrain.Capabilities.Connections;
 using DigitalBrain.Capabilities.Connections.Connectors;
 using DigitalBrain.Capabilities.Connections.Requests;
@@ -29,7 +30,7 @@ public sealed class ConnectionRequestsNeuron(IEnumerable<ConnectorDefinition>? c
     private IReadOnlyList<ConnectorDefinition> Connectors
         => _connectors.Length > 0
             ? _connectors
-            : Context.Services.GetService(typeof(IReadOnlyList<ConnectorDefinition>)) as IReadOnlyList<ConnectorDefinition> ?? [];
+            : Seat.Services.GetService(typeof(IReadOnlyList<ConnectorDefinition>)) as IReadOnlyList<ConnectorDefinition> ?? [];
 
     /// <inheritdoc />
     public async Task Changed(string connectionKey)
@@ -56,7 +57,7 @@ public sealed class ConnectionRequestsNeuron(IEnumerable<ConnectorDefinition>? c
     public async Task<ConnectionSummary[]> ListConnections()
     {
         var result = new List<ConnectionSummary>();
-        var hosted = Context.Services.GetService(typeof(ConnectionNeuronTypes)) as ConnectionNeuronTypes;
+        var hosted = Seat.Services.GetService(typeof(ConnectionNeuronTypes)) as ConnectionNeuronTypes;
         var keys = await Get<IConnectionIndex>(IConnectionIndex.Id(BrainId)).List().ConfigureAwait(true);
         foreach (var key in Ordered(keys))
         {

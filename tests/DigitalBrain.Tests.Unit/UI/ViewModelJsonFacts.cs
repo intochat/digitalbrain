@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using DigitalBrain.Invocation;
+using DigitalBrain.Units;
 using DigitalBrain.UI;
 
 namespace DigitalBrain.Tests.Unit.UI;

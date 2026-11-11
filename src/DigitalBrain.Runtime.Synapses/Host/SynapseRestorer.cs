@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using DigitalBrain.Spi;
+using DigitalBrain.Units;
 
 namespace DigitalBrain.Runtime.Synapses;
 

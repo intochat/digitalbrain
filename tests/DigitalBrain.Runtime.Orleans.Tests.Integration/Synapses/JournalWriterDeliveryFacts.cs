@@ -1,3 +1,5 @@
+using DigitalBrain.Kernel;
+using DigitalBrain.Neurons;
 using System.Text;
 using DigitalBrain.Runtime.Orleans.Tests.Integration.Hosting;
 using Microsoft.Extensions.DependencyInjection;

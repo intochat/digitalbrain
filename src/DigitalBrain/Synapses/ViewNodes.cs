@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 // Walks a view's wire JSON: every object with a "key" and either a "kind" or an action member (emit, intent, resolve, onSubmit) is addressable, its "emit" object ({owner, signal, args}) is what it emits.
 internal static class ViewNodes
@@ -53,14 +53,29 @@ internal static class ViewNodes
     // The member of a payload the host reserves for who activated the node; an author can never set it.
     public const string By = "by";
 
+    private static bool HasBy(JsonElement element)
+        => element.ValueKind == JsonValueKind.Object && element.EnumerateObject().Any(p => string.Equals(p.Name, By, StringComparison.OrdinalIgnoreCase));
+
     // The emit's args (a JSON object, or none) with the field value added as "value" and the host-asserted activator as "by";
     // without one, an author-declared "by" is removed.
     public static JsonElement Payload(JsonElement? args, string? fieldValue, string? by)
     {
-        if (fieldValue is null && by is null && args is { } only && !(only.ValueKind == JsonValueKind.Object && only.TryGetProperty(By, out _))) { return only.Clone(); }
+        if (fieldValue is null && by is null && args is { } only && !HasBy(only)) { return only.Clone(); }
         var payload = args is { ValueKind: JsonValueKind.Object } given ? JsonObject.Create(given) ?? [] : [];
         if (fieldValue is not null) { payload["value"] = fieldValue; }
-        payload.Remove(By);
+        List<string>? byKeys = null;
+        foreach (var (key, _) in payload)
+        {
+            if (string.Equals(key, By, StringComparison.OrdinalIgnoreCase))
+            {
+                byKeys ??= [];
+                byKeys.Add(key);
+            }
+        }
+        if (byKeys is not null)
+        {
+            foreach (var key in byKeys) { payload.Remove(key); }
+        }
         if (by is not null) { payload[By] = by; }
         return JsonSerializer.SerializeToElement(payload);
     }
@@ -77,7 +92,7 @@ internal static class ViewNodes
                 foreach (var property in element.EnumerateObject())
                 {
                     if (property.Name is "emit" or "onSubmit" && property.Value.ValueKind == JsonValueKind.Object
-                        && property.Value.TryGetProperty("args", out var args) && args.ValueKind == JsonValueKind.Object && args.TryGetProperty(By, out _)) { return true; }
+                        && property.Value.TryGetProperty("args", out var args) && HasBy(args)) { return true; }
                     pending.Push(property.Value);
                 }
             }

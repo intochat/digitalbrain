@@ -1,7 +1,8 @@
+using DigitalBrain.Neurons;
 using DigitalBrain.Capabilities.Compute;
 using DigitalBrain.Runtime.Orleans.Tests.Integration.Hosting;
 using DigitalBrain.Runtime.Orleans.Tests.Integration.Synapses;
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Runtime.Orleans.Tests.Integration.Signals;

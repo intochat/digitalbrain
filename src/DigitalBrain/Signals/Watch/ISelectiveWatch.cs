@@ -1,3 +1,5 @@
+using DigitalBrain.Neurons;
+
 namespace DigitalBrain.Signals.Watch;
 
 // A watch that tells the runtime which signals to deliver. Callers that only have INeuronProxies

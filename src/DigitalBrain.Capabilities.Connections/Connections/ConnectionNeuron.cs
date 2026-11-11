@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using System.Reflection;
 using DigitalBrain.Brains;
 using DigitalBrain.Capabilities.Connections.Connectors;
@@ -23,7 +24,7 @@ public abstract class ConnectionNeuron<TState> : Neuron<TState>, IConnection, IC
 
     protected string FullKey => $"{Id.Brain.Value}/{Id.Key}";
 
-    protected IServiceProvider ServiceProvider => Context.Services;
+    protected IServiceProvider ServiceProvider => Seat.Services;
 
     internal static IDisposable StampCaller(CapabilityCaller? caller) => CallerAdmission.Stamp(caller);
 

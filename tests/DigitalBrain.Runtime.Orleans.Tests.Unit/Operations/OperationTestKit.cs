@@ -3,7 +3,6 @@ using System.Text;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Capabilities.Storage;
 using DigitalBrain.Operations;
-using DigitalBrain.Spi;
 using DigitalBrain.Testing.Conformance.Storage;
 
 namespace DigitalBrain.Runtime.Orleans.Tests.Unit.Operations;

@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Limits;
 
 /// <summary>Thrown when a proposed policy row violates the <see cref="PolicyGrammar"/>.</summary>
 public sealed class PolicyGrammarException : Exception

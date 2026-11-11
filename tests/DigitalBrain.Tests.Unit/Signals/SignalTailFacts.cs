@@ -1,4 +1,5 @@
-using DigitalBrain.Spi;
+
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Tests.Unit.Signals;
 

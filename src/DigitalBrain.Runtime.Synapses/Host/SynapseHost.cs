@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
+using DigitalBrain.Units;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 

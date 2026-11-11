@@ -1,9 +1,9 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using DigitalBrain.Invocation;
-using DigitalBrain.Spi;
+using DigitalBrain.Neurons;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 // Reentrant by design: the state is written once by Put and only read afterwards; each Run is one ask's I/O, and interleaving the Runs is the concurrency.
 [Neuron(AskRules.BatchNeuronType), Reentrant]
@@ -15,7 +15,7 @@ internal sealed class AskBatchNeuron(ISynapseCatalogSource catalog, ISlotResolve
     private bool _putting;
 
     protected override async Task OnActivate(CancellationToken cancellationToken) =>
-        _state = await Context.State.Load<AskBatchState>().ConfigureAwait(true);
+        _state = await Seat.Load<AskBatchState>().ConfigureAwait(true);
 
     public async Task Put(string unit, IReadOnlyList<Ask> asks)
     {
@@ -30,7 +30,7 @@ internal sealed class AskBatchNeuron(ISynapseCatalogSource catalog, ISlotResolve
         try
         {
             var next = new AskBatchState(unit, [.. asks]);
-            await Context.State.Save(next, []).ConfigureAwait(true);
+            await Seat.Save(next, []).ConfigureAwait(true);
             _state = next;
         }
         finally
@@ -120,7 +120,7 @@ internal sealed class AskBatchNeuron(ISynapseCatalogSource catalog, ISlotResolve
         }
 
         _state = null;
-        await Context.State.Clear().ConfigureAwait(true);
+        await Seat.Clear().ConfigureAwait(true);
     }
 
     private string BatchKey(string unit)

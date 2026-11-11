@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using System.Reflection;
 using DigitalBrain.Access;
 using DigitalBrain.Runtime.Orleans.Access;

@@ -1,4 +1,7 @@
-namespace DigitalBrain.Time;
+using DigitalBrain.Neurons;
+using DigitalBrain.Time;
+
+namespace DigitalBrain.Scheduling;
 
 /// <summary>
 /// The time neuron of a brain (<c>{brain}/time/default</c>). It runs one reminder per distinct schedule text, however many owners

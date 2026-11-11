@@ -6,7 +6,9 @@ using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using DigitalBrain.Access;
+using DigitalBrain.Contracts;
 using DigitalBrain.Invocation;
+using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Kernel;
 

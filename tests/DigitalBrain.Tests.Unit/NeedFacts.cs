@@ -1,3 +1,5 @@
+using DigitalBrain.Modules;
+
 namespace DigitalBrain.Tests.Unit;
 
 public sealed class NeedFacts

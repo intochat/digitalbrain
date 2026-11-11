@@ -1,4 +1,3 @@
-using DigitalBrain.Spi;
 using DigitalBrain.Testing.Tests.Unit.Apps;
 
 namespace DigitalBrain.Testing.Tests.Unit.Hosting;
@@ -18,10 +17,6 @@ public sealed class TestBrainFacts
         Assert.Equal(["n:7"], viaOS);
         Assert.Equal(viaOS, viaBrain);
     }
-
-    [Fact]
-    public void TestBrainDefinitionOfIsTestOSDefinitionOf()
-        => Assert.Equal(TestOS.DefinitionOf(typeof(NeedsClockApp)).Id, TestBrain.DefinitionOf(typeof(NeedsClockApp)).Id);
 
     private static async Task<IReadOnlyList<string>> Heard(Func<Action<TestOSOptions>, TestOS> local)
     {

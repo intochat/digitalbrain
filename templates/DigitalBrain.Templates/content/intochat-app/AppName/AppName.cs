@@ -1,10 +1,12 @@
-using DigitalBrain;
+﻿using DigitalBrain;
+using DigitalBrain.Neurons;
 using DigitalBrain.UI;
+using DigitalBrain.Units;
 
 namespace APP_NAMESPACE;
 
-/// <summary>Asks the app to show its start view.</summary>
-[Signal("APP_ID.opened")]
+/// <summary>Asks the screen to show its start view.</summary>
+[Signal("APP_ID.open")]
 public sealed record Opened : Signal;
 
 /// <summary>The turn state of <see cref="APP_CLASS"/>.</summary>
@@ -14,16 +16,16 @@ public sealed record APP_CLASSState(string Message)
 }
 
 /// <summary>
-/// The APP_CLASS app. What it does is written in the spec comment next to this file; every operation described there is one
-/// <c>[On]</c> method here. The app id is frozen once people install it.
+/// The APP_CLASS screen. What it does is written in the spec comment next to this file; every operation described there is one
+/// <c>[On]</c> method here.
 /// </summary>
-[App("APP_ID")]
-public sealed class APP_CLASS : App<APP_CLASSState>
+[Neuron("app.APP_ID")]
+public sealed class APP_CLASS : Screen<APP_CLASSState>
 {
     /// <summary>Shows the start view.</summary>
     [On]
-    public void Open() => Set(new("Welcome to APP_CLASS."));
+    public Task Open(Opened signal) => Show(new APP_CLASSState("Welcome to APP_CLASS."));
 
-    /// <summary>Renders the main view from <see cref="App{TState}.State"/>.</summary>
-    public View Render() => new("APP_CLASS", new Column([new Text(State.Message)]));
+    /// <summary>Renders the main view from <see cref="Screen{TState}.State"/>.</summary>
+    protected override View Render(APP_CLASSState state) => new("APP_CLASS", new Column([new Text(state.Message)]));
 }

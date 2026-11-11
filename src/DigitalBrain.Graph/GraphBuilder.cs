@@ -1,5 +1,6 @@
+﻿using DigitalBrain.Neurons;
 using System.Reflection;
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Graph;
 

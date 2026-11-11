@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
+using DigitalBrain.Units;
 
 namespace DigitalBrain.Runtime.Synapses;
 

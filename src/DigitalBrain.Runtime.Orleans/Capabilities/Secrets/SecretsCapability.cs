@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Capabilities.Secrets;
 using Microsoft.Extensions.Logging;

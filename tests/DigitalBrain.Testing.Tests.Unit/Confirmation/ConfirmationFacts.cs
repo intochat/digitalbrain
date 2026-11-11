@@ -1,3 +1,6 @@
+﻿using DigitalBrain.Kernel;
+using DigitalBrain.Neurons;
+using DigitalBrain.Units;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Capabilities.Storage;
 using DigitalBrain.Confirmation;
@@ -19,13 +22,13 @@ public interface IConfirmer
     Task Relay(string planId);
 }
 
-/// <summary>Asks through Context.Confirm and Context.Operations, and tries to relay an approval as itself.</summary>
+/// <summary>Asks through IConfirmations and IOperations, and tries to relay an approval as itself.</summary>
 [Neuron("test.confirmer")]
-public sealed class ConfirmerNeuron : Neuron, IConfirmer
+public sealed class ConfirmerNeuron(IOperations operations, IConfirmations confirmations) : Neuron, IConfirmer
 {
     public async Task<string> Delete(string item)
     {
-        var operation = (FakeOperation)await Context.Operations.Start(WritePlan.Delete(new ItemId(item)), CancellationToken.None);
+        var operation = (FakeOperation)await operations.Start(WritePlan.Delete(new ItemId(item)), CancellationToken.None);
         return await operation.Completion switch
         {
             OperationResult.Failed failed => "failed:" + failed.Code,
@@ -35,11 +38,11 @@ public sealed class ConfirmerNeuron : Neuron, IConfirmer
 
     public async Task<string> Ask(string planId, bool destructive)
     {
-        var result = await Context.Confirm(ConfirmationFacts.Plan(planId, destructive), CancellationToken.None);
+        var result = await confirmations.Confirm(ConfirmationFacts.Plan(planId, destructive), CancellationToken.None);
         return $"{result.Outcome}:{result.Reason}:{result.Skipped}";
     }
 
-    public Task Relay(string planId) => Context.Confirmations.Resolve(planId, approve: true, CancellationToken.None);
+    public Task Relay(string planId) => confirmations.Resolve(planId, approve: true, CancellationToken.None);
 }
 
 // 07-02 (CAP-06, FILES-04, D-03, D-09, D-16, D-19, D-22): the confirmation gate contract, its TestOS implementation and ConfirmView.
@@ -278,7 +281,7 @@ public sealed class ConfirmationFacts
         };
         var confirmations = new TestConfirmations(new TestClock()) { Policy = policy };
 
-        var check = StorageConfirmationGate.Check(runner, confirmations.For(App), plan, Ct);
+        var check = Check(runner, confirmations.For(App), plan, Ct);
         if (asks)
         {
             var request = await WaitAny(confirmations);
@@ -305,13 +308,28 @@ public sealed class ConfirmationFacts
         throw new TimeoutException("Nothing was asked.");
     }
 
+    private static async Task<string?> Check(StorageWriteRunner runner, IConfirmations confirmations, WritePlan plan, CancellationToken ct)
+    {
+        var question = await runner.Confirmation(plan, ct).ConfigureAwait(false);
+        var result = await confirmations.Confirm(question, ct).ConfigureAwait(false);
+        return result.Approved ? null : "The confirmation was denied.";
+    }
+
+    private static Task<string?> Check(IStorage storage, IConfirmations confirmations, WritePlan plan, CancellationToken ct)
+    {
+        var runner = new StorageWriteRunner(
+            (_, _) => Task.FromResult(new CapabilityConnection<IStorage>("drive", "Drive", storage)),
+            (_, _, _) => Task.FromResult<OperationResult>(new OperationResult.Succeeded()));
+        return Check(runner, confirmations, plan, ct);
+    }
+
     [Fact]
     public async Task A_direct_provider_write_uses_the_same_confirmation_policy_before_any_effect()
     {
         var storage = new FakeStorage("Drive");
         var file = storage.AddFile(storage.Root, "a.txt", "x"u8.ToArray());
         var confirmations = new TestConfirmations(new TestClock());
-        var checking = StorageConfirmationGate.Check(storage, confirmations.For(App), WritePlan.Delete(file), Ct);
+        var checking = Check(storage, confirmations.For(App), WritePlan.Delete(file), Ct);
         var request = await WaitAny(confirmations);
         Assert.Contains("a.txt", request.Plan.Title, StringComparison.Ordinal);
         Assert.False(checking.IsCompleted);
@@ -433,7 +451,7 @@ public sealed class ConfirmationFacts
         var request = await WaitAny(os.Confirmations);
         await os.Confirmations.Deny(request.PlanId);
 
-        Assert.Equal("failed:denied", await deleting);
+        Assert.Equal("failed:declined", await deleting);
         Assert.Equal(("Move a.txt to trash?", ConfirmationAction.Delete), (request.Plan.Title, request.Plan.Action));
         Assert.Contains((await drive.List(drive.Root, new ListQuery(), Ct)).Items, item => item.Name == "a.txt");
     }

@@ -27,8 +27,8 @@ public sealed class SignalLoopAnalyzerFacts
         """);
 
     [Fact]
-    public Task Signal_loop_over_any_async_enumerable_in_app_reports_DB0013() => Verify<SignalLoopAnalyzer>.Diagnostics(Prelude + """
-        public abstract class Base : App { }
+    public Task Signal_loop_over_any_async_enumerable_in_neuron_reports_DB0013() => Verify<SignalLoopAnalyzer>.Diagnostics(Prelude + """
+        public abstract class Base : Neuron { }
         public sealed class Mail : Base
         {
             public async Task Run(IAsyncEnumerable<Number> numbers) { {|DB0013:await foreach (var n in numbers) { }|} }

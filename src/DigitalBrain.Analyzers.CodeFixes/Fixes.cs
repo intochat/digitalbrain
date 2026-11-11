@@ -4,7 +4,7 @@ using System.Composition;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using DigitalBrain.Analyzers.Apps;
+using DigitalBrain.Analyzers.Screens;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
@@ -16,61 +16,8 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace DigitalBrain.Analyzers.CodeFixes;
 
-/// <summary>DB0020 fix: derive the <c>[App]</c> class from <c>DigitalBrain.App</c> (replaces a class base, else adds one).</summary>
-[ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(AppBaseFix)), Shared]
-public sealed class AppBaseFix : CodeFixProvider
-{
-    /// <summary>The equivalence key of the action.</summary>
-    public const string Key = "DB0020.DeriveFromApp";
-
-    /// <inheritdoc />
-    public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(AppRules.AppBase.Id);
-
-    /// <inheritdoc />
-    public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
-
-    /// <inheritdoc />
-    public override async Task RegisterCodeFixesAsync(CodeFixContext context)
-    {
-        var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
-        foreach (var diagnostic in context.Diagnostics)
-        {
-            if (root?.FindNode(diagnostic.Location.SourceSpan).FirstAncestorOrSelf<ClassDeclarationSyntax>() is not { } type) { continue; }
-            context.RegisterCodeFix(
-                CodeAction.Create("Derive from App", ct => Fix(context.Document, type, ct), Key), diagnostic);
-        }
-    }
-
-    private static async Task<Document> Fix(Document document, ClassDeclarationSyntax type, CancellationToken cancellation)
-    {
-        var model = await document.GetSemanticModelAsync(cancellation).ConfigureAwait(false);
-        var app = SimpleBaseType(ParseTypeName("DigitalBrain.App").WithAdditionalAnnotations(Simplifier.Annotation));
-        ClassDeclarationSyntax next;
-        if (type.BaseList is { Types.Count: > 0 } list)
-        {
-            var first = list.Types[0];
-            var isClass = model?.GetTypeInfo(first.Type, cancellation).Type is { TypeKind: TypeKind.Class or TypeKind.Error };
-            next = isClass
-                ? type.WithBaseList(list.WithTypes(list.Types.Replace(first, app.WithTriviaFrom(first))))
-                : type.WithBaseList(list.WithTypes(list.Types.Insert(0, app)));
-        }
-        else
-        {
-            var identifier = type.TypeParameterList is null ? type.Identifier.WithTrailingTrivia() : type.Identifier;
-            next = type.WithIdentifier(identifier)
-                .WithBaseList(BaseList(SingletonSeparatedList<BaseTypeSyntax>(app))
-                    .WithColonToken(Token(SyntaxKind.ColonToken).WithLeadingTrivia(Space).WithTrailingTrivia(Space))
-                    .WithTrailingTrivia(type.Identifier.TrailingTrivia));
-        }
-        var root = await document.GetSyntaxRootAsync(cancellation).ConfigureAwait(false);
-        var changed = document.WithSyntaxRoot(root!.ReplaceNode(type, next));
-        return await Simplifier.ReduceAsync(changed, Simplifier.Annotation, cancellationToken: cancellation).ConfigureAwait(false);
-    }
-}
-
 /// <summary>
-/// DB0022 fixes: make the swallowing catch rethrow (<c>throw;</c>), or, inside an instance member of an App, record the error state
-/// (<c>catch (Exception error) { RecordError(error); }</c>).
+/// DB0022 fixes: make the swallowing catch rethrow (<c>throw;</c>).
 /// </summary>
 [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(EmptyCatchFix)), Shared]
 public sealed class EmptyCatchFix : CodeFixProvider
@@ -78,11 +25,8 @@ public sealed class EmptyCatchFix : CodeFixProvider
     /// <summary>The equivalence key of the rethrow action.</summary>
     public const string Key = "DB0022.Rethrow";
 
-    /// <summary>The equivalence key of the record-the-error-state action.</summary>
-    public const string RecordErrorKey = RecordErrorAction.Key;
-
     /// <inheritdoc />
-    public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(AppRules.SwallowingCatch.Id);
+    public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(ScreenRules.SwallowingCatch.Id);
 
     /// <inheritdoc />
     public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
@@ -91,16 +35,10 @@ public sealed class EmptyCatchFix : CodeFixProvider
     public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
         var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
-        var model = await context.Document.GetSemanticModelAsync(context.CancellationToken).ConfigureAwait(false);
         foreach (var diagnostic in context.Diagnostics)
         {
             if (root?.FindToken(diagnostic.Location.SourceSpan.Start).Parent?.FirstAncestorOrSelf<CatchClauseSyntax>() is not { } clause) { continue; }
             context.RegisterCodeFix(CodeAction.Create("Rethrow", ct => Fix(context.Document, clause, ct), Key), diagnostic);
-            if (model is not null && RecordErrorAction.Applies(model, clause, context.CancellationToken))
-            {
-                context.RegisterCodeFix(
-                    CodeAction.Create("Record the error state", ct => RecordErrorAction.Fix(context.Document, clause, ct), RecordErrorKey), diagnostic);
-            }
         }
     }
 
@@ -126,7 +64,7 @@ public sealed class TypedRecordFix : CodeFixProvider
     public const string Key = "DB0025.TypedRecord";
 
     /// <inheritdoc />
-    public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(AppRules.HandWrittenJson.Id);
+    public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(ScreenRules.HandWrittenJson.Id);
 
     /// <inheritdoc />
     public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
@@ -138,45 +76,47 @@ public sealed class TypedRecordFix : CodeFixProvider
         foreach (var diagnostic in context.Diagnostics)
         {
             var node = root?.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true);
-            if (node?.FirstAncestorOrSelf<InvocationExpressionSyntax>() is not { } invocation
-                || invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression is not AnonymousObjectCreationExpressionSyntax anonymous
-                || invocation.FirstAncestorOrSelf<ClassDeclarationSyntax>() is null)
-            {
-                continue;
-            }
-            context.RegisterCodeFix(CodeAction.Create("Use a typed record", ct => Fix(context.Document, anonymous, ct), Key), diagnostic);
+            var invocation = node?.FirstAncestorOrSelf<InvocationExpressionSyntax>();
+            if (invocation?.ArgumentList.Arguments.FirstOrDefault()?.Expression is not AnonymousObjectCreationExpressionSyntax anonymous) { continue; }
+            if (node?.FirstAncestorOrSelf<TypeDeclarationSyntax>() is not { } owner) { continue; }
+            context.RegisterCodeFix(
+                CodeAction.Create("Declare a nested record for the payload", ct => Fix(context.Document, owner, anonymous, invocation, ct), Key),
+                diagnostic);
         }
     }
 
-    private static async Task<Document> Fix(Document document, AnonymousObjectCreationExpressionSyntax anonymous, CancellationToken cancellation)
+    private static async Task<Document> Fix(Document document, TypeDeclarationSyntax owner,
+        AnonymousObjectCreationExpressionSyntax anonymous, InvocationExpressionSyntax invocation, CancellationToken cancellation)
     {
-        var model = await document.GetSemanticModelAsync(cancellation).ConfigureAwait(false);
         var root = await document.GetSyntaxRootAsync(cancellation).ConfigureAwait(false);
-        if (model is null || root is null || model.GetTypeInfo(anonymous, cancellation).Type is not INamedTypeSymbol shape) { return document; }
-        var owner = anonymous.FirstAncestorOrSelf<ClassDeclarationSyntax>()!;
-        var method = anonymous.FirstAncestorOrSelf<MemberDeclarationSyntax>() switch
-        {
-            MethodDeclarationSyntax m => m.Identifier.ValueText,
-            PropertyDeclarationSyntax p => p.Identifier.ValueText,
-            _ => "Json",
-        };
-        var taken = new HashSet<string>(model.GetDeclaredSymbol(owner, cancellation)?.GetMembers().Select(m => m.Name) ?? Enumerable.Empty<string>());
-        var name = method + "Payload";
-        for (var i = 2; taken.Contains(name); i++) { name = method + "Payload" + i; }
+        var model = await document.GetSemanticModelAsync(cancellation).ConfigureAwait(false);
+        if (root is null || model is null) { return document; }
+
+        var method = invocation.FirstAncestorOrSelf<MethodDeclarationSyntax>()?.Identifier.ValueText ?? "Action";
+        var recordName = method + "Payload";
 
         var parameters = new List<ParameterSyntax>();
-        foreach (var property in shape.GetMembers().OfType<IPropertySymbol>())
+        var arguments = new List<ArgumentSyntax>();
+        foreach (var declarator in anonymous.Initializers)
         {
-            parameters.Add(Parameter(Identifier(property.Name))
-                .WithType(ParseTypeName(property.Type.ToMinimalDisplayString(model, anonymous.SpanStart))));
+            var propertyName = declarator.NameEquals?.Name.Identifier.ValueText
+                ?? (declarator.Expression as MemberAccessExpressionSyntax)?.Name.Identifier.ValueText
+                ?? (declarator.Expression as IdentifierNameSyntax)?.Identifier.ValueText
+                ?? "Value";
+            var typeInfo = model.GetTypeInfo(declarator.Expression, cancellation);
+            var typeName = typeInfo.Type?.ToMinimalDisplayString(model, declarator.SpanStart) ?? "object";
+            parameters.Add(Parameter(Identifier(propertyName)).WithType(ParseTypeName(typeName)));
+            arguments.Add(Argument(declarator.Expression.WithoutTrivia()));
         }
-        var record = RecordDeclaration(Token(SyntaxKind.RecordKeyword), Identifier(name))
+
+        var record = RecordDeclaration(Token(SyntaxKind.RecordKeyword), Identifier(recordName))
             .WithModifiers(TokenList(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.SealedKeyword)))
             .WithParameterList(ParameterList(SeparatedList(parameters)))
             .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
             .WithAdditionalAnnotations(Formatter.Annotation);
-        var creation = ObjectCreationExpression(IdentifierName(name))
-            .WithArgumentList(ArgumentList(SeparatedList(anonymous.Initializers.Select(i => Argument(i.Expression.WithoutTrivia())))))
+
+        var creation = ObjectCreationExpression(IdentifierName(recordName))
+            .WithArgumentList(ArgumentList(SeparatedList(arguments)))
             .WithTriviaFrom(anonymous);
 
         var next = owner.ReplaceNode(anonymous, creation);
@@ -194,7 +134,7 @@ public sealed class SpecCommentFix : CodeFixProvider
     public const string Key = "DB0027.InsertSpecComment";
 
     /// <inheritdoc />
-    public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(AppRules.MissingSpec.Id);
+    public override ImmutableArray<string> FixableDiagnosticIds => ImmutableArray.Create(ScreenRules.MissingSpec.Id);
 
     /// <inheritdoc />
     public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
@@ -230,7 +170,7 @@ public sealed class SpecCommentFix : CodeFixProvider
             {
                 if (method.GetAttributes().Any(a => a.AttributeClass?.ToDisplayString() == "DigitalBrain.OnAttribute"))
                 {
-                    operations.Add(DigitalBrain.Apps.SpecComment.NormalizeOperation(method.Name));
+                    operations.Add(DigitalBrain.Screens.SpecComment.NormalizeOperation(method.Name));
                 }
             }
         }

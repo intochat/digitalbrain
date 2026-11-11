@@ -1,7 +1,7 @@
+using DigitalBrain.Kernel;
 using DigitalBrain.Rules;
-using DigitalBrain.Spi;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Neurons;
 
 /// <summary>
 /// A neuron: a plain class, addressed by <see cref="NeuronId"/>, that reacts to signals one turn at a time.
@@ -10,6 +10,7 @@ namespace DigitalBrain;
 public abstract class Neuron
 {
     private INeuronContext? _context;
+    private INeuronSeat? _seat;
 
     /// <summary>This neuron's id.</summary>
     protected NeuronId Id => Context.Id;
@@ -17,11 +18,14 @@ public abstract class Neuron
     /// <summary>What the runtime gives this neuron. Available once attached.</summary>
     protected INeuronContext Context => _context ?? throw new InvalidOperationException("The neuron is not attached to a runtime.");
 
+    private protected INeuronSeat Seat => _seat ?? throw new InvalidOperationException("This context carries no seat: attach through a runtime, TestOS or FakeNeuronContext.");
+
     internal void Attach(INeuronContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
         if (_context is not null) { throw new InvalidOperationException("The neuron is already attached."); }
         _context = context;
+        _seat = context as INeuronSeat;
     }
 
     // Loads persisted state before the first turn; Neuron<TState> overrides it.

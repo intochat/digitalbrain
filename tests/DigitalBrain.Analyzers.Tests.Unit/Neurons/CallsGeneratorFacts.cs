@@ -17,11 +17,10 @@ public sealed class CallsGeneratorFacts
         namespace DigitalBrain
         {
             [System.AttributeUsage(System.AttributeTargets.Class)] public sealed class NeuronAttribute(string type) : System.Attribute { public string Type { get; } = type; }
-            [System.AttributeUsage(System.AttributeTargets.Class)] public sealed class AppAttribute(string id) : System.Attribute { public string Id { get; } = id; }
             [System.AttributeUsage(System.AttributeTargets.Assembly, AllowMultiple = true)] public sealed class CallsAttribute(string from, string to) : System.Attribute { public string From { get; } = from; public string To { get; } = to; }
             public readonly record struct NeuronId(string Value);
             public abstract class Neuron { protected T Get<T>(NeuronId id) where T : class => default!; }
-            public abstract class App { protected T Get<T>(string key) where T : class => default!; }
+            public abstract class Screen { protected T Get<T>(string key) where T : class => default!; }
         }
         namespace DigitalBrain.Contracts
         {
@@ -62,11 +61,11 @@ public sealed class CallsGeneratorFacts
     }
 
     [Fact]
-    public void An_app_is_recorded_by_its_id_and_duplicates_collapse()
+    public void A_screen_is_recorded_by_its_id_and_duplicates_collapse()
     {
         var lines = Generated("""
-            [App("notes")]
-            public sealed class Notes : App
+            [Neuron("notes")]
+            public sealed class Notes : Screen
             {
                 public Task A() => Get<IMemory>("memory").Remember("a");
                 public Task B() => Get<IMemory>("memory").Remember("b");

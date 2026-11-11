@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>A deployed synapse source as stored: its source, its build and what it declares.</summary>
 /// <param name="SourceKey">The source key.</param>

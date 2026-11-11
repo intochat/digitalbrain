@@ -1,7 +1,7 @@
 using System.Text.Json;
 using DigitalBrain.Contracts;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>
 /// The current state record of a state alias, read at that alias's state neuron (<c>{brain}/{alias}/default</c>): what a debugger's

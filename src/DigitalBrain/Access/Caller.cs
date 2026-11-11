@@ -1,3 +1,4 @@
+﻿
 namespace DigitalBrain.Access;
 
 /// <summary>

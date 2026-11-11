@@ -1,8 +1,11 @@
+﻿using DigitalBrain.Contracts;
+using DigitalBrain.Modules;
+using DigitalBrain.Neurons;
 using DigitalBrain;
 using DigitalBrain.Capabilities.Compute;
 using DigitalBrain.Confirmation;
 using DigitalBrain.Flows;
-using DigitalBrain.Runtime.Orleans.Operations;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using DigitalBrain.Testing;
 
@@ -21,18 +24,31 @@ public sealed class FaultingConfirmationsFixture : BothRuntimesFixture
 
     protected override void ConfigureSilo(IServiceCollection services)
     {
-        services.AddSingleton<IConfirmationContexts, FaultingConfirmations>();
-        services.AddSingleton<IConfirmations, FaultingConfirmations>();
+        services.AddSingleton<FaultingConfirmations>();
+        services.AddSingleton<IConfirmationRequests>(sp => sp.GetRequiredService<FaultingConfirmations>());
+        services.AddSingleton<IConfirmations>(sp => sp.GetRequiredService<FaultingConfirmations>());
     }
 
-    protected override void ConfigureTestOS(IServiceCollection services) => services.AddSingleton<IConfirmations, FaultingConfirmations>();
+    protected override void ConfigureTestOS(IServiceCollection services)
+    {
+        services.AddSingleton<FaultingConfirmations>();
+        services.AddSingleton<IConfirmationRequests>(sp => sp.GetRequiredService<FaultingConfirmations>());
+        services.AddSingleton<IConfirmations>(sp => sp.GetRequiredService<FaultingConfirmations>());
+    }
 }
 
-public sealed class FaultingConfirmations : IConfirmations, IConfirmationContexts
+public sealed class FaultingConfirmations : IConfirmations, IConfirmationRequests
 {
     public ConfirmationPolicy Policy => ConfirmationPolicy.DestructiveOnly;
 
-    public IConfirmations For(BrainId brain, string requester) => this;
+    public Task<ConfirmationResult?> Request(ConfirmationPlan plan)
+    {
+        throw new InvalidOperationException("inbox down");
+    }
+
+    public Task<ConfirmationResult?> Outcome(string planId) => Task.FromResult<ConfirmationResult?>(null);
+
+    public Task Withdraw(string planId) => Task.CompletedTask;
 
     public async Task<ConfirmationResult> Confirm(ConfirmationPlan plan, CancellationToken ct = default)
     {
@@ -260,8 +276,10 @@ public interface ITestFlow
 
 /// <summary>Two steps; "b" waits (for approval when <see cref="FlowBox.Approval"/>, else an external signal) when <see cref="FlowBox.AskFirst"/>.</summary>
 [Neuron("test.flow", State = "test-flow")]
-public sealed class TwoStepFlow : Flow<FlowBox>, ITestFlow
+public sealed class TwoStepFlow(ISignalHistory? history = null) : Flow<FlowBox>, ITestFlow
 {
+    private readonly ISignalHistory? _history = history;
+
     protected override IReadOnlyList<string> Steps => ["a", "b"];
 
     public Task<FlowSnapshot> Read() => Task.FromResult(new FlowSnapshot(State.Status, [.. State.Done], State.Waiting?.Step, State.Inner.Runs));
@@ -269,7 +287,7 @@ public sealed class TwoStepFlow : Flow<FlowBox>, ITestFlow
     public Task<string> TraceId() => Task.FromResult(State.TraceId);
 
     public async Task<string?> StartedTraceId()
-        => (await Context.History.Read(Id, 0, 100, CancellationToken.None)).Signals.FirstOrDefault(item => item.Signal is FlowStarted)?.TraceId;
+        => (await (_history ?? throw new InvalidOperationException("ISignalHistory not injected")).Read(Id, 0, 100, CancellationToken.None)).Signals.FirstOrDefault(item => item.Signal is FlowStarted)?.TraceId;
 
     protected override async Task<StepResult<FlowBox>> Run(string step, FlowBox inner, CancellationToken ct)
     {

@@ -1,3 +1,5 @@
+using DigitalBrain.Units;
+
 namespace DigitalBrain.Runtime.Synapses;
 
 /// <summary>The result of compiling a <see cref="SynapseSource"/>.</summary>

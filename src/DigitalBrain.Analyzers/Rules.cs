@@ -13,11 +13,6 @@ internal static class Rules
         "'{0}' derives from DigitalBrain.Module and must {1}",
         Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
-    public static readonly DiagnosticDescriptor SchedulingInApp = new(
-        "DB0002", "Scheduling attribute inside an App class",
-        "'{0}' is a neuron scheduling attribute and cannot be used in app '{1}'; put it on a [Neuron] class",
-        Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
-
     public static readonly DiagnosticDescriptor OrleansOnIdentity = new(
         "DB0003", "Orleans attribute on a DigitalBrain identity type",
         "'{0}' carries the Orleans attribute '{1}'; Orleans attributes belong to the runtime, not to DigitalBrain types",
@@ -78,13 +73,11 @@ internal static class Rules
         customTags: [WellKnownDiagnosticTags.CompilationEnd]);
 
     public const string SignalType = "DigitalBrain.Signal";
-    public const string NeuronType = "DigitalBrain.Neuron";
-    public const string OnAttribute = "DigitalBrain.OnAttribute";
-    public const string ModuleAttribute = "DigitalBrain.ModuleAttribute";
-    public const string AppAttribute = "DigitalBrain.AppAttribute";
-    public const string ModuleType = "DigitalBrain.Module";
-    public const string AppType = "DigitalBrain.App";
-    public const string ManifestType = "DigitalBrain.ModuleManifest";
+    public const string NeuronType = "DigitalBrain.Neurons.Neuron";
+    public const string OnAttribute = "DigitalBrain.Neurons.OnAttribute";
+    public const string ModuleAttribute = "DigitalBrain.Modules.ModuleAttribute";
+    public const string ModuleType = "DigitalBrain.Modules.Module";
+    public const string ManifestType = "DigitalBrain.Modules.ModuleManifest";
     public const string SynapseAttribute = "DigitalBrain.SynapseAttribute";
     public const string StateAttribute = "DigitalBrain.StateAttribute";
     public const string SlotAttribute = "DigitalBrain.SlotAttribute";
@@ -111,11 +104,17 @@ internal static class Rules
     }
 
     public static readonly ImmutableHashSet<string> IdentityAttributes = ImmutableHashSet.Create(
-        "DigitalBrain.NeuronAttribute", "DigitalBrain.SignalAttribute", AppAttribute, ModuleAttribute);
+        "DigitalBrain.Neurons.NeuronAttribute", "DigitalBrain.NeuronAttribute",
+        "DigitalBrain.SignalAttribute",
+        "DigitalBrain.Modules.ModuleAttribute", "DigitalBrain.ModuleAttribute");
 
     public static readonly ImmutableHashSet<string> SchedulingAttributes = ImmutableHashSet.Create(
-        "DigitalBrain.ReadOnlyCallAttribute", "DigitalBrain.OneWayCallAttribute", "DigitalBrain.InterleavesAttribute",
-        "DigitalBrain.InterleavesWhenAttribute", "DigitalBrain.CallTimeoutAttribute", "DigitalBrain.ReentrantAttribute");
+        "DigitalBrain.Contracts.ReadOnlyCallAttribute", "DigitalBrain.ReadOnlyCallAttribute",
+        "DigitalBrain.Contracts.OneWayCallAttribute", "DigitalBrain.OneWayCallAttribute",
+        "DigitalBrain.Contracts.InterleavesAttribute", "DigitalBrain.InterleavesAttribute",
+        "DigitalBrain.Neurons.InterleavesWhenAttribute", "DigitalBrain.InterleavesWhenAttribute",
+        "DigitalBrain.Contracts.CallTimeoutAttribute", "DigitalBrain.CallTimeoutAttribute",
+        "DigitalBrain.Neurons.ReentrantAttribute", "DigitalBrain.ReentrantAttribute");
 
     public static string FullName(INamedTypeSymbol? type)
     {
@@ -127,7 +126,14 @@ internal static class Rules
     {
         for (var current = type.BaseType; current is not null; current = current.BaseType)
         {
-            if (FullName(current) == fullName) { return true; }
+            var name = FullName(current);
+            if (name == fullName || name == fullName + "`1"
+                || (fullName.StartsWith("DigitalBrain.", System.StringComparison.Ordinal)
+                    && (name == "DigitalBrain." + fullName.Substring(fullName.LastIndexOf('.') + 1)
+                        || name == "DigitalBrain." + fullName.Substring(fullName.LastIndexOf('.') + 1) + "`1")))
+            {
+                return true;
+            }
         }
         return false;
     }
@@ -136,7 +142,14 @@ internal static class Rules
     {
         for (var current = type as INamedTypeSymbol; current is not null; current = current.BaseType)
         {
-            if (FullName(current.OriginalDefinition) == fullName) { return true; }
+            var name = FullName(current.OriginalDefinition);
+            if (name == fullName || name == fullName + "`1"
+                || (fullName.StartsWith("DigitalBrain.", System.StringComparison.Ordinal)
+                    && (name == "DigitalBrain." + fullName.Substring(fullName.LastIndexOf('.') + 1)
+                        || name == "DigitalBrain." + fullName.Substring(fullName.LastIndexOf('.') + 1) + "`1")))
+            {
+                return true;
+            }
         }
         return false;
     }
@@ -145,7 +158,8 @@ internal static class Rules
     {
         foreach (var data in symbol.GetAttributes())
         {
-            if (FullName(data.AttributeClass) == attribute) { return true; }
+            var name = FullName(data.AttributeClass);
+            if (name == attribute || (attribute.StartsWith("DigitalBrain.", System.StringComparison.Ordinal) && name == "DigitalBrain." + attribute.Substring(attribute.LastIndexOf('.') + 1))) { return true; }
         }
         return false;
     }

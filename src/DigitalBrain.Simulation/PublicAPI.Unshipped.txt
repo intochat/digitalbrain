@@ -1,0 +1,664 @@
+#nullable enable
+abstract DigitalBrain.Testing.Conformance.CallerScope.As(DigitalBrain.Capabilities.CapabilityCaller! caller) -> System.IDisposable!
+abstract DigitalBrain.Testing.Synapses.ScenarioStep.<Clone>$() -> DigitalBrain.Testing.Synapses.ScenarioStep!
+abstract DigitalBrain.Testing.Synapses.WorldAnswer.<Clone>$() -> DigitalBrain.Testing.Synapses.WorldAnswer!
+const DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.AllFlags = DigitalBrain.Capabilities.Storage.ItemFlags.Read | DigitalBrain.Capabilities.Storage.ItemFlags.Write | DigitalBrain.Capabilities.Storage.ItemFlags.Trash | DigitalBrain.Capabilities.Storage.ItemFlags.Delete | DigitalBrain.Capabilities.Storage.ItemFlags.Move | DigitalBrain.Capabilities.Storage.ItemFlags.Copy | DigitalBrain.Capabilities.Storage.ItemFlags.Rename | DigitalBrain.Capabilities.Storage.ItemFlags.Search | DigitalBrain.Capabilities.Storage.ItemFlags.CreateFolder -> DigitalBrain.Capabilities.Storage.ItemFlags
+const DigitalBrain.Testing.Conformance.Storage.StorageSeed.LeafName = "leaf.txt" -> string!
+const DigitalBrain.Testing.Conformance.Storage.StorageSeed.ManyCount = 250 -> int
+const DigitalBrain.Testing.Conformance.Storage.StorageSeed.ManyFolder = "Many" -> string!
+const DigitalBrain.Testing.Conformance.Storage.StorageSeed.NoteName = "a.txt" -> string!
+const DigitalBrain.Testing.Conformance.Storage.StorageSeed.NotesFolder = "Notes" -> string!
+const DigitalBrain.Testing.Conformance.Storage.StorageSeed.NoteText = "hello kit" -> string!
+const DigitalBrain.Testing.Conformance.Storage.StorageSeed.PlanName = "Plan.txt" -> string!
+DigitalBrain.Testing.CapabilityFakes
+DigitalBrain.Testing.CapabilityFakes.All<TCapability>() -> System.Collections.Generic.IReadOnlyList<TCapability!>!
+DigitalBrain.Testing.CapabilityFakes.Bind<TCapability>(string! name, TCapability! fake) -> DigitalBrain.Testing.CapabilityFakes!
+DigitalBrain.Testing.CapabilityFakes.Bound.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.CapabilityId>!
+DigitalBrain.Testing.CapabilityFakes.CapabilityFakes() -> void
+DigitalBrain.Testing.CapabilityFakes.IsBound(DigitalBrain.Capabilities.CapabilityId capability) -> bool
+DigitalBrain.Testing.CapabilityFakes.Names<TCapability>() -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Testing.CapabilityFakes.Resolve<TCapability>() -> TCapability!
+DigitalBrain.Testing.CapabilityFakes.Resolve<TCapability>(string! name) -> TCapability!
+DigitalBrain.Testing.CapabilityNotBoundException
+DigitalBrain.Testing.CapabilityNotBoundException.Capability.get -> DigitalBrain.Capabilities.CapabilityId
+DigitalBrain.Testing.CapabilityNotBoundException.CapabilityNotBoundException(DigitalBrain.Capabilities.CapabilityId capability, string? name, string? requiredBy = null) -> void
+DigitalBrain.Testing.CapabilityNotBoundException.Name.get -> string?
+DigitalBrain.Testing.Conformance.AmbientCallerScope
+DigitalBrain.Testing.Conformance.AmbientCallerScope.AmbientCallerScope(DigitalBrain.Capabilities.CapabilityCaller? fallback = null) -> void
+DigitalBrain.Testing.Conformance.AmbientCallerScope.Current.get -> DigitalBrain.Capabilities.CapabilityCaller!
+DigitalBrain.Testing.Conformance.CallerScope
+DigitalBrain.Testing.Conformance.CallerScope.CallerScope() -> void
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.AddSignInHandler(DigitalBrain.Capabilities.Identity.ISignInHandler! handler) -> void
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.Authorize(DigitalBrain.Capabilities.Identity.CallRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.CallDecision?>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.BrainExists(string! brainScopeId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.BrainsOf(string! principalId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Identity.BrainEntry!>!>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.CompleteRegistration(string! principalId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision?>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.CreateBrain(string! accountId, string! principalId, string! operationId, string! displayName, DigitalBrain.Capabilities.Identity.BrainKind kind, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.Declarations.get -> DigitalBrain.Modules.ModuleDeclarations!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.Declarations.init -> void
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.Describe() -> DigitalBrain.Capabilities.Identity.IdentityProviderDescriptor!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.Descriptor.get -> DigitalBrain.Capabilities.Identity.IdentityProviderDescriptor!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.Descriptor.init -> void
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.End(string! sessionId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.EnsureAccount(DigitalBrain.Capabilities.Identity.Account! account, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.EnsureBrain(DigitalBrain.Capabilities.Identity.Member! owner, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.EnsureMember(DigitalBrain.Capabilities.Identity.Member! member, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member?>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.GrantAsOwner(DigitalBrain.Capabilities.Identity.Grant! grant, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Grant!>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.InMemoryIdentity(DigitalBrain.Testing.Conformance.AmbientCallerScope? callers = null, System.TimeProvider? time = null) -> void
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.IsRegistered(string! principalId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.Issue(DigitalBrain.Capabilities.Identity.SessionRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.SessionIssued!>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.KindOf(string! brainScopeId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainKind>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.ListGrants(string! brainScopeId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Identity.Grant!>!>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.Membership(string! brainScopeId, string! principalId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member?>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.OwnerOfBrain(string! brainId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Account?>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.ProvisionOwner(DigitalBrain.Capabilities.Identity.Member! owner, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.ReadAccount(string! accountId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Account?>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.RegisterPrincipal(string! principalId, string! displayName, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.RemoveMember(string! brainScopeId, string! accountId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.RemovePrincipalMember(string! brainScopeId, string! principalId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.RevokeAsOwner(string! appId, string! semanticTypeId, DigitalBrain.Capabilities.Identity.GrantMode mode, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.SignIn(string! principalId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member!>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.Validate(string! sessionId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member?>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.AddSignInHandler(DigitalBrain.Capabilities.Identity.ISignInHandler! handler) -> void
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.Authorize(DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.Capabilities.Identity.CallRequest! request, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.CallDecision?>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.BrainExists(string! brainScopeId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.BrainsOf(string! principalId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Identity.BrainEntry!>!>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.CompleteRegistration(string! principalId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision?>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.CreateBrain(string! accountId, string! principalId, string! operationId, string! displayName, DigitalBrain.Capabilities.Identity.BrainKind kind, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.Describe() -> DigitalBrain.Capabilities.Identity.IdentityProviderDescriptor!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.Descriptor.get -> DigitalBrain.Capabilities.Identity.IdentityProviderDescriptor!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.Descriptor.init -> void
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.End(DigitalBrain.Capabilities.CapabilityCaller! caller, string! sessionId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.EnsureAccount(DigitalBrain.Capabilities.Identity.Account! account, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.EnsureBrain(DigitalBrain.Capabilities.Identity.Member! owner, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.EnsureMember(DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.Capabilities.Identity.Member! member, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member?>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.GrantAsOwner(DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.Capabilities.Identity.Grant! grant, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Grant?>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.InMemoryIdentityDirectory(System.TimeProvider? time = null) -> void
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.IsRegistered(string! principalId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.Issue(DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.Capabilities.Identity.SessionRequest! request, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.SessionIssued!>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.KindOf(string! brainScopeId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainKind>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.ListGrants(string! brainScopeId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Identity.Grant!>!>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.Membership(string! brainScopeId, string! principalId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member?>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.OwnerOfBrain(string! brainId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Account?>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.ProvisionOwner(DigitalBrain.Capabilities.Identity.Member! owner, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.ReadAccount(string! accountId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Account?>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.RegisterPrincipal(string! principalId, string! displayName, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.RemoveMember(DigitalBrain.Capabilities.CapabilityCaller! caller, string! brainScopeId, string! accountId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.RemovePrincipalMember(DigitalBrain.Capabilities.CapabilityCaller! caller, string! brainScopeId, string! principalId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.RevokeAsOwner(DigitalBrain.Capabilities.CapabilityCaller! caller, string! appId, string! semanticTypeId, DigitalBrain.Capabilities.Identity.GrantMode mode, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.SignIn(string! principalId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member!>!
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.Validate(string! sessionId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member?>!
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecrets
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecrets.Declarations.get -> DigitalBrain.Modules.ModuleDeclarations!
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecrets.Declarations.init -> void
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecrets.InMemorySecrets(DigitalBrain.Testing.Conformance.AmbientCallerScope? callers = null) -> void
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecrets.Log.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecrets.Named(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Secrets.SecretRef!>!
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecrets.Open(string! context, DigitalBrain.Capabilities.Secrets.SealedSecret! sealedSecret, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<byte[]!>!
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecrets.Provide(string! name, string! value) -> void
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecrets.Put(string! brainId, string! name, string! label, string! value) -> DigitalBrain.Capabilities.Secrets.SecretRef!
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecrets.Remove(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecrets.Resolve(DigitalBrain.Capabilities.Secrets.SecretRef! secret, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecrets.Seal(string! context, System.ReadOnlyMemory<byte> plaintext, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Secrets.SealedSecret!>!
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecrets.Set(string! name, string! label, string! value, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Secrets.SecretRef!>!
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecretVault
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecretVault.Callers.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.CapabilityCaller!>!
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecretVault.InMemorySecretVault() -> void
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecretVault.Log.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecretVault.Named(DigitalBrain.Capabilities.CapabilityCaller! caller, string! name, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Secrets.SecretVaultResult!>!
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecretVault.Open(DigitalBrain.Capabilities.CapabilityCaller! caller, string! context, DigitalBrain.Capabilities.Secrets.SealedSecret! sealedSecret, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<byte[]?>!
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecretVault.Provide(string! name, string! value) -> void
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecretVault.Remove(DigitalBrain.Capabilities.CapabilityCaller! caller, string! name, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Secrets.SecretVaultStatus>!
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecretVault.Resolve(DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.Capabilities.Secrets.SecretRef! secret, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Secrets.SecretVaultResult!>!
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecretVault.Seal(DigitalBrain.Capabilities.CapabilityCaller! caller, string! context, System.ReadOnlyMemory<byte> plaintext, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Secrets.SealedSecret?>!
+DigitalBrain.Testing.Conformance.Secrets.InMemorySecretVault.Set(DigitalBrain.Capabilities.CapabilityCaller! caller, string! name, string! label, string! value, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Secrets.SecretVaultResult!>!
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent.<Clone>$() -> DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent!
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent.Deconstruct(out DigitalBrain.Operations.OperationId Id, out string! Stage, out double? Fraction, out DigitalBrain.Operations.OperationResult? Result) -> void
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent.Equals(DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent? other) -> bool
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent.Fraction.get -> double?
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent.Fraction.init -> void
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent.Id.get -> DigitalBrain.Operations.OperationId
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent.Id.init -> void
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent.InMemoryOperationEvent(DigitalBrain.Operations.OperationId Id, string! Stage, double? Fraction, DigitalBrain.Operations.OperationResult? Result) -> void
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent.Result.get -> DigitalBrain.Operations.OperationResult?
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent.Result.init -> void
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent.Stage.get -> string!
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent.Stage.init -> void
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperations
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperations.Cancel(DigitalBrain.Operations.OperationId id, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperations.Events.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent!>!
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperations.InMemoryOperations() -> void
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperations.PlanOf(DigitalBrain.Operations.OperationId id) -> DigitalBrain.Operations.OperationPlan!
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperations.Start(DigitalBrain.Operations.OperationPlan! plan, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Operations.IOperation!>!
+DigitalBrain.Testing.Conformance.Storage.InMemoryOperations.WaitFor(DigitalBrain.Operations.OperationId id, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Operations.OperationResult!>!
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.AddFile(DigitalBrain.Capabilities.Storage.ItemId parent, string! name, System.ReadOnlySpan<byte> bytes) -> DigitalBrain.Capabilities.Storage.ItemId
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.AddFolder(DigitalBrain.Capabilities.Storage.ItemId parent, string! name) -> DigitalBrain.Capabilities.Storage.ItemId
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.Ancestors(DigitalBrain.Capabilities.Storage.ItemId id, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Storage.Item!>!>!
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.Describe(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.StorageDescriptor!>!
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.Flags.get -> DigitalBrain.Capabilities.Storage.ItemFlags
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.InMemoryStorage(string! label = "Memory", DigitalBrain.Capabilities.Storage.Quota? quota = null, DigitalBrain.Capabilities.Storage.ItemFlags flags = DigitalBrain.Capabilities.Storage.ItemFlags.Read | DigitalBrain.Capabilities.Storage.ItemFlags.Write | DigitalBrain.Capabilities.Storage.ItemFlags.Trash | DigitalBrain.Capabilities.Storage.ItemFlags.Delete | DigitalBrain.Capabilities.Storage.ItemFlags.Move | DigitalBrain.Capabilities.Storage.ItemFlags.Copy | DigitalBrain.Capabilities.Storage.ItemFlags.Rename | DigitalBrain.Capabilities.Storage.ItemFlags.Search | DigitalBrain.Capabilities.Storage.ItemFlags.CreateFolder, DigitalBrain.Testing.Conformance.Storage.InMemoryOperations? operations = null, System.TimeProvider? time = null, string! kind = "memory") -> void
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.Label.get -> string!
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.List(DigitalBrain.Capabilities.Storage.ItemId folder, DigitalBrain.Capabilities.Storage.ListQuery! query, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.Page<DigitalBrain.Capabilities.Storage.Item!>!>!
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.OpenRead(DigitalBrain.Capabilities.Storage.ItemId item, DigitalBrain.Capabilities.Storage.ByteRange? range, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.StorageReadStream!>!
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.OpenWrite(DigitalBrain.Capabilities.Storage.WritePlan! plan, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.StorageWriteStream!>!
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.Operations.get -> DigitalBrain.Testing.Conformance.Storage.InMemoryOperations!
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.Quota.get -> DigitalBrain.Capabilities.Storage.Quota!
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.Quota.set -> void
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.Read(DigitalBrain.Capabilities.Storage.ItemId id, DigitalBrain.Capabilities.Storage.ByteRange? range, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.Content!>!
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.Root.get -> DigitalBrain.Capabilities.Storage.ItemId
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.Roots(System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Storage.Item!>!>!
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.Search(DigitalBrain.Capabilities.Storage.SearchQuery! query, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.Page<DigitalBrain.Capabilities.Storage.Item!>!>!
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.Seed(DigitalBrain.Testing.Conformance.Storage.StorageSeed! seed) -> void
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.Stat(DigitalBrain.Capabilities.Storage.ItemId id, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.Item!>!
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.Trash.get -> DigitalBrain.Capabilities.Storage.ItemId
+DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.Write(DigitalBrain.Capabilities.Storage.WritePlan! plan, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Operations.OperationId>!
+DigitalBrain.Testing.Conformance.Storage.IOperationsProbe
+DigitalBrain.Testing.Conformance.Storage.IOperationsProbe.WaitFor(DigitalBrain.Operations.OperationId id, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Operations.OperationResult!>!
+DigitalBrain.Testing.Conformance.Storage.SeedEntry
+DigitalBrain.Testing.Conformance.Storage.SeedEntry.<Clone>$() -> DigitalBrain.Testing.Conformance.Storage.SeedEntry!
+DigitalBrain.Testing.Conformance.Storage.SeedEntry.Bytes.get -> System.ReadOnlyMemory<byte>
+DigitalBrain.Testing.Conformance.Storage.SeedEntry.Bytes.init -> void
+DigitalBrain.Testing.Conformance.Storage.SeedEntry.Deconstruct(out string! Path, out DigitalBrain.Capabilities.Storage.ItemKind Kind, out System.ReadOnlyMemory<byte> Bytes) -> void
+DigitalBrain.Testing.Conformance.Storage.SeedEntry.Equals(DigitalBrain.Testing.Conformance.Storage.SeedEntry? other) -> bool
+DigitalBrain.Testing.Conformance.Storage.SeedEntry.Kind.get -> DigitalBrain.Capabilities.Storage.ItemKind
+DigitalBrain.Testing.Conformance.Storage.SeedEntry.Kind.init -> void
+DigitalBrain.Testing.Conformance.Storage.SeedEntry.Path.get -> string!
+DigitalBrain.Testing.Conformance.Storage.SeedEntry.Path.init -> void
+DigitalBrain.Testing.Conformance.Storage.SeedEntry.SeedEntry(string! Path, DigitalBrain.Capabilities.Storage.ItemKind Kind, System.ReadOnlyMemory<byte> Bytes) -> void
+DigitalBrain.Testing.Conformance.Storage.StorageSeed
+DigitalBrain.Testing.Conformance.Storage.StorageSeed.Entries.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Testing.Conformance.Storage.SeedEntry!>!
+DigitalBrain.Testing.FakeCapabilityBroker
+DigitalBrain.Testing.FakeCapabilityBroker.FakeCapabilityBroker() -> void
+DigitalBrain.Testing.FakeCapabilityBroker.Register<TCapability>(TCapability! instance, string? connectionKey = null, string? label = null) -> DigitalBrain.Testing.FakeCapabilityBroker!
+DigitalBrain.Testing.FakeCapabilityBroker.Resolve<TCapability>(DigitalBrain.BrainId brain, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<TCapability!>!
+DigitalBrain.Testing.FakeCapabilityBroker.ResolveAll<TCapability>(DigitalBrain.BrainId brain, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.CapabilityConnection<TCapability!>!>!>!
+DigitalBrain.Testing.FakeIdentity
+DigitalBrain.Testing.FakeIdentity.Calls.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Testing.FakeIdentity.FakeIdentity(DigitalBrain.Testing.Conformance.AmbientCallerScope? callers = null, System.TimeProvider? time = null) -> void
+DigitalBrain.Testing.FakeNeuronContext
+DigitalBrain.Testing.FakeNeuronContext.Caller.get -> DigitalBrain.Access.Caller?
+DigitalBrain.Testing.FakeNeuronContext.Caller.set -> void
+DigitalBrain.Testing.FakeNeuronContext.Clock.get -> DigitalBrain.Testing.ManualTime!
+DigitalBrain.Testing.FakeNeuronContext.Confirmations.get -> DigitalBrain.Testing.TestConfirmations!
+DigitalBrain.Testing.FakeNeuronContext.Defer(System.Func<System.Threading.Tasks.Task!>! work) -> void
+DigitalBrain.Testing.FakeNeuronContext.FakeNeuronContext(DigitalBrain.NeuronId id, System.IServiceProvider? services = null) -> void
+DigitalBrain.Testing.FakeNeuronContext.Get<T>(DigitalBrain.NeuronId id) -> T!
+DigitalBrain.Testing.FakeNeuronContext.History.get -> DigitalBrain.Testing.InMemorySignalHistory!
+DigitalBrain.Testing.FakeNeuronContext.Id.get -> DigitalBrain.NeuronId
+DigitalBrain.Testing.FakeNeuronContext.MemoryState.get -> DigitalBrain.Testing.InMemoryNeuronState!
+DigitalBrain.Testing.FakeNeuronContext.Operations.get -> DigitalBrain.Testing.FakeOperations!
+DigitalBrain.Testing.FakeNeuronContext.Proxies.get -> DigitalBrain.Testing.FakeNeuronProxies!
+DigitalBrain.Testing.FakeNeuronContext.Publish(DigitalBrain.Signal! signal) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.FakeNeuronContext.Published.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Signal!>!
+DigitalBrain.Testing.FakeNeuronContext.Reminders.get -> DigitalBrain.Testing.ManualReminders!
+DigitalBrain.Testing.FakeNeuronContext.RunDeferred() -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.FakeNeuronContext.Services.get -> System.IServiceProvider!
+DigitalBrain.Testing.FakeNeuronContext.Synapses.get -> DigitalBrain.Testing.RecordingSynapses!
+DigitalBrain.Testing.FakeNeuronContext.Time.get -> System.TimeProvider!
+DigitalBrain.Testing.FakeNeuronContext.Timers.get -> DigitalBrain.Testing.ManualTimers!
+DigitalBrain.Testing.FakeNeuronContext.TraceId.get -> string?
+DigitalBrain.Testing.FakeNeuronContext.TraceId.set -> void
+DigitalBrain.Testing.FakeNeuronProxies
+DigitalBrain.Testing.FakeNeuronProxies.FakeNeuronProxies() -> void
+DigitalBrain.Testing.FakeNeuronProxies.Get<T>(DigitalBrain.NeuronId id) -> T!
+DigitalBrain.Testing.FakeNeuronProxies.Register<T>(DigitalBrain.NeuronId id, T! instance) -> DigitalBrain.Testing.FakeNeuronProxies!
+DigitalBrain.Testing.FakeOperation
+DigitalBrain.Testing.FakeOperation.Cancellation.get -> System.Threading.CancellationToken
+DigitalBrain.Testing.FakeOperation.Complete(DigitalBrain.Operations.OperationResult! result) -> System.Threading.Tasks.ValueTask
+DigitalBrain.Testing.FakeOperation.Completion.get -> System.Threading.Tasks.Task<DigitalBrain.Operations.OperationResult!>!
+DigitalBrain.Testing.FakeOperation.Dispose() -> void
+DigitalBrain.Testing.FakeOperation.Id.get -> DigitalBrain.Operations.OperationId
+DigitalBrain.Testing.FakeOperation.Plan.get -> DigitalBrain.Operations.OperationPlan!
+DigitalBrain.Testing.FakeOperation.Progress.get -> System.Collections.Generic.IReadOnlyList<double>!
+DigitalBrain.Testing.FakeOperation.Report(double fraction) -> System.Threading.Tasks.ValueTask
+DigitalBrain.Testing.FakeOperation.Result.get -> DigitalBrain.Operations.OperationResult?
+DigitalBrain.Testing.FakeOperations
+DigitalBrain.Testing.FakeOperations.All.get -> System.Collections.Generic.IReadOnlyDictionary<DigitalBrain.Operations.OperationId, DigitalBrain.Testing.FakeOperation!>!
+DigitalBrain.Testing.FakeOperations.Cancel(DigitalBrain.Operations.OperationId id, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.FakeOperations.FakeOperations() -> void
+DigitalBrain.Testing.FakeOperations.FakeOperations(DigitalBrain.Capabilities.Storage.StorageWriteRunner! runner, System.Func<DigitalBrain.Signal!, System.Threading.Tasks.Task!>! publish, DigitalBrain.Confirmation.IConfirmations? confirmations = null) -> void
+DigitalBrain.Testing.FakeOperations.Read(DigitalBrain.Operations.OperationId id, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Operations.OperationView?>!
+DigitalBrain.Testing.FakeOperations.Start(DigitalBrain.Operations.OperationPlan! plan, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Operations.IOperation!>!
+DigitalBrain.Testing.FakeSecrets
+DigitalBrain.Testing.FakeSecrets.Calls.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Testing.FakeSecrets.FakeSecrets(DigitalBrain.Testing.Conformance.AmbientCallerScope? callers = null) -> void
+DigitalBrain.Testing.FakeStorage
+DigitalBrain.Testing.FakeStorage.Calls.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Testing.FakeStorage.FakeStorage(string! label = "Fake storage", DigitalBrain.Capabilities.Storage.Quota? quota = null, DigitalBrain.Capabilities.Storage.ItemFlags flags = DigitalBrain.Capabilities.Storage.ItemFlags.Read | DigitalBrain.Capabilities.Storage.ItemFlags.Write | DigitalBrain.Capabilities.Storage.ItemFlags.Trash | DigitalBrain.Capabilities.Storage.ItemFlags.Delete | DigitalBrain.Capabilities.Storage.ItemFlags.Move | DigitalBrain.Capabilities.Storage.ItemFlags.Copy | DigitalBrain.Capabilities.Storage.ItemFlags.Rename | DigitalBrain.Capabilities.Storage.ItemFlags.Search | DigitalBrain.Capabilities.Storage.ItemFlags.CreateFolder, System.TimeProvider? time = null) -> void
+DigitalBrain.Testing.FakeStorage.MaxSingleRead.get -> int
+DigitalBrain.Testing.FakeStorage.OpenRead(DigitalBrain.Capabilities.Storage.ItemId item, DigitalBrain.Capabilities.Storage.ByteRange? range, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.StorageReadStream!>!
+DigitalBrain.Testing.FakeStorage.Seekable.get -> bool
+DigitalBrain.Testing.FakeStorage.Seekable.set -> void
+DigitalBrain.Testing.InMemoryNeuronState
+DigitalBrain.Testing.InMemoryNeuronState.Clear() -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.InMemoryNeuronState.Exists.get -> bool
+DigitalBrain.Testing.InMemoryNeuronState.InMemoryNeuronState() -> void
+DigitalBrain.Testing.InMemoryNeuronState.Load<T>() -> System.Threading.Tasks.Task<T?>!
+DigitalBrain.Testing.InMemoryNeuronState.Save<T>(T next, System.Collections.Generic.IReadOnlyList<DigitalBrain.Signal!>! signals) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.InMemoryNeuronState.Saves.get -> int
+DigitalBrain.Testing.InMemoryNeuronState.Signals.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Signal!>!
+DigitalBrain.Testing.InMemorySignalHistory
+DigitalBrain.Testing.InMemorySignalHistory.Append(DigitalBrain.NeuronId publisher, DigitalBrain.Signal! signal, System.DateTimeOffset at) -> long
+DigitalBrain.Testing.InMemorySignalHistory.InMemorySignalHistory() -> void
+DigitalBrain.Testing.InMemorySignalHistory.Last.get -> long
+DigitalBrain.Testing.InMemorySignalHistory.Read(DigitalBrain.NeuronId publisher, long since, int limit, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Kernel.SignalPage!>!
+DigitalBrain.Testing.InMemorySignalHistory.Read(long since, int limit, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Kernel.SignalPage!>!
+DigitalBrain.Testing.InMemorySignalHistory.ReadTrace(string! traceId, long since, int limit, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Kernel.SignalPage!>!
+DigitalBrain.Testing.InMemorySignalHistory.Trim(long floor) -> void
+DigitalBrain.Testing.ManualReminders
+DigitalBrain.Testing.ManualReminders.Fire(string! name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.ManualReminders.ManualReminders() -> void
+DigitalBrain.Testing.ManualReminders.Names() -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string!>!>!
+DigitalBrain.Testing.ManualReminders.Start(string! name, System.TimeSpan due, System.TimeSpan period) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.ManualReminders.Stop(string! name) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.ManualReminders.Target.get -> DigitalBrain.Neurons.Neuron?
+DigitalBrain.Testing.ManualReminders.Target.set -> void
+DigitalBrain.Testing.ManualTime
+DigitalBrain.Testing.ManualTime.Advance(System.TimeSpan by) -> void
+DigitalBrain.Testing.ManualTime.ManualTime(System.DateTimeOffset? start = null) -> void
+DigitalBrain.Testing.ManualTimers
+DigitalBrain.Testing.ManualTimers.Advance(System.TimeSpan by) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<string!>!>!
+DigitalBrain.Testing.ManualTimers.KeepAliveNames.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+DigitalBrain.Testing.ManualTimers.ManualTimers(DigitalBrain.Testing.ManualTime! time) -> void
+DigitalBrain.Testing.ManualTimers.Names.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+DigitalBrain.Testing.ManualTimers.OnFire.get -> System.Func<string!, System.Threading.Tasks.Task!>?
+DigitalBrain.Testing.ManualTimers.OnFire.set -> void
+DigitalBrain.Testing.ManualTimers.Start(string! name, System.TimeSpan due, System.TimeSpan? period) -> void
+DigitalBrain.Testing.ManualTimers.Start(string! name, System.TimeSpan due, System.TimeSpan? period, bool keepAlive) -> void
+DigitalBrain.Testing.ManualTimers.Stop(string! name) -> void
+DigitalBrain.Testing.NeuronAssertionException
+DigitalBrain.Testing.NeuronAssertionException.NeuronAssertionException() -> void
+DigitalBrain.Testing.NeuronAssertionException.NeuronAssertionException(string! message) -> void
+DigitalBrain.Testing.NeuronAssertionException.NeuronAssertionException(string! message, System.Exception! innerException) -> void
+DigitalBrain.Testing.NeuronHarness
+DigitalBrain.Testing.NeuronHarness<TNeuron>
+DigitalBrain.Testing.NeuronHarness<TNeuron>.AssertNothingPublished() -> void
+DigitalBrain.Testing.NeuronHarness<TNeuron>.AssertPublished<TSignal>(System.Func<TSignal!, bool>? predicate = null) -> TSignal!
+DigitalBrain.Testing.NeuronHarness<TNeuron>.Context.get -> DigitalBrain.Testing.FakeNeuronContext!
+DigitalBrain.Testing.NeuronHarness<TNeuron>.Deactivate(DigitalBrain.Neurons.DeactivationCause cause = DigitalBrain.Neurons.DeactivationCause.Requested, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.NeuronHarness<TNeuron>.Neuron.get -> TNeuron!
+DigitalBrain.Testing.PresentationAssertionException
+DigitalBrain.Testing.PresentationAssertionException.PresentationAssertionException(string! message) -> void
+DigitalBrain.Testing.PresentedView
+DigitalBrain.Testing.PresentedView.Entries.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Entry!>!
+DigitalBrain.Testing.PresentedView.Entry(string! id) -> DigitalBrain.UI.Entry!
+DigitalBrain.Testing.PresentedView.Fields.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Field!>!
+DigitalBrain.Testing.PresentedView.Find(string! id) -> object!
+DigitalBrain.Testing.PresentedView.Ids.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Testing.PresentedView.IsSet.get -> bool
+DigitalBrain.Testing.PresentedView.Nodes.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>!
+DigitalBrain.Testing.PresentedView.Part.get -> string!
+DigitalBrain.Testing.PresentedView.PresentedView(string! part, DigitalBrain.UI.View? view) -> void
+DigitalBrain.Testing.PresentedView.Texts.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Testing.PresentedView.Title.get -> string?
+DigitalBrain.Testing.PresentedView.View.get -> DigitalBrain.UI.View?
+DigitalBrain.Testing.RecordingSynapses
+DigitalBrain.Testing.RecordingSynapses.BrainWide.get -> System.Collections.Generic.IReadOnlyCollection<System.Type!>!
+DigitalBrain.Testing.RecordingSynapses.BrainWideAliases.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
+DigitalBrain.Testing.RecordingSynapses.Current.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Kernel.Synapse!>!
+DigitalBrain.Testing.RecordingSynapses.Ensure(DigitalBrain.NeuronId from, params System.Type![]! signals) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.RecordingSynapses.Ensure<TSignal>(DigitalBrain.NeuronId from) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.RecordingSynapses.EnsureBrainWide(params System.Type![]! signals) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.RecordingSynapses.EnsureBrainWide(System.Collections.Generic.IReadOnlyList<string!>! signalAliases) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.RecordingSynapses.RecordingSynapses(DigitalBrain.NeuronId subscriber) -> void
+DigitalBrain.Testing.RecordingSynapses.Remove(DigitalBrain.NeuronId from) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.RecordingSynapses.RemoveBrainWide() -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.RecordingSynapses.Subscriber.get -> DigitalBrain.NeuronId
+DigitalBrain.Testing.Synapses.ExpectFailure
+DigitalBrain.Testing.Synapses.ExpectFailure.Deconstruct(out string? Function) -> void
+DigitalBrain.Testing.Synapses.ExpectFailure.Equals(DigitalBrain.Testing.Synapses.ExpectFailure? other) -> bool
+DigitalBrain.Testing.Synapses.ExpectFailure.ExpectFailure(string? Function = null) -> void
+DigitalBrain.Testing.Synapses.ExpectFailure.Function.get -> string?
+DigitalBrain.Testing.Synapses.ExpectFailure.Function.init -> void
+DigitalBrain.Testing.Synapses.ExpectNoSignal
+DigitalBrain.Testing.Synapses.ExpectNoSignal.Alias.get -> string!
+DigitalBrain.Testing.Synapses.ExpectNoSignal.Alias.init -> void
+DigitalBrain.Testing.Synapses.ExpectNoSignal.Deconstruct(out string! Alias) -> void
+DigitalBrain.Testing.Synapses.ExpectNoSignal.Equals(DigitalBrain.Testing.Synapses.ExpectNoSignal? other) -> bool
+DigitalBrain.Testing.Synapses.ExpectNoSignal.ExpectNoSignal(string! Alias) -> void
+DigitalBrain.Testing.Synapses.ExpectSignal
+DigitalBrain.Testing.Synapses.ExpectSignal.Alias.get -> string!
+DigitalBrain.Testing.Synapses.ExpectSignal.Alias.init -> void
+DigitalBrain.Testing.Synapses.ExpectSignal.Deconstruct(out string! Alias) -> void
+DigitalBrain.Testing.Synapses.ExpectSignal.Equals(DigitalBrain.Testing.Synapses.ExpectSignal? other) -> bool
+DigitalBrain.Testing.Synapses.ExpectSignal.ExpectSignal(string! Alias) -> void
+DigitalBrain.Testing.Synapses.ExpectState
+DigitalBrain.Testing.Synapses.ExpectState.Alias.get -> string!
+DigitalBrain.Testing.Synapses.ExpectState.Alias.init -> void
+DigitalBrain.Testing.Synapses.ExpectState.Deconstruct(out string! Alias, out string! JsonPath, out System.Text.Json.JsonElement Expected) -> void
+DigitalBrain.Testing.Synapses.ExpectState.Equals(DigitalBrain.Testing.Synapses.ExpectState? other) -> bool
+DigitalBrain.Testing.Synapses.ExpectState.Expected.get -> System.Text.Json.JsonElement
+DigitalBrain.Testing.Synapses.ExpectState.Expected.init -> void
+DigitalBrain.Testing.Synapses.ExpectState.ExpectState(string! Alias, string! JsonPath, System.Text.Json.JsonElement Expected) -> void
+DigitalBrain.Testing.Synapses.ExpectState.JsonPath.get -> string!
+DigitalBrain.Testing.Synapses.ExpectState.JsonPath.init -> void
+DigitalBrain.Testing.Synapses.ExpectView
+DigitalBrain.Testing.Synapses.ExpectView.Alias.get -> string!
+DigitalBrain.Testing.Synapses.ExpectView.Alias.init -> void
+DigitalBrain.Testing.Synapses.ExpectView.Contains.get -> string!
+DigitalBrain.Testing.Synapses.ExpectView.Contains.init -> void
+DigitalBrain.Testing.Synapses.ExpectView.Deconstruct(out string! Alias, out string! Contains) -> void
+DigitalBrain.Testing.Synapses.ExpectView.Equals(DigitalBrain.Testing.Synapses.ExpectView? other) -> bool
+DigitalBrain.Testing.Synapses.ExpectView.ExpectView(string! Alias, string! Contains) -> void
+DigitalBrain.Testing.Synapses.FakeSlots
+DigitalBrain.Testing.Synapses.FakeSlots.FakeSlots() -> void
+DigitalBrain.Testing.Synapses.FakeSlots.Http(string! slot, System.Func<string!, string!>! body) -> DigitalBrain.Testing.Synapses.FakeSlots!
+DigitalBrain.Testing.Synapses.FakeSlots.Slot<T>(string! slot, T! instance) -> DigitalBrain.Testing.Synapses.FakeSlots!
+DigitalBrain.Testing.Synapses.FakeSlots.Slots.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Testing.Synapses.FakeSlots.Tool(string! slot, System.Func<string!, System.Text.Json.JsonElement, System.Text.Json.JsonElement>! run) -> DigitalBrain.Testing.Synapses.FakeSlots!
+DigitalBrain.Testing.Synapses.FakeSlots.World<TContract>(string! slot, DigitalBrain.Testing.Synapses.World! world) -> DigitalBrain.Testing.Synapses.FakeSlots!
+DigitalBrain.Testing.Synapses.Publish
+DigitalBrain.Testing.Synapses.Publish.Deconstruct(out string! SignalAlias, out System.Text.Json.JsonElement Payload) -> void
+DigitalBrain.Testing.Synapses.Publish.Equals(DigitalBrain.Testing.Synapses.Publish? other) -> bool
+DigitalBrain.Testing.Synapses.Publish.Payload.get -> System.Text.Json.JsonElement
+DigitalBrain.Testing.Synapses.Publish.Payload.init -> void
+DigitalBrain.Testing.Synapses.Publish.Publish(string! SignalAlias, System.Text.Json.JsonElement Payload) -> void
+DigitalBrain.Testing.Synapses.Publish.SignalAlias.get -> string!
+DigitalBrain.Testing.Synapses.Publish.SignalAlias.init -> void
+DigitalBrain.Testing.Synapses.ScenarioEvent
+DigitalBrain.Testing.Synapses.ScenarioEvent.<Clone>$() -> DigitalBrain.Testing.Synapses.ScenarioEvent!
+DigitalBrain.Testing.Synapses.ScenarioEvent.Deconstruct(out int Step, out DigitalBrain.Kernel.JournaledSignal! Signal) -> void
+DigitalBrain.Testing.Synapses.ScenarioEvent.Equals(DigitalBrain.Testing.Synapses.ScenarioEvent? other) -> bool
+DigitalBrain.Testing.Synapses.ScenarioEvent.ScenarioEvent(int Step, DigitalBrain.Kernel.JournaledSignal! Signal) -> void
+DigitalBrain.Testing.Synapses.ScenarioEvent.Signal.get -> DigitalBrain.Kernel.JournaledSignal!
+DigitalBrain.Testing.Synapses.ScenarioEvent.Signal.init -> void
+DigitalBrain.Testing.Synapses.ScenarioEvent.Step.get -> int
+DigitalBrain.Testing.Synapses.ScenarioEvent.Step.init -> void
+DigitalBrain.Testing.Synapses.ScenarioStep
+DigitalBrain.Testing.Synapses.ScenarioStep.ScenarioStep() -> void
+DigitalBrain.Testing.Synapses.ScenarioStep.ScenarioStep(DigitalBrain.Testing.Synapses.ScenarioStep! original) -> void
+DigitalBrain.Testing.Synapses.ScenarioTranscript
+DigitalBrain.Testing.Synapses.ScenarioTranscript.<Clone>$() -> DigitalBrain.Testing.Synapses.ScenarioTranscript!
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Consented.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Consented.init -> void
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Deconstruct(out bool Passed, out System.Collections.Generic.IReadOnlyList<DigitalBrain.Testing.Synapses.ScenarioEvent!>! Events, out System.Collections.Generic.IReadOnlyList<string!>! Failures, out System.Collections.Generic.IReadOnlyList<string!>! Consented, out System.Collections.Generic.IReadOnlyList<DigitalBrain.Units.PublishedView!>! Views) -> void
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Equals(DigitalBrain.Testing.Synapses.ScenarioTranscript? other) -> bool
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Events.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Testing.Synapses.ScenarioEvent!>!
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Events.init -> void
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Failures.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Failures.init -> void
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Passed.get -> bool
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Passed.init -> void
+DigitalBrain.Testing.Synapses.ScenarioTranscript.ScenarioTranscript(bool Passed, System.Collections.Generic.IReadOnlyList<DigitalBrain.Testing.Synapses.ScenarioEvent!>! Events, System.Collections.Generic.IReadOnlyList<string!>! Failures, System.Collections.Generic.IReadOnlyList<string!>! Consented, System.Collections.Generic.IReadOnlyList<DigitalBrain.Units.PublishedView!>! Views) -> void
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Views.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Units.PublishedView!>!
+DigitalBrain.Testing.Synapses.ScenarioTranscript.Views.init -> void
+DigitalBrain.Testing.Synapses.Tick
+DigitalBrain.Testing.Synapses.Tick.At.get -> System.DateTimeOffset
+DigitalBrain.Testing.Synapses.Tick.At.init -> void
+DigitalBrain.Testing.Synapses.Tick.Deconstruct(out System.DateTimeOffset At) -> void
+DigitalBrain.Testing.Synapses.Tick.Equals(DigitalBrain.Testing.Synapses.Tick? other) -> bool
+DigitalBrain.Testing.Synapses.Tick.Tick(System.DateTimeOffset At) -> void
+DigitalBrain.Testing.Synapses.UnitScenario
+DigitalBrain.Testing.Synapses.World
+DigitalBrain.Testing.Synapses.World.As<TContract>(DigitalBrain.Testing.TestOS! os, string! slot) -> TContract!
+DigitalBrain.Testing.Synapses.World.Calls.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Testing.Synapses.WorldCall!>!
+DigitalBrain.Testing.Synapses.World.On(string! slot, string! operation, params DigitalBrain.Testing.Synapses.WorldAnswer![]! answers) -> DigitalBrain.Testing.Synapses.World!
+DigitalBrain.Testing.Synapses.World.On(string! slot, string! operation, System.Func<System.Text.Json.JsonElement, DigitalBrain.Testing.Synapses.WorldAnswer!>! answer) -> DigitalBrain.Testing.Synapses.World!
+DigitalBrain.Testing.Synapses.World.World() -> void
+DigitalBrain.Testing.Synapses.WorldAnswer
+DigitalBrain.Testing.Synapses.WorldAnswer.Fail
+DigitalBrain.Testing.Synapses.WorldAnswer.Fail.Deconstruct(out System.Exception! Error) -> void
+DigitalBrain.Testing.Synapses.WorldAnswer.Fail.Equals(DigitalBrain.Testing.Synapses.WorldAnswer.Fail? other) -> bool
+DigitalBrain.Testing.Synapses.WorldAnswer.Fail.Error.get -> System.Exception!
+DigitalBrain.Testing.Synapses.WorldAnswer.Fail.Error.init -> void
+DigitalBrain.Testing.Synapses.WorldAnswer.Fail.Fail(System.Exception! Error) -> void
+DigitalBrain.Testing.Synapses.WorldAnswer.Ok
+DigitalBrain.Testing.Synapses.WorldAnswer.Ok.Deconstruct(out System.Text.Json.JsonElement Result) -> void
+DigitalBrain.Testing.Synapses.WorldAnswer.Ok.Equals(DigitalBrain.Testing.Synapses.WorldAnswer.Ok? other) -> bool
+DigitalBrain.Testing.Synapses.WorldAnswer.Ok.Ok(System.Text.Json.JsonElement Result) -> void
+DigitalBrain.Testing.Synapses.WorldAnswer.Ok.Result.get -> System.Text.Json.JsonElement
+DigitalBrain.Testing.Synapses.WorldAnswer.Ok.Result.init -> void
+DigitalBrain.Testing.Synapses.WorldAnswer.WorldAnswer() -> void
+DigitalBrain.Testing.Synapses.WorldAnswer.WorldAnswer(DigitalBrain.Testing.Synapses.WorldAnswer! original) -> void
+DigitalBrain.Testing.Synapses.WorldCall
+DigitalBrain.Testing.Synapses.WorldCall.<Clone>$() -> DigitalBrain.Testing.Synapses.WorldCall!
+DigitalBrain.Testing.Synapses.WorldCall.Arguments.get -> System.Text.Json.JsonElement
+DigitalBrain.Testing.Synapses.WorldCall.Arguments.init -> void
+DigitalBrain.Testing.Synapses.WorldCall.Deconstruct(out string! Slot, out string! Operation, out System.Text.Json.JsonElement Arguments) -> void
+DigitalBrain.Testing.Synapses.WorldCall.Equals(DigitalBrain.Testing.Synapses.WorldCall? other) -> bool
+DigitalBrain.Testing.Synapses.WorldCall.Operation.get -> string!
+DigitalBrain.Testing.Synapses.WorldCall.Operation.init -> void
+DigitalBrain.Testing.Synapses.WorldCall.Slot.get -> string!
+DigitalBrain.Testing.Synapses.WorldCall.Slot.init -> void
+DigitalBrain.Testing.Synapses.WorldCall.WorldCall(string! Slot, string! Operation, System.Text.Json.JsonElement Arguments) -> void
+DigitalBrain.Testing.TestBrain
+DigitalBrain.Testing.TestClock
+DigitalBrain.Testing.TestClock.Advance(System.TimeSpan by) -> void
+DigitalBrain.Testing.TestClock.TestClock(System.DateTimeOffset? start = null) -> void
+DigitalBrain.Testing.TestConfirmations
+DigitalBrain.Testing.TestConfirmations.Approve(string! planId) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.TestConfirmations.ApproveAll() -> void
+DigitalBrain.Testing.TestConfirmations.Audit.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Confirmation.ConfirmationResolved!>!
+DigitalBrain.Testing.TestConfirmations.Click(DigitalBrain.UI.ApprovalCardNode! card, bool approve = true) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.TestConfirmations.Confirm(DigitalBrain.Confirmation.ConfirmationPrincipal! requester, System.Func<DigitalBrain.Signal!, System.Threading.Tasks.Task!>? publish, DigitalBrain.Confirmation.ConfirmationPlan! plan, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Confirmation.ConfirmationResult!>!
+DigitalBrain.Testing.TestConfirmations.Current.get -> DigitalBrain.Confirmation.ConfirmationPrincipal!
+DigitalBrain.Testing.TestConfirmations.Current.set -> void
+DigitalBrain.Testing.TestConfirmations.Deny(string! planId) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.TestConfirmations.For(DigitalBrain.Confirmation.ConfirmationPrincipal! requester, System.Func<DigitalBrain.Signal!, System.Threading.Tasks.Task!>? publish = null) -> DigitalBrain.Confirmation.IConfirmations!
+DigitalBrain.Testing.TestConfirmations.Outcome(string! planId) -> System.Threading.Tasks.Task<DigitalBrain.Confirmation.ConfirmationResult?>!
+DigitalBrain.Testing.TestConfirmations.Policy.get -> DigitalBrain.Confirmation.ConfirmationPolicy
+DigitalBrain.Testing.TestConfirmations.Policy.set -> void
+DigitalBrain.Testing.TestConfirmations.Read() -> System.Threading.Tasks.Task<DigitalBrain.Confirmation.ConfirmationInbox!>!
+DigitalBrain.Testing.TestConfirmations.Request(DigitalBrain.Confirmation.ConfirmationPlan! plan) -> System.Threading.Tasks.Task<DigitalBrain.Confirmation.ConfirmationResult?>!
+DigitalBrain.Testing.TestConfirmations.Request(DigitalBrain.Confirmation.ConfirmationPlan! plan, DigitalBrain.Confirmation.ConfirmationPrincipal! requester, string! raisedBy, System.Func<DigitalBrain.Signal!, System.Threading.Tasks.Task!>? publish) -> System.Threading.Tasks.Task<DigitalBrain.Confirmation.ConfirmationResult?>!
+DigitalBrain.Testing.TestConfirmations.Requested.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Confirmation.ConfirmationRequested!>!
+DigitalBrain.Testing.TestConfirmations.Resolve(string! planId, bool approve, DigitalBrain.Confirmation.ConfirmationPrincipal! approver) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.TestConfirmations.TestConfirmations(System.TimeProvider! clock) -> void
+DigitalBrain.Testing.TestConfirmations.Waiting.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Confirmation.ConfirmationRequested!>!
+DigitalBrain.Testing.TestConfirmations.Withdraw(string! planId) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.TestJournal
+DigitalBrain.Testing.TestJournal.Brain.get -> DigitalBrain.BrainId
+DigitalBrain.Testing.TestJournal.Floor(DigitalBrain.NeuronId publisher) -> long
+DigitalBrain.Testing.TestJournal.Last(DigitalBrain.NeuronId publisher) -> long
+DigitalBrain.Testing.TestJournal.Read(DigitalBrain.NeuronId publisher, long since, int limit, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Kernel.SignalPage!>!
+DigitalBrain.Testing.TestJournal.Read(long since, int limit, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Kernel.SignalPage!>!
+DigitalBrain.Testing.TestJournal.ReadTrace(string! traceId, long since, int limit, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Kernel.SignalPage!>!
+DigitalBrain.Testing.TestJournal.Saves.get -> int
+DigitalBrain.Testing.TestJournal.Signals(DigitalBrain.NeuronId publisher) -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Kernel.JournaledSignal!>!
+DigitalBrain.Testing.TestJournal.Watch(long since, System.Threading.CancellationToken ct) -> System.Collections.Generic.IAsyncEnumerable<DigitalBrain.Kernel.JournaledSignal!>!
+DigitalBrain.Testing.TestOS
+DigitalBrain.Testing.TestOS.AccessCounters.get -> DigitalBrain.Access.AccessCounters!
+DigitalBrain.Testing.TestOS.AccessOptions.get -> DigitalBrain.Access.AccessOptions!
+DigitalBrain.Testing.TestOS.Activate(DigitalBrain.NeuronId id) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.TestOS.Brains(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string![]!>!
+DigitalBrain.Testing.TestOS.Caller.get -> DigitalBrain.Capabilities.CapabilityCaller?
+DigitalBrain.Testing.TestOS.Caller.set -> void
+DigitalBrain.Testing.TestOS.Capabilities.get -> DigitalBrain.Testing.CapabilityFakes!
+DigitalBrain.Testing.TestOS.Catalog.get -> DigitalBrain.Units.SynapseCatalog!
+DigitalBrain.Testing.TestOS.Clock.get -> DigitalBrain.Testing.TestClock!
+DigitalBrain.Testing.TestOS.ClusterListeners.get -> DigitalBrain.Kernel.IClusterListeners!
+DigitalBrain.Testing.TestOS.Confirmations.get -> DigitalBrain.Testing.TestConfirmations!
+DigitalBrain.Testing.TestOS.Cursor(DigitalBrain.NeuronId subscriber, DigitalBrain.NeuronId source) -> long?
+DigitalBrain.Testing.TestOS.Deactivate(DigitalBrain.NeuronId id) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.TestOS.Deliveries(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<DigitalBrain.Kernel.SignalDelivery!>!
+DigitalBrain.Testing.TestOS.DisposeAsync() -> System.Threading.Tasks.ValueTask
+DigitalBrain.Testing.TestOS.DuplicatesDropped.get -> long
+DigitalBrain.Testing.TestOS.Edge.get -> DigitalBrain.Access.EdgeAuthority!
+DigitalBrain.Testing.TestOS.FailNextPublishAfterAppend(DigitalBrain.NeuronId publisher) -> void
+DigitalBrain.Testing.TestOS.Failures.get -> System.Collections.Generic.IReadOnlyCollection<System.Exception!>!
+DigitalBrain.Testing.TestOS.ForceCheckpoint(DigitalBrain.BrainId brain) -> void
+DigitalBrain.Testing.TestOS.Get<T>(DigitalBrain.NeuronId id) -> T!
+DigitalBrain.Testing.TestOS.Idle() -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.TestOS.Instances(string? type, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<DigitalBrain.Kernel.BrainInstance!>!
+DigitalBrain.Testing.TestOS.Instances<T>(System.Threading.CancellationToken cancellationToken) -> System.Collections.Generic.IAsyncEnumerable<DigitalBrain.Kernel.BrainInstance!>!
+DigitalBrain.Testing.TestOS.IsActive(DigitalBrain.NeuronId id) -> bool
+DigitalBrain.Testing.TestOS.Journal(DigitalBrain.BrainId brain) -> DigitalBrain.Testing.TestJournal!
+DigitalBrain.Testing.TestOS.Options.get -> DigitalBrain.Testing.TestOSOptions!
+DigitalBrain.Testing.TestOS.Register(System.Reflection.Assembly! assembly) -> DigitalBrain.Testing.TestOS!
+DigitalBrain.Testing.TestOS.Register<TNeuron>() -> DigitalBrain.Testing.TestOS!
+DigitalBrain.Testing.TestOS.Registrar.get -> DigitalBrain.Units.ISynapseRegistrar!
+DigitalBrain.Testing.TestOS.Restart() -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.TestOS.Restorer.get -> DigitalBrain.Units.ISynapseRestorer!
+DigitalBrain.Testing.TestOS.SeedStoredState(DigitalBrain.NeuronId id, string! json) -> void
+DigitalBrain.Testing.TestOS.Services.get -> System.IServiceProvider!
+DigitalBrain.Testing.TestOS.Source.get -> DigitalBrain.Units.SynapseCatalogSource!
+DigitalBrain.Testing.TestOS.Store.get -> DigitalBrain.Units.ISourceStore!
+DigitalBrain.Testing.TestOS.Synapses.get -> DigitalBrain.Runtime.Synapses.SynapseHost!
+DigitalBrain.Testing.TestOS.SynapsesOf(DigitalBrain.NeuronId subscriber) -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Kernel.Synapse!>!
+DigitalBrain.Testing.TestOS.Types(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Kernel.BrainType![]!>!
+DigitalBrain.Testing.TestOS.Unregister(string! alias) -> DigitalBrain.Testing.TestOS!
+DigitalBrain.Testing.TestOS.With<TCapability>(string! name, TCapability! fake) -> DigitalBrain.Testing.TestOS!
+DigitalBrain.Testing.TestOS.With<TCapability>(TCapability! fake) -> DigitalBrain.Testing.TestOS!
+DigitalBrain.Testing.TestOS.Without<TCapability>(string! name) -> DigitalBrain.Testing.TestOS!
+DigitalBrain.Testing.TestOSOptions
+DigitalBrain.Testing.TestOSOptions.BeforeGateCommit.get -> System.Func<DigitalBrain.NeuronId, DigitalBrain.Signal!, System.Threading.Tasks.Task!>?
+DigitalBrain.Testing.TestOSOptions.BeforeGateCommit.set -> void
+DigitalBrain.Testing.TestOSOptions.CallTimeout.get -> System.TimeSpan
+DigitalBrain.Testing.TestOSOptions.CallTimeout.set -> void
+DigitalBrain.Testing.TestOSOptions.DuplicateDelivery.get -> bool
+DigitalBrain.Testing.TestOSOptions.DuplicateDelivery.set -> void
+DigitalBrain.Testing.TestOSOptions.HistoryWindowAge.get -> System.TimeSpan
+DigitalBrain.Testing.TestOSOptions.HistoryWindowAge.set -> void
+DigitalBrain.Testing.TestOSOptions.HistoryWindowSignals.get -> int
+DigitalBrain.Testing.TestOSOptions.HistoryWindowSignals.set -> void
+DigitalBrain.Testing.TestOSOptions.Services.get -> System.IServiceProvider?
+DigitalBrain.Testing.TestOSOptions.Services.set -> void
+DigitalBrain.Testing.TestOSOptions.StaleCursorAfter.get -> System.TimeSpan
+DigitalBrain.Testing.TestOSOptions.StaleCursorAfter.set -> void
+DigitalBrain.Testing.TestOSOptions.Start.get -> System.DateTimeOffset?
+DigitalBrain.Testing.TestOSOptions.Start.set -> void
+DigitalBrain.Testing.TestOSOptions.TestOSOptions() -> void
+DigitalBrain.Testing.TestOSPolicyExtensions
+DigitalBrain.Testing.TestOSSecretsIdentityExtensions
+DigitalBrain.Testing.TestOSStorageExtensions
+override DigitalBrain.Testing.Conformance.AmbientCallerScope.As(DigitalBrain.Capabilities.CapabilityCaller! caller) -> System.IDisposable!
+override DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent.GetHashCode() -> int
+override DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent.ToString() -> string!
+override DigitalBrain.Testing.Conformance.Storage.SeedEntry.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Conformance.Storage.SeedEntry.GetHashCode() -> int
+override DigitalBrain.Testing.Conformance.Storage.SeedEntry.ToString() -> string!
+override DigitalBrain.Testing.ManualTime.GetUtcNow() -> System.DateTimeOffset
+override DigitalBrain.Testing.PresentedView.ToString() -> string!
+override DigitalBrain.Testing.Synapses.ExpectFailure.<Clone>$() -> DigitalBrain.Testing.Synapses.ExpectFailure!
+override DigitalBrain.Testing.Synapses.ExpectFailure.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.ExpectFailure.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.ExpectFailure.ToString() -> string!
+override DigitalBrain.Testing.Synapses.ExpectNoSignal.<Clone>$() -> DigitalBrain.Testing.Synapses.ExpectNoSignal!
+override DigitalBrain.Testing.Synapses.ExpectNoSignal.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.ExpectNoSignal.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.ExpectNoSignal.ToString() -> string!
+override DigitalBrain.Testing.Synapses.ExpectSignal.<Clone>$() -> DigitalBrain.Testing.Synapses.ExpectSignal!
+override DigitalBrain.Testing.Synapses.ExpectSignal.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.ExpectSignal.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.ExpectSignal.ToString() -> string!
+override DigitalBrain.Testing.Synapses.ExpectState.<Clone>$() -> DigitalBrain.Testing.Synapses.ExpectState!
+override DigitalBrain.Testing.Synapses.ExpectState.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.ExpectState.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.ExpectState.ToString() -> string!
+override DigitalBrain.Testing.Synapses.ExpectView.<Clone>$() -> DigitalBrain.Testing.Synapses.ExpectView!
+override DigitalBrain.Testing.Synapses.ExpectView.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.ExpectView.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.ExpectView.ToString() -> string!
+override DigitalBrain.Testing.Synapses.Publish.<Clone>$() -> DigitalBrain.Testing.Synapses.Publish!
+override DigitalBrain.Testing.Synapses.Publish.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.Publish.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.Publish.ToString() -> string!
+override DigitalBrain.Testing.Synapses.ScenarioEvent.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.ScenarioEvent.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.ScenarioEvent.ToString() -> string!
+override DigitalBrain.Testing.Synapses.ScenarioStep.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.ScenarioStep.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.ScenarioStep.ToString() -> string!
+override DigitalBrain.Testing.Synapses.ScenarioTranscript.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.ScenarioTranscript.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.ScenarioTranscript.ToString() -> string!
+override DigitalBrain.Testing.Synapses.Tick.<Clone>$() -> DigitalBrain.Testing.Synapses.Tick!
+override DigitalBrain.Testing.Synapses.Tick.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.Tick.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.Tick.ToString() -> string!
+override DigitalBrain.Testing.Synapses.WorldAnswer.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.WorldAnswer.Fail.<Clone>$() -> DigitalBrain.Testing.Synapses.WorldAnswer.Fail!
+override DigitalBrain.Testing.Synapses.WorldAnswer.Fail.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.WorldAnswer.Fail.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.WorldAnswer.Fail.ToString() -> string!
+override DigitalBrain.Testing.Synapses.WorldAnswer.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.WorldAnswer.Ok.<Clone>$() -> DigitalBrain.Testing.Synapses.WorldAnswer.Ok!
+override DigitalBrain.Testing.Synapses.WorldAnswer.Ok.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.WorldAnswer.Ok.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.WorldAnswer.Ok.ToString() -> string!
+override DigitalBrain.Testing.Synapses.WorldAnswer.ToString() -> string!
+override DigitalBrain.Testing.Synapses.WorldCall.Equals(object? obj) -> bool
+override DigitalBrain.Testing.Synapses.WorldCall.GetHashCode() -> int
+override DigitalBrain.Testing.Synapses.WorldCall.ToString() -> string!
+override DigitalBrain.Testing.TestClock.CreateTimer(System.Threading.TimerCallback! callback, object? state, System.TimeSpan dueTime, System.TimeSpan period) -> System.Threading.ITimer!
+override DigitalBrain.Testing.TestClock.GetUtcNow() -> System.DateTimeOffset
+override sealed DigitalBrain.Testing.Synapses.ExpectFailure.Equals(DigitalBrain.Testing.Synapses.ScenarioStep? other) -> bool
+override sealed DigitalBrain.Testing.Synapses.ExpectNoSignal.Equals(DigitalBrain.Testing.Synapses.ScenarioStep? other) -> bool
+override sealed DigitalBrain.Testing.Synapses.ExpectSignal.Equals(DigitalBrain.Testing.Synapses.ScenarioStep? other) -> bool
+override sealed DigitalBrain.Testing.Synapses.ExpectState.Equals(DigitalBrain.Testing.Synapses.ScenarioStep? other) -> bool
+override sealed DigitalBrain.Testing.Synapses.ExpectView.Equals(DigitalBrain.Testing.Synapses.ScenarioStep? other) -> bool
+override sealed DigitalBrain.Testing.Synapses.Publish.Equals(DigitalBrain.Testing.Synapses.ScenarioStep? other) -> bool
+override sealed DigitalBrain.Testing.Synapses.Tick.Equals(DigitalBrain.Testing.Synapses.ScenarioStep? other) -> bool
+override sealed DigitalBrain.Testing.Synapses.WorldAnswer.Fail.Equals(DigitalBrain.Testing.Synapses.WorldAnswer? other) -> bool
+override sealed DigitalBrain.Testing.Synapses.WorldAnswer.Ok.Equals(DigitalBrain.Testing.Synapses.WorldAnswer? other) -> bool
+static DigitalBrain.Testing.CapabilityFakes.IdOf(System.Type! contract) -> DigitalBrain.Capabilities.CapabilityId
+static DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent.operator !=(DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent? left, DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent? right) -> bool
+static DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent.operator ==(DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent? left, DigitalBrain.Testing.Conformance.Storage.InMemoryOperationEvent? right) -> bool
+static DigitalBrain.Testing.Conformance.Storage.SeedEntry.operator !=(DigitalBrain.Testing.Conformance.Storage.SeedEntry? left, DigitalBrain.Testing.Conformance.Storage.SeedEntry? right) -> bool
+static DigitalBrain.Testing.Conformance.Storage.SeedEntry.operator ==(DigitalBrain.Testing.Conformance.Storage.SeedEntry? left, DigitalBrain.Testing.Conformance.Storage.SeedEntry? right) -> bool
+static DigitalBrain.Testing.Conformance.Storage.StorageSeed.Canonical.get -> DigitalBrain.Testing.Conformance.Storage.StorageSeed!
+static DigitalBrain.Testing.Conformance.Storage.StorageSeed.DeepChain.get -> System.Collections.Generic.IReadOnlyList<string!>!
+static DigitalBrain.Testing.Conformance.Storage.StorageSeed.ManyName(int index) -> string!
+static DigitalBrain.Testing.Conformance.Storage.StorageSeed.PlanBytes.get -> System.ReadOnlyMemory<byte>
+static DigitalBrain.Testing.NeuronHarness.Create<TNeuron>(DigitalBrain.NeuronId id, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Testing.NeuronHarness<TNeuron!>!>!
+static DigitalBrain.Testing.PresentedView.From(DigitalBrain.Units.PublishedView! published) -> DigitalBrain.Testing.PresentedView!
+static DigitalBrain.Testing.Synapses.ExpectFailure.operator !=(DigitalBrain.Testing.Synapses.ExpectFailure? left, DigitalBrain.Testing.Synapses.ExpectFailure? right) -> bool
+static DigitalBrain.Testing.Synapses.ExpectFailure.operator ==(DigitalBrain.Testing.Synapses.ExpectFailure? left, DigitalBrain.Testing.Synapses.ExpectFailure? right) -> bool
+static DigitalBrain.Testing.Synapses.ExpectNoSignal.operator !=(DigitalBrain.Testing.Synapses.ExpectNoSignal? left, DigitalBrain.Testing.Synapses.ExpectNoSignal? right) -> bool
+static DigitalBrain.Testing.Synapses.ExpectNoSignal.operator ==(DigitalBrain.Testing.Synapses.ExpectNoSignal? left, DigitalBrain.Testing.Synapses.ExpectNoSignal? right) -> bool
+static DigitalBrain.Testing.Synapses.ExpectSignal.operator !=(DigitalBrain.Testing.Synapses.ExpectSignal? left, DigitalBrain.Testing.Synapses.ExpectSignal? right) -> bool
+static DigitalBrain.Testing.Synapses.ExpectSignal.operator ==(DigitalBrain.Testing.Synapses.ExpectSignal? left, DigitalBrain.Testing.Synapses.ExpectSignal? right) -> bool
+static DigitalBrain.Testing.Synapses.ExpectState.operator !=(DigitalBrain.Testing.Synapses.ExpectState? left, DigitalBrain.Testing.Synapses.ExpectState? right) -> bool
+static DigitalBrain.Testing.Synapses.ExpectState.operator ==(DigitalBrain.Testing.Synapses.ExpectState? left, DigitalBrain.Testing.Synapses.ExpectState? right) -> bool
+static DigitalBrain.Testing.Synapses.ExpectView.operator !=(DigitalBrain.Testing.Synapses.ExpectView? left, DigitalBrain.Testing.Synapses.ExpectView? right) -> bool
+static DigitalBrain.Testing.Synapses.ExpectView.operator ==(DigitalBrain.Testing.Synapses.ExpectView? left, DigitalBrain.Testing.Synapses.ExpectView? right) -> bool
+static DigitalBrain.Testing.Synapses.Publish.operator !=(DigitalBrain.Testing.Synapses.Publish? left, DigitalBrain.Testing.Synapses.Publish? right) -> bool
+static DigitalBrain.Testing.Synapses.Publish.operator ==(DigitalBrain.Testing.Synapses.Publish? left, DigitalBrain.Testing.Synapses.Publish? right) -> bool
+static DigitalBrain.Testing.Synapses.ScenarioEvent.operator !=(DigitalBrain.Testing.Synapses.ScenarioEvent? left, DigitalBrain.Testing.Synapses.ScenarioEvent? right) -> bool
+static DigitalBrain.Testing.Synapses.ScenarioEvent.operator ==(DigitalBrain.Testing.Synapses.ScenarioEvent? left, DigitalBrain.Testing.Synapses.ScenarioEvent? right) -> bool
+static DigitalBrain.Testing.Synapses.ScenarioStep.operator !=(DigitalBrain.Testing.Synapses.ScenarioStep? left, DigitalBrain.Testing.Synapses.ScenarioStep? right) -> bool
+static DigitalBrain.Testing.Synapses.ScenarioStep.operator ==(DigitalBrain.Testing.Synapses.ScenarioStep? left, DigitalBrain.Testing.Synapses.ScenarioStep? right) -> bool
+static DigitalBrain.Testing.Synapses.ScenarioTranscript.operator !=(DigitalBrain.Testing.Synapses.ScenarioTranscript? left, DigitalBrain.Testing.Synapses.ScenarioTranscript? right) -> bool
+static DigitalBrain.Testing.Synapses.ScenarioTranscript.operator ==(DigitalBrain.Testing.Synapses.ScenarioTranscript? left, DigitalBrain.Testing.Synapses.ScenarioTranscript? right) -> bool
+static DigitalBrain.Testing.Synapses.Tick.operator !=(DigitalBrain.Testing.Synapses.Tick? left, DigitalBrain.Testing.Synapses.Tick? right) -> bool
+static DigitalBrain.Testing.Synapses.Tick.operator ==(DigitalBrain.Testing.Synapses.Tick? left, DigitalBrain.Testing.Synapses.Tick? right) -> bool
+static DigitalBrain.Testing.Synapses.UnitScenario.Run(DigitalBrain.Units.SynapseSource! source, DigitalBrain.Testing.Synapses.FakeSlots! fakes, System.Collections.Generic.IReadOnlyList<DigitalBrain.Testing.Synapses.ScenarioStep!>! steps, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Testing.Synapses.ScenarioTranscript!>!
+static DigitalBrain.Testing.Synapses.WorldAnswer.Fail.operator !=(DigitalBrain.Testing.Synapses.WorldAnswer.Fail? left, DigitalBrain.Testing.Synapses.WorldAnswer.Fail? right) -> bool
+static DigitalBrain.Testing.Synapses.WorldAnswer.Fail.operator ==(DigitalBrain.Testing.Synapses.WorldAnswer.Fail? left, DigitalBrain.Testing.Synapses.WorldAnswer.Fail? right) -> bool
+static DigitalBrain.Testing.Synapses.WorldAnswer.Json(string! json) -> DigitalBrain.Testing.Synapses.WorldAnswer!
+static DigitalBrain.Testing.Synapses.WorldAnswer.Ok.operator !=(DigitalBrain.Testing.Synapses.WorldAnswer.Ok? left, DigitalBrain.Testing.Synapses.WorldAnswer.Ok? right) -> bool
+static DigitalBrain.Testing.Synapses.WorldAnswer.Ok.operator ==(DigitalBrain.Testing.Synapses.WorldAnswer.Ok? left, DigitalBrain.Testing.Synapses.WorldAnswer.Ok? right) -> bool
+static DigitalBrain.Testing.Synapses.WorldAnswer.operator !=(DigitalBrain.Testing.Synapses.WorldAnswer? left, DigitalBrain.Testing.Synapses.WorldAnswer? right) -> bool
+static DigitalBrain.Testing.Synapses.WorldAnswer.operator ==(DigitalBrain.Testing.Synapses.WorldAnswer? left, DigitalBrain.Testing.Synapses.WorldAnswer? right) -> bool
+static DigitalBrain.Testing.Synapses.WorldAnswer.Status(int status) -> DigitalBrain.Testing.Synapses.WorldAnswer!
+static DigitalBrain.Testing.Synapses.WorldAnswer.Text(string! text) -> DigitalBrain.Testing.Synapses.WorldAnswer!
+static DigitalBrain.Testing.Synapses.WorldAnswer.TimedOut() -> DigitalBrain.Testing.Synapses.WorldAnswer!
+static DigitalBrain.Testing.Synapses.WorldCall.operator !=(DigitalBrain.Testing.Synapses.WorldCall? left, DigitalBrain.Testing.Synapses.WorldCall? right) -> bool
+static DigitalBrain.Testing.Synapses.WorldCall.operator ==(DigitalBrain.Testing.Synapses.WorldCall? left, DigitalBrain.Testing.Synapses.WorldCall? right) -> bool
+static DigitalBrain.Testing.TestBrain.Local(System.Action<DigitalBrain.Testing.TestOSOptions!>? configure = null) -> DigitalBrain.Testing.TestOS!
+static DigitalBrain.Testing.TestOS.Local(System.Action<DigitalBrain.Testing.TestOSOptions!>? configure = null) -> DigitalBrain.Testing.TestOS!
+static DigitalBrain.Testing.TestOSPolicyExtensions.AdoptPolicy(this DigitalBrain.Testing.TestOS! os, string! brainId, DigitalBrain.Limits.PolicyRule! rule, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Limits.PolicyRule!>!
+static DigitalBrain.Testing.TestOSSecretsIdentityExtensions.WithIdentity(this DigitalBrain.Testing.TestOS! os, string! name) -> DigitalBrain.Testing.TestOS!
+static DigitalBrain.Testing.TestOSSecretsIdentityExtensions.WithIdentity(this DigitalBrain.Testing.TestOS! os, string! name, DigitalBrain.Capabilities.Identity.IIdentity! identity, DigitalBrain.Capabilities.Identity.IGrants! grants) -> DigitalBrain.Testing.TestOS!
+static DigitalBrain.Testing.TestOSSecretsIdentityExtensions.WithIdentity(this DigitalBrain.Testing.TestOS! os, string! name, System.Action<DigitalBrain.Testing.FakeIdentity!>! configure) -> DigitalBrain.Testing.TestOS!
+static DigitalBrain.Testing.TestOSSecretsIdentityExtensions.WithSecrets(this DigitalBrain.Testing.TestOS! os, string! name) -> DigitalBrain.Testing.TestOS!
+static DigitalBrain.Testing.TestOSSecretsIdentityExtensions.WithSecrets(this DigitalBrain.Testing.TestOS! os, string! name, DigitalBrain.Capabilities.Secrets.ISecrets! secrets) -> DigitalBrain.Testing.TestOS!
+static DigitalBrain.Testing.TestOSSecretsIdentityExtensions.WithSecrets(this DigitalBrain.Testing.TestOS! os, string! name, System.Action<DigitalBrain.Testing.FakeSecrets!>! configure) -> DigitalBrain.Testing.TestOS!
+static DigitalBrain.Testing.TestOSStorageExtensions.WithStorage(this DigitalBrain.Testing.TestOS! os, string! name, DigitalBrain.Capabilities.Storage.IStorage! storage) -> DigitalBrain.Testing.TestOS!
+static DigitalBrain.Testing.TestOSStorageExtensions.WithStorage(this DigitalBrain.Testing.TestOS! os, string! name, string? label = null, DigitalBrain.Capabilities.Storage.Quota? quota = null, System.Action<DigitalBrain.Testing.FakeStorage!>? configure = null) -> DigitalBrain.Testing.TestOS!
+static readonly DigitalBrain.Testing.Conformance.AmbientCallerScope.LocalOwner -> DigitalBrain.Capabilities.CapabilityCaller!
+static readonly DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.DefaultSessionLifetime -> System.TimeSpan
+virtual DigitalBrain.Testing.Conformance.Identity.InMemoryIdentity.OnCall(string! member) -> void
+virtual DigitalBrain.Testing.Conformance.Secrets.InMemorySecrets.OnCall(string! member) -> void
+virtual DigitalBrain.Testing.Conformance.Storage.InMemoryStorage.OnCall(string! member) -> void
+virtual DigitalBrain.Testing.Synapses.ScenarioStep.EqualityContract.get -> System.Type!
+virtual DigitalBrain.Testing.Synapses.ScenarioStep.Equals(DigitalBrain.Testing.Synapses.ScenarioStep? other) -> bool
+virtual DigitalBrain.Testing.Synapses.ScenarioStep.PrintMembers(System.Text.StringBuilder! builder) -> bool
+virtual DigitalBrain.Testing.Synapses.WorldAnswer.EqualityContract.get -> System.Type!
+virtual DigitalBrain.Testing.Synapses.WorldAnswer.Equals(DigitalBrain.Testing.Synapses.WorldAnswer? other) -> bool
+virtual DigitalBrain.Testing.Synapses.WorldAnswer.PrintMembers(System.Text.StringBuilder! builder) -> bool

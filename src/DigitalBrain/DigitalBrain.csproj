@@ -18,17 +18,20 @@
     <InternalsVisibleTo Include="DigitalBrain.Tests.Unit" />
     <InternalsVisibleTo Include="DigitalBrain.Runtime.Orleans" />
     <InternalsVisibleTo Include="DigitalBrain.Testing" />
+    <InternalsVisibleTo Include="DigitalBrain.Simulation" />
     <InternalsVisibleTo Include="DigitalBrain.Runtime.Http" />
     <InternalsVisibleTo Include="DigitalBrain.Testing.Tests.Unit" />
     <InternalsVisibleTo Include="DigitalBrain.Capabilities.Connections" />
     <InternalsVisibleTo Include="DigitalBrain.Runtime.Orleans.Tests.Integration" />
     <InternalsVisibleTo Include="DigitalBrain.Testing.Silo" />
     <InternalsVisibleTo Include="DigitalBrain.Framework.Tests.E2E" />
+    <InternalsVisibleTo Include="DigitalBrain.Identity.Local" />
   </ItemGroup>
   <ItemGroup>
     <!-- Analyzer-only (03-04): no assembly reference. NuGet drops ReferenceOutputAssembly=false references from the
          dependency list (pack-and-consume probe), so the analyzer dll is bundled under analyzers/dotnet/cs below;
          DigitalBrain.Analyzers still ships as its own package. -->
+    <ProjectReference Include="..\DigitalBrain.UI\DigitalBrain.UI.csproj" />
     <ProjectReference Include="../DigitalBrain.Analyzers/DigitalBrain.Analyzers.csproj" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
   </ItemGroup>
   <Target Name="DigitalBrainBundleAnalyzers" BeforeTargets="_GetPackageFiles">

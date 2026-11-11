@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using DigitalBrain.Modules.Validation;
 
 namespace DigitalBrain.Tests.Unit.Modules;

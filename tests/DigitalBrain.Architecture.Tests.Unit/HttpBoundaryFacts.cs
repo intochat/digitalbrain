@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
@@ -14,7 +14,7 @@ public sealed partial class HttpBoundaryFacts
 
     public static readonly TheoryData<string> AspNetFreeProjects = new()
     {
-        "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Analyzers",
+        "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Simulation", "DigitalBrain.Testing", "DigitalBrain.Analyzers",
         "DigitalBrain.Capabilities.Storage", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Identity",
         "DigitalBrain.Capabilities.Compute", "DigitalBrain.Capabilities.Connections", "DigitalBrain.Capabilities.Http", "DigitalBrain.Capabilities.Tools", "DigitalBrain.Identity.Local",
     };
@@ -41,7 +41,7 @@ public sealed partial class HttpBoundaryFacts
     {
         Assembly[] assemblies =
         [
-            typeof(Signal).Assembly, typeof(DigitalBrain.UI.View).Assembly, typeof(DigitalBrain.Testing.ManualTime).Assembly,
+            typeof(Signal).Assembly, typeof(DigitalBrain.UI.View).Assembly, typeof(DigitalBrain.Testing.TestOS).Assembly, typeof(DigitalBrain.Testing.SiloHost).Assembly,
             typeof(DigitalBrain.Capabilities.Storage.IStorage).Assembly, typeof(DigitalBrain.Capabilities.Secrets.ISecrets).Assembly,
             typeof(DigitalBrain.Capabilities.Identity.IIdentity).Assembly, typeof(DigitalBrain.Capabilities.Compute.ICostMeter).Assembly,
             typeof(DigitalBrain.Capabilities.Connections.IConnection).Assembly, typeof(DigitalBrain.Capabilities.Http.IHttpRead).Assembly,

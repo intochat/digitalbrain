@@ -2,7 +2,8 @@ using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using DigitalBrain.Invocation;
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
+using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Units;
 
@@ -208,7 +209,7 @@ internal sealed class UnitNeuron<TState> : Neuron<StoredUnit<TState>>, ISynapseR
 
     private Microsoft.Extensions.Logging.ILogger Logger()
     {
-        try { return (Context.Services.GetService(typeof(Microsoft.Extensions.Logging.ILoggerFactory)) as Microsoft.Extensions.Logging.ILoggerFactory)?.CreateLogger("DigitalBrain.Synapses") ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance; }
+        try { return (Seat.Services.GetService(typeof(Microsoft.Extensions.Logging.ILoggerFactory)) as Microsoft.Extensions.Logging.ILoggerFactory)?.CreateLogger("DigitalBrain.Synapses") ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance; }
         catch { return Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance; }
     }
 }

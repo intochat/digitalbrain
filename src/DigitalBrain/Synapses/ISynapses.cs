@@ -1,4 +1,6 @@
-namespace DigitalBrain.Spi;
+using DigitalBrain.Neurons;
+
+namespace DigitalBrain.Kernel;
 
 /// <summary>
 /// The synapses a neuron holds as a subscriber. A synapse is durable: it survives restarts and is declared again harmlessly.

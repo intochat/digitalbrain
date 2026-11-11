@@ -2,6 +2,7 @@
 
 using System.Text.Json;
 using DigitalBrain.Invocation;
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Units;
 

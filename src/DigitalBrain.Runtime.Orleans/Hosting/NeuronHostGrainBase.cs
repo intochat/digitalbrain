@@ -6,7 +6,8 @@ using DigitalBrain.Invocation;
 using DigitalBrain.Kernel;
 using DigitalBrain.Rules;
 using DigitalBrain.Runtime.Orleans.Access;
-using DigitalBrain.Spi;
+using DigitalBrain.Neurons;
+using DigitalBrain.Units;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
@@ -59,7 +60,8 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
         var expected = NeuronTypeRegistry.GrainTypeOf(registration.Policy);
         if (expected != GrainTypeName) { throw new BindingException($"{neuronClass.FullName} is hosted by {expected}, not {GrainTypeName}."); }
         _class = neuronClass;
-        var neuron = Construct(ServiceProvider, neuronClass);
+        var bound = new NeuronServices(ServiceProvider, id, ServiceProvider.GetServices<NeuronBinding>());
+        var neuron = Construct(bound, neuronClass);
         var logs = ServiceProvider.GetService<BrainLogs>();
         BrainLog? log = logs is not null ? await logs.For(id.Brain.Value).ConfigureAwait(true) : null;
         var time = (TimeProvider?)ServiceProvider.GetService(typeof(TimeProvider)) ?? TimeProvider.System;
@@ -89,7 +91,7 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
             {
                 ServiceProvider.GetService<Signalling.ClusterListeners>()?.Offer(pub, sigs);
             });
-        var context = new HostNeuronContext(id, this.GetGrainId(), registration, ServiceProvider, grains, types,
+        var context = new HostNeuronContext(id, this.GetGrainId(), registration, bound, grains, types,
             ServiceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress.ToString(), this, _deferred.Enqueue, delivery, journal, nudge);
         NeuronAttachment.Attach(neuron, context);
         await NeuronAttachment.Activate(neuron, cancellationToken).ConfigureAwait(true);
@@ -242,7 +244,7 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
         ArgumentNullException.ThrowIfNull(signalAliases);
         if (_neuron is not { } neuron) { throw new InvalidOperationException($"The neuron {_key} is not active."); }
         // Admission is decided under the subscriber's identity: a caller may not ask on behalf of another neuron (T-04-36).
-        var caller = _callers.Current?.Via?.ToString() ?? (RequestContext.Get(HostNeuronContext.CallerKey) as string) ?? string.Empty;
+        var caller = (RequestContext.Get(HostNeuronContext.CallerKey) as string) ?? _callers.Current?.Via?.ToString() ?? string.Empty;
         if (!string.Equals(caller, subscriber.ToString(), StringComparison.Ordinal))
         {
             throw new UnauthorizedAccessException($"Admission of {subscriber} was asked by '{caller}', not by the subscriber.");
@@ -281,7 +283,7 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
     {
         if (_neuron is null) { throw new InvalidOperationException($"The neuron {_key} is not active."); }
         var installs = new NeuronId(NeuronId.Parse(_key).Brain, OrleansInstallHooks.InstallsType, "default").ToString();
-        var caller = _callers.Current?.Via?.ToString() ?? (RequestContext.Get(HostNeuronContext.CallerKey) as string) ?? string.Empty;
+        var caller = (RequestContext.Get(HostNeuronContext.CallerKey) as string) ?? _callers.Current?.Via?.ToString() ?? string.Empty;
         if (!string.Equals(caller, installs, StringComparison.Ordinal))
         {
             throw new UnauthorizedAccessException($"The brain-wide synapse of {_key} was asked by '{caller}', not by {installs}.");

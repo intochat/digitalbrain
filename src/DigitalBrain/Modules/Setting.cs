@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Modules;
 
 /// <summary>An options type a module binds from a configuration section.</summary>
 /// <param name="OptionsType">The options type.</param>

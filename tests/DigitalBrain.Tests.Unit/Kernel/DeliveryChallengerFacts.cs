@@ -5,7 +5,6 @@
 using System.Collections.Concurrent;
 using DigitalBrain.Kernel;
 using DigitalBrain.Signals;
-using DigitalBrain.Spi;
 
 namespace DigitalBrain.Tests.Unit.Kernel;
 

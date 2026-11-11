@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Runtime.Orleans.Capabilities;
 using DigitalBrain.Testing.Conformance.Secrets;

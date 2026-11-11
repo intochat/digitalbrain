@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>One thing a unit asks the kernel to do. Data only.</summary>
 /// <param name="Slot">The <c>[Slot]</c> parameter name the person approved and bound.</param>

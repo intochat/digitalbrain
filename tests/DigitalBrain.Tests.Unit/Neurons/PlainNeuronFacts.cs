@@ -1,5 +1,6 @@
+using DigitalBrain.Kernel;
 using System.Reflection;
-using DigitalBrain.Spi;
+using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Tests.Unit.Neurons;
 

@@ -1,6 +1,8 @@
+using DigitalBrain.Neurons;
+using DigitalBrain.Units;
 using System.Collections.Concurrent;
 using DigitalBrain.Capabilities;
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
 using DigitalBrain.Time;
 using OS = DigitalBrain.Testing.TestOS;
 

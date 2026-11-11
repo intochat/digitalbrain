@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using DigitalBrain.Runtime.Orleans.Tests.Integration.Hosting;
 
 namespace DigitalBrain.Runtime.Orleans.Tests.Integration.Synapses;

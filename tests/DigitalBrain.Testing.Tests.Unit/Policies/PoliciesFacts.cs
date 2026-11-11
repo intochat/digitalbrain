@@ -1,3 +1,6 @@
+using DigitalBrain.Kernel;
+using DigitalBrain.Limits;
+using DigitalBrain.Modules;
 using DigitalBrain.Rules;
 using OS = DigitalBrain.Testing.TestOS;
 
@@ -300,7 +303,7 @@ public sealed class PoliciesFacts
 
     private static async Task<int> ReservationCount(OS os)
     {
-        var state = await ((DigitalBrain.Spi.IBrainObserver)os).State(Policies, Ct);
+        var state = await ((DigitalBrain.Kernel.IBrainObserver)os).State(Policies, Ct);
         return state is { } json && json.TryGetProperty("reservations", out var reservations) ? reservations.GetArrayLength() : -1;
     }
 }

@@ -72,4 +72,7 @@ public sealed record ConfirmationResult(string PlanId, ConfirmationOutcome Outco
 {
     /// <summary>True when approved.</summary>
     public bool Approved => Outcome == ConfirmationOutcome.Approved;
+
+    /// <summary>Who answered; null when expired or skipped.</summary>
+    public ConfirmationPrincipal? Approver { get; init; }
 }

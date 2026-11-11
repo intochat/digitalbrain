@@ -46,7 +46,7 @@ public sealed class BareInvariantAnalyzer : DiagnosticAnalyzer
         if (method.DeclaredAccessibility != Accessibility.Public && !Rules.Has(method, "DigitalBrain.OnAttribute")) { return; }
         if (method.IsStatic || Rules.Has(method, "DigitalBrain.ScenarioAttribute")) { return; }
         var owner = method.ContainingType;
-        if (!Rules.DerivesFrom(owner, "DigitalBrain.Neuron") && !Rules.DerivesFrom(owner, "DigitalBrain.App")) { return; }
+        if (!Rules.DerivesFrom(owner, "DigitalBrain.Neuron")) { return; }
         context.ReportDiagnostic(Diagnostic.Create(Rules.BareInvariant, context.Node.GetLocation(), method.Name, exception.Name));
     }
 

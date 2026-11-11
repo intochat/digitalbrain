@@ -8,7 +8,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>DigitalBrain.Analyzers</PackageId>
     <RootNamespace>DigitalBrain.Analyzers</RootNamespace>
-    <Description>Build-time rules for DigitalBrain modules, apps and neurons (DB0001-DB0003, DB0013, DB0020-DB0023, DB0025-DB0028, DB0030-DB0033, DB0041-DB0044).</Description>
+    <Description>Build-time rules for DigitalBrain modules, screens and neurons.</Description>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <IncludeSymbols>false</IncludeSymbols>
@@ -22,7 +22,7 @@
     <InternalsVisibleTo Include="DigitalBrain.Analyzers.Tests.Unit" />
     <InternalsVisibleTo Include="DigitalBrain.Analyzers.CodeFixes" />
     <InternalsVisibleTo Include="DigitalBrain.Runtime.Synapses" />
-    <Compile Include="..\DigitalBrain\Apps\SpecComment.cs" Link="Apps\SpecComment.cs" />
+    <Compile Include="..\DigitalBrain\Screens\SpecComment.cs" Link="Screens\SpecComment.cs" />
     <AdditionalFiles Include="AnalyzerReleases.Shipped.md;AnalyzerReleases.Unshipped.md" />
     <None Include="$(OutputPath)$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>

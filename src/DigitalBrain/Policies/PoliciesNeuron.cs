@@ -1,6 +1,8 @@
+using DigitalBrain.Units;
 using DigitalBrain.Confirmation;
+using DigitalBrain.Neurons;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Limits;
 
 /// <summary>
 /// The per-brain policies neuron (<c>{brain}/policies/default</c>): asks a person before adopting a promise, reserves against adopted
@@ -50,7 +52,19 @@ public sealed class PoliciesNeuron : Neuron<PoliciesState>, IPolicies
         await Save(
             State.StageProposal(pending),
             [new PolicyProposed(prepared.Id, plan.Id, text)]).ConfigureAwait(true);
-        _ = Ask(plan);
+        var requests = Context.Get<IConfirmationRequests>(IConfirmationRequests.Of(Id.Brain));
+        var immediate = await requests.Request(plan).ConfigureAwait(true);
+        if (immediate is not null)
+        {
+            if (!immediate.Approved)
+            {
+                await Save(State.DenyProposal(pending.PlanId), [new StateChanged(Id.ToString(), "policy.denied")]).ConfigureAwait(true);
+                return new ProposalOutcome(ProposalStatus.Denied, prepared.Id, text, plan.Id, immediate.Reason.ToString());
+            }
+            var (next, adopted) = State.AdoptProposal(pending, Context.Time.GetUtcNow());
+            await Save(next, [new PolicyAdopted(adopted.Id, adopted.Action, adopted.Text)]).ConfigureAwait(true);
+            return new ProposalOutcome(ProposalStatus.Adopted, prepared.Id, text, plan.Id, null);
+        }
         return new ProposalOutcome(ProposalStatus.Pending, prepared.Id, text, plan.Id, null);
     }
 
@@ -66,7 +80,11 @@ public sealed class PoliciesNeuron : Neuron<PoliciesState>, IPolicies
             return;
         }
 
-        if (resolved.Outcome != ConfirmationOutcome.Approved)
+        var requests = Context.Get<IConfirmationRequests>(IConfirmationRequests.Of(Id.Brain));
+        var outcome = await requests.Outcome(resolved.PlanId).ConfigureAwait(true);
+        if (outcome is null) { return; }
+
+        if (!outcome.Approved)
         {
             await Save(State.DenyProposal(pending.PlanId), [new StateChanged(Id.ToString(), "policy.denied")]).ConfigureAwait(true);
             return;
@@ -123,14 +141,9 @@ public sealed class PoliciesNeuron : Neuron<PoliciesState>, IPolicies
     public Task<IReadOnlyList<ActionDescriptor>> Actions(CancellationToken ct = default) => Task.FromResult(DeclaredActions);
 
     /// <inheritdoc />
-    protected override Task OnActivate(CancellationToken cancellationToken) => Context.Synapses.EnsureBrainWide(typeof(ConfirmationResolved));
+    protected override Task OnActivate(CancellationToken cancellationToken)
+        => Context.Synapses.Ensure<ConfirmationResolved>(IConfirmationRequests.Of(Id.Brain));
 
     private IReadOnlyList<ActionDescriptor> DeclaredActions
-        => Context.Services.GetService(typeof(IReadOnlyList<ActionDescriptor>)) as IReadOnlyList<ActionDescriptor> ?? [];
-
-    private async Task Ask(ConfirmationPlan plan)
-    {
-        try { _ = await Context.Confirm(plan, CancellationToken.None).ConfigureAwait(true); }
-        catch (Exception error) when (error is not OutOfMemoryException) { _ = error; }
-    }
+        => Seat.Services.GetService(typeof(IReadOnlyList<ActionDescriptor>)) as IReadOnlyList<ActionDescriptor> ?? [];
 }

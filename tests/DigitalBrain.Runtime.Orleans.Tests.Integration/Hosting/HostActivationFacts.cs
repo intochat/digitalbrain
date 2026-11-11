@@ -1,9 +1,11 @@
+﻿using DigitalBrain.Modules;
+using DigitalBrain.Neurons;
 using System.Reflection;
 using System.Reflection.Emit;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Synapses;
 using DigitalBrain.Runtime.Orleans.Testing;
-using DigitalBrain.Spi;
+using DigitalBrain.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -41,7 +43,7 @@ public sealed class GreeterNeuron(Greeting greeting, IGreetingPort port) : Neuro
 
 /// <summary>The module of the hosting probes: its assembly is what UseModuleTopology hands to AddDigitalBrainRuntime.</summary>
 [Module("hosting-test")]
-public sealed class HostingModule : Module
+public sealed class HostingModule : DigitalBrain.Modules.Module
 {
     public static ModuleManifest Manifest { get; } = new([], [], [], [], []);
 }
@@ -70,15 +72,6 @@ public sealed class HostActivationFacts
         var error = Assert.Throws<InvalidOperationException>(() => new NeuronTypeRegistry([typeof(ProbeNeuron).Assembly, clash]));
         Assert.Contains(typeof(ProbeNeuron).FullName!, error.Message);
         Assert.Contains("Emitted.Clash", error.Message);
-    }
-
-    [Fact]
-    public void A_neuron_marked_class_deriving_App_fails_startup()
-    {
-        var app = Emit(("Emitted.ScriptApp", typeof(App), "emitted.app"));
-        var error = Assert.Throws<InvalidOperationException>(() => new NeuronTypeRegistry([app]));
-        Assert.Contains("script apps run in the sandbox, not in the silo", error.Message);
-        Assert.Contains("Emitted.ScriptApp", error.Message);
     }
 
     [Fact]

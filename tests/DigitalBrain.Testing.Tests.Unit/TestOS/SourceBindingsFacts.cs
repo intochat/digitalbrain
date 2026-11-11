@@ -1,4 +1,5 @@
-using DigitalBrain.Spi;
+using DigitalBrain.Units;
+using DigitalBrain.Kernel;
 using DigitalBrain.Testing;
 using DigitalBrain.Testing.Tests.Unit.Slots;
 using OS = DigitalBrain.Testing.TestOS;

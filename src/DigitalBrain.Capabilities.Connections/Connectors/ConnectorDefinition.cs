@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using System.Reflection;
 
 namespace DigitalBrain.Capabilities.Connections.Connectors;

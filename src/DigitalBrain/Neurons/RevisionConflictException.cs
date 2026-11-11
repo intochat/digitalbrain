@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Neurons;
 
 /// <summary>A commit expected another revision than the current one.</summary>
 public sealed class RevisionConflictException : Exception

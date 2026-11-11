@@ -1,3 +1,5 @@
+using DigitalBrain.Kernel;
+using DigitalBrain.Neurons;
 using DigitalBrain.Capabilities.Compute;
 using Orleans.Runtime;
 

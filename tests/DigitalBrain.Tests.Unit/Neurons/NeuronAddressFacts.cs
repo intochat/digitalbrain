@@ -1,3 +1,5 @@
+using DigitalBrain.Brains;
+
 namespace DigitalBrain.Tests.Unit.Neurons;
 
 public sealed class NeuronAddressFacts

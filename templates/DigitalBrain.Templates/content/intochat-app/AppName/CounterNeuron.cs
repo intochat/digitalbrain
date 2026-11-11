@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using System.Text.Json.Serialization;
 using DigitalBrain;
 using DigitalBrain.Contracts;

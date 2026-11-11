@@ -2,7 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using DigitalBrain.Invocation;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 internal static class AskCall
 {

@@ -1,4 +1,5 @@
-using DigitalBrain.Spi;
+using DigitalBrain.Neurons;
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Graph;
 
@@ -8,8 +9,10 @@ namespace DigitalBrain.Graph;
 /// touches it. Analysis runs in its own turn and is cached by revision.
 /// </summary>
 [Neuron("brain.graph", State = "graph")]
-public sealed class BrainGraphNeuron : Neuron<BrainGraphState>, IBrainGraph
+public sealed class BrainGraphNeuron(IBrainObserver? observer = null, IEnumerable<IGraphSource>? sources = null) : Neuron<BrainGraphState>, IBrainGraph
 {
+    private readonly IBrainObserver? _observer = observer;
+    private readonly IEnumerable<IGraphSource>? _sources = sources;
     /// <summary>How old an in-memory snapshot may be before a read rebuilds it.</summary>
     public static TimeSpan Staleness { get; } = TimeSpan.FromSeconds(30);
 
@@ -64,9 +67,9 @@ public sealed class BrainGraphNeuron : Neuron<BrainGraphState>, IBrainGraph
 
     private async Task Build()
     {
-        var observer = Context.Services.GetService(typeof(IBrainObserver)) as IBrainObserver
+        var observer = _observer
             ?? throw new InvalidOperationException("No IBrainObserver is registered: the brain graph reads neuron instances and synapses from it.");
-        var sources = Context.Services.GetService(typeof(IEnumerable<IGraphSource>)) as IEnumerable<IGraphSource> ?? [];
+        var sources = _sources ?? [];
         var candidate = await GraphBuilder.Build(Id.Brain, observer, sources, State.Revision + 1, CancellationToken.None).ConfigureAwait(true);
         var hash = Csr.Hash(candidate);
         _builtAt = Context.Time.GetUtcNow();

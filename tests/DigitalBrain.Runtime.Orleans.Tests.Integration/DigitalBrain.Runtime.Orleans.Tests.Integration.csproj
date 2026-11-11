@@ -10,8 +10,5 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="../DigitalBrain.Framework.Tests.E2E/WeeklyCap/Budget.cs" Link="Synapses/WeeklyCap/Budget.cs" />
-    <Compile Include="../DigitalBrain.Framework.Tests.E2E/WeeklyCap/Payments.cs" Link="Synapses/WeeklyCap/Payments.cs" />
-  </ItemGroup>
+
 </Project>

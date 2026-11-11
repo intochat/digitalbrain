@@ -45,7 +45,7 @@ public sealed class BareInvariantAnalyzerFacts
         using System;
         using DigitalBrain;
         public sealed record Placed : Signal;
-        public sealed class Orders : App
+        public sealed class Orders : Neuron
         {
             [On] private void When(Placed placed) { {|DB0040:throw new InvalidOperationException("Order already placed");|} }
         }

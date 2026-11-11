@@ -1,3 +1,5 @@
+using DigitalBrain.Neurons;
+
 namespace DigitalBrain.Kernel;
 
 /// <summary>Everything one journal entry of a neuron contains; durable as a whole or not at all.</summary>

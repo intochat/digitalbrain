@@ -1,5 +1,5 @@
+using DigitalBrain.Neurons;
 using DigitalBrain.Signals;
-using DigitalBrain.Spi;
 
 namespace DigitalBrain.Kernel;
 

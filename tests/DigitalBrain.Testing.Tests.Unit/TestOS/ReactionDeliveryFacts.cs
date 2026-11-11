@@ -1,5 +1,8 @@
 using OS = DigitalBrain.Testing.TestOS;
 
+using DigitalBrain.Neurons;
+using DigitalBrain.Kernel;
+
 namespace DigitalBrain.Testing.Tests.Unit.Hosting;
 
 [Signal("test.number")]

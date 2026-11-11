@@ -1,3 +1,5 @@
+using DigitalBrain.Units;
+
 namespace DigitalBrain.Runtime.Synapses;
 
 /// <summary>An <see cref="ISourceStore"/> over the <see cref="ISources"/> neuron of each brain.</summary>

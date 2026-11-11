@@ -51,6 +51,7 @@
     ],
     "neurons": [
       "policies",
+      "runtime.confirmations",
       "runtime.listener",
       "runtime.operation",
       "runtime.session",

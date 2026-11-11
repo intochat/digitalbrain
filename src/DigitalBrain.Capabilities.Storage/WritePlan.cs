@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using DigitalBrain.Operations;
 
 namespace DigitalBrain.Capabilities.Storage;
@@ -59,6 +60,16 @@ public sealed record WritePlan(
     ReadOnlyMemory<byte>? Inline = null,
     bool DryRun = false) : OperationPlan(DryRun)
 {
+    /// <inheritdoc />
+    [JsonIgnore]
+    public override ReadOnlyMemory<byte>? Payload => Inline;
+
+    /// <inheritdoc />
+    public override OperationPlan Persisted() => this with { Inline = null };
+
+    /// <inheritdoc />
+    public override OperationPlan WithPayload(ReadOnlyMemory<byte> payload) => this with { Inline = payload };
+
     /// <summary>Create a folder.</summary>
     public static WritePlan CreateFolder(ItemId parent, string name, ConflictPolicy conflict = ConflictPolicy.Fail) =>
         new(WriteKind.CreateFolder, null, parent, Named(name), conflict);

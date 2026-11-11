@@ -1,6 +1,6 @@
 using DigitalBrain.Kernel;
 using DigitalBrain.Runtime.Orleans.Hosting;
-using DigitalBrain.Spi;
+using DigitalBrain.Units;
 using DigitalBrain.Time;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
@@ -64,8 +64,10 @@ internal sealed class OrleansInstallHooks(IServiceProvider services) : IInstallH
         var types = services.GetRequiredService<NeuronTypeRegistry>();
         var host = services.GetRequiredService<IGrainFactory>().GetGrain<ISynapseHost>(
             GrainId.Create(NeuronTypeRegistry.GrainTypeOf(types.Require(state.Type).Policy), state.ToString()));
+        var installs = new NeuronId(state.Brain, InstallsType, "default");
         var previous = RequestContext.Get(HostNeuronContext.CallerKey);
-        RequestContext.Set(HostNeuronContext.CallerKey, new NeuronId(state.Brain, InstallsType, "default").ToString());
+        RequestContext.Set(HostNeuronContext.CallerKey, installs.ToString());
+        using var callerScope = Access.OrleansCallerAmbient.Instance.Enter(DigitalBrain.Access.Caller.OfKernel(state.Brain, via: installs));
         try { await call(host).ConfigureAwait(true); }
         finally
         {

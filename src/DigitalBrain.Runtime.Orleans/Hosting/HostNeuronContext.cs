@@ -1,10 +1,9 @@
 using DigitalBrain.Confirmation;
 using DigitalBrain.Invocation;
 using DigitalBrain.Kernel;
-using DigitalBrain.Runtime.Orleans.Operations;
+using DigitalBrain.Neurons;
 using DigitalBrain.Runtime.Orleans.Storage;
 using DigitalBrain.Runtime.Orleans.Synapses;
-using DigitalBrain.Spi;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
@@ -17,7 +16,7 @@ internal interface IHostNeuronContext
     string Silo { get; }
 }
 
-internal sealed class HostNeuronContext : INeuronContext, IHostNeuronContext
+internal sealed class HostNeuronContext : INeuronContext, INeuronSeat, IHostNeuronContext
 {
     internal const string CallerKey = "db.caller";
 
@@ -76,28 +75,15 @@ internal sealed class HostNeuronContext : INeuronContext, IHostNeuronContext
 
     public TimeProvider Time => (TimeProvider?)_services.GetService(typeof(TimeProvider)) ?? TimeProvider.System;
 
-    public INeuronState State => _state;
-
     public ITimers Timers => _timers;
 
     public IReminders Reminders => _timers;
-
-    public IOperations Operations => field ??= new RuntimeOperations(_services, Id.Brain, Id.ToString());
-
-    public IOperationsQuery OperationsQuery => field ??= new RuntimeOperationsQuery(_services, Id.Brain);
 
     public ISynapses Synapses { get; }
 
     public Delivery Delivery { get; }
 
     internal IAdmission Admission { get; }
-
-    public ISignalHistory History => (_services.GetService<BrainSignalHistories>()
-        ?? throw new InvalidOperationException("Signal history needs BrainLog as the cluster store (BrainStorageRegistration).")).For(Id.Brain);
-
-    public IConfirmations Confirmations
-        => _services.GetService<IConfirmationContexts>()?.For(Id.Brain, Id.ToString())
-            ?? _services.GetService<IConfirmations>() ?? UnavailableConfirmations.Instance;
 
     public string? TraceId => CurrentCause.Stamp().TraceId;
 
@@ -122,6 +108,39 @@ internal sealed class HostNeuronContext : INeuronContext, IHostNeuronContext
         ArgumentNullException.ThrowIfNull(work);
         _defer(work);
     }
+
+    public bool Interrupts(Exception error)
+    {
+        for (var current = error; current is not null; current = current.InnerException)
+        {
+            if (current is SiloUnavailableException) { return true; }
+        }
+        var stopping = _services.GetService<Microsoft.Extensions.Hosting.IHostApplicationLifetime>()?.ApplicationStopping;
+        return stopping?.IsCancellationRequested == true;
+    }
+
+    public void Detach(Func<CancellationToken, Task> work)
+    {
+        ArgumentNullException.ThrowIfNull(work);
+        _ticks.StartTimer("detached-" + Guid.NewGuid().ToString("N"), TimeSpan.FromSeconds(30), null, keepAlive: true);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await work(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Unhandled detached work does not fault the host
+            }
+        });
+    }
+
+    public Task<TState?> Load<TState>() where TState : class => _state.Load<TState>();
+
+    public Task Save<TState>(TState next, IReadOnlyList<Signal> signals) where TState : class => _state.Save(next, signals);
+
+    public Task Clear() => _state.Clear();
 
     internal void DeactivateOnIdle() => _ticks.Deactivate();
 

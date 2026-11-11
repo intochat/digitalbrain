@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Capabilities.Identity;
 using DigitalBrain.Contracts;

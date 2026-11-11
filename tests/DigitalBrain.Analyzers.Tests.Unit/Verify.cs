@@ -22,26 +22,19 @@ internal static class Verify<TAnalyzer> where TAnalyzer : DiagnosticAnalyzer, ne
             public sealed class CallTimeoutAttribute(int milliseconds) : System.Attribute { public int Milliseconds { get; } = milliseconds; }
             public sealed class ReentrantAttribute : System.Attribute;
             public abstract class Module { }
-            public abstract class App
+            public interface IScreen { }
+            public abstract class Screen<TState> : Neuron, IScreen where TState : class, new()
             {
-                protected AppKey Key(BrainId brain) => default;
-                protected RequestLedger Requests { get; } = new RequestLedger();
-                protected bool Present<TView>(System.Action<TView, TView> publish, System.Func<TView> side, System.Func<TView> main, string operation = "") where TView : class => true;
-                protected T Get<T>(string key) where T : class => default!;
-                protected void RecordError(System.Exception error, string operation = "") { }
-                protected void Swallow(System.Exception error, string reason, string operation = "") { }
-                protected void Check(string operation, params DigitalBrain.Rules.Rule[] rules) { }
+                protected abstract DigitalBrain.UI.View Render(TState state);
+                protected System.Threading.Tasks.Task Show(TState next, params Signal[] facts) => System.Threading.Tasks.Task.CompletedTask;
+                protected TState State { get; } = new();
             }
             public readonly record struct BrainId(string Value);
-            public readonly record struct AppKey
+            public abstract class Neuron
             {
-                public static AppKey Parse(string path) => default;
-                public static AppKey operator /(AppKey key, string part) => key;
-                public static AppKey operator /(AppKey key, long part) => key;
-                public static implicit operator string(AppKey key) => "";
+                protected T Get<T>(string key) where T : class => default!;
+                protected System.Threading.Tasks.Task Check(string operation, params DigitalBrain.Rules.Rule[] rules) => System.Threading.Tasks.Task.CompletedTask;
             }
-            public sealed class RequestLedger { public bool Handled(System.Guid id) => false; public bool Record(System.Guid id) => true; }
-            public abstract class Neuron { protected System.Threading.Tasks.Task Check(string operation, params DigitalBrain.Rules.Rule[] rules) => System.Threading.Tasks.Task.CompletedTask; }
             public sealed class ModuleManifest { }
             public abstract record Signal;
             [System.AttributeUsage(System.AttributeTargets.Class)] public sealed class StateAttribute(string alias) : System.Attribute { public string Alias { get; } = alias; }
@@ -87,6 +80,10 @@ internal static class Verify<TAnalyzer> where TAnalyzer : DiagnosticAnalyzer, ne
                 public static CapabilityId Parse(string text) => default;
                 public static bool TryParse(string? text, out CapabilityId id) { id = default; return false; }
             }
+        }
+        namespace DigitalBrain.UI
+        {
+            public sealed record View(string Title, object Root);
         }
         namespace Orleans
         {

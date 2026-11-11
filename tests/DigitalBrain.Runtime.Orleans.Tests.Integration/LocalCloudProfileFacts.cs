@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using DigitalBrain.Capabilities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;

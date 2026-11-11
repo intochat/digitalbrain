@@ -4,7 +4,7 @@ using System.Text;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Time;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>One capability slot a synapse app needs connected.</summary>
 /// <param name="Name">The slot (parameter) name.</param>

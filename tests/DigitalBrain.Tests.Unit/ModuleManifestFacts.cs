@@ -1,3 +1,4 @@
+﻿using DigitalBrain.Modules;
 using DigitalBrain.Capabilities;
 
 namespace DigitalBrain.Tests.Unit;
@@ -96,13 +97,6 @@ public sealed class ModuleManifestFacts
         Assert.Equal("google-oauth", Secret.Named("google-oauth").Name);
     }
 
-    [Fact]
-    public void App_requirements_lists_required_capabilities()
-    {
-        var req = new AppRequirements([CapabilityId.Parse("storage@1")]);
-        Assert.Equal("storage@1", Assert.Single(req.Capabilities).ToString());
-    }
-
     [Theory]
     [InlineData(typeof(DuplicateProvidesModule), "dup.provides", "storage@1")]
     [InlineData(typeof(DuplicateRequiresModule), "dup.requires", "secrets@1")]
@@ -111,13 +105,6 @@ public sealed class ModuleManifestFacts
         var error = Assert.Throws<InvalidDataException>(() => ModuleManifest.Of(module));
         Assert.Contains(id, error.Message, StringComparison.Ordinal);
         Assert.Contains(capability, error.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void App_requirements_reject_duplicate_capabilities()
-    {
-        var error = Assert.Throws<InvalidDataException>(() => new AppRequirements([Capability.Storage.V1, Capability.Storage.V1]));
-        Assert.Contains("storage@1", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]

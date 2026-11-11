@@ -3,7 +3,7 @@ using System.Runtime.Loader;
 using System.Text.Json;
 using DigitalBrain.Invocation;
 using DigitalBrain.Runtime.Synapses;
-using DigitalBrain.Spi;
+using DigitalBrain.Neurons;
 using DigitalBrain.Testing;
 using DigitalBrain.Units;
 

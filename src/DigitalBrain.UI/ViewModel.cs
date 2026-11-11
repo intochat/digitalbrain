@@ -668,13 +668,3 @@ public static class Ui
         string executionMode = "wasm-ui") =>
         new(key, url, title, height, executionMode);
 }
-
-/// <summary>Where an app publishes what it shows: its side and main views and transient toasts. The host renders the latest of each.</summary>
-public interface IPresenter
-{
-    /// <summary>Replaces the side view, the main view, or both; a null view keeps the current one.</summary>
-    void Present(View? side, View? main);
-
-    /// <summary>Shows a transient message.</summary>
-    void Toast(Toast toast);
-}

@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>A synapse slot has no binding, or its bound connection is not usable.</summary>
 /// <param name="alias">The state alias of the synapse.</param>

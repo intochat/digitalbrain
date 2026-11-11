@@ -1,3 +1,4 @@
+using DigitalBrain.Modules;
 using System.Collections.Concurrent;
 using System.Reflection;
 using DigitalBrain.Capabilities;

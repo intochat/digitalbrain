@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using DigitalBrain.Confirmation;
-using DigitalBrain.Spi;
+using DigitalBrain.Units;
 using DigitalBrain.Testing.Tests.Unit.Synapses;
 using DigitalBrain.Time;
 using OS = DigitalBrain.Testing.TestOS;

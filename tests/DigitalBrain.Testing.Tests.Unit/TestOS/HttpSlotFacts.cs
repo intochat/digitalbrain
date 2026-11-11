@@ -1,7 +1,8 @@
 using System.Text.Json;
 using DigitalBrain.Capabilities.Http;
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
 using DigitalBrain.Testing;
+using DigitalBrain.Units;
 using OS = DigitalBrain.Testing.TestOS;
 
 namespace DigitalBrain.Testing.Tests.Unit.Host;

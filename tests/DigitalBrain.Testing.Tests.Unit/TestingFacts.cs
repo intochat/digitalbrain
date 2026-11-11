@@ -1,4 +1,5 @@
-using DigitalBrain.Spi;
+using DigitalBrain.Kernel;
+using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Testing.Tests.Unit;
 

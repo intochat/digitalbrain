@@ -1,5 +1,6 @@
 using System.Text.Json;
 using DigitalBrain.Invocation;
+using DigitalBrain.Units;
 
 namespace DigitalBrain.Tests.Unit.Synapses;
 

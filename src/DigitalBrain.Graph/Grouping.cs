@@ -1,3 +1,5 @@
+using DigitalBrain.Neurons;
+
 namespace DigitalBrain.Graph;
 
 /// <summary>Groups nodes by module prefix and renders the three levels.</summary>

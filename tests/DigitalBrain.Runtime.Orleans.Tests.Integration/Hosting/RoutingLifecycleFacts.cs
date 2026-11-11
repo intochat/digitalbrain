@@ -1,3 +1,6 @@
+using DigitalBrain.Hosting;
+using DigitalBrain.Neurons;
+using DigitalBrain.Units;
 using DigitalBrain.Invocation;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Synapses;

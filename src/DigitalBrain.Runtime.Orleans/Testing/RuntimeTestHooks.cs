@@ -1,3 +1,4 @@
+using DigitalBrain.Kernel;
 using DigitalBrain.Invocation;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Signalling;

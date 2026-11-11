@@ -1,3 +1,5 @@
+using DigitalBrain.Modules;
+
 namespace DigitalBrain.Runtime.Orleans.Azure.Tests.Integration;
 
 public sealed class CloudStorageAccountFacts

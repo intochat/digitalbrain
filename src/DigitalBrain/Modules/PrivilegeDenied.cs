@@ -1,7 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using DigitalBrain.Capabilities;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Modules;
 
 /// <summary>
 /// A privileged capability member was called by a module whose manifest does not grant it (or by a caller with no module).

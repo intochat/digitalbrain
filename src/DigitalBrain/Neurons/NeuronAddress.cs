@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Brains;
 
 public readonly record struct NeuronAddress(string NeuronType, string Key)
 {

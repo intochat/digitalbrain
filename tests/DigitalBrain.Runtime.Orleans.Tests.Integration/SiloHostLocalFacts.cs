@@ -1,3 +1,4 @@
+using DigitalBrain.Hosting;
 using DigitalBrain.Runtime.Orleans.Testing;
 using DigitalBrain.Testing;
 using Microsoft.Extensions.DependencyInjection;

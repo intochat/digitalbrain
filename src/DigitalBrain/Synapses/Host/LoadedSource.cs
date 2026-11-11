@@ -1,6 +1,6 @@
 using System.Reflection;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Units;
 
 /// <summary>A synapse source compiled and loaded into its own assembly, with what the assembly declares.</summary>
 /// <param name="SourceKey">The source's key.</param>

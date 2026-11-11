@@ -1,6 +1,6 @@
 using DigitalBrain.Capabilities;
 
-namespace DigitalBrain;
+namespace DigitalBrain.Kernel;
 
 /// <summary>
 /// What a source's <c>AdmitSynapse</c> decides on (04-19): the subscriber, the signal types it asks for and the trusted caller

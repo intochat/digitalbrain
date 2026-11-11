@@ -11,24 +11,24 @@ public sealed class LegacyPureTypeFacts
         Assert.Null(typeof(DigitalBrain.Contracts.NeuronAliasAttribute).GetMethod("Of"));
     }
 
-    // 03-04 relaxation: exactly one ProjectReference, to DigitalBrain.Analyzers, analyzer-only. Anything else fails.
+    // R10: DigitalBrain.csproj references DigitalBrain.UI and DigitalBrain.Analyzers (analyzer-only).
     [Fact]
     public void Core_references_only_the_analyzer_project_as_analyzer()
     {
         var references = CoreReferences(LoadCore());
-        var reference = Assert.Single(references);
-        Assert.True(IsAnalyzerOnly(reference), reference.ToString());
+        Assert.Equal(2, references.Count);
+        Assert.Contains(references, r => IsAnalyzerOnly(r));
+        Assert.Contains(references, r => Path.GetFileName((r.Attribute("Include")?.Value ?? string.Empty).Replace('\\', '/')) == "DigitalBrain.UI.csproj");
     }
 
     [Theory]
-    [InlineData("<ProjectReference Include=\"../DigitalBrain.UI/DigitalBrain.UI.csproj\" />")]
     [InlineData("<ProjectReference Include=\"../DigitalBrain.Analyzers/DigitalBrain.Analyzers.csproj\" />")]
     [InlineData("<ProjectReference Include=\"../DigitalBrain.Analyzers/DigitalBrain.Analyzers.csproj\" ReferenceOutputAssembly=\"true\" OutputItemType=\"Analyzer\" />")]
     [InlineData("<ProjectReference Include=\"../Other/Other.csproj\" ReferenceOutputAssembly=\"false\" OutputItemType=\"Analyzer\" />")]
     public void Any_other_reference_is_rejected(string reference)
     {
         var csproj = XDocument.Parse($"<Project><ItemGroup>{reference}</ItemGroup></Project>");
-        Assert.False(CoreReferences(csproj).All(IsAnalyzerOnly) && CoreReferences(csproj).Count == 1);
+        Assert.False(CoreReferences(csproj).Any(IsAnalyzerOnly) && CoreReferences(csproj).Count == 2);
     }
 
     private static List<XElement> CoreReferences(XDocument csproj) => csproj.Descendants("ProjectReference").ToList();

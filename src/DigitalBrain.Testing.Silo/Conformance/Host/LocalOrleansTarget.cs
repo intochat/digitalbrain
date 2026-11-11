@@ -1,6 +1,6 @@
 using DigitalBrain.Runtime.Orleans;
 using DigitalBrain.Runtime.Orleans.Testing;
-using DigitalBrain.Spi;
+using DigitalBrain.Hosting;
 using DigitalBrain.Testing;
 
 namespace DigitalBrain.Testing.Conformance.Host;

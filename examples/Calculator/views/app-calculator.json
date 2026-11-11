@@ -1,0 +1,17 @@
+{
+  "title": "Calculator",
+  "root": {
+    "kind": "column",
+    "children": [
+      {
+        "kind": "text",
+        "value": "0",
+        "tone": "neutral",
+        "tabular": false,
+        "mono": false
+      }
+    ],
+    "gap": 12,
+    "padding": 0
+  }
+}

@@ -1,4 +1,5 @@
-using DigitalBrain.Spi;
+using DigitalBrain.Neurons;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 

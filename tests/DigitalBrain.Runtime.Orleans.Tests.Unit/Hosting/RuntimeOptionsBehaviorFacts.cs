@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Runtime;
 using Orleans.Storage;
+using DigitalBrain.Hosting;
 using DigitalBrain.Runtime.Orleans.Testing;
 
 namespace DigitalBrain.Runtime.Orleans.Tests.Unit.Hosting;

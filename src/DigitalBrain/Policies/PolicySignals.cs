@@ -1,4 +1,4 @@
-namespace DigitalBrain;
+namespace DigitalBrain.Limits;
 
 /// <summary>A policy rule was proposed to a person for confirmation.</summary>
 /// <param name="RuleId">The proposed rule id.</param>

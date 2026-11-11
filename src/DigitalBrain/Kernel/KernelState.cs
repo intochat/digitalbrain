@@ -1,6 +1,6 @@
+using DigitalBrain.Neurons;
 using System.Text.Json;
 using DigitalBrain.Invocation;
-using DigitalBrain.Spi;
 
 namespace DigitalBrain.Kernel;
 
@@ -12,7 +12,7 @@ internal sealed class KernelState(
     IBrainJournal journal,
     ISignalNudge nudge,
     Func<Stamp> stamp,
-    Action drop) : INeuronState
+    Action drop)
 {
     private long? _version;
 

@@ -1,3 +1,4 @@
+using DigitalBrain.Neurons;
 using DigitalBrain.Invocation;
 using DigitalBrain.Kernel;
 

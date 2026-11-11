@@ -9,7 +9,6 @@ using DigitalBrain.Capabilities.Identity;
 using DigitalBrain.Capabilities.Storage;
 using DigitalBrain.Operations;
 using DigitalBrain.Runtime.Http.Storage;
-using DigitalBrain.Spi;
 using DigitalBrain.Testing;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
