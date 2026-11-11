@@ -8,13 +8,6 @@ DigitalBrain.Runtime.Http.ISessionIssuer
 DigitalBrain.Runtime.Http.ISessionIssuer.EndAsync(Microsoft.AspNetCore.Http.HttpContext! http, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 DigitalBrain.Runtime.Http.ISessionIssuer.IssueAsync(Microsoft.AspNetCore.Http.HttpContext! http, DigitalBrain.Capabilities.Identity.SessionRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.SessionIssued!>!
 DigitalBrain.Runtime.Http.ModuleHttpSurfaces
-DigitalBrain.Runtime.Http.RuntimeEdge
-DigitalBrain.Runtime.Http.RuntimeEdgeOptions
-DigitalBrain.Runtime.Http.RuntimeEdgeOptions.RuntimeEdgeOptions() -> void
-DigitalBrain.Runtime.Http.RuntimeEdgeOptions.SecretKey.get -> byte[]?
-DigitalBrain.Runtime.Http.RuntimeEdgeOptions.SecretKey.set -> void
-DigitalBrain.Runtime.Http.RuntimeEdgeOptions.TokenLifetime.get -> System.TimeSpan
-DigitalBrain.Runtime.Http.RuntimeEdgeOptions.TokenLifetime.set -> void
 DigitalBrain.Runtime.Http.SessionPrincipal
 DigitalBrain.Runtime.Http.Surface.BrainRoutes
 DigitalBrain.Runtime.Http.Surface.ForwardedHeadersHosting
@@ -49,7 +42,6 @@ DigitalBrain.Runtime.Http.Surface.ThrottleResult.Equals(DigitalBrain.Runtime.Htt
 DigitalBrain.Runtime.Http.Surface.ThrottleResult.RetryAt.get -> System.DateTimeOffset?
 DigitalBrain.Runtime.Http.Surface.ThrottleResult.RetryAt.init -> void
 DigitalBrain.Runtime.Http.Surface.ThrottleResult.ThrottleResult(bool Allowed, System.DateTimeOffset? RetryAt) -> void
-const DigitalBrain.Runtime.Http.RuntimeEdge.RefusalHeader = "X-DigitalBrain-Refusal" -> string!
 const DigitalBrain.Runtime.Http.SessionPrincipal.SessionIdClaim = "sid" -> string!
 const DigitalBrain.Runtime.Http.Surface.HttpProblems.MaxBodyBytes = 4096 -> int
 const DigitalBrain.Runtime.Http.Surface.HttpProblems.RateLimitedCode = "RATE_LIMITED" -> string!
@@ -63,8 +55,6 @@ static DigitalBrain.Runtime.Http.BrainRouteGroups.MemberOf(Microsoft.AspNetCore.
 static DigitalBrain.Runtime.Http.BrainRouteGroups.Session(Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints, string! suffix = "") -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!
 static DigitalBrain.Runtime.Http.ModuleHttpSurfaces.AddModuleHttpSurface<T>(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static DigitalBrain.Runtime.Http.ModuleHttpSurfaces.MapModuleHttpSurfaces(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.RouteGroupBuilder!
-static DigitalBrain.Runtime.Http.RuntimeEdge.AddRuntimeEdge(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<DigitalBrain.Runtime.Http.RuntimeEdgeOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
-static DigitalBrain.Runtime.Http.RuntimeEdge.MapRuntimeEdge(this Microsoft.AspNetCore.Routing.IEndpointRouteBuilder! endpoints) -> Microsoft.AspNetCore.Routing.IEndpointRouteBuilder!
 static DigitalBrain.Runtime.Http.SessionPrincipal.Create(DigitalBrain.Capabilities.Identity.SessionRequest! request, DigitalBrain.Capabilities.Identity.SessionIssued! issued, string! authenticationType) -> System.Security.Claims.ClaimsPrincipal!
 static DigitalBrain.Runtime.Http.SessionPrincipal.PrincipalId(System.Security.Claims.ClaimsPrincipal? user) -> string?
 static DigitalBrain.Runtime.Http.SessionPrincipal.SessionId(System.Security.Claims.ClaimsPrincipal? user) -> string?

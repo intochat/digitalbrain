@@ -19,6 +19,8 @@ internal sealed class BrainLogs : IAsyncDisposable
     private readonly BrainStoreOptions storeOptions;
     private bool disposed;
 
+    internal Action<BrainLog>? OnLogCreated { get; set; }
+
     public BrainLogs(BrainStorageKeys keys, Serializer serializer, JournalPayloads payloads, TimeProvider time, IRetentionPolicy retention,
         IOptions<BrainStoreOptions> options, IBrainLogOwnership ownership, IBrainLogFiles? files = null)
     {
@@ -40,6 +42,32 @@ internal sealed class BrainLogs : IAsyncDisposable
         // The evicted log's lease release can be a network call; it runs after the gate is free so other brains are not held behind it.
         if (evicted is not null) { await evicted.DisposeAsync(); }
         return await log;
+    }
+
+    public BrainLog? TryOpen(string brainId)
+    {
+        lock (gate)
+        {
+            if (disposed) { return null; }
+            if (logs.TryGetValue(brainId, out var task) && task.IsCompletedSuccessfully)
+            {
+                var log = task.Result;
+                return log.Usable ? log : null;
+            }
+            return null;
+        }
+    }
+
+    public IReadOnlyCollection<BrainLog> Opened
+    {
+        get
+        {
+            lock (gate)
+            {
+                if (disposed) { return []; }
+                return [.. logs.Values.Where(t => t.IsCompletedSuccessfully && t.Result.Usable).Select(t => t.Result)];
+            }
+        }
     }
 
     private (Task<BrainLog> Log, BrainLog? Evicted) Lookup(string brainId)
@@ -68,7 +96,12 @@ internal sealed class BrainLogs : IAsyncDisposable
         {
             var directory = keys.DirectoryOf(brainId);
             var lease = await ownership.ClaimAsync(directory, brainId, CancellationToken.None);
-            try { return new(directory, brainId, await keys.GetOrCreate(brainId, CancellationToken.None), serializer, payloads, time, retention, lease, files, storeOptions); }
+            try
+            {
+                var opened = new BrainLog(directory, brainId, await keys.GetOrCreate(brainId, CancellationToken.None), serializer, payloads, time, retention, lease, files, storeOptions);
+                OnLogCreated?.Invoke(opened);
+                return opened;
+            }
             catch { await lease.DisposeAsync(); throw; }
         }
         catch

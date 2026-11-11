@@ -44,7 +44,6 @@ public sealed class NeedsBindingFacts
         var unbinding = new Func<Bindings, Bindings>[]
         {
             b => b with { GrainStores = GrainStoreBinding.None },
-            b => b with { Streams = StreamsBinding.None },
             b => b with { Reminders = RemindersBinding.None },
             b => b with { Secrets = SecretsBinding.None },
             b => b with { Http = HttpBinding.None },
@@ -60,7 +59,7 @@ public sealed class NeedsBindingFacts
     public void Every_unbound_need_of_every_module_is_reported()
     {
         var issues = TopologyValidator.ValidateNeeds(Topology.Local, Bindings.Unbound,
-            [Manifests.Needing("a", Need.Http, Need.Model), Manifests.Needing("b", Need.Streams)]);
+            [Manifests.Needing("a", Need.Http, Need.Model), Manifests.Needing("b", Need.Reminders)]);
 
         Assert.Equal(3, issues.Count);
     }

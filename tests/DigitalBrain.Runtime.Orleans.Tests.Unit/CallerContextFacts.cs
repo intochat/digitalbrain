@@ -40,36 +40,4 @@ public sealed class CallerContextFacts
         Assert.False(RuntimeCallerContext.IsTrusted(untrusted));
         Assert.Throws<UntrustedCallerException>(() => RuntimeCallerContext.StampScope(untrusted));
     }
-
-    [Fact]
-    public async Task ObsoleteStamperForwards()
-    {
-#pragma warning disable CS0618
-        Assert.Equal("db.cap.principal", CallerContextStamper.RequestContextKey);
-        Assert.Equal("intochatos.trusted-module-call", CallerContextStamper.ModuleCallKey);
-        Assert.Equal("intochatos.trace", TraceRequestContext.RequestContextKey);
-
-        var caller = CapabilityCallers.Of("person-2", "acc-2", "brain-2", CallerKind.User);
-        Assert.True(CallerContextStamper.IsTrusted(caller));
-        Assert.False(CallerContextStamper.IsModelOriginated(caller));
-
-        using (CallerContextStamper.StampScope(caller))
-        {
-            Assert.True(CallerContextStamper.TryGet(out var active));
-            Assert.Equal(caller, active);
-            Assert.Equal(caller, CallerContextStamper.Require());
-        }
-
-        Assert.False(CallerContextStamper.TryGet(out _));
-
-        await Task.Run(() =>
-        {
-            var stamped = CallerContextStamper.Stamp(caller);
-            Assert.Equal(caller, stamped);
-            Assert.Equal(caller, CallerContextStamper.Require());
-        }, TestContext.Current.CancellationToken);
-
-        Assert.False(CallerContextStamper.TryGet(out _));
-#pragma warning restore CS0618
-    }
 }

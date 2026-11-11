@@ -5,17 +5,9 @@ namespace DigitalBrain.Brains;
 
 public static class CallerAdmission
 {
-    private const string PrincipalKey = "db.cap.principal";
-    private const string AccountKey = "db.cap.account";
-    private const string BrainKey = "db.cap.brain";
-    private const string AppKey = "db.cap.app";
-    private const string ConversationKey = "db.cap.conversation";
-
     internal static readonly AsyncLocal<CapabilityCaller?> Ambient = new();
 
     internal static Func<CapabilityCaller?>? Reader { get; set; }
-
-    private static Func<string, object?>? s_requestContextGet;
 
     internal static IDisposable Stamp(CapabilityCaller? caller)
     {
@@ -36,19 +28,6 @@ public static class CallerAdmission
         {
             caller = read;
             return true;
-        }
-
-        var get = RequestContextGet();
-        if (get is not null)
-        {
-            var principal = get(PrincipalKey) as string;
-            var account = get(AccountKey) as string;
-            var brain = get(BrainKey) as string;
-            if (!string.IsNullOrWhiteSpace(principal) && !string.IsNullOrWhiteSpace(account) && !string.IsNullOrWhiteSpace(brain))
-            {
-                caller = new CapabilityCaller(principal, account, brain, get(AppKey) as string, get(ConversationKey) as string);
-                return true;
-            }
         }
 
         caller = null;
@@ -91,22 +70,6 @@ public static class CallerAdmission
         {
             throw new UnauthorizedAccessException(message);
         }
-    }
-
-    private static Func<string, object?>? RequestContextGet()
-    {
-        if (s_requestContextGet is not null) { return s_requestContextGet; }
-        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            if (!string.Equals(assembly.GetName().Name, "Orleans.Core.Abstractions", StringComparison.Ordinal)) { continue; }
-            var method = assembly.GetType("Orleans.Runtime.RequestContext")?.GetMethod("Get", [typeof(string)]);
-            if (method is not null)
-            {
-                s_requestContextGet = method.CreateDelegate<Func<string, object?>>();
-                return s_requestContextGet;
-            }
-        }
-        return null;
     }
 
     private sealed class Scope(CapabilityCaller? previous) : IDisposable

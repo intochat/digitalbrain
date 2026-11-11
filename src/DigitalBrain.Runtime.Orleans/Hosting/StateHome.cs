@@ -30,11 +30,6 @@ public sealed record StateHome
     /// <summary><c>&lt;Home&gt;/settings.json</c>.</summary>
     public string SettingsFile => System.IO.Path.Combine(Path, "settings.json");
 
-    /// <summary>Resolves Home with the <see cref="RuntimeOptions.Default"/> spellings; a leading <c>~</c> expands to the user folder.</summary>
-    /// <exception cref="InvalidOperationException">The value is relative or names an existing file. Names the key only.</exception>
-    [Obsolete("Pass RuntimeOptions; removed in 0.14.")]
-    public static StateHome Resolve(IConfiguration? configuration) => Resolve(configuration, RuntimeOptions.Default);
-
     /// <summary>Resolves Home; a leading <c>~</c> expands to the user folder.</summary>
     /// <param name="configuration">The configuration holding the home key.</param>
     /// <param name="options">Names the home key and the default folder; null means <see cref="RuntimeOptions.Default"/>.</param>

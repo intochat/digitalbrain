@@ -1,5 +1,4 @@
 using DigitalBrain.Framework.Tests.E2E.MorningStats;
-using DigitalBrain.Rules;
 using DigitalBrain.Spi;
 using DigitalBrain.Testing;
 using OS = DigitalBrain.Testing.TestOS;
@@ -18,8 +17,8 @@ public sealed class GsPayments : Neuron<GsPayments.Count>, IGsPayments
     public Task Charge(decimal amount)
     {
         var source = (ISynapseCatalogSource)(Context.Services.GetService(typeof(ISynapseCatalogSource)) ?? throw new InvalidOperationException("no catalog"));
-        var type = source.Current.For(WeeklyCapSource.Week).FirstOrDefault(d => d.Kind == SynapseKind.Gate)?.Signal
-            ?? throw new InvalidOperationException("no gate is installed");
+        var type = source.Current.For(WeeklyCapSource.Week).FirstOrDefault(d => d.Kind == SynapseKind.Reaction)?.Signal
+            ?? throw new InvalidOperationException("no reaction is installed");
         return Save(State with { N = State.N + 1 }, (Signal)Activator.CreateInstance(type, amount)!);
     }
 
@@ -62,8 +61,14 @@ public sealed class GeneratedSourceFacts
         return outcome;
     }
 
+    private static async Task<decimal> Spent(OS os)
+    {
+        var state = await ((IBrainObserver)os).State(NeuronId.Parse("gs/gs.week/default"), Ct);
+        return state!.Value.GetProperty("spent").GetDecimal();
+    }
+
     [Fact]
-    public async Task ThePromiseHoldsFromTextToRefusal()
+    public async Task ThePromiseHoldsFromTextToExecution()
     {
         await using var os = Start();
         await DeployApproved(os);
@@ -72,10 +77,9 @@ public sealed class GeneratedSourceFacts
         await pay.Charge(120m);
         await pay.Charge(100m);
         await pay.Charge(70m);
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => pay.Charge(20m));
         await os.Idle();
 
-        Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
+        Assert.Equal(290m, await Spent(os));
         Assert.Empty(os.Failures);
     }
 
@@ -91,7 +95,9 @@ public sealed class GeneratedSourceFacts
 
         Assert.Equal(DeployStatus.Deployed, update.Status);
         Assert.Equal(asked, os.Confirmations.Requested.Count);
-        await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os).Charge(250m));
+        await Pay(os).Charge(50m);
+        await os.Idle();
+        Assert.Equal(100m, await Spent(os));
         Assert.Empty(os.Synapses.Leaked);
         Assert.Empty(os.Failures);
     }
@@ -126,15 +132,13 @@ public sealed class GeneratedSourceFacts
     {
         await using var os = Start();
         var first = await DeployApproved(os);
-        await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os).Charge(350m));
-        await os.Idle();
 
         var retired = await os.Synapses.Retire(Brain, WeeklyCapSource.Key, Ct);
         await os.Idle();
 
         Assert.Equal((DeployStatus.Retired, first.Hash), (retired.Status, retired.Hash));
         Assert.False(os.Catalog.States.ContainsKey(WeeklyCapSource.Week));
-        // No gate is left on the alias: the publisher finds no Charging signal to publish, so nothing refuses a charge.
+        // No reaction is left on the alias: the publisher finds no Charging signal to publish.
         Assert.Empty(os.Catalog.For(WeeklyCapSource.Week));
         await Assert.ThrowsAsync<InvalidOperationException>(() => Pay(os).Charge(350m));
         Assert.Empty(os.Synapses.Leaked);

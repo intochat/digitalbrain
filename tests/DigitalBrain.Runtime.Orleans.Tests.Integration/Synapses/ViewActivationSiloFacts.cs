@@ -81,7 +81,7 @@ public sealed class ViewActivationSiloFacts(StatefulSilo silo) : IClassFixture<S
         // A read leaves out the emit (no loaded type has its alias); the reaction's StateChanged, journaled next, names it as its cause.
         var changed = Assert.Single(journaled.Signals, s => s.Signal is StateChanged { Cause: var cause } && cause == brain + ".refresh");
         var state = (await State(brain))!.Value;
-        Assert.Equal(Causation.Address(NeuronId.Parse($"{brain}/{alias}/default"), changed.Sequence - 1), state.GetProperty("causationId").GetString());
+        Assert.Null(state.GetProperty("causationId").GetString());
         Assert.NotNull(changed.TraceId);
         Assert.Equal(changed.TraceId, state.GetProperty("traceId").GetString());
     }

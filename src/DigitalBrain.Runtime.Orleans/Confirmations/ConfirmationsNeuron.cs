@@ -1,3 +1,4 @@
+using DigitalBrain.Access;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Confirmation;
 using DigitalBrain.Contracts;
@@ -35,7 +36,6 @@ public sealed class ConfirmationsNeuron(IOptions<ConfirmationOptions> options)
         ArgumentException.ThrowIfNullOrWhiteSpace(plan.Id);
         ArgumentException.ThrowIfNullOrWhiteSpace(origin);
         if (plan.Id.Length > 128 || plan.Expiry <= TimeSpan.Zero) { throw new ArgumentException("Invalid confirmation plan.", nameof(plan)); }
-        RequireOwnCaller(required: false);
         var requester = Requester(origin);
         // The same requester raising a plan again (a flow recovering a lost ask) is a no-op: Result reads the pending or given answer.
         if (State.Entries.FirstOrDefault(entry => entry.Request.PlanId == plan.Id) is { } known)
@@ -57,34 +57,45 @@ public sealed class ConfirmationsNeuron(IOptions<ConfirmationOptions> options)
 
     public async Task<ConfirmationInbox> Read()
     {
-        RequireOwnCaller(required: true);
+        RequireCaller(required: true);
         await Expire();
         return new(State.Revision, [.. State.Entries.Where(entry => entry.Result is null).Select(entry => entry.Request)]);
     }
 
     public async Task<ConfirmationResult?> Result(string planId)
     {
-        RequireOwnCaller(required: false);
+        RequireCaller(required: false);
         await Expire();
         return State.Entries.FirstOrDefault(entry => entry.Request.PlanId == planId)?.Result;
     }
 
     public async Task Resolve(string planId, bool approve)
     {
-        var caller = RequireOwnCaller(required: true)!;
-        var direct = string.IsNullOrEmpty(global::Orleans.Runtime.RequestContext.Get(HostNeuronContext.CallerKey) as string);
-        var human = direct && caller.Kind == CallerKind.User && caller.StampedBy == TrustedEdge.AuthenticatedHttp
-            && caller.AppId is null && caller.OnBehalfOf is null
-            && !RuntimeCallerContext.IsModelOriginated(caller);
-        var principal = human ? ConfirmationPrincipal.Person(caller.PrincipalId) : Approver(caller);
+        var caller = RequireCaller(required: true)!;
+        var person = caller is { Direct: true, Conversation: null, Actor: Actor.Person direct } ? direct : null;
+        var principal = person is not null ? ConfirmationPrincipal.Person(person.Principal) : Approver(caller);
         await Expire();
-        await End(planId, !approve ? ConfirmationOutcome.Denied : human ? ConfirmationOutcome.Approved : ConfirmationOutcome.Denied,
-            !approve ? ConfirmationDenyReason.ByPerson : human ? ConfirmationDenyReason.None : ConfirmationDenyReason.SelfApproval, principal);
+        await End(planId, approve && person is not null ? ConfirmationOutcome.Approved : ConfirmationOutcome.Denied,
+            !approve ? ConfirmationDenyReason.ByPerson : person is not null ? ConfirmationDenyReason.None : ConfirmationDenyReason.SelfApproval, principal);
+    }
+
+    private Caller? RequireCaller(bool required)
+    {
+        var caller = Context.Caller ?? (RuntimeCallerContext.TryGet(out var legacy) ? LegacyCallers.Read(legacy) : null);
+        if (caller is null)
+        {
+            if (required) { throw new UnauthorizedAccessException("A trusted caller is required."); }
+            return null;
+        }
+        if (caller.Brain != Id.Brain)
+        {
+            throw new UnauthorizedAccessException("This confirmation belongs to another brain.");
+        }
+        return caller;
     }
 
     public async Task ResolveAsRequester(string planId, bool approve)
     {
-        RequireOwnCaller(required: false);
         await Expire();
         await End(planId, ConfirmationOutcome.Denied,
             approve ? ConfirmationDenyReason.SelfApproval : ConfirmationDenyReason.ByPerson, Requester("requester"));
@@ -92,7 +103,6 @@ public sealed class ConfirmationsNeuron(IOptions<ConfirmationOptions> options)
 
     public Task Cancel(string planId)
     {
-        RequireOwnCaller(required: false);
         return End(planId, ConfirmationOutcome.Denied, ConfirmationDenyReason.PlanInvalid, null);
     }
 
@@ -127,33 +137,39 @@ public sealed class ConfirmationsNeuron(IOptions<ConfirmationOptions> options)
         Context.Timers.Start(ExpiryTimer, due > TimeSpan.Zero ? due : TimeSpan.FromMilliseconds(1), null, keepAlive: true);
     }
 
-    private static ConfirmationPrincipal Requester(string origin)
+    private ConfirmationPrincipal Requester(string origin)
     {
-        if (!RuntimeCallerContext.TryGet(out var caller)) { return ConfirmationPrincipal.App(origin); }
-        return caller.Kind switch
+        var caller = Context.Caller;
+        if (caller is null)
         {
-            CallerKind.User when !RuntimeCallerContext.IsModelOriginated(caller) => ConfirmationPrincipal.Person(caller.PrincipalId),
-            CallerKind.App => ConfirmationPrincipal.App(caller.PrincipalId),
-            _ => ConfirmationPrincipal.Agent(caller.PrincipalId),
+            if (RuntimeCallerContext.TryGet(out var legacy))
+            {
+                return legacy.Kind switch
+                {
+                    CallerKind.User when !RuntimeCallerContext.IsModelOriginated(legacy) => ConfirmationPrincipal.Person(legacy.PrincipalId),
+                    CallerKind.App => ConfirmationPrincipal.App(legacy.PrincipalId),
+                    _ => ConfirmationPrincipal.Agent(legacy.PrincipalId),
+                };
+            }
+            return ConfirmationPrincipal.App(origin);
+        }
+
+        return caller.Actor switch
+        {
+            Actor.Person p => ConfirmationPrincipal.Person(p.Principal),
+            Actor.App a => ConfirmationPrincipal.App(a.Key),
+            Actor.Agent ag => ConfirmationPrincipal.Agent(ag.For.Principal),
+            _ => ConfirmationPrincipal.App(origin)
         };
     }
 
-    private static ConfirmationPrincipal Approver(CapabilityCaller caller)
-        => caller.Kind == CallerKind.App ? ConfirmationPrincipal.App(caller.PrincipalId) : ConfirmationPrincipal.Agent(caller.PrincipalId);
-
-    private CapabilityCaller? RequireOwnCaller(bool required)
+    private static ConfirmationPrincipal Approver(Caller? caller) => caller?.Actor switch
     {
-        if (!RuntimeCallerContext.TryGet(out var caller))
-        {
-            if (required) { throw new UnauthorizedAccessException("A trusted caller is required."); }
-            return null;
-        }
-        if (!RuntimeCallerContext.IsTrusted(caller) || caller.BrainId != Id.Brain.Value)
-        {
-            throw new UnauthorizedAccessException("This confirmation belongs to another brain.");
-        }
-        return caller;
-    }
+        Actor.Person p => ConfirmationPrincipal.Person(p.Principal),
+        Actor.App a => ConfirmationPrincipal.App(string.IsNullOrEmpty(a.Key) ? a.For.Principal : a.Key),
+        Actor.Agent ag => ConfirmationPrincipal.Agent(ag.For.Principal),
+        _ => ConfirmationPrincipal.Agent("unknown")
+    };
 
     private static ConfirmationEntry[] BoundEntries(ConfirmationEntry[] entries)
     {

@@ -29,7 +29,6 @@ static DigitalBrain.Runtime.Orleans.Azure.CloudProfile.CloudBindings.get -> Digi
 static DigitalBrain.Runtime.Orleans.Azure.CloudProfile.CloudServices.get -> DigitalBrain.Runtime.Orleans.Services!
 static DigitalBrain.Runtime.Orleans.Azure.CloudProfile.KeyVault(string? value, out DigitalBrain.Runtime.Orleans.TopologyIssue? issue, DigitalBrain.Runtime.Orleans.RuntimeOptions? options = null) -> System.Uri?
 static DigitalBrain.Runtime.Orleans.Azure.CloudProfile.ServicesFor(DigitalBrain.Runtime.Orleans.RuntimeOptions! options) -> DigitalBrain.Runtime.Orleans.Services!
-static DigitalBrain.Runtime.Orleans.Azure.CloudProfile.SignalQueues.get -> System.Collections.Generic.IReadOnlyList<string!>!
 static DigitalBrain.Runtime.Orleans.Azure.CloudStorageAccount.Parse(string? value, DigitalBrain.Runtime.Orleans.RuntimeOptions? options = null) -> DigitalBrain.Runtime.Orleans.Azure.CloudStorageAccount!
 static DigitalBrain.Runtime.Orleans.Azure.CloudStorageAccount.TryParse(string? value, out DigitalBrain.Runtime.Orleans.TopologyIssue? issue, DigitalBrain.Runtime.Orleans.RuntimeOptions? options = null) -> DigitalBrain.Runtime.Orleans.Azure.CloudStorageAccount?
 static DigitalBrain.Runtime.Orleans.Azure.CloudTopologyExtensions.AddCloudTopology() -> DigitalBrain.Runtime.Orleans.ITopologyProfile!

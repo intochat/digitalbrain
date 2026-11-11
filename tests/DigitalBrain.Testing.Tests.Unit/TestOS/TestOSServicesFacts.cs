@@ -1,7 +1,8 @@
 using DigitalBrain.Capabilities;
 using DigitalBrain.Capabilities.Connections.Broker;
-using DigitalBrain.Rules;
 using DigitalBrain.Runtime.Synapses;
+using DigitalBrain.Spi;
+using DigitalBrain.Testing;
 using DigitalBrain.Testing.Tests.Unit.Slots;
 using OS = DigitalBrain.Testing.TestOS;
 
@@ -35,9 +36,8 @@ public sealed class Deployer : Neuron<DeployerState>, IDeployer
 public sealed class TestOSServicesFacts
 {
     private static readonly string ReadsDb = HsSource.WithDb
-        .Replace("t.Spent + s.Amount > 300m", "t.Spent + s.Amount > 0m", StringComparison.Ordinal)
-        .Replace("public static Check WeeklyCap", "public static async Task<Check> WeeklyCap", StringComparison.Ordinal)
-        .Replace("Check.Reject(\"weekly cap of $300\")", "Check.Reject($\"db {await Db.Scalar<int>(\"select\", null, CancellationToken.None)}\")", StringComparison.Ordinal);
+        .Replace("public static WeekSpend WeeklyCap", "public static async Task<WeekSpend> WeeklyCap", StringComparison.Ordinal)
+        .Replace("Spent = t.Spent + s.Amount", "Spent = t.Spent + await Db.Scalar<int>(\"select\", null, CancellationToken.None)", StringComparison.Ordinal);
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -68,8 +68,10 @@ public sealed class TestOSServicesFacts
         await os.Confirmations.Approve(outcome.Installs["hs.week"].Reason!);
         await os.Idle();
 
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => os.Get<IHsPayments>(NeuronId.Parse("sv2/hs.payments/p")).Charge(1m));
-        Assert.Equal("db 5", e.Rejected.Messages[0]);
+        await os.Get<IHsPayments>(NeuronId.Parse("sv2/hs.payments/p")).Charge(1m);
+        await os.Idle();
+        var state = await ((IBrainObserver)os).State(NeuronId.Parse("sv2/hs.week/default"), Ct);
+        Assert.Equal(5m, state!.Value.GetProperty("spent").GetDecimal());
         Assert.Equal(["conn-x:hs.week"], connections.Bound);
     }
 

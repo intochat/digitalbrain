@@ -1,6 +1,7 @@
 using System.Text.Json;
 using DigitalBrain.Capabilities.Http;
-using DigitalBrain.Rules;
+using DigitalBrain.Spi;
+using DigitalBrain.Testing;
 using OS = DigitalBrain.Testing.TestOS;
 
 namespace DigitalBrain.Testing.Tests.Unit.Host;
@@ -15,12 +16,11 @@ public sealed class HttpSlotFacts
         public Task<string> GetText(string url, CancellationToken ct) => Task.FromResult(body);
     }
 
-    // The gate rejects with what the bound connection returned.
+    // The reaction reads what the bound connection returned.
     private static readonly string ReadsHttp = HsSource.Budget
         .Replace("namespace Me.HostBudget;", "using DigitalBrain.Capabilities.Http;\n\nnamespace Me.HostBudget;", StringComparison.Ordinal)
-        .Replace("public static Check WeeklyCap(Charging s, WeekSpend t)", "public static async Task<Check> WeeklyCap(Charging s, WeekSpend t, [Slot] IHttpRead Http)", StringComparison.Ordinal)
-        .Replace("t.Spent + s.Amount > 300m", "t.Spent + s.Amount > 0m", StringComparison.Ordinal)
-        .Replace("Check.Reject(\"weekly cap of $300\")", "Check.Reject($\"http {await Http.GetText(\"https://api.example.org/x\", CancellationToken.None)}\")", StringComparison.Ordinal);
+        .Replace("public static WeekSpend WeeklyCap(Charging s, WeekSpend t)", "public static async Task<WeekSpend> WeeklyCap(Charging s, WeekSpend t, [Slot] IHttpRead Http)", StringComparison.Ordinal)
+        .Replace("Spent = t.Spent + s.Amount", "Spent = t.Spent + (await Http.GetText(\"https://api.example.org/x\", CancellationToken.None)).Length", StringComparison.Ordinal);
 
     [Fact]
     public async Task ASlotOfTypeIHttpReadBindsToAnHttpConnection()
@@ -35,7 +35,9 @@ public sealed class HttpSlotFacts
         await os.Confirmations.Approve(outcome.Installs["hs.week"].Reason!);
         await os.Idle();
 
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => os.Get<IHsPayments>(NeuronId.Parse("hh/hs.payments/p")).Charge(1m));
-        Assert.Equal("http hello", e.Rejected.Messages[0]);
+        await os.Get<IHsPayments>(NeuronId.Parse("hh/hs.payments/p")).Charge(1m);
+        await os.Idle();
+        var state = await ((IBrainObserver)os).State(NeuronId.Parse("hh/hs.week/default"), ct);
+        Assert.Equal(5m, state!.Value.GetProperty("spent").GetDecimal());
     }
 }

@@ -1,5 +1,7 @@
 using System.Buffers.Binary;
 using System.Globalization;
+using DigitalBrain.Kernel;
+using DigitalBrain.Runtime.Orleans.Storage;
 using DigitalBrain.Runtime.Orleans.Synapses;
 using Orleans.Serialization;
 using Orleans.Storage;
@@ -7,12 +9,12 @@ using Orleans.Storage;
 namespace DigitalBrain.Runtime.Orleans;
 
 /// <summary>
-/// One brain's journal (moved from os Authority in 04-05, format <see cref="BrainLogFormat.Json"/>). One writer, proven by its
-/// ownership lease. State and the signals emitted with it share one flushed, authenticated entry, so a signal is durable before
+/// One brain's journal (format <see cref="BrainLogFormat.Json"/>). One writer, proven by its ownership lease.
+/// State and the signals emitted with it share one flushed, authenticated entry, so a signal is durable before
 /// any observer can see it. Each publisher numbers its signals from 1; every signal also has a brain-wide position.
-/// Checkpoints trim each publisher below the floor of the <see cref="IRetentionPolicy"/> (04 D-04, D-11).
+/// Checkpoints trim each publisher below the floor of the <see cref="IRetentionPolicy"/>.
 /// </summary>
-internal sealed class BrainLog : IAsyncDisposable
+internal sealed class BrainLog : IAsyncDisposable, IJournalView
 {
     private const int MaxEntryBytes = 16 * 1024 * 1024;
     private const int SegmentHeaderBytes = 5;
@@ -32,18 +34,16 @@ internal sealed class BrainLog : IAsyncDisposable
     private readonly SemaphoreSlim checkpointGate = new(1, 1);
     // Protects in-memory projections (records, signals, marks, sequence, position) from concurrent access without blocking on disk flushes.
     private readonly Lock stateLock = new();
-    private Dictionary<string, Dictionary<string, BrainRecord>> records = new(StringComparer.Ordinal);
-    // Signal-only entries still held (above each publisher's floor), in position order.
-    private readonly List<BrainEntry> signals = [];
-    private readonly Dictionary<string, Mark> marks = new(StringComparer.Ordinal);
+    private readonly Journal<JournaledSignalPayload> _journal = new();
+    private readonly SubscriptionIndex _subscriptions = new();
     private string generation = "initial";
-    private long sequence;
-    private long position;
     private long uncompactedBytes;
     private int uncompactedEntries;
     // Read without the gate; written only under it.
     private volatile Exception? failure;
     private volatile bool disposed;
+
+    public DigitalBrain.Kernel.Fanout? Fanout { get; set; }
 
     internal BrainLog(string directory, string brainId, byte[] key, Serializer serializer, JournalPayloads payloads, TimeProvider time,
         IRetentionPolicy retention, IBrainLogLease ownership, IBrainLogFiles? files = null, BrainStoreOptions? options = null)
@@ -70,13 +70,114 @@ internal sealed class BrainLog : IAsyncDisposable
 
     public JournalPayloads Payloads => payloads;
 
+    public long Sequence
+    {
+        get
+        {
+            lock (stateLock) { return _journal.Sequence; }
+        }
+    }
+
     /// <summary>The last brain-wide signal position.</summary>
     public long LastPosition
     {
         get
         {
-            lock (stateLock) { return position; }
+            lock (stateLock) { return _journal.Position; }
         }
+    }
+
+    public Position Last => new(LastPosition);
+
+    public SubscriptionIndex Subscriptions => _subscriptions;
+
+    public Position FloorOf(NeuronId? publisher)
+    {
+        lock (stateLock)
+        {
+            return publisher is { } p ? new Position(_journal.FloorOf(p.ToString())) : new Position(0);
+        }
+    }
+
+    public Position LastOf(NeuronId publisher)
+    {
+        lock (stateLock)
+        {
+            return new Position(_journal.LastPositionOf(publisher.ToString()));
+        }
+    }
+
+    public IEnumerable<AliasMark> Marks(NeuronId? publisher)
+    {
+        lock (stateLock)
+        {
+            var pubString = publisher?.ToString();
+            var dict = new Dictionary<(string Publisher, string Alias), Position>();
+            foreach (var entry in _journal.HeldEntries)
+            {
+                if (pubString is null || entry.Publisher == pubString)
+                {
+                    for (var i = 0; i < entry.Signals.Count; i++)
+                    {
+                        var payload = entry.Signals[i];
+                        dict[(entry.Publisher, payload.Type)] = new Position(entry.FirstPosition + i);
+                    }
+                }
+            }
+            return dict.Select(kv => new AliasMark(NeuronId.Parse(kv.Key.Publisher), kv.Key.Alias, kv.Value)).ToList();
+        }
+    }
+
+    public long SequenceAt(NeuronId publisher, Position position)
+    {
+        lock (stateLock)
+        {
+            return _journal.SequenceAt(publisher.ToString(), position.Value);
+        }
+    }
+
+    public Position PositionAt(NeuronId publisher, long sequence)
+    {
+        lock (stateLock)
+        {
+            var pos = _journal.PositionAt(publisher.ToString(), sequence);
+            return pos > 0 ? new Position(pos) : new Position(sequence);
+        }
+    }
+
+    public Task<JournalPage> ReadAfter(Position after, NeuronId? publisher, int limit, CancellationToken ct)
+    {
+        RequireOpen();
+        ct.ThrowIfCancellationRequested();
+        lock (stateLock)
+        {
+            var pubString = publisher?.ToString();
+            var held = _journal.HeldAfter(after.Value, pubString, limit);
+            var floor = FloorOf(publisher);
+            var positioned = new List<PositionedSignal>();
+            foreach (var entry in held)
+            {
+                for (var i = 0; i < entry.Signals.Count; i++)
+                {
+                    var pos = new Position(entry.FirstPosition + i);
+                    if (pos.Value <= after.Value) { continue; }
+                    var payload = entry.Signals[i];
+                    var pubId = NeuronId.Parse(entry.Publisher);
+                    var signalObj = Decode(payload);
+                    var seq = publisher is null ? (entry.FirstPosition + i) : (entry.FirstSignal + i);
+                    var jSignal = new JournaledSignal(pubId, seq, signalObj,
+                        DateTimeOffset.FromUnixTimeMilliseconds(entry.AtUnixMs), payload.TraceId, payload.CausationId);
+                    positioned.Add(new PositionedSignal(pos, payload.Type, jSignal));
+                }
+            }
+            return Task.FromResult(new JournalPage(floor, Last, positioned.Take(limit).ToList()));
+        }
+    }
+
+    private Signal Decode(JournaledSignalPayload payload)
+    {
+        if (payloads.Types.TryResolve(payload.Type, out _)) { return payloads.DecodeSignal(payload); }
+        return new UnknownSignal(payload.Type) { Json = payload.Json };
     }
 
     private static bool TryDelete(string path)
@@ -87,7 +188,7 @@ internal sealed class BrainLog : IAsyncDisposable
 
     internal async Task<bool> CheckStorage(CancellationToken ct)
     {
-        await gate.WaitAsync(ct);
+        await gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             RequireOpen();
@@ -112,8 +213,17 @@ internal sealed class BrainLog : IAsyncDisposable
         RequireOpen();
         lock (stateLock)
         {
-            return Task.FromResult(records.TryGetValue(grainId, out var states) && states.TryGetValue(stateName, out var record)
-                ? record with { Record = (byte[])record.Record.Clone() } : null);
+            var record = _journal.Record(grainId, stateName);
+            return Task.FromResult(record is null ? null : new BrainRecord(record.Bytes.ToArray(), record.Version, record.Type));
+        }
+    }
+
+    public JournalRecord? Record(string grainId, string stateName)
+    {
+        RequireOpen();
+        lock (stateLock)
+        {
+            return _journal.Record(grainId, stateName);
         }
     }
 
@@ -125,14 +235,88 @@ internal sealed class BrainLog : IAsyncDisposable
         lock (stateLock)
         {
             var found = new List<(string, byte[])>();
-            foreach (var (grain, states) in records)
+            foreach (var (grain, record) in _journal.Named(stateName))
             {
-                if (states.TryGetValue(stateName, out var record) && record.Record.Length > 0)
-                {
-                    found.Add((grain, (byte[])record.Record.Clone()));
-                }
+                found.Add((grain, record.Bytes.ToArray()));
             }
             return found;
+        }
+    }
+
+    public async Task<JournalEntry<JournaledSignalPayload>> Append(
+        string grainId,
+        RecordWrite? state,
+        RecordWrite? side,
+        string publisher,
+        JournaledSignalPayload[] encoded,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(encoded);
+        if (encoded.Length > 0) { ArgumentException.ThrowIfNullOrEmpty(publisher); }
+        encoded = Stamped(encoded);
+        await gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            RequireOpen();
+            ct.ThrowIfCancellationRequested();
+            JournalEntry<JournaledSignalPayload> entry;
+            lock (stateLock)
+            {
+                entry = _journal.Decide(grainId, state, side, publisher, encoded, time.GetUtcNow().ToUnixTimeMilliseconds());
+            }
+            var brainEntry = new BrainEntry(
+                entry.Sequence,
+                entry.Owner,
+                entry.State?.Name ?? "",
+                entry.State is not null ? ToRecordChange(entry.State.Change) : BrainRecordChange.None,
+                entry.State?.Bytes.ToArray() ?? [],
+                entry.Publisher,
+                encoded,
+                entry.FirstSignal,
+                entry.FirstPosition,
+                entry.AtUnixMs,
+                entry.Side?.Name,
+                entry.Side?.Bytes.ToArray(),
+                entry.State?.Type);
+
+            var plain = serializer.SerializeToArray(brainEntry);
+            if (plain.Length > MaxEntryBytes) { throw new ArgumentException("A brain change exceeds 16 MiB.", nameof(state)); }
+            var bytes = SegmentSeal.Close(key, Context("log"), plain);
+            var started = ownership.BeginWrite();
+            try
+            {
+                using var stream = files.OpenAppend(Journal);
+                var before = stream.Length;
+                var headed = stream.Length == 0;
+                var frame = new byte[(headed ? SegmentHeaderBytes : 0) + 4 + bytes.Length];
+                var offset = 0;
+                if (headed) { WriteHeader(frame); offset = SegmentHeaderBytes; }
+                BinaryPrimitives.WriteInt32LittleEndian(frame.AsSpan(offset), bytes.Length);
+                bytes.CopyTo(frame.AsSpan(offset + 4));
+                stream.Write(frame);
+                try { ownership.EndWrite(started); }
+                catch (BrainNotOwnedException)
+                {
+                    stream.SetLength(before);
+                    FlushToDisk(stream);
+                    throw;
+                }
+                FlushToDisk(stream);
+                lock (stateLock)
+                {
+                    _journal.Apply(entry);
+                    FoldSubscriptions(entry);
+                    uncompactedBytes += frame.Length;
+                    uncompactedEntries++;
+                }
+            }
+            catch (Exception error) { failure = error; throw; }
+            return entry;
+        }
+        finally
+        {
+            gate.Release();
+            TryTriggerAutoCheckpoint();
         }
     }
 
@@ -186,84 +370,75 @@ internal sealed class BrainLog : IAsyncDisposable
     private async Task<(long Sequence, long LastSignal, long LastPosition)> AppendEncodedWithPosition(string grainId, string stateName, long? expectedETag, BrainRecordChange change,
         byte[] record, string? recordType, string publisher, JournaledSignalPayload[] encoded, BrainSideWrite? side, CancellationToken ct)
     {
-        ArgumentNullException.ThrowIfNull(encoded);
-        if (encoded.Length > 0) { ArgumentException.ThrowIfNullOrEmpty(publisher); }
-        encoded = Stamped(encoded);
-        await gate.WaitAsync(ct);
+        RecordWrite? stateWrite = change == BrainRecordChange.None && string.IsNullOrEmpty(stateName)
+            ? null
+            : new RecordWrite(stateName, ToStateChange(change), record, expectedETag, recordType);
+        RecordWrite? sideWrite = side is null
+            ? null
+            : new RecordWrite(side.StateName, StateChange.Write, side.Record, side.ExpectedETag);
         try
         {
-            RequireOpen();
-            ct.ThrowIfCancellationRequested();
-            BrainRecord? current;
-            long last;
-            BrainEntry entry;
+            var entry = await Append(grainId, stateWrite, sideWrite, publisher, encoded, ct).ConfigureAwait(false);
+            long lastSignal;
             lock (stateLock)
             {
-                current = records.GetValueOrDefault(grainId)?.GetValueOrDefault(stateName);
-                if (change != BrainRecordChange.None && current?.ETag != expectedETag)
-                {
-                    throw new InconsistentStateException($"State {grainId}/{stateName} changed since it was read.",
-                        current?.ETag.ToString(CultureInfo.InvariantCulture) ?? "none", expectedETag?.ToString(CultureInfo.InvariantCulture) ?? "none");
-                }
-                if (side is not null)
-                {
-                    if (side.StateName == stateName && change != BrainRecordChange.None) { throw new ArgumentException("The side state must be another state of the grain.", nameof(side)); }
-                    var stored = records.GetValueOrDefault(grainId)?.GetValueOrDefault(side.StateName)?.ETag;
-                    if (stored != side.ExpectedETag)
-                    {
-                        throw new InconsistentStateException($"State {grainId}/{side.StateName} changed since it was read.",
-                            stored?.ToString(CultureInfo.InvariantCulture) ?? "none", side.ExpectedETag?.ToString(CultureInfo.InvariantCulture) ?? "none");
-                    }
-                }
-                last = encoded.Length > 0 ? marks.GetValueOrDefault(publisher).Last : 0;
-                entry = new BrainEntry(checked(sequence + 1), grainId, stateName, change, record, encoded.Length > 0 ? publisher : "", encoded,
-                    checked(last + 1), checked(position + 1), time.GetUtcNow().ToUnixTimeMilliseconds(), side?.StateName, side?.Record,
-                    change == BrainRecordChange.Write ? recordType : null);
+                lastSignal = encoded.Length > 0 ? _journal.LastOf(publisher) : _journal.LastOf(publisher);
             }
-            var plain = serializer.SerializeToArray(entry);
-            if (plain.Length > MaxEntryBytes) { throw new ArgumentException("A brain change exceeds 16 MiB.", nameof(record)); }
-            var bytes = SegmentSeal.Close(key, Context("log"), plain);
-            var started = ownership.BeginWrite();
-            try
+            return (entry.Sequence, lastSignal, _journal.Position);
+        }
+        catch (StaleVersionException ex)
+        {
+            throw new InconsistentStateException(ex.Message,
+                ex.Stored?.ToString(CultureInfo.InvariantCulture) ?? "none",
+                ex.Expected?.ToString(CultureInfo.InvariantCulture) ?? "none");
+        }
+    }
+
+    private static bool TryParseNeuronId(string text, out NeuronId id)
+    {
+        if (text.StartsWith("neuron.host/", StringComparison.Ordinal))
+        {
+            return NeuronId.TryParse(text["neuron.host/".Length..], out id);
+        }
+        if (NeuronId.TryParse(text, out id)) { return true; }
+        var slash = text.IndexOf('/', StringComparison.Ordinal);
+        if (slash > 0 && NeuronId.TryParse(text[(slash + 1)..], out id)) { return true; }
+        id = default;
+        return false;
+    }
+
+    private void FoldSubscriptions(JournalEntry<JournaledSignalPayload> entry)
+    {
+        if (entry.Side is { Name: DigitalBrain.Kernel.Subscriptions.RecordName } sideSub)
+        {
+            if (TryParseNeuronId(entry.Owner, out var subscriber))
             {
-                using var stream = files.OpenAppend(Journal);
-                var before = stream.Length;
-                // Header and first frame go out in one write; a torn header is truncated on recovery.
-                var headed = stream.Length == 0;
-                var frame = new byte[(headed ? SegmentHeaderBytes : 0) + 4 + bytes.Length];
-                var offset = 0;
-                if (headed) { WriteHeader(frame); offset = SegmentHeaderBytes; }
-                BinaryPrimitives.WriteInt32LittleEndian(frame.AsSpan(offset), bytes.Length);
-                bytes.CopyTo(frame.AsSpan(offset + 4));
-                stream.Write(frame);
-                // A write that outlived the lease or its time cap is cut back off the journal before it can be replayed, and is
-                // not applied. Truncation is best effort; recovery also faults on a sequence that is not contiguous.
-                try { ownership.EndWrite(started); }
-                catch (BrainNotOwnedException)
-                {
-                    stream.SetLength(before);
-                    FlushToDisk(stream);
-                    throw;
-                }
-                FlushToDisk(stream);
-                // Deserialize the durable bytes so callers cannot mutate the stored projection.
-                lock (stateLock)
-                {
-                    Apply(serializer.Deserialize<BrainEntry>(plain)!);
-                    uncompactedBytes += frame.Length;
-                    uncompactedEntries++;
-                }
-            }
-            catch (Exception error) { failure = error; throw; }
-            lock (stateLock)
-            {
-                return (sequence, encoded.Length > 0 ? marks[publisher].Last : marks.GetValueOrDefault(publisher).Last, position);
+                _subscriptions.Fold(subscriber, sideSub.Bytes, StateChange.Write, owner: entry.Owner);
             }
         }
-        finally
+        else if (entry.Side is { Name: "synapses" } sideLegacy)
         {
-            gate.Release();
-            TryTriggerAutoCheckpoint();
+            if (TryParseNeuronId(entry.Owner, out var subscriber)
+                && SubscriptionUpgrade.TryUpgrade(subscriber, sideLegacy.Bytes, DateTimeOffset.FromUnixTimeMilliseconds(entry.AtUnixMs)) is { } upgraded)
+            {
+                _subscriptions.Fold(upgraded, owner: entry.Owner);
+            }
+        }
+
+        if (entry.State is { Name: DigitalBrain.Kernel.Subscriptions.RecordName } stateSub)
+        {
+            if (TryParseNeuronId(entry.Owner, out var subscriber))
+            {
+                _subscriptions.Fold(subscriber, stateSub.Bytes, stateSub.Change, owner: entry.Owner);
+            }
+        }
+        else if (entry.State is { Name: "synapses" } stateLegacy)
+        {
+            if (TryParseNeuronId(entry.Owner, out var subscriber)
+                && SubscriptionUpgrade.TryUpgrade(subscriber, stateLegacy.Bytes, DateTimeOffset.FromUnixTimeMilliseconds(entry.AtUnixMs)) is { } upgraded)
+            {
+                _subscriptions.Fold(upgraded, owner: entry.Owner);
+            }
         }
     }
 
@@ -276,7 +451,7 @@ internal sealed class BrainLog : IAsyncDisposable
         RequireOpen();
         lock (stateLock)
         {
-            var mark = marks.GetValueOrDefault(publisher);
+            var mark = _journal.Marks.GetValueOrDefault(publisher);
             StoredSignal[] held = [.. Held().Where(item => item.Publisher == publisher && item.Sequence > since).Take(limit)];
             return Task.FromResult(new StoredSlice(mark.Floor, mark.Last, held));
         }
@@ -291,9 +466,10 @@ internal sealed class BrainLog : IAsyncDisposable
         RequireOpen();
         lock (stateLock)
         {
-            var floor = signals.Count == 0 ? position : signals[0].FirstPosition - 1;
+            var firstEntry = _journal.HeldEntries.Count > 0 ? _journal.HeldEntries[0] : null;
+            var floor = firstEntry is null ? _journal.Position : firstEntry.FirstPosition - 1;
             StoredSignal[] held = [.. Held().Where(item => item.Position > since).Take(limit)];
-            return Task.FromResult(new StoredSlice(floor, position, held));
+            return Task.FromResult(new StoredSlice(floor, _journal.Position, held));
         }
     }
 
@@ -307,15 +483,16 @@ internal sealed class BrainLog : IAsyncDisposable
         RequireOpen();
         lock (stateLock)
         {
-            var floor = signals.Count == 0 ? position : signals[0].FirstPosition - 1;
+            var firstEntry = _journal.HeldEntries.Count > 0 ? _journal.HeldEntries[0] : null;
+            var floor = firstEntry is null ? _journal.Position : firstEntry.FirstPosition - 1;
             StoredSignal[] held = [.. Held().Where(item => item.Position > since && item.Payload.TraceId == traceId).Take(limit)];
-            return Task.FromResult(new StoredSlice(floor, position, held));
+            return Task.FromResult(new StoredSlice(floor, _journal.Position, held));
         }
     }
 
     // The caller holds the stateLock.
     private IEnumerable<StoredSignal> Held()
-        => signals.SelectMany(entry => entry.Signals.Select((payload, index)
+        => _journal.HeldEntries.SelectMany(entry => entry.Signals.Select((payload, index)
             => new StoredSignal(entry.Publisher, entry.FirstSignal + index, entry.FirstPosition + index, entry.AtUnixMs, payload)));
 
     /// <summary>
@@ -324,11 +501,11 @@ internal sealed class BrainLog : IAsyncDisposable
     /// </summary>
     public async Task Checkpoint(CancellationToken ct)
     {
-        await checkpointGate.WaitAsync(ct);
+        await checkpointGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-            var floors = await Floors(ct);
-            await gate.WaitAsync(ct);
+            var floors = await Floors(ct).ConfigureAwait(false);
+            await gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
                 RequireOpen();
@@ -340,8 +517,25 @@ internal sealed class BrainLog : IAsyncDisposable
                 lock (stateLock)
                 {
                     foreach (var (publisher, floor) in floors) { Trim(publisher, floor); }
-                    var snapshot = new BrainSnapshot(sequence, position, records, [.. signals],
-                        [.. marks.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => new PublisherMark(pair.Key, pair.Value.Floor, pair.Value.Last))]);
+                    var recordsSnapshot = new Dictionary<string, Dictionary<string, BrainRecord>>(StringComparer.Ordinal);
+                    foreach (var (owner, dict) in _journal.SnapshotRecords())
+                    {
+                        var inner = new Dictionary<string, BrainRecord>(StringComparer.Ordinal);
+                        foreach (var (name, jr) in dict)
+                        {
+                            inner[name] = new BrainRecord(jr.Bytes.ToArray(), jr.Version, jr.Type);
+                        }
+                        recordsSnapshot[owner] = inner;
+                    }
+                    BrainEntry[] heldSignals = [.. _journal.HeldEntries.Select(e => new BrainEntry(
+                        e.Sequence, "", "", BrainRecordChange.None, [], e.Publisher,
+                        e.Signals is JournaledSignalPayload[] arr ? arr : [.. e.Signals],
+                        e.FirstSignal, e.FirstPosition, e.AtUnixMs))];
+                    PublisherMark[] publisherMarks = [.. _journal.SnapshotMarks()
+                        .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                        .Select(pair => new PublisherMark(pair.Key, pair.Value.Floor, pair.Value.Last, pair.Value.LastPosition))];
+
+                    var snapshot = new BrainSnapshot(_journal.Sequence, _journal.Position, recordsSnapshot, heldSignals, publisherMarks);
                     var body = serializer.SerializeToArray(snapshot);
                     plain = new byte[SegmentHeaderBytes + body.Length];
                     WriteHeader(plain);
@@ -385,11 +579,11 @@ internal sealed class BrainLog : IAsyncDisposable
         {
             var held = Held().GroupBy(item => item.Publisher, StringComparer.Ordinal)
                 .ToDictionary(group => group.Key, group => group.Select(item => item.AtUnixMs).ToArray(), StringComparer.Ordinal);
-            foreach (var (publisher, mark) in marks)
+            foreach (var (publisher, range) in _journal.Marks)
             {
                 // Only neuron publishers have synapses and cursors; anything else keeps its whole history.
-                if (mark.Last <= mark.Floor || !NeuronId.TryParse(publisher, out var id)) { continue; }
-                inputs.Add((publisher, id, mark.Last, held.GetValueOrDefault(publisher) ?? []));
+                if (range.Last <= range.Floor || !NeuronId.TryParse(publisher, out var id)) { continue; }
+                inputs.Add((publisher, id, range.Last, held.GetValueOrDefault(publisher) ?? []));
             }
         }
         var now = time.GetUtcNow();
@@ -410,18 +604,19 @@ internal sealed class BrainLog : IAsyncDisposable
     // The caller holds the gate. Floors only rise and never pass the publisher's last sequence.
     private void Trim(string publisher, long floor)
     {
-        if (!marks.TryGetValue(publisher, out var mark)) { return; }
+        var mark = _journal.Marks.GetValueOrDefault(publisher);
         floor = Math.Min(floor, mark.Last);
         if (floor <= mark.Floor) { return; }
-        marks[publisher] = mark with { Floor = floor };
-        for (var index = signals.Count - 1; index >= 0; index--)
+        long floorPos = 0;
+        foreach (var entry in _journal.HeldEntries)
         {
-            var entry = signals[index];
-            if (entry.Publisher != publisher || entry.FirstSignal > floor) { continue; }
-            var drop = (int)Math.Min(entry.Signals.Length, floor - entry.FirstSignal + 1);
-            if (drop == entry.Signals.Length) { signals.RemoveAt(index); continue; }
-            signals[index] = entry with { Signals = entry.Signals[drop..], FirstSignal = entry.FirstSignal + drop, FirstPosition = entry.FirstPosition + drop };
+            if (entry.Publisher == publisher && entry.FirstSignal <= floor)
+            {
+                var drop = Math.Min(entry.Signals.Count, floor - entry.FirstSignal + 1);
+                floorPos = entry.FirstPosition + drop - 1;
+            }
         }
+        _journal.Trim(publisher, floor, floorPos);
     }
 
     private string Journal => Path.Combine(directory, generation + ".log");
@@ -456,8 +651,8 @@ internal sealed class BrainLog : IAsyncDisposable
             var bytes = new byte[length];
             stream.ReadExactly(bytes);
             var entry = serializer.Deserialize<BrainEntry>(SegmentSeal.Open(key, Context("log"), bytes))!;
-            if (entry.Sequence != sequence + 1 || entry.FirstPosition != position + 1
-                || (entry.Signals.Length > 0 && entry.FirstSignal != marks.GetValueOrDefault(entry.Publisher).Last + 1))
+            if (entry.Sequence != _journal.Sequence + 1 || entry.FirstPosition != _journal.Position + 1
+                || (entry.Signals.Length > 0 && entry.FirstSignal != _journal.LastOf(entry.Publisher) + 1))
             { throw new InvalidDataException("The local brain log is not contiguous."); }
             Apply(entry);
             valid = stream.Position;
@@ -470,14 +665,25 @@ internal sealed class BrainLog : IAsyncDisposable
     // Held signals of each publisher run contiguously from Floor + 1 to Last; positions rise strictly.
     private void RestoreSnapshot(BrainSnapshot checkpoint)
     {
-        records = checkpoint.Records;
-        sequence = checkpoint.Sequence;
-        position = checkpoint.Position;
+        var journalRecords = new Dictionary<string, Dictionary<string, JournalRecord>>(StringComparer.Ordinal);
+        foreach (var (grain, states) in checkpoint.Records)
+        {
+            var inner = new Dictionary<string, JournalRecord>(StringComparer.Ordinal);
+            foreach (var (stateName, br) in states)
+            {
+                inner[stateName] = new JournalRecord(br.Record, br.ETag, br.Type);
+            }
+            journalRecords[grain] = inner;
+        }
+
+        var marks = new Dictionary<string, PublisherRange>(StringComparer.Ordinal);
         foreach (var mark in checkpoint.Publishers)
         {
             if (mark.Floor < 0 || mark.Floor > mark.Last) { throw new InvalidDataException("A snapshot publisher floor is out of range."); }
-            marks[mark.Publisher] = new Mark(mark.Floor, mark.Last);
+            marks[mark.Publisher] = new PublisherRange(mark.Floor, mark.Last, mark.LastPosition);
         }
+
+        var heldEntries = new List<JournalEntry<JournaledSignalPayload>>();
         var next = marks.ToDictionary(pair => pair.Key, pair => pair.Value.Floor + 1, StringComparer.Ordinal);
         long lastPosition = 0;
         foreach (var entry in checkpoint.Signals)
@@ -486,10 +692,40 @@ internal sealed class BrainLog : IAsyncDisposable
             { throw new InvalidDataException("The brain snapshot signals are not contiguous above their floor."); }
             next[entry.Publisher] = expected + entry.Signals.Length;
             lastPosition = entry.FirstPosition + entry.Signals.Length - 1;
-            signals.Add(entry);
+            heldEntries.Add(new JournalEntry<JournaledSignalPayload>(
+                entry.Sequence,
+                "",
+                null,
+                null,
+                entry.Publisher,
+                entry.Signals,
+                entry.FirstSignal,
+                entry.FirstPosition,
+                entry.AtUnixMs));
         }
-        if (lastPosition > position || next.Any(pair => pair.Value != marks[pair.Key].Last + 1))
+        if (lastPosition > checkpoint.Position || next.Any(pair => pair.Value != marks[pair.Key].Last + 1))
         { throw new InvalidDataException("The brain snapshot signals do not reach their publishers' last sequence."); }
+
+        _journal.Restore(checkpoint.Sequence, checkpoint.Position, journalRecords, marks, heldEntries);
+
+        foreach (var (grain, states) in journalRecords)
+        {
+            if (states.TryGetValue(DigitalBrain.Kernel.Subscriptions.RecordName, out var subRecord))
+            {
+                if (TryParseNeuronId(grain, out var subscriber))
+                {
+                    _subscriptions.Fold(subscriber, subRecord.Bytes, StateChange.Write, owner: grain);
+                }
+            }
+            else if (states.TryGetValue("synapses", out var legacyRecord))
+            {
+                if (TryParseNeuronId(grain, out var subscriber)
+                    && SubscriptionUpgrade.TryUpgrade(subscriber, legacyRecord.Bytes, DateTimeOffset.UnixEpoch) is { } upgraded)
+                {
+                    _subscriptions.Fold(upgraded, owner: grain);
+                }
+            }
+        }
     }
 
     private static void WriteHeader(Span<byte> target)
@@ -532,26 +768,39 @@ internal sealed class BrainLog : IAsyncDisposable
         return SegmentHeaderBytes;
     }
 
+    private static BrainRecordChange ToRecordChange(StateChange change) => change switch
+    {
+        StateChange.Write => BrainRecordChange.Write,
+        StateChange.Clear => BrainRecordChange.Clear,
+        _ => BrainRecordChange.None
+    };
+
+    private static StateChange ToStateChange(BrainRecordChange change) => change switch
+    {
+        BrainRecordChange.Clear => StateChange.Clear,
+        _ => StateChange.Write
+    };
+
     private void Apply(BrainEntry entry)
     {
-        if (entry.Change == BrainRecordChange.Write)
-        {
-            if (!records.TryGetValue(entry.GrainId, out var states)) { records[entry.GrainId] = states = new(StringComparer.Ordinal); }
-            states[entry.StateName] = new BrainRecord(entry.Record, entry.Sequence, entry.RecordType);
-        }
-        else if (entry.Change == BrainRecordChange.Clear) { records.GetValueOrDefault(entry.GrainId)?.Remove(entry.StateName); }
-        if (entry.SideStateName is { } side && entry.SideRecord is { } sideRecord)
-        {
-            if (!records.TryGetValue(entry.GrainId, out var held)) { records[entry.GrainId] = held = new(StringComparer.Ordinal); }
-            held[side] = new BrainRecord(sideRecord, entry.Sequence);
-        }
-        if (entry.Signals.Length > 0)
-        {
-            signals.Add(entry with { Record = [], StateName = "", GrainId = "", Change = BrainRecordChange.None, SideStateName = null, SideRecord = null, RecordType = null });
-            marks[entry.Publisher] = marks.GetValueOrDefault(entry.Publisher) with { Last = entry.FirstSignal + entry.Signals.Length - 1 };
-            position = entry.FirstPosition + entry.Signals.Length - 1;
-        }
-        sequence = entry.Sequence;
+        var stateWrite = entry.StateName.Length > 0 && entry.Change != BrainRecordChange.None
+            ? new RecordWrite(entry.StateName, ToStateChange(entry.Change), entry.Record, null, entry.RecordType)
+            : null;
+        var sideWrite = entry.SideStateName is not null
+            ? new RecordWrite(entry.SideStateName, StateChange.Write, entry.SideRecord ?? [], null)
+            : null;
+        var jEntry = new JournalEntry<JournaledSignalPayload>(
+            entry.Sequence,
+            entry.GrainId,
+            stateWrite,
+            sideWrite,
+            entry.Publisher,
+            entry.Signals,
+            entry.FirstSignal,
+            entry.FirstPosition,
+            entry.AtUnixMs);
+        _journal.Apply(jEntry);
+        FoldSubscriptions(jEntry);
     }
 
     private static void FlushToDisk(Stream stream)
@@ -620,6 +869,4 @@ internal sealed class BrainLog : IAsyncDisposable
     // A failed open cannot await in a constructor: the release starts at once and its outcome is observed, never blocked on.
     private static void ReleaseUnopened(IBrainLogLease lease)
         => _ = lease.DisposeAsync().AsTask().ContinueWith(static task => _ = task.Exception, TaskScheduler.Default);
-
-    private readonly record struct Mark(long Floor, long Last);
 }

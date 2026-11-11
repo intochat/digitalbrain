@@ -1,6 +1,9 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using DigitalBrain.Access;
 using DigitalBrain.Invocation;
+using DigitalBrain.Kernel;
+using DigitalBrain.Runtime.Orleans.Access;
 using Orleans;
 using Orleans.Runtime;
 
@@ -10,35 +13,43 @@ namespace DigitalBrain.Runtime.Orleans.Hosting;
 /// The in-silo <see cref="IInvocationSink"/> behind <c>Get&lt;T&gt;(NeuronId)</c>: picks the host grain by the class's policy,
 /// keys it <c>brain/type/key</c> and stamps the caller into RequestContext, where the host grain reads provenance.
 /// </summary>
-internal sealed class OrleansInvocationSink(IGrainFactory grains, NeuronTypeRegistry? types, NeuronId? caller, Func<NeuronId, RuntimeInvocation, Task>? beforeStream = null) : IInvocationSink
+internal sealed class OrleansInvocationSink(
+    IGrainFactory grains,
+    NeuronTypeRegistry? types,
+    NeuronId? caller,
+    ICallerCarrier? callers = null,
+    bool asKernel = false,
+    Func<NeuronId, RuntimeInvocation, Task>? beforeStream = null) : IInvocationSink
 {
+    private readonly ICallerCarrier _callers = callers ?? OrleansCallerAmbient.Instance;
+
     // Async methods: the RequestContext change stays inside the call and never leaks back into the caller's flow.
     public async Task<JsonElement?> Invoke(NeuronId target, RuntimeInvocation call, CancellationToken cancellationToken)
     {
         var (host, neuronClass) = await Host(target, call, cancellationToken).ConfigureAwait(false);
-        Stamp();
+        Hop(target);
         var invocation = Stamped(call);
         var interleaved = neuronClass is null
             ? await host.IsInterleaved(invocation).WaitAsync(cancellationToken).ConfigureAwait(false)
-            : NeutralCallMapping.MayInterleave(neuronClass, NeuronHostGrainBase.Bind(neuronClass, invocation), invocation);
+            : CallPolicy.MayInterleave(neuronClass, NeuronHostGrainBase.Bind(neuronClass, invocation), invocation);
         return await (interleaved ? host.InvokeInterleaved(invocation, cancellationToken) : host.Invoke(invocation, cancellationToken)).ConfigureAwait(false);
     }
 
     public async Task Post(NeuronId target, RuntimeInvocation call)
     {
         var (host, neuronClass) = await Host(target, call, CancellationToken.None).ConfigureAwait(false);
-        Stamp();
+        Hop(target);
         var invocation = Stamped(call);
         var interleaved = neuronClass is null
             ? await host.IsInterleaved(invocation).ConfigureAwait(false)
-            : NeutralCallMapping.MayInterleave(neuronClass, NeuronHostGrainBase.Bind(neuronClass, invocation), invocation);
+            : CallPolicy.MayInterleave(neuronClass, NeuronHostGrainBase.Bind(neuronClass, invocation), invocation);
         await (interleaved ? host.PostInterleaved(invocation) : host.Post(invocation)).ConfigureAwait(false);
     }
 
     public async IAsyncEnumerable<JsonElement> Stream(NeuronId target, RuntimeInvocation call, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var (host, _) = await Host(target, call, cancellationToken).ConfigureAwait(false);
-        Stamp();
+        Hop(target);
         if (beforeStream is not null) { await beforeStream(target, call).ConfigureAwait(false); }
         await foreach (var item in host.Stream(Stamped(call), cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false)) { yield return item; }
     }
@@ -72,9 +83,9 @@ internal sealed class OrleansInvocationSink(IGrainFactory grains, NeuronTypeRegi
     private RuntimeInvocation Stamped(RuntimeInvocation call)
         => string.Equals(call.Behavior, _behavior, StringComparison.Ordinal) ? call : call with { Behavior = _behavior };
 
-    private void Stamp()
+    private void Hop(NeuronId target)
     {
-        if (caller is not null) { RequestContext.Set(HostNeuronContext.CallerKey, _behavior); }
-        else { RequestContext.Remove(HostNeuronContext.CallerKey); }
+        var current = asKernel ? Caller.OfKernel(target.Brain) : _callers.Current;
+        _ = _callers.Enter(current?.Hop(via: caller, inside: caller is not null));
     }
 }

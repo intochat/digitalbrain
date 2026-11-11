@@ -15,11 +15,11 @@ public interface ICounter
 [NeuronAlias("APP_ID.counter-state")]
 public sealed record CounterState
 {
-    [Field(0), JsonPropertyName("count")] public int Count { get; init; }
+    [JsonPropertyName("count")] public int Count { get; init; }
 }
 
 [Signal("APP_ID.counted")]
-public sealed record Counted([property: Field(0), JsonPropertyName("count")] int Count) : Signal;
+public sealed record Counted([property: JsonPropertyName("count")] int Count) : Signal;
 
 /// <summary>State belongs to a neuron, so it survives deactivation and runtime restart.</summary>
 [Neuron("APP_ID.counter")]

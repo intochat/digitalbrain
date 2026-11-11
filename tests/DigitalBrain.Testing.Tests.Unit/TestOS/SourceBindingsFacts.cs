@@ -1,17 +1,17 @@
-using DigitalBrain.Rules;
+using DigitalBrain.Spi;
+using DigitalBrain.Testing;
 using DigitalBrain.Testing.Tests.Unit.Slots;
 using OS = DigitalBrain.Testing.TestOS;
 
 namespace DigitalBrain.Testing.Tests.Unit.Host;
 
-// The bindings of a unit travel with its source: deploy, restore and re-deploy read the same ones. The unit's gate reads its Db slot and
-// rejects with the value it read, so the message tells which connection the slot resolved to.
+// The bindings of a unit travel with its source: deploy, restore and re-deploy read the same ones. The unit's reaction reads its Db slot and
+// sets the state to the value it read, so the state tells which connection the slot resolved to.
 public sealed class SourceBindingsFacts
 {
     private static readonly string ReadsDb = HsSource.WithDb
-        .Replace("t.Spent + s.Amount > 300m", "t.Spent + s.Amount > 0m", StringComparison.Ordinal)
-        .Replace("public static Check WeeklyCap", "public static async Task<Check> WeeklyCap", StringComparison.Ordinal)
-        .Replace("Check.Reject(\"weekly cap of $300\")", "Check.Reject($\"db {await Db.Scalar<int>(\"select\", null, CancellationToken.None)}\")", StringComparison.Ordinal);
+        .Replace("public static WeekSpend WeeklyCap", "public static async Task<WeekSpend> WeeklyCap", StringComparison.Ordinal)
+        .Replace("Spent = t.Spent + s.Amount", "Spent = await Db.Scalar<int>(\"select\", null, CancellationToken.None)", StringComparison.Ordinal);
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -46,11 +46,13 @@ public sealed class SourceBindingsFacts
         await os.Activate(NeuronId.Parse($"{brain}/hs.week/default"));
     }
 
-    // Drives the unit through its Db slot: the gate rejects with what the bound connection returned.
+    // Drives the unit through its Db slot: the reaction stores what the bound connection returned.
     private static async Task<string> Read(OS os, string brain)
     {
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => os.Get<IHsPayments>(NeuronId.Parse($"{brain}/hs.payments/p")).Charge(1m));
-        return e.Rejected.Messages[0];
+        await os.Get<IHsPayments>(NeuronId.Parse($"{brain}/hs.payments/p")).Charge(1m);
+        await os.Idle();
+        var state = await ((IBrainObserver)os).State(NeuronId.Parse($"{brain}/hs.week/default"), Ct);
+        return $"db {state!.Value.GetProperty("spent").GetInt32()}";
     }
 
     [Fact]
@@ -100,8 +102,9 @@ public sealed class SourceBindingsFacts
 
         var pay = os.Get<IHsPayments>(NeuronId.Parse("sb4/hs.payments/p"));
         await pay.Charge(250m);
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => pay.Charge(100m));
-        Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
+        await os.Idle();
+        var state = await ((IBrainObserver)os).State(NeuronId.Parse("sb4/hs.week/default"), Ct);
+        Assert.Equal(250m, state!.Value.GetProperty("spent").GetDecimal());
     }
 
     [Fact]
@@ -225,7 +228,7 @@ public sealed class SourceBindingsFacts
         ["hs.week2"] = new Dictionary<string, string> { ["Db"] = week2 },
     };
 
-    // The gate source plus a second state alias that has its own Db slot.
+    // The reaction source plus a second state alias that has its own Db slot.
     private static readonly string TwoAliases = ReadsDb + """
 
         [Signal("hs.charging2")]
@@ -240,7 +243,7 @@ public sealed class SourceBindingsFacts
         public static class Budget2
         {
             [Synapse(typeof(Charging2), "hs.week2")]
-            public static Check Cap2(Charging2 s, WeekSpend2 t, [Slot] ISqlRead Db) => Check.Allow(t with { Spent = t.Spent + s.Amount });
+            public static WeekSpend2 Cap2(Charging2 s, WeekSpend2 t, [Slot] ISqlRead Db) => t with { Spent = t.Spent + s.Amount };
         }
         """;
 }

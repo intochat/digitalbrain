@@ -36,10 +36,10 @@ public sealed class InstallRestoreDeadlockFacts
         public static class Units
         {
             [Synapse(typeof(OneHit), "sc.one")]
-            public static Check First(OneHit s, One t, [Slot] ISqlRead Db) => Check.Allow(t with { Spent = t.Spent + s.Amount });
+            public static One First(OneHit s, One t, [Slot] ISqlRead Db) => t with { Spent = t.Spent + s.Amount };
 
             [Synapse(typeof(TwoHit), "sc.two")]
-            public static Check Second(TwoHit s, Two t, [Slot] ISqlRead Db) => Check.Allow(t with { Spent = t.Spent + s.Amount });
+            public static Two Second(TwoHit s, Two t, [Slot] ISqlRead Db) => t with { Spent = t.Spent + s.Amount };
         }
         """;
 

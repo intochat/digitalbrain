@@ -1,6 +1,6 @@
-using DigitalBrain.Rules;
 using DigitalBrain.Spi;
 using DigitalBrain.Tests.Unit.Neurons;
+using DigitalBrain.Units;
 
 namespace DigitalBrain.Tests.Unit.Synapses;
 
@@ -18,9 +18,6 @@ public static class SlotFunctions
     [Synapse(typeof(SlotPoke), "slotted")]
     public static async Task<Slotted> Read(SlotPoke s, [Slot] ISqlRead db, Slotted state, CancellationToken ct) =>
         state with { Value = await db.Scalar<int>("select 7", null, ct) };
-
-    [Synapse(typeof(SlotPoke), "slotted")]
-    public static Task<Check> Guard(SlotPoke s, Slotted state, [Slot] ISqlRead db) => Task.FromResult(Check.Allow(state));
 }
 
 public sealed class FakeSqlRead(int value) : ISqlRead
@@ -47,9 +44,9 @@ public sealed class StateNeuronSlotFacts
 
     private RecordingContext Context { get; } = new(Id);
 
-    private StateNeuron<Slotted> Attach(Type function, ISlotResolver resolver)
+    private UnitNeuron<Slotted> Attach(Type function, ISlotResolver resolver)
     {
-        var neuron = new StateNeuron<Slotted>(new SynapseCatalogSource(SynapseCatalog.Scan([typeof(Slotted), function])), resolver);
+        var neuron = new UnitNeuron<Slotted>(new SynapseCatalogSource(SynapseCatalog.Scan([typeof(Slotted), function])), resolver);
         NeuronAttachment.Attach(neuron, Context);
         return neuron;
     }
@@ -64,20 +61,6 @@ public sealed class StateNeuronSlotFacts
 
         Assert.Equal(7, ((Slotted)Context.Writes[0].State).Value);
         Assert.Equal(1, resolver.Calls);
-    }
-
-    [Fact]
-    public async Task AGateWithAnUnboundSlotRefusesByName()
-    {
-        var n = Attach(typeof(SlotFunctions), new FakeSlotResolver([]));
-
-        var verdict = await n.Gate(new SlotPoke(), Guid.NewGuid(), TestContext.Current.CancellationToken);
-
-        var refused = Assert.IsType<Check.Refused>(verdict);
-        Assert.Contains("slot 'db' is not bound", refused.Broken[0].Message, StringComparison.Ordinal);
-        var rejected = Assert.IsType<Rejected>(Assert.Single(Assert.Single(Context.Writes).Signals));
-        Assert.EndsWith(".SlotFunctions.Guard", rejected.Rules[0], StringComparison.Ordinal);
-        Assert.Contains(Context.Published, p => p is SynapseFinished { Outcome: "rejected" });
     }
 
     [Fact]

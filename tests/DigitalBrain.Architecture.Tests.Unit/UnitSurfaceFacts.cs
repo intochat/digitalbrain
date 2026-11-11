@@ -9,7 +9,7 @@ public sealed class UnitSurfaceFacts
 {
     private static readonly string[] Shipped =
     [
-        "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Client", "DigitalBrain.Identity.Local",
+        "DigitalBrain", "DigitalBrain.UI", "DigitalBrain.Testing", "DigitalBrain.Identity.Local",
         "DigitalBrain.Runtime.Http", "DigitalBrain.Runtime.Synapses",
         "DigitalBrain.Capabilities.Compute", "DigitalBrain.Capabilities.Connections", "DigitalBrain.Capabilities.Http",
         "DigitalBrain.Capabilities.Identity", "DigitalBrain.Capabilities.Secrets", "DigitalBrain.Capabilities.Storage",

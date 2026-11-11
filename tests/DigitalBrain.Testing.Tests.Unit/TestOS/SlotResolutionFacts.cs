@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using DigitalBrain.Capabilities;
-using DigitalBrain.Rules;
 using DigitalBrain.Spi;
 using DigitalBrain.Time;
 using OS = DigitalBrain.Testing.TestOS;
@@ -33,11 +32,7 @@ public sealed record SlotAudit(int Value)
     public SlotAudit() : this(0) { }
 }
 
-[State("slot.guard")]
-public sealed record SlotGuard(int Seen)
-{
-    public SlotGuard() : this(0) { }
-}
+
 
 public static class SlotApps
 {
@@ -49,20 +44,10 @@ public static class SlotApps
     public static async Task<SlotAudit> Refresh(Tick t, SlotAudit state, [Slot(Name = "Db")] ISqlRead db, CancellationToken ct) =>
         state with { Value = await db.Scalar<int>("select 1", null, ct) };
 
-    [Synapse(typeof(SlotPaying), "slot.guard")]
-    public static Task<Check> Guard(SlotPaying s, SlotGuard state, [Slot(Name = "Db")] ISqlRead db) => Task.FromResult(Check.Allow(state with { Seen = state.Seen + 1 }));
+
 }
 
-public interface ISlotPayer
-{
-    Task Pay();
-}
 
-[Neuron("slot.payer")]
-public sealed class SlotPayer : Neuron<SlotGuard>, ISlotPayer
-{
-    public Task Pay() => Save(State with { Seen = State.Seen + 1 }, new SlotPaying());
-}
 
 // Slots resolve through the TestOS capability fakes: a binding is the fake's name.
 public sealed class SlotResolutionFacts
@@ -171,17 +156,13 @@ public sealed class SlotResolutionFacts
             return Task.CompletedTask;
         });
         await Install(os, "slot.stats", "analytics");
-        await Install(os, "slot.guard", "analytics");
 
         os.Without<ISqlRead>("analytics");
         await Tick(os);
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => os.Get<ISlotPayer>(NeuronId.Parse("sr/slot.payer/one")).Pay());
         await os.Idle();
 
         Assert.Contains(finished, f => f.Outcome == "failed" && f.Function.EndsWith(".Refresh", StringComparison.Ordinal) && f.Neuron == Stats.ToString());
         Assert.Single(os.Journal(Stats.Brain).Signals(Stats), item => SignalAliases.Of(item.Signal) == "synapse.failed");
         Assert.DoesNotContain(os.Journal(Stats.Brain).Signals(Stats), s => s.Signal is StateChanged);
-        Assert.Contains("slot 'Db' is not bound", e.Rejected.Messages[0], StringComparison.Ordinal);
-        Assert.Contains(os.Journal(Stats.Brain).Signals(NeuronId.Parse("sr/slot.guard/default")), s => s.Signal is Rejected);
     }
 }

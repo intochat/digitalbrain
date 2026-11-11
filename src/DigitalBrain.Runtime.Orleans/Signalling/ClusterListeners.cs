@@ -11,9 +11,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace DigitalBrain.Runtime.Orleans.Signalling;
 
 /// <summary>
-/// The silo singleton behind <see cref="IClusterListeners"/> (04-19). Every host grain offers each durable journal append here
-/// (the publish tap in <c>HostNeuronState</c>, beside the <see cref="SignalPublisher"/> reference), so a silo hears every signal
-/// published by the neurons it hosts. Registered on every silo at host start, the listeners together hear every brain once.
+/// The silo singleton behind <see cref="IClusterListeners"/> (04-19). Every host grain offers each durable journal append here,
+/// so a silo hears every signal published by the neurons it hosts. Registered on every silo at host start, the listeners together hear every brain once.
 /// Handlers run on one pump off the grain scheduler, in publish order, so a handler that calls back into the publisher cannot
 /// deadlock its turn. In-memory and best effort: a signal appended while the silo stops is not replayed.
 /// </summary>

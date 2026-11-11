@@ -19,6 +19,5 @@
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain.Capabilities.Identity/DigitalBrain.Capabilities.Identity.csproj" />
     <ProjectReference Include="../DigitalBrain.Capabilities.Storage/DigitalBrain.Capabilities.Storage.csproj" />
-    <ProjectReference Include="../DigitalBrain.Client/DigitalBrain.Client.csproj" />
   </ItemGroup>
 </Project>

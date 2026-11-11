@@ -8,8 +8,8 @@ namespace DigitalBrain.Runtime.Orleans;
 
 /// <summary>
 /// Everything on this machine (P2-D-09, P2-D-12 revised): localhost clustering on loopback, file grain stores for
-/// <c>platform</c>, <c>PubSubStore</c> and every module grain store under <c>&lt;Home&gt;/state/files/&lt;name&gt;</c>, a file
-/// reminder table, memory streams for <c>signals</c> over the file <c>PubSubStore</c>, and the machine-key master key.
+/// <c>platform</c> and every module grain store under <c>&lt;Home&gt;/state/files/&lt;name&gt;</c>, a file
+/// reminder table, and the machine-key master key.
 /// The <c>cluster</c> store is host-bound (BrainLog); until the host registers it, it is <see cref="UnregisteredClusterStorage"/>.
 /// </summary>
 public sealed class LocalProfile : ITopologyProfile, IRuntimeOptionsHolder
@@ -33,7 +33,7 @@ public sealed class LocalProfile : ITopologyProfile, IRuntimeOptionsHolder
     public LocalProfile(RuntimeOptions? options = null)
     {
         _options = options ?? RuntimeOptions.Default;
-        _reserved = new(StringComparer.OrdinalIgnoreCase) { _options.PlatformGrainStorage, _options.PubSubStore };
+        _reserved = new(StringComparer.OrdinalIgnoreCase) { _options.PlatformGrainStorage };
         Services = ServicesFor(_options);
         Defaults = new Dictionary<string, string?> { [_options.AuthPostureKey] = "Open" };
     }
@@ -48,7 +48,6 @@ public sealed class LocalProfile : ITopologyProfile, IRuntimeOptionsHolder
     public static Bindings LocalBindings { get; } = new(
         ClusteringBinding.Localhost,
         GrainStoreBinding.Memory,
-        StreamsBinding.Memory,
         RemindersBinding.Memory,
         SecretsBinding.MachineKey,
         HttpBinding.Direct,
@@ -126,7 +125,7 @@ public sealed class LocalProfile : ITopologyProfile, IRuntimeOptionsHolder
         // Loopback only; the bind key widens the HTTP listener (os BindPolicy), never the silo.
         silo.UseLocalhostClustering(context.SiloPort, context.GatewayPort);
 
-        var stores = new List<string> { _options.PlatformGrainStorage, _options.PubSubStore };
+        var stores = new List<string> { _options.PlatformGrainStorage };
         stores.AddRange(context.Modules.SelectMany(m => m.Needs)
             .Where(n => n.Kind == NeedKind.State && n.Name is not null && n.Name != _options.ClusterGrainStorage && !_reserved.Contains(n.Name))
             .Select(n => n.Name!));
@@ -139,7 +138,6 @@ public sealed class LocalProfile : ITopologyProfile, IRuntimeOptionsHolder
 
         silo.AddReminders();
         silo.Services.AddSingleton<IReminderTable>(_ => MemoryReminderTable.For(context.Home.State));
-        silo.AddMemoryStreams(_options.SignalStreams);
     }
 
     /// <inheritdoc />

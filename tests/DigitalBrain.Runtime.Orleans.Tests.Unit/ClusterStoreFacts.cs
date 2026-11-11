@@ -78,7 +78,7 @@ public sealed class ClusterStoreFacts : IDisposable
 
     [Fact]
     public void Other_named_stores_still_follow_grain_store_bindings()
-        => Assert.Empty(TopologyValidator.ValidateNeeds(Topology.Local, HostBound, [Manifests.Needing("m", Need.State("platform"), Need.State("pubsubstore"))], clusterStoreRegistered: true));
+        => Assert.Empty(TopologyValidator.ValidateNeeds(Topology.Local, HostBound, [Manifests.Needing("m", Need.State("platform"), Need.State("custom"))], clusterStoreRegistered: true));
 
     public void Dispose()
     {

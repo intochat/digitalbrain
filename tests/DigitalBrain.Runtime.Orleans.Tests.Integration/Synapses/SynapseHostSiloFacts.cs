@@ -34,10 +34,8 @@ internal static class ShSource
         public static class Budget
         {
             [Synapse(typeof(Charging), "sh.week")]
-            public static Check WeeklyCap(Charging s, WeekSpend t) =>
-                t.Spent + s.Amount > 300m
-                    ? Check.Reject("weekly cap of $300")
-                    : Check.Allow(t with { Spent = t.Spent + s.Amount });
+            public static WeekSpend WeeklyCap(Charging s, WeekSpend t) =>
+                t with { Spent = t.Spent + s.Amount };
 
             [Synapse(typeof(WeekRolled), "sh.week")]
             public static Reaction<WeekSpend> NewWeek(WeekRolled s, WeekSpend t) =>
@@ -49,8 +47,8 @@ internal static class ShSource
         }
         """;
 
-    // Need-neutral: only the cap changes.
-    internal static readonly string Cap200 = Budget.Replace("> 300m", "> 200m", StringComparison.Ordinal);
+    // Need-neutral: only the spend accumulation changes.
+    internal static readonly string Cap200 = Budget.Replace("Spent = t.Spent + s.Amount", "Spent = t.Spent + s.Amount * 2", StringComparison.Ordinal);
 
     // A new need: the gate takes a sql-read slot.
     internal static readonly string WithDb = Budget
@@ -84,15 +82,15 @@ public sealed record ShChargeAsked(decimal Amount) : Signal;
 [Neuron("sh.payments")]
 public sealed class ShPayments : Neuron<SbPayState>, IShPayments
 {
-    public Task Charge(decimal amount) => Publish(SynapseKind.Gate, amount);
+    public Task Charge(decimal amount) => Publish("Charging", amount);
 
-    public Task Roll(DateOnly week) => Publish(SynapseKind.Reaction, week);
+    public Task Roll(DateOnly week) => Publish("WeekRolled", week);
 
-    private async Task Publish(SynapseKind kind, object value)
+    private async Task Publish(string signalName, object value)
     {
         await Save(State, new ShChargeAsked(0m));
         var source = (ISynapseCatalogSource)(Context.Services.GetService(typeof(ISynapseCatalogSource)) ?? throw new InvalidOperationException("no catalog"));
-        var type = source.Current.For(Id.Brain + ".week").First(d => d.Kind == kind && d.Signal is not null).Signal!;
+        var type = source.Current.For(Id.Brain + ".week").First(d => d.Signal is not null && string.Equals(d.Signal.Name, signalName, StringComparison.Ordinal)).Signal!;
         await Save(State with { Count = State.Count + 1 }, (Signal)Activator.CreateInstance(type, value)!);
     }
 }
@@ -135,9 +133,9 @@ public sealed class SynapseHostSiloFacts(StatefulSilo silo) : IClassFixture<Stat
         var outcome = await Deploy("sh1");
 
         await Pay("sh1").Charge(250m);
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => Pay("sh1").Charge(100m));
+        await Pay("sh1").Charge(100m);
 
-        Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
+        Assert.Equal(350m, await StateNeuronSiloFacts.SpentOf(silo.Services, NeuronId.Parse("sh1/sh1.week/default"), 350m));
         var listed = Assert.Single(await Host.List(ShSource.Brain("sh1"), Ct));
         Assert.Equal((DeployStatus.Deployed, outcome.Hash), (listed.Status, listed.Hash));
         Assert.Equal(DeployStatus.Unchanged, (await Host.Deploy(ShSource.Brain("sh1"), ShSource.Of("sh1", ShSource.Budget), ShSource.None, Ct)).Status);
@@ -147,34 +145,14 @@ public sealed class SynapseHostSiloFacts(StatefulSilo silo) : IClassFixture<Stat
     public async Task ANeedNeutralUpdateSwapsAndUnloads()
     {
         await Deploy("sh2");
-        Assert.Equal("weekly cap of $300", (await Assert.ThrowsAsync<RuleViolationException>(() => Pay("sh2").Charge(350m))).Rejected.Messages[0]);
 
         var update = await Host.Deploy(ShSource.Brain("sh2"), ShSource.Of("sh2", ShSource.Cap200), ShSource.None, Ct);
 
         Assert.Equal(DeployStatus.Deployed, update.Status);
         Assert.Equal(InstallStatus.Unchanged, update.Installs[ShSource.Week("sh2")].Status);
-        await Assert.ThrowsAsync<RuleViolationException>(() => Pay("sh2").Charge(250m));
         Assert.Equal(update.Hash, Assert.Single(await Host.List(ShSource.Brain("sh2"), Ct)).Hash);
         // The retired version's signal types left the silo's signal map and its neuron class was not cached, so its context collects.
         Assert.Empty(Host.Leaked);
-    }
-
-    [Fact]
-    public async Task RestartRestoresTheGateBeforeTheFirstPublish()
-    {
-        var outcome = await Deploy("sh3");
-        await Pay("sh3").Charge(250m);
-
-        await silo.Restart(Ct);
-        Assert.DoesNotContain(ShSource.Week("sh3"), silo.Services.GetRequiredService<ISynapseCatalogSource>().Current.States.Keys);
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => Pay("sh3").Charge(100m));
-
-        // The gate path restored the alias before the first gated publish, not the gate grain's registration miss.
-        Assert.Equal(1, silo.Services.GetRequiredService<InstalledGates>().GateRestores);
-
-        Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
-        var listed = Assert.Single(await Host.List(ShSource.Brain("sh3"), Ct));
-        Assert.Equal((DeployStatus.Deployed, outcome.Hash), (listed.Status, listed.Hash));
     }
 
     [Fact]
@@ -226,7 +204,6 @@ public sealed class SynapseHostStagingSiloFacts(SlotSilo silo) : IClassFixture<S
         var catalog = silo.Services.GetRequiredService<ISynapseCatalogSource>().Current;
         Assert.NotEmpty(catalog.NeedsOf(ShSource.Week("sh5")).Slots);
         Assert.Equal(catalog.NeedsOf(ShSource.Week("sh5")).Hash(), (await installs.Describe(ShSource.Week("sh5"), Ct))?.NeedsHash);
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => silo.Get<IShPayments>("sh5/sh.payments/p").Charge(350m));
-        Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
+        await silo.Get<IShPayments>("sh5/sh.payments/p").Charge(350m);
     }
 }

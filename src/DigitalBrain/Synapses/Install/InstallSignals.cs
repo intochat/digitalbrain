@@ -23,9 +23,3 @@ public sealed record InstallDenied(string Alias, string PlanId, string Reason) :
 /// <param name="Alias">The state alias.</param>
 [Signal("synapse.retired")]
 public sealed record Retired(string Alias) : Signal;
-
-/// <summary>The set of installed gates changed. Ephemeral: never journaled.</summary>
-/// <param name="Brain">The brain whose gates changed.</param>
-[Signal("synapse.gate-changed")]
-[EphemeralSignal]
-public sealed record GateChanged(string Brain) : Signal;

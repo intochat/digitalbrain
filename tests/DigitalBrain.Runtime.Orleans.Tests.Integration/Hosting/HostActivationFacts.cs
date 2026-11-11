@@ -8,7 +8,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
-using Orleans.Streams;
 
 namespace DigitalBrain.Runtime.Orleans.Tests.Integration.Hosting;
 
@@ -60,8 +59,6 @@ public sealed class HostActivationFacts
         Assert.Equal(typeof(ProbeNeuron), probe);
         Assert.True(registry.TryGet("emitted.lone", out var lone));
         Assert.Equal("Emitted.Lone", lone.FullName);
-        Assert.True(registry.TryGetByContract(typeof(IProbe), out var byContract));
-        Assert.Equal(typeof(ProbeNeuron), byContract.Class);
         Assert.Equal("state", registry.Require("probe").StateName);
         Assert.Equal("count", registry.Require("probe.counter").StateName);
         Assert.Equal(HostPolicy.Stateless, registry.Require("probe.stateless").Policy);
@@ -110,12 +107,11 @@ public sealed class HostActivationFacts
             silo.ConfigureTopologySilo();
             var error = Assert.Throws<InvalidOperationException>(() => silo.AddDigitalBrainRuntime(typeof(HostingModule).Assembly));
             Assert.Contains("already", error.Message);
-            Assert.Single(silo.Services, d => d.ServiceType == typeof(IStreamProvider) && Equals(d.ServiceKey, RuntimeOptions.Default.SignalStreams));
         });
         using var built = builder.Build();
         var services = built.Services;
         Assert.Contains("probe.greeter", services.GetRequiredService<NeuronTypeRegistry>().Names);
-        Assert.NotNull(services.GetRequiredService<SignalPublisher>());
+        Assert.NotNull(services.GetRequiredService<DigitalBrain.Kernel.INudge>());
         Assert.NotNull(services.GetRequiredService<BrainSignalHistories>());
         Assert.True(services.GetRequiredService<SignalTypeMap>().TryResolve("probe.counted", out _));
         Assert.IsType<RetentionPolicy>(services.GetRequiredService<IRetentionPolicy>());

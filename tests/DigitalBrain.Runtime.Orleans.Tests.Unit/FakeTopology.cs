@@ -15,7 +15,7 @@ internal sealed class FakeTopology(Topology topology, Bindings? bindings = null,
     public bool ServicesConfigured { get; private set; }
     public bool ConfigurationConfigured { get; private set; }
 
-    public static Bindings AllBound { get; } = new(ClusteringBinding.Localhost, GrainStoreBinding.File, StreamsBinding.MemoryWithFilePubSub,
+    public static Bindings AllBound { get; } = new(ClusteringBinding.Localhost, GrainStoreBinding.File,
         RemindersBinding.File, SecretsBinding.MachineKey, HttpBinding.Direct, SandboxBinding.LocalContainer, ModelBinding.ConfiguredEndpoint, UiBinding.LocalWeb);
 
     public IEnumerable<TopologyIssue> Validate(IConfiguration configuration, IReadOnlyList<ModuleManifest> modules) => issues;

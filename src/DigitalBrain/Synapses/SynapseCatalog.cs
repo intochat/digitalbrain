@@ -42,17 +42,6 @@ public sealed class SynapseCatalog
     public IReadOnlyList<SynapseDescriptor> For(string stateAlias) =>
         [.. Synapses.Where(d => string.Equals(d.StateAlias, stateAlias, StringComparison.Ordinal))];
 
-    /// <summary>The gates a signal of type <paramref name="signal"/> reaches: most derived parameter type first, then registration order.</summary>
-    /// <param name="signal">The arriving signal type.</param>
-    /// <returns>The gates.</returns>
-    public IReadOnlyList<SynapseDescriptor> GatesOf(Type signal)
-    {
-        ArgumentNullException.ThrowIfNull(signal);
-        return [.. Synapses
-            .Where(d => d.Kind == SynapseKind.Gate && d.Signal!.IsAssignableFrom(signal))
-            .OrderByDescending(d => Depth(d.Signal!))];
-    }
-
     /// <summary>What the app with state alias <paramref name="alias"/> asks for at install time.</summary>
     /// <param name="alias">The state alias.</param>
     /// <returns>The needs, derived from every synapse of the alias.</returns>
@@ -72,15 +61,10 @@ public sealed class SynapseCatalog
             .Select(s => new SlotNeed(s.Name, s.Capability, DisplayName(s.Contract)))
             .ToList();
         var schedules = own.Where(d => d.Every is not null).Select(d => d.Every!).DistinctBy(s => s.Text, StringComparer.Ordinal).ToList();
-        var gates = own
-            .Where(d => d.Kind == SynapseKind.Gate)
-            .Select(d => d.Signal!.GetCustomAttribute<SignalAttribute>()?.Alias ?? d.Signal!.Name)
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
         var reactions = own.Where(d => d.Kind == SynapseKind.Reaction)
             .Select(d => d.SignalAlias is { } signal ? SynapseNeeds.AliasPrefix + signal : d.Function.Name)
             .ToList();
-        return new SynapseNeeds(alias, slots, schedules, gates, reactions, own.Any(d => d.Kind == SynapseKind.View));
+        return new SynapseNeeds(alias, slots, schedules, reactions, own.Any(d => d.Kind == SynapseKind.View));
     }
 
     /// <summary>A new catalog holding both sets.</summary>

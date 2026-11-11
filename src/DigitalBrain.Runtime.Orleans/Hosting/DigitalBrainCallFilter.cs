@@ -9,8 +9,8 @@ namespace DigitalBrain.Runtime.Orleans.Hosting;
 
 /// <summary>
 /// Global bidirectional Orleans grain call filter pipeline.
-/// Automatically propagates, extracts, and validates capability caller credentials,
-/// security principals, tenant brain identity, and distributed tracing activities across grain hops.
+/// Automatically propagates and extracts distributed tracing activities across grain hops,
+/// and enforces cross-brain grain boundary invariants.
 /// </summary>
 public sealed class DigitalBrainCallFilter : IIncomingGrainCallFilter, IOutgoingGrainCallFilter
 {
@@ -30,13 +30,6 @@ public sealed class DigitalBrainCallFilter : IIncomingGrainCallFilter, IOutgoing
         // 2. Validate stamped caller context
         if (RuntimeCallerContext.TryGet(out var caller) && caller is not null)
         {
-            if (context.Grain is INeuronHost && context.Request is { } req && req.GetArgumentCount() > 0 && req.GetArgument(0) is Invocation.RuntimeInvocation call
-                && Enforcement.PlainNeuronCallFilter.IsPlumbing(call))
-            {
-                await context.Invoke();
-                return;
-            }
-
             var targetType = context.TargetId.Type.ToString();
             if (targetType is not null && targetType.StartsWith("neuron", StringComparison.OrdinalIgnoreCase))
             {

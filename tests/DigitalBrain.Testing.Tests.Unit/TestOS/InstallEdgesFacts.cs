@@ -114,16 +114,17 @@ public sealed class InstallEdgesFacts
     }
 
     [Fact]
-    public async Task AGateInstalledLaterIsFoundOnTheNextPublish()
+    public async Task AReactionInstalledLaterIsFoundOnTheNextPublish()
     {
         await using var os = Start();
         var pay = os.Get<IPayments>(One);
         await pay.Charge(400m);
         await os.Idle();
 
-        await Install(os, "week");
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => pay.Charge(400m));
+        await Install(os, "ledger");
+        await pay.Charge(400m);
+        await os.Idle();
 
-        Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
+        Assert.Equal(400m, await Spent(os));
     }
 }

@@ -7,18 +7,15 @@ namespace DigitalBrain;
 /// <summary>What a synapse function does with the signal and the state.</summary>
 public enum SynapseKind
 {
-    /// <summary>Decides whether the signal may change the state: returns <c>Check</c>.</summary>
-    Gate,
-
     /// <summary>Computes the next state, optionally with signals to publish.</summary>
-    Reaction,
+    Reaction = 1,
 
     /// <summary>Projects the state to a value; takes only the state.</summary>
-    View,
+    View = 2,
 }
 
 /// <summary>A synapse function read into its shape.</summary>
-/// <param name="Kind">Gate, reaction or view.</param>
+/// <param name="Kind">Reaction or view.</param>
 /// <param name="Function">The compiled function.</param>
 /// <param name="Signal">The signal parameter type; null for a view.</param>
 /// <param name="State">The state record type.</param>
@@ -62,7 +59,7 @@ public sealed record SlotDescriptor(string Name, Type Contract, CapabilityId Cap
 /// <summary>The refusal fragments <see cref="SynapseShape"/> puts in its messages, shared so analyzers can mirror them.</summary>
 public static class SynapseReasons
 {
-    /// <summary>A gate or reaction has no signal parameter.</summary>
+    /// <summary>A reaction has no signal parameter.</summary>
     public const string GateNeedsSignal = "gate needs a signal";
 
     /// <summary>More than one signal parameter.</summary>
@@ -217,8 +214,7 @@ public static class SynapseShape
         }
 
         var returned = Unwrap(function.ReturnType);
-        var kind = returned == typeof(Rules.Check) ? SynapseKind.Gate
-            : returned == state || returned == typeof(Reaction<>).MakeGenericType(state) ? SynapseKind.Reaction
+        var kind = returned == state || returned == typeof(Reaction<>).MakeGenericType(state) ? SynapseKind.Reaction
             : SynapseKind.View;
         var isAsync = returned != function.ReturnType;
         var hasDeferred = slots.Any(s => s.Deferred);
@@ -257,7 +253,7 @@ public static class SynapseShape
         {
             if (signal is not null || tokens > 0 || attribute.Signal is not null)
             {
-                throw new SynapseShapeException($"{name}: a {SynapseReasons.ViewTakesOnlyState}; a function with a signal must return Check or the state.");
+                throw new SynapseShapeException($"{name}: a {SynapseReasons.ViewTakesOnlyState}; a function with a signal must return the state.");
             }
         }
         else if (signal is null || attribute.Signal is null)

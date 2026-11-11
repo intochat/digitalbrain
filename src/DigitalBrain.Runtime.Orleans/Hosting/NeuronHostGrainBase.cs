@@ -1,15 +1,18 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using DigitalBrain.Access;
 using DigitalBrain.Invocation;
+using DigitalBrain.Kernel;
 using DigitalBrain.Rules;
+using DigitalBrain.Runtime.Orleans.Access;
 using DigitalBrain.Spi;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Streams.Core;
 using Orleans.Storage;
+using DigitalBrain.Runtime.Orleans.Storage;
 using DigitalBrain.Runtime.Orleans.Synapses;
 
 namespace DigitalBrain.Runtime.Orleans.Hosting;
@@ -19,19 +22,22 @@ namespace DigitalBrain.Runtime.Orleans.Hosting;
 /// dispatch each <see cref="RuntimeInvocation"/> through the one <see cref="NeuronBinder"/>. The invocation's Behavior is ignored:
 /// provenance comes from RequestContext, stamped by <see cref="OrleansInvocationSink"/>.
 /// </summary>
-internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IGrainFactory grains) : Grain, INeuronHost, Synapses.ISynapseHost, IStreamSubscriptionObserver, IRemindable, IHostTicks
+internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IGrainFactory grains) : Grain, INeuronHost, Synapses.ISynapseHost, IRemindable, IHostTicks
 {
     private readonly Dictionary<string, IGrainTimer> _timers = new(StringComparer.Ordinal);
     /// <summary>The binder every host grain dispatches through; its cache also serves scheduling policy checks.</summary>
     internal static readonly NeuronBinder Binder = new();
 
-    private static readonly ConcurrentDictionary<(Type Class, string Contract), Type?> Contracts = new();
-
     private readonly Queue<Func<Task>> _deferred = new();
     private Neuron? _neuron;
     private Type? _class;
     private string _key = string.Empty;
-    private SynapseEngine? _synapses;
+    private NeuronId _id;
+    private AccessGate _access = null!;
+    private ICallerCarrier _callers = null!;
+    private Delivery? _delivery;
+
+    internal Neuron? ActiveNeuron => _neuron;
 
     /// <summary>The host grain type this class implements.</summary>
     protected abstract string GrainTypeName { get; }
@@ -41,6 +47,9 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
     {
         _key = this.GetPrimaryKeyString();
         if (!NeuronId.TryParse(_key, out var id)) { throw new BindingException($"'{_key}' is not a neuron id brain/type/key."); }
+        _id = id;
+        _access = ServiceProvider.GetService<AccessGate>() ?? new AccessGate(OrleansCallerAmbient.Instance, new AccessOptions(), new AccessCounters());
+        _callers = ServiceProvider.GetService<ICallerCarrier>() ?? OrleansCallerAmbient.Instance;
         if (!types.TryGetRegistration(id.Type, out var registration)
             && !(await Restore(id, cancellationToken).ConfigureAwait(true) && types.TryGetRegistration(id.Type, out registration)))
         {
@@ -51,18 +60,43 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
         if (expected != GrainTypeName) { throw new BindingException($"{neuronClass.FullName} is hosted by {expected}, not {GrainTypeName}."); }
         _class = neuronClass;
         var neuron = Construct(ServiceProvider, neuronClass);
-        var synapses = new SynapseEngine(id, this.GetGrainId(), registration, ServiceProvider, grains, types, Drain);
+        var logs = ServiceProvider.GetService<BrainLogs>();
+        BrainLog? log = logs is not null ? await logs.For(id.Brain.Value).ConfigureAwait(true) : null;
+        var time = (TimeProvider?)ServiceProvider.GetService(typeof(TimeProvider)) ?? TimeProvider.System;
+        var histories = logs is not null ? ServiceProvider.GetService<BrainSignalHistories>() : null;
+        var history = (BrainSignalHistory?)histories?.For(id.Brain);
+        IBrainJournal journal = logs is not null && history is not null
+            ? new BrainLogJournal(logs, history, _ => this.GetGrainId().ToString())
+            : UnregisteredJournal.Instance;
+        IJournalView view = log ?? (IJournalView)journal;
+        var consumer = new HostConsumer(this);
+        var counters = ServiceProvider.GetService<DeliveryCounters>() ?? new DeliveryCounters();
+        var delivery = new Delivery(
+            id,
+            journal,
+            view,
+            consumer,
+            alias => types.TryGetRegistration(alias, out var r) ? r.Class : null,
+            time,
+            counters);
+        await delivery.Initialize(cancellationToken).ConfigureAwait(true);
+
+        var nudge = (ISignalNudge?)log?.Fanout ?? new Fanout(
+            view,
+            new GrainNudge(grains, types),
+            alias => types.TryGetRegistration(alias, out var r) ? r.Class : null,
+            (pub, sigs) =>
+            {
+                ServiceProvider.GetService<Signalling.ClusterListeners>()?.Offer(pub, sigs);
+            });
         var context = new HostNeuronContext(id, this.GetGrainId(), registration, ServiceProvider, grains, types,
-            ServiceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress.ToString(), this, _deferred.Enqueue, synapses);
+            ServiceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress.ToString(), this, _deferred.Enqueue, delivery, journal, nudge);
         NeuronAttachment.Attach(neuron, context);
         await NeuronAttachment.Activate(neuron, cancellationToken).ConfigureAwait(true);
         _neuron = neuron;
-        _synapses = synapses;
-        synapses.Neuron = neuron;
+        _delivery = delivery;
         RegisterExtensions(neuron, neuronClass);
-        // Load persisted synapse subscription state and catch up any sources on activation (04 D-12).
-        await synapses.Load().ConfigureAwait(true);
-        await synapses.CatchUp().ConfigureAwait(true);
+        await delivery.CatchUp().ConfigureAwait(true);
     }
 
     private void RegisterExtensions(Neuron neuron, Type neuronClass)
@@ -93,7 +127,7 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
 
     // ActivatorUtilities caches constructors per type in a process-wide map, which would pin the load context of a generated
     // (collectible) neuron class for good; a collectible class is built from its widest public constructor with services instead.
-    // Generated neuron classes are StateNeuron<TRecord>, whose single public constructor takes only services, so the choice is unambiguous.
+    // Generated neuron classes are UnitNeuron<TRecord>, whose single public constructor takes only services, so the choice is unambiguous.
     private static Neuron Construct(IServiceProvider services, Type neuronClass)
     {
         if (!neuronClass.IsCollectible) { return (Neuron)ActivatorUtilities.CreateInstance(services, neuronClass); }
@@ -131,13 +165,20 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
     public Task<bool> IsInterleaved(RuntimeInvocation call)
     {
         var (neuron, bound) = Prepare(call);
-        return Task.FromResult(NeutralCallMapping.MayInterleave(neuron.GetType(), bound, call));
+        return Task.FromResult(CallPolicy.MayInterleave(neuron.GetType(), bound, call));
+    }
+
+    private (Neuron Neuron, BoundCall Call, Caller As) Admitted(RuntimeInvocation call)
+    {
+        var (neuron, bound) = Prepare(call);
+        return (neuron, bound, _access.Admit(_id, bound));
     }
 
     /// <inheritdoc />
     public async Task<JsonElement?> Invoke(RuntimeInvocation call, CancellationToken cancellationToken = default)
     {
-        var (neuron, bound) = Prepare(call);
+        var (neuron, bound, caller) = Admitted(call);
+        using var running = _callers.Enter(caller);
         try { return await Binder.InvokeAsync(neuron, bound, call.Arguments, cancellationToken).ConfigureAwait(true); }
         catch (InconsistentStateException error)
         {
@@ -157,7 +198,8 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
     /// <inheritdoc />
     public async Task Post(RuntimeInvocation call)
     {
-        var (neuron, bound) = Prepare(call);
+        var (neuron, bound, caller) = Admitted(call);
+        using var running = _callers.Enter(caller);
         try { _ = await Binder.InvokeAsync(neuron, bound, call.Arguments, CancellationToken.None).ConfigureAwait(true); }
         finally { await Drain().ConfigureAwait(true); }
     }
@@ -172,7 +214,8 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
     public async IAsyncEnumerable<JsonElement> Stream(RuntimeInvocation call, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         // Orleans enumerates streams through its extension outside ordinary request admission, as before.
-        var (neuron, bound) = Prepare(call);
+        var (neuron, bound, caller) = Admitted(call);
+        using var running = _callers.Enter(caller);
         await foreach (var item in Binder.StreamAsync(neuron, bound, call.Arguments, cancellationToken).ConfigureAwait(true)) { yield return item; }
     }
 
@@ -186,54 +229,10 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
         return Task.FromResult<JsonElement?>(null);
     }
 
-    /// <inheritdoc />
-    public async Task<GateVerdict> Gate(string signalAlias, JsonElement signal, Guid attempt, CancellationToken cancellationToken = default)
-    {
-        var receiver = Receiver();
-        try
-        {
-            var verdict = await receiver.Gate(Decode(signalAlias, signal), attempt, cancellationToken).ConfigureAwait(true);
-            return verdict switch
-            {
-                Check.Refused refused => new GateVerdict(false, [.. refused.Broken.Select(rule => rule.Name)], [.. refused.Broken.Select(rule => rule.Message)], null),
-                // A null next state travels as null: the publisher's GateRunner fails it closed.
-                Check.Allowed { Next: null } allowed => new GateVerdict(true, [], [], null) { Ticket = allowed.Ticket },
-                Check.Allowed allowed => new GateVerdict(true, [], [], JsonSerializer.SerializeToElement(allowed.Next, allowed.Next.GetType(), RuntimeProtocol.OptionsFor(allowed.Next.GetType()))) { Ticket = allowed.Ticket },
-                _ => throw new InvalidOperationException($"{_key} returned an unknown verdict."),
-            };
-        }
-        finally { await Drain().ConfigureAwait(true); }
-    }
-
-    /// <inheritdoc />
-    public async Task Committed(string signalAlias, JsonElement signal, JsonElement next, Guid ticket, CancellationToken cancellationToken = default)
-    {
-        var receiver = Receiver();
-        var stateType = _class!.GetGenericArguments()[0];
-        var state = next.Deserialize(stateType, RuntimeProtocol.OptionsFor(stateType)) ?? throw new JournalPayloadException($"The next state for {_key} is null.");
-        try { await receiver.Committed(Decode(signalAlias, signal), new Check.Allowed(state) { Ticket = ticket }).ConfigureAwait(true); }
-        finally { await Drain().ConfigureAwait(true); }
-    }
-
-    /// <inheritdoc />
-    public async Task Aborted(string signalAlias, JsonElement signal, Guid ticket, CancellationToken cancellationToken = default)
-    {
-        var receiver = Receiver();
-        try { await receiver.Aborted(Decode(signalAlias, signal), ticket).ConfigureAwait(true); }
-        finally { await Drain().ConfigureAwait(true); }
-    }
-
-    private ISynapseReceiver Receiver()
-        => _neuron as ISynapseReceiver ?? throw new InvalidOperationException($"The neuron {_key} is not a state neuron: it runs no gate.");
-
-    private Signal Decode(string signalAlias, JsonElement signal)
-        => ServiceProvider.GetRequiredService<JournalPayloads>().DecodeSignal(new JournaledSignalPayload(signalAlias,
-            JsonElementSurrogateConverter.Utf8(signal) ?? throw new JournalPayloadException($"The signal '{signalAlias}' for {_key} is empty.")));
-
     private void RequireInterleaving(RuntimeInvocation call)
     {
         var (neuron, bound) = Prepare(call);
-        if (!NeutralCallMapping.MayInterleave(neuron.GetType(), bound, call))
+        if (!CallPolicy.MayInterleave(neuron.GetType(), bound, call))
         { throw new BindingException($"{bound.Contract.FullName}.{bound.Method.Name} does not permit interleaving."); }
     }
 
@@ -243,7 +242,7 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
         ArgumentNullException.ThrowIfNull(signalAliases);
         if (_neuron is not { } neuron) { throw new InvalidOperationException($"The neuron {_key} is not active."); }
         // Admission is decided under the subscriber's identity: a caller may not ask on behalf of another neuron (T-04-36).
-        var caller = RequestContext.Get(HostNeuronContext.CallerKey) as string ?? string.Empty;
+        var caller = _callers.Current?.Via?.ToString() ?? (RequestContext.Get(HostNeuronContext.CallerKey) as string) ?? string.Empty;
         if (!string.Equals(caller, subscriber.ToString(), StringComparison.Ordinal))
         {
             throw new UnauthorizedAccessException($"Admission of {subscriber} was asked by '{caller}', not by the subscriber.");
@@ -255,30 +254,42 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
     }
 
     /// <inheritdoc />
-    public Task EnsureBrainWide(string[] signalAliases) => InstallsOnly().EnsureBrain(signalAliases);
+    public async Task Nudge(long upTo)
+    {
+        if (_delivery is { } delivery)
+        {
+            await delivery.Nudged(new Position(upTo)).ConfigureAwait(true);
+        }
+    }
 
     /// <inheritdoc />
-    public Task RemoveBrainWide() => InstallsOnly().RemoveBrain();
+    public Task EnsureBrainWide(string[] signalAliases)
+    {
+        EnsureInstallsCaller();
+        return _delivery?.EnsureBrainWide(signalAliases, (ServiceProvider.GetService<TimeProvider>() ?? TimeProvider.System).GetUtcNow(), false) ?? Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task RemoveBrainWide()
+    {
+        EnsureInstallsCaller();
+        return _delivery?.RemoveBrainWide() ?? Task.CompletedTask;
+    }
 
     // Reaction edges are wired at install time: only the installs neuron of this brain asks (OrleansInstallHooks).
-    private SynapseEngine InstallsOnly()
+    private void EnsureInstallsCaller()
     {
-        if (_synapses is not { } synapses) { throw new InvalidOperationException($"The neuron {_key} is not active."); }
+        if (_neuron is null) { throw new InvalidOperationException($"The neuron {_key} is not active."); }
         var installs = new NeuronId(NeuronId.Parse(_key).Brain, OrleansInstallHooks.InstallsType, "default").ToString();
-        var caller = RequestContext.Get(HostNeuronContext.CallerKey) as string ?? string.Empty;
+        var caller = _callers.Current?.Via?.ToString() ?? (RequestContext.Get(HostNeuronContext.CallerKey) as string) ?? string.Empty;
         if (!string.Equals(caller, installs, StringComparison.Ordinal))
         {
             throw new UnauthorizedAccessException($"The brain-wide synapse of {_key} was asked by '{caller}', not by {installs}.");
         }
-        return synapses;
     }
 
     /// <inheritdoc />
-    public Task CatchUp() => _synapses?.CatchUp() ?? Task.CompletedTask;
-
-    /// <summary>Resumes the explicit subscription on this activation; never subscribes again (04 D-12).</summary>
-    public Task OnSubscribed(IStreamSubscriptionHandleFactory handleFactory)
-        => _synapses is { } synapses ? synapses.OnSubscribed(handleFactory) : Task.CompletedTask;
+    public Task CatchUp() => _delivery?.CatchUp() ?? Task.CompletedTask;
 
     /// <inheritdoc />
     public Task ReceiveReminder(string reminderName, TickStatus status) => Tick(reminderName, CancellationToken.None);
@@ -313,21 +324,19 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
     private async Task Tick(string name, CancellationToken cancellationToken)
     {
         if (_neuron is not { } neuron) { return; }
+        using var running = _callers.Enter(Caller.OfKernel(_id.Brain));
         try { await NeuronAttachment.Remind(neuron, name, cancellationToken).ConfigureAwait(true); }
         finally { await Drain().ConfigureAwait(true); }
     }
 
     /// <summary>The contract <paramref name="contract"/> names on <paramref name="neuronClass"/>, or null when the class does not implement it.</summary>
     internal static Type? ContractOf(Type neuronClass, string contract)
-        => Contracts.GetOrAdd((neuronClass, contract), static key => key.Class.GetInterfaces().FirstOrDefault(face => NeuronProxy.ContractName(face) == key.Contract));
+        => CallPolicy.FindContract((neuronClass, contract));
 
     /// <summary>Binds <paramref name="call"/> against the contract it names on <paramref name="neuronClass"/>.</summary>
     /// <exception cref="BindingException">The class does not implement the contract, or the call does not bind.</exception>
     internal static BoundCall Bind(Type neuronClass, RuntimeInvocation call)
-    {
-        var contract = ContractOf(neuronClass, call.Contract) ?? throw new BindingException($"{neuronClass.FullName} does not implement contract {call.Contract}.");
-        return Binder.Bind(contract, call);
-    }
+        => CallPolicy.Bind(Binder, neuronClass, call);
 
     private (Neuron Neuron, BoundCall Call) Prepare(RuntimeInvocation call)
     {

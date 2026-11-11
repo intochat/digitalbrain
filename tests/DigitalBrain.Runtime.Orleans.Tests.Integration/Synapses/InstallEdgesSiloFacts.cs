@@ -1,3 +1,4 @@
+using DigitalBrain.Kernel;
 using DigitalBrain.Rules;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Synapses;
@@ -43,9 +44,9 @@ public sealed class InstallEdgesSiloFacts(StatefulSilo silo) : IClassFixture<Sta
         var grain = GrainId.Create(NeuronTypeRegistry.AffineGrainType, books.ToString());
         // Plan-1 data: a per-source entry on the state neuron, written before it ever activates.
         var store = silo.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage);
-        await store.WriteStateAsync(SynapseState.Name, grain, new DigitalBrain.Runtime.Orleans.Tests.Integration.Storage.TestGrainState<SynapseState>
+        await store.WriteStateAsync(Subscriptions.RecordName, grain, new DigitalBrain.Runtime.Orleans.Tests.Integration.Storage.TestGrainState<LegacySynapseState>
         {
-            State = new SynapseState { Sources = [new global::DigitalBrain.Runtime.Orleans.Synapses.SynapseSource { Source = "iee/sb.payments/one", Aliases = ["test.sb.charging"], Cursor = 0 }] },
+            State = new LegacySynapseState { Sources = [new LegacySynapseSource { Source = "iee/sb.payments/one", Aliases = ["test.sb.charging"], Cursor = 0 }] },
         });
 
         await StateNeuronSiloFacts.Install(silo.Services, "iee", "sb.ledger");
@@ -56,10 +57,23 @@ public sealed class InstallEdgesSiloFacts(StatefulSilo silo) : IClassFixture<Sta
 
         Assert.Equal(12m, await Spent(books));
         Assert.Equal(2, (await silo.History("iee").Read(books, 0, 10, Ct)).Signals.Count(s => s.Signal is StateChanged));
-        var record = await (await silo.Services.GetRequiredService<BrainLogs>().For("iee")).Read("neuron.host/" + books, SynapseState.Name);
+        var record = await (await silo.Services.GetRequiredService<BrainLogs>().For("iee")).Read("neuron.host/" + books, Subscriptions.RecordName);
         Assert.NotNull(record);
-        var entry = Assert.Single(JournalPayloads.DecodeState<SynapseState>(record.Record)!.Sources);
-        Assert.Equal("*", entry.Source);
+        var sub = Subscriptions.Decode(books, record.Record);
+        var entry = Assert.Single(sub.Entries);
+        Assert.True(entry.IsBrainWide);
+    }
+
+    private sealed class LegacySynapseState
+    {
+        public List<LegacySynapseSource> Sources { get; set; } = [];
+    }
+
+    private sealed class LegacySynapseSource
+    {
+        public string Source { get; set; } = string.Empty;
+        public List<string> Aliases { get; set; } = [];
+        public long Cursor { get; set; }
     }
 
     [Fact]
@@ -90,14 +104,16 @@ public sealed class InstallEdgesSiloFacts(StatefulSilo silo) : IClassFixture<Sta
     }
 
     [Fact]
-    public async Task AGateInstalledLaterIsFoundOnTheNextPublish()
+    public async Task AReactionInstalledLaterIsFoundOnTheNextPublish()
     {
+        var books = NeuronId.Parse("ied/sb.ledger/default");
         var pay = silo.Get<ISbPayments>("ied/sb.payments/one");
         await pay.Charge(400m);
 
-        await StateNeuronSiloFacts.Install(silo.Services, "ied", "sb.week");
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => pay.Charge(400m));
+        await StateNeuronSiloFacts.Install(silo.Services, "ied", "sb.ledger");
+        await pay.Charge(400m);
+        await StateNeuronSiloFacts.Until(async () => await Spent(books) == 400m, Ct);
 
-        Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
+        Assert.Equal(400m, await Spent(books));
     }
 }

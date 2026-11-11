@@ -5,8 +5,6 @@ using DigitalBrain.Runtime.Orleans.Synapses;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Core.Internal;
-using Orleans.Streams;
-using Orleans.Streams.Core;
 
 namespace DigitalBrain.Runtime.Orleans.Testing;
 
@@ -31,13 +29,14 @@ internal static class RuntimeTestHooks
         services.GetRequiredService<RuntimeClock>().Advance(by);
     }
 
-    /// <summary>How many live stream subscriptions <paramref name="subscriber"/> holds for <paramref name="signal"/> from <paramref name="source"/>'s brain.</summary>
+    /// <summary>How many live subscriptions <paramref name="subscriber"/> holds for <paramref name="signal"/> from <paramref name="source"/>'s brain.</summary>
     public static async Task<int> SubscriptionCount(IServiceProvider services, NeuronId subscriber, NeuronId source, Type signal)
     {
         ArgumentNullException.ThrowIfNull(services);
-        var manager = services.GetRequiredService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
-        var all = await manager.GetSubscriptions(RuntimeOptions.From(services).SignalStreams, StreamNames.For(source.Brain.Value, signal)).ConfigureAwait(false);
-        return all.Count(s => s.GrainId.Key.ToString() == subscriber.ToString());
+        var log = await services.GetRequiredService<BrainLogs>().For(subscriber.Brain.Value).ConfigureAwait(false);
+        var subs = log.Subscriptions.All.FirstOrDefault(s => s.Subscriber == subscriber);
+        var alias = SignalAliases.Of(signal);
+        return subs?.Entries.Count(e => (e.Source == source || (e.IsBrainWide && e.Source is null)) && e.Aliases.Contains(alias)) ?? 0;
     }
 
     /// <summary>A typed proxy, from outside any neuron, to the hosted neuron <paramref name="id"/>.</summary>

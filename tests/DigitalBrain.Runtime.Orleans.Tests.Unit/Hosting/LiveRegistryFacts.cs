@@ -25,7 +25,9 @@ public sealed class LiveRegistryFacts
         registry.RegisterState("live.registry", typeof(LiveRegistryState));
 
         Assert.True(registry.TryGet("live.registry", out var neuronClass));
-        Assert.Equal(typeof(StateNeuron<LiveRegistryState>), neuronClass);
+        Assert.NotNull(neuronClass);
+        Assert.Equal("UnitNeuron`1", neuronClass.Name);
+        Assert.Equal(typeof(LiveRegistryState), neuronClass.GetGenericArguments()[0]);
         Assert.Equal(HostPolicy.Affine, registry.Require("live.registry").Policy);
         Assert.Equal(NeuronTypeRegistry.DefaultStateName, registry.Require("live.registry").StateName);
         Assert.True(registry.Version > before);

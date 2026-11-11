@@ -50,12 +50,6 @@ public sealed record RuntimeOptions
     /// <summary>The container image of the sandbox process, named by <c>Services</c>.</summary>
     public string? SandboxImage { get; init; }
 
-    /// <summary>The stream pub-sub grain store.</summary>
-    public string PubSubStore { get; init; } = "PubSubStore";
-
-    /// <summary>The signal stream namespace.</summary>
-    public string SignalStreams { get; init; } = "signals";
-
     /// <summary>The platform grain store.</summary>
     public string PlatformGrainStorage { get; init; } = "platform";
 
@@ -67,9 +61,6 @@ public sealed record RuntimeOptions
 
     /// <summary>The configuration key that selects the master-key custody kind.</summary>
     public string CustodyConfigurationKey { get; init; } = "DigitalBrain:Platform:Storage:Custody";
-
-    /// <summary>How long a publisher waits for one gate neuron's verdict before the gate counts as refusing (fail closed).</summary>
-    public TimeSpan GateTimeout { get; init; } = TimeSpan.FromSeconds(15);
 
     /// <summary>Keys named after DigitalBrain, home <c>~/.digitalbrain</c>.</summary>
     public static RuntimeOptions Default { get; } = new();

@@ -23,10 +23,3 @@ public readonly record struct NeuronAddress(string NeuronType, string Key)
         return separator > 0 && BrainId.IsValid(key[..separator]) ? key[..separator] : null;
     }
 }
-
-public interface INeuronResolver
-{
-    T Resolve<T>(BrainId brain, string relative) where T : class;
-
-    T ResolveKey<T>(string fullKey) where T : class;
-}

@@ -1,5 +1,7 @@
+using DigitalBrain.Access;
 using DigitalBrain.Capabilities.Storage;
 using DigitalBrain.Confirmation;
+using DigitalBrain.Kernel;
 using DigitalBrain.Spi;
 
 namespace DigitalBrain.Testing;
@@ -13,10 +15,19 @@ internal sealed class TestNeuronContext : INeuronContext
     public TestNeuronContext(TestNeuronHost host)
     {
         _host = host;
-        State = new JournalState(host);
+        var journal = host.OS.Journal(host.Id.Brain);
+        var nudge = host.OS.Delivery.NudgeFor(host.Id.Brain);
+        State = new KernelState(
+            host.Id,
+            "state",
+            host.Stateless,
+            journal,
+            nudge,
+            () => { var (t, c) = TestCause.Stamp(); return new Stamp(t, c); },
+            () => host.Drop());
         Timers = new HostTimers(host);
         Reminders = new HostReminders(host);
-        Synapses = new TestSynapses(host);
+        Synapses = new Subscribing(host.Id, host.Stateless, host.OS.Delivery.For(host.Id), host.OS.Delivery.Admission, host.OS.Clock);
         // An IConfirmations in TestOSOptions.Services replaces the kit's gate (a fact substitutes a faulting one), as the silo's
         // registered IConfirmations does.
         Confirmations = host.OS.Services.GetService(typeof(IConfirmations)) as IConfirmations
@@ -49,6 +60,8 @@ internal sealed class TestNeuronContext : INeuronContext
 
     public string? TraceId => TestCause.Stamp().TraceId;
 
+    public Caller? Caller => TestCallerAmbient.Instance.Current;
+
     public async Task Publish(Signal signal)
     {
         ArgumentNullException.ThrowIfNull(signal);
@@ -57,17 +70,7 @@ internal sealed class TestNeuronContext : INeuronContext
             await PublishEphemeral(signal).ConfigureAwait(false);
             return;
         }
-        var allowed = await TestGates.Run(_host.OS, Id, [signal], CancellationToken.None).ConfigureAwait(false);
-        IReadOnlyList<JournaledSignal> written;
-        try { written = _host.OS.Journal(Id.Brain).Append(Id, [signal]); }
-        catch
-        {
-            await TestGates.Abort(_host.OS, allowed).ConfigureAwait(false);
-            throw;
-        }
-        _host.OS.Delivery.Committed(Id);
-        await TestGates.Commit(_host.OS, allowed).ConfigureAwait(false);
-        _host.OS.Delivery.Appended(Id, written);
+        await ((KernelState)State).Publish(signal).ConfigureAwait(false);
     }
 
     public Task PublishEphemeral(Signal signal)
@@ -87,33 +90,6 @@ internal sealed class TestNeuronContext : INeuronContext
     {
         ArgumentNullException.ThrowIfNull(work);
         _host.Defer(work);
-    }
-
-    private sealed class JournalState(TestNeuronHost host) : INeuronState
-    {
-        public Task<T?> Load<T>() => Task.FromResult(host.OS.Journal(host.Id.Brain).Load<T>(host.Id));
-
-        public async Task Save<T>(T next, IReadOnlyList<Signal> signals)
-        {
-            ArgumentNullException.ThrowIfNull(signals);
-            var allowed = await TestGates.Run(host.OS, host.Id, signals, CancellationToken.None).ConfigureAwait(false);
-            IReadOnlyList<JournaledSignal> written;
-            try { written = host.OS.Journal(host.Id.Brain).Save(host.Id, next, signals); }
-            catch
-            {
-                await TestGates.Abort(host.OS, allowed).ConfigureAwait(false);
-                throw;
-            }
-            host.OS.Delivery.Committed(host.Id);
-            await TestGates.Commit(host.OS, allowed).ConfigureAwait(false);
-            host.OS.Delivery.Appended(host.Id, written);
-        }
-
-        public Task Clear()
-        {
-            host.OS.Journal(host.Id.Brain).Clear(host.Id);
-            return Task.CompletedTask;
-        }
     }
 
     private sealed class HostTimers(TestNeuronHost host) : ITimers

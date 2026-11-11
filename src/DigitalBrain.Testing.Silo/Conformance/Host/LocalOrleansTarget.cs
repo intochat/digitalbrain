@@ -5,7 +5,7 @@ using DigitalBrain.Testing;
 
 namespace DigitalBrain.Testing.Conformance.Host;
 
-/// <summary>The local topology (LocalProfile on a temp Home: memory streams, file PubSubStore, BrainLog cluster store).</summary>
+/// <summary>The local topology (LocalProfile on a temp Home: BrainLog cluster store).</summary>
 public sealed class LocalOrleansTarget : OrleansFrameworkTarget
 {
     public const string TargetName = "local-orleans";

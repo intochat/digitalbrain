@@ -5,7 +5,7 @@ namespace DigitalBrain;
 
 /// <summary>
 /// The installs neuron of a brain: derives an app's needs from the catalog, asks a person once per distinct needs, records the
-/// approval with its bindings and schedules, wires the host through <see cref="IInstallHooks"/>, and announces <see cref="GateChanged"/>.
+/// approval with its bindings and schedules, and wires the host through <see cref="IInstallHooks"/>.
 /// </summary>
 /// <remarks>
 /// An install is two-phase: <see cref="Install"/> records a <see cref="PendingInstall"/>, asks without awaiting the answer and returns
@@ -47,7 +47,6 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
                 status = InstallStatus.Updated;
             }
 
-            await GateChanged().ConfigureAwait(true);
             return new InstallOutcome(status, sentence, await Wire(alias, needs, ct).ConfigureAwait(true));
         }
 
@@ -158,7 +157,6 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
         var needs = source.NeedsOf(alias);
         _ = await Wire(alias, needs, ct).ConfigureAwait(true);
         await Save(State.CompleteInstall(pending, needs, Context.Time.GetUtcNow()), [new Installed(alias, pending.NeedsHash)]).ConfigureAwait(true);
-        await GateChanged().ConfigureAwait(true);
     }
 
     /// <inheritdoc />
@@ -172,7 +170,7 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
 
     /// <inheritdoc />
     /// <remarks>
-    /// Pending asks of the alias are denied with reason <c>retired</c>. The record is removed and <see cref="DigitalBrain.GateChanged"/> published first; a failing hook is then swallowed, since
+    /// Pending asks of the alias are denied with reason <c>retired</c>. The record is removed and <see cref="Retired"/> published first; a failing hook is then swallowed, since
     /// <see cref="IInstalls.Retire"/> reports nothing, and leaves edges or schedules the host must tolerate (they reach a retired app).
     /// </remarks>
     public async Task Retire(string alias, CancellationToken ct)
@@ -186,7 +184,6 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
 
         if (State.FindRecord(alias) is null) { return; }
         await Save(State.RemoveRecord(alias), [new Retired(alias)]).ConfigureAwait(true);
-        await GateChanged().ConfigureAwait(true);
         var state = StateOf(alias);
         try
         {
@@ -231,8 +228,6 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
     }
 
     private NeuronId StateOf(string alias) => new(Id.Brain, alias, "default");
-
-    private Task GateChanged() => PublishEphemeral(new GateChanged(Id.Brain.Value!));
 
     // Runs the hooks; a failure comes back as a reason. The next Install of the alias retries.
     private async Task<string?> Wire(string alias, SynapseNeeds needs, CancellationToken ct)

@@ -1,4 +1,6 @@
 using System.Reflection;
+using DigitalBrain.Access;
+using DigitalBrain.Runtime.Orleans.Access;
 using DigitalBrain.Runtime.Orleans.Capabilities;
 using DigitalBrain.Runtime.Orleans.Compute;
 using DigitalBrain.Runtime.Orleans.Hosting;
@@ -22,7 +24,7 @@ public static class RuntimeSiloBuilderExtensions
 {
     /// <summary>
     /// Hosts the plain <c>[Neuron]</c> classes of <paramref name="modules"/> on the host grains, with their JSON journal payloads,
-    /// signal publishing and synapse retention. Relies on the topology's <see cref="RuntimeOptions.SignalStreams"/> binding.
+    /// signal publishing and synapse retention.
     /// </summary>
     /// <exception cref="InvalidOperationException">The runtime was already added to this silo.</exception>
     public static ISiloBuilder AddDigitalBrainRuntime(this ISiloBuilder silo, params Assembly[] modules)
@@ -59,9 +61,6 @@ public static class RuntimeSiloBuilderExtensions
         // The live catalog, seeded from the startup scan; state neurons, the installs neuron and the gate index read it per call.
         silo.Services.TryAddSingleton(sp => new SynapseCatalogSource(sp.GetRequiredService<NeuronTypeRegistry>().Catalog));
         silo.Services.TryAddSingleton<ISynapseCatalogSource>(sp => sp.GetRequiredService<SynapseCatalogSource>());
-        silo.Services.TryAddSingleton(sp => new InstalledGateIndex(sp.GetRequiredService<ISynapseCatalogSource>()));
-        silo.Services.TryAddSingleton<DigitalBrain.Spi.IGateIndex>(sp => sp.GetRequiredService<InstalledGateIndex>());
-        silo.Services.TryAddSingleton<InstalledGates>();
         silo.Services.TryAddSingleton<DigitalBrain.Spi.IInstallHooks, OrleansInstallHooks>();
         silo.Services.TryAddSingleton<DigitalBrain.Spi.ISynapseRegistrar, OrleansSynapseRegistrar>();
         // The synapse host: compiles, loads and deploys generated sources; each brain's sources neuron keeps them, and the restorer
@@ -87,13 +86,24 @@ public static class RuntimeSiloBuilderExtensions
             sp.GetRequiredService<ISynapseCatalogSource>(),
             sp.GetRequiredService<SynapseHost>()));
         silo.Services.AddJournalPayloads(modules);
-        silo.Services.AddSignalPublisher();
+        silo.Services.TryAddSingleton<DigitalBrain.Kernel.INudge, GrainNudge>();
+        silo.Services.TryAddSingleton<DigitalBrain.Kernel.IAdmission, GrainAdmission>();
+        silo.Services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SubscriptionSweep>();
         silo.Services.TryAddSingleton<DigitalBrain.Spi.ISlotResolver, BrokerSlotResolver>();
+        silo.Services.TryAddSingleton<PublishFaults>();
         silo.Services.AddSingleton<SynapseCounters>();
+        silo.Services.AddSingleton<DigitalBrain.Kernel.DeliveryCounters>(sp => sp.GetRequiredService<SynapseCounters>());
         silo.AddSynapseRetention();
         silo.AddRuntimeServices();
         silo.Services.AddCapabilityBroker();
         silo.Services.TryAddSingleton<Operations.IConfirmationContexts, Confirmations.KernelConfirmations>();
+        silo.Services.TryAddSingleton<ICallerAmbient>(OrleansCallerAmbient.Instance);
+        silo.Services.TryAddSingleton<ICallerCarrier>(OrleansCallerAmbient.Instance);
+        silo.Services.TryAddSingleton(new AccessOptions());
+        silo.Services.TryAddSingleton(new AccessCounters());
+        silo.Services.TryAddSingleton(sp => new AccessGate(sp.GetRequiredService<ICallerAmbient>(), sp.GetRequiredService<AccessOptions>(), sp.GetRequiredService<AccessCounters>()));
+        silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IIncomingGrainCallFilter, CallerEdgeFilter>());
+        DigitalBrain.Brains.CallerAdmission.Reader = () => LegacyCallers.Project(OrleansCallerAmbient.Instance.Current);
         silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IIncomingGrainCallFilter, DigitalBrainCallFilter>());
         silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IOutgoingGrainCallFilter, DigitalBrainCallFilter>());
         silo.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IOutgoingGrainCallFilter, TraceOutgoingFilter>());

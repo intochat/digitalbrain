@@ -9,8 +9,6 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
-using Orleans.Streams;
-using Orleans.Streams.Core;
 
 namespace DigitalBrain.Runtime.Orleans.Tests.Integration.Synapses;
 
@@ -133,25 +131,31 @@ public class SynapseSilo : IAsyncLifetime
 
     public Task Restart(CancellationToken ct) => _host!.Restart(ct);
 
+    public DigitalBrain.Spi.ISignalHistory History(string brain) => Services.GetRequiredService<BrainSignalHistories>().For(new BrainId(brain));
+
     internal SynapseCounters Counters => Services.GetRequiredService<SynapseCounters>();
 
     internal PublishFaults Faults => Services.GetRequiredService<PublishFaults>();
 
-    /// <summary>Subscriptions of <paramref name="listener"/> on the stream of <paramref name="alias"/>.</summary>
+    /// <summary>Subscriptions of <paramref name="listener"/> on the signal of <paramref name="alias"/>.</summary>
     public async Task<int> Subscriptions(string listener, string alias)
     {
-        var manager = Services.GetRequiredService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
         var id = NeuronId.Parse(listener);
-        var all = await manager.GetSubscriptions(RuntimeOptions.Default.SignalStreams, StreamNames.For(id.Brain.Value, alias));
-        return all.Count(s => s.GrainId.Key.ToString() == listener);
+        var logs = Services.GetRequiredService<BrainLogs>();
+        var log = await logs.For(id.Brain.Value);
+        var sub = log.Subscriptions.Of(id);
+        if (sub is null) { return 0; }
+        return sub.Entries.Count(e => e.Aliases.Contains(alias) || e.IsBrainWide);
     }
 
-    /// <summary>Sends a reference by hand, as a duplicate or forged nudge would arrive.</summary>
-    internal Task Nudge(string publisher, long sequence, string alias)
+    /// <summary>Sends a nudge by hand, as a duplicate or forged nudge would arrive.</summary>
+    internal async Task Nudge(string publisher, long sequence, string alias)
     {
         var id = NeuronId.Parse(publisher);
-        var provider = Services.GetRequiredKeyedService<IStreamProvider>(RuntimeOptions.Default.SignalStreams);
-        return provider.GetStream<SignalReference>(StreamNames.For(id.Brain.Value, alias)).OnNextAsync(new SignalReference(id, sequence));
+        var logs = Services.GetRequiredService<BrainLogs>();
+        var log = await logs.For(id.Brain.Value);
+        var position = log.PositionAt(id, sequence);
+        log.Fanout?.Appended(id, [alias], position);
     }
 
     /// <summary>Deactivates every idle activation.</summary>

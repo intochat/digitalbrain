@@ -43,7 +43,7 @@ public sealed class ConnectionIndexNeuron : Neuron<ConnectionIndexState>, IConne
 
     private async Task Persist(ConnectionIndexState next)
     {
-        await Context.State.Save(next, []).ConfigureAwait(true);
+        await Context.State.Store(next).ConfigureAwait(true);
         State.Keys = next.Keys;
     }
 

@@ -1,3 +1,4 @@
+using DigitalBrain.Kernel;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Spi;
 using DigitalBrain.Time;
@@ -10,9 +11,9 @@ namespace DigitalBrain.Runtime.Orleans.Synapses;
 /// <summary>
 /// The install hooks of the silo: a state neuron's reaction edges are its one brain-wide synapse, set on its host grain through
 /// <see cref="ISynapseHost.EnsureBrainWide"/> under the installs neuron's identity; its schedules are registrations with
-/// <c>{brain}/time/default</c> owned by its alias. Each edge change also marks the brain's <see cref="InstalledGates"/> stale.
+/// <c>{brain}/time/default</c> owned by its alias.
 /// </summary>
-internal sealed class OrleansInstallHooks(IServiceProvider services, InstalledGates gates) : IInstallHooks
+internal sealed class OrleansInstallHooks(IServiceProvider services) : IInstallHooks
 {
     /// <summary>The neuron type of the installs neuron, <c>{brain}/synapse.installs/default</c>.</summary>
     internal const string InstallsType = "synapse.installs";
@@ -28,7 +29,6 @@ internal sealed class OrleansInstallHooks(IServiceProvider services, InstalledGa
     {
         ArgumentNullException.ThrowIfNull(signals);
         ArgumentNullException.ThrowIfNull(signalAliases);
-        gates.Invalidate(state.Brain);
         if (signals.Count == 0 && signalAliases.Count == 0) { return; }
         var map = services.GetRequiredService<JournalPayloads>().Types;
         string[] aliases = [.. signals.Select(signal => map.TryAliasOf(signal, out var alias)
@@ -40,22 +40,13 @@ internal sealed class OrleansInstallHooks(IServiceProvider services, InstalledGa
     /// <inheritdoc />
     public Task RemoveReactionEdges(NeuronId state, CancellationToken ct)
     {
-        gates.Invalidate(state.Brain);
         return AsInstalls(state, host => host.RemoveBrainWide());
     }
 
     /// <inheritdoc />
     /// <remarks>The alias's registrations are replaced only when they differ, so an unchanged install leaves its reminders running.</remarks>
-    public async Task RegisterSchedules(NeuronId state, IReadOnlyList<Schedule> schedules, CancellationToken ct)
-    {
-        ArgumentNullException.ThrowIfNull(schedules);
-        var time = Time(state.Brain);
-        var held = (await time.Registered(ct).ConfigureAwait(true)).Where(r => r.Owner == state.Type).Select(r => r.Schedule).ToHashSet(StringComparer.Ordinal);
-        var wanted = schedules.Select(s => s.Text).ToHashSet(StringComparer.Ordinal);
-        if (held.SetEquals(wanted)) { return; }
-        if (held.Count > 0) { await time.Unregister(state.Type, ct).ConfigureAwait(true); }
-        foreach (var text in wanted) { await time.Register(state.Type, text, ct).ConfigureAwait(true); }
-    }
+    public Task RegisterSchedules(NeuronId state, IReadOnlyList<Schedule> schedules, CancellationToken ct)
+        => ScheduleDiff.Apply(Time(state.Brain), state.Type, schedules, ct);
 
     /// <inheritdoc />
     public Task UnregisterSchedules(NeuronId state, CancellationToken ct) => Time(state.Brain).Unregister(state.Type, ct);

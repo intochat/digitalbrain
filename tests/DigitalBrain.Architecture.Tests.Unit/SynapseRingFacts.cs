@@ -13,7 +13,7 @@ public sealed partial class SynapseRingFacts
     {
         var core = Path.Combine(Repository.Root, "src", "DigitalBrain");
         var files = Repository.SourceFiles(Path.Combine(core, "Synapses"), "*.cs")
-            .Concat([Path.Combine(core, "Spi", "ISynapseReceiver.cs"), Path.Combine(core, "Spi", "IGateIndex.cs")])
+            .Concat([Path.Combine(core, "Spi", "ISynapseReceiver.cs")])
             .ToList();
         Assert.True(files.Count > 2);
         Assert.All(files, file => Assert.True(File.Exists(file), $"{file} is missing."));

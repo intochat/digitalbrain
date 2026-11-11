@@ -22,7 +22,7 @@ public sealed class SourceBindingsFlipFacts
         public static class Budget2
         {
             [Synapse(typeof(Charging2), "week2")]
-            public static Check Cap2(Charging2 s, WeekSpend2 t) => Check.Allow(t with { Spent = t.Spent + s.Amount });
+            public static WeekSpend2 Cap2(Charging2 s, WeekSpend2 t) => t with { Spent = t.Spent + s.Amount };
         }
         """;
 

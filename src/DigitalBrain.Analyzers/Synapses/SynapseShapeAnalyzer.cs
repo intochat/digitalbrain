@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace DigitalBrain.Analyzers.Synapses;
 
-/// <summary>DB0041: a <c>[Synapse]</c> method is a gate, a reaction or a view; the rules mirror DigitalBrain.SynapseShape over symbols.</summary>
+/// <summary>DB0041: a <c>[Synapse]</c> method is a reaction or a view; the rules mirror DigitalBrain.SynapseShape over symbols.</summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
 {
@@ -154,7 +154,6 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
         }
 
         var returned = Unwrap(method.ReturnType);
-        var isGate = Rules.FullName(returned as INamedTypeSymbol) == Rules.CheckType;
         var isReaction = SymbolEqualityComparer.Default.Equals(returned, state)
             || (returned is INamedTypeSymbol { IsGenericType: true } generic
                 && Rules.FullName(generic.OriginalDefinition) == ReactionType
@@ -181,11 +180,11 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
             return isReaction ? EveryRefusal(attribute, isReaction: false, declared: null) : $"an {Rules.SynapseReasons.AliasNeedsEnvelope}.";
         }
 
-        if (!isGate && !isReaction)
+        if (!isReaction)
         {
             if (hasSignalParameter || tokens > 0 || hasSignal)
             {
-                return $"a {Rules.SynapseReasons.ViewTakesOnlyState}; a function with a signal must return Check or the state.";
+                return $"a {Rules.SynapseReasons.ViewTakesOnlyState}; a function with a signal must return the state.";
             }
 
             return EveryRefusal(attribute, isReaction: false, declared: null);

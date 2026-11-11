@@ -35,10 +35,8 @@ internal static class RsSource
         public static class Budget
         {
             [Synapse(typeof(Charging), "rs.week")]
-            public static Check WeeklyCap(Charging s, WeekSpend t) =>
-                t.Spent + s.Amount > 300m
-                    ? Check.Reject("weekly cap of $300")
-                    : Check.Allow(t with { Spent = t.Spent + s.Amount });
+            public static WeekSpend WeeklyCap(Charging s, WeekSpend t) =>
+                t with { Spent = t.Spent + s.Amount };
 
             [Synapse(typeof(WeekRolled), "rs.week")]
             public static Reaction<WeekSpend> NewWeek(WeekRolled s, WeekSpend t) =>
@@ -121,11 +119,9 @@ public sealed class RegistrarSiloFacts(StatefulSilo silo) : IClassFixture<Statef
         var pay = silo.Get<IRsPayments>("rsa/rs.payments/p");
 
         await pay.Charge(250m);
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => pay.Charge(100m));
         await pay.Roll(new DateOnly(2026, 1, 5));
         var report = await Report("rsa");
 
-        Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
         Assert.NotNull(report);
         Assert.Same(source.Assembly, report.GetType().Assembly);
         Assert.Equal("rs.report-ready", report.GetType().GetCustomAttribute<SignalAttribute>()?.Alias);
@@ -162,7 +158,7 @@ public sealed class RegistrarSiloFacts(StatefulSilo silo) : IClassFixture<Statef
         var old = await Report("rsr");
         Assert.Same(a.Assembly, old?.GetType().Assembly);
 
-        var b = RsSource.Load(RsSource.Budget.Replace("weekly cap of $300", "weekly cap of 300 dollars", StringComparison.Ordinal));
+        var b = RsSource.Load(RsSource.Budget.Replace("This week", "Current week", StringComparison.Ordinal));
         Assert.NotEqual(a.Hash, b.Hash);
         await Registrar.Activate(Brain("rsr"), b, Ct);
         var decoded = await Report("rsr");

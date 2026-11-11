@@ -43,7 +43,10 @@ internal sealed class RuntimeOperations(IServiceProvider services, BrainId brain
 
         if (plan is WritePlan write)
         {
-            _ = Task.Run(() => CheckAndDrive(write, handle, ct), CancellationToken.None);
+            using (ExecutionContext.SuppressFlow())
+            {
+                _ = Task.Run(() => CheckAndDrive(write, handle, ct), CancellationToken.None);
+            }
             return handle;
         }
         var gate = services.GetService<IOperationGate>() ?? new AllowAllOperations();

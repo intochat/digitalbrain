@@ -92,7 +92,7 @@ public interface IBrainJournalWriter
     Task<JournalSignalPage> ReadSince(string brainId, string publisher, long cursor, int limit, CancellationToken ct);
 }
 
-internal sealed class BrainJournalWriter(BrainLogs logs, IServiceProvider services) : IBrainJournalWriter
+internal sealed class BrainJournalWriter(BrainLogs logs) : IBrainJournalWriter
 {
     private static readonly JsonDocumentOptions Parse = new() { MaxDepth = 64 };
 
@@ -125,10 +125,9 @@ internal sealed class BrainJournalWriter(BrainLogs logs, IServiceProvider servic
         var (sequence, last) = await log.AppendEncoded(state?.GrainId ?? "", state?.StateName ?? "", state?.ExpectedETag, change,
             change == BrainRecordChange.Write ? state!.Record.ToArray() : [], state?.StateType, publisher, encoded, null, ct);
         var position = log.LastPosition;
-        if (encoded.Length > 0 && NeuronId.TryParse(publisher, out var neuron) && services.GetService<SignalPublisher>() is { } announcer)
+        if (signals.Count > 0 && NeuronId.TryParse(publisher, out var publisherNeuron))
         {
-            await announcer.Publish(new AppendedSignals(neuron,
-                [.. encoded.Select((payload, index) => (last - encoded.Length + 1 + index, payload.Type))]));
+            log.Fanout?.Appended(publisherNeuron, [.. signals.Select(s => s.Type)], new DigitalBrain.Kernel.Position(position));
         }
         return new JournalAppendResult(sequence, last, position);
     }

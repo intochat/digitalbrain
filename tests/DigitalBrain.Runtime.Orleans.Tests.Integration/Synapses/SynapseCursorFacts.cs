@@ -1,3 +1,4 @@
+using DigitalBrain.Kernel;
 using DigitalBrain.Runtime.Orleans.Synapses;
 using DigitalBrain.Runtime.Orleans.Testing;
 using DigitalBrain.Runtime.Orleans.Tests.Integration.Hosting;
@@ -65,13 +66,14 @@ public sealed class SynapseCursorFacts(SynapseSilo silo) : IClassFixture<Synapse
         await Heard.Until(Listener, 2, ct);
         await Task.Delay(300, ct);
 
-        var record = await (await silo.Services.GetRequiredService<BrainLogs>().For("b1")).Read("neuron.host/" + Listener, SynapseState.Name);
+        var record = await (await silo.Services.GetRequiredService<BrainLogs>().For("b1")).Read("neuron.host/" + Listener, Subscriptions.RecordName);
         Assert.NotNull(record);
-        var state = JournalPayloads.DecodeState<SynapseState>(record.Record)!;
-        var entry = Assert.Single(state.Sources);
-        Assert.Equal(Source, entry.Source);
+        var sub = Subscriptions.Decode(NeuronId.Parse(Listener), record.Record);
+        var entry = Assert.Single(sub.Entries);
+        Assert.Equal(NeuronId.Parse(Source), entry.Source);
         Assert.Equal(["probe.counted"], entry.Aliases);
-        Assert.Equal(2, entry.Cursor);
+        var lastSignal = (await silo.History("b1").Read(0, 100, ct)).Signals.Last(s => s.Publisher == NeuronId.Parse(Source));
+        Assert.Equal(lastSignal.Sequence, entry.Cursor.Value);
     }
 
     [Fact]

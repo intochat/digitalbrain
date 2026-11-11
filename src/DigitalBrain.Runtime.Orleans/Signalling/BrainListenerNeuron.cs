@@ -45,7 +45,7 @@ internal sealed class BrainListenerNeuron(IOptions<SessionSynapseOptions> option
     public Task Listen(string[] aliases)
     {
         _emptySince = null;
-        return Host.Engine.EnsureBrain(aliases);
+        return Host.Delivery.EnsureBrainWide(aliases, Host.Time.GetUtcNow(), false);
     }
 
     public Task<string> Silo() => Task.FromResult(((IHostNeuronContext)Context).Silo);
@@ -66,7 +66,7 @@ internal sealed class BrainListenerNeuron(IOptions<SessionSynapseOptions> option
         }
         _emptySince ??= clock.Now;
         if (clock.Now - _emptySince < _options.SessionTtl) { return; }
-        await Host.Engine.RemoveBrain().ConfigureAwait(true);
+        await Host.Delivery.RemoveBrainWide().ConfigureAwait(true);
         Context.Timers.Stop(SweepTimer);
         Host.DeactivateOnIdle();
     }

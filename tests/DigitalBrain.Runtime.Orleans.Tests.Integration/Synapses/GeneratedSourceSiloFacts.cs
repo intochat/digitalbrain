@@ -27,7 +27,7 @@ public sealed class GeneratedSourceSiloFacts(StatefulSilo silo) : IClassFixture<
     }
 
     [Fact]
-    public async Task ThePromiseHoldsFromTextToRefusal()
+    public async Task ThePromiseHoldsFromTextToExecution()
     {
         await Deploy("ge1");
         var pay = Pay("ge1");
@@ -35,24 +35,20 @@ public sealed class GeneratedSourceSiloFacts(StatefulSilo silo) : IClassFixture<
         await pay.Charge(120m);
         await pay.Charge(100m);
         await pay.Charge(70m);
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => pay.Charge(20m));
 
-        Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
+        Assert.Equal(290m, await StateNeuronSiloFacts.SpentOf(silo.Services, NeuronId.Parse("ge1/ge1.week/default"), 290m));
     }
 
     [Fact]
     public async Task RetireFreesEverything()
     {
         var first = await Deploy("ge2");
-        await Assert.ThrowsAsync<RuleViolationException>(() => Pay("ge2").Charge(350m));
 
         var retired = await Host.Retire(ShSource.Brain("ge2"), ShSource.Key("ge2"), Ct);
 
         Assert.Equal((DeployStatus.Retired, first.Hash), (retired.Status, retired.Hash));
         Assert.Empty(await Host.List(ShSource.Brain("ge2"), Ct));
         Assert.DoesNotContain(ShSource.Week("ge2"), silo.Services.GetRequiredService<ISynapseCatalogSource>().Current.States.Keys);
-        // No gate is left on the alias: the publisher finds no Charging signal to publish, so nothing refuses a charge.
-        await Assert.ThrowsAsync<InvalidOperationException>(() => Pay("ge2").Charge(350m));
         Assert.Empty(Host.Leaked);
     }
 }

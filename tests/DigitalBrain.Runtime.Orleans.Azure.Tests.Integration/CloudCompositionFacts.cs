@@ -7,7 +7,6 @@ using Microsoft.Extensions.Hosting;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Storage;
-using Orleans.Streams;
 
 namespace DigitalBrain.Runtime.Orleans.Azure.Tests.Integration;
 
@@ -79,12 +78,6 @@ public sealed class CloudCompositionFacts(AzuriteFixture azurite)
             var rows = new List<TableEntity>();
             await foreach (var row in members) { rows.Add(row); }
             Assert.Contains(rows, row => row.GetString("Status") == "Active");
-
-            // Queue streams: the signals provider writes to signals-0.
-            var stream = services.GetRequiredKeyedService<IStreamProvider>(RuntimeOptions.Default.SignalStreams)
-                .GetStream<int>(StreamId.Create(RuntimeOptions.Default.SignalStreams, "probe"));
-            await stream.OnNextAsync(1);
-            Assert.True((await new QueueServiceClient(storage).GetQueueClient("signals-0").ExistsAsync(ct)).Value);
 
             await host.StopAsync(ct);
         }

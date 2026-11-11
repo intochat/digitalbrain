@@ -2,7 +2,9 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using DigitalBrain.Access;
 using DigitalBrain.Invocation;
+using DigitalBrain.Kernel;
 using DigitalBrain.Spi;
 
 namespace DigitalBrain.Testing;
@@ -13,7 +15,6 @@ namespace DigitalBrain.Testing;
 internal sealed class TestNeuronHost : IDisposable
 {
     private static readonly AsyncLocal<List<Func<Task>>?> Deferred = new();
-    private static readonly ConcurrentDictionary<(Type Class, string Contract), Type?> Contracts = new();
 
     private readonly TestOS _os;
     private readonly TurnScheduler _turns = new();
@@ -40,6 +41,10 @@ internal sealed class TestNeuronHost : IDisposable
 
     public bool IsActive => _neuron is not null;
 
+    public bool Stateless => Class.IsDefined(typeof(StatelessNeuronAttribute), false);
+
+    public void Drop() => _ = _os.Track(Deactivate(DeactivationCause.Failed));
+
     internal Neuron? CurrentNeuron => _neuron;
 
     public TestOS OS => _os;
@@ -47,14 +52,22 @@ internal sealed class TestNeuronHost : IDisposable
     public Task<JsonElement?> Invoke(RuntimeInvocation call, CancellationToken cancellationToken)
     {
         var (bound, interleave, _) = Bind(call);
-        var work = _os.Track(Turn(interleave, neuron => _os.Binder.InvokeAsync(neuron, bound, call.Arguments, cancellationToken)));
+        var work = _os.Track(Turn(interleave, async neuron =>
+        {
+            using var running = TestCallerAmbient.Instance.Enter(_os.Access.Admit(Id, bound));
+            return await _os.Binder.InvokeAsync(neuron, bound, call.Arguments, cancellationToken).ConfigureAwait(false);
+        }));
         return work.WaitAsync(_os.Options.CallTimeout, _os.Clock, cancellationToken);
     }
 
     public Task Post(RuntimeInvocation call)
     {
         var (bound, interleave, _) = Bind(call);
-        _ = _os.Track(Observe(Turn(interleave, neuron => _os.Binder.InvokeAsync(neuron, bound, call.Arguments, CancellationToken.None))));
+        _ = _os.Track(Observe(Turn(interleave, async neuron =>
+        {
+            using var running = TestCallerAmbient.Instance.Enter(_os.Access.Admit(Id, bound));
+            return await _os.Binder.InvokeAsync(neuron, bound, call.Arguments, CancellationToken.None).ConfigureAwait(false);
+        })));
         return Task.CompletedTask;
     }
 
@@ -62,6 +75,7 @@ internal sealed class TestNeuronHost : IDisposable
     public async IAsyncEnumerable<JsonElement> Stream(RuntimeInvocation call, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var (bound, _, _) = Bind(call);
+        using var running = TestCallerAmbient.Instance.Enter(_os.Access.Admit(Id, bound));
         var neuron = await Activated().ConfigureAwait(false);
         await foreach (var item in _os.Binder.StreamAsync(neuron, bound, call.Arguments, cancellationToken).ConfigureAwait(false))
         {
@@ -175,6 +189,7 @@ internal sealed class TestNeuronHost : IDisposable
         if (!reminder && !IsActive) { return; }
         _ = _os.Track(Observe(Turn(interleave: false, async neuron =>
         {
+            using var running = TestCallerAmbient.Instance.Enter(Caller.OfKernel(Id.Brain));
             await NeuronAttachment.Remind(neuron, name, CancellationToken.None).ConfigureAwait(false);
             return 0;
         })));
@@ -182,10 +197,9 @@ internal sealed class TestNeuronHost : IDisposable
 
     private (BoundCall Bound, bool Interleave, bool OneWay) Bind(RuntimeInvocation call)
     {
-        var contract = Contracts.GetOrAdd((Class, call.Contract), static key => key.Class.GetInterfaces().FirstOrDefault(face => NeuronProxy.ContractName(face) == key.Contract))
-            ?? throw new BindingException($"{Class.FullName} does not implement contract {call.Contract}.");
-        var bound = _os.Binder.Bind(contract, call);
-        var (interleave, oneWay) = CallMarkers.Of(Class, bound.Method, call);
+        var bound = CallPolicy.Bind(_os.Binder, Class, call);
+        var interleave = CallPolicy.MayInterleave(Class, bound, call);
+        var oneWay = bound.Method.IsDefined(typeof(OneWayCallAttribute), false);
         return (bound, interleave, oneWay);
     }
 

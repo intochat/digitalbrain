@@ -77,6 +77,7 @@ public sealed class LocalSiloHostFactory : IInProcessHostFactory
         builder.UseOrleans(silo =>
         {
             silo.ConfigureTopologySilo();
+            silo.Services.AddSingleton(new DigitalBrain.Access.AccessOptions { UnstampedEdgeIsKernel = true, AuditContractInternal = true });
             _configureServices?.Invoke(silo.Services);
             if (_clusterStore is Unregistered && silo.Services.Any(d => d.ServiceType == typeof(DigitalBrain.Capabilities.Identity.IIdentityDirectoryPort)))
             {

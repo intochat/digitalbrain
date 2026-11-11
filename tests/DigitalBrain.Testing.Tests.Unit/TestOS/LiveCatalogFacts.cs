@@ -68,15 +68,13 @@ public sealed class LiveCatalogFacts
     }
 
     [Fact]
-    public async Task UnregisterRemovesTheAliasFromGatesAndCatalog()
+    public async Task UnregisterRemovesTheAliasFromCatalog()
     {
         await using var os = await Start("week");
-        Assert.NotEmpty(os.Gates.GatesFor(Pay.Brain, typeof(Charging)));
 
         os.Unregister("week");
 
         Assert.False(os.Catalog.States.ContainsKey("week"));
-        Assert.Empty(os.Gates.GatesFor(Pay.Brain, typeof(Charging)));
         Assert.Throws<InvalidOperationException>(() => os.Get<IInstalls>(new NeuronId(Pay.Brain, "week", "default")));
         await os.Get<IPayments>(Pay).Charge(400m);
         await os.Idle();

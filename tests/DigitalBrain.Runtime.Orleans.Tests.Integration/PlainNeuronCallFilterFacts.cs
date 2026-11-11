@@ -3,7 +3,6 @@ using DigitalBrain.Capabilities;
 using DigitalBrain.Contracts;
 using DigitalBrain.Runtime.Orleans.Brain;
 using DigitalBrain.Runtime.Orleans.Capabilities;
-using DigitalBrain.Runtime.Orleans.Enforcement;
 using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Testing;
 using DigitalBrain.Spi;
@@ -76,8 +75,7 @@ public sealed class PlainNeuronCallFilterFacts(PlainNeuronCallFilterFacts.Filter
                 new BrainStorageRegistration(signalAssemblies),
                 services =>
                 {
-                    services.TryAddSingleton<ICallFilter, CallFilter>();
-                    services.TryAddEnumerable(ServiceDescriptor.Singleton<IIncomingGrainCallFilter, PlainNeuronCallFilter>());
+                    services.AddSingleton(new AccessOptions { UnstampedEdgeIsKernel = false, AuditContractInternal = true });
                 });
 
             _host = await factory.Start(

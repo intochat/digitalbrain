@@ -11,4 +11,7 @@ public sealed class RetentionOptions
 
     /// <summary>A cursor not reported for this long stops pinning the floor. Default 7 days.</summary>
     public TimeSpan StaleCursorAfter { get; set; } = TimeSpan.FromDays(7);
+
+    /// <summary>How often the subscription reconciliation sweep runs. Default 5 minutes.</summary>
+    public TimeSpan ReconcileEvery { get; set; } = TimeSpan.FromMinutes(5);
 }

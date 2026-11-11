@@ -31,8 +31,7 @@ public sealed class NeedFacts
     [Fact]
     public void Other_needs_have_no_name()
     {
-        Assert.All(new[] { Need.Streams, Need.Reminders, Need.Secrets, Need.Http, Need.Sandbox, Need.Model }, need => Assert.Null(need.Name));
-        Assert.Equal(NeedKind.Streams, Need.Streams.Kind);
+        Assert.All(new[] { Need.Reminders, Need.Secrets, Need.Http, Need.Sandbox, Need.Model }, need => Assert.Null(need.Name));
         Assert.Equal(NeedKind.Reminders, Need.Reminders.Kind);
         Assert.Equal(NeedKind.Secrets, Need.Secrets.Kind);
         Assert.Equal(NeedKind.Http, Need.Http.Kind);
@@ -41,10 +40,10 @@ public sealed class NeedFacts
     }
 
     [Fact]
-    public void NeedKind_has_exactly_seven_members()
+    public void NeedKind_has_exactly_six_members()
     {
         Assert.Equal(
-            ["State", "Streams", "Reminders", "Secrets", "Http", "Sandbox", "Model"],
+            ["State", "Reminders", "Secrets", "Http", "Sandbox", "Model"],
             Enum.GetNames<NeedKind>());
     }
 }

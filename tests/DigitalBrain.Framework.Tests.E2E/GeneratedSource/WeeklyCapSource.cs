@@ -11,6 +11,8 @@ internal static class WeeklyCapSource
     internal const string Budget = """
         namespace Me.GeneratedBudget;
 
+        using DigitalBrain.UI;
+
         [Signal("gs.charging")]
         public sealed record Charging(decimal Amount) : Signal;
 
@@ -29,10 +31,8 @@ internal static class WeeklyCapSource
         public static class Budget
         {
             [Synapse(typeof(Charging), "gs.week")]
-            public static Check WeeklyCap(Charging s, WeekSpend t) =>
-                t.Spent + s.Amount > 300m
-                    ? Check.Reject("weekly cap of $300")
-                    : Check.Allow(t with { Spent = t.Spent + s.Amount });
+            public static WeekSpend WeeklyCap(Charging s, WeekSpend t) =>
+                t with { Spent = t.Spent + s.Amount };
 
             [Synapse(typeof(WeekRolled), "gs.week")]
             public static Reaction<WeekSpend> NewWeek(WeekRolled s, WeekSpend t) =>
@@ -44,10 +44,10 @@ internal static class WeeklyCapSource
         }
         """;
 
-    // Need-neutral: only the cap changes.
-    internal static readonly string Cap200 = Budget.Replace("> 300m", "> 200m", StringComparison.Ordinal);
+    // Need-neutral: only the spend accumulation changes.
+    internal static readonly string Cap200 = Budget.Replace("Spent = t.Spent + s.Amount", "Spent = t.Spent + s.Amount * 2", StringComparison.Ordinal);
 
-    // A new need: the gate takes a sql-read slot (the ISqlRead contract of the morning-stats facts).
+    // A new need: the reaction takes a sql-read slot (the ISqlRead contract of the morning-stats facts).
     internal static readonly string WithSlot = Budget
         .Replace("namespace Me.GeneratedBudget;", "using DigitalBrain.Framework.Tests.E2E.MorningStats;\n\nnamespace Me.GeneratedBudget;", StringComparison.Ordinal)
         .Replace("WeeklyCap(Charging s, WeekSpend t)", "WeeklyCap(Charging s, WeekSpend t, [Slot] ISqlRead Db)", StringComparison.Ordinal);

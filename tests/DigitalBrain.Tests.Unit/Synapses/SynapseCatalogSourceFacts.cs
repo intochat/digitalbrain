@@ -1,5 +1,17 @@
 namespace DigitalBrain.Tests.Unit.Synapses;
 
+public static class Budget
+{
+    [Synapse(typeof(Charging), "week")]
+    public static WeekSpend WeeklyCap(Charging s, WeekSpend w) => w;
+}
+
+public static class Hundred
+{
+    [Synapse(typeof(Charging), "week")]
+    public static WeekSpend Cap(Charging s, WeekSpend w) => w;
+}
+
 public sealed class SynapseCatalogSourceFacts
 {
     private static SynapseCatalog Week() => SynapseCatalog.Scan([typeof(WeekSpend), typeof(Budget)]);

@@ -154,7 +154,6 @@ public static class TopologyHosting
         // The host-bound cluster store goes last, so it replaces any cluster registration the topology made.
         foreach (var registration in ClusterStoreHosting.Registrations(silo.Services)) { registration.Register(silo); }
         silo.AddPlacementDirector<Placement.BrainAffinePlacement, Placement.BrainAffinePlacementDirector>();
-        silo.Services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>>(sp => new PubSubStoreCheck(context.Topology, sp));
         return silo;
     }
 

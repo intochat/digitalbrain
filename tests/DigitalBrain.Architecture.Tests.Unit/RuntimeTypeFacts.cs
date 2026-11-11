@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 namespace DigitalBrain.Architecture.Tests.Unit;
 
 // 04 D-06, 06 specifics (keys never move), T-04-50, T-04-52: grain types, serializer and interface aliases, runtime neuron types
-// and the framework's synapse signals are persisted (grain ids, PubSubStore, journal entries), so every one of them is pinned
+// and the framework's synapse signals are persisted (grain ids, state stores, journal entries), so every one of them is pinned
 // in ContractManifest.json. Adding or renaming one in source without updating the manifest fails here and names the difference.
 // Read from source text: this project does not reference the runtime.
 public sealed partial class RuntimeTypeFacts
@@ -14,8 +14,8 @@ public sealed partial class RuntimeTypeFacts
     // The names this phase added (04-16 must-haves); the namespace prefix is pinned under "streams".
     private static readonly string[] PhaseNames =
     [
-        "neuron.host", "neuron.host.reentrant", "neuron.host.stateless", "signal.subscriber",
-        "runtime.listener", "synapse.ref", "synapse.gap",
+        "neuron.host", "neuron.host.reentrant", "neuron.host.stateless",
+        "runtime.listener", "synapse.gap",
     ];
 
     private static readonly string[] Kinds = ["grainTypes", "aliases", "neurons", "signals"];
@@ -114,7 +114,6 @@ public sealed partial class RuntimeTypeFacts
         var pinned = Kinds.SelectMany(Pinned).ToHashSet(StringComparer.Ordinal);
         var missing = PhaseNames.Where(name => !pinned.Contains(name)).ToList();
         Assert.True(missing.Count == 0, "Not pinned: " + string.Join(", ", missing));
-        Assert.Equal("brain.signals.", Manifest().GetProperty("streams").GetProperty("namespacePrefix").GetString());
     }
 
     [Fact]

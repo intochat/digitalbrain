@@ -12,7 +12,7 @@ namespace DigitalBrain.Runtime.Orleans.Synapses;
 /// hosts the class registered then. A signal alias is unregistered with the source that last registered it.
 /// </summary>
 internal sealed class OrleansSynapseRegistrar(
-    SynapseCatalogSource catalog, NeuronTypeRegistry types, JournalPayloads payloads, InstalledGates gates, IGrainFactory grains) : ISynapseRegistrar
+    SynapseCatalogSource catalog, NeuronTypeRegistry types, JournalPayloads payloads, IGrainFactory grains) : ISynapseRegistrar
 {
     private readonly Lock _gate = new();
     private readonly Dictionary<string, string> _signals = new(StringComparer.Ordinal);
@@ -35,7 +35,6 @@ internal sealed class OrleansSynapseRegistrar(
         if (source.Catalog.States.Keys.FirstOrDefault() is { } first) { catalog.Replace(first, source.Catalog); }
         else { catalog.Merge(source.Catalog); }
         foreach (var (alias, record) in source.Catalog.States) { types.RegisterState(alias, record); }
-        gates.Invalidate(brain);
         foreach (var alias in source.Catalog.States.Keys) { await Reload(brain, alias).ConfigureAwait(false); }
     }
 
@@ -58,7 +57,6 @@ internal sealed class OrleansSynapseRegistrar(
                 _signals.Remove(alias);
             }
         }
-        gates.Invalidate(brain);
         foreach (var alias in aliases) { await Reload(brain, alias).ConfigureAwait(false); }
     }
 

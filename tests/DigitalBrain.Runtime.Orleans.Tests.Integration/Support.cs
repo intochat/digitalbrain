@@ -5,6 +5,11 @@ using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Storage;
 
+// Note: In xUnit v3, CollectionBehavior properties DisableTestParallelization and MaxParallelThreads
+// are obsolete (CS0619 error) in favor of ParallelizationAttribute.Mode and MaxThreads.
+[assembly: CollectionBehavior(CollectionBehavior.CollectionPerAssembly)]
+[assembly: Xunit.v3.Parallelization(Mode = Xunit.Sdk.ParallelMode.None, MaxThreads = 1)]
+
 namespace DigitalBrain.Runtime.Orleans.Tests.Integration;
 
 public interface IProbeGrain : IGrainWithStringKey

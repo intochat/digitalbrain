@@ -74,27 +74,6 @@ public static class TopologyValidator
         return issues;
     }
 
-    /// <summary>
-    /// The PubSubStore durability rule (RT-06, 04 D-09): a missing <c>PubSubStore</c> fails every topology; a memory-backed one
-    /// fails outside <c>local</c>, because subscriptions would be lost on restart.
-    /// </summary>
-    public static IReadOnlyList<TopologyIssue> ValidatePubSubStore(Topology topology, IServiceProvider services)
-    {
-        ArgumentNullException.ThrowIfNull(services);
-        var options = RuntimeOptions.From(services);
-        var key = $"grain store {options.PubSubStore}";
-        var store = services.GetKeyedService<IGrainStorage>(options.PubSubStore);
-        if (store is null)
-        {
-            return [new TopologyIssue(key, $"is not registered under Topology={topology.ToConfigValue()}; stream subscriptions need it.")];
-        }
-        if (store is (MemoryGrainStorage or LocalMemoryGrainStorage) && topology == Topology.Cloud)
-        {
-            return [new TopologyIssue(key, $"is memory-backed under Topology={topology.ToConfigValue()}; it must be durable outside local.")];
-        }
-        return [];
-    }
-
     internal static (Topology? Topology, IReadOnlyList<TopologyIssue> Issues, IReadOnlyList<string> Warnings) Evaluate(
         IConfiguration configuration, IReadOnlyList<RetiredSetting> retired, RuntimeOptions options)
     {

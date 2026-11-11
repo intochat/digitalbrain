@@ -63,22 +63,8 @@ public sealed class SynapseCatalogFacts
     {
         var c = SynapseCatalog.Scan(typeof(SynapseCatalogFacts).Assembly);
         Assert.Equal(typeof(WeekSpend), c.States["week"]);
-        Assert.Contains(c.Synapses, d => d.Name.EndsWith(".Gate", StringComparison.Ordinal));
-        Assert.Equal(3, c.For("week").Count(d => d.Function.DeclaringType == typeof(Registered)));
-    }
-
-    [Fact]
-    public void GatesOfReturnsMostDerivedSignalFirst()
-    {
-        var gates = SynapseCatalog.Scan(typeof(SynapseCatalogFacts).Assembly).GatesOf(typeof(Charging));
-        Assert.Equal([nameof(Registered.Gate), nameof(Registered.GateOnBase)], gates.Where(g => g.Function.DeclaringType == typeof(Registered)).Select(g => g.Function.Name));
-    }
-
-    [Fact]
-    public void GatesOfIgnoresGatesOnOtherSignals()
-    {
-        var gates = SynapseCatalog.Scan(typeof(SynapseCatalogFacts).Assembly).GatesOf(typeof(SynapseStarted));
-        Assert.Equal([nameof(Registered.GateOnBase)], gates.Select(g => g.Function.Name));
+        Assert.Contains(c.Synapses, d => d.Name.EndsWith(".React", StringComparison.Ordinal));
+        Assert.Equal(2, c.For("week").Count(d => d.Function.DeclaringType == typeof(Registered)));
     }
 
     [Fact]
@@ -105,12 +91,11 @@ public sealed class SynapseCatalogFacts
     }
 
     [Fact]
-    public void NeedsOfListsGatesBySignalAliasOrTypeName()
+    public void NeedsOfListsReactionsAndViews()
     {
         var needs = SynapseCatalog.Scan([typeof(WeekSpend), typeof(Registered)]).NeedsOf("week");
-        Assert.Equal(["Signal", "test.charging"], needs.Gates.Order(StringComparer.Ordinal));
         Assert.True(needs.HasView);
-        Assert.Empty(needs.Reactions);
+        Assert.Equal(["React"], needs.Reactions);
     }
 
     [Fact]
@@ -156,7 +141,7 @@ public sealed class SynapseCatalogFacts
         Assert.Throws<SynapseShapeException>(() => a.Merge(SynapseCatalog.Scan([Dynamic("week")])));
         var merged = a.Merge(SynapseCatalog.Scan([typeof(OtherState)]));
         Assert.Equal(2, merged.States.Count);
-        Assert.Equal(3, merged.Synapses.Count);
+        Assert.Equal(2, merged.Synapses.Count);
     }
 
     [Fact]

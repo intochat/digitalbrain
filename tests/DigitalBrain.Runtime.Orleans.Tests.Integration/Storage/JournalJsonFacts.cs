@@ -146,16 +146,16 @@ public sealed class JournalJsonFacts
     }
 
     [Fact]
-    public async Task AddBrainStorage_replaces_only_the_cluster_store_so_PubSubStore_and_reminders_keep_their_Orleans_encoding()
+    public async Task AddBrainStorage_replaces_only_the_cluster_store_so_other_stores_keep_their_Orleans_encoding()
     {
         using var home = new TempHome();
-        var pubsub = new FakeStorage();
+        var otherStore = new FakeStorage();
         await using var store = new BrainStore(home.Path, services =>
         {
-            services.AddKeyedSingleton<IGrainStorage>(RuntimeOptions.Default.PubSubStore, pubsub);
+            services.AddKeyedSingleton<IGrainStorage>(RuntimeOptions.Default.PlatformGrainStorage, otherStore);
             services.AddKeyedSingleton<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage, new FakeStorage());
         });
-        Assert.Same(pubsub, store.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.PubSubStore));
+        Assert.Same(otherStore, store.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.PlatformGrainStorage));
         Assert.IsType<BrainGrainStorage>(store.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage));
         Assert.Single(store.Services.GetKeyedServices<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage));
     }

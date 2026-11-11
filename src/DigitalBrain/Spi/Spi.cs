@@ -41,6 +41,9 @@ public interface INeuronContext
     /// </summary>
     string? TraceId => null;
 
+    /// <summary>The unforgeable caller behind the currently running turn, or null when the host stamps none.</summary>
+    DigitalBrain.Access.Caller? Caller => null;
+
     /// <summary>Publishes a signal from this neuron.</summary>
     Task Publish(Signal signal);
 
@@ -72,6 +75,11 @@ public interface INeuronState
     /// either both are durable or neither is. Signals reach subscribers only after the entry is durable.
     /// </summary>
     Task Save<T>(T next, IReadOnlyList<Signal> signals);
+
+    /// <summary>
+    /// Stores <paramref name="next"/> without publishing any signals.
+    /// </summary>
+    Task Store<T>(T next) => Save(next, []);
 
     /// <summary>Deletes the stored state.</summary>
     Task Clear();

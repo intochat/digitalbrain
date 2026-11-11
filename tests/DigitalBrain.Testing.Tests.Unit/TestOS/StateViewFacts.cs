@@ -127,7 +127,7 @@ public sealed class StateViewFacts
         Assert.Equal(1, state?.GetProperty("refreshes").GetInt32());
         Assert.Equal("now", state?.GetProperty("value").GetString());
         var emit = Assert.Single(os.Journal(Board.Brain).Signals(Board), item => SignalAliases.Of(item.Signal) == "x.refresh");
-        Assert.Equal(Causation.Address(Board, emit.Sequence), state?.GetProperty("causationId").GetString());
+        Assert.Null(state?.GetProperty("causationId").GetString());
         Assert.NotNull(emit.TraceId);
         Assert.Equal(emit.TraceId, state?.GetProperty("traceId").GetString());
         Assert.True((await views.Read("vw"))!.Generation > before.Generation);

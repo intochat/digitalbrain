@@ -1,6 +1,7 @@
 using System.Text.Json;
 using DigitalBrain.Spi;
 using DigitalBrain.Tests.Unit.Neurons;
+using DigitalBrain.Units;
 
 namespace DigitalBrain.Tests.Unit.Synapses;
 
@@ -55,9 +56,9 @@ public sealed class StateNeuronAskFacts
     private static JournaledSignal Group(NeuronId publisher, params (string Key, AnswerStatus Status)[] answers) =>
         new(publisher, 9, new Answered("asker", [.. answers.Select(a => new Answer("feed", "Get", a.Key, a.Status, AskRules.NoResult, null, 0))]), DateTimeOffset.UnixEpoch);
 
-    private StateNeuron<Asker> Attach(Type function, ISlotResolver resolver)
+    private UnitNeuron<Asker> Attach(Type function, ISlotResolver resolver)
     {
-        var neuron = new StateNeuron<Asker>(new SynapseCatalogSource(SynapseCatalog.Scan([typeof(Asker), function])), resolver);
+        var neuron = new UnitNeuron<Asker>(new SynapseCatalogSource(SynapseCatalog.Scan([typeof(Asker), function])), resolver);
         NeuronAttachment.Attach(neuron, Context);
         return neuron;
     }

@@ -1,26 +1,35 @@
+using System.Collections.Concurrent;
+using DigitalBrain.Kernel;
 using DigitalBrain.Runtime.Orleans.Synapses;
+using DigitalBrain.Spi;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Runtime.Orleans.Tests.Integration.Hosting;
 
-// 04 D-01, T-04-34: a reference is sent only for a durable entry.
+// 04 D-01, T-04-34: a signal is sent only for a durable entry.
 public sealed class PublishAfterAppendFacts(StatefulSilo silo) : IClassFixture<StatefulSilo>
 {
     [Fact]
-    public async Task The_reference_of_a_save_arrives_only_after_its_entry_is_in_the_journal()
+    public async Task The_signal_of_a_save_arrives_only_after_its_entry_is_in_the_journal()
     {
         var ct = TestContext.Current.CancellationToken;
         var publisher = NeuronId.Parse("b1/probe.counter/after");
         var history = silo.History("b1");
         var seenAtArrival = new List<long>();
-        var watched = await silo.Watch("b1", "probe");
+        var items = new ConcurrentQueue<(NeuronId Pub, Counted Sig)>();
+        var clusterListeners = silo.Services.GetRequiredService<IClusterListeners>();
+        await using var reg = await clusterListeners.Listen<Counted>("test.after", async (pub, sig, token) =>
+        {
+            seenAtArrival.Add((await history.Read(pub, 0, 10, token)).Last);
+            items.Enqueue((pub, sig));
+        });
         await silo.Get<ICounter>("b1/probe.counter/after").Add(7);
-        await watched.Until(items => items.Count > 0, ct);
-        foreach (var reference in watched.Items) { seenAtArrival.Add((await history.Read(reference.Publisher, 0, 10, ct)).Last); }
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (items.IsEmpty && DateTime.UtcNow < deadline) { await Task.Delay(50, ct); }
 
-        var item = Assert.Single(watched.Items);
-        Assert.Equal(publisher, item.Publisher);
-        Assert.True(item.Sequence >= 1);
+        var (itemPub, itemSig) = Assert.Single(items);
+        Assert.Equal(publisher, itemPub);
+        Assert.Equal(7, itemSig.Value);
         Assert.All(seenAtArrival, last => Assert.True(last >= 1));
     }
 
@@ -29,7 +38,13 @@ public sealed class PublishAfterAppendFacts(StatefulSilo silo) : IClassFixture<S
     {
         var ct = TestContext.Current.CancellationToken;
         var faults = silo.Services.GetRequiredService<PublishFaults>();
-        var watched = await silo.Watch("b1", "probe");
+        var items = new ConcurrentQueue<(NeuronId Pub, Counted Sig)>();
+        var clusterListeners = silo.Services.GetRequiredService<IClusterListeners>();
+        await using var reg = await clusterListeners.Listen<Counted>("test.faulted", (pub, sig, token) =>
+        {
+            items.Enqueue((pub, sig));
+            return Task.CompletedTask;
+        });
         faults.FailAfterAppend = true;
         try
         {
@@ -40,6 +55,6 @@ public sealed class PublishAfterAppendFacts(StatefulSilo silo) : IClassFixture<S
         var page = await silo.History("b1").Read(NeuronId.Parse("b1/probe.counter/faulted"), 0, 10, ct);
         Assert.Equal(1, ((Counted)Assert.Single(page.Signals).Signal).Value);
         await Task.Delay(500, ct);
-        Assert.DoesNotContain(watched.Items, reference => reference.Publisher == NeuronId.Parse("b1/probe.counter/faulted"));
+        Assert.Empty(items);
     }
 }

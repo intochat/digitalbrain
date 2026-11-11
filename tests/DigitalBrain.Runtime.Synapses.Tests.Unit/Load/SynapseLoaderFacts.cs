@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using DigitalBrain.Rules;
 using DigitalBrain.Runtime.Synapses.Tests.Unit.Compile;
 
 namespace DigitalBrain.Runtime.Synapses.Tests.Unit.Load;
@@ -43,7 +42,7 @@ public sealed class SynapseLoaderFacts
         var loaded = new SynapseLoader().Load(Build());
 
         var gate = loaded.Catalog.Synapses.Select(d => d.Function).First(m => m.Name == "WeeklyCap");
-        Assert.Same(typeof(Check), gate.ReturnType);
+        Assert.Equal("WeekSpend", gate.ReturnType.Name);
         Assert.Equal("Charging", Assert.Single(loaded.Signals, t => t.Name == "Charging").Name);
         Assert.All(loaded.Signals, t => Assert.True(typeof(Signal).IsAssignableFrom(t)));
     }

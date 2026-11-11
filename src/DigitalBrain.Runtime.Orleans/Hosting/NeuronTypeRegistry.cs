@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using DigitalBrain.Kernel;
+using DigitalBrain.Units;
 
 namespace DigitalBrain.Runtime.Orleans.Hosting;
 
@@ -41,13 +43,12 @@ internal sealed class NeuronTypeRegistry
     internal const string DefaultStateName = "state";
 
     private readonly ConcurrentDictionary<string, NeuronRegistration> _types = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<Type, NeuronRegistration> _byContract = new();
     private long _version;
 
     /// <summary>
     /// Registers the <c>[Neuron]</c> classes of <paramref name="assemblies"/>, the installs neuron (<c>synapse.installs</c>) and the time
     /// neuron (<c>time</c>) of every brain, and, under each <c>[State]</c> alias of their <see cref="SynapseCatalog"/>, the closed
-    /// <see cref="StateNeuron{TState}"/> with <see cref="HostPolicy.Affine"/>.
+    /// <see cref="UnitNeuron{TState}"/> with <see cref="HostPolicy.Affine"/>.
     /// </summary>
     /// <exception cref="InvalidOperationException">Two classes claim one type name, or a <c>[Neuron]</c> class is an app.</exception>
     /// <exception cref="SynapseShapeException">A state alias is declared twice, or a synapse function has an unsupported shape.</exception>
@@ -59,7 +60,7 @@ internal sealed class NeuronTypeRegistry
         Actions = ScanActions(listed);
         foreach (var (alias, record) in Catalog.States)
         {
-            var neuronClass = typeof(StateNeuron<>).MakeGenericType(record);
+            var neuronClass = typeof(UnitNeuron<>).MakeGenericType(record);
             if (_types.TryGetValue(alias, out var other))
             {
                 throw new InvalidOperationException($"Neuron type '{alias}' is claimed by {other.Class.FullName} and the [State] record {record.FullName}.");
@@ -84,10 +85,9 @@ internal sealed class NeuronTypeRegistry
             {
                 throw new InvalidOperationException($"Neuron type '{neuron.Type}' is claimed by {other.Class.FullName} and {type.FullName}.");
             }
-            _ = NeutralCallMapping.PredicateOf(type); // a misnamed predicate fails at registration, not on a call
+            _ = CallPolicy.PredicateOf(type); // a misnamed predicate fails at registration, not on a call
             var registration = new NeuronRegistration(neuron.Type, type, neuron.State ?? DefaultStateName, PolicyOf(type), ContractsOf(type));
             _types[neuron.Type] = registration;
-            foreach (var contract in registration.Contracts) { _byContract.TryAdd(contract, registration); }
         }
     }
 
@@ -103,7 +103,7 @@ internal sealed class NeuronTypeRegistry
     /// <summary>Bumped on every <see cref="RegisterState"/> and <see cref="UnregisterState"/> that changes the map.</summary>
     public long Version => Interlocked.Read(ref _version);
 
-    /// <summary>Adds or replaces the closed <see cref="StateNeuron{TState}"/> of <paramref name="record"/> under <paramref name="alias"/>.</summary>
+    /// <summary>Adds or replaces the closed <see cref="UnitNeuron{TState}"/> of <paramref name="record"/> under <paramref name="alias"/>.</summary>
     /// <param name="alias">The state alias.</param>
     /// <param name="record">The <c>[State]</c> record.</param>
     /// <exception cref="InvalidOperationException">A plain <c>[Neuron]</c> class already claims the alias.</exception>
@@ -111,7 +111,7 @@ internal sealed class NeuronTypeRegistry
     {
         ArgumentNullException.ThrowIfNull(alias);
         ArgumentNullException.ThrowIfNull(record);
-        var registration = new NeuronRegistration(alias, typeof(StateNeuron<>).MakeGenericType(record), DefaultStateName, HostPolicy.Affine, []);
+        var registration = new NeuronRegistration(alias, typeof(UnitNeuron<>).MakeGenericType(record), DefaultStateName, HostPolicy.Affine, []);
         _ = _types.AddOrUpdate(alias, registration, (_, existing) => IsState(existing)
             ? registration
             : throw new InvalidOperationException($"Neuron type '{alias}' is claimed by {existing.Class.FullName} and the [State] record {record.FullName}."));
@@ -145,9 +145,6 @@ internal sealed class NeuronTypeRegistry
     /// <summary>The registration for <paramref name="type"/>.</summary>
     public bool TryGetRegistration(string type, [NotNullWhen(true)] out NeuronRegistration? registration) => _types.TryGetValue(type, out registration);
 
-    /// <summary>The first registered class implementing <paramref name="contract"/>.</summary>
-    public bool TryGetByContract(Type contract, [NotNullWhen(true)] out NeuronRegistration? registration) => _byContract.TryGetValue(contract, out registration);
-
     /// <summary>The registration for <paramref name="type"/>; the error names the type.</summary>
     /// <exception cref="Invocation.BindingException">No class is hosted for the type.</exception>
     public NeuronRegistration Require(string type)
@@ -171,7 +168,7 @@ internal sealed class NeuronTypeRegistry
     };
 
     private static bool IsState(NeuronRegistration registration)
-        => registration.Class.IsGenericType && registration.Class.GetGenericTypeDefinition() == typeof(StateNeuron<>);
+        => registration.Class.IsGenericType && registration.Class.GetGenericTypeDefinition() == typeof(UnitNeuron<>);
 
     private static Type[] ContractsOf(Type neuronClass)
         => [.. neuronClass.GetInterfaces().Where(face => face.Assembly != typeof(Neuron).Assembly && face.Assembly != typeof(object).Assembly)];

@@ -99,16 +99,16 @@ public sealed class BrainSignalHistoryFacts
             Assert.IsType<BrainGrainStorage>(host.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage));
             Assert.NotNull(host.Services.GetRequiredService<BrainSignalHistories>());
             var cluster = host.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage);
-            var grainState = new TestGrainState<SynapseState> { State = new SynapseState { Sources = [new global::DigitalBrain.Runtime.Orleans.Synapses.SynapseSource { Source = BrainStore.P.ToString(), Cursor = 5 }] } };
-            await cluster.WriteStateAsync(SynapseState.Name, GrainId.Create("neuron.host", "b1/probe/s"), grainState);
+            var grainState = new TestGrainState<TestSampleState> { State = new TestSampleState(BrainStore.P.ToString(), 5) };
+            await cluster.WriteStateAsync("sample", GrainId.Create("neuron.host", "b1/probe/s"), grainState);
         }
         await using (var host = await new LocalSiloHostFactory(registration).Start(new InProcessHostOptions { Home = home.Path }, ct))
         {
             // The state was written into the b1 journal (JSON) and reads back after a restart.
             var cluster = host.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage);
-            var grainState = new TestGrainState<SynapseState>();
-            await cluster.ReadStateAsync(SynapseState.Name, GrainId.Create("neuron.host", "b1/probe/s"), grainState);
-            Assert.Equal(5, grainState.State.Sources[0].Cursor);
+            var grainState = new TestGrainState<TestSampleState>();
+            await cluster.ReadStateAsync("sample", GrainId.Create("neuron.host", "b1/probe/s"), grainState);
+            Assert.Equal(5, grainState.State.Cursor);
             // The policy runs outside the log gate, so a checkpoint that asks the registry (stored in this same log) does not deadlock.
             var log = await host.Services.GetRequiredService<BrainLogs>().For("b1");
             await log.AppendEntry("x", "", null, BrainRecordChange.None, [], BrainStore.P.ToString(), [new Count(1)], ct);
@@ -147,4 +147,6 @@ public sealed class BrainSignalHistoryFacts
         Assert.Equal([1L, 3L], brain.Signals.Select(s => s.Sequence));
         Assert.Equal(new UnknownSignal("os.chat.posted"), engine.Signals[1].Signal);
     }
+
+    private sealed record TestSampleState(string Text = "", long Cursor = 0);
 }

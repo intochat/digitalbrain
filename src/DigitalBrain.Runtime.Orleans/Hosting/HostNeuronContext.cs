@@ -1,5 +1,8 @@
+using DigitalBrain.Confirmation;
 using DigitalBrain.Invocation;
+using DigitalBrain.Kernel;
 using DigitalBrain.Runtime.Orleans.Operations;
+using DigitalBrain.Runtime.Orleans.Storage;
 using DigitalBrain.Runtime.Orleans.Synapses;
 using DigitalBrain.Spi;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,49 +11,62 @@ using Orleans.Runtime;
 
 namespace DigitalBrain.Runtime.Orleans.Hosting;
 
-/// <summary>What the host runtime knows about the current call, beyond <see cref="INeuronContext"/>.</summary>
 internal interface IHostNeuronContext
 {
-    /// <summary>The calling neuron, written <c>brain/type/key</c>, or empty for a caller outside any neuron. Read from RequestContext.</summary>
     string Caller { get; }
-
-    /// <summary>The silo running this activation.</summary>
     string Silo { get; }
 }
 
-/// <summary>
-/// The context of a hosted neuron: id, services, clock, state over BrainLog with publish after append, timers and reminders as
-/// host grain turns, the brain's signal history, synapses over the activation's <see cref="SynapseEngine"/>, typed proxies, caller
-/// provenance, deferred work and operations (runtime operation entities, D-04).
-/// </summary>
 internal sealed class HostNeuronContext : INeuronContext, IHostNeuronContext
 {
     internal const string CallerKey = "db.caller";
 
-    // The publishers currently awaiting their gates or Commit along this call chain (comma-separated neuron ids), set by GateRunner.
-    internal const string GateChainKey = "db.gate-chain";
-
     private readonly IServiceProvider _services;
     private readonly IGrainFactory _grains;
     private readonly NeuronTypeRegistry _types;
+    private readonly NeuronRegistration _registration;
     private readonly Action<Func<Task>> _defer;
-    private readonly HostNeuronState _state;
     private readonly HostTimers _timers;
     private readonly IHostTicks _ticks;
+    private readonly KernelState _state;
 
-    public HostNeuronContext(NeuronId id, GrainId grainId, NeuronRegistration registration, IServiceProvider services, IGrainFactory grains,
-        NeuronTypeRegistry types, string silo, IHostTicks ticks, Action<Func<Task>> defer, SynapseEngine synapses)
+    public HostNeuronContext(
+        NeuronId id,
+        GrainId grainId,
+        NeuronRegistration registration,
+        IServiceProvider services,
+        IGrainFactory grains,
+        NeuronTypeRegistry types,
+        string silo,
+        IHostTicks ticks,
+        Action<Func<Task>> defer,
+        Delivery delivery,
+        IBrainJournal journal,
+        ISignalNudge nudge)
     {
-        Synapses = new HostSynapses(synapses);
-        Engine = synapses;
-        _ticks = ticks;
         Id = id;
         Silo = silo;
         _services = services;
         _grains = grains;
         _types = types;
+        _registration = registration;
+        _ticks = ticks;
         _defer = defer;
-        _state = new HostNeuronState(id, grainId, registration, services);
+        Delivery = delivery;
+
+        Admission = new GrainAdmission(grains, types);
+        var time = (TimeProvider?)services.GetService(typeof(TimeProvider)) ?? TimeProvider.System;
+        Synapses = new Subscribing(id, registration.Policy == HostPolicy.Stateless, delivery, Admission, time);
+
+        _state = new KernelState(
+            id,
+            registration.StateName,
+            registration.Policy == HostPolicy.Stateless,
+            journal,
+            nudge,
+            () => new Stamp(CurrentCause.Stamp().TraceId, CurrentCause.Stamp().CausationId),
+            () => DeactivateOnIdle());
+
         _timers = new HostTimers(ticks, registration);
     }
 
@@ -62,39 +78,32 @@ internal sealed class HostNeuronContext : INeuronContext, IHostNeuronContext
 
     public INeuronState State => _state;
 
-    internal HostNeuronState HostState => _state;
-
     public ITimers Timers => _timers;
 
     public IReminders Reminders => _timers;
 
-    /// <summary>Operations started by this neuron: entities <c>brain/runtime.operation/id</c> in its own brain, origin this neuron.</summary>
     public IOperations Operations => field ??= new RuntimeOperations(_services, Id.Brain, Id.ToString());
 
-    /// <summary>Read-only view of the operations of this neuron's brain.</summary>
     public IOperationsQuery OperationsQuery => field ??= new RuntimeOperationsQuery(_services, Id.Brain);
 
     public ISynapses Synapses { get; }
 
-    /// <summary>The activation's synapse engine, for runtime services (04-13) that use the alias and brain-wide forms.</summary>
-    internal SynapseEngine Engine { get; }
+    public Delivery Delivery { get; }
 
-    /// <summary>Deactivates the activation after the current turn (runtime services end themselves on SessionTtl).</summary>
-    internal void DeactivateOnIdle() => _ticks.Deactivate();
+    internal IAdmission Admission { get; }
 
-    /// <summary>The signal history of this neuron's brain only (T-04-35).</summary>
-    /// <exception cref="InvalidOperationException">The <c>cluster</c> store is not BrainLog.</exception>
     public ISignalHistory History => (_services.GetService<BrainSignalHistories>()
         ?? throw new InvalidOperationException("Signal history needs BrainLog as the cluster store (BrainStorageRegistration).")).For(Id.Brain);
 
-    /// <summary>The host's confirmation gate (the runtime confirmations neuron, 07-06); until one is registered, asking throws.</summary>
-    public DigitalBrain.Confirmation.IConfirmations Confirmations
+    public IConfirmations Confirmations
         => _services.GetService<IConfirmationContexts>()?.For(Id.Brain, Id.ToString())
-            ?? _services.GetService<DigitalBrain.Confirmation.IConfirmations>() ?? UnavailableConfirmations.Instance;
+            ?? _services.GetService<IConfirmations>() ?? UnavailableConfirmations.Instance;
 
-    public string? TraceId => DigitalBrain.Runtime.Orleans.Synapses.CurrentCause.Stamp().TraceId;
+    public string? TraceId => CurrentCause.Stamp().TraceId;
 
-    public string Caller => RequestContext.Get(CallerKey) as string ?? string.Empty;
+    public string Caller => (RequestContext.Get(CallerKey) as string) ?? string.Empty;
+
+    DigitalBrain.Access.Caller? INeuronContext.Caller => _services.GetService<DigitalBrain.Access.ICallerAmbient>()?.Current ?? Access.OrleansCallerAmbient.Instance.Current;
 
     public string Silo { get; }
 
@@ -105,12 +114,28 @@ internal sealed class HostNeuronContext : INeuronContext, IHostNeuronContext
     public T Get<T>(NeuronId target) where T : class
     {
         if (target.Brain != Id.Brain) { throw new ArgumentException($"Neuron {target} belongs to another brain than {Id}.", nameof(target)); }
-        return NeuronProxy.Create<T>(target, new OrleansInvocationSink(_grains, _types, Id));
+        return NeuronProxy.Create<T>(target, new OrleansInvocationSink(_grains, _types, Id, Access.OrleansCallerAmbient.Instance));
     }
 
     public void Defer(Func<Task> work)
     {
         ArgumentNullException.ThrowIfNull(work);
         _defer(work);
+    }
+
+    internal void DeactivateOnIdle() => _ticks.Deactivate();
+
+    internal string[] ValidateAliases(NeuronId from, string[] aliases)
+    {
+        ArgumentNullException.ThrowIfNull(aliases);
+        if (_registration.Policy == HostPolicy.Stateless)
+        {
+            throw new InvalidOperationException($"{_registration.Class.FullName} is a [StatelessNeuron] class: stateless activations own no durable synapse.");
+        }
+        if (from == Id) { throw new ArgumentException("A neuron does not subscribe to itself.", nameof(from)); }
+        if (aliases.Length == 0) { throw new ArgumentException("A synapse names at least one signal alias.", nameof(aliases)); }
+        if (aliases.Any(string.IsNullOrWhiteSpace)) { throw new ArgumentException("A signal alias is empty.", nameof(aliases)); }
+        if (from.Brain != Id.Brain) { throw new UnauthorizedAccessException($"Neuron {Id} may not subscribe to {from} of another brain."); }
+        return [.. aliases.Distinct(StringComparer.Ordinal)];
     }
 }

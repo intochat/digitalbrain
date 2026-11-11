@@ -8,9 +8,6 @@ public enum NeedKind
     /// <summary>A named durable state store (<see cref="Need.State"/>).</summary>
     State,
 
-    /// <summary>Signal streams (<see cref="Need.Streams"/>).</summary>
-    Streams,
-
     /// <summary>Durable reminders (<see cref="Need.Reminders"/>).</summary>
     Reminders,
 
@@ -54,9 +51,6 @@ public sealed record Need
 
     /// <summary>The container image for <see cref="Need.Container"/>.</summary>
     public string? Image { get; init; }
-
-    /// <summary>Signal streams.</summary>
-    public static Need Streams { get; } = new(NeedKind.Streams, null);
 
     /// <summary>Durable reminders.</summary>
     public static Need Reminders { get; } = new(NeedKind.Reminders, null);

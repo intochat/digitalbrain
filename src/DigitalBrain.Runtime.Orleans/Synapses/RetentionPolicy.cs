@@ -1,3 +1,4 @@
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.Options;
 
 namespace DigitalBrain.Runtime.Orleans.Synapses;
@@ -16,10 +17,7 @@ internal sealed class RetentionPolicy(IOptions<RetentionOptions> options, TimePr
     }
 
     internal static long Floor(RetentionOptions o, long last, Func<TimeSpan, long> countNewerThan, long? lowestLive)
-    {
-        var window = Math.Max(o.HistoryWindowSignals, countNewerThan(o.HistoryWindowAge));
-        return Math.Max(0, Math.Min(lowestLive ?? long.MaxValue, last - window));
-    }
+        => RetentionMath.Floor(last, o.HistoryWindowSignals, countNewerThan(o.HistoryWindowAge), lowestLive);
 }
 
 /// <summary>The fallback when synapses are not registered: no live cursors, only the history window.</summary>

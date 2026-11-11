@@ -50,7 +50,7 @@ internal sealed class SessionSynapseNeuron(IOptions<SessionSynapseOptions> optio
 
     public async Task<string> PrepareSubscription(NeuronId source, string[] aliases)
     {
-        aliases = Host.Engine.ValidateAliases(source, aliases);
+        aliases = Host.ValidateAliases(source, aliases);
         if (_ended) { throw new InvalidOperationException("This session has ended."); }
         PruneAdmissions();
         if (_admissions.Count >= _options.MaxSessionSynapses || _admitting >= _options.MaxSessionSynapses)
@@ -83,20 +83,19 @@ internal sealed class SessionSynapseNeuron(IOptions<SessionSynapseOptions> optio
         { throw new UnauthorizedAccessException("The subscription admission ticket is not valid for this caller and session."); }
         _admissions.Remove(ticket);
         var source = admission.Source;
-        var key = source.ToString();
-        var held = Host.Engine.Sources;
-        if (held.Count >= _options.MaxSessionSynapses && !held.Any(entry => entry.Source == key))
+        var held = Host.Delivery.Subscriptions.Entries;
+        if (held.Count >= _options.MaxSessionSynapses && !held.Exists(entry => entry.Source == source))
         {
             throw new SessionLimitException($"Session {Id} holds {held.Count} synapses, the most a session may ({_options.MaxSessionSynapses}).");
         }
-        await Host.Engine.CommitAliases(source, admission.Aliases).ConfigureAwait(true);
+        await Host.Delivery.Ensure(source, admission.Aliases, clock.Now).ConfigureAwait(true);
     }
 
     public Task Unsubscribe(NeuronId source)
     {
         foreach (var ticket in _admissions.Where(pair => pair.Value.Source == source).Select(pair => pair.Key).ToArray())
         { Invalidate(ticket); }
-        return Host.Engine.Remove(source);
+        return Host.Delivery.Remove(source);
     }
 
     public async Task<SessionBatch?> Next(long acked, CancellationToken cancellationToken)
@@ -132,7 +131,11 @@ internal sealed class SessionSynapseNeuron(IOptions<SessionSynapseOptions> optio
         _ended = true;
         _generation++;
         foreach (var ticket in _admissions.Keys.ToArray()) { Invalidate(ticket); }
-        await Host.Engine.RemoveAll().ConfigureAwait(true);
+        foreach (var entry in Host.Delivery.Subscriptions.Entries.ToList())
+        {
+            if (entry.IsBrainWide || entry.Source is null) { await Host.Delivery.RemoveBrainWide().ConfigureAwait(true); }
+            else { await Host.Delivery.Remove(entry.Source.Value).ConfigureAwait(true); }
+        }
         _pending.Clear();
         _outstanding = null;
         Wake();
@@ -181,7 +184,7 @@ internal sealed class SessionSynapseNeuron(IOptions<SessionSynapseOptions> optio
         _admitting++;
         try
         {
-            await Host.Engine.AdmitAliases(admission.Source, admission.Aliases).ConfigureAwait(true);
+            await Host.Admission.Admit(Id, admission.Source, admission.Aliases).ConfigureAwait(true);
             admission.Ready.TrySetResult();
         }
         catch (Exception error) when (error is not OutOfMemoryException) { admission.Ready.TrySetException(error); }

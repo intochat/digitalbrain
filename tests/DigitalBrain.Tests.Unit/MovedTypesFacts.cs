@@ -19,8 +19,6 @@ public sealed class MovedTypesFacts
         ["IntoChat.OS.Sources"] = "DigitalBrain.Signals.Watch.Sources",
         ["IntoChat.OS.WatchStream`1"] = "DigitalBrain.Signals.Watch.WatchStream`1",
         ["IntoChat.OS.Runtime.NeuronAddress"] = "DigitalBrain.NeuronAddress",
-        ["IntoChat.OS.Runtime.INeuronResolver"] = "DigitalBrain.INeuronResolver",
-        ["IntoChat.OS.Framework.IWorkContinuation"] = "DigitalBrain.Invocation.IWorkContinuation",
     };
 
     private sealed record Inventory(string Method, Entry[] Types);

@@ -157,43 +157,13 @@ public sealed class InstallsFacts
     }
 
     [Fact]
-    public async Task AFailingHookStillRecordsAndPublishesGateChanged()
+    public async Task AFailingHookStillRecords()
     {
         await using var os = Start(new RecordingHooks { FailEdges = true });
         Assert.NotNull(await Answer(os, "week", approve: true));
-        Assert.Single(os.Gates.GatesFor(Installs.Brain, typeof(Charging)));
         // The next install of the same needs runs the hooks again and reports their failure.
         var again = await os.Get<IInstalls>(Installs).Install(new InstallRequest("week", None), Ct);
         Assert.Equal(InstallStatus.Unchanged, again.Status);
         Assert.Equal("hooks failed: edges down", again.Reason);
-    }
-
-    [Fact]
-    public async Task UnchangedPublishesGateChanged()
-    {
-        await using var os = Start(new RecordingHooks());
-        await Answer(os, "week", approve: true);
-        await os.Idle();
-        var heard = new ConcurrentQueue<GateChanged>();
-        await using var listen = await os.ClusterListeners.Listen<GateChanged>("fact", (_, signal, _) =>
-        {
-            heard.Enqueue(signal);
-            return Task.CompletedTask;
-        });
-        Assert.Equal(InstallStatus.Unchanged, (await os.Get<IInstalls>(Installs).Install(new InstallRequest("week", None), Ct)).Status);
-        await os.Idle();
-        Assert.Equal([new GateChanged("b")], heard);
-    }
-
-    [Fact]
-    public async Task GateIndexServesOnlyInstalledGates()
-    {
-        await using var os = Start(new RecordingHooks());
-        Assert.Empty(os.Gates.GatesFor(Installs.Brain, typeof(Charging)));
-        await Answer(os, "week", approve: true);
-        await os.Idle();
-        var gate = Assert.Single(os.Gates.GatesFor(Installs.Brain, typeof(Charging)));
-        Assert.Equal(NeuronId.Parse("b/week/default"), gate.Gate);
-        Assert.Empty(os.Gates.GatesFor(new BrainId("other"), typeof(Charging)));
     }
 }

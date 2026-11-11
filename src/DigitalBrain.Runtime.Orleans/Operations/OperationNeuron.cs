@@ -83,7 +83,14 @@ internal sealed class OperationNeuron : Neuron, IOperationEntity
         IReadOnlyList<Signal> signals = initial.Kind == nameof(WritePlan)
             ? [new OperationStarted(new OperationId(initial.Id), JsonSerializer.Deserialize<WritePlan>(initial.PlanJson, RuntimeProtocol.Json)!)]
             : [];
-        await Context.State.Save(initial, signals).ConfigureAwait(true);
+        if (signals.Count == 0)
+        {
+            await Context.State.Store(initial).ConfigureAwait(true);
+        }
+        else
+        {
+            await Context.State.Save(initial, signals).ConfigureAwait(true);
+        }
         return _state = initial;
     }
 
@@ -118,7 +125,7 @@ internal sealed class OperationNeuron : Neuron, IOperationEntity
         if (_state is not { Phase: OperationPhase.Running } state) { return false; }
         if (state.CancelRequested) { return true; }
         var next = state with { CancelRequested = true, Updated = Context.Time.GetUtcNow() };
-        await Context.State.Save(next, []).ConfigureAwait(true);
+        await Context.State.Store(next).ConfigureAwait(true);
         _state = next;
         return true;
     }

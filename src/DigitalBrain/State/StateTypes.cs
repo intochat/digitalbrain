@@ -8,16 +8,6 @@ namespace DigitalBrain.State;
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct, AllowMultiple = false, Inherited = false)]
 public sealed class ExportableStateAttribute : Attribute;
 
-/// <summary>A stored record: codec bytes and the store's concurrency tag.</summary>
-/// <param name="Record">The codec bytes.</param>
-/// <param name="ETag">The concurrency tag.</param>
-public sealed record StoredRecord(ReadOnlyMemory<byte> Record, long ETag);
-
-/// <summary>The outcome of a store write.</summary>
-/// <param name="ETag">The new concurrency tag.</param>
-/// <param name="Sequence">The last journal sequence, or null when the store journals nothing.</param>
-public sealed record WriteResult(long ETag, long? Sequence);
-
 /// <summary>The seam that keeps stores runtime-free: the runtime supplies the codec.</summary>
 public interface IStateCodec
 {

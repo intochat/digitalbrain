@@ -1,6 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
+using DigitalBrain.Access;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Capabilities.Compute;
+using DigitalBrain.Runtime.Orleans.Access;
 using Orleans;
 using Orleans.Runtime;
 
@@ -33,6 +35,14 @@ public static class RuntimeCallerContext
     {
         get
         {
+            if (OrleansCallerAmbient.Instance.Current is { } caller)
+            {
+                if (caller.Actor is Actor.Kernel && RequestContext.Get(PrincipalKey) is null)
+                {
+                    return null;
+                }
+                return LegacyCallers.Project(caller);
+            }
             var principal = RequestContext.Get(PrincipalKey) as string;
             var account = RequestContext.Get(AccountKey) as string;
             var brain = RequestContext.Get(BrainKey) as string;
@@ -53,9 +63,10 @@ public static class RuntimeCallerContext
         ArgumentException.ThrowIfNullOrWhiteSpace(caller.PrincipalId);
         ArgumentException.ThrowIfNullOrWhiteSpace(caller.AccountId);
         ArgumentException.ThrowIfNullOrWhiteSpace(caller.BrainId);
+        var ambientScope = OrleansCallerAmbient.Instance.Enter(LegacyCallers.Read(caller));
         var previous = Keys.Select(RequestContext.Get).ToArray();
         Write([caller.PrincipalId, caller.AccountId, caller.BrainId, caller.AppId, caller.ConversationId]);
-        return new Restore(previous);
+        return new CombinedScope(ambientScope, new Restore(previous));
     }
 
     /// <summary>Validates that <paramref name="context"/> is trusted, stamps it on the current flow, and starts an edge trace if none is active.</summary>

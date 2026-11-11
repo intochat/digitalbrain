@@ -3,6 +3,7 @@ using System.Text.Json;
 using DigitalBrain.Contracts;
 using DigitalBrain.Spi;
 using DigitalBrain.Tests.Unit.Neurons;
+using DigitalBrain.Units;
 
 namespace DigitalBrain.Tests.Unit.Synapses;
 
@@ -14,7 +15,7 @@ public sealed class StateReaderFacts
     public async Task ReadReturnsTheStateRecordAsJson()
     {
         var context = new RecordingContext(Id);
-        var neuron = new StateNeuron<Ledger>(new SynapseCatalogSource(SynapseCatalog.Scan([typeof(Ledger), typeof(Books)])), new UnboundSlotResolver());
+        var neuron = new UnitNeuron<Ledger>(new SynapseCatalogSource(SynapseCatalog.Scan([typeof(Ledger), typeof(Books)])), new UnboundSlotResolver());
         NeuronAttachment.Attach(neuron, context);
         await neuron.Receive(new Charging(5m), TestContext.Current.CancellationToken);
         IStateReader reader = neuron;

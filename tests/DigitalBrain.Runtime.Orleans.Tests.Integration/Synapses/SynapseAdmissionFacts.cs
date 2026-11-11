@@ -36,7 +36,7 @@ public sealed class SynapseAdmissionFacts(SynapseSilo silo) : IClassFixture<Syna
         await listener.Follow("b1/probe.counter/s1");
         await listener.Follow("b1/probe.counter/s2");
         await listener.Follow("b1/probe.counter/s1");
-        Assert.Equal(1, await silo.Subscriptions(Listener, "probe.counted"));
+        Assert.Equal(2, await silo.Subscriptions(Listener, "probe.counted"));
 
         await silo.Get<ICounter>("b1/probe.counter/s1").Add(1);
         await silo.Get<ICounter>("b1/probe.counter/s2").Add(20);

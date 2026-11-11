@@ -14,7 +14,7 @@ using Microsoft.Extensions.Hosting;
 namespace DigitalBrain.Framework.Tests.E2E;
 
 /// <summary>
-/// The cloud topology (CloudProfile: Azure queue streams, table PubSubStore, table clustering) against Azurite. No Key Vault is
+/// The cloud topology (CloudProfile: Azure table clustering and reminders, blob storage) against Azurite. No Key Vault is
 /// configured (04-06 R4-08): the profile falls back to the machine-key secrets source.
 /// </summary>
 public sealed class AzuriteOrleansTarget(AzuriteFixture azurite) : OrleansFrameworkTarget

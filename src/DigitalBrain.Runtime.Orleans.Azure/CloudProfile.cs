@@ -11,8 +11,8 @@ namespace DigitalBrain.Runtime.Orleans.Azure;
 
 /// <summary>
 /// Hosted in the cloud (P2-D-12 revised, P2-D-22): Azure Table clustering and reminders, Azure Blob grain storage for
-/// <c>platform</c>, <c>PubSubStore</c> and every module grain store, Azure Queue streams for <c>signals</c>, Key Vault secrets as
-/// configuration, and blob-lease brain ownership. One account (<see cref="RuntimeOptions.CloudStorageKey"/>) carries tables, blobs and queues.
+/// <c>platform</c> and every module grain store, Key Vault secrets as
+/// configuration, and blob-lease brain ownership. One account (<see cref="RuntimeOptions.CloudStorageKey"/>) carries tables and blobs.
 /// The <c>cluster</c> store is host-bound (BrainLog); until the host registers it, it is <see cref="UnregisteredClusterStorage"/>.
 /// </summary>
 public sealed class CloudProfile : ITopologyProfile, IRuntimeOptionsHolder
@@ -40,12 +40,9 @@ public sealed class CloudProfile : ITopologyProfile, IRuntimeOptionsHolder
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _keyVaultSource = keyVaultSource;
-        _reserved = new(StringComparer.OrdinalIgnoreCase) { _options.PlatformGrainStorage, _options.PubSubStore };
+        _reserved = new(StringComparer.OrdinalIgnoreCase) { _options.PlatformGrainStorage };
         Services = ServicesFor(_options);
     }
-
-    /// <summary>The signal queues (one partition).</summary>
-    public static IReadOnlyList<string> SignalQueues { get; } = ["signals-0"];
 
     /// <summary>The Azure resource kinds the cloud topology needs.</summary>
     public static IReadOnlyList<string> AzureResourceKinds { get; } =
@@ -61,7 +58,6 @@ public sealed class CloudProfile : ITopologyProfile, IRuntimeOptionsHolder
     public static Bindings CloudBindings { get; } = new(
         ClusteringBinding.AzureTable,
         GrainStoreBinding.AzureBlob,
-        StreamsBinding.AzureQueue,
         RemindersBinding.AzureTable,
         SecretsBinding.KeyVault,
         HttpBinding.Direct,
@@ -171,7 +167,7 @@ public sealed class CloudProfile : ITopologyProfile, IRuntimeOptionsHolder
         silo.UseAzureStorageClustering(options => options.Configure(o => o.TableServiceClient = account.Tables()));
         silo.UseAzureTableReminderService(options => options.Configure(o => o.TableServiceClient = account.Tables()));
 
-        var stores = new List<string> { _options.PlatformGrainStorage, _options.PubSubStore };
+        var stores = new List<string> { _options.PlatformGrainStorage };
         stores.AddRange(context.Modules.SelectMany(m => m.Needs)
             .Where(n => n.Kind == NeedKind.State && n.Name is not null && n.Name != _options.ClusterGrainStorage && !_reserved.Contains(n.Name))
             .Select(n => n.Name!));
@@ -185,12 +181,6 @@ public sealed class CloudProfile : ITopologyProfile, IRuntimeOptionsHolder
         }
         // Replaced by the host-bound registration, which ConfigureTopologySilo runs after this.
         silo.Services.AddKeyedSingleton<IGrainStorage>(_options.ClusterGrainStorage, new UnregisteredClusterStorage());
-
-        silo.AddAzureQueueStreams(_options.SignalStreams, configurator => configurator.ConfigureAzureQueue(options => options.Configure(o =>
-        {
-            o.QueueServiceClient = account.Queues();
-            o.QueueNames = [.. SignalQueues];
-        })));
     }
 
     /// <inheritdoc />

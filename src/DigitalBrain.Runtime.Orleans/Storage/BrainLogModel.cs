@@ -25,7 +25,7 @@ internal sealed record JournaledSignalPayload([property: Id(0)] string Type, [pr
 
 /// <summary>A publisher's retention floor and last sequence; every sequence at or below the floor is trimmed.</summary>
 [GenerateSerializer, Alias("storage.publisher-mark")]
-internal sealed record PublisherMark([property: Id(0)] string Publisher, [property: Id(1)] long Floor, [property: Id(2)] long Last);
+internal sealed record PublisherMark([property: Id(0)] string Publisher, [property: Id(1)] long Floor, [property: Id(2)] long Last, [property: Id(3)] long LastPosition = 0);
 
 /// <summary>
 /// One durable brain change: a state record and the signals its publisher emitted with it. <see cref="FirstSignal"/> is the

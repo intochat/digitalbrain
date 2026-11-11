@@ -36,8 +36,8 @@ internal static class Rules
         Category, DiagnosticSeverity.Warning, isEnabledByDefault: false);
 
     public static readonly DiagnosticDescriptor SynapseShape = new(
-        "DB0041", "Synapse signature outside gate, reaction, view",
-        "'{0}' is not a gate, reaction or view synapse: {1}",
+        "DB0041", "Synapse signature outside reaction, view",
+        "'{0}' is not a reaction or view synapse: {1}",
         Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
     public static readonly DiagnosticDescriptor StateLocality = new(
@@ -87,7 +87,6 @@ internal static class Rules
     public const string ManifestType = "DigitalBrain.ModuleManifest";
     public const string SynapseAttribute = "DigitalBrain.SynapseAttribute";
     public const string StateAttribute = "DigitalBrain.StateAttribute";
-    public const string CheckType = "DigitalBrain.Rules.Check";
     public const string SlotAttribute = "DigitalBrain.SlotAttribute";
     public const string CapabilityAttribute = "DigitalBrain.CapabilityAttribute";
     public const string TickType = "DigitalBrain.Time.Tick";

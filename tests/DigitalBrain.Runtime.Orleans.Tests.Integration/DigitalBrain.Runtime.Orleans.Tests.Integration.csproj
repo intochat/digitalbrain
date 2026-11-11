@@ -6,8 +6,12 @@
     <PackageReference Include="Microsoft.Orleans.Sdk" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="../DigitalBrain.Framework.Tests.E2E/WeeklyCap/Budget.cs" Link="Synapses/WeeklyCap/Budget.cs" />
     <Compile Include="../DigitalBrain.Framework.Tests.E2E/WeeklyCap/Payments.cs" Link="Synapses/WeeklyCap/Payments.cs" />
-    <Compile Include="../DigitalBrain.Framework.Tests.E2E/WeeklyCap/Fixtures.cs" Link="Synapses/WeeklyCap/Fixtures.cs" />
   </ItemGroup>
 </Project>

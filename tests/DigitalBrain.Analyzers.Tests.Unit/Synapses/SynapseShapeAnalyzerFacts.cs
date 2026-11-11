@@ -30,13 +30,11 @@ public sealed class SynapseShapeAnalyzerFacts
     private static string Wrap(string method) => Prelude + "\npublic sealed class Shapes\n{\n    " + method + "\n}\n";
 
     [Theory]
-    [InlineData("[Synapse(typeof(Charging), \"week\")] public static Check {|#0:Gate|}(Charging s, WeekSpend w) => default!;")]
-    [InlineData("[Synapse(typeof(Charging), \"week\")] public static Task<Check> {|#0:AsyncGate|}(Charging s, WeekSpend w, CancellationToken ct) => default!;")]
     [InlineData("[Synapse(typeof(Charging), \"week\")] public static WeekSpend {|#0:React|}(Charging s, WeekSpend w) => w;")]
     [InlineData("[Synapse(typeof(Charging), \"week\")] public static Reaction<WeekSpend> {|#0:ReactWithSignals|}(Charging s, WeekSpend w) => default!;")]
     [InlineData("[Synapse(typeof(Charging), \"week\")] public static Task<Reaction<WeekSpend>> {|#0:AsyncReact|}(Charging s, WeekSpend w) => default!;")]
     [InlineData("[Synapse(\"week\")] public static string {|#0:View|}(WeekSpend w) => string.Empty;")]
-    [InlineData("[Synapse(typeof(Signal), \"week/2026-45\")] public static Check {|#0:KeyedGate|}(Signal s, WeekSpend w) => default!;")]
+    [InlineData("[Synapse(typeof(Signal), \"week/2026-45\")] public static WeekSpend {|#0:KeyedReaction|}(Signal s, WeekSpend w) => w;")]
     [InlineData("[Synapse(typeof(Charging), \"week\")] public static Task<WeekSpend> {|#0:WithSlot|}(Charging s, WeekSpend w, [Slot] ISqlRead db) => default!;")]
     [InlineData("[Synapse(typeof(Charging), \"week\")] public static Task<WeekSpend> {|#0:SlotFirst|}(Charging s, [Slot(Name = \"Ledger\")] ISqlRead db, WeekSpend w, CancellationToken ct) => default!;")]
     [InlineData("[Synapse(typeof(Tick), \"week\", Every = \"07:00\")] public static WeekSpend {|#0:Daily|}(Tick t, WeekSpend w) => w;")]
@@ -49,7 +47,7 @@ public sealed class SynapseShapeAnalyzerFacts
     public Task Recognised_shapes_report_nothing(string method) => Run(method, null);
 
     [Theory]
-    [InlineData("[Synapse(\"week\")] public static Check {|#0:NoSignal|}(WeekSpend w) => default!;", "NoSignal",
+    [InlineData("[Synapse(\"week\")] public static WeekSpend {|#0:NoSignal|}(WeekSpend w) => default!;", "NoSignal",
         "a gate needs a signal (a reaction as well), declared by [Synapse] and taken as a parameter.")]
     [InlineData("[Synapse(typeof(Charging), \"week\")] public static Check {|#0:TwoSignals|}(Charging a, Charging b, WeekSpend w) => default!;", "TwoSignals",
         "a synapse takes at most one signal.")]
@@ -58,12 +56,12 @@ public sealed class SynapseShapeAnalyzerFacts
     [InlineData("[Synapse(typeof(Charging), \"gone\")] public static Check {|#0:UnknownState|}(Charging s, WeekSpend w) => default!;", "UnknownState",
         "a synapse takes exactly one state record 'gone' parameter.")]
     [InlineData("[Synapse(typeof(Charging), \"week\")] public static string {|#0:ViewWithSignal|}(Charging s, WeekSpend w) => string.Empty;", "ViewWithSignal",
-        "a view takes only the state; a function with a signal must return Check or the state.")]
+        "a view takes only the state; a function with a signal must return the state.")]
     [InlineData("[Synapse(typeof(Charging), \"week\")] public Check {|#0:Instance|}(Charging s, WeekSpend w) => default!;", "Instance", NotPublicStatic)]
     [InlineData("[Synapse(typeof(Charging), \"week\")] public static Check {|#0:TokenFirst|}(CancellationToken ct, Charging s, WeekSpend w) => default!;", "TokenFirst", UnknownParameter)]
     [InlineData("[Synapse(typeof(Charging), \"week\")] public static Check {|#0:TwoTokens|}(Charging s, WeekSpend w, CancellationToken a, CancellationToken b) => default!;", "TwoTokens", UnknownParameter)]
     [InlineData("[Synapse(typeof(Charging), \"week\")] public static Check {|#0:WithServices|}(Charging s, WeekSpend w, IServiceProvider sp) => default!;", "WithServices", UnknownParameter)]
-    [InlineData("[Synapse(typeof(Signal), \"week\")] public static Check {|#0:NarrowParameter|}(Charging s, WeekSpend w) => default!;", "NarrowParameter",
+    [InlineData("[Synapse(typeof(Signal), \"week\")] public static WeekSpend {|#0:NarrowParameter|}(Charging s, WeekSpend w) => default!;", "NarrowParameter",
         "the declared signal type must be assignable to the signal parameter.")]
     [InlineData("[Synapse(typeof(Charging), \"week\")] public static WeekSpend {|#0:NotAContract|}(Charging s, WeekSpend w, [Slot] string notAContract) => w;", "NotAContract",
         "a slot contract needs [Capability].")]
@@ -72,8 +70,6 @@ public sealed class SynapseShapeAnalyzerFacts
     [InlineData("[Synapse(typeof(Tick), \"week\", Every = \"every 0m\")] public static WeekSpend {|#0:ZeroInterval|}(Tick t, WeekSpend w) => w;", "ZeroInterval",
         "a schedule: every 0m is not HH:mm, Mon HH:mm, every 5m or every 2h.")]
     [InlineData("[Synapse(typeof(Charging), \"week\", Every = \"07:00\")] public static WeekSpend {|#0:EveryOnCharging|}(Charging s, WeekSpend w) => w;", "EveryOnCharging",
-        "an every needs a Tick reaction.")]
-    [InlineData("[Synapse(typeof(Tick), \"week\", Every = \"07:00\")] public static Check {|#0:EveryOnGate|}(Tick t, WeekSpend w) => default!;", "EveryOnGate",
         "an every needs a Tick reaction.")]
     [InlineData("[Synapse(\"week\", Every = \"07:00\")] public static string {|#0:EveryOnView|}(WeekSpend w) => string.Empty;", "EveryOnView",
         "an every needs a Tick reaction.")]
@@ -99,11 +95,11 @@ public sealed class SynapseShapeAnalyzerFacts
             {
                 public static class Inner
                 {
-                    [Synapse(typeof(Charging), "week")] public static Check {|#0:Gate|}(Charging s, WeekSpend w) => default!;
+                    [Synapse(typeof(Charging), "week")] public static WeekSpend {|#0:React|}(Charging s, WeekSpend w) => default!;
                 }
             }
             """);
-        test.ExpectedDiagnostics.Add(Expect("Outer.Inner.Gate", "a synapse function must be public static on a static class or a top-level type, not nested in a non-static class."));
+        test.ExpectedDiagnostics.Add(Expect("Outer.Inner.React", "a synapse function must be public static on a static class or a top-level type, not nested in a non-static class."));
         return test.RunAsync(TestContext.Current.CancellationToken);
     }
 

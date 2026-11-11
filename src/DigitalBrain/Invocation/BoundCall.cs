@@ -1,4 +1,6 @@
 using System.Reflection;
+using DigitalBrain.Access;
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Invocation;
 
@@ -31,13 +33,41 @@ public sealed class BoundCall
         Streamer = stream;
         Parameters = method.GetParameters().Select(parameter => parameter.ParameterType).ToArray();
         ArgumentCount = Parameters.Count(type => type != typeof(CancellationToken));
+        Access = OperationAccessOf.Resolve(contract, method);
     }
+
+    internal BoundCall(CallDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        Descriptor = descriptor;
+        Contract = descriptor.Contract ?? descriptor.Method?.DeclaringType ?? typeof(object);
+        Method = descriptor.Method!;
+        Kind = descriptor.Kind;
+        ResultType = descriptor.ResultType;
+        TaskResultType = descriptor.TaskResultType;
+        IsTask = descriptor.IsTask;
+        Streamer = descriptor.Streamer;
+        Parameters = descriptor.ParameterTypes;
+        ArgumentCount = descriptor.Arity;
+        Access = descriptor.Access;
+        Invoker = (target, values) =>
+        {
+            var task = descriptor.Invoker(target, values);
+            return task.GetAwaiter().GetResult();
+        };
+    }
+
+    /// <summary>The pre-compiled <see cref="CallDescriptor"/>, if constructed from one.</summary>
+    internal CallDescriptor? Descriptor { get; }
 
     /// <summary>The contract the call was bound against.</summary>
     public Type Contract { get; }
 
     /// <summary>The bound method.</summary>
     public MethodInfo Method { get; }
+
+    /// <summary>The access classification for caller admission.</summary>
+    public OperationAccess Access { get; }
 
     /// <summary>What the call returns.</summary>
     public InvocationResultKind Kind { get; }

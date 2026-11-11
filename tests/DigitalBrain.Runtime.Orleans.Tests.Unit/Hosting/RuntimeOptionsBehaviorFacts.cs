@@ -2,7 +2,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans.Runtime;
-using Orleans.Streams;
 using Orleans.Storage;
 using DigitalBrain.Runtime.Orleans.Testing;
 
@@ -49,17 +48,15 @@ public sealed class RuntimeOptionsBehaviorFacts : IDisposable
     }
 
     [Fact]
-    public void LocalSiloHostFactory_takes_home_streams_and_stores_from_the_options()
+    public void LocalSiloHostFactory_takes_home_and_stores_from_the_options()
     {
-        var options = RuntimeOptions.Default with { SignalStreams = "sig-x", PlatformGrainStorage = "plat-x", ClusterGrainStorage = "clu-x" };
+        var options = RuntimeOptions.Default with { PlatformGrainStorage = "plat-x", ClusterGrainStorage = "clu-x" };
         var factory = new LocalSiloHostFactory(null, null, options);
 
         using var host = factory.Build(new InProcessHostOptions { Modules = [] }, _home);
 
         var services = host.Services;
         Assert.Equal(Path.GetFullPath(_home), services.GetRequiredService<TopologySettings>().Home!.Path);
-        Assert.NotNull(services.GetKeyedService<IStreamProvider>("sig-x"));
-        Assert.Null(services.GetKeyedService<IStreamProvider>("signals"));
         Assert.NotNull(services.GetKeyedService<IGrainStorage>("plat-x"));
         Assert.Null(services.GetKeyedService<IGrainStorage>("platform"));
         Assert.IsType<UnregisteredClusterStorage>(services.GetKeyedService<IGrainStorage>("clu-x"));

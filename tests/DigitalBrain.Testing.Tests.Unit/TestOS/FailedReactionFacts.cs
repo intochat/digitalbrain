@@ -1,4 +1,3 @@
-using DigitalBrain.Rules;
 using DigitalBrain.Spi;
 using OS = DigitalBrain.Testing.TestOS;
 
@@ -19,11 +18,7 @@ public sealed record FrEcho(int Value)
     public FrEcho() : this(0) { }
 }
 
-[State("fr.gate")]
-public sealed record FrGate(int Value)
-{
-    public FrGate() : this(0) { }
-}
+
 
 public static class FrUnit
 {
@@ -37,9 +32,7 @@ public static class FrUnit
     [Synapse(typeof(FrPoke), "fr.echo")]
     public static FrEcho Heard(FrPoke p, FrEcho e) => e with { Value = e.Value + 1 };
 
-    // A gate on the kernel's failure fact must never run: it would refuse the record of the failure.
-    [Synapse(typeof(SynapseFailed), "fr.gate")]
-    public static Check NoFailures(SynapseFailed f, FrGate g) => Check.Reject("failures are not gated");
+
 }
 
 public interface IFrPoker
@@ -66,7 +59,6 @@ public sealed class FailedReactionFacts
         os.Confirmations.ApproveAll();
         _ = await os.Get<IInstalls>(Installs).Install(new InstallRequest("fr.count", new Dictionary<string, string>()), Ct);
         _ = await os.Get<IInstalls>(Installs).Install(new InstallRequest("fr.echo", new Dictionary<string, string>()), Ct);
-        _ = await os.Get<IInstalls>(Installs).Install(new InstallRequest("fr.gate", new Dictionary<string, string>()), Ct);
         await os.Idle();
         var poker = os.Get<IFrPoker>(NeuronId.Parse("fr/fr.poker/a"));
 

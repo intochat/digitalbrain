@@ -1,4 +1,5 @@
-using DigitalBrain.Rules;
+using DigitalBrain.Spi;
+using DigitalBrain.Testing;
 using DigitalBrain.Testing.Tests.Unit.Slots;
 using OS = DigitalBrain.Testing.TestOS;
 
@@ -30,10 +31,8 @@ internal static class HsSource
         public static class Budget
         {
             [Synapse(typeof(Charging), "hs.week")]
-            public static Check WeeklyCap(Charging s, WeekSpend t) =>
-                t.Spent + s.Amount > 300m
-                    ? Check.Reject("weekly cap of $300")
-                    : Check.Allow(t with { Spent = t.Spent + s.Amount });
+            public static WeekSpend WeeklyCap(Charging s, WeekSpend t) =>
+                t with { Spent = t.Spent + s.Amount };
 
             [Synapse(typeof(WeekRolled), "hs.week")]
             public static Reaction<WeekSpend> NewWeek(WeekRolled s, WeekSpend t) =>
@@ -45,19 +44,19 @@ internal static class HsSource
         }
         """;
 
-    // Need-neutral: only the cap changes.
-    internal static readonly string Cap200 = Budget.Replace("> 300m", "> 200m", StringComparison.Ordinal);
+    // Need-neutral: only the spend accumulation changes.
+    internal static readonly string Cap200 = Budget.Replace("Spent = t.Spent + s.Amount", "Spent = t.Spent + s.Amount * 2", StringComparison.Ordinal);
 
-    // A new need: the gate takes a sql-read slot.
+    // A new need: the reaction takes a sql-read slot.
     internal static readonly string WithDb = Budget
         .Replace("namespace Me.HostBudget;", "using DigitalBrain.Testing.Tests.Unit.Slots;\n\nnamespace Me.HostBudget;", StringComparison.Ordinal)
         .Replace("WeeklyCap(Charging s, WeekSpend t)", "WeeklyCap(Charging s, WeekSpend t, [Slot] ISqlRead Db)", StringComparison.Ordinal);
 
     // A second needs-changing edit on top of WithDb.
-    internal static readonly string WithDbCap250 = WithDb.Replace("> 300m", "> 250m", StringComparison.Ordinal);
+    internal static readonly string WithDbCap250 = WithDb.Replace("s.Amount", "s.Amount * 3", StringComparison.Ordinal);
 
-    // A compile error on line 22: the gate's ternary loses its condition.
-    internal static readonly string Broken = Budget.Replace("t.Spent + s.Amount > 300m", "t.Spent + s.Amount >", StringComparison.Ordinal);
+    // A compile error on line 22: the reaction loses its expression.
+    internal static readonly string Broken = Budget.Replace("t.Spent + s.Amount", "t.Spent +", StringComparison.Ordinal);
 
     // Another source key that declares the same state alias.
     internal static readonly string Rival = Budget.Replace("Me.HostBudget", "Me.Rival", StringComparison.Ordinal)
@@ -81,7 +80,7 @@ public sealed class HsPayments : Neuron<HsPayments.Count>, IHsPayments
     public Task Charge(decimal amount)
     {
         var type = Context.Services.GetService(typeof(ISynapseCatalogSource)) is ISynapseCatalogSource source
-            ? source.Current.For("hs.week").First(d => d.Kind == SynapseKind.Gate).Signal!
+            ? source.Current.For("hs.week").First(d => d.Kind == SynapseKind.Reaction).Signal!
             : throw new InvalidOperationException("no catalog");
         return Save(State with { N = State.N + 1 }, (Signal)Activator.CreateInstance(type, amount)!);
     }
@@ -107,6 +106,12 @@ public sealed class SynapseHostFacts
 
     private static IHsPayments Pay(OS os, string brain) => os.Get<IHsPayments>(NeuronId.Parse($"{brain}/hs.payments/p"));
 
+    private static async Task<decimal> Spent(OS os, string brain)
+    {
+        var state = await ((IBrainObserver)os).State(NeuronId.Parse($"{brain}/hs.week/default"), Ct);
+        return state!.Value.GetProperty("spent").GetDecimal();
+    }
+
     // Deploys the weekly cap and approves its first install.
     private static async Task<DeployOutcome> DeployApproved(OS os, string brain)
     {
@@ -126,10 +131,10 @@ public sealed class SynapseHostFacts
         var pay = Pay(os, "hs1");
 
         await pay.Charge(250m);
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => pay.Charge(100m));
+        await pay.Charge(100m);
         await os.Idle();
 
-        Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
+        Assert.Equal(350m, await Spent(os, "hs1"));
         var listed = Assert.Single(await os.Synapses.List(Brain("hs1"), Ct));
         Assert.Equal("hs.week", Assert.Single(listed.Aliases));
         Assert.Equal(DeployStatus.Deployed, listed.Status);
@@ -152,8 +157,9 @@ public sealed class SynapseHostFacts
         Assert.Empty(broken.Installs);
         Assert.Empty(os.Synapses.Leaked);
         Assert.Equal(first.Hash, Assert.Single(await os.Synapses.List(Brain("hs2"), Ct)).Hash);
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "hs2").Charge(350m));
-        Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
+        await Pay(os, "hs2").Charge(50m);
+        await os.Idle();
+        Assert.Equal(50m, await Spent(os, "hs2"));
     }
 
     [Fact]
@@ -161,10 +167,6 @@ public sealed class SynapseHostFacts
     {
         await using var os = Start();
         await DeployApproved(os, "hs3");
-        // A refused charge runs the old gate and its state through the runtime JSON; an allowed one would also stay in the TestOS
-        // journal, which keeps typed signal objects of the old version as history.
-        Assert.Equal("weekly cap of $300", (await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "hs3").Charge(350m))).Rejected.Messages[0]);
-        await os.Idle();
         var asked = os.Confirmations.Requested.Count;
 
         var update = await os.Synapses.Deploy(Brain("hs3"), HsSource.Of(HsSource.Cap200), None, Ct);
@@ -173,8 +175,10 @@ public sealed class SynapseHostFacts
         Assert.Equal(DeployStatus.Deployed, update.Status);
         Assert.Equal(InstallStatus.Unchanged, update.Installs["hs.week"].Status);
         Assert.Equal(asked, os.Confirmations.Requested.Count);
-        await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "hs3").Charge(250m));
         Assert.Equal(update.Hash, Assert.Single(await os.Synapses.List(Brain("hs3"), Ct)).Hash);
+        await Pay(os, "hs3").Charge(50m);
+        await os.Idle();
+        Assert.Equal(100m, await Spent(os, "hs3"));
         Assert.Empty(os.Synapses.Leaked);
         Assert.Empty(os.Failures);
     }
@@ -194,8 +198,6 @@ public sealed class SynapseHostFacts
         var listed = Assert.Single(await os.Synapses.List(Brain("hs4"), Ct));
         Assert.Equal((DeployStatus.Staged, first.Hash, update.Hash), (listed.Status, listed.Hash, listed.StagedHash));
         Assert.Empty(os.Catalog.NeedsOf("hs.week").Slots);
-        var old = await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "hs4").Charge(350m));
-        Assert.Equal("weekly cap of $300", old.Rejected.Messages[0]);
         var asked = Assert.Single(os.Confirmations.Waiting);
         Assert.Equal(install.Reason, asked.PlanId);
         Assert.Contains("through Db", install.Sentence, StringComparison.Ordinal);
@@ -207,8 +209,6 @@ public sealed class SynapseHostFacts
         Assert.Equal((DeployStatus.Deployed, update.Hash, (string?)null), (listed.Status, listed.Hash, listed.StagedHash));
         Assert.NotEmpty(os.Catalog.NeedsOf("hs.week").Slots);
         Assert.Equal(update.Hash, (await os.Store.Get(Brain("hs4"), HsSource.Key, Ct))?.Hash);
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "hs4").Charge(350m));
-        Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
         Assert.Empty(os.Synapses.Leaked);
         Assert.Empty(os.Failures);
     }
@@ -230,8 +230,9 @@ public sealed class SynapseHostFacts
         Assert.Empty(os.Source.ForNeeds("hs.week").NeedsOf("hs.week").Slots);
         var record = await os.Get<IInstalls>(NeuronId.Parse("hs5/synapse.installs/default")).Describe("hs.week", Ct);
         Assert.Equal(os.Catalog.NeedsOf("hs.week").Hash(), record?.NeedsHash);
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "hs5").Charge(350m));
-        Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
+        await Pay(os, "hs5").Charge(50m);
+        await os.Idle();
+        Assert.Equal(50m, await Spent(os, "hs5"));
         Assert.Empty(os.Synapses.Leaked);
         Assert.Empty(os.Failures);
     }
@@ -251,8 +252,9 @@ public sealed class SynapseHostFacts
         Assert.Equal(first.Hash, Assert.Single(await os.Synapses.List(Brain("hs6"), Ct)).Hash);
         Assert.Null(await os.Store.Get(Brain("hs6"), "Me.Rival", Ct));
         Assert.Empty(os.Synapses.Leaked);
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "hs6").Charge(350m));
-        Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
+        await Pay(os, "hs6").Charge(50m);
+        await os.Idle();
+        Assert.Equal(50m, await Spent(os, "hs6"));
     }
 
     [Fact]
@@ -260,8 +262,6 @@ public sealed class SynapseHostFacts
     {
         await using var os = Start();
         var first = await DeployApproved(os, "hs7");
-        Assert.Equal("weekly cap of $300", (await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "hs7").Charge(350m))).Rejected.Messages[0]);
-        await os.Idle();
 
         var retired = await os.Synapses.Retire(Brain("hs7"), HsSource.Key, Ct);
         await os.Idle();
@@ -336,9 +336,9 @@ public sealed class SynapseHostFacts
         Assert.Equal(emits, os.Synapses.Compiler.Emits);
         await Pay(os, "b1").Charge(250m);
         await Pay(os, "b2").Charge(100m);
-        Assert.Equal("weekly cap of $300", (await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "b1").Charge(100m))).Rejected.Messages[0]);
-        await Pay(os, "b2").Charge(150m);
-        await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "b2").Charge(100m));
+        await os.Idle();
+        Assert.Equal(250m, await Spent(os, "b1"));
+        Assert.Equal(100m, await Spent(os, "b2"));
         Assert.Equal(one.Hash, Assert.Single(await os.Synapses.List(Brain("b2"), Ct)).Hash);
         Assert.Empty(os.Failures);
     }
@@ -357,7 +357,6 @@ public sealed class SynapseHostFacts
 
         Assert.Empty(await os.Synapses.List(Brain("b1"), Ct));
         Assert.Single(await os.Synapses.List(Brain("b2"), Ct));
-        Assert.Equal("weekly cap of $300", (await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "b2").Charge(350m))).Rejected.Messages[0]);
         Assert.Empty(os.Synapses.Leaked);
 
         Assert.Equal(DeployStatus.Retired, (await os.Synapses.Retire(Brain("b2"), HsSource.Key, Ct)).Status);
@@ -383,7 +382,6 @@ public sealed class SynapseHostFacts
         await os.Idle();
 
         Assert.Contains("hs.week", os.Catalog.States.Keys);
-        await Assert.ThrowsAsync<RuleViolationException>(() => Pay(os, "sa").Charge(250m));
         Assert.Empty(os.Synapses.Leaked);
 
         Assert.Equal(DeployStatus.Retired, (await os.Synapses.Retire(Brain("sa"), HsSource.Key, Ct)).Status);
@@ -403,7 +401,8 @@ public sealed class SynapseHostFacts
         await os.Synapses.Deploy(Brain("rb"), HsSource.Of(HsSource.Budget), None, Ct);
         await os.Idle();
         await os.Restart();
-        await Assert.ThrowsAsync<RuleViolationException>(() => os.Get<IHsPayments>(NeuronId.Parse("rb/sr.payments/p")).Charge(350m));
+        await os.Activate(NeuronId.Parse("rb/hs.week/default"));
+        await os.Get<IHsPayments>(NeuronId.Parse("rb/sr.payments/p")).Charge(50m);
         await os.Idle();
         Assert.Single(await os.Synapses.List(Brain("rb"), Ct));
         Assert.Empty(await os.Synapses.List(Brain("ra"), Ct));
@@ -412,8 +411,9 @@ public sealed class SynapseHostFacts
         await os.Idle();
 
         Assert.Contains("hs.week", os.Catalog.States.Keys);
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => os.Get<IHsPayments>(NeuronId.Parse("rb/sr.payments/p")).Charge(350m));
-        Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
+        await os.Get<IHsPayments>(NeuronId.Parse("rb/sr.payments/p")).Charge(50m);
+        await os.Idle();
+        Assert.Equal(100m, await Spent(os, "rb"));
         Assert.Empty(os.Failures);
     }
 }

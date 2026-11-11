@@ -16,14 +16,12 @@ public sealed record SlotNeed(string Name, CapabilityId Capability, string Contr
 /// <param name="Alias">The state alias.</param>
 /// <param name="Slots">The capability slots.</param>
 /// <param name="Schedules">The schedules it runs on.</param>
-/// <param name="Gates">The signal aliases it can stop.</param>
 /// <param name="Reactions">The reactions it runs: a typed reaction by its function name, an alias reaction as <c>alias:{signal alias}</c>.</param>
 /// <param name="HasView">True when it shows a view.</param>
 public sealed record SynapseNeeds(
     string Alias,
     IReadOnlyList<SlotNeed> Slots,
     IReadOnlyList<Schedule> Schedules,
-    IReadOnlyList<string> Gates,
     IReadOnlyList<string> Reactions,
     bool HasView)
 {
@@ -33,7 +31,6 @@ public sealed record SynapseNeeds(
         var parts = new List<string>();
         parts.AddRange(Slots.Select(s => $"{s.ContractDisplayName} through {s.Name}"));
         parts.AddRange(Schedules.Select(Describe));
-        parts.AddRange(Gates.Select(g => $"stop {g} before it happens"));
         var typed = Reactions.Count(r => !r.StartsWith(AliasPrefix, StringComparison.Ordinal));
         if (typed > 0)
         {
@@ -56,7 +53,6 @@ public sealed record SynapseNeeds(
         var lines = new List<string> { $"alias:{Alias}" };
         lines.AddRange(Sorted(Slots.Select(s => $"slot:{s.Name}|{s.Capability}|{s.ContractDisplayName}")));
         lines.AddRange(Sorted(Schedules.Select(s => $"schedule:{s.Text}")));
-        lines.AddRange(Sorted(Gates.Select(g => $"gate:{g}")));
         lines.AddRange(Sorted(Reactions.Select(r => $"reaction:{r}")));
         lines.Add(HasView ? "view:true" : "view:false");
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', lines))));

@@ -1,4 +1,5 @@
 using DigitalBrain.Rules;
+using DigitalBrain.Spi;
 using DigitalBrain.Testing.Tests.Unit.Slots;
 using OS = DigitalBrain.Testing.TestOS;
 
@@ -19,6 +20,12 @@ public sealed class SourceRestoreFacts
     private static IHsPayments Ask(OS os, string brain) => os.Get<IHsPayments>(NeuronId.Parse($"{brain}/sr.payments/p"));
 
     private static ISources Sources(OS os, string brain) => os.Get<ISources>(NeuronId.Parse($"{brain}/synapse.sources/default"));
+
+    private static async Task<decimal> Spent(OS os, string brain)
+    {
+        var state = await ((IBrainObserver)os).State(NeuronId.Parse($"{brain}/hs.week/default"), Ct);
+        return state!.Value.GetProperty("spent").GetDecimal();
+    }
 
     private static async Task<DeployOutcome> DeployApproved(OS os, string brain)
     {
@@ -52,18 +59,18 @@ public sealed class SourceRestoreFacts
     }
 
     [Fact]
-    public async Task AfterRestartTheFirstGateHitRestoresTheSource()
+    public async Task AfterRestartTheFirstHitRestoresTheSource()
     {
         await using var os = Start();
         var outcome = await DeployApproved(os, "sr2");
         await Ask(os, "sr2").Charge(250m);
         await os.Idle();
 
-        await os.Restart();
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => Ask(os, "sr2").Charge(100m));
+        await RestartAndTouch(os, "sr2");
+        await Ask(os, "sr2").Charge(100m);
         await os.Idle();
 
-        Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
+        Assert.Equal(350m, await Spent(os, "sr2"));
         var listed = Assert.Single(await os.Synapses.List(Brain("sr2"), Ct));
         Assert.Equal(DeployStatus.Deployed, listed.Status);
         Assert.Equal(outcome.Hash, listed.Hash);
@@ -108,7 +115,6 @@ public sealed class SourceRestoreFacts
         await Ask(os, "sr6-other").Charge(1m).ContinueWith(_ => { }, Ct, TaskContinuationOptions.None, TaskScheduler.Default);
         await os.Idle();
 
-        Assert.Equal(0, os.GateRestores);
         Assert.Null(await Sources(os, "sr6").Get(HsSource.Key, Ct));
     }
 
@@ -263,7 +269,7 @@ public sealed class SrPayments : Neuron<HsPayments.Count>, IHsPayments
     {
         await Save(State, new ChargeAsked(amount));
         var type = Context.Services.GetService(typeof(ISynapseCatalogSource)) is ISynapseCatalogSource source
-            ? source.Current.For("hs.week").First(d => d.Kind == SynapseKind.Gate).Signal!
+            ? source.Current.For("hs.week").First(d => d.Kind == SynapseKind.Reaction).Signal!
             : throw new InvalidOperationException("no catalog");
         await Save(State with { N = State.N + 1 }, (Signal)Activator.CreateInstance(type, amount)!);
     }

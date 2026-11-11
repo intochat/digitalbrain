@@ -7,7 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime;
-using Orleans.Streams;
 
 namespace DigitalBrain.Runtime.Orleans.Tests.Integration.Hosting;
 
@@ -25,18 +24,6 @@ public sealed class StatefulSilo : IAsyncLifetime
 
     public Task Restart(CancellationToken ct) => _host!.Restart(ct);
 
-    internal async Task<References> Watch(string brain, string signalNamespace)
-    {
-        var references = new References();
-        var provider = Services.GetRequiredKeyedService<IStreamProvider>(RuntimeOptions.Default.SignalStreams);
-        await provider.GetStream<SignalReference>(StreamId.Create(StreamNames.NamespacePrefix + signalNamespace, brain)).SubscribeAsync((item, _) =>
-        {
-            references.Items.Enqueue(item);
-            return Task.CompletedTask;
-        });
-        return references;
-    }
-
     public async ValueTask InitializeAsync()
         => _host = await new LocalSiloHostFactory(new Stores()).Start(new InProcessHostOptions { Home = _home.Path, Modules = [typeof(HostingModule)] }, CancellationToken.None);
 
@@ -44,17 +31,6 @@ public sealed class StatefulSilo : IAsyncLifetime
     {
         if (_host is not null) { await _host.DisposeAsync(); }
         _home.Dispose();
-    }
-
-    internal sealed class References
-    {
-        public ConcurrentQueue<SignalReference> Items { get; } = new();
-
-        public async Task Until(Func<IReadOnlyCollection<SignalReference>, bool> condition, CancellationToken ct)
-        {
-            var deadline = DateTime.UtcNow.AddSeconds(15);
-            while (!condition(Items) && DateTime.UtcNow < deadline) { await Task.Delay(50, ct); }
-        }
     }
 
     private sealed class Stores : IClusterStoreRegistration
@@ -95,16 +71,23 @@ public sealed class HostStateFacts(StatefulSilo silo) : IClassFixture<StatefulSi
     public async Task Publish_without_state_appends_a_signal_only_entry_then_announces_it()
     {
         var ct = TestContext.Current.CancellationToken;
-        var watched = await silo.Watch("b1", "probe.noted");
+        var received = new ConcurrentQueue<(NeuronId Pub, Noted Signal)>();
+        var clusterListeners = silo.Services.GetRequiredService<IClusterListeners>();
+        await using var sub = await clusterListeners.Listen<Noted>("test.watcher", (pub, s, token) =>
+        {
+            received.Enqueue((pub, s));
+            return Task.CompletedTask;
+        });
         var counter = silo.Get<ICounter>("b1/probe.counter/note");
         await counter.Note("hi");
 
         var page = await silo.History("b1").Read(NeuronId.Parse("b1/probe.counter/note"), 0, 10, ct);
         Assert.Equal("hi", ((Noted)Assert.Single(page.Signals).Signal).Text);
-        await watched.Until(items => items.Count > 0, ct);
-        var item = Assert.Single(watched.Items);
-        Assert.Equal(NeuronId.Parse("b1/probe.counter/note"), item.Publisher);
-        Assert.True(item.Sequence >= 1);
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (received.IsEmpty && DateTime.UtcNow < deadline) { await Task.Delay(50, ct); }
+        var (itemPub, itemSignal) = Assert.Single(received);
+        Assert.Equal(NeuronId.Parse("b1/probe.counter/note"), itemPub);
+        Assert.Equal("hi", itemSignal.Text);
         Assert.Equal(0, await counter.Value());
     }
 

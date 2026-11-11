@@ -59,27 +59,10 @@ public sealed class Notifier : Neuron
     public Task Notice() => Publish(new Noticed("hello"));
 }
 
-public sealed record Ledger(long Revision, IReadOnlyCollection<string> Operations, int Balance) : IRevisioned<Ledger>
-{
-    public Ledger() : this(0, [], 0) { }
-
-    public Ledger Advanced(string operationId) => this with { Revision = Revision + 1, Operations = [.. Operations, operationId] };
-}
-
 public sealed class Private : Neuron
 {
     protected override Task AdmitSynapse(NeuronId subscriber, IReadOnlyList<Type> signals)
         => throw new UnauthorizedAccessException("private");
-}
-
-public sealed record Credited(int Balance) : Signal;
-
-public sealed class LedgerNeuron : RevisionedNeuron<Ledger>
-{
-    public long Current => Revision;
-
-    public Task<bool> Credit(string operation, long expected, int amount)
-        => Commit(operation, expected, state => state with { Balance = state.Balance + amount }, state => new Credited(state.Balance));
 }
 
 public sealed class PlainNeuronFacts
@@ -132,21 +115,6 @@ public sealed class PlainNeuronFacts
 
         Assert.Equal([new Noticed("hello")], context.Published);
         Assert.Empty(context.Writes);
-    }
-
-    [Fact]
-    public async Task Revisioned_neuron_advances_and_refuses_a_stale_revision()
-    {
-        var (neuron, context) = Attached<LedgerNeuron>();
-
-        Assert.True(await neuron.Credit("op-1", 0, 5));
-        Assert.True(await neuron.Credit("op-2", 1, 5));
-        Assert.Equal(2, neuron.Current);
-        Assert.False(await neuron.Credit("op-2", 2, 5));
-
-        var conflict = await Assert.ThrowsAsync<RevisionConflictException>(() => neuron.Credit("op-3", 1, 5));
-        Assert.Equal(2, conflict.CurrentRevision);
-        Assert.Equal(2, context.Writes.Count);
     }
 
     [Fact]

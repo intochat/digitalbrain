@@ -21,6 +21,9 @@
     <InternalsVisibleTo Include="DigitalBrain.Runtime.Http" />
     <InternalsVisibleTo Include="DigitalBrain.Testing.Tests.Unit" />
     <InternalsVisibleTo Include="DigitalBrain.Capabilities.Connections" />
+    <InternalsVisibleTo Include="DigitalBrain.Runtime.Orleans.Tests.Integration" />
+    <InternalsVisibleTo Include="DigitalBrain.Testing.Silo" />
+    <InternalsVisibleTo Include="DigitalBrain.Framework.Tests.E2E" />
   </ItemGroup>
   <ItemGroup>
     <!-- Analyzer-only (03-04): no assembly reference. NuGet drops ReferenceOutputAssembly=false references from the

@@ -181,6 +181,8 @@ public sealed class SynapseLoader
             {
                 return true;
             }
+
+            Thread.Sleep(5);
         }
 
         return IsDead(weak);

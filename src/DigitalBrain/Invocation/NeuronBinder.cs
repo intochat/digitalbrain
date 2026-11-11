@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Invocation;
 
@@ -73,6 +74,11 @@ public sealed class NeuronBinder
     public async Task<JsonElement?> InvokeAsync(object target, BoundCall call, JsonElement[] arguments, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(call);
+        if (call.Descriptor is { } descriptor)
+        {
+            return await descriptor.InvokeAsync(target, arguments, cancellationToken).ConfigureAwait(true);
+        }
+
         if (call.Kind == InvocationResultKind.Stream) { throw new BindingException($"{call.Contract.Name}.{call.Method.Name} returns a stream; stream it."); }
         var returned = Call(target, call, arguments, cancellationToken);
         var result = call.IsTask ? await TaskBoxing.ResultAsync((Task)returned!, call.TaskResultType).ConfigureAwait(true) : returned;
@@ -85,6 +91,11 @@ public sealed class NeuronBinder
     public IAsyncEnumerable<JsonElement> StreamAsync(object target, BoundCall call, JsonElement[] arguments, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(call);
+        if (call.Descriptor is { } descriptor)
+        {
+            return descriptor.StreamAsync(target, arguments, cancellationToken);
+        }
+
         if (call.Kind != InvocationResultKind.Stream) { throw new BindingException($"{call.Contract.Name}.{call.Method.Name} does not return a stream."); }
         var returned = Call(target, call, arguments, cancellationToken)
             ?? throw new InvalidOperationException($"{call.Contract.Name}.{call.Method.Name} returned no stream.");
@@ -144,90 +155,14 @@ public sealed class NeuronBinder
     }
 
     private static BoundCall[] Candidates(Type contract, string method, int arity)
-        => Methods(contract)
-            .Where(candidate => candidate.Name == method && candidate.GetParameters().Count(parameter => parameter.ParameterType != typeof(CancellationToken)) == arity)
-            .Select(candidate => Create(contract, candidate))
-            .ToArray();
-
-    private static IEnumerable<MethodInfo> Methods(Type contract)
     {
-        IEnumerable<MethodInfo> methods = contract.IsInterface
-            ? contract.GetMethods().Concat(contract.GetInterfaces().SelectMany(inherited => inherited.GetMethods()))
-            : contract.GetMethods(BindingFlags.Public | BindingFlags.Instance);
-        HashSet<MethodInfo> excluded = contract.IsInterface ? [] : contract.GetInterfaces()
-            .Where(inherited => inherited == typeof(IDisposable) || inherited == typeof(IAsyncDisposable))
-            .SelectMany(inherited => contract.GetInterfaceMap(inherited).TargetMethods)
-            .ToHashSet();
-        return methods.Where(method => !method.IsSpecialName && !method.IsGenericMethodDefinition && !method.IsStatic
-            && method.DeclaringType != typeof(object) && method.DeclaringType != typeof(IDisposable) && method.DeclaringType != typeof(IAsyncDisposable)
-            && !excluded.Contains(method)
-            && method.GetParameters().All(parameter => !parameter.ParameterType.IsByRef));
-    }
-
-    private static BoundCall Create(Type contract, MethodInfo method)
-    {
-        var returnType = method.ReturnType;
-        var definition = returnType.IsGenericType ? returnType.GetGenericTypeDefinition() : null;
-        Type? resultType = null, taskResultType = null;
-        var isTask = false;
-        var kind = InvocationResultKind.None;
-        Func<object, CancellationToken, IAsyncEnumerable<object?>>? streamer = null;
-        if (returnType == typeof(void) || returnType == typeof(Task) || returnType == typeof(ValueTask))
-        {
-            isTask = returnType != typeof(void);
-        }
-        else if (definition == typeof(Task<>) || definition == typeof(ValueTask<>))
-        {
-            isTask = true;
-            kind = InvocationResultKind.Value;
-            resultType = taskResultType = returnType.GetGenericArguments()[0];
-        }
-        else if (definition == typeof(IAsyncEnumerable<>))
-        {
-            kind = InvocationResultKind.Stream;
-            resultType = returnType.GetGenericArguments()[0];
-            streamer = ItemsMethod.MakeGenericMethod(resultType).CreateDelegate<Func<object, CancellationToken, IAsyncEnumerable<object?>>>();
-        }
-        else
-        {
-            kind = InvocationResultKind.Value;
-            resultType = returnType;
-        }
-        return new BoundCall(contract, method, kind, resultType, taskResultType, isTask, Invoker(method), streamer);
+        var catalog = CallCatalog.GetOrCreate(contract);
+        var descriptors = catalog.GetCandidates(method, arity);
+        return descriptors.Select(d => new BoundCall(d)).ToArray();
     }
 
     private static bool IsValueTask(Type type)
         => type == typeof(ValueTask) || (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(ValueTask<>));
-
-    // (target, values) => (object?)((Declaring)target).Method((P0)values[0], ...), with ValueTask shapes turned into tasks.
-    private static Func<object, object?[], object?> Invoker(MethodInfo method)
-    {
-        try
-        {
-            var target = Expression.Parameter(typeof(object), "target");
-            var values = Expression.Parameter(typeof(object?[]), "values");
-            var arguments = method.GetParameters().Select((parameter, index)
-                => Expression.Convert(Expression.ArrayIndex(values, Expression.Constant(index)), parameter.ParameterType));
-            Expression body = Expression.Call(Expression.Convert(target, method.DeclaringType!), method, arguments);
-            if (method.ReturnType == typeof(void)) { body = Expression.Block(body, Expression.Constant(null, typeof(object))); }
-            else
-            {
-                if (IsValueTask(method.ReturnType)) { body = Expression.Call(body, method.ReturnType.GetMethod(nameof(ValueTask.AsTask))!); }
-                body = Expression.Convert(body, typeof(object));
-            }
-            return Expression.Lambda<Func<object, object?[], object?>>(body, target, values).Compile(preferInterpretation: !RuntimeFeature.IsDynamicCodeCompiled);
-        }
-        catch (Exception error) when (error is ArgumentException or InvalidOperationException or NotSupportedException)
-        {
-            // A shape expression trees cannot call: reflect instead; Call unwraps the TargetInvocationException this raises.
-            var asTask = IsValueTask(method.ReturnType) ? method.ReturnType.GetMethod(nameof(ValueTask.AsTask)) : null;
-            return (target, values) =>
-            {
-                var returned = method.Invoke(target, values);
-                return asTask is null ? returned : asTask.Invoke(returned, null);
-            };
-        }
-    }
 
     private static async IAsyncEnumerable<object?> Items<T>(object source, [EnumeratorCancellation] CancellationToken cancellationToken)
     {

@@ -1,4 +1,5 @@
 using System.Reflection;
+using DigitalBrain.Runtime.Orleans.Hosting;
 using DigitalBrain.Runtime.Orleans.Synapses;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -64,19 +65,40 @@ public static class BrainStorageHosting
         services.TryAddSingleton<IBrainLogOwnership>(FileLockBrainLogOwnership.Instance);
         services.TryAddSingleton<IBrainOwnershipCounters, BrainLogOwnershipCounters>();
         services.TryAddSingleton<BrainStorageKeys>();
-        services.TryAddSingleton(sp => new BrainLogs(sp.GetRequiredService<BrainStorageKeys>(),
-            sp.GetRequiredService<OrleansSdk.Serialization.Serializer>(), sp.GetRequiredService<JournalPayloads>(),
-            sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<IRetentionPolicy>(),
-            sp.GetRequiredService<IOptions<BrainStoreOptions>>(), sp.GetRequiredService<IBrainLogOwnership>()));
+        services.TryAddSingleton(sp =>
+        {
+            var logs = new BrainLogs(sp.GetRequiredService<BrainStorageKeys>(),
+                sp.GetRequiredService<OrleansSdk.Serialization.Serializer>(), sp.GetRequiredService<JournalPayloads>(),
+                sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<IRetentionPolicy>(),
+                sp.GetRequiredService<IOptions<BrainStoreOptions>>(), sp.GetRequiredService<IBrainLogOwnership>());
+            logs.OnLogCreated = log =>
+            {
+                var types = sp.GetService<NeuronTypeRegistry>();
+                var grains = sp.GetService<IGrainFactory>();
+                var faults = sp.GetService<Synapses.PublishFaults>();
+                var nudge = sp.GetService<DigitalBrain.Kernel.INudge>()
+                    ?? (grains is not null && types is not null ? new Synapses.GrainNudge(grains, types, faults) : null);
+                var listeners = sp.GetService<Signalling.BrainListeners>();
+                if (nudge is not null)
+                {
+                    log.Fanout = new DigitalBrain.Kernel.Fanout(
+                        log,
+                        nudge,
+                        alias => types?.TryGetRegistration(alias, out var r) == true ? r.Class : null,
+                        (pub, sigs) =>
+                        {
+                            if (faults?.ShouldFail(pub) == true)
+                            {
+                                throw new InvalidOperationException("PublishFaults: FailAfterAppend.");
+                            }
+                            sp.GetService<Signalling.ClusterListeners>()?.Offer(pub, sigs);
+                        });
+                }
+            };
+            return logs;
+        });
         // The adapters' write path shares the per-brain BrainLog (and its writer claim) with the cluster store: one writer per brain.
-        services.TryAddSingleton<IBrainJournalWriter>(sp => new BrainJournalWriter(sp.GetRequiredService<BrainLogs>(), sp));
-        services.TryAddSingleton<Func<string, IBrainSignalLog>>(sp => brainId =>
-            new Log.BrainSignalLog(
-                brainId,
-                sp.GetRequiredService<BrainLogs>(),
-                sp.GetService<OrleansSdk.IGrainFactory>(),
-                sp.GetService<TimeProvider>(),
-                sp.GetService<IOptions<RetentionOptions>>()));
+        services.TryAddSingleton<IBrainJournalWriter>(sp => new BrainJournalWriter(sp.GetRequiredService<BrainLogs>()));
         foreach (var descriptor in services.Where(d => d.ServiceType == typeof(IGrainStorage) && Equals(d.ServiceKey, runtime.ClusterGrainStorage)).ToArray())
         { services.Remove(descriptor); }
         services.AddKeyedSingleton<IGrainStorage>(runtime.ClusterGrainStorage, (sp, _) => new BrainGrainStorage(sp.GetRequiredService<BrainLogs>()));

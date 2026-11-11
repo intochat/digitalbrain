@@ -19,9 +19,7 @@ public sealed record CapabilityCaller(string PrincipalId, string AccountId, stri
         null or "" => CallerKind.User,
         CapabilityCallers.PlatformApp => CallerKind.Platform,
         CapabilityCallers.SchedulerApp => CallerKind.Scheduler,
-#pragma warning disable CS0618
         CapabilityCallers.AssistantApp => CallerKind.Agent,
-#pragma warning restore CS0618
         _ => CallerKind.App,
     };
 
@@ -67,9 +65,7 @@ public sealed record CapabilityCaller(string PrincipalId, string AccountId, stri
     public static CapabilityCaller App(string appKey)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(appKey);
-#pragma warning disable CS0618
         if (appKey is CapabilityCallers.PlatformApp or CapabilityCallers.SchedulerApp or CapabilityCallers.AssistantApp)
-#pragma warning restore CS0618
         {
             throw new ArgumentException($"'{appKey}' is a reserved caller id, not an app key.", nameof(appKey));
         }
@@ -116,7 +112,6 @@ public static class CapabilityCallers
     /// <summary>Reserved app identifier for scheduler-stamped calls.</summary>
     public const string SchedulerApp = "scheduler";
     /// <summary>The app identifier the former assistant caller carried; still read as an agent.</summary>
-    [Obsolete("In 0.12 it is still the default app id of an Agent caller; removed in 0.13.")]
     public const string AssistantApp = "assistant";
 
     /// <summary>Creates a <see cref="CapabilityCaller"/> for the specified principal, account, brain, and caller kind.</summary>
@@ -135,9 +130,7 @@ public static class CapabilityCallers
         {
             CallerKind.Platform => PlatformApp,
             CallerKind.Scheduler => SchedulerApp,
-#pragma warning disable CS0618
             CallerKind.Agent => AssistantApp,
-#pragma warning restore CS0618
             CallerKind.App => string.IsNullOrEmpty(appId) ? "app" : appId,
             _ => null,
         };

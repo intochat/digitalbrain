@@ -8,24 +8,26 @@ namespace DigitalBrain;
 /// <typeparam name="TState">An immutable state record with a parameterless constructor for the empty state.</typeparam>
 public abstract class Neuron<TState> : Neuron, Spi.IStateInspectable where TState : class, new()
 {
-    private static readonly System.Text.Json.JsonSerializerOptions InspectOptions = new(System.Text.Json.JsonSerializerDefaults.Web);
-
     /// <summary>The current state; loaded by the runtime before <c>OnActivate</c>.</summary>
     protected TState State { get; private set; } = new();
 
     Task<System.Text.Json.JsonElement?> Spi.IStateInspectable.InspectState(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult<System.Text.Json.JsonElement?>(System.Text.Json.JsonSerializer.SerializeToElement(State, InspectOptions));
+        return Task.FromResult<System.Text.Json.JsonElement?>(System.Text.Json.JsonSerializer.SerializeToElement(State, Invocation.RuntimeProtocol.OptionsFor(typeof(TState))));
     }
 
     internal override async Task Load()
-        => State = await LoadState().ConfigureAwait(true) ?? new TState();
+        => State = await Context.State.Load<TState>().ConfigureAwait(true) ?? new TState();
 
-    // How the state is read and written: a state neuron keeps its stored view beside the state.
-    internal virtual Task<TState?> LoadState() => Context.State.Load<TState>();
-
-    internal virtual Task StoreState(TState next, IReadOnlyList<Signal> signals) => Context.State.Save(next, signals);
+    /// <summary>Stores <paramref name="next"/> without publishing any signals.</summary>
+    protected async Task Store(TState next)
+    {
+        ArgumentNullException.ThrowIfNull(next);
+        await Context.State.Store(next).ConfigureAwait(true);
+        State = next;
+        OnCommitted();
+    }
 
     /// <summary>Saves <paramref name="next"/> with the signal that says what changed and, optionally, the signal that says what was acted on.</summary>
     protected Task Save(TState next, Signal changed, Signal? acted = null)
@@ -42,7 +44,7 @@ public abstract class Neuron<TState> : Neuron, Spi.IStateInspectable where TStat
         ArgumentNullException.ThrowIfNull(signals);
         if (signals.Count == 0) { throw new ArgumentException("A state change publishes at least one signal.", nameof(signals)); }
         if (signals.Any(signal => signal is null)) { throw new ArgumentException("A signal is null.", nameof(signals)); }
-        await StoreState(next, signals).ConfigureAwait(true);
+        await Context.State.Save(next, signals).ConfigureAwait(true);
         State = next;
         OnCommitted();
     }

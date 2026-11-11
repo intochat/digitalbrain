@@ -13,7 +13,7 @@ public static class SynapseRetentionHosting
         ArgumentNullException.ThrowIfNull(silo);
         AddRetentionOptions(silo.Services, RuntimeOptions.From(silo.Services));
         silo.Services.TryAddSingleton(TimeProvider.System);
-        silo.Services.AddSingleton<ISynapseCursorLookup, NullSynapseCursorLookup>();
+        silo.Services.AddSingleton<ISynapseCursorLookup, JournalCursorLookup>();
         silo.Services.AddSingleton<IRetentionPolicy, RetentionPolicy>();
         return silo;
     }

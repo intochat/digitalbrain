@@ -29,10 +29,8 @@ internal static class RgSource
         public static class Budget
         {
             [Synapse(typeof(Charging), "rg.week")]
-            public static Check WeeklyCap(Charging s, WeekSpend t) =>
-                t.Spent + s.Amount > 300m
-                    ? Check.Reject("weekly cap of $300")
-                    : Check.Allow(t with { Spent = t.Spent + s.Amount });
+            public static WeekSpend WeeklyCap(Charging s, WeekSpend t) =>
+                t with { Spent = t.Spent + s.Amount };
 
             [Synapse(typeof(WeekRolled), "rg.week")]
             public static Reaction<WeekSpend> NewWeek(WeekRolled s, WeekSpend t) =>
@@ -102,11 +100,9 @@ public sealed class RegistrarFacts
         var pay = os.Get<IRgPayments>(NeuronId.Parse("rga/rg.payments/p"));
 
         await pay.Charge(250m);
-        var e = await Assert.ThrowsAsync<RuleViolationException>(() => pay.Charge(100m));
         await pay.Roll(new DateOnly(2026, 1, 5));
         await os.Idle();
 
-        Assert.Equal("weekly cap of $300", e.Rejected.Messages[0]);
         var week = NeuronId.Parse("rga/rg.week/default");
         var report = Assert.Single(os.Journal(week.Brain).Signals(week), s => s.Signal.GetType().Name == "ReportReady").Signal;
         Assert.Same(source.Assembly, report.GetType().Assembly);
@@ -127,7 +123,6 @@ public sealed class RegistrarFacts
 
         Assert.False(os.IsActive(week));
         Assert.False(os.Catalog.States.ContainsKey("rg.week"));
-        Assert.Empty(os.Gates.GatesFor(week.Brain, source.Signals.Single(t => t.Name == "Charging")));
         Assert.Throws<InvalidOperationException>(() => os.Get<IInstalls>(week));
         await os.Get<IRgPayments>(NeuronId.Parse("rgd/rg.payments/p")).Charge(400m);
         await os.Idle();

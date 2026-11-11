@@ -26,10 +26,8 @@ public sealed class SynapseCompilerFacts
         public static class Budget
         {
             [Synapse(typeof(Charging), "week")]
-            public static Check WeeklyCap(Charging s, WeekSpend t) =>
-                t.Spent + s.Amount > 300m
-                    ? Check.Reject("weekly cap of $300")
-                    : Check.Allow(t with { Spent = t.Spent + s.Amount });
+            public static WeekSpend WeeklyCap(Charging s, WeekSpend t) =>
+                t with { Spent = t.Spent + s.Amount };
 
             [Synapse(typeof(WeekRolled), "week")]
             public static WeekSpend NewWeek(WeekRolled s, WeekSpend t) => new(s.Week);
@@ -81,7 +79,7 @@ public sealed class SynapseCompilerFacts
             public static class Gates
             {
                 [Synapse(typeof(Charging), "week")]
-                public static Check Cap(Charging s, string t) => Check.Reject("no");
+                public static WeekSpend Cap(Charging s, string t) => new();
             }
             """;
 
@@ -111,7 +109,7 @@ public sealed class SynapseCompilerFacts
             public static class Gates
             {
                 [Synapse(typeof(Charging), "week")]
-                public static Check Cap(Charging s, WeekSpend t) => Check.Reject("no");
+                public static WeekSpend Cap(Charging s, WeekSpend t) => t;
             }
             """;
 

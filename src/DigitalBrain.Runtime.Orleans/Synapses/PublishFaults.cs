@@ -8,10 +8,10 @@ internal sealed class PublishFaults
 {
     private string? _failNext;
 
-    /// <summary>While set, <see cref="SignalPublisher.Publish"/> throws after the journal append and before any stream item is sent.</summary>
+    /// <summary>While set, publishing throws after the journal append.</summary>
     public bool FailAfterAppend { get; set; }
 
-    /// <summary>Makes exactly the next <see cref="SignalPublisher.Publish"/> of <paramref name="publisher"/> throw after its journal append (a kill between write and publish).</summary>
+    /// <summary>Makes exactly the next publish of <paramref name="publisher"/> throw after its journal append (a kill between write and publish).</summary>
     public void FailNextAfterAppend(NeuronId publisher) => Volatile.Write(ref _failNext, publisher.ToString());
 
     /// <summary>Sends every reference twice, as an at-least-once stream may.</summary>

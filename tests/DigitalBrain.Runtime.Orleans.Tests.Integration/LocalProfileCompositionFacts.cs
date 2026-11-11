@@ -22,13 +22,12 @@ public sealed class LocalProfileCompositionFacts
 
         Assert.Same(fake, host.Services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage));
         Assert.Equal(1, fake.Registered);
-        foreach (var name in new[] { RuntimeOptions.Default.PlatformGrainStorage, RuntimeOptions.Default.PubSubStore, "drive" })
+        foreach (var name in new[] { RuntimeOptions.Default.PlatformGrainStorage, "drive" })
         {
             var store = host.Services.GetRequiredKeyedService<IGrainStorage>(name);
             Assert.NotNull(store);
         }
         Assert.NotNull(host.Services.GetRequiredService<IReminderTable>());
-        Assert.NotNull(host.Services.GetRequiredKeyedService<OrleansSdk.Streams.IStreamProvider>(RuntimeOptions.Default.SignalStreams));
         Assert.False(string.IsNullOrEmpty(host.Services.GetRequiredService<IConfiguration>()[RuntimeOptions.Default.MasterKeyKey]));
     }
 
@@ -50,11 +49,10 @@ public sealed class LocalProfileCompositionFacts
         Assert.Contains("AddBrainStorage", error.Message, StringComparison.Ordinal);
     }
 
-    [Theory]
-    [InlineData("platform")]
-    [InlineData("pubsubstore")]
-    public void A_module_grain_store_with_a_reserved_name_is_an_issue_naming_the_module(string name)
+    [Fact]
+    public void A_module_grain_store_with_a_reserved_name_is_an_issue_naming_the_module()
     {
+        const string name = "platform";
         var module = new ModuleManifest([], [], [Need.State(name)], [], []) { Id = "greedy" };
         var issue = Assert.Single(new LocalProfile().Validate(new ConfigurationBuilder().Build(), [module]));
         Assert.Contains("greedy", issue.Key, StringComparison.Ordinal);

@@ -1,10 +1,4 @@
 {
-  "streams": {
-    "binding": "signals",
-    "namespacePrefix": "brain.signals.",
-    "granularity": "one stream per (brain, signal namespace); key = brain key; namespace = alias up to its last dot",
-    "item": "synapse.ref"
-  },
   "runtime": {
     "grainTypes": [
       "neuron.host",
@@ -13,22 +7,20 @@
       "runtime.storage-write-grants"
     ],
     "aliases": [
-      "aborted",
       "admit",
       "brain.affine-placement",
       "brain.owner",
       "brain.state",
       "brain.trace",
       "catch-up",
-      "committed",
       "connection.oauth-grant",
       "connection.probe-result",
       "connection.view",
+      "db.access.caller",
       "db.json-element",
       "db.runtime-invocation",
       "enforcement.untrusted-caller",
       "ensure-brain-wide",
-      "gate",
       "inspect-state",
       "integration.registration.configure",
       "integration.registration.released",
@@ -44,20 +36,18 @@
       "kernel.type-kind",
       "neuron.host",
       "neuron.synapse-host",
+      "nudge",
       "post",
       "post-interleaved",
       "reload",
       "remove-brain-wide",
       "sealed-secret",
-      "signal.subscriber",
       "storage.brain-entry",
       "storage.brain-record",
       "storage.brain-snapshot",
       "storage.journaled-signal",
       "storage.publisher-mark",
-      "stream",
-      "synapse.gate-verdict",
-      "synapse.ref"
+      "stream"
     ],
     "neurons": [
       "policies",
@@ -81,7 +71,6 @@
       "synapse.failed",
       "synapse.finished",
       "synapse.gap",
-      "synapse.gate-changed",
       "synapse.install-denied",
       "synapse.install-requested",
       "synapse.installed",

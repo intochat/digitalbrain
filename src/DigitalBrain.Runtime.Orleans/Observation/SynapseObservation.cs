@@ -47,17 +47,16 @@ public static class SynapseObservation
         cancellationToken.ThrowIfCancellationRequested();
         var log = await logs.For(brain).WaitAsync(cancellationToken).ConfigureAwait(false);
         var rows = new List<ObservedSynapse>();
-        foreach (var (grain, record) in log.Named(SynapseState.Name))
+        foreach (var subs in log.Subscriptions.All)
         {
-            if (SubscriberOf(grain) is not { } subscriber) { continue; }
-            var state = JournalPayloads.DecodeState<SynapseState>(record);
-            if (state is null) { continue; }
-            foreach (var source in state.Sources)
+            var subscriber = subs.Subscriber.ToString();
+            foreach (var entry in subs.Entries)
             {
-                if (source.Source == SynapseEngine.BrainWide || source.Source.Length == 0) { continue; }
-                foreach (var alias in source.Aliases)
+                if (entry.IsBrainWide || entry.Source is null) { continue; }
+                var source = entry.Source.Value.ToString();
+                foreach (var alias in entry.Aliases)
                 {
-                    if (alias.Length > 0) { rows.Add(new ObservedSynapse(source.Source, subscriber, alias)); }
+                    if (alias.Length > 0) { rows.Add(new ObservedSynapse(source, subscriber, alias)); }
                 }
             }
         }

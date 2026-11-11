@@ -2,10 +2,12 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using DigitalBrain.Access;
 using DigitalBrain.Contracts;
 using DigitalBrain.Invocation;
 using DigitalBrain.Spi;
 using DigitalBrain.Time;
+using DigitalBrain.Units;
 
 namespace DigitalBrain.Testing;
 
@@ -26,15 +28,6 @@ public sealed class TestOSOptions
 
     /// <summary>How long an awaited call waits on the TestOS clock before it fails with <see cref="TimeoutException"/>. Default 30 seconds.</summary>
     public TimeSpan CallTimeout { get; set; } = TimeSpan.FromSeconds(30);
-
-    /// <summary>How long a gate synapse may take before the publish fails closed; default half of <see cref="CallTimeout"/>.</summary>
-    public TimeSpan GateTimeout
-    {
-        get => _gateTimeout ?? CallTimeout / 2;
-        set => _gateTimeout = value;
-    }
-
-    private TimeSpan? _gateTimeout;
 
     /// <summary>The clock's start, or 2026-01-01 UTC.</summary>
     public DateTimeOffset? Start { get; set; }
@@ -71,6 +64,39 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     private readonly ConcurrentDictionary<string, byte> _generated = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ActionDescriptor> _actions = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<Assembly, byte> _scannedModules = new();
+    private readonly ConcurrentDictionary<string, Type> _signalTypes = new(StringComparer.Ordinal);
+
+    internal IReadOnlyList<BrainId> AllBrains => [.. _hosts.Keys.Select(h => h.Brain).Union(_journals.Keys).Distinct()];
+
+    internal Type? TypeOf(string alias)
+    {
+        if (_signalTypes.TryGetValue(alias, out var type)) { return type; }
+        foreach (var desc in Source.Current.Synapses)
+        {
+            if (desc.Signal is { } signalType && SignalAliases.Of(signalType) == alias)
+            {
+                if (!signalType.IsCollectible) { _signalTypes[alias] = signalType; }
+                return signalType;
+            }
+        }
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (assembly.IsDynamic || assembly.IsCollectible) { continue; }
+            try
+            {
+                foreach (var t in assembly.GetTypes())
+                {
+                    if (typeof(Signal).IsAssignableFrom(t) && !t.IsAbstract && SignalAliases.Of(t) == alias)
+                    {
+                        if (!t.IsCollectible) { _signalTypes[alias] = t; }
+                        return t;
+                    }
+                }
+            }
+            catch { }
+        }
+        return null;
+    }
 
     private TestOS(TestOSOptions options)
     {
@@ -82,14 +108,16 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         Delivery = new SynapseRegistry(this);
         Confirmations = new TestConfirmations(Clock);
         Listeners = new TestClusterListeners(this);
-        Gates = new InstalledGateIndex(Source);
         Registrar = new TestSynapseRegistrar(this);
         Store = new DigitalBrain.Runtime.Synapses.NeuronSourceStore(brain => Get<ISources>(new NeuronId(brain, SourcesType, "default")));
+        AccessOptions = new AccessOptions { UnstampedEdgeIsKernel = true, AuditContractInternal = true };
+        AccessCounters = new AccessCounters();
+        Access = new AccessGate(TestCallerAmbient.Instance, AccessOptions, AccessCounters);
+        Edge = new EdgeAuthority(TestCallerAmbient.Instance);
         Register<InstallsNeuron>();
         Register<SourcesNeuron>();
         Register<PoliciesNeuron>();
         Register<TimeNeuron>();
-        _ = Listeners.Listen<GateChanged>("testos.installed-gates", RefreshGates);
     }
 
     /// <summary>The <c>[State]</c> records and synapse functions in force now: <see cref="Source"/>'s current catalog.</summary>
@@ -100,12 +128,6 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     /// neurons activated before it. <see cref="Register(Assembly)"/> merges into it and <see cref="Unregister(string)"/> removes from it.
     /// </summary>
     public SynapseCatalogSource Source { get; }
-
-    /// <summary>
-    /// The gate index a durable signal passes before it is appended: the <see cref="Catalog"/> gates of the aliases the brain's
-    /// <see cref="IInstalls"/> neuron records, refreshed on every <see cref="GateChanged"/>. A brain with no install has no gates.
-    /// </summary>
-    public InstalledGateIndex Gates { get; }
 
     /// <summary>
     /// Makes a loaded synapse source live on this TestOS, or removes it: <see cref="Source"/>, the state neuron classes and the hosts of a
@@ -131,6 +153,18 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
 
     /// <summary>Host-level listeners on the signals of every brain of this TestOS (04-19); they survive <see cref="Restart"/>.</summary>
     public DigitalBrain.Spi.IClusterListeners ClusterListeners => Listeners;
+
+    /// <summary>The edge minting authority of this TestOS.</summary>
+    public EdgeAuthority Edge { get; }
+
+    /// <summary>The access admission gate of this TestOS.</summary>
+    internal AccessGate Access { get; }
+
+    /// <summary>The operational access configuration of this TestOS.</summary>
+    public AccessOptions AccessOptions { get; }
+
+    /// <summary>Observability counters for access telemetry.</summary>
+    public AccessCounters AccessCounters { get; }
 
     internal TestClusterListeners Listeners { get; }
 
@@ -181,7 +215,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
 
     /// <summary>
     /// Registers every concrete <c>[Neuron("type")]</c> class of <paramref name="assembly"/>, merges its <c>[State]</c> records and synapse
-    /// functions into <see cref="Catalog"/>, and hosts each state alias as a <see cref="StateNeuron{TState}"/>.
+    /// functions into <see cref="Catalog"/>, and hosts each state alias as a <see cref="UnitNeuron{TState}"/>.
     /// </summary>
     /// <exception cref="SynapseShapeException">A synapse of unsupported shape, or a state alias already in <see cref="Catalog"/>.</exception>
     public TestOS Register(Assembly assembly)
@@ -192,7 +226,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         Source.Merge(scanned);
         foreach (var (alias, record) in scanned.States)
         {
-            var neuron = typeof(StateNeuron<>).MakeGenericType(record);
+            var neuron = typeof(UnitNeuron<>).MakeGenericType(record);
             var registered = _types.GetOrAdd(alias, neuron);
             if (registered != neuron) { throw new ArgumentException($"State alias '{alias}' is already registered for {registered.FullName}.", nameof(assembly)); }
         }
@@ -213,9 +247,17 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     {
         ArgumentNullException.ThrowIfNull(alias);
         Source.Remove(alias);
-        if (_types.TryGetValue(alias, out var type) && type.IsGenericType && type.GetGenericTypeDefinition() == typeof(StateNeuron<>))
+        if (_types.TryGetValue(alias, out var type) && type.IsGenericType && type.GetGenericTypeDefinition() == typeof(UnitNeuron<>))
         {
             _ = _types.TryRemove(new KeyValuePair<string, Type>(alias, type));
+            foreach (var host in _hosts.Values.Where(host => host.Id.Type == alias).ToList())
+            {
+                if (_hosts.TryRemove(new KeyValuePair<NeuronId, TestNeuronHost>(host.Id, host)))
+                {
+                    Delivery.RemoveSubscriber(host.Id);
+                    host.Dispose();
+                }
+            }
         }
         return this;
     }
@@ -370,10 +412,12 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
             await Track(host.Deactivate(DeactivationCause.Shutdown)).ConfigureAwait(false);
         }
         await ForgetGenerated().ConfigureAwait(false);
-        Gates.Reset();
         foreach (var subscriber in Delivery.Behind())
         {
-            await Activate(subscriber).ConfigureAwait(false);
+            if (TryHost(subscriber, out var host))
+            {
+                await Track(host.Activate()).ConfigureAwait(false);
+            }
         }
         await Idle().ConfigureAwait(false);
     }
@@ -455,10 +499,15 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
             _ = Unregister(alias);
             foreach (var host in _hosts.Values.Where(host => host.Id.Type == alias).ToList())
             {
-                if (_hosts.TryRemove(new KeyValuePair<NeuronId, TestNeuronHost>(host.Id, host))) { host.Dispose(); }
+                if (_hosts.TryRemove(new KeyValuePair<NeuronId, TestNeuronHost>(host.Id, host)))
+                {
+                    Delivery.RemoveSubscriber(host.Id);
+                    host.Dispose();
+                }
             }
         }
         _generated.Clear();
+        _signalTypes.Clear();
         (DigitalBrain.Runtime.Synapses.SynapseHost Host, ISynapseRestorer Restorer)? old;
         lock (_gate)
         {
@@ -468,8 +517,8 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         if (old is { } stopped) { await stopped.Host.DisposeAsync().ConfigureAwait(false); }
     }
 
-    // Hosts alias as the state neuron of record from now on.
-    internal void ReplaceStateType(string alias, Type record) => _types[alias] = typeof(StateNeuron<>).MakeGenericType(record);
+    // Hosts alias as the unit neuron of record from now on.
+    internal void ReplaceStateType(string alias, Type record) => _types[alias] = typeof(UnitNeuron<>).MakeGenericType(record);
 
     // Ends and forgets every host of alias, so the next call constructs the class registered then; state and synapses survive.
     internal async Task DropHosts(string alias)
@@ -477,14 +526,12 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         foreach (var host in _hosts.Values.Where(host => host.Id.Type == alias).ToList())
         {
             await Track(host.Deactivate(DeactivationCause.Requested)).ConfigureAwait(false);
-            if (_hosts.TryRemove(new KeyValuePair<NeuronId, TestNeuronHost>(host.Id, host))) { host.Dispose(); }
+            if (_hosts.TryRemove(new KeyValuePair<NeuronId, TestNeuronHost>(host.Id, host)))
+            {
+                Delivery.RemoveSubscriber(host.Id);
+                host.Dispose();
+            }
         }
-    }
-
-    private async Task RefreshGates(NeuronId publisher, GateChanged changed, CancellationToken ct)
-    {
-        var records = await Get<IInstalls>(new NeuronId(publisher.Brain, InstallsType, "default")).List(ct).ConfigureAwait(false);
-        Gates.Refresh(publisher.Brain, records);
     }
 
     private const string InstallsType = "synapse.installs";
@@ -492,13 +539,6 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     private const string SourcesType = "synapse.sources";
 
     internal bool HasHost(NeuronId id) => _hosts.ContainsKey(id);
-
-    private int _gateRestores;
-
-    /// <summary>How many gate paths awaited the restore of an installed alias missing from the catalog; every other gate path runs inline.</summary>
-    public int GateRestores => Volatile.Read(ref _gateRestores);
-
-    internal void CountGateRestore() => Interlocked.Increment(ref _gateRestores);
 
     internal bool TryHost(NeuronId id, out TestNeuronHost host)
     {
@@ -580,12 +620,34 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     private sealed class CallerSink(TestOS os, NeuronId? caller) : IInvocationSink
     {
         public Task<JsonElement?> Invoke(NeuronId target, RuntimeInvocation call, CancellationToken cancellationToken)
-            => os.Host(target).Invoke(Stamp(call), cancellationToken);
+        {
+            using var frame = Hop(target);
+            return os.Host(target).Invoke(Stamp(call), cancellationToken);
+        }
 
-        public Task Post(NeuronId target, RuntimeInvocation call) => os.Host(target).Post(Stamp(call));
+        public Task Post(NeuronId target, RuntimeInvocation call)
+        {
+            using var frame = Hop(target);
+            return os.Host(target).Post(Stamp(call));
+        }
 
         public IAsyncEnumerable<JsonElement> Stream(NeuronId target, RuntimeInvocation call, CancellationToken cancellationToken)
-            => os.Host(target).Stream(Stamp(call), cancellationToken);
+            => StreamInternal(target, call, cancellationToken);
+
+        private async IAsyncEnumerable<JsonElement> StreamInternal(NeuronId target, RuntimeInvocation call, [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            using var frame = Hop(target);
+            await foreach (var item in os.Host(target).Stream(Stamp(call), cancellationToken).ConfigureAwait(false))
+            {
+                yield return item;
+            }
+        }
+
+        private IDisposable Hop(NeuronId target)
+        {
+            var current = TestCallerAmbient.Instance.Current;
+            return TestCallerAmbient.Instance.Enter(current?.Hop(via: caller, inside: caller is not null));
+        }
 
         private RuntimeInvocation Stamp(RuntimeInvocation call) => call with { Behavior = caller?.ToString() ?? string.Empty };
     }

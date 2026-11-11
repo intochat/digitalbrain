@@ -29,22 +29,6 @@ public enum GrainStoreBinding
     Memory,
 }
 
-/// <summary>How streams are carried.</summary>
-public enum StreamsBinding
-{
-    /// <summary>Not bound.</summary>
-    None,
-
-    /// <summary>Memory streams with a file pub-sub store.</summary>
-    MemoryWithFilePubSub,
-
-    /// <summary>Azure Queue streams.</summary>
-    AzureQueue,
-
-    /// <summary>In-memory streams with memory pub-sub store.</summary>
-    Memory,
-}
-
 /// <summary>Where durable reminders live.</summary>
 public enum RemindersBinding
 {
@@ -134,7 +118,6 @@ public enum ClusterStoreBinding
 public sealed record Bindings(
     ClusteringBinding Clustering,
     GrainStoreBinding GrainStores,
-    StreamsBinding Streams,
     RemindersBinding Reminders,
     SecretsBinding Secrets,
     HttpBinding Http,
@@ -146,14 +129,13 @@ public sealed record Bindings(
     public ClusterStoreBinding ClusterStore { get; init; }
 
     /// <summary>Nothing bound.</summary>
-    public static Bindings Unbound { get; } = new(default, default, default, default, default, default, default, default, default);
+    public static Bindings Unbound { get; } = new(default, default, default, default, default, default, default, default);
 
     /// <summary>True when a module need of this kind is bound.</summary>
     /// <exception cref="ArgumentOutOfRangeException">A need kind without a mapping.</exception>
     public bool Binds(NeedKind kind) => kind switch
     {
         NeedKind.State => GrainStores != GrainStoreBinding.None,
-        NeedKind.Streams => Streams != StreamsBinding.None,
         NeedKind.Reminders => Reminders != RemindersBinding.None,
         NeedKind.Secrets => Secrets != SecretsBinding.None,
         NeedKind.Http => Http != HttpBinding.None,

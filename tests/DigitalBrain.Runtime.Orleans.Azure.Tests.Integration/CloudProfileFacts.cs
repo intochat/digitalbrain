@@ -2,7 +2,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Storage;
-using Orleans.Streams;
 
 namespace DigitalBrain.Runtime.Orleans.Azure.Tests.Integration;
 
@@ -55,7 +54,6 @@ public sealed class CloudProfileFacts(AzuriteFixture azurite)
 
     [Theory]
     [InlineData("platform")]
-    [InlineData("pubsubstore")]
     public void A_module_grain_store_with_a_reserved_name_is_an_issue_naming_the_module(string name)
     {
         var module = new ModuleManifest([], [], [Need.State(name)], [], []) { Id = "greedy" };
@@ -73,10 +71,9 @@ public sealed class CloudProfileFacts(AzuriteFixture azurite)
     public void Bindings_are_the_azure_ones_and_the_cluster_store_is_host_bound()
     {
         var bindings = new CloudProfile().Bindings;
-        Assert.Equal(7, Enum.GetValues<NeedKind>().Length);
+        Assert.Equal(6, Enum.GetValues<NeedKind>().Length);
         Assert.Equal(ClusteringBinding.AzureTable, bindings.Clustering);
         Assert.Equal(GrainStoreBinding.AzureBlob, bindings.GrainStores);
-        Assert.Equal(StreamsBinding.AzureQueue, bindings.Streams);
         Assert.Equal(RemindersBinding.AzureTable, bindings.Reminders);
         Assert.Equal(SecretsBinding.KeyVault, bindings.Secrets);
         Assert.Equal(HttpBinding.Direct, bindings.Http);
@@ -126,17 +123,13 @@ public sealed class CloudProfileFacts(AzuriteFixture azurite)
         var services = host.Services;
 
         Assert.Same(fake, services.GetRequiredKeyedService<IGrainStorage>(RuntimeOptions.Default.ClusterGrainStorage));
-        foreach (var name in new[] { RuntimeOptions.Default.PlatformGrainStorage, RuntimeOptions.Default.PubSubStore, "drive" })
+        foreach (var name in new[] { RuntimeOptions.Default.PlatformGrainStorage, "drive" })
         {
             Assert.IsType<AzureBlobGrainStorage>(services.GetRequiredKeyedService<IGrainStorage>(name));
             Assert.Equal(RuntimeOptions.Default.GrainStateContainer, services.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<AzureBlobStorageOptions>>().Get(name).ContainerName);
         }
         Assert.Contains("Azure", services.GetRequiredService<IMembershipTable>().GetType().Name, StringComparison.Ordinal);
         Assert.Contains("Azure", services.GetRequiredService<IReminderTable>().GetType().Name, StringComparison.Ordinal);
-        Assert.NotNull(services.GetRequiredKeyedService<IStreamProvider>(RuntimeOptions.Default.SignalStreams));
-        var queues = services.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<AzureQueueOptions>>().Get(RuntimeOptions.Default.SignalStreams);
-        Assert.Equal(["signals-0"], queues.QueueNames);
-        Assert.NotNull(queues.QueueServiceClient);
         Assert.IsType<BlobLeaseBrainLogOwnership>(services.GetRequiredService<IBrainLogOwnership>());
         Assert.Same(services.GetRequiredService<IBrainLogOwnership>(), services.GetRequiredService<IBrainOwnershipCounters>());
         Assert.Equal(CloudHosts.MasterKey, services.GetRequiredService<IConfiguration>()[RuntimeOptions.Default.MasterKeyKey]);

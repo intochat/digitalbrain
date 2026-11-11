@@ -18,13 +18,13 @@ DigitalBrain.Runtime.Orleans.Operations.StorageWriteAuthorizer.Invoke<T>(string!
 DigitalBrain.Runtime.Orleans.Operations.StorageWriteAuthorizer.StorageWriteAuthorizer(Orleans.IGrainFactory! grains, DigitalBrain.Capabilities.Storage.IStorageWriteIdentity! identity, Microsoft.Extensions.Logging.ILogger<DigitalBrain.Runtime.Orleans.Operations.StorageWriteAuthorizer!>! logger) -> void
 DigitalBrain.Runtime.Orleans.Bindings
 DigitalBrain.Runtime.Orleans.Bindings.<Clone>$() -> DigitalBrain.Runtime.Orleans.Bindings!
-DigitalBrain.Runtime.Orleans.Bindings.Bindings(DigitalBrain.Runtime.Orleans.ClusteringBinding Clustering, DigitalBrain.Runtime.Orleans.GrainStoreBinding GrainStores, DigitalBrain.Runtime.Orleans.StreamsBinding Streams, DigitalBrain.Runtime.Orleans.RemindersBinding Reminders, DigitalBrain.Runtime.Orleans.SecretsBinding Secrets, DigitalBrain.Runtime.Orleans.HttpBinding Http, DigitalBrain.Runtime.Orleans.SandboxBinding Sandbox, DigitalBrain.Runtime.Orleans.ModelBinding Model, DigitalBrain.Runtime.Orleans.UiBinding Ui) -> void
+DigitalBrain.Runtime.Orleans.Bindings.Bindings(DigitalBrain.Runtime.Orleans.ClusteringBinding Clustering, DigitalBrain.Runtime.Orleans.GrainStoreBinding GrainStores, DigitalBrain.Runtime.Orleans.RemindersBinding Reminders, DigitalBrain.Runtime.Orleans.SecretsBinding Secrets, DigitalBrain.Runtime.Orleans.HttpBinding Http, DigitalBrain.Runtime.Orleans.SandboxBinding Sandbox, DigitalBrain.Runtime.Orleans.ModelBinding Model, DigitalBrain.Runtime.Orleans.UiBinding Ui) -> void
 DigitalBrain.Runtime.Orleans.Bindings.Binds(DigitalBrain.NeedKind kind) -> bool
 DigitalBrain.Runtime.Orleans.Bindings.ClusterStore.get -> DigitalBrain.Runtime.Orleans.ClusterStoreBinding
 DigitalBrain.Runtime.Orleans.Bindings.ClusterStore.init -> void
 DigitalBrain.Runtime.Orleans.Bindings.Clustering.get -> DigitalBrain.Runtime.Orleans.ClusteringBinding
 DigitalBrain.Runtime.Orleans.Bindings.Clustering.init -> void
-DigitalBrain.Runtime.Orleans.Bindings.Deconstruct(out DigitalBrain.Runtime.Orleans.ClusteringBinding Clustering, out DigitalBrain.Runtime.Orleans.GrainStoreBinding GrainStores, out DigitalBrain.Runtime.Orleans.StreamsBinding Streams, out DigitalBrain.Runtime.Orleans.RemindersBinding Reminders, out DigitalBrain.Runtime.Orleans.SecretsBinding Secrets, out DigitalBrain.Runtime.Orleans.HttpBinding Http, out DigitalBrain.Runtime.Orleans.SandboxBinding Sandbox, out DigitalBrain.Runtime.Orleans.ModelBinding Model, out DigitalBrain.Runtime.Orleans.UiBinding Ui) -> void
+DigitalBrain.Runtime.Orleans.Bindings.Deconstruct(out DigitalBrain.Runtime.Orleans.ClusteringBinding Clustering, out DigitalBrain.Runtime.Orleans.GrainStoreBinding GrainStores, out DigitalBrain.Runtime.Orleans.RemindersBinding Reminders, out DigitalBrain.Runtime.Orleans.SecretsBinding Secrets, out DigitalBrain.Runtime.Orleans.HttpBinding Http, out DigitalBrain.Runtime.Orleans.SandboxBinding Sandbox, out DigitalBrain.Runtime.Orleans.ModelBinding Model, out DigitalBrain.Runtime.Orleans.UiBinding Ui) -> void
 DigitalBrain.Runtime.Orleans.Bindings.Equals(DigitalBrain.Runtime.Orleans.Bindings? other) -> bool
 DigitalBrain.Runtime.Orleans.Bindings.GrainStores.get -> DigitalBrain.Runtime.Orleans.GrainStoreBinding
 DigitalBrain.Runtime.Orleans.Bindings.GrainStores.init -> void
@@ -38,8 +38,6 @@ DigitalBrain.Runtime.Orleans.Bindings.Sandbox.get -> DigitalBrain.Runtime.Orlean
 DigitalBrain.Runtime.Orleans.Bindings.Sandbox.init -> void
 DigitalBrain.Runtime.Orleans.Bindings.Secrets.get -> DigitalBrain.Runtime.Orleans.SecretsBinding
 DigitalBrain.Runtime.Orleans.Bindings.Secrets.init -> void
-DigitalBrain.Runtime.Orleans.Bindings.Streams.get -> DigitalBrain.Runtime.Orleans.StreamsBinding
-DigitalBrain.Runtime.Orleans.Bindings.Streams.init -> void
 DigitalBrain.Runtime.Orleans.Bindings.Ui.get -> DigitalBrain.Runtime.Orleans.UiBinding
 DigitalBrain.Runtime.Orleans.Bindings.Ui.init -> void
 DigitalBrain.Runtime.Orleans.BrainLogFormatException
@@ -102,18 +100,6 @@ DigitalBrain.Runtime.Orleans.Capabilities.CapabilityRegistry.ContractOf(DigitalB
 DigitalBrain.Runtime.Orleans.Capabilities.CapabilityRegistry.IsSingle(DigitalBrain.Capabilities.CapabilityId capability) -> bool
 DigitalBrain.Runtime.Orleans.Capabilities.CapabilityRegistry.Known(DigitalBrain.Capabilities.CapabilityId capability) -> bool
 DigitalBrain.Runtime.Orleans.Capabilities.CapabilityRegistry.Register(DigitalBrain.Capabilities.CapabilityId capability, System.Type? contract, DigitalBrain.Runtime.Orleans.Capabilities.CapabilityConnectionMode mode) -> void
-DigitalBrain.Runtime.Orleans.Capabilities.KitCoverage
-DigitalBrain.Runtime.Orleans.Capabilities.KitGap
-DigitalBrain.Runtime.Orleans.Capabilities.KitGap.<Clone>$() -> DigitalBrain.Runtime.Orleans.Capabilities.KitGap!
-DigitalBrain.Runtime.Orleans.Capabilities.KitGap.Capability.get -> DigitalBrain.Capabilities.CapabilityId
-DigitalBrain.Runtime.Orleans.Capabilities.KitGap.Capability.init -> void
-DigitalBrain.Runtime.Orleans.Capabilities.KitGap.Deconstruct(out string! ModuleId, out System.Type! Module, out DigitalBrain.Capabilities.CapabilityId Capability) -> void
-DigitalBrain.Runtime.Orleans.Capabilities.KitGap.Equals(DigitalBrain.Runtime.Orleans.Capabilities.KitGap? other) -> bool
-DigitalBrain.Runtime.Orleans.Capabilities.KitGap.KitGap(string! ModuleId, System.Type! Module, DigitalBrain.Capabilities.CapabilityId Capability) -> void
-DigitalBrain.Runtime.Orleans.Capabilities.KitGap.Module.get -> System.Type!
-DigitalBrain.Runtime.Orleans.Capabilities.KitGap.Module.init -> void
-DigitalBrain.Runtime.Orleans.Capabilities.KitGap.ModuleId.get -> string!
-DigitalBrain.Runtime.Orleans.Capabilities.KitGap.ModuleId.init -> void
 DigitalBrain.Runtime.Orleans.Capabilities.ModuleCapabilityValidator
 DigitalBrain.Runtime.Orleans.ClusterStoreBinding
 DigitalBrain.Runtime.Orleans.ClusterStoreBinding.HostBound = 1 -> DigitalBrain.Runtime.Orleans.ClusterStoreBinding
@@ -170,8 +156,6 @@ DigitalBrain.Runtime.Orleans.ITopologyProfile.Defaults.get -> System.Collections
 DigitalBrain.Runtime.Orleans.ITopologyProfile.Services.get -> DigitalBrain.Runtime.Orleans.Services!
 DigitalBrain.Runtime.Orleans.ITopologyProfile.Topology.get -> DigitalBrain.Runtime.Orleans.Topology
 DigitalBrain.Runtime.Orleans.ITopologyProfile.Validate(Microsoft.Extensions.Configuration.IConfiguration! configuration, System.Collections.Generic.IReadOnlyList<DigitalBrain.ModuleManifest!>! modules) -> System.Collections.Generic.IEnumerable<DigitalBrain.Runtime.Orleans.TopologyIssue!>!
-DigitalBrain.Runtime.Orleans.IntoChatOSNames
-DigitalBrain.Runtime.Orleans.IntoChatOSNames.Signalling
 DigitalBrain.Runtime.Orleans.JournalAppendResult
 DigitalBrain.Runtime.Orleans.JournalAppendResult.<Clone>$() -> DigitalBrain.Runtime.Orleans.JournalAppendResult!
 DigitalBrain.Runtime.Orleans.JournalAppendResult.Deconstruct(out long Sequence, out long LastSignal, out long LastPosition) -> void
@@ -335,15 +319,11 @@ DigitalBrain.Runtime.Orleans.RuntimeOptions.OsImage.get -> string?
 DigitalBrain.Runtime.Orleans.RuntimeOptions.OsImage.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.PlatformGrainStorage.get -> string!
 DigitalBrain.Runtime.Orleans.RuntimeOptions.PlatformGrainStorage.init -> void
-DigitalBrain.Runtime.Orleans.RuntimeOptions.PubSubStore.get -> string!
-DigitalBrain.Runtime.Orleans.RuntimeOptions.PubSubStore.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.RetentionSection.get -> string!
 DigitalBrain.Runtime.Orleans.RuntimeOptions.RetentionSection.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.RuntimeOptions() -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.SandboxImage.get -> string?
 DigitalBrain.Runtime.Orleans.RuntimeOptions.SandboxImage.init -> void
-DigitalBrain.Runtime.Orleans.RuntimeOptions.SignalStreams.get -> string!
-DigitalBrain.Runtime.Orleans.RuntimeOptions.SignalStreams.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.SignallingSection.get -> string!
 DigitalBrain.Runtime.Orleans.RuntimeOptions.SignallingSection.init -> void
 DigitalBrain.Runtime.Orleans.RuntimeOptions.TopologyKey.get -> string!
@@ -446,11 +426,6 @@ DigitalBrain.Runtime.Orleans.StateHome.Path.get -> string!
 DigitalBrain.Runtime.Orleans.StateHome.Secrets.get -> string!
 DigitalBrain.Runtime.Orleans.StateHome.SettingsFile.get -> string!
 DigitalBrain.Runtime.Orleans.StateHome.State.get -> string!
-DigitalBrain.Runtime.Orleans.StreamsBinding
-DigitalBrain.Runtime.Orleans.StreamsBinding.AzureQueue = 2 -> DigitalBrain.Runtime.Orleans.StreamsBinding
-DigitalBrain.Runtime.Orleans.StreamsBinding.Memory = 3 -> DigitalBrain.Runtime.Orleans.StreamsBinding
-DigitalBrain.Runtime.Orleans.StreamsBinding.MemoryWithFilePubSub = 1 -> DigitalBrain.Runtime.Orleans.StreamsBinding
-DigitalBrain.Runtime.Orleans.StreamsBinding.None = 0 -> DigitalBrain.Runtime.Orleans.StreamsBinding
 DigitalBrain.Runtime.Orleans.Synapses.IRetentionPolicy
 DigitalBrain.Runtime.Orleans.Synapses.IRetentionPolicy.FloorFor(string! brainKey, DigitalBrain.NeuronId publisher, long last, System.Func<System.TimeSpan, long>! countNewerThan, System.Threading.CancellationToken ct) -> System.Threading.Tasks.ValueTask<long>
 DigitalBrain.Runtime.Orleans.Synapses.RetentionOptions
@@ -458,6 +433,8 @@ DigitalBrain.Runtime.Orleans.Synapses.RetentionOptions.HistoryWindowAge.get -> S
 DigitalBrain.Runtime.Orleans.Synapses.RetentionOptions.HistoryWindowAge.set -> void
 DigitalBrain.Runtime.Orleans.Synapses.RetentionOptions.HistoryWindowSignals.get -> int
 DigitalBrain.Runtime.Orleans.Synapses.RetentionOptions.HistoryWindowSignals.set -> void
+DigitalBrain.Runtime.Orleans.Synapses.RetentionOptions.ReconcileEvery.get -> System.TimeSpan
+DigitalBrain.Runtime.Orleans.Synapses.RetentionOptions.ReconcileEvery.set -> void
 DigitalBrain.Runtime.Orleans.Synapses.RetentionOptions.RetentionOptions() -> void
 DigitalBrain.Runtime.Orleans.Synapses.RetentionOptions.StaleCursorAfter.get -> System.TimeSpan
 DigitalBrain.Runtime.Orleans.Synapses.RetentionOptions.StaleCursorAfter.set -> void
@@ -534,21 +511,6 @@ DigitalBrain.Runtime.Orleans.UnregisteredClusterStorage.ReadStateAsync<T>(string
 DigitalBrain.Runtime.Orleans.UnregisteredClusterStorage.UnregisteredClusterStorage() -> void
 DigitalBrain.Runtime.Orleans.UnregisteredClusterStorage.WriteStateAsync<T>(string! stateName, Orleans.Runtime.GrainId grainId, Orleans.IGrainState<T>! grainState) -> System.Threading.Tasks.Task!
 const DigitalBrain.Runtime.Orleans.ClusterStoreHosting.HookName = "UseClusterStore (or an IClusterStoreRegistration service instance)" -> string!
-const DigitalBrain.Runtime.Orleans.IntoChatOSNames.BindKey = "IntoChatOS:Bind" -> string!
-const DigitalBrain.Runtime.Orleans.IntoChatOSNames.CloudKeyVaultKey = "IntoChatOS:Cloud:KeyVault" -> string!
-const DigitalBrain.Runtime.Orleans.IntoChatOSNames.CloudSectionPrefix = "IntoChatOS:Cloud:" -> string!
-const DigitalBrain.Runtime.Orleans.IntoChatOSNames.CloudServerAddressKey = "IntoChatOS:Cloud:ServerAddress" -> string!
-const DigitalBrain.Runtime.Orleans.IntoChatOSNames.CloudStorageKey = "IntoChatOS:Cloud:Storage" -> string!
-const DigitalBrain.Runtime.Orleans.IntoChatOSNames.ClusterGrainStorage = "cluster" -> string!
-const DigitalBrain.Runtime.Orleans.IntoChatOSNames.GrainStateContainer = "os-state" -> string!
-const DigitalBrain.Runtime.Orleans.IntoChatOSNames.HomeKey = "IntoChatOS:Home" -> string!
-const DigitalBrain.Runtime.Orleans.IntoChatOSNames.MasterKeyKey = "IntoChatOS:MasterKey" -> string!
-const DigitalBrain.Runtime.Orleans.IntoChatOSNames.PlatformGrainStorage = "platform" -> string!
-const DigitalBrain.Runtime.Orleans.IntoChatOSNames.PubSubStore = "PubSubStore" -> string!
-const DigitalBrain.Runtime.Orleans.IntoChatOSNames.SignalStreams = "signals" -> string!
-const DigitalBrain.Runtime.Orleans.IntoChatOSNames.Signalling.Retention = "IntoChatOS:Signalling:Retention" -> string!
-const DigitalBrain.Runtime.Orleans.IntoChatOSNames.Signalling.Section = "IntoChatOS:Signalling" -> string!
-const DigitalBrain.Runtime.Orleans.IntoChatOSNames.TopologyKey = "IntoChatOS:Topology" -> string!
 const DigitalBrain.Runtime.Orleans.LocalProfile.HttpPort = 5310 -> int
 const DigitalBrain.Runtime.Orleans.LocalProfile.Image = "ghcr.io/intochat/os" -> string!
 const DigitalBrain.Runtime.Orleans.LocalProfile.SandboxImage = "ghcr.io/intochat/os-sandbox" -> string!
@@ -568,9 +530,6 @@ override DigitalBrain.Runtime.Orleans.Bindings.ToString() -> string!
 override DigitalBrain.Runtime.Orleans.BrainOwnershipCounts.Equals(object? obj) -> bool
 override DigitalBrain.Runtime.Orleans.BrainOwnershipCounts.GetHashCode() -> int
 override DigitalBrain.Runtime.Orleans.BrainOwnershipCounts.ToString() -> string!
-override DigitalBrain.Runtime.Orleans.Capabilities.KitGap.Equals(object? obj) -> bool
-override DigitalBrain.Runtime.Orleans.Capabilities.KitGap.GetHashCode() -> int
-override DigitalBrain.Runtime.Orleans.Capabilities.KitGap.ToString() -> string!
 override DigitalBrain.Runtime.Orleans.JournalAppendResult.Equals(object? obj) -> bool
 override DigitalBrain.Runtime.Orleans.JournalAppendResult.GetHashCode() -> int
 override DigitalBrain.Runtime.Orleans.JournalAppendResult.ToString() -> string!
@@ -628,10 +587,6 @@ static DigitalBrain.Runtime.Orleans.BrainStorageHosting.AddBrainStorage(this Orl
 static DigitalBrain.Runtime.Orleans.BrainStorageHosting.AddJournalPayloads(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, params System.Reflection.Assembly![]! assemblies) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static DigitalBrain.Runtime.Orleans.Capabilities.CapabilityBroker.SingleRegistrationIssues(DigitalBrain.Runtime.Orleans.Capabilities.CapabilityRegistry! registry, Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> System.Collections.Generic.IReadOnlyList<string!>!
 static DigitalBrain.Runtime.Orleans.Capabilities.CapabilityHosting.ConfigureCapabilities(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder, System.Action<DigitalBrain.Runtime.Orleans.Capabilities.CapabilityRegistry!>! configure) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
-static DigitalBrain.Runtime.Orleans.Capabilities.KitCoverage.HasKitSubclass(System.Collections.Generic.IEnumerable<System.Type!>! types, System.Type! kitBase) -> bool
-static DigitalBrain.Runtime.Orleans.Capabilities.KitCoverage.Missing(System.Collections.Generic.IEnumerable<System.Type!>! moduleTypes, System.Collections.Generic.IReadOnlyDictionary<System.Type!, System.Reflection.Assembly!>! testAssemblyByModule, System.Collections.Generic.IReadOnlyDictionary<DigitalBrain.Capabilities.CapabilityId, System.Type!>! kitBaseByCapability) -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Runtime.Orleans.Capabilities.KitGap!>!
-static DigitalBrain.Runtime.Orleans.Capabilities.KitGap.operator !=(DigitalBrain.Runtime.Orleans.Capabilities.KitGap? left, DigitalBrain.Runtime.Orleans.Capabilities.KitGap? right) -> bool
-static DigitalBrain.Runtime.Orleans.Capabilities.KitGap.operator ==(DigitalBrain.Runtime.Orleans.Capabilities.KitGap? left, DigitalBrain.Runtime.Orleans.Capabilities.KitGap? right) -> bool
 static DigitalBrain.Runtime.Orleans.Capabilities.ModuleCapabilityValidator.Validate(DigitalBrain.Runtime.Orleans.Capabilities.CapabilityRegistry! registry, System.Collections.Generic.IEnumerable<System.Type!>! moduleTypes) -> void
 static DigitalBrain.Runtime.Orleans.ClusterStoreHosting.HasClusterStore(Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> bool
 static DigitalBrain.Runtime.Orleans.ClusterStoreHosting.UseClusterStore(this Microsoft.Extensions.Hosting.IHostApplicationBuilder! builder, DigitalBrain.Runtime.Orleans.IClusterStoreRegistration! registration) -> Microsoft.Extensions.Hosting.IHostApplicationBuilder!
@@ -675,7 +630,6 @@ static DigitalBrain.Runtime.Orleans.Signalling.SessionSignal.operator ==(Digital
 static DigitalBrain.Runtime.Orleans.Signalling.SessionSynapses.For(DigitalBrain.BrainId brain, string! session) -> DigitalBrain.NeuronId
 static DigitalBrain.Runtime.Orleans.StateHome.Default() -> DigitalBrain.Runtime.Orleans.StateHome!
 static DigitalBrain.Runtime.Orleans.StateHome.Default(DigitalBrain.Runtime.Orleans.RuntimeOptions! options) -> DigitalBrain.Runtime.Orleans.StateHome!
-static DigitalBrain.Runtime.Orleans.StateHome.Resolve(Microsoft.Extensions.Configuration.IConfiguration? configuration) -> DigitalBrain.Runtime.Orleans.StateHome!
 static DigitalBrain.Runtime.Orleans.StateHome.Resolve(Microsoft.Extensions.Configuration.IConfiguration? configuration, DigitalBrain.Runtime.Orleans.RuntimeOptions? options = null) -> DigitalBrain.Runtime.Orleans.StateHome!
 static DigitalBrain.Runtime.Orleans.StateHome.operator !=(DigitalBrain.Runtime.Orleans.StateHome? left, DigitalBrain.Runtime.Orleans.StateHome? right) -> bool
 static DigitalBrain.Runtime.Orleans.StateHome.operator ==(DigitalBrain.Runtime.Orleans.StateHome? left, DigitalBrain.Runtime.Orleans.StateHome? right) -> bool
@@ -700,7 +654,6 @@ static DigitalBrain.Runtime.Orleans.TopologyValidator.TryParse(string? value, ou
 static DigitalBrain.Runtime.Orleans.TopologyValidator.Validate(Microsoft.Extensions.Configuration.IConfiguration! configuration, System.Collections.Generic.IReadOnlyList<DigitalBrain.Runtime.Orleans.RetiredSetting!>! retired, DigitalBrain.Runtime.Orleans.RuntimeOptions? options = null) -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Runtime.Orleans.TopologyIssue!>!
 static DigitalBrain.Runtime.Orleans.TopologyValidator.ValidateNeeds(DigitalBrain.Runtime.Orleans.Topology topology, DigitalBrain.Runtime.Orleans.Bindings! bindings, System.Collections.Generic.IReadOnlyList<DigitalBrain.ModuleManifest!>! modules) -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Runtime.Orleans.TopologyIssue!>!
 static DigitalBrain.Runtime.Orleans.TopologyValidator.ValidateNeeds(DigitalBrain.Runtime.Orleans.Topology topology, DigitalBrain.Runtime.Orleans.Bindings! bindings, System.Collections.Generic.IReadOnlyList<DigitalBrain.ModuleManifest!>! modules, bool clusterStoreRegistered, DigitalBrain.Runtime.Orleans.RuntimeOptions? options = null) -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Runtime.Orleans.TopologyIssue!>!
-static DigitalBrain.Runtime.Orleans.TopologyValidator.ValidatePubSubStore(DigitalBrain.Runtime.Orleans.Topology topology, System.IServiceProvider! services) -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Runtime.Orleans.TopologyIssue!>!
 DigitalBrain.Runtime.Orleans.Operations.AllowAllOperations
 DigitalBrain.Runtime.Orleans.Operations.AllowAllOperations.AllowAllOperations() -> void
 DigitalBrain.Runtime.Orleans.Operations.AllowAllOperations.Check(DigitalBrain.Runtime.Orleans.Operations.OperationRequest! request, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Runtime.Orleans.Operations.OperationGateDecision!>!
@@ -840,9 +793,6 @@ static DigitalBrain.Runtime.Orleans.InstanceDirectoryKey.Of(string! brain, strin
 static DigitalBrain.Runtime.Orleans.SynapseObservation.Deliveries(System.IServiceProvider? services, string! brain, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<DigitalBrain.SignalDelivery!>!
 static DigitalBrain.Runtime.Orleans.SynapseObservation.List(System.IServiceProvider? services, string! brain, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.ObservedSynapse![]!>!
 DigitalBrain.Runtime.Orleans.Hosting.INeuronHost.InspectState(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Text.Json.JsonElement?>!
-DigitalBrain.Runtime.Orleans.Signalling.ISignalSubscriber
-DigitalBrain.Runtime.Orleans.Signalling.ISignalSubscriber.Notify(long position) -> System.Threading.Tasks.Task!
-DigitalBrain.Runtime.Orleans.Capabilities.CallerContextStamper
 DigitalBrain.Runtime.Orleans.Capabilities.UntrustedCallerException
 DigitalBrain.Runtime.Orleans.Capabilities.UntrustedCallerException.UntrustedCallerException() -> void
 DigitalBrain.Runtime.Orleans.Capabilities.UntrustedCallerException.UntrustedCallerException(string! message) -> void
@@ -851,17 +801,9 @@ DigitalBrain.Runtime.Orleans.Compute.TraceOutgoingFilter
 DigitalBrain.Runtime.Orleans.Compute.TraceOutgoingFilter.Invoke(Orleans.IOutgoingGrainCallContext! context) -> System.Threading.Tasks.Task!
 DigitalBrain.Runtime.Orleans.Compute.TraceOutgoingFilter.TraceOutgoingFilter() -> void
 DigitalBrain.Runtime.Orleans.Compute.TraceRequestContext
-const DigitalBrain.Runtime.Orleans.Capabilities.CallerContextStamper.ModuleCallKey = "intochatos.trusted-module-call" -> string!
-const DigitalBrain.Runtime.Orleans.Capabilities.CallerContextStamper.RequestContextKey = "db.cap.principal" -> string!
 const DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.ModuleCallKey = "intochatos.trusted-module-call" -> string!
 const DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.RequestContextKey = "db.cap.principal" -> string!
 const DigitalBrain.Runtime.Orleans.Compute.TraceRequestContext.RequestContextKey = "intochatos.trace" -> string!
-static DigitalBrain.Runtime.Orleans.Capabilities.CallerContextStamper.IsModelOriginated(DigitalBrain.Capabilities.CapabilityCaller! caller) -> bool
-static DigitalBrain.Runtime.Orleans.Capabilities.CallerContextStamper.IsTrusted(DigitalBrain.Capabilities.CapabilityCaller! context) -> bool
-static DigitalBrain.Runtime.Orleans.Capabilities.CallerContextStamper.Require() -> DigitalBrain.Capabilities.CapabilityCaller!
-static DigitalBrain.Runtime.Orleans.Capabilities.CallerContextStamper.Stamp(DigitalBrain.Capabilities.CapabilityCaller! context) -> DigitalBrain.Capabilities.CapabilityCaller!
-static DigitalBrain.Runtime.Orleans.Capabilities.CallerContextStamper.StampScope(DigitalBrain.Capabilities.CapabilityCaller! context) -> System.IDisposable!
-static DigitalBrain.Runtime.Orleans.Capabilities.CallerContextStamper.TryGet(out DigitalBrain.Capabilities.CapabilityCaller? context) -> bool
 static DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.IsModelOriginated(DigitalBrain.Capabilities.CapabilityCaller! caller) -> bool
 static DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.IsTrusted(DigitalBrain.Capabilities.CapabilityCaller! context) -> bool
 static DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.Require() -> DigitalBrain.Capabilities.CapabilityCaller!
@@ -869,31 +811,6 @@ static DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.StampScope
 static DigitalBrain.Runtime.Orleans.Capabilities.RuntimeCallerContext.TryGet(out DigitalBrain.Capabilities.CapabilityCaller? context) -> bool
 static DigitalBrain.Runtime.Orleans.Compute.TraceRequestContext.OriginOf(string! brainId, string! osKey) -> DigitalBrain.NeuronId
 static DigitalBrain.Runtime.Orleans.RuntimeOptions.Resolve(Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> DigitalBrain.Runtime.Orleans.RuntimeOptions!
-DigitalBrain.Runtime.Orleans.RuntimeOptions.GateTimeout.get -> System.TimeSpan
-DigitalBrain.Runtime.Orleans.RuntimeOptions.GateTimeout.init -> void
-DigitalBrain.Runtime.Orleans.Hosting.INeuronHost.Committed(string! signalAlias, System.Text.Json.JsonElement signal, System.Text.Json.JsonElement next, System.Guid ticket, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-DigitalBrain.Runtime.Orleans.Hosting.INeuronHost.Aborted(string! signalAlias, System.Text.Json.JsonElement signal, System.Guid ticket, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-DigitalBrain.Runtime.Orleans.Hosting.INeuronHost.Gate(string! signalAlias, System.Text.Json.JsonElement signal, System.Guid attempt, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Runtime.Orleans.Synapses.GateVerdict!>!
-DigitalBrain.Runtime.Orleans.Synapses.GateVerdict
-DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.<Clone>$() -> DigitalBrain.Runtime.Orleans.Synapses.GateVerdict!
-DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Allowed.get -> bool
-DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Allowed.init -> void
-DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Deconstruct(out bool Allowed, out string![]! Rules, out string![]! Messages, out System.Text.Json.JsonElement? Next) -> void
-DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Equals(DigitalBrain.Runtime.Orleans.Synapses.GateVerdict? other) -> bool
-DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.GateVerdict(bool Allowed, string![]! Rules, string![]! Messages, System.Text.Json.JsonElement? Next) -> void
-DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Messages.get -> string![]!
-DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Messages.init -> void
-DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Next.get -> System.Text.Json.JsonElement?
-DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Next.init -> void
-DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Rules.get -> string![]!
-DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Rules.init -> void
-DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Ticket.get -> System.Guid
-DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Ticket.init -> void
-override DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.Equals(object? obj) -> bool
-override DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.GetHashCode() -> int
-override DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.ToString() -> string!
-static DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.operator !=(DigitalBrain.Runtime.Orleans.Synapses.GateVerdict? left, DigitalBrain.Runtime.Orleans.Synapses.GateVerdict? right) -> bool
-static DigitalBrain.Runtime.Orleans.Synapses.GateVerdict.operator ==(DigitalBrain.Runtime.Orleans.Synapses.GateVerdict? left, DigitalBrain.Runtime.Orleans.Synapses.GateVerdict? right) -> bool
 DigitalBrain.Runtime.Orleans.Hosting.INeuronHost.Reload() -> System.Threading.Tasks.Task!
 const DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationOptions.Section = "DigitalBrain:Confirmations" -> string!
 const DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationPolicyPreference.Section = "DigitalBrain:Confirmations" -> string!
@@ -961,19 +878,7 @@ DigitalBrain.Runtime.Orleans.Confirmations.IConfirmationEntity.Result(string! pl
 DigitalBrain.Runtime.Orleans.Confirmations.KernelConfirmations
 DigitalBrain.Runtime.Orleans.Confirmations.KernelConfirmations.For(DigitalBrain.BrainId brain, string! requester) -> DigitalBrain.Confirmation.IConfirmations!
 DigitalBrain.Runtime.Orleans.Confirmations.KernelConfirmations.KernelConfirmations(System.IServiceProvider! services, Microsoft.Extensions.Options.IOptions<DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationOptions!>! options) -> void
-DigitalBrain.Runtime.Orleans.Enforcement.CallFilter
-DigitalBrain.Runtime.Orleans.Enforcement.CallFilter.AuthorizeAsync(DigitalBrain.Capabilities.Identity.CallRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<DigitalBrain.Capabilities.Identity.CallDecision!>
-DigitalBrain.Runtime.Orleans.Enforcement.CallFilter.CallFilter(System.Collections.Generic.IEnumerable<DigitalBrain.Runtime.Orleans.Enforcement.ICallFilterStage!>! stages, DigitalBrain.Runtime.Orleans.Enforcement.ICallBindings? bindings = null) -> void
-DigitalBrain.Runtime.Orleans.Enforcement.ICallBindings
-DigitalBrain.Runtime.Orleans.Enforcement.ICallBindings.IsBound(DigitalBrain.Capabilities.Identity.CallRequest! request, string! callerScope, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<bool>
-DigitalBrain.Runtime.Orleans.Enforcement.ICallFilter
-DigitalBrain.Runtime.Orleans.Enforcement.ICallFilter.AuthorizeAsync(DigitalBrain.Capabilities.Identity.CallRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<DigitalBrain.Capabilities.Identity.CallDecision!>
-DigitalBrain.Runtime.Orleans.Enforcement.ICallFilterStage
-DigitalBrain.Runtime.Orleans.Enforcement.ICallFilterStage.EvaluateAsync(DigitalBrain.Capabilities.Identity.CallRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<DigitalBrain.Capabilities.Identity.CallDecision?>
-DigitalBrain.Runtime.Orleans.Enforcement.ICallFilterStage.Order.get -> int
-DigitalBrain.Runtime.Orleans.Enforcement.PlainNeuronCallFilter
-DigitalBrain.Runtime.Orleans.Enforcement.PlainNeuronCallFilter.Invoke(Orleans.IIncomingGrainCallContext! context) -> System.Threading.Tasks.Task!
-DigitalBrain.Runtime.Orleans.Enforcement.PlainNeuronCallFilter.PlainNeuronCallFilter(DigitalBrain.Runtime.Orleans.Enforcement.ICallFilter! filter, Microsoft.Extensions.Logging.ILogger<DigitalBrain.Runtime.Orleans.Enforcement.PlainNeuronCallFilter!>! logger) -> void
+
 override DigitalBrain.Runtime.Orleans.Brain.BrainStorage.Equals(object? obj) -> bool
 override DigitalBrain.Runtime.Orleans.Brain.BrainStorage.GetHashCode() -> int
 override DigitalBrain.Runtime.Orleans.Brain.BrainStorage.ToString() -> string!
@@ -990,7 +895,7 @@ static DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationEntry.operator ==(
 static DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationPolicyPreference.For(DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationOptions! options, string! brain) -> DigitalBrain.Confirmation.ConfirmationPolicy
 static DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState.operator !=(DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState? left, DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState? right) -> bool
 static DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState.operator ==(DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState? left, DigitalBrain.Runtime.Orleans.Confirmations.ConfirmationState? right) -> bool
-static DigitalBrain.Runtime.Orleans.Enforcement.PlainNeuronCallFilter.Authorize(DigitalBrain.Runtime.Orleans.Enforcement.ICallFilter! filter, Microsoft.Extensions.Logging.ILogger! logger, DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.NeuronId id, DigitalBrain.Invocation.RuntimeInvocation! call) -> System.Threading.Tasks.Task!
+
 
 DigitalBrain.Runtime.Orleans.Hosting.DigitalBrainCallFilter
 DigitalBrain.Runtime.Orleans.Hosting.DigitalBrainCallFilter.DigitalBrainCallFilter() -> void
@@ -998,9 +903,3 @@ DigitalBrain.Runtime.Orleans.Hosting.DigitalBrainCallFilter.Invoke(Orleans.IInco
 DigitalBrain.Runtime.Orleans.Hosting.DigitalBrainCallFilter.Invoke(Orleans.IOutgoingGrainCallContext! context) -> System.Threading.Tasks.Task!
 static DigitalBrain.Runtime.Orleans.RuntimeSiloBuilderExtensions.AddDigitalBrainCallFilter(this Orleans.Hosting.ISiloBuilder! silo) -> Orleans.Hosting.ISiloBuilder!
 
-DigitalBrain.Identity.CompoundGrainKeyOrleansExtensions
-static DigitalBrain.Identity.CompoundGrainKeyOrleansExtensions.Parse(Orleans.Runtime.IdSpan span) -> DigitalBrain.Identity.CompoundGrainKey
-static DigitalBrain.Identity.CompoundGrainKeyOrleansExtensions.ToCompoundGrainKey(this Orleans.Runtime.IdSpan span) -> DigitalBrain.Identity.CompoundGrainKey
-static DigitalBrain.Identity.CompoundGrainKeyOrleansExtensions.ToIdSpan(this DigitalBrain.Identity.CompoundGrainKey key) -> Orleans.Runtime.IdSpan
-static DigitalBrain.Identity.CompoundGrainKeyOrleansExtensions.ToIdSpan(this DigitalBrain.NeuronId neuronId) -> Orleans.Runtime.IdSpan
-static DigitalBrain.Identity.CompoundGrainKeyOrleansExtensions.TryParse(Orleans.Runtime.IdSpan span, out DigitalBrain.Identity.CompoundGrainKey key) -> bool

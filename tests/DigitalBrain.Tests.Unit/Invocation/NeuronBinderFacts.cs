@@ -170,17 +170,4 @@ public sealed class NeuronBinderFacts
         Assert.Equal(misses, binder.Misses);
         Assert.Same(first, second);
     }
-
-    [Fact]
-    public void Encoder_matches_the_os_proxy_encoding()
-    {
-        // Golden strings: os IntoChat.OS.Client NeuronProxy serializes each non-token argument with its parameter type
-        // under RuntimeProtocol.Json (Web defaults, MaxDepth 128).
-        static string Encoded(string method, params object?[] args)
-            => string.Join("|", InvocationEncoder.Encode(typeof(IProbe).GetMethods().First(m => m.Name == method), args).Select(e => e.GetRawText()));
-
-        Assert.Equal("2", Encoded("Twice", 2, CancellationToken.None));
-        Assert.Equal("\"t\"", Encoded("Tokened", CancellationToken.None, "t", CancellationToken.None));
-        Assert.Equal("{\"name\":\"x\",\"count\":3}", Encoded("Put", new Item("x", 3)));
-    }
 }

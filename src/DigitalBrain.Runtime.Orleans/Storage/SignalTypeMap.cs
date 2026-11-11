@@ -34,7 +34,6 @@ internal sealed class SignalTypeMap
         // The installs neuron completes an install on the resolution of its plan.
         Add(typeof(DigitalBrain.Confirmation.ConfirmationRequested));
         Add(typeof(DigitalBrain.Confirmation.ConfirmationResolved));
-        Add(typeof(GateChanged));
         Add(typeof(PolicyProposed));
         Add(typeof(PolicyAdopted));
         Add(typeof(PolicyRefused));

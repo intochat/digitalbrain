@@ -5,27 +5,6 @@ namespace DigitalBrain.Tests.Unit;
 // The Orleans-free legacy types copied from os IntoChat.OS (03-03); 03-10 deletes the os copies.
 public sealed class LegacyPureTypeFacts
 {
-    [Theory]
-    [InlineData("DigitalBrain.Contracts.NeuronContractAttribute")]
-    [InlineData("DigitalBrain.Contracts.NeuronAliasAttribute")]
-    [InlineData("DigitalBrain.Contracts.FieldAttribute")]
-    [InlineData("DigitalBrain.Contracts.DefaultNeuronTypeAttribute")]
-    [InlineData("DigitalBrain.Access.AccessAttribute")]
-    [InlineData("DigitalBrain.Access.PublicAttribute")]
-    [InlineData("DigitalBrain.Access.SharedAttribute")]
-    [InlineData("DigitalBrain.Access.PerAccountAttribute")]
-    [InlineData("DigitalBrain.Access.InternalAttribute")]
-    [InlineData("DigitalBrain.State.ExportableStateAttribute")]
-    [InlineData("DigitalBrain.State.StoredRecord")]
-    [InlineData("DigitalBrain.State.WriteResult")]
-    [InlineData("DigitalBrain.State.IStateCodec")]
-    public void Copied_type_exists(string fullName)
-    {
-        var type = typeof(Signal).Assembly.GetType(fullName);
-        Assert.NotNull(type);
-        Assert.True(type.IsPublic, fullName);
-    }
-
     [Fact]
     public void Alias_helper_is_not_copied()
     {
