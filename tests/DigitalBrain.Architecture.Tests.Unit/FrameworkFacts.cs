@@ -284,7 +284,8 @@ public sealed class ScriptFacts
 
         var allFiles = Directory.EnumerateFiles(Repository.Root, "*", SearchOption.AllDirectories)
             .Where(file => !file.Contains(Path.DirectorySeparatorChar + ".git" + Path.DirectorySeparatorChar)
-                        && !file.EndsWith(Path.DirectorySeparatorChar + ".git", StringComparison.OrdinalIgnoreCase))
+                        && !file.EndsWith(Path.DirectorySeparatorChar + ".git", StringComparison.OrdinalIgnoreCase)
+                        && !file.Contains(Path.DirectorySeparatorChar + ".nuget" + Path.DirectorySeparatorChar))
             .ToList();
 
         var offenders = new List<string>();
