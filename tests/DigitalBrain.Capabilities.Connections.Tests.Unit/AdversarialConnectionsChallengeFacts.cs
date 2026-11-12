@@ -26,7 +26,7 @@ public sealed class AdversarialConnectionsChallengeFacts
     {
         var services = new TestServices(
             new FakeSecretSealer(),
-            [new ConnectorDefinition("stress", "Stress Connector", ["api-key", "oauth"], ["api-key", "oauth"])]);
+            [new ConnectorDefinition("stress", "Stress Connector", ["token", "oauth"], ["token", "oauth"])]);
         await using var os = TestOS.Local(options => options.Services = services);
         os.Register<ConnectionCatalogNeuron>();
         os.Register<FaultInjectableConnectionNeuron>();
@@ -39,7 +39,7 @@ public sealed class AdversarialConnectionsChallengeFacts
 
         // Scenario 1: Initial Connect fails on save -> remains Disconnected with 0 secrets
         FaultInjectableConnectionNeuron.FailRecord = true;
-        var ex1 = await Assert.ThrowsAsync<InvalidOperationException>(() => connection.Connect("api-key", "CANARY_PLAIN_SECRET_1"));
+        var ex1 = await Assert.ThrowsAsync<InvalidOperationException>(() => connection.Connect("token", "test-value"));
         Assert.Equal("Simulated record failure", ex1.Message);
 
         var read1 = await connection.Read();
@@ -53,7 +53,7 @@ public sealed class AdversarialConnectionsChallengeFacts
 
         // Scenario 2: Successful Connect succeeds
         FaultInjectableConnectionNeuron.FailRecord = false;
-        var connected = await connection.Connect("api-key", "CANARY_PLAIN_SECRET_1");
+        var connected = await connection.Connect("token", "test-value");
         Assert.Equal(ConnectionStatus.Connected, connected.Status);
         Assert.Equal(1, await neuronDirect.GetSecretsCount());
         Assert.Equal(ConnectionStatus.Connected, await neuronDirect.GetCurrentStatus());

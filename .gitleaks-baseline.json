@@ -12,5 +12,19 @@
     "StartLine": 79,
     "Commit": "76357d8698cc0bbf01ca3f0208246d8e5b86950d",
     "Fingerprint": "76357d8698cc0bbf01ca3f0208246d8e5b86950d:src/DigitalBrain.Analyzers.CodeFixes/Fixes.cs:generic-api-key:79"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "File": "tests/DigitalBrain.Capabilities.Connections.Tests.Unit/AdversarialConnectionsChallengeFacts.cs",
+    "StartLine": 42,
+    "Commit": "aa3d0ed7d8ea2dff7ab3dd70abb98988eed0f770",
+    "Fingerprint": "aa3d0ed7d8ea2dff7ab3dd70abb98988eed0f770:tests/DigitalBrain.Capabilities.Connections.Tests.Unit/AdversarialConnectionsChallengeFacts.cs:generic-api-key:42"
+  },
+  {
+    "RuleID": "generic-api-key",
+    "File": "tests/DigitalBrain.Capabilities.Connections.Tests.Unit/AdversarialConnectionsChallengeFacts.cs",
+    "StartLine": 56,
+    "Commit": "aa3d0ed7d8ea2dff7ab3dd70abb98988eed0f770",
+    "Fingerprint": "aa3d0ed7d8ea2dff7ab3dd70abb98988eed0f770:tests/DigitalBrain.Capabilities.Connections.Tests.Unit/AdversarialConnectionsChallengeFacts.cs:generic-api-key:56"
   }
 ]
