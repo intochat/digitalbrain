@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
-    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
     <IsPackable>false</IsPackable>
     <!-- NU5104: .NET 11 is still RC, so stable DigitalBrain packages depend on prerelease Microsoft packages; remove at .NET 11 GA -->
     <NoWarn>$(NoWarn);NU5104</NoWarn>

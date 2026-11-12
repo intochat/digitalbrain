@@ -2,9 +2,13 @@
 useDefault = true
 
 [allowlist]
-description = "Roslyn CodeFix equivalence keys in Fixes.cs and Azurite well-known development storage key"
-commits = ["76357d8698cc0bbf01ca3f0208246d8e5b86950d"]
-paths = ['''src/DigitalBrain\.Analyzers\.CodeFixes/Fixes\.cs''']
+description = "Roslyn CodeFix equivalence keys in Fixes.cs, test canary placeholders, and Azurite well-known development storage key"
+commits = ["76357d8698cc0bbf01ca3f0208246d8e5b86950d", "aa3d0ed7d8ea2dff7ab3dd70abb98988eed0f770", "c6485f8967c211f1d82fd8a80217f83f22b4534e"]
+paths = [
+  '''src/DigitalBrain\.Analyzers\.CodeFixes/Fixes\.cs''',
+  '''tests/DigitalBrain\.Capabilities\.Connections\.Tests\.Unit/AdversarialConnectionsChallengeFacts\.cs''',
+]
 regexes = [
   '''(?i)Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==''',
+  '''CANARY_PLAIN_SECRET_1''',
 ]

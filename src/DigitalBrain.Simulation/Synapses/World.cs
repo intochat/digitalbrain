@@ -85,11 +85,10 @@ public sealed class World
 
     internal WorldAnswer Step(string slot, string operation, JsonElement arguments)
     {
-        Func<JsonElement, WorldAnswer>? script;
         lock (_gate)
         {
             _calls.Add(new WorldCall(slot, operation, arguments));
-            if (_scripts.TryGetValue((slot, operation), out script))
+            if (_scripts.TryGetValue((slot, operation), out var script))
             {
                 return script(arguments);
             }
