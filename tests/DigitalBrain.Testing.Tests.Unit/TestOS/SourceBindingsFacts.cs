@@ -76,7 +76,8 @@ public sealed class SourceBindingsFacts
         await RestartAndTouch(os, "sb2");
 
         Assert.Equal("db 2", await Read(os, "sb2"));
-        Assert.Equal("conn-2", (await os.Store.Get(brain, HsSource.Key, Ct))!.Bindings!["hs.week"]["Db"]);
+        var installs2 = os.Get<IInstalls>(NeuronId.Parse("sb2/synapse.installs/default"));
+        Assert.Equal("conn-2", (await installs2.Describe("hs.week", Ct))!.Bindings["Db"]);
     }
 
     [Fact]
@@ -95,9 +96,6 @@ public sealed class SourceBindingsFacts
         await using var os = Start();
         var brain = Brain("sb4");
         _ = await Deploy(os, brain, HsSource.Of(HsSource.Budget), None);
-        var record = (await os.Store.Get(brain, HsSource.Key, Ct))!;
-        await os.Store.Put(brain, record with { Bindings = null }, Ct);
-        Assert.Null((await os.Store.Get(brain, HsSource.Key, Ct))!.Bindings);
 
         await RestartAndTouch(os, "sb4");
 
@@ -124,7 +122,8 @@ public sealed class SourceBindingsFacts
         Assert.Equal(first.Hash, again.Hash);
         Assert.Equal(InstallStatus.Updated, again.Installs["hs.week"].Status);
         Assert.Equal("db 2", await Read(os, "sb5"));
-        Assert.Equal("conn-2", (await os.Store.Get(brain, HsSource.Key, Ct))!.Bindings!["hs.week"]["Db"]);
+        var installs5 = os.Get<IInstalls>(NeuronId.Parse("sb5/synapse.installs/default"));
+        Assert.Equal("conn-2", (await installs5.Describe("hs.week", Ct))!.Bindings["Db"]);
         Assert.Equal(DeployStatus.Unchanged, (await os.Synapses.Deploy(brain, Source(Bind("conn-2")), None, Ct)).Status);
     }
 
@@ -138,7 +137,8 @@ public sealed class SourceBindingsFacts
         var again = await os.Synapses.Deploy(brain, Source(null), None, Ct);
 
         Assert.Equal(DeployStatus.Unchanged, again.Status);
-        Assert.Equal("conn-1", (await os.Store.Get(brain, HsSource.Key, Ct))!.Bindings!["hs.week"]["Db"]);
+        var installs6 = os.Get<IInstalls>(NeuronId.Parse("sb6/synapse.installs/default"));
+        Assert.Equal("conn-1", (await installs6.Describe("hs.week", Ct))!.Bindings["Db"]);
         Assert.Equal("db 1", await Read(os, "sb6"));
     }
 
@@ -168,9 +168,6 @@ public sealed class SourceBindingsFacts
         var installs = os.Get<IInstalls>(NeuronId.Parse("sb7/synapse.installs/default"));
         Assert.Equal("conn-1", (await installs.Describe("hs.week", Ct))!.Bindings["Db"]);
         Assert.Equal("conn-1", (await installs.Describe("hs.week2", Ct))!.Bindings["Db"]);
-        var stored = (await os.Store.Get(brain, HsSource.Key, Ct))!.Bindings!;
-        Assert.Equal("conn-1", stored["hs.week"]["Db"]);
-        Assert.Equal("conn-1", stored["hs.week2"]["Db"]);
         Assert.Equal("db 1", await Read(os, "sb7"));
     }
 
@@ -187,12 +184,13 @@ public sealed class SourceBindingsFacts
 
         Assert.Equal(DeployStatus.Deployed, again.Status);
         Assert.Equal(InstallStatus.Pending, again.Installs["hs.week"].Status);
-        Assert.Equal("conn-1", (await os.Store.Get(brain, HsSource.Key, Ct))!.Bindings!["hs.week"]["Db"]);
+        var installs8 = os.Get<IInstalls>(NeuronId.Parse("sb8/synapse.installs/default"));
+        Assert.Null(await installs8.Describe("hs.week", Ct));
 
         await os.Confirmations.Approve(again.Installs["hs.week"].Reason!);
         await os.Idle();
 
-        Assert.Equal("conn-2", (await os.Store.Get(brain, HsSource.Key, Ct))!.Bindings!["hs.week"]["Db"]);
+        Assert.Equal("conn-2", (await installs8.Describe("hs.week", Ct))!.Bindings["Db"]);
     }
 
     [Fact]
@@ -211,16 +209,15 @@ public sealed class SourceBindingsFacts
 
         Assert.Equal(InstallStatus.Updated, again.Installs["hs.week"].Status);
         Assert.Equal(InstallStatus.Pending, again.Installs["hs.week2"].Status);
-        var stored = (await os.Store.Get(brain, HsSource.Key, Ct))!.Bindings!;
-        Assert.Equal("conn-2", stored["hs.week"]["Db"]);
-        Assert.Equal("conn-1", stored["hs.week2"]["Db"]);
+        var installs9 = os.Get<IInstalls>(NeuronId.Parse("sb9/synapse.installs/default"));
+        Assert.Equal("conn-2", (await installs9.Describe("hs.week", Ct))!.Bindings["Db"]);
+        Assert.Null(await installs9.Describe("hs.week2", Ct));
 
         await os.Confirmations.Approve(again.Installs["hs.week2"].Reason!);
         await os.Idle();
 
-        stored = (await os.Store.Get(brain, HsSource.Key, Ct))!.Bindings!;
-        Assert.Equal("conn-2", stored["hs.week"]["Db"]);
-        Assert.Equal("conn-2", stored["hs.week2"]["Db"]);
+        Assert.Equal("conn-2", (await installs9.Describe("hs.week", Ct))!.Bindings["Db"]);
+        Assert.Equal("conn-2", (await installs9.Describe("hs.week2", Ct))!.Bindings["Db"]);
     }
 
     private static Dictionary<string, IReadOnlyDictionary<string, string>> Both(string week, string week2) => new()

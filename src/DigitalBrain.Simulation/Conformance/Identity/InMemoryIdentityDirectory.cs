@@ -1,130 +1,339 @@
-using DigitalBrain.Capabilities;
-using DigitalBrain.Capabilities.Identity;
-
 namespace DigitalBrain.Testing.Conformance.Identity;
 
+using System.Collections.Immutable;
+using DigitalBrain.Capabilities;
+using DigitalBrain.Capabilities.Identity;
+using DigitalBrain.Capabilities.Identity.Model;
+
 /// <summary>
-/// An in-memory <see cref="IIdentityDirectoryPort"/> over <see cref="InMemoryIdentity"/>: each caller-taking member runs the
-/// reference implementation as the caller it was handed. Lets the runtime's identity@1 capability run its conformance kit
-/// without a host directory, and serves as the <see cref="IIdentitySessionPort"/> (sessions unchecked: the runtime checks
-/// the privileged grant before it calls the port). Owner-only members answer null/false instead of throwing (the port is neutral).
+/// An in-memory <see cref="IIdentityDirectoryPort"/> and <see cref="IIdentitySessionPort"/> delegating directly
+/// to pure domain models <see cref="BrainDirectory"/>, <see cref="AccountBook"/>, and <see cref="SessionBook"/>.
 /// </summary>
 public sealed class InMemoryIdentityDirectory : IIdentityDirectoryPort, IIdentitySessionPort
 {
-    private readonly AmbientCallerScope _callers = new();
-    private readonly InMemoryIdentity _identity;
+    private static readonly TimeSpan DefaultSessionLifetime = TimeSpan.FromHours(8);
+
+    private readonly Lock _gate = new();
+    private readonly TimeProvider _time;
+    private AccountBook _accounts = new();
+    private readonly Dictionary<string, BrainDirectory> _brains = new(StringComparer.Ordinal);
+    private SessionBook _sessions = new();
+    private readonly List<ISignInHandler> _handlers = [];
 
     /// <summary>Creates the directory.</summary>
     /// <param name="time">The clock for created, joined and granted times.</param>
-    public InMemoryIdentityDirectory(TimeProvider? time = null) => _identity = new InMemoryIdentity(_callers, time);
+    public InMemoryIdentityDirectory(TimeProvider? time = null)
+    {
+        _time = time ?? TimeProvider.System;
+    }
 
     /// <summary>What <see cref="Describe"/> answers; a Secured <c>memory</c> implementation without an account surface by default.</summary>
-    public IdentityProviderDescriptor Descriptor { get; init; } = new() { ProviderId = "memory", Posture = IdentityPosture.Secured };
+    public IdentityProviderDescriptor Descriptor { get; set; } = new() { ProviderId = "memory", Posture = IdentityPosture.Secured };
 
-    /// <summary>Simulates a host sign-in (see <see cref="InMemoryIdentity.SignIn"/>).</summary>
-    public Task<Member> SignIn(string principalId, CancellationToken cancellationToken) => _identity.SignIn(principalId, cancellationToken);
-
-    /// <summary>Adds a sign-in handler.</summary>
-    public void AddSignInHandler(ISignInHandler handler) => _identity.AddSignInHandler(handler);
-
-    /// <inheritdoc />
-    public Task<Account?> ReadAccount(string accountId, CancellationToken cancellationToken) => _identity.ReadAccount(accountId, cancellationToken);
-
-    /// <inheritdoc />
-    public Task<Account?> OwnerOfBrain(string brainId, CancellationToken cancellationToken) => _identity.OwnerOfBrain(brainId, cancellationToken);
-
-    /// <inheritdoc />
-    public Task EnsureAccount(Account account, CancellationToken cancellationToken) => _identity.EnsureAccount(account, cancellationToken);
-
-    /// <inheritdoc />
-    public Task<BrainProvision> CreateBrain(string accountId, string principalId, string operationId, string displayName, BrainKind kind, CancellationToken cancellationToken)
-        => _identity.CreateBrain(accountId, principalId, operationId, displayName, kind, cancellationToken);
-
-    /// <inheritdoc />
-    public Task<BrainProvision> EnsureBrain(Member owner, CancellationToken cancellationToken) => _identity.EnsureBrain(owner, cancellationToken);
-
-    /// <inheritdoc />
-    public Task<BrainProvision> ProvisionOwner(Member owner, CancellationToken cancellationToken) => _identity.ProvisionOwner(owner, cancellationToken);
-
-    /// <inheritdoc />
-    public Task<bool> IsRegistered(string principalId, CancellationToken cancellationToken) => _identity.IsRegistered(principalId, cancellationToken);
-
-    /// <inheritdoc />
-    public Task<BrainProvision> RegisterPrincipal(string principalId, string displayName, CancellationToken cancellationToken)
-        => _identity.RegisterPrincipal(principalId, displayName, cancellationToken);
-
-    /// <inheritdoc />
-    public Task<BrainProvision?> CompleteRegistration(string principalId, CancellationToken cancellationToken) => _identity.CompleteRegistration(principalId, cancellationToken);
-
-    /// <inheritdoc />
-    public Task<IReadOnlyList<BrainEntry>> BrainsOf(string principalId, CancellationToken cancellationToken) => _identity.BrainsOf(principalId, cancellationToken);
-
-    /// <inheritdoc />
-    public Task<BrainKind> KindOf(string brainScopeId, CancellationToken cancellationToken) => _identity.KindOf(brainScopeId, cancellationToken);
-
-    /// <inheritdoc />
-    public Task<bool> BrainExists(string brainScopeId, CancellationToken cancellationToken) => _identity.BrainExists(brainScopeId, cancellationToken);
-
-    /// <inheritdoc />
-    public Task<Member?> Membership(string brainScopeId, string principalId, CancellationToken cancellationToken) => _identity.Membership(brainScopeId, principalId, cancellationToken);
-
-    /// <inheritdoc />
-    public async Task<Member?> EnsureMember(CapabilityCaller caller, Member member, CancellationToken cancellationToken)
+    /// <summary>Simulates a host sign-in: registers <paramref name="principalId"/> if needed and invokes handlers.</summary>
+    public async Task<Member> SignIn(string principalId, CancellationToken cancellationToken)
     {
-        using (As(caller)) { return await _identity.EnsureMember(member, cancellationToken).ConfigureAwait(false); }
-    }
-
-    /// <inheritdoc />
-    public async Task RemoveMember(CapabilityCaller caller, string brainScopeId, string accountId, CancellationToken cancellationToken)
-    {
-        using (As(caller)) { await _identity.RemoveMember(brainScopeId, accountId, cancellationToken).ConfigureAwait(false); }
-    }
-
-    /// <inheritdoc />
-    public async Task RemovePrincipalMember(CapabilityCaller caller, string brainScopeId, string principalId, CancellationToken cancellationToken)
-    {
-        using (As(caller)) { await _identity.RemovePrincipalMember(brainScopeId, principalId, cancellationToken).ConfigureAwait(false); }
-    }
-
-    /// <inheritdoc />
-    public async Task<CallDecision?> Authorize(CapabilityCaller caller, CallRequest request, CancellationToken cancellationToken)
-    {
-        using (As(caller)) { return await _identity.Authorize(request, cancellationToken).ConfigureAwait(false); }
-    }
-
-    /// <inheritdoc />
-    public Task<IReadOnlyList<Grant>> ListGrants(string brainScopeId, CancellationToken cancellationToken) => _identity.ListGrants(brainScopeId, cancellationToken);
-
-    /// <inheritdoc />
-    public async Task<Grant?> GrantAsOwner(CapabilityCaller caller, Grant grant, CancellationToken cancellationToken)
-    {
-        using (As(caller))
+        var provision = await RegisterPrincipal(principalId, principalId, cancellationToken).ConfigureAwait(false);
+        ISignInHandler[] handlers;
+        lock (_gate) { handlers = [.. _handlers]; }
+        foreach (var handler in handlers)
         {
             try
             {
-                return await _identity.GrantAsOwner(grant, cancellationToken).ConfigureAwait(false);
+                await handler.SignedIn(provision.Member, cancellationToken).ConfigureAwait(false);
             }
-            catch (UnauthorizedAccessException)
+#pragma warning disable CA1031
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+#pragma warning restore CA1031
             {
-                return null;
             }
+        }
+
+        return provision.Member;
+    }
+
+    /// <summary>Adds a sign-in handler.</summary>
+    public void AddSignInHandler(ISignInHandler handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        lock (_gate) { _handlers.Add(handler); }
+    }
+
+    /// <inheritdoc />
+    public Task<Account?> ReadAccount(string accountId, CancellationToken cancellationToken)
+    {
+        lock (_gate) { return Task.FromResult(_accounts.AccountOf(accountId)); }
+    }
+
+    /// <inheritdoc />
+    public Task<Account?> OwnerOfBrain(string brainId, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            var brain = BrainLocked(brainId);
+            var accountId = brain.AccountId;
+            if (string.IsNullOrEmpty(accountId))
+            {
+                accountId = brain.Owner?.AccountId ?? "";
+            }
+
+            return Task.FromResult(string.IsNullOrEmpty(accountId) ? null : _accounts.AccountOf(accountId));
         }
     }
 
     /// <inheritdoc />
-    public async Task<bool> RevokeAsOwner(CapabilityCaller caller, string appId, string semanticTypeId, GrantMode mode, CancellationToken cancellationToken)
+    public Task EnsureAccount(Account account, CancellationToken cancellationToken)
     {
-        using (As(caller))
+        ArgumentNullException.ThrowIfNull(account);
+        lock (_gate)
         {
-            try
+            var (next, _, _) = _accounts.EnsureAccount(account.AccountId, account.Name, account.OwnerPrincipalId, account.CreatedAt, _time.GetUtcNow());
+            _accounts = next;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task<BrainProvision> CreateBrain(string accountId, string principalId, string operationId, string displayName, BrainKind kind, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(accountId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(principalId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(operationId);
+
+        lock (_gate)
+        {
+            var (next, provision, _) = _accounts.CreateBrain(accountId, principalId, operationId, displayName, kind, _time.GetUtcNow());
+            _accounts = next;
+            if (provision.NewBrain)
             {
-                await _identity.RevokeAsOwner(appId, semanticTypeId, mode, cancellationToken).ConfigureAwait(false);
-                return true;
+                var brain = new BrainDirectory
+                {
+                    BrainId = provision.Member.BrainId,
+                    AccountId = accountId,
+                    Kind = kind,
+                    Members = [provision.Member],
+                };
+                _brains[provision.Member.BrainId] = brain;
             }
-            catch (UnauthorizedAccessException)
+
+            return Task.FromResult(provision);
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<BrainProvision> EnsureBrain(Member owner, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        lock (_gate)
+        {
+            var brain = BrainLocked(owner.BrainId);
+            if (brain.Owner is { } existing)
             {
-                return false;
+                return Task.FromResult(new BrainProvision(existing, false));
             }
+
+            var now = _time.GetUtcNow();
+            var (nextAccounts, _, _) = _accounts.EnsureAccount(owner.AccountId, owner.DisplayName, owner.PrincipalId, owner.JoinedAt, now);
+            _accounts = nextAccounts;
+
+            var stamped = owner with
+            {
+                Role = MemberRole.Owner,
+                JoinedAt = owner.JoinedAt == default ? now : owner.JoinedAt,
+            };
+            var updatedBrain = brain with
+            {
+                AccountId = owner.AccountId,
+                Kind = brain.Kind,
+                Members = brain.Members.Add(stamped),
+            };
+            _brains[owner.BrainId] = updatedBrain;
+            return Task.FromResult(new BrainProvision(stamped, true));
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<BrainProvision> ProvisionOwner(Member owner, CancellationToken cancellationToken)
+        => EnsureBrain(owner, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<bool> IsRegistered(string principalId, CancellationToken cancellationToken)
+    {
+        lock (_gate) { return Task.FromResult(_accounts.IsRegistered(principalId)); }
+    }
+
+    /// <inheritdoc />
+    public Task<BrainProvision> RegisterPrincipal(string principalId, string displayName, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(principalId);
+        lock (_gate)
+        {
+            var (next, provision, _) = _accounts.RegisterPrincipal(principalId, displayName, _time.GetUtcNow());
+            _accounts = next;
+            if (provision.NewBrain)
+            {
+                var brain = new BrainDirectory
+                {
+                    BrainId = provision.Member.BrainId,
+                    AccountId = provision.Member.AccountId,
+                    Kind = BrainKind.Personal,
+                    Members = [provision.Member],
+                };
+                _brains[provision.Member.BrainId] = brain;
+            }
+
+            return Task.FromResult(provision);
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<BrainProvision?> CompleteRegistration(string principalId, CancellationToken cancellationToken)
+    {
+        lock (_gate) { return Task.FromResult(_accounts.CompleteRegistration(principalId)); }
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<BrainEntry>> BrainsOf(string principalId, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            var list = _brains.Values
+                .Where(b => b.Members.Any(m => m.PrincipalId == principalId))
+                .Select(b => new BrainEntry(b.BrainId, b.Kind))
+                .OrderBy(entry => entry.Id, StringComparer.Ordinal)
+                .ToArray();
+            return Task.FromResult<IReadOnlyList<BrainEntry>>(list);
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<BrainKind> KindOf(string brainScopeId, CancellationToken cancellationToken)
+    {
+        lock (_gate) { return Task.FromResult(_brains.TryGetValue(brainScopeId, out var brain) ? brain.Kind : BrainKind.Personal); }
+    }
+
+    /// <inheritdoc />
+    public Task<bool> BrainExists(string brainScopeId, CancellationToken cancellationToken)
+    {
+        lock (_gate) { return Task.FromResult(_brains.ContainsKey(brainScopeId)); }
+    }
+
+    /// <inheritdoc />
+    public Task<Member?> Membership(string brainScopeId, string principalId, CancellationToken cancellationToken)
+    {
+        lock (_gate) { return Task.FromResult(_brains.TryGetValue(brainScopeId, out var brain) ? brain.MemberOf(principalId) : null); }
+    }
+
+    /// <inheritdoc />
+    public Task<Member?> EnsureMember(CapabilityCaller caller, Member member, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(caller);
+        ArgumentNullException.ThrowIfNull(member);
+
+        lock (_gate)
+        {
+            var brain = BrainLocked(member.BrainId);
+            var outcome = brain.AddMember(caller, member, _time.GetUtcNow());
+            var nextBrain = outcome.OrThrow(caller, member.BrainId);
+            _brains[member.BrainId] = nextBrain;
+            return Task.FromResult(nextBrain.MemberOf(member.PrincipalId));
+        }
+    }
+
+    /// <inheritdoc />
+    public Task RemoveMember(CapabilityCaller caller, string brainScopeId, string accountId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(caller);
+        lock (_gate)
+        {
+            var brain = BrainLocked(brainScopeId);
+            var outcome = brain.RemoveMember(caller, accountId);
+            var nextBrain = outcome.OrThrow(caller, brainScopeId);
+            _brains[brainScopeId] = nextBrain;
+            return Task.CompletedTask;
+        }
+    }
+
+    /// <inheritdoc />
+    public Task RemovePrincipalMember(CapabilityCaller caller, string brainScopeId, string principalId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(caller);
+        lock (_gate)
+        {
+            var brain = BrainLocked(brainScopeId);
+            var outcome = brain.RemovePrincipal(caller, principalId);
+            var nextBrain = outcome.OrThrow(caller, brainScopeId);
+            _brains[brainScopeId] = nextBrain;
+            return Task.CompletedTask;
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<CallDecision?> Authorize(CapabilityCaller caller, CallRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(caller);
+        ArgumentNullException.ThrowIfNull(request);
+
+        lock (_gate)
+        {
+            var brain = BrainLocked(caller.BrainId);
+            var (outcome, decision) = brain.Authorize(caller, request);
+            _brains[caller.BrainId] = outcome.Next;
+            return Task.FromResult<CallDecision?>(decision);
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<Grant>> ListGrants(string brainScopeId, CancellationToken cancellationToken)
+    {
+        lock (_gate)
+        {
+            var brain = BrainLocked(brainScopeId);
+            var active = brain.Grants.Where(g => !g.Revoked).ToArray();
+            return Task.FromResult<IReadOnlyList<Grant>>(active);
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<Grant?> GrantAsOwner(CapabilityCaller caller, Grant grant, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(caller);
+        ArgumentNullException.ThrowIfNull(grant);
+
+        lock (_gate)
+        {
+            var brainId = string.IsNullOrWhiteSpace(grant.WorkspaceId) ? caller.BrainId : grant.WorkspaceId;
+            var brain = BrainLocked(brainId);
+            var outcome = brain.RecordGrant(caller, grant, _time.GetUtcNow());
+            if (outcome.Refused == Refusal.NotOwner)
+            {
+                return Task.FromResult<Grant?>(null);
+            }
+
+            var nextBrain = outcome.OrThrow(caller, brainId);
+            _brains[brainId] = nextBrain;
+            var stored = nextBrain.Grants.FirstOrDefault(g => g.AppId == grant.AppId && g.SemanticTypeId == grant.SemanticTypeId && g.Mode == grant.Mode && g.WorkspaceId == brainId && !g.Revoked);
+            return Task.FromResult(stored);
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<bool> RevokeAsOwner(CapabilityCaller caller, string appId, string semanticTypeId, GrantMode mode, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(caller);
+        lock (_gate)
+        {
+            var brain = BrainLocked(caller.BrainId);
+            var outcome = brain.RevokeGrant(caller, appId, semanticTypeId, mode);
+            if (outcome.Refused == Refusal.NotOwner)
+            {
+                return Task.FromResult(false);
+            }
+
+            var nextBrain = outcome.OrThrow(caller, caller.BrainId);
+            _brains[caller.BrainId] = nextBrain;
+            return Task.FromResult(true);
         }
     }
 
@@ -132,26 +341,70 @@ public sealed class InMemoryIdentityDirectory : IIdentityDirectoryPort, IIdentit
     public Task<SessionIssued> Issue(CapabilityCaller caller, SessionRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(caller);
-        return Task.FromResult(_identity.IssueSession(request));
+        SessionClaims.Validate(request);
+
+        lock (_gate)
+        {
+            var member = request.Member;
+            var current = BrainLocked(member.BrainId).MemberOf(member.PrincipalId);
+            if (current is null || current.AccountId != member.AccountId)
+            {
+                throw new InvalidOperationException($"{member.PrincipalId} is not a member of {member.BrainId}; no session is issued.");
+            }
+
+            var sessionId = $"session-{Guid.NewGuid():N}";
+            var tokenHash = SessionBook.HashToken(sessionId);
+            var expiresAt = _time.GetUtcNow() + (request.Lifetime ?? DefaultSessionLifetime);
+            var (nextSessions, _, _) = _sessions.Start(tokenHash, member.BrainId, member.PrincipalId, expiresAt, _time.GetUtcNow());
+            _sessions = nextSessions;
+            return Task.FromResult(new SessionIssued(sessionId, expiresAt));
+        }
     }
 
     /// <inheritdoc />
     public Task End(CapabilityCaller caller, string sessionId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(caller);
-        _identity.EndSession(sessionId);
-        return Task.CompletedTask;
+        ArgumentNullException.ThrowIfNull(sessionId);
+
+        lock (_gate)
+        {
+            var tokenHash = SessionBook.HashToken(sessionId);
+            var (nextSessions, _) = _sessions.End(tokenHash);
+            _sessions = nextSessions;
+            return Task.CompletedTask;
+        }
     }
 
     /// <inheritdoc />
-    public Task<Member?> Validate(string sessionId, CancellationToken cancellationToken) => Task.FromResult(_identity.ValidateSession(sessionId));
+    public Task<Member?> Validate(string sessionId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(sessionId);
+
+        lock (_gate)
+        {
+            var tokenHash = SessionBook.HashToken(sessionId);
+            var session = _sessions.Find(tokenHash, _time.GetUtcNow());
+            if (session is null)
+            {
+                return Task.FromResult<Member?>(null);
+            }
+
+            return Task.FromResult(BrainLocked(session.BrainId).MemberOf(session.PrincipalId));
+        }
+    }
 
     /// <inheritdoc />
     public IdentityProviderDescriptor Describe() => Descriptor;
 
-    private IDisposable As(CapabilityCaller caller)
+    private BrainDirectory BrainLocked(string brainId)
     {
-        ArgumentNullException.ThrowIfNull(caller);
-        return _callers.As(new CapabilityCaller(caller.PrincipalId, caller.AccountId, caller.BrainId, caller.AppId, caller.ConversationId));
+        if (!_brains.TryGetValue(brainId, out var brain))
+        {
+            brain = new BrainDirectory { BrainId = brainId };
+            _brains[brainId] = brain;
+        }
+
+        return brain;
     }
 }

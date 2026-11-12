@@ -48,8 +48,17 @@ public abstract class Neuron<TState> : Neuron, IStateInspectable where TState : 
         ArgumentNullException.ThrowIfNull(signals);
         if (signals.Count == 0) { throw new ArgumentException("A state change publishes at least one signal.", nameof(signals)); }
         if (signals.Any(signal => signal is null)) { throw new ArgumentException("A signal is null.", nameof(signals)); }
-        await StoreState(next, signals).ConfigureAwait(true);
+        var previous = State;
         State = next;
+        try
+        {
+            await StoreState(next, signals).ConfigureAwait(true);
+        }
+        catch
+        {
+            State = previous;
+            throw;
+        }
         OnCommitted();
     }
 

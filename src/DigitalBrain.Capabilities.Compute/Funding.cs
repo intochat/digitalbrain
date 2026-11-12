@@ -1,4 +1,4 @@
-﻿using DigitalBrain.Neurons;
+using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Capabilities.Compute;
 

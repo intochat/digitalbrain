@@ -16,8 +16,8 @@ public sealed record ConnectionsSubject(
     IConnectionRequests Requests,
     CallerScope Callers)
 {
-    /// <summary>The connection index for the test brain; null skips the index-backed facts.</summary>
-    public IConnectionIndex? Index { get; init; }
+    /// <summary>Optional seam to create/connect a connection for testing; null skips connection-backed facts.</summary>
+    public Func<string, Task>? AddConnection { get; init; }
 
     /// <summary>The brain under test.</summary>
     public BrainId Brain { get; init; } = new("kit-brain");
@@ -66,14 +66,14 @@ public abstract class ConnectionsConformance<TConnections> where TConnections : 
         Assert.Contains(requested, pending);
     }
 
-    /// <summary>Tracking a connection key in the index causes ListInOrder to include it.</summary>
+    /// <summary>Adding a connection causes ListInOrder to include it.</summary>
     [Fact(Timeout = Timeout)]
     public async Task TrackThenListInOrderContainsTheConnection()
     {
         var (s, ct) = await Open().ConfigureAwait(false);
-        Assert.SkipWhen(s.Index is null, "the subject exposes no connection index");
+        Assert.SkipWhen(s.AddConnection is null, "the subject exposes no connection creation seam");
         var key = ConnectionKeys.For(s.Brain.Value, s.ConnectorKind, Unique("conn"));
-        await s.Index!.Track(key).ConfigureAwait(false);
+        await s.AddConnection!(key).ConfigureAwait(false);
         var listed = await s.Connections.ListInOrder(s.Brain, ct).ConfigureAwait(false);
         Assert.Contains(listed, connection => connection.Key == key);
     }
@@ -83,11 +83,11 @@ public abstract class ConnectionsConformance<TConnections> where TConnections : 
     public async Task ReorderIsRespectedByListInOrder()
     {
         var (s, ct) = await Open().ConfigureAwait(false);
-        Assert.SkipWhen(s.Index is null, "the subject exposes no connection index");
+        Assert.SkipWhen(s.AddConnection is null, "the subject exposes no connection creation seam");
         var first = ConnectionKeys.For(s.Brain.Value, s.ConnectorKind, Unique("first"));
         var second = ConnectionKeys.For(s.Brain.Value, s.ConnectorKind, Unique("second"));
-        await s.Index!.Track(first).ConfigureAwait(false);
-        await s.Index.Track(second).ConfigureAwait(false);
+        await s.AddConnection!(first).ConfigureAwait(false);
+        await s.AddConnection(second).ConfigureAwait(false);
         await s.Requests.Reorder([second, first]).ConfigureAwait(false);
         var listed = await s.Connections.ListInOrder(s.Brain, ct).ConfigureAwait(false);
         Assert.Equal([second, first], listed.Select(connection => connection.Key).ToArray());

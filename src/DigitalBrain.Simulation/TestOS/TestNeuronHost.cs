@@ -25,13 +25,15 @@ internal sealed class TestNeuronHost : IDisposable
     private readonly HashSet<string> _keepAlive = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ITimer> _reminders = new(StringComparer.Ordinal);
     private Neuron? _neuron;
+    private DigitalBrain.Units.UnitHandle? _handle;
 
-    public TestNeuronHost(TestOS os, NeuronId id, Type neuronClass)
+    public TestNeuronHost(TestOS os, NeuronId id, Type neuronClass, DigitalBrain.Units.UnitHandle? handle = null)
     {
         _os = os;
         Id = id;
         Class = neuronClass;
         Created = os.Clock.GetUtcNow();
+        _handle = handle;
     }
 
     public NeuronId Id { get; }
@@ -181,6 +183,8 @@ internal sealed class TestNeuronHost : IDisposable
         }
         _turns.Dispose();
         _activating.Dispose();
+        _handle?.Dispose();
+        _handle = null;
     }
 
     // A timer tick needs the activation it lives with; a reminder reactivates the neuron. Both run as turns and reach
@@ -211,6 +215,10 @@ internal sealed class TestNeuronHost : IDisposable
         try
         {
             if (_neuron is { } raced) { return raced; }
+            if (_handle is null && Class.Assembly.IsCollectible)
+            {
+                _handle = _os.Resolver.Resolve(Id.Brain, Id.Type, DigitalBrain.Units.UnitView.Live, CancellationToken.None).GetAwaiter().GetResult();
+            }
             var context = new TestNeuronContext(this);
             var neuron = Construct(context.Services);
             NeuronAttachment.Attach(neuron, context);
@@ -232,6 +240,8 @@ internal sealed class TestNeuronHost : IDisposable
             _timers.Clear();
         }
         await NeuronAttachment.Deactivate(neuron, cause, CancellationToken.None).ConfigureAwait(false);
+        _handle?.Dispose();
+        _handle = null;
     }
 
     // The widest public constructor, its parameters resolved from the context services; a SynapseCatalog is the TestOS catalog.

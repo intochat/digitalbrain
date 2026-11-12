@@ -37,6 +37,7 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
     private AccessGate _access = null!;
     private ICallerCarrier _callers = null!;
     private Delivery? _delivery;
+    private (BrainId Brain, UnitHandle Handle)? _unit;
 
     internal Neuron? ActiveNeuron => _neuron;
 
@@ -51,54 +52,80 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
         _id = id;
         _access = ServiceProvider.GetService<AccessGate>() ?? new AccessGate(OrleansCallerAmbient.Instance, new AccessOptions(), new AccessCounters());
         _callers = ServiceProvider.GetService<ICallerCarrier>() ?? OrleansCallerAmbient.Instance;
-        if (!types.TryGetRegistration(id.Type, out var registration)
-            && !(await Restore(id, cancellationToken).ConfigureAwait(true) && types.TryGetRegistration(id.Type, out registration)))
-        {
-            throw new BindingException($"No neuron class is hosted for type '{id.Type}'.");
-        }
-        var neuronClass = registration.Class;
-        var expected = NeuronTypeRegistry.GrainTypeOf(registration.Policy);
-        if (expected != GrainTypeName) { throw new BindingException($"{neuronClass.FullName} is hosted by {expected}, not {GrainTypeName}."); }
-        _class = neuronClass;
-        var bound = new NeuronServices(ServiceProvider, id, ServiceProvider.GetServices<NeuronBinding>());
-        var neuron = Construct(bound, neuronClass);
-        var logs = ServiceProvider.GetService<BrainLogs>();
-        BrainLog? log = logs is not null ? await logs.For(id.Brain.Value).ConfigureAwait(true) : null;
-        var time = (TimeProvider?)ServiceProvider.GetService(typeof(TimeProvider)) ?? TimeProvider.System;
-        var histories = logs is not null ? ServiceProvider.GetService<BrainSignalHistories>() : null;
-        var history = (BrainSignalHistory?)histories?.For(id.Brain);
-        IBrainJournal journal = logs is not null && history is not null
-            ? new BrainLogJournal(logs, history, _ => this.GetGrainId().ToString())
-            : UnregisteredJournal.Instance;
-        IJournalView view = log ?? (IJournalView)journal;
-        var consumer = new HostConsumer(this);
-        var counters = ServiceProvider.GetService<DeliveryCounters>() ?? new DeliveryCounters();
-        var delivery = new Delivery(
-            id,
-            journal,
-            view,
-            consumer,
-            alias => types.TryGetRegistration(alias, out var r) ? r.Class : null,
-            time,
-            counters);
-        await delivery.Initialize(cancellationToken).ConfigureAwait(true);
 
-        var nudge = (ISignalNudge?)log?.Fanout ?? new Fanout(
-            view,
-            new GrainNudge(grains, types),
-            alias => types.TryGetRegistration(alias, out var r) ? r.Class : null,
-            (pub, sigs) =>
+        try
+        {
+            if (!types.TryGetRegistration(id.Type, out var registration))
             {
-                ServiceProvider.GetService<Signalling.ClusterListeners>()?.Offer(pub, sigs);
-            });
-        var context = new HostNeuronContext(id, this.GetGrainId(), registration, bound, grains, types,
-            ServiceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress.ToString(), this, _deferred.Enqueue, delivery, journal, nudge);
-        NeuronAttachment.Attach(neuron, context);
-        await NeuronAttachment.Activate(neuron, cancellationToken).ConfigureAwait(true);
-        _neuron = neuron;
-        _delivery = delivery;
-        RegisterExtensions(neuron, neuronClass);
-        await delivery.CatchUp().ConfigureAwait(true);
+                var resolver = ServiceProvider.GetService<UnitResolver>();
+                if (resolver is not null && await resolver.Resolve(id.Brain, id.Type, UnitView.Live, cancellationToken).ConfigureAwait(true) is { } handle)
+                {
+                    _unit = (id.Brain, handle);
+                    registration = NeuronTypeRegistry.StateRegistration(id.Type, handle.StateOf(id.Type));
+                }
+                else
+                {
+                    throw new BindingException($"No neuron class is hosted for type '{id.Type}'.");
+                }
+            }
+            var neuronClass = registration.Class;
+            var expected = NeuronTypeRegistry.GrainTypeOf(registration.Policy);
+            if (expected != GrainTypeName) { throw new BindingException($"{neuronClass.FullName} is hosted by {expected}, not {GrainTypeName}."); }
+            _class = neuronClass;
+            var bound = new NeuronServices(ServiceProvider, id, ServiceProvider.GetServices<NeuronBinding>());
+            var neuron = Construct(bound, neuronClass);
+            var logs = ServiceProvider.GetService<BrainLogs>();
+            BrainLog? log = logs is not null ? await logs.For(id.Brain.Value).ConfigureAwait(true) : null;
+            var time = (TimeProvider?)ServiceProvider.GetService(typeof(TimeProvider)) ?? TimeProvider.System;
+            var histories = logs is not null ? ServiceProvider.GetService<BrainSignalHistories>() : null;
+            var history = (BrainSignalHistory?)histories?.For(id.Brain);
+            IBrainJournal journal = logs is not null && history is not null
+                ? new BrainLogJournal(logs, history, _ => this.GetGrainId().ToString())
+                : UnregisteredJournal.Instance;
+            IJournalView view = log ?? (IJournalView)journal;
+            var consumer = new HostConsumer(this);
+            var counters = ServiceProvider.GetService<DeliveryCounters>() ?? new DeliveryCounters();
+            var delivery = new Delivery(
+                id,
+                journal,
+                view,
+                consumer,
+                alias => types.TryGetRegistration(alias, out var r) ? r.Class : null,
+                time,
+                counters);
+            await delivery.Initialize(cancellationToken).ConfigureAwait(true);
+
+            var nudge = (ISignalNudge?)log?.Fanout ?? new Fanout(
+                view,
+                new GrainNudge(grains, types),
+                alias => types.TryGetRegistration(alias, out var r) ? r.Class : null,
+                (pub, sigs) =>
+                {
+                    ServiceProvider.GetService<Signalling.ClusterListeners>()?.Offer(pub, sigs);
+                });
+            var context = new HostNeuronContext(id, this.GetGrainId(), registration, bound, grains, types,
+                ServiceProvider.GetRequiredService<ILocalSiloDetails>().SiloAddress.ToString(), this, _deferred.Enqueue, delivery, journal, nudge);
+            NeuronAttachment.Attach(neuron, context);
+            await NeuronAttachment.Activate(neuron, cancellationToken).ConfigureAwait(true);
+            _neuron = neuron;
+            _delivery = delivery;
+            RegisterExtensions(neuron, neuronClass);
+            await delivery.CatchUp().ConfigureAwait(true);
+        }
+        catch
+        {
+            ReleaseUnit();
+            throw;
+        }
+    }
+
+    private void ReleaseUnit()
+    {
+        if (_unit is { } unit)
+        {
+            _unit = null;
+            unit.Handle.Dispose();
+        }
     }
 
     private void RegisterExtensions(Neuron neuron, Type neuronClass)
@@ -137,30 +164,26 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
         return (Neuron)constructor.Invoke([.. constructor.GetParameters().Select(parameter => services.GetRequiredService(parameter.ParameterType))]);
     }
 
-    // On a registration miss the host's ISynapseRestorer (none restores by default) may restore the alias once.
-    private Task<bool> Restore(NeuronId id, CancellationToken cancellationToken)
-        => (ServiceProvider.GetService<ISynapseRestorer>() ?? NoSynapseRestorer.Instance).TryRestore(id.Brain, id.Type, cancellationToken);
-
-    /// <inheritdoc />
-    public Task Reload()
-    {
-        this.DeactivateOnIdle();
-        return Task.CompletedTask;
-    }
-
     /// <inheritdoc />
     public override async Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
-        if (_neuron is { } neuron)
+        try
         {
-            var cause = reason.ReasonCode switch
+            if (_neuron is { } neuron)
             {
-                DeactivationReasonCode.ActivationIdle => DeactivationCause.Idle,
-                DeactivationReasonCode.ShuttingDown => DeactivationCause.Shutdown,
-                DeactivationReasonCode.ApplicationError or DeactivationReasonCode.ActivationFailed => DeactivationCause.Failed,
-                _ => DeactivationCause.Requested,
-            };
-            await NeuronAttachment.Deactivate(neuron, cause, cancellationToken).ConfigureAwait(true);
+                var cause = reason.ReasonCode switch
+                {
+                    DeactivationReasonCode.ActivationIdle => DeactivationCause.Idle,
+                    DeactivationReasonCode.ShuttingDown => DeactivationCause.Shutdown,
+                    DeactivationReasonCode.ApplicationError or DeactivationReasonCode.ActivationFailed => DeactivationCause.Failed,
+                    _ => DeactivationCause.Requested,
+                };
+                await NeuronAttachment.Deactivate(neuron, cause, cancellationToken).ConfigureAwait(true);
+            }
+        }
+        finally
+        {
+            ReleaseUnit();
         }
     }
 
@@ -352,6 +375,10 @@ internal abstract partial class NeuronHostGrainBase(NeuronTypeRegistry types, IG
     private async Task Drain()
     {
         while (_deferred.TryDequeue(out var work)) { await work().ConfigureAwait(true); }
+        if (_unit is { } unit && !ServiceProvider.GetRequiredService<LiveBindings>().IsCurrent(unit.Brain, unit.Handle.Build))
+        {
+            this.DeactivateOnIdle();
+        }
     }
 
     [LoggerMessage(EventId = 4130, Level = LogLevel.Error,

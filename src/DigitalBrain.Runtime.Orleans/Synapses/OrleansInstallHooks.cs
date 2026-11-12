@@ -62,8 +62,11 @@ internal sealed class OrleansInstallHooks(IServiceProvider services) : IInstallH
     private async Task AsInstalls(NeuronId state, Func<ISynapseHost, Task> call)
     {
         var types = services.GetRequiredService<NeuronTypeRegistry>();
+        var grainType = types.TryGetRegistration(state.Type, out var reg)
+            ? NeuronTypeRegistry.GrainTypeOf(reg.Policy)
+            : "neuron.host";
         var host = services.GetRequiredService<IGrainFactory>().GetGrain<ISynapseHost>(
-            GrainId.Create(NeuronTypeRegistry.GrainTypeOf(types.Require(state.Type).Policy), state.ToString()));
+            GrainId.Create(grainType, state.ToString()));
         var installs = new NeuronId(state.Brain, InstallsType, "default");
         var previous = RequestContext.Get(HostNeuronContext.CallerKey);
         RequestContext.Set(HostNeuronContext.CallerKey, installs.ToString());

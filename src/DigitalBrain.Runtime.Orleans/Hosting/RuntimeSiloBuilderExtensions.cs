@@ -1,3 +1,4 @@
+using DigitalBrain.Capabilities;
 using DigitalBrain.Kernel;
 using DigitalBrain.Limits;
 using DigitalBrain.Neurons;
@@ -63,32 +64,52 @@ public static class RuntimeSiloBuilderExtensions
             return [.. fromTopology.Concat(fromRegistry).DistinctBy(a => a.Name, StringComparer.Ordinal)];
         });
         // The live catalog, seeded from the startup scan; state neurons, the installs neuron and the gate index read it per call.
-        silo.Services.TryAddSingleton(sp => new SynapseCatalogSource(sp.GetRequiredService<NeuronTypeRegistry>().Catalog));
+        silo.Services.TryAddSingleton<IUnitLoader>(sp =>
+        {
+            var loader = new UnitLoader();
+            loader.Loaded += (_, signals) =>
+            {
+                if (sp.GetService<SignalTypeMap>() is { } map)
+                {
+                    foreach (var signal in signals) { map.Replace(signal); }
+                }
+            };
+            loader.Unloading += (_, signals) =>
+            {
+                if (sp.GetService<SignalTypeMap>() is { } map)
+                {
+                    foreach (var signal in signals)
+                    {
+                        if (map.TryAliasOf(signal, out var alias))
+                        {
+                            map.Unregister(alias);
+                        }
+                    }
+                }
+            };
+            return loader;
+        });
+        silo.Services.TryAddSingleton(sp => (UnitLoader)sp.GetRequiredService<IUnitLoader>());
+        silo.Services.TryAddSingleton<LiveBindings>();
+        silo.Services.TryAddSingleton(sp => new SynapseCatalogSource(sp.GetRequiredService<NeuronTypeRegistry>().Catalog, sp.GetRequiredService<IUnitLoader>()));
         silo.Services.TryAddSingleton<ISynapseCatalogSource>(sp => sp.GetRequiredService<SynapseCatalogSource>());
         silo.Services.TryAddSingleton<DigitalBrain.Units.IInstallHooks, OrleansInstallHooks>();
-        silo.Services.TryAddSingleton<DigitalBrain.Units.ISynapseRegistrar, OrleansSynapseRegistrar>();
-        // The synapse host: compiles, loads and deploys generated sources; each brain's sources neuron keeps them, and the restorer
-        // brings one back when an activation or the gate path misses its alias (as after a restart).
+
         silo.Services.TryAddSingleton(_ => new SynapseCompiler(ReferenceSet.FromDefaultContext()));
-        silo.Services.TryAddSingleton<SynapseLoader>();
-        silo.Services.TryAddSingleton<ISourceStore>(sp => new NeuronSourceStore(
-            brain => NeuronHosting.Get<ISources>(sp, new NeuronId(brain, SourcesType, "default"))));
-        silo.Services.TryAddSingleton(sp => new SynapseHost(
+        silo.Services.TryAddSingleton(sp => new UnitResolver(
+            sp.GetRequiredService<IUnitLoader>(),
+            sp.GetRequiredService<ISynapseCatalogSource>(),
+            sp.GetRequiredService<LiveBindings>(),
+            id => NeuronHosting.Get<ISources>(sp, id),
+            id => NeuronHosting.Get<IUnitDeployment>(sp, id),
+            brain => RuntimeCallerContext.StampScope(CapabilityCallers.Platform(brain.Value, brain.Value, brain.Value))));
+        silo.Services.TryAddSingleton(sp => new UnitDeployer(
             sp.GetRequiredService<SynapseCompiler>(),
-            sp.GetRequiredService<SynapseLoader>(),
-            sp.GetRequiredService<DigitalBrain.Units.ISynapseRegistrar>(),
-            sp.GetRequiredService<ISynapseCatalogSource>(),
-            brain => NeuronHosting.Get<IInstalls>(sp, new NeuronId(brain, OrleansInstallHooks.InstallsType, "default")),
-            sp.GetRequiredService<ISourceStore>(),
-            sp.GetRequiredService<DigitalBrain.Kernel.IClusterListeners>(),
-            sp.GetService<ILogger<SynapseHost>>()));
-        silo.Services.TryAddSingleton<DigitalBrain.Units.ISynapseHost>(sp => sp.GetRequiredService<SynapseHost>());
-        silo.Services.TryAddSingleton<DigitalBrain.Units.ISynapseRestorer>(sp => new SynapseRestorer(
-            sp.GetRequiredService<SynapseLoader>(),
-            sp.GetRequiredService<DigitalBrain.Units.ISynapseRegistrar>(),
-            sp.GetRequiredService<ISourceStore>(),
-            sp.GetRequiredService<ISynapseCatalogSource>(),
-            sp.GetRequiredService<SynapseHost>()));
+            sp.GetRequiredService<IUnitLoader>(),
+            id => NeuronHosting.Get<ISources>(sp, id),
+            id => NeuronHosting.Get<IUnitDeployment>(sp, id)));
+        silo.Services.TryAddSingleton<DigitalBrain.Units.ISynapseHost>(sp => sp.GetRequiredService<UnitDeployer>());
+        silo.Services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, LiveBindingsClusterListener>();
         silo.Services.AddJournalPayloads(modules);
         silo.Services.TryAddSingleton<DigitalBrain.Kernel.INudge, GrainNudge>();
         silo.Services.TryAddSingleton<DigitalBrain.Kernel.IAdmission, GrainAdmission>();

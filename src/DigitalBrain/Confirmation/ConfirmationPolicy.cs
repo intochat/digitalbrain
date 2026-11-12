@@ -1,4 +1,4 @@
-﻿using DigitalBrain.Units;
+using DigitalBrain.Units;
 
 namespace DigitalBrain.Confirmation;
 

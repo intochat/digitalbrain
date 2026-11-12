@@ -52,7 +52,7 @@ public interface IIdentity
     /// <summary>The principal's membership of the brain, or null.</summary>
     Task<Member?> Membership(string brainScopeId, string principalId, CancellationToken cancellationToken = default);
 
-    /// <summary>Adds the member when the runtime caller may; null when it may not.</summary>
+    /// <summary>Adds the member when the runtime caller may; throws <see cref="UnauthorizedAccessException"/> when it may not.</summary>
     Task<Member?> EnsureMember(Member member, CancellationToken cancellationToken = default);
 
     /// <summary>Removes every membership of the account in the brain; the owner's account is never removed.</summary>

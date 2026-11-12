@@ -23,15 +23,16 @@ public sealed class ConnectionKeysFacts
         var state = new ConnectionState();
         Assert.False(state.IsConfigured);
 
-        state.ApplySecretCredential("pat", new SealedSecret { Cipher = "sealed-token", KeyId = "k1" });
-        state.Status = ConnectionStatus.Connected;
-        Assert.True(state.IsConfigured);
+        var configured = state.WithSecret("pat", new SealedSecret { Cipher = "sealed-token", KeyId = "k1" })
+            .In(ConnectionStatus.Connected);
+        Assert.True(configured.IsConfigured);
 
         var appRecipient = SharedRecipient.ForApp("alice", "apps/triage");
-        Assert.True(state.TryAddSharedRecipient(appRecipient));
-        Assert.False(state.TryAddSharedRecipient(appRecipient));
-        Assert.True(state.IsSharedWith(appRecipient));
-        Assert.True(state.TryRemoveSharedRecipient(appRecipient));
-        Assert.False(state.IsSharedWith(appRecipient));
+        var shared = configured.WithSharing(appRecipient.Value);
+        Assert.True(shared.IsSharedWith(appRecipient));
+        var sharedAgain = shared.WithSharing(appRecipient.Value);
+        Assert.Same(shared, sharedAgain);
+        var unshared = shared.WithoutSharing(appRecipient.Value);
+        Assert.False(unshared.IsSharedWith(appRecipient));
     }
 }

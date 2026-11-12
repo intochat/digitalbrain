@@ -1,4 +1,4 @@
-﻿using DigitalBrain.Neurons;
+using DigitalBrain.Neurons;
 using System.Globalization;
 
 namespace DigitalBrain.Graph;

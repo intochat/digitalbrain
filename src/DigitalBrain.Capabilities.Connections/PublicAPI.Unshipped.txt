@@ -25,12 +25,10 @@ DigitalBrain.Capabilities.Connections.ConnectionConnected.Account.get -> string?
 DigitalBrain.Capabilities.Connections.ConnectionConnected.Account.init -> void
 DigitalBrain.Capabilities.Connections.ConnectionConnected.AuthMethodId.get -> string!
 DigitalBrain.Capabilities.Connections.ConnectionConnected.AuthMethodId.init -> void
-DigitalBrain.Capabilities.Connections.ConnectionConnected.ConnectionConnected(string! ConnectorId, string! ConnectionId, string! AuthMethodId, string? Account) -> void
 DigitalBrain.Capabilities.Connections.ConnectionConnected.ConnectionId.get -> string!
 DigitalBrain.Capabilities.Connections.ConnectionConnected.ConnectionId.init -> void
 DigitalBrain.Capabilities.Connections.ConnectionConnected.ConnectorId.get -> string!
 DigitalBrain.Capabilities.Connections.ConnectionConnected.ConnectorId.init -> void
-DigitalBrain.Capabilities.Connections.ConnectionConnected.Deconstruct(out string! ConnectorId, out string! ConnectionId, out string! AuthMethodId, out string? Account) -> void
 DigitalBrain.Capabilities.Connections.ConnectionConnected.Equals(DigitalBrain.Capabilities.Connections.ConnectionConnected? other) -> bool
 DigitalBrain.Capabilities.Connections.ConnectionDisconnected
 DigitalBrain.Capabilities.Connections.ConnectionDisconnected.ConnectionDisconnected(string! ConnectorId, string! ConnectionId) -> void
@@ -41,20 +39,16 @@ DigitalBrain.Capabilities.Connections.ConnectionDisconnected.ConnectorId.init ->
 DigitalBrain.Capabilities.Connections.ConnectionDisconnected.Deconstruct(out string! ConnectorId, out string! ConnectionId) -> void
 DigitalBrain.Capabilities.Connections.ConnectionDisconnected.Equals(DigitalBrain.Capabilities.Connections.ConnectionDisconnected? other) -> bool
 DigitalBrain.Capabilities.Connections.ConnectionExpired
-DigitalBrain.Capabilities.Connections.ConnectionExpired.ConnectionExpired(string! ConnectorId, string! ConnectionId) -> void
 DigitalBrain.Capabilities.Connections.ConnectionExpired.ConnectionId.get -> string!
 DigitalBrain.Capabilities.Connections.ConnectionExpired.ConnectionId.init -> void
 DigitalBrain.Capabilities.Connections.ConnectionExpired.ConnectorId.get -> string!
 DigitalBrain.Capabilities.Connections.ConnectionExpired.ConnectorId.init -> void
-DigitalBrain.Capabilities.Connections.ConnectionExpired.Deconstruct(out string! ConnectorId, out string! ConnectionId) -> void
 DigitalBrain.Capabilities.Connections.ConnectionExpired.Equals(DigitalBrain.Capabilities.Connections.ConnectionExpired? other) -> bool
 DigitalBrain.Capabilities.Connections.ConnectionFailing
-DigitalBrain.Capabilities.Connections.ConnectionFailing.ConnectionFailing(string! ConnectorId, string! ConnectionId, string! Detail) -> void
 DigitalBrain.Capabilities.Connections.ConnectionFailing.ConnectionId.get -> string!
 DigitalBrain.Capabilities.Connections.ConnectionFailing.ConnectionId.init -> void
 DigitalBrain.Capabilities.Connections.ConnectionFailing.ConnectorId.get -> string!
 DigitalBrain.Capabilities.Connections.ConnectionFailing.ConnectorId.init -> void
-DigitalBrain.Capabilities.Connections.ConnectionFailing.Deconstruct(out string! ConnectorId, out string! ConnectionId, out string! Detail) -> void
 DigitalBrain.Capabilities.Connections.ConnectionFailing.Detail.get -> string!
 DigitalBrain.Capabilities.Connections.ConnectionFailing.Detail.init -> void
 DigitalBrain.Capabilities.Connections.ConnectionFailing.Equals(DigitalBrain.Capabilities.Connections.ConnectionFailing? other) -> bool
@@ -76,7 +70,6 @@ DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.MarkFailing(strin
 DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.Probe() -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.ConnectionView!>!
 DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.PublishAsync(DigitalBrain.Signal! signal) -> System.Threading.Tasks.Task!
 DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.Read() -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.ConnectionView!>!
-DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.Restore(TState! before) -> void
 DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.SaveQuietly(TState! next) -> System.Threading.Tasks.Task!
 DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.ServiceProvider.get -> System.IServiceProvider!
 DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.ShareInto(string! brainId, string! app) -> System.Threading.Tasks.Task!
@@ -105,24 +98,13 @@ DigitalBrain.Capabilities.Connections.ConnectionProbeResult.Outcome.get -> Digit
 DigitalBrain.Capabilities.Connections.ConnectionProbeResult.Outcome.init -> void
 DigitalBrain.Capabilities.Connections.ConnectionState
 DigitalBrain.Capabilities.Connections.ConnectionState.Account.get -> string?
-DigitalBrain.Capabilities.Connections.ConnectionState.Account.set -> void
 DigitalBrain.Capabilities.Connections.ConnectionState.AuthMethodId.get -> string!
-DigitalBrain.Capabilities.Connections.ConnectionState.AuthMethodId.set -> void
 DigitalBrain.Capabilities.Connections.ConnectionState.ConnectionState() -> void
 DigitalBrain.Capabilities.Connections.ConnectionState.Detail.get -> string?
-DigitalBrain.Capabilities.Connections.ConnectionState.Detail.set -> void
 DigitalBrain.Capabilities.Connections.ConnectionState.ExpiresAt.get -> System.DateTimeOffset?
-DigitalBrain.Capabilities.Connections.ConnectionState.ExpiresAt.set -> void
 DigitalBrain.Capabilities.Connections.ConnectionState.LastProbedAt.get -> System.DateTimeOffset?
-DigitalBrain.Capabilities.Connections.ConnectionState.LastProbedAt.set -> void
 DigitalBrain.Capabilities.Connections.ConnectionState.Scopes.get -> string!
-DigitalBrain.Capabilities.Connections.ConnectionState.Scopes.set -> void
-DigitalBrain.Capabilities.Connections.ConnectionState.Secrets.get -> System.Collections.Generic.Dictionary<string!, DigitalBrain.Capabilities.Secrets.SealedSecret!>!
-DigitalBrain.Capabilities.Connections.ConnectionState.Secrets.set -> void
-DigitalBrain.Capabilities.Connections.ConnectionState.SharedInto.get -> string![]!
-DigitalBrain.Capabilities.Connections.ConnectionState.SharedInto.set -> void
 DigitalBrain.Capabilities.Connections.ConnectionState.Status.get -> DigitalBrain.Capabilities.Connections.ConnectionStatus
-DigitalBrain.Capabilities.Connections.ConnectionState.Status.set -> void
 DigitalBrain.Capabilities.Connections.ConnectionStatus
 DigitalBrain.Capabilities.Connections.ConnectionStatus.Connected = 0 -> DigitalBrain.Capabilities.Connections.ConnectionStatus
 DigitalBrain.Capabilities.Connections.ConnectionStatus.Disconnected = 3 -> DigitalBrain.Capabilities.Connections.ConnectionStatus
@@ -276,21 +258,8 @@ DigitalBrain.Capabilities.Connections.IConnection.ShareInto(string! brainId, str
 DigitalBrain.Capabilities.Connections.IConnection.ShareWith(string! principalId) -> System.Threading.Tasks.Task!
 DigitalBrain.Capabilities.Connections.IConnection.UnshareFrom(string! brainId, string! app) -> System.Threading.Tasks.Task!
 DigitalBrain.Capabilities.Connections.IConnection.UnshareWith(string! principalId) -> System.Threading.Tasks.Task!
-DigitalBrain.Capabilities.Connections.IConnectionCatalogUpdates
-DigitalBrain.Capabilities.Connections.IConnectionCatalogUpdates.Changed(string! connectionKey) -> System.Threading.Tasks.Task!
-DigitalBrain.Capabilities.Connections.IConnectionCatalogUpdates.Id(string! brainId) -> DigitalBrain.NeuronId
 DigitalBrain.Capabilities.Connections.IConnectionInbound
 DigitalBrain.Capabilities.Connections.IConnectionInbound.AcceptGrant(DigitalBrain.Capabilities.Connections.OAuthGrant! grant) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.ConnectionView!>!
-DigitalBrain.Capabilities.Connections.IConnectionIndex
-DigitalBrain.Capabilities.Connections.IConnectionIndex.Id(string! brainId) -> DigitalBrain.NeuronId
-DigitalBrain.Capabilities.Connections.IConnectionIndex.Key(string! brainId) -> string!
-DigitalBrain.Capabilities.Connections.IConnectionIndex.List() -> System.Threading.Tasks.Task<string![]!>!
-DigitalBrain.Capabilities.Connections.IConnectionIndex.Track(string! connectionKey) -> System.Threading.Tasks.Task!
-DigitalBrain.Capabilities.Connections.IConnectionIndex.Untrack(string! connectionKey) -> System.Threading.Tasks.Task!
-DigitalBrain.Capabilities.Connections.IConnectionWriteFaults
-DigitalBrain.Capabilities.Connections.IConnectionWriteFaults.AfterWrite(string! connectionKey, object? next, System.Collections.Generic.IReadOnlyList<DigitalBrain.Signal!>! signals) -> System.Threading.Tasks.Task!
-DigitalBrain.Capabilities.Connections.IConnectionWriteFaults.BeforeWrite(string! connectionKey, object? next, System.Collections.Generic.IReadOnlyList<DigitalBrain.Signal!>! signals) -> System.Threading.Tasks.Task!
-DigitalBrain.Capabilities.Connections.IConnectionWriteFaults.Loaded(string! connectionKey, object! state) -> void
 DigitalBrain.Capabilities.Connections.Integrations.ConfigureIntegration
 DigitalBrain.Capabilities.Connections.Integrations.ConfigureIntegration.<Clone>$() -> DigitalBrain.Capabilities.Connections.Integrations.ConfigureIntegration!
 DigitalBrain.Capabilities.Connections.Integrations.ConfigureIntegration.ConfigureIntegration() -> void
@@ -484,8 +453,6 @@ DigitalBrain.Capabilities.Connections.Sealing.ISecretSealer.Seal(string! name, s
 abstract DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.ProbeAsync(DigitalBrain.Capabilities.Connections.Credential! credential, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.ConnectionProbeResult!>!
 const DigitalBrain.Capabilities.Connections.ConnectionKeys.NeuronScheme = "neuron://" -> string!
 const DigitalBrain.Capabilities.Connections.Connectors.HostConfiguration.OtlpEndpointVariable = "OTEL_EXPORTER_OTLP_ENDPOINT" -> string!
-const DigitalBrain.Capabilities.Connections.IConnectionCatalogUpdates.TypeName = "integrations.accounts" -> string!
-const DigitalBrain.Capabilities.Connections.IConnectionIndex.TypeName = "connection.index" -> string!
 const DigitalBrain.Capabilities.Connections.Sealing.BrainSeal.KeyPrefix = "brain:" -> string!
 override DigitalBrain.Capabilities.Connections.Broker.BrainConnection.Equals(object? obj) -> bool
 override DigitalBrain.Capabilities.Connections.Broker.BrainConnection.GetHashCode() -> int
@@ -665,3 +632,179 @@ virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.Activated
 virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.OnConnectedAsync() -> System.Threading.Tasks.Task!
 virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.OnDisconnectedAsync() -> System.Threading.Tasks.Task!
 virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.RefreshAsync(DigitalBrain.Capabilities.Connections.Credential! credential, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.OAuthGrant!>!
+const DigitalBrain.Capabilities.Connections.Catalog.IConnectionCatalog.TypeName = "integrations.accounts" -> string!
+DigitalBrain.Capabilities.Connections.ConnectionFailing.Deconstruct(out string! ConnectorId, out string! ConnectionId, out string! Detail, out System.DateTimeOffset? ProbedAt) -> void
+DigitalBrain.Capabilities.Connections.ConnectionExpired.Deconstruct(out string! ConnectorId, out string! ConnectionId, out System.DateTimeOffset? ProbedAt) -> void
+DigitalBrain.Capabilities.Connections.ConnectionShared
+DigitalBrain.Capabilities.Connections.ConnectionTransitions
+DigitalBrain.Capabilities.Connections.ConnectionConnected.Deconstruct(out string! ConnectorId, out string! ConnectionId, out string! AuthMethodId, out string? Account, out System.DateTimeOffset? ProbedAt) -> void
+override DigitalBrain.Capabilities.Connections.ConnectionShared.ToString() -> string!
+DigitalBrain.Capabilities.Connections.ConnectionUnshared
+static DigitalBrain.Capabilities.Connections.ConnectionShared.operator !=(DigitalBrain.Capabilities.Connections.ConnectionShared? left, DigitalBrain.Capabilities.Connections.ConnectionShared? right) -> bool
+override DigitalBrain.Capabilities.Connections.ConnectionUnshared.ToString() -> string!
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog
+static DigitalBrain.Capabilities.Connections.ConnectionShared.operator ==(DigitalBrain.Capabilities.Connections.ConnectionShared? left, DigitalBrain.Capabilities.Connections.ConnectionShared? right) -> bool
+static DigitalBrain.Capabilities.Connections.ConnectionUnshared.operator !=(DigitalBrain.Capabilities.Connections.ConnectionUnshared? left, DigitalBrain.Capabilities.Connections.ConnectionUnshared? right) -> bool
+override DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.ToString() -> string!
+DigitalBrain.Capabilities.Connections.Catalog.CatalogRow
+override DigitalBrain.Capabilities.Connections.ConnectionShared.GetHashCode() -> int
+static DigitalBrain.Capabilities.Connections.ConnectionUnshared.operator ==(DigitalBrain.Capabilities.Connections.ConnectionUnshared? left, DigitalBrain.Capabilities.Connections.ConnectionUnshared? right) -> bool
+override DigitalBrain.Capabilities.Connections.ConnectionUnshared.GetHashCode() -> int
+override DigitalBrain.Capabilities.Connections.ConnectionUnshared.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.ToString() -> string!
+override DigitalBrain.Capabilities.Connections.ConnectionShared.Equals(object? obj) -> bool
+override sealed DigitalBrain.Capabilities.Connections.ConnectionUnshared.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.operator !=(DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog? left, DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog? right) -> bool
+DigitalBrain.Capabilities.Connections.ConnectionUnshared.Equals(DigitalBrain.Capabilities.Connections.ConnectionUnshared? other) -> bool
+static DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.operator !=(DigitalBrain.Capabilities.Connections.Catalog.CatalogRow? left, DigitalBrain.Capabilities.Connections.Catalog.CatalogRow? right) -> bool
+override sealed DigitalBrain.Capabilities.Connections.ConnectionShared.Equals(DigitalBrain.Signal? other) -> bool
+override DigitalBrain.Capabilities.Connections.ConnectionUnshared.<Clone>$() -> DigitalBrain.Capabilities.Connections.ConnectionUnshared!
+DigitalBrain.Capabilities.Connections.ConnectionAdopted
+static DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.operator ==(DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog? left, DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog? right) -> bool
+static DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.operator ==(DigitalBrain.Capabilities.Connections.Catalog.CatalogRow? left, DigitalBrain.Capabilities.Connections.Catalog.CatalogRow? right) -> bool
+DigitalBrain.Capabilities.Connections.ConnectionShared.Equals(DigitalBrain.Capabilities.Connections.ConnectionShared? other) -> bool
+DigitalBrain.Capabilities.Connections.ConnectionUnshared.Deconstruct(out string! ConnectorId, out string! ConnectionId, out string! Recipient) -> void
+override DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.GetHashCode() -> int
+override DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.GetHashCode() -> int
+override DigitalBrain.Capabilities.Connections.ConnectionShared.<Clone>$() -> DigitalBrain.Capabilities.Connections.ConnectionShared!
+override DigitalBrain.Capabilities.Connections.ConnectionAdopted.ToString() -> string!
+override DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.Equals(object? obj) -> bool
+DigitalBrain.Capabilities.Connections.ConnectionShared.Deconstruct(out string! ConnectorId, out string! ConnectionId, out string! Recipient) -> void
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.Equals(DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog? other) -> bool
+DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.Equals(DigitalBrain.Capabilities.Connections.Catalog.CatalogRow? other) -> bool
+static DigitalBrain.Capabilities.Connections.ConnectionAdopted.operator !=(DigitalBrain.Capabilities.Connections.ConnectionAdopted? left, DigitalBrain.Capabilities.Connections.ConnectionAdopted? right) -> bool
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.<Clone>$() -> DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog!
+DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.<Clone>$() -> DigitalBrain.Capabilities.Connections.Catalog.CatalogRow!
+static DigitalBrain.Capabilities.Connections.ConnectionAdopted.operator ==(DigitalBrain.Capabilities.Connections.ConnectionAdopted? left, DigitalBrain.Capabilities.Connections.ConnectionAdopted? right) -> bool
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.ConnectionCatalog() -> void
+DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.Deconstruct(out string! Key, out string! ConnectorId, out string! ConnectionId, out DigitalBrain.Capabilities.Connections.ConnectionStatus Status, out string? Account, out System.DateTimeOffset? LastProbedAt) -> void
+override DigitalBrain.Capabilities.Connections.ConnectionAdopted.GetHashCode() -> int
+override DigitalBrain.Capabilities.Connections.ConnectionAdopted.Equals(object? obj) -> bool
+virtual DigitalBrain.Capabilities.Connections.ConnectionState.EqualityContract.get -> System.Type!
+override sealed DigitalBrain.Capabilities.Connections.ConnectionAdopted.Equals(DigitalBrain.Signal? other) -> bool
+DigitalBrain.Capabilities.Connections.ConnectionAdopted.Equals(DigitalBrain.Capabilities.Connections.ConnectionAdopted? other) -> bool
+override DigitalBrain.Capabilities.Connections.ConnectionAdopted.<Clone>$() -> DigitalBrain.Capabilities.Connections.ConnectionAdopted!
+DigitalBrain.Capabilities.Connections.ConnectionAdopted.Deconstruct(out string! ConnectorId, out string! ConnectionId, out string! AuthMethodId, out string? Account) -> void
+virtual DigitalBrain.Capabilities.Connections.ConnectionState.PrintMembers(System.Text.StringBuilder! builder) -> bool
+static DigitalBrain.Capabilities.Connections.ConnectionState.operator !=(DigitalBrain.Capabilities.Connections.ConnectionState? left, DigitalBrain.Capabilities.Connections.ConnectionState? right) -> bool
+static DigitalBrain.Capabilities.Connections.ConnectionState.operator ==(DigitalBrain.Capabilities.Connections.ConnectionState? left, DigitalBrain.Capabilities.Connections.ConnectionState? right) -> bool
+override DigitalBrain.Capabilities.Connections.ConnectionState.GetHashCode() -> int
+override DigitalBrain.Capabilities.Connections.ConnectionState.Equals(object? obj) -> bool
+virtual DigitalBrain.Capabilities.Connections.ConnectionState.Equals(DigitalBrain.Capabilities.Connections.ConnectionState? other) -> bool
+virtual DigitalBrain.Capabilities.Connections.ConnectionState.<Clone>$() -> DigitalBrain.Capabilities.Connections.ConnectionState!
+DigitalBrain.Capabilities.Connections.ConnectionState.ConnectionState(DigitalBrain.Capabilities.Connections.ConnectionState! original) -> void
+DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.Key.get -> string!
+DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.Key.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionAdopted.ConnectorId.get -> string!
+DigitalBrain.Capabilities.Connections.ConnectionShared.ConnectionId.get -> string!
+DigitalBrain.Capabilities.Connections.ConnectionAdopted.AuthMethodId.get -> string!
+DigitalBrain.Capabilities.Connections.ConnectionUnshared.ConnectorId.get -> string!
+DigitalBrain.Capabilities.Connections.ConnectionAdopted.ConnectionId.get -> string!
+DigitalBrain.Capabilities.Connections.ConnectionAdopted.ConnectorId.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionShared.ConnectionId.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionAdopted.AuthMethodId.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionAdopted.ConnectionId.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionUnshared.ConnectorId.init -> void
+DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.ConnectorId.get -> string!
+DigitalBrain.Capabilities.Connections.ConnectionShared.Recipient.get -> string!
+DigitalBrain.Capabilities.Connections.ConnectionAdopted.Account.get -> string?
+DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.ConnectionId.get -> string!
+DigitalBrain.Capabilities.Connections.ConnectionUnshared.Recipient.get -> string!
+DigitalBrain.Capabilities.Connections.ConnectionExpired.ProbedAt.get -> System.DateTimeOffset?
+DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.ConnectorId.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionShared.Recipient.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionShared.ConnectorId.get -> string!
+DigitalBrain.Capabilities.Connections.ConnectionUnshared.ConnectionId.get -> string!
+DigitalBrain.Capabilities.Connections.ConnectionAdopted.Account.init -> void
+DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.ConnectionId.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionFailing.ProbedAt.get -> System.DateTimeOffset?
+DigitalBrain.Capabilities.Connections.ConnectionUnshared.Recipient.init -> void
+DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.Status.get -> DigitalBrain.Capabilities.Connections.ConnectionStatus
+DigitalBrain.Capabilities.Connections.ConnectionShared.ConnectorId.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionUnshared.ConnectionId.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionExpired.ProbedAt.init -> void
+DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.Account.get -> string?
+DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.Status.init -> void
+DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.LastProbedAt.get -> System.DateTimeOffset?
+DigitalBrain.Capabilities.Connections.ConnectionConnected.ProbedAt.get -> System.DateTimeOffset?
+DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.Account.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionFailing.ProbedAt.init -> void
+DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.LastProbedAt.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionConnected.ProbedAt.init -> void
+DigitalBrain.Capabilities.Connections.Connectors.IConnectorOffers
+DigitalBrain.Capabilities.Connections.Connectors.DefaultConnectorOffers
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.Rows.get -> DigitalBrain.Capabilities.Connections.Catalog.CatalogRow![]!
+DigitalBrain.Capabilities.Connections.ConnectionUnshared.ConnectionUnshared(string! ConnectorId, string! ConnectionId, string! Recipient) -> void
+DigitalBrain.Capabilities.Connections.Catalog.CatalogRow.CatalogRow(string! Key, string! ConnectorId, string! ConnectionId, DigitalBrain.Capabilities.Connections.ConnectionStatus Status, string? Account, System.DateTimeOffset? LastProbedAt) -> void
+DigitalBrain.Capabilities.Connections.ConnectionAdopted.ConnectionAdopted(string! ConnectorId, string! ConnectionId, string! AuthMethodId, string? Account) -> void
+DigitalBrain.Capabilities.Connections.Catalog.IConnectionCatalog
+static DigitalBrain.Capabilities.Connections.ConnectionTransitions.Connect<TState>(this TState! state, string! connectorId, string! connectionId, string! authMethodId, DigitalBrain.Capabilities.Secrets.SealedSecret! value, string? account = null, System.DateTimeOffset? probedAt = null) -> (TState! Next, DigitalBrain.Signal! Fact)
+DigitalBrain.Capabilities.Connections.ConnectionFailing.ConnectionFailing(string! ConnectorId, string! ConnectionId, string! Detail, System.DateTimeOffset? ProbedAt = null) -> void
+DigitalBrain.Capabilities.Connections.ConnectionShared.ConnectionShared(string! ConnectorId, string! ConnectionId, string! Recipient) -> void
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalogNeuron.ConnectionCatalogNeuron(DigitalBrain.Capabilities.Connections.Connectors.IConnectorOffers? offers = null) -> void
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.Rows.init -> void
+DigitalBrain.Capabilities.Connections.Catalog.IConnectionCatalog.Id(string! brainId) -> DigitalBrain.NeuronId
+DigitalBrain.Capabilities.Connections.ConnectionExpired.ConnectionExpired(string! ConnectorId, string! ConnectionId, System.DateTimeOffset? ProbedAt = null) -> void
+DigitalBrain.Capabilities.Connections.ConnectionConnected.ConnectionConnected(string! ConnectorId, string! ConnectionId, string! AuthMethodId, string? Account, System.DateTimeOffset? ProbedAt = null) -> void
+DigitalBrain.Capabilities.Connections.ConnectionState.AuthMethodId.init -> void
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalogNeuron
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.Pending.init -> void
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.Pending.get -> DigitalBrain.Capabilities.Connections.Requests.ConnectionRef![]!
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.Revision.get -> long
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.Revision.init -> void
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.Order.get -> string![]!
+DigitalBrain.Capabilities.Connections.ConnectionState.Status.init -> void
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.Order.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionState.Secrets.get -> System.Collections.Generic.IReadOnlyDictionary<string!, DigitalBrain.Capabilities.Secrets.SealedSecret!>!
+DigitalBrain.Capabilities.Connections.ConnectionState.Secrets.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionState.Account.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionState.Scopes.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionState.ExpiresAt.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionState.LastProbedAt.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionState.Detail.init -> void
+DigitalBrain.Capabilities.Connections.ConnectionState.SharedInto.get -> System.Collections.Generic.IReadOnlyList<string!>!
+DigitalBrain.Capabilities.Connections.Catalog.IConnectionCatalog.Key(string! brainId) -> string!
+DigitalBrain.Capabilities.Connections.ConnectionState.SharedInto.init -> void
+DigitalBrain.Capabilities.Connections.Catalog.IConnectionCatalog.Subscribed() -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Connections.Catalog.IConnectionCatalog.Read() -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog!>!
+DigitalBrain.Capabilities.Connections.Connectors.IConnectorOffers.ProvidesOf(string! connectorId) -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.CapabilityId>!
+DigitalBrain.Capabilities.Connections.Connectors.IConnectorOffers.Offered.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Connections.Connectors.ConnectorDefinition!>!
+DigitalBrain.Capabilities.Connections.Connectors.IConnectorOffers.Declared.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Connections.Connectors.ConnectorDefinition!>!
+override sealed DigitalBrain.Capabilities.Connections.ConnectionState.ToString() -> string!
+DigitalBrain.Capabilities.Connections.Connectors.DefaultConnectorOffers.DefaultConnectorOffers(System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Connections.Connectors.ConnectorDefinition!>? connectors = null, DigitalBrain.Capabilities.Connections.ConnectionNeuronTypes? neuronTypes = null) -> void
+DigitalBrain.Capabilities.Connections.Connectors.DefaultConnectorOffers.Declared.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Connections.Connectors.ConnectorDefinition!>!
+DigitalBrain.Capabilities.Connections.Connectors.DefaultConnectorOffers.Offered.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Connections.Connectors.ConnectorDefinition!>!
+DigitalBrain.Capabilities.Connections.Connectors.DefaultConnectorOffers.ProvidesOf(string! connectorId) -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.CapabilityId>!
+static DigitalBrain.Capabilities.Connections.ConnectionTransitions.ConnectOAuth<TState>(this TState! state, string! connectorId, string! connectionId, DigitalBrain.Capabilities.Connections.OAuthGrant! grant, DigitalBrain.Capabilities.Secrets.SealedSecret! access, DigitalBrain.Capabilities.Secrets.SealedSecret? refresh, string? account = null, System.DateTimeOffset? probedAt = null) -> (TState! Next, DigitalBrain.Signal! Fact)
+static DigitalBrain.Capabilities.Connections.ConnectionTransitions.Adopt<TState>(this TState! state, string! connectorId, string! connectionId, string! authMethodId, string? account) -> (TState! Next, DigitalBrain.Signal! Fact)
+static DigitalBrain.Capabilities.Connections.ConnectionTransitions.Disconnect<TState>(this TState! state, string! connectorId, string! connectionId) -> (TState! Next, DigitalBrain.Signal! Fact)
+static DigitalBrain.Capabilities.Connections.ConnectionTransitions.Expire<TState>(this TState! state, string! connectorId, string! connectionId, string? detail = null, System.DateTimeOffset? probedAt = null) -> (TState! Next, DigitalBrain.Signal! Fact)
+virtual DigitalBrain.Capabilities.Connections.ConnectionNeuron<TState>.Record(TState! next, DigitalBrain.Signal! fact) -> System.Threading.Tasks.Task!
+static DigitalBrain.Capabilities.Connections.ConnectionTransitions.Fail<TState>(this TState! state, string! connectorId, string! connectionId, string! detail, System.DateTimeOffset? probedAt = null) -> (TState! Next, DigitalBrain.Signal! Fact)
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.RowOf(string! key) -> DigitalBrain.Capabilities.Connections.Catalog.CatalogRow?
+static DigitalBrain.Capabilities.Connections.ConnectionTransitions.UpdateSecrets<TState>(this TState! state, string! connectorId, string! connectionId, System.Collections.Generic.IReadOnlyDictionary<string!, DigitalBrain.Capabilities.Secrets.SealedSecret!>! secrets, System.DateTimeOffset? expiresAt = null) -> (TState! Next, DigitalBrain.Signal! Fact)
+static DigitalBrain.Capabilities.Connections.ConnectionTransitions.Share<TState>(this TState! state, string! connectorId, string! connectionId, string! recipient) -> (TState! Next, DigitalBrain.Signal! Fact)
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.Put(DigitalBrain.Capabilities.Connections.Catalog.CatalogRow! row) -> DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog!
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.Without(string! key) -> DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog!
+static DigitalBrain.Capabilities.Connections.ConnectionTransitions.Unshare<TState>(this TState! state, string! connectorId, string! connectionId, string! recipient) -> (TState! Next, DigitalBrain.Signal! Fact)
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog.Resolved(string! connectorId) -> bool
+static DigitalBrain.Capabilities.Connections.ConnectionTransitions.WithOAuth<TState>(this TState! state, DigitalBrain.Capabilities.Connections.OAuthGrant! grant, DigitalBrain.Capabilities.Secrets.SealedSecret! access, DigitalBrain.Capabilities.Secrets.SealedSecret? refresh) -> TState!
+static DigitalBrain.Capabilities.Connections.ConnectionTransitions.WithSecret<TState>(this TState! state, string! authMethodId, DigitalBrain.Capabilities.Secrets.SealedSecret! value) -> TState!
+static DigitalBrain.Capabilities.Connections.ConnectionTransitions.In<TState>(this TState! state, DigitalBrain.Capabilities.Connections.ConnectionStatus status, string? detail = null) -> TState!
+static DigitalBrain.Capabilities.Connections.ConnectionTransitions.Cleared<TState>(this TState! state) -> TState!
+static DigitalBrain.Capabilities.Connections.ConnectionTransitions.WithSharing<TState>(this TState! state, string! recipient) -> TState!
+static DigitalBrain.Capabilities.Connections.ConnectionTransitions.WithoutSharing<TState>(this TState! state, string! recipient) -> TState!
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalogNeuron.On(DigitalBrain.Capabilities.Connections.ConnectionConnected! signal) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalogNeuron.On(DigitalBrain.Capabilities.Connections.ConnectionExpired! signal) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalogNeuron.On(DigitalBrain.Capabilities.Connections.ConnectionFailing! signal) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalogNeuron.On(DigitalBrain.Capabilities.Connections.ConnectionAdopted! signal) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalogNeuron.On(DigitalBrain.Capabilities.Connections.ConnectionDisconnected! signal) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalogNeuron.Subscribed() -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalogNeuron.Read() -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalog!>!
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalogNeuron.ListKinds() -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.Requests.ConnectorKind![]!>!
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalogNeuron.ListPending() -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.Requests.ConnectionRef![]!>!
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalogNeuron.ListConnections() -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.Requests.ConnectionSummary![]!>!
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalogNeuron.Reorder(string![]! keys) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalogNeuron.Request(string! kind) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.Requests.ConnectionRef!>!
+DigitalBrain.Capabilities.Connections.Catalog.ConnectionCatalogNeuron.ListOffers() -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Connections.Requests.ConnectorOffer![]!>!

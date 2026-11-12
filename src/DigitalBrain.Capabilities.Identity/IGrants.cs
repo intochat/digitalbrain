@@ -14,7 +14,7 @@ public interface IGrants
     /// <summary>Authorizes <paramref name="request"/> for the runtime caller; null when no decision applies.</summary>
     Task<CallDecision?> Authorize(CallRequest request, CancellationToken cancellationToken = default);
 
-    /// <summary>The grants recorded in the brain, revoked ones included.</summary>
+    /// <summary>The active grants recorded in the brain; revoked grants excluded.</summary>
     Task<IReadOnlyList<Grant>> ListGrants(string brainScopeId, CancellationToken cancellationToken = default);
 
     /// <summary>Records <paramref name="grant"/> as the brain's owner.</summary>

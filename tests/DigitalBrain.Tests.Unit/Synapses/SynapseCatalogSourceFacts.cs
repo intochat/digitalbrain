@@ -42,39 +42,26 @@ public sealed class SynapseCatalogSourceFacts
 
         source.Replace("week", replacement);
 
-        var gates = source.Current.For("week");
+        var gates = source.Static.For("week");
         Assert.Equal(nameof(Hundred.Cap), Assert.Single(gates).Function.Name);
-        Assert.True(source.Current.States.ContainsKey("ledger"));
-        Assert.Equal(1, source.Version);
+        Assert.True(source.Static.States.ContainsKey("ledger"));
     }
 
     [Fact]
-    public void RemoveBumpsVersionAndRaisesChanged()
+    public void RemoveDropsTheAliasAndKeepsOthers()
     {
         var source = new SynapseCatalogSource(Week().Merge(Books()));
-        SynapseCatalog? seen = null;
-        source.Changed += catalog => seen = catalog;
 
         source.Remove("ledger");
 
-        Assert.Equal(1, source.Version);
-        Assert.Same(source.Current, seen);
-        Assert.False(source.Current.States.ContainsKey("ledger"));
-        Assert.True(source.Current.States.ContainsKey("week"));
+        Assert.False(source.Static.States.ContainsKey("ledger"));
+        Assert.True(source.Static.States.ContainsKey("week"));
     }
 
     [Fact]
-    public void ForNeedsServesAStagedCatalogWithoutChangingCurrent()
+    public void OfReturnsLoaderCatalogOrStatic()
     {
         var source = new SynapseCatalogSource(Week());
-        var staged = Week().Without("week").Merge(SynapseCatalog.Scan([typeof(WeekSpend), typeof(Hundred)]));
-
-        source.Stage("upload", staged);
-
-        Assert.Same(staged, source.ForNeeds("week"));
-        Assert.Same(source.Current, source.ForNeeds("ledger"));
-        Assert.Equal(0, source.Version);
-        source.Unstage("upload");
-        Assert.Same(source.Current, source.ForNeeds("week"));
+        Assert.Same(source.Static, source.Of(typeof(WeekSpend)));
     }
 }

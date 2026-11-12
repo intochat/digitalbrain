@@ -22,114 +22,36 @@ internal readonly record struct SharedRecipient(string Value)
     }
 }
 
-public class ConnectionState
+public record ConnectionState
 {
     internal const string ValueSecret = "value";
     internal const string AccessSecret = "access";
     internal const string RefreshSecret = "refresh";
 
-    public string AuthMethodId { get; set; } = "";
-    public ConnectionStatus Status { get; set; } = ConnectionStatus.Disconnected;
+    public string AuthMethodId { get; init; } = "";
+    public ConnectionStatus Status { get; init; } = ConnectionStatus.Disconnected;
 
     [JsonConverter(typeof(ConnectionSecretsJsonConverter))]
-    public Dictionary<string, SealedSecret> Secrets { get; set; } = new(StringComparer.Ordinal);
+    public IReadOnlyDictionary<string, SealedSecret> Secrets { get; init; } = new Dictionary<string, SealedSecret>(StringComparer.Ordinal);
 
-    public string? Account { get; set; }
-    public string Scopes { get; set; } = "";
-    public DateTimeOffset? ExpiresAt { get; set; }
-    public DateTimeOffset? LastProbedAt { get; set; }
-    public string? Detail { get; set; }
-    public string[] SharedInto { get; set; } = [];
+    public string? Account { get; init; }
+    public string Scopes { get; init; } = "";
+    public DateTimeOffset? ExpiresAt { get; init; }
+    public DateTimeOffset? LastProbedAt { get; init; }
+    public string? Detail { get; init; }
+    public IReadOnlyList<string> SharedInto { get; init; } = [];
 
     internal bool IsConfigured => Status != ConnectionStatus.Disconnected && Secrets.Count > 0;
-
-    internal void ApplySecretCredential(string authMethodId, SealedSecret sealedValue)
-    {
-        AuthMethodId = authMethodId;
-        Secrets = new(StringComparer.Ordinal) { [ValueSecret] = sealedValue };
-        ExpiresAt = null;
-        Scopes = "";
-    }
-
-    internal void ApplyOAuthCredential(OAuthGrant grant, SealedSecret access, SealedSecret? refresh)
-    {
-        var secrets = new Dictionary<string, SealedSecret>(StringComparer.Ordinal)
-        {
-            [AccessSecret] = access,
-        };
-        if (refresh is not null)
-        {
-            secrets[RefreshSecret] = refresh;
-        }
-
-        Secrets = secrets;
-        ExpiresAt = grant.ExpiresAt;
-        Scopes = grant.Scopes;
-    }
-
-    internal void ClearCredentials()
-    {
-        Secrets = new(StringComparer.Ordinal);
-        ExpiresAt = null;
-        Account = null;
-    }
-
-    internal void AdoptSharedMetadata(string authMethodId, string? account)
-    {
-        AuthMethodId = authMethodId;
-        Account = account;
-    }
-
-    internal void ImportSealedCredentials(string authMethodId, string? account, Dictionary<string, SealedSecret> secrets)
-    {
-        AuthMethodId = authMethodId;
-        Account = account;
-        Secrets = new(secrets, StringComparer.Ordinal);
-    }
-
-    internal bool TryAddSharedRecipient(SharedRecipient recipient)
-    {
-        if (SharedInto.Contains(recipient.Value, StringComparer.Ordinal))
-        {
-            return false;
-        }
-
-        SharedInto = [.. SharedInto, recipient.Value];
-        return true;
-    }
-
-    internal bool TryRemoveSharedRecipient(SharedRecipient recipient)
-    {
-        if (!SharedInto.Contains(recipient.Value, StringComparer.Ordinal))
-        {
-            return false;
-        }
-
-        SharedInto = [.. SharedInto.Where(shared => shared != recipient.Value)];
-        return true;
-    }
 
     internal bool IsSharedWith(SharedRecipient recipient)
         => SharedInto.Contains(recipient.Value, StringComparer.Ordinal);
 
-    internal void CopyBaseFrom(ConnectionState source)
-    {
-        ArgumentNullException.ThrowIfNull(source);
-        AuthMethodId = source.AuthMethodId;
-        Status = source.Status;
-        Secrets = new(source.Secrets, StringComparer.Ordinal);
-        Account = source.Account;
-        Scopes = source.Scopes;
-        ExpiresAt = source.ExpiresAt;
-        LastProbedAt = source.LastProbedAt;
-        Detail = source.Detail;
-        SharedInto = [.. source.SharedInto];
-    }
+    public sealed override string ToString() => $"{GetType().Name} {{ <redacted> }}";
 }
 
-internal sealed class ConnectionSecretsJsonConverter : JsonConverter<Dictionary<string, SealedSecret>>
+internal sealed class ConnectionSecretsJsonConverter : JsonConverter<IReadOnlyDictionary<string, SealedSecret>>
 {
-    public override Dictionary<string, SealedSecret> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override IReadOnlyDictionary<string, SealedSecret> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         var result = new Dictionary<string, SealedSecret>(StringComparer.Ordinal);
         if (reader.TokenType == JsonTokenType.Null)
@@ -170,7 +92,7 @@ internal sealed class ConnectionSecretsJsonConverter : JsonConverter<Dictionary<
         throw new JsonException($"Unexpected JSON token {root.ValueKind} for ConnectionState.Secrets.");
     }
 
-    public override void Write(Utf8JsonWriter writer, Dictionary<string, SealedSecret> value, JsonSerializerOptions options)
+    public override void Write(Utf8JsonWriter writer, IReadOnlyDictionary<string, SealedSecret> value, JsonSerializerOptions options)
     {
         writer.WriteStartObject();
         if (value is not null)

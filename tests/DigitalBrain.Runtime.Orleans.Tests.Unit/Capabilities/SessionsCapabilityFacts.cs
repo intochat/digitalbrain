@@ -13,7 +13,7 @@ public sealed class SessionsCapabilityFacts
     [Fact]
     public async Task Unstamped_call_is_denied()
     {
-        var sessions = new SessionsCapability(new InMemoryIdentityDirectory(), KitDeclarations.Identity);
+        var sessions = new BoundSessions(new InMemoryIdentityDirectory(), static () => RuntimeCallerContext.Current, KitDeclarations.Identity.RequirePrivileged);
         await Assert.ThrowsAnyAsync<UnauthorizedAccessException>(() => sessions.Validate("s", TestContext.Current.CancellationToken));
     }
 
@@ -34,7 +34,7 @@ public sealed class SessionsCapabilityFacts
     [Fact]
     public async Task Identity_owned_claims_never_reach_the_port()
     {
-        var sessions = new SessionsCapability(new ThrowingPort(), KitDeclarations.Identity);
+        var sessions = new BoundSessions(new ThrowingPort(), static () => RuntimeCallerContext.Current, KitDeclarations.Identity.RequirePrivileged);
         var member = new Member { PrincipalId = "p", AccountId = "a", BrainId = "b", Role = MemberRole.Owner, DisplayName = "P" };
         using (RuntimeCallerContext.Stamp(new CapabilityCaller("app:kit-auth", "a", "b", KitDeclarations.PrivilegedModule)))
         {

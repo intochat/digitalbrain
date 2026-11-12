@@ -41,8 +41,4 @@ public interface INeuronHost : IGrainWithStringKey
     /// <summary>Inspects the live state of the hosted neuron.</summary>
     [AlwaysInterleave, Alias("inspect-state")]
     Task<JsonElement?> InspectState(CancellationToken cancellationToken = default);
-
-    /// <summary>Ends this activation once idle, so the next call activates the class registered then; state and synapses survive.</summary>
-    [Alias("reload")]
-    Task Reload();
 }

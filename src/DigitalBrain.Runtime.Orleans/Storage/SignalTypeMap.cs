@@ -33,6 +33,10 @@ internal sealed class SignalTypeMap
         Add(typeof(Deployed));
         Add(typeof(Staged));
         Add(typeof(Undeployed));
+        Add(typeof(StageChanged));
+        Add(typeof(StageDropped));
+        Add(typeof(AliasesClaimed));
+        Add(typeof(AliasesReleased));
         // The installs neuron completes an install on the resolution of its plan.
         Add(typeof(DigitalBrain.Confirmation.ConfirmationRequested));
         Add(typeof(DigitalBrain.Confirmation.ConfirmationResolved));

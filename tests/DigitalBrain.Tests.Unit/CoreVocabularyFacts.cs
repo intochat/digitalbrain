@@ -1,4 +1,4 @@
-﻿using DigitalBrain.Contracts;
+using DigitalBrain.Contracts;
 using DigitalBrain.Kernel;
 using DigitalBrain.Neurons;
 

@@ -1,9 +1,10 @@
-using DigitalBrain.Capabilities;
-using DigitalBrain.Capabilities.Identity;
-
 namespace DigitalBrain.Identity.Local.Directory;
 
-/// <summary>Implements <see cref="IIdentityDirectoryPort"/> and <see cref="IIdentitySessionPort"/> over <see cref="DirectoryNeuron"/>.</summary>
+using DigitalBrain.Capabilities;
+using DigitalBrain.Capabilities.Identity;
+using DigitalBrain.Capabilities.Identity.Model;
+
+/// <summary>Implements <see cref="IIdentityDirectoryPort"/> and <see cref="IIdentitySessionPort"/> over <see cref="DirectoryNeuron"/> and <see cref="SessionsNeuron"/>.</summary>
 public sealed class LocalDirectoryPort(Func<Type, string, object> neuronResolver, TimeProvider? time = null)
     : IIdentityDirectoryPort, IIdentitySessionPort
 {
@@ -12,6 +13,8 @@ public sealed class LocalDirectoryPort(Func<Type, string, object> neuronResolver
         ProviderId = "local",
         Posture = IdentityPosture.Open,
     };
+
+    private static readonly TimeSpan DefaultSessionLifetime = TimeSpan.FromHours(24);
 
     private readonly Func<Type, string, object> _neuronResolver = neuronResolver ?? throw new ArgumentNullException(nameof(neuronResolver));
     private readonly TimeProvider _time = time ?? TimeProvider.System;
@@ -142,11 +145,22 @@ public sealed class LocalDirectoryPort(Func<Type, string, object> neuronResolver
     }
 
     /// <inheritdoc />
-    public Task<SessionIssued> Issue(CapabilityCaller caller, SessionRequest request, CancellationToken cancellationToken)
+    public async Task<SessionIssued> Issue(CapabilityCaller caller, SessionRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(caller);
         SessionClaims.Validate(request);
-        return Directory().Issue(request).WaitAsync(cancellationToken);
+        var member = request.Member;
+        var current = await Directory().Membership(member.BrainId, member.PrincipalId).WaitAsync(cancellationToken).ConfigureAwait(false);
+        if (current is null || current.AccountId != member.AccountId)
+        {
+            throw new InvalidOperationException($"{member.PrincipalId} is not a member of {member.BrainId}; no session is issued.");
+        }
+
+        var sessionId = $"session-{Guid.NewGuid():N}";
+        var expiresAt = _time.GetUtcNow() + (request.Lifetime ?? DefaultSessionLifetime);
+        var tokenHash = SessionBook.HashToken(sessionId);
+        await Sessions().Start(tokenHash, member.BrainId, member.PrincipalId, expiresAt).WaitAsync(cancellationToken).ConfigureAwait(false);
+        return new SessionIssued(sessionId, expiresAt);
     }
 
     /// <inheritdoc />
@@ -154,14 +168,22 @@ public sealed class LocalDirectoryPort(Func<Type, string, object> neuronResolver
     {
         ArgumentNullException.ThrowIfNull(caller);
         ArgumentNullException.ThrowIfNull(sessionId);
-        return Directory().End(sessionId).WaitAsync(cancellationToken);
+        var tokenHash = SessionBook.HashToken(sessionId);
+        return Sessions().End(tokenHash).WaitAsync(cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task<Member?> Validate(string sessionId, CancellationToken cancellationToken)
+    public async Task<Member?> Validate(string sessionId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(sessionId);
-        return Directory().Validate(sessionId).WaitAsync(cancellationToken);
+        var tokenHash = SessionBook.HashToken(sessionId);
+        var session = await Sessions().Find(tokenHash).WaitAsync(cancellationToken).ConfigureAwait(false);
+        if (session is null)
+        {
+            return null;
+        }
+
+        return await Directory().Membership(session.BrainId, session.PrincipalId).WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -169,4 +191,7 @@ public sealed class LocalDirectoryPort(Func<Type, string, object> neuronResolver
 
     private IDirectory Directory()
         => (IDirectory)_neuronResolver(typeof(IDirectory), IDirectory.Key);
+
+    private ISessionStore Sessions()
+        => (ISessionStore)_neuronResolver(typeof(ISessionStore), ISessionStore.Key);
 }

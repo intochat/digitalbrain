@@ -2,6 +2,7 @@ using DigitalBrain.Neurons;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Capabilities.Connections;
 using DigitalBrain.Capabilities.Connections.Broker;
+using DigitalBrain.Capabilities.Connections.Catalog;
 using DigitalBrain.Capabilities.Connections.Requests;
 
 namespace DigitalBrain.Identity.Local.Connections;
@@ -16,8 +17,21 @@ public sealed class LocalConnections(Func<Type, string, object> neuronResolver, 
     /// <inheritdoc />
     public async Task<IReadOnlyList<BrainConnection>> ListInOrder(BrainId brain, CancellationToken ct)
     {
-        var summaries = await Requests(brain).ListConnections().WaitAsync(ct).ConfigureAwait(false);
-        return [.. summaries.OrderBy(summary => summary.Order).Select(ToConnection)];
+        var catalog = await Catalog(brain).Read().WaitAsync(ct).ConfigureAwait(false);
+        var rows = Ordered(catalog.Rows, catalog.Order);
+        var result = new List<BrainConnection>();
+        foreach (var row in rows)
+        {
+            var provides = _neuronTypes?.ProvidesOf(row.ConnectorId) ?? [];
+            result.Add(new BrainConnection(
+                row.Key,
+                row.Account is { Length: > 0 } account ? account : row.ConnectionId,
+                row.Status == ConnectionStatus.Connected,
+                [.. provides],
+                null));
+        }
+
+        return result;
     }
 
     /// <inheritdoc />
@@ -30,8 +44,8 @@ public sealed class LocalConnections(Func<Type, string, object> neuronResolver, 
             throw new KeyNotFoundException($"Connection '{key}' does not belong to brain '{brain.Value}'.");
         }
 
-        var tracked = await Index(brain).List().WaitAsync(ct).ConfigureAwait(false);
-        if (!tracked.Contains(key, StringComparer.Ordinal))
+        var catalog = await Catalog(brain).Read().WaitAsync(ct).ConfigureAwait(false);
+        if (catalog.RowOf(key) is null)
         {
             throw new KeyNotFoundException($"Connection '{key}' is not tracked in brain '{brain.Value}'.");
         }
@@ -73,17 +87,25 @@ public sealed class LocalConnections(Func<Type, string, object> neuronResolver, 
         _ = await requests.Request(candidates[0]).WaitAsync(ct).ConfigureAwait(false);
     }
 
+    private IConnectionCatalog Catalog(BrainId brain)
+        => (IConnectionCatalog)_neuronResolver(typeof(IConnectionCatalog), IConnectionCatalog.Key(brain.Value));
+
     private IConnectionRequests Requests(BrainId brain)
         => (IConnectionRequests)_neuronResolver(typeof(IConnectionRequests), IConnectionRequests.Key(brain.Value));
 
-    private IConnectionIndex Index(BrainId brain)
-        => (IConnectionIndex)_neuronResolver(typeof(IConnectionIndex), IConnectionIndex.Key(brain.Value));
+    private static List<CatalogRow> Ordered(CatalogRow[] rows, string[] order)
+    {
+        var rowMap = rows.ToDictionary(r => r.Key, StringComparer.Ordinal);
+        var ordered = new List<CatalogRow>();
+        foreach (var key in order)
+        {
+            if (rowMap.Remove(key, out var row))
+            {
+                ordered.Add(row);
+            }
+        }
 
-    private static BrainConnection ToConnection(ConnectionSummary summary)
-        => new(
-            summary.Neuron,
-            summary.Account is { Length: > 0 } account ? account : summary.Id,
-            string.Equals(summary.Status, "connected", StringComparison.OrdinalIgnoreCase),
-            [.. summary.Provides.Select(text => CapabilityId.TryParse(text, out var id) ? id : (CapabilityId?)null).OfType<CapabilityId>()],
-            null);
+        ordered.AddRange(rowMap.Values);
+        return ordered;
+    }
 }

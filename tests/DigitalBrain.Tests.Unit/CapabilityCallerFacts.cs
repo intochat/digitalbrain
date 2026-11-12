@@ -1,4 +1,4 @@
-﻿using DigitalBrain.Capabilities;
+using DigitalBrain.Capabilities;
 
 namespace DigitalBrain.Tests.Unit;
 

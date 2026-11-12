@@ -416,28 +416,12 @@ internal sealed class BrainLog : IAsyncDisposable, IJournalView
                 _subscriptions.Fold(subscriber, sideSub.Bytes, StateChange.Write, owner: entry.Owner);
             }
         }
-        else if (entry.Side is { Name: "synapses" } sideLegacy)
-        {
-            if (TryParseNeuronId(entry.Owner, out var subscriber)
-                && SubscriptionUpgrade.TryUpgrade(subscriber, sideLegacy.Bytes, DateTimeOffset.FromUnixTimeMilliseconds(entry.AtUnixMs)) is { } upgraded)
-            {
-                _subscriptions.Fold(upgraded, owner: entry.Owner);
-            }
-        }
 
         if (entry.State is { Name: DigitalBrain.Kernel.Subscriptions.RecordName } stateSub)
         {
             if (TryParseNeuronId(entry.Owner, out var subscriber))
             {
                 _subscriptions.Fold(subscriber, stateSub.Bytes, stateSub.Change, owner: entry.Owner);
-            }
-        }
-        else if (entry.State is { Name: "synapses" } stateLegacy)
-        {
-            if (TryParseNeuronId(entry.Owner, out var subscriber)
-                && SubscriptionUpgrade.TryUpgrade(subscriber, stateLegacy.Bytes, DateTimeOffset.FromUnixTimeMilliseconds(entry.AtUnixMs)) is { } upgraded)
-            {
-                _subscriptions.Fold(upgraded, owner: entry.Owner);
             }
         }
     }
@@ -715,14 +699,6 @@ internal sealed class BrainLog : IAsyncDisposable, IJournalView
                 if (TryParseNeuronId(grain, out var subscriber))
                 {
                     _subscriptions.Fold(subscriber, subRecord.Bytes, StateChange.Write, owner: grain);
-                }
-            }
-            else if (states.TryGetValue("synapses", out var legacyRecord))
-            {
-                if (TryParseNeuronId(grain, out var subscriber)
-                    && SubscriptionUpgrade.TryUpgrade(subscriber, legacyRecord.Bytes, DateTimeOffset.UnixEpoch) is { } upgraded)
-                {
-                    _subscriptions.Fold(upgraded, owner: grain);
                 }
             }
         }

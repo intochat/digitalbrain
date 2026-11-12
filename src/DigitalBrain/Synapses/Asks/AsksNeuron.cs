@@ -62,7 +62,7 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog) : Neuron, IAsks
         ArgumentNullException.ThrowIfNull(catalog);
         try
         {
-            _ = AskRules.Checked(asked.Asks, catalog.Current.For(Id.Key));
+            _ = AskRules.Checked(asked.Asks, catalog.Static.For(Id.Key));
         }
         catch (InvalidOperationException)
         {

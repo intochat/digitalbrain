@@ -35,7 +35,7 @@ public sealed class HostRefusesBannedApisFacts
         { "System.Runtime.CompilerServices.Unsafe.As called from Leak", "public static class Leak { public static long Cast(object o) => System.Runtime.CompilerServices.Unsafe.As<object, long>(ref o); }" },
         { "System.Runtime.InteropServices.MemoryMarshal.CreateSpan called from Leak", "public static class Leak { public static int Poke(ref int x) => System.Runtime.InteropServices.MemoryMarshal.CreateSpan(ref x, 64)[63]; }" },
         { "DigitalBrain.Units.ISynapseHost", "public static class Leak { public static object? Host(IServiceProvider services) => services.GetService(typeof(DigitalBrain.Units.ISynapseHost)); }" },
-        { "DigitalBrain.Runtime.Synapses.SynapseHost", "public static class Leak { public static Type Host() => typeof(DigitalBrain.Runtime.Synapses.SynapseHost); }" },
+        { "DigitalBrain.Runtime.Synapses.UnitDeployer", "public static class Leak { public static Type Host() => typeof(DigitalBrain.Runtime.Synapses.UnitDeployer); }" },
         { "System.AppContext.", "public static class Leak { public static object? Data() => AppContext.GetData(\"x\"); }" },
         { "System.Progress", "public static class Leak { public static object Report() => new Progress<int>(_ => { }); }" },
         { "System.Buffers.ArrayPool.get_Shared", "public static class Leak { public static int[] Rent() => System.Buffers.ArrayPool<int>.Shared.Rent(4); }" },
@@ -51,7 +51,7 @@ public sealed class HostRefusesBannedApisFacts
         { "System.Text.Json.JsonSerializer.Deserialize(System.String,System.Type", "public static class Leak { public static object? Make(Type t) => System.Text.Json.JsonSerializer.Deserialize(\"{}\", t); }" },
         { "System.Text.Json.JsonSerializer.Serialize(System.Object,System.Type", "public static class Leak { public static string Read(object o, Type t) => System.Text.Json.JsonSerializer.Serialize(o, t); }" },
         { "typeof(System.Net.Http.HttpClient) in an attribute", "public sealed class TagAttribute(Type type) : Attribute { public Type Type { get; } = type; }\n[Tag(typeof(System.Net.Http.HttpClient))] public static class Leak { }" },
-        { "typeof(DigitalBrain.Runtime.Synapses.SynapseHost) in an attribute", "public sealed class TagAttribute : Attribute { public Type[] Types { get; set; } = []; }\n[Tag(Types = [typeof(int), typeof(DigitalBrain.Runtime.Synapses.SynapseHost)])] public static class Leak { }" },
+        { "typeof(DigitalBrain.Runtime.Synapses.UnitDeployer) in an attribute", "public sealed class TagAttribute : Attribute { public Type[] Types { get; set; } = []; }\n[Tag(Types = [typeof(int), typeof(DigitalBrain.Runtime.Synapses.UnitDeployer)])] public static class Leak { }" },
         // I4: nothing leaves the activation's turn.
         { "System.Threading.Tasks.Task.ConfigureAwait", "public static class Leak { public static async Task Go() => await Task.Delay(1).ConfigureAwait(false); }" },
         { "System.Threading.Tasks.ValueTask.ConfigureAwait", "public static class Leak { public static async Task Go() => await default(ValueTask).ConfigureAwait(false); }" },
@@ -83,7 +83,7 @@ public sealed class HostRefusesBannedApisFacts
     [Fact]
     public async Task AUnitUsingTheAllowedSurfaceDeploys()
     {
-        await using var host = Host(new Installs());
+        var host = Host(new Installs());
         var outcome = await host.Deploy(Brain("ok"), Source(SynapseCompilerFacts.Budget + """
 
             public sealed record Note(string Text);
@@ -133,7 +133,7 @@ public sealed class HostRefusesBannedApisFacts
     [Fact]
     public async Task AUnitUsingCollectionExpressionsAndSpansDeploys()
     {
-        await using var host = Host(new Installs());
+        var host = Host(new Installs());
         var outcome = await host.Deploy(Brain("cx"), Source(SynapseCompilerFacts.Budget + """
 
             [System.Runtime.CompilerServices.InlineArray(4)]
@@ -170,7 +170,7 @@ public sealed class HostRefusesBannedApisFacts
     [Fact]
     public async Task AUnitUsingWhatTheCompilerEmitsDeploys()
     {
-        await using var host = Host(new Installs());
+        var host = Host(new Installs());
         var outcome = await host.Deploy(Brain("ce"), Source(SynapseCompilerFacts.Budget + """
 
             public sealed record Item
@@ -227,8 +227,8 @@ public sealed class HostRefusesBannedApisFacts
     [Fact]
     public async Task NonCodeFilesRideInTheSourceAndItsHashButDoNotCompile()
     {
-        var store = new Store();
-        await using var host = Host(new Installs(), store);
+        var deployment = new FakeDeployment(new Installs());
+        var host = Host(new Installs(), deployment);
         var files = new Dictionary<string, string>
         {
             ["Budget.cs"] = SynapseCompilerFacts.Budget,
@@ -239,8 +239,8 @@ public sealed class HostRefusesBannedApisFacts
         var outcome = await host.Deploy(Brain("nc"), new SynapseSource(Key, files, null), None, Ct);
 
         Assert.True(outcome.Status == DeployStatus.Deployed, outcome.Reason);
-        var record = Assert.Single(await store.List(Brain("nc"), Ct));
-        Assert.Equal(["Budget.cs", "scenarios.json", "spec.md"], record.Files.Keys.Order(StringComparer.Ordinal));
+        Assert.NotNull(deployment.LastBuild);
+        Assert.Equal(["Budget.cs", "scenarios.json", "spec.md"], deployment.LastBuild.Files.Keys.Order(StringComparer.Ordinal));
         var changed = new Dictionary<string, string>(files) { ["spec.md"] = "# Weekly cap, revised" };
         Assert.NotEqual(outcome.Hash, host.Compiler.Compile(new SynapseSource(Key, changed, null)).Hash);
     }
@@ -264,7 +264,8 @@ public sealed class HostRefusesBannedApisFacts
     public async Task ARefusedDeployKeepsTheStagedBuild()
     {
         var installs = new Installs();
-        await using var host = Host(installs);
+        var deployment = new FakeDeployment(installs);
+        var host = Host(installs, deployment);
         var brain = Brain("st");
         Assert.Equal(DeployStatus.Deployed, (await host.Deploy(brain, Source(SynapseCompilerFacts.Budget), None, Ct)).Status);
         installs.Ask = true;
@@ -283,7 +284,7 @@ public sealed class HostRefusesBannedApisFacts
 
     private static async Task Refuses(string named, string leak)
     {
-        await using var host = Host(new Installs());
+        var host = Host(new Installs());
         var source = Source(SynapseCompilerFacts.Budget + "\n" + leak);
         Assert.True(host.Compiler.Compile(source).Success);
 
@@ -304,31 +305,50 @@ public sealed class HostRefusesBannedApisFacts
     private static SynapseSource Source(string text) => new(Key, new Dictionary<string, string> { ["Budget.cs"] = text }, null);
 
     // The analyzer is left out, so only the host's own check stands in front of the load.
-    private static SynapseHost Host(Installs installs, Store? store = null)
+    private static UnitDeployer Host(Installs installs, FakeDeployment? deployment = null)
     {
-        var catalog = new SynapseCatalogSource(SynapseCatalog.Scan());
-        return new(
-            new SynapseCompiler(ReferenceSet.FromDefaultContext(), [], withoutBannedApis: true),
-            new SynapseLoader(),
-            new Registrar(catalog),
-            catalog,
-            _ => installs,
-            store ?? new Store(),
-            new Listeners());
+        var loader = new UnitLoader();
+        var compiler = new SynapseCompiler(ReferenceSet.FromDefaultContext(), [], withoutBannedApis: true);
+        var sources = new FakeSources();
+        var dep = deployment ?? new FakeDeployment(installs);
+        return new UnitDeployer(compiler, loader, _ => sources, _ => dep);
     }
 
     private sealed class NoBindings : Dictionary<string, IReadOnlyDictionary<string, string>>;
 
-    // Merges what it activates, as the runtime registrar does, so the host sees the live needs.
-    private sealed class Registrar(SynapseCatalogSource catalog) : ISynapseRegistrar
+    private sealed class FakeSources : ISources
     {
-        public Task Activate(BrainId brain, LoadedSource source, CancellationToken ct)
+        public Task<AliasConflict?> Claim(string sourceKey, IReadOnlyList<string> aliases, CancellationToken ct = default) => Task.FromResult<AliasConflict?>(null);
+        public Task Release(string sourceKey, IReadOnlyList<string> aliases, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<string?> OwnerOf(string alias, CancellationToken ct = default) => Task.FromResult<string?>("Me.Budget");
+        public Task<IReadOnlyList<string>> Keys(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>(["Me.Budget"]);
+    }
+
+    private sealed class FakeDeployment(Installs installs) : IUnitDeployment
+    {
+        public StoredBuild? LastBuild { get; private set; }
+        public StoredBuild? StagedBuild { get; private set; }
+
+        public Task<DeployOutcome> Propose(StoredBuild build, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> bindings, CancellationToken ct = default)
         {
-            catalog.Merge(source.Catalog);
-            return Task.CompletedTask;
+            if (installs.Ask)
+            {
+                StagedBuild = build;
+                var p = build.Aliases.ToDictionary(a => a, a => new InstallOutcome(InstallStatus.Pending, "", "plan-1"));
+                return Task.FromResult(new DeployOutcome(DeployStatus.Staged, build.Ref.Hash, [], p, null));
+            }
+            LastBuild = build;
+            var outcomes = build.Aliases.ToDictionary(a => a, a => installs.Install(new InstallRequest(a, new Dictionary<string, string>()), ct).Result);
+            return Task.FromResult(new DeployOutcome(DeployStatus.Deployed, build.Ref.Hash, [], outcomes, null));
         }
 
-        public Task Deactivate(BrainId brain, string sourceKey, IReadOnlyList<string> aliases, CancellationToken ct) => Task.CompletedTask;
+        public Task<BuildRef?> Ref(UnitView view, CancellationToken ct = default) =>
+            Task.FromResult<BuildRef?>(view == UnitView.Proposed && StagedBuild != null ? StagedBuild.Ref : LastBuild?.Ref);
+        public Task<StoredBuild?> Build(string hash, CancellationToken ct = default) => Task.FromResult(LastBuild?.Ref.Hash == hash ? LastBuild : null);
+        public Task<UnitSourceView?> Source(CancellationToken ct = default) =>
+            Task.FromResult(LastBuild is not null ? new UnitSourceView(LastBuild.Ref.SourceKey, LastBuild.Ref.Hash, LastBuild.Files, LastBuild.Icon, LastBuild.Aliases, DateTimeOffset.UtcNow, LastBuild.RebuildReason) : null);
+        public Task Refuse(string hash, string reason, CancellationToken ct = default) => Task.CompletedTask;
+        public Task Retire(CancellationToken ct = default) => Task.CompletedTask;
     }
 
     private sealed class Installs : IInstalls
@@ -345,41 +365,13 @@ public sealed class HostRefusesBannedApisFacts
 
         public Task CancelPending(string alias, CancellationToken ct) => Task.CompletedTask;
 
+        public Task Rewire(string alias, CancellationToken ct = default) => Task.CompletedTask;
+
         public Task<InstallRecord?> Describe(string alias, CancellationToken ct) =>
             Task.FromResult<InstallRecord?>(new InstallRecord(alias, "", new Dictionary<string, string>(), [], DateTimeOffset.UnixEpoch));
 
         public Task<IReadOnlyList<InstallRecord>> List(CancellationToken ct) => Task.FromResult<IReadOnlyList<InstallRecord>>([]);
 
         public Task<IReadOnlyList<PendingInstall>> Pending(CancellationToken ct) => Task.FromResult<IReadOnlyList<PendingInstall>>([]);
-    }
-
-    private sealed class Store : ISourceStore
-    {
-        public List<SourceRecord> Puts { get; } = [];
-
-        public Task<SourceRecord?> Get(BrainId brain, string sourceKey, CancellationToken ct) => Task.FromResult(Puts.LastOrDefault(r => r.SourceKey == sourceKey));
-
-        public Task Put(BrainId brain, SourceRecord record, CancellationToken ct)
-        {
-            Puts.Add(record);
-            return Task.CompletedTask;
-        }
-
-        public Task Stage(BrainId brain, string sourceKey, string hash, CancellationToken ct) => Task.CompletedTask;
-
-        public Task Remove(BrainId brain, string sourceKey, CancellationToken ct) => Task.CompletedTask;
-
-        public Task<IReadOnlyList<SourceRecord>> List(BrainId brain, CancellationToken ct) => Task.FromResult<IReadOnlyList<SourceRecord>>([.. Puts]);
-    }
-
-    private sealed class Listeners : IClusterListeners
-    {
-        public Task<IAsyncDisposable> Listen<TSignal>(string listener, Func<NeuronId, TSignal, CancellationToken, Task> handler)
-            where TSignal : Signal => Task.FromResult<IAsyncDisposable>(new Nop());
-
-        private sealed class Nop : IAsyncDisposable
-        {
-            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-        }
     }
 }

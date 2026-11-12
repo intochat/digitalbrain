@@ -1,9 +1,11 @@
+using DigitalBrain.Brains;
 using DigitalBrain.Modules;
 using DigitalBrain.Neurons;
 using System.Reflection;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Capabilities.Connections;
 using DigitalBrain.Capabilities.Connections.Broker;
+using DigitalBrain.Capabilities.Connections.Catalog;
 using DigitalBrain.Capabilities.Connections.Connectors;
 using DigitalBrain.Capabilities.Connections.Requests;
 using DigitalBrain.Capabilities.Storage;
@@ -29,7 +31,7 @@ public sealed class LocalConnectionsConformance : ConnectionsConformance<LocalCo
     private static readonly ConnectionNeuronTypes NeuronTypes = new([typeof(KitConnectorModule)]);
 
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "db-conn-" + Guid.NewGuid().ToString("N"));
-    private readonly AmbientCallerScope _callers = new();
+    private readonly LocalCallerScope _callers = new();
     private SimpleServiceProvider? _provider;
     private TestOS? _os;
     private ICapabilityConnections? _connections;
@@ -45,8 +47,8 @@ public sealed class LocalConnectionsConformance : ConnectionsConformance<LocalCo
         services.AddLocalIdentity((contract, fullKey) => ResolveNeuron(os!, contract, fullKey), _directory);
         _provider = services.BuildServiceProvider();
         _os = os = TestOS.Local(options => options.Services = _provider);
-        _os.Register<ConnectionIndexNeuron>();
-        _os.Register<ConnectionRequestsNeuron>();
+        _os.Register<ConnectionCatalogNeuron>();
+        _os.Register<KitConnectorNeuron>();
         _connections = _provider.GetRequiredService<ICapabilityConnections>();
         return ValueTask.CompletedTask;
     }
@@ -67,16 +69,21 @@ public sealed class LocalConnectionsConformance : ConnectionsConformance<LocalCo
     protected override Task<ConnectionsSubject> Connect(CancellationToken ct)
     {
         var brain = new BrainId($"kit-brain-{Guid.NewGuid():N}");
-        var requests = _os!.Get<IConnectionRequests>(IConnectionCatalogUpdates.Id(brain.Value));
-        var index = _os.Get<IConnectionIndex>(IConnectionIndex.Id(brain.Value));
+        var requests = _os!.Get<IConnectionRequests>(IConnectionCatalog.Id(brain.Value));
         return Task.FromResult(new ConnectionsSubject(_connections!, requests, _callers)
         {
             Brain = brain,
             ConnectorKind = ConnectorId,
             Capability = Capability.Storage.V1,
-            Index = index,
+            AddConnection = async key =>
+            {
+                var connection = _os.Get<IConnection>(ConnectionKeys.IdFor(key));
+                using var _ = _callers.As(new CapabilityCaller("kit-owner", "kit-account", brain.Value));
+                await connection.Connect("token", "secret-token-value");
+                await _os.Idle();
+            },
             RequestedSignals = _ => Task.FromResult<IReadOnlyList<ConnectionRequested>>(
-                [.. _os.Journal(brain).Signals(IConnectionCatalogUpdates.Id(brain.Value))
+                [.. _os.Journal(brain).Signals(IConnectionCatalog.Id(brain.Value))
                     .Select(entry => entry.Signal)
                     .OfType<ConnectionRequested>()]),
         });
@@ -103,14 +110,14 @@ public sealed class LocalConnectionsConformance : ConnectionsConformance<LocalCo
         var key = fullKey[(separator + 1)..];
         var type = contract.GetCustomAttribute<DefaultNeuronTypeAttribute>(inherit: false)!.Type;
         var id = new NeuronId(new BrainId(brain), type, key);
+        if (contract == typeof(IConnectionCatalog))
+        {
+            return os.Get<IConnectionCatalog>(id);
+        }
+
         if (contract == typeof(IConnectionRequests))
         {
             return os.Get<IConnectionRequests>(id);
-        }
-
-        if (contract == typeof(IConnectionIndex))
-        {
-            return os.Get<IConnectionIndex>(id);
         }
 
         throw new InvalidOperationException($"Unsupported neuron contract {contract.FullName}.");
@@ -130,5 +137,14 @@ public sealed class LocalConnectionsConformance : ConnectionsConformance<LocalCo
     {
         protected override Task<ConnectionProbeResult> ProbeAsync(Credential credential, CancellationToken ct)
             => Task.FromResult(ConnectionProbeResult.Connected());
+    }
+
+    private sealed class LocalCallerScope : CallerScope
+    {
+        public override IDisposable As(CapabilityCaller caller)
+        {
+            ArgumentNullException.ThrowIfNull(caller);
+            return CallerAdmission.Stamp(caller);
+        }
     }
 }

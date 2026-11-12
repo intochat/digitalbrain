@@ -14,14 +14,19 @@ public interface IGsPayments
 
 // Publishes the live generated Charging signal: its type is read from the catalog on each call, as the source declares it.
 [Neuron("gs.payments")]
-public sealed class GsPayments(ISynapseCatalogSource? source = null) : Neuron<GsPayments.Count>, IGsPayments
+public sealed class GsPayments(ISynapseCatalogSource? source = null, UnitResolver? resolver = null) : Neuron<GsPayments.Count>, IGsPayments
 {
-    public Task Charge(decimal amount)
+    public async Task Charge(decimal amount)
     {
-        var catalogSource = source ?? throw new InvalidOperationException("no catalog");
-        var type = catalogSource.Current.For(WeeklyCapSource.Week).FirstOrDefault(d => d.Kind == SynapseKind.Reaction)?.Signal
+        Type? type = null;
+        if (resolver is not null)
+        {
+            using var handle = await resolver.Resolve(Id.Brain, WeeklyCapSource.Week, UnitView.Live, CancellationToken.None).ConfigureAwait(true);
+            type = handle?.Catalog.For(WeeklyCapSource.Week).FirstOrDefault(d => d.Kind == SynapseKind.Reaction)?.Signal;
+        }
+        type ??= source?.Static.For(WeeklyCapSource.Week).FirstOrDefault(d => d.Kind == SynapseKind.Reaction)?.Signal
             ?? throw new InvalidOperationException("no reaction is installed");
-        return Save(State with { N = State.N + 1 }, (Signal)Activator.CreateInstance(type, amount)!);
+        await Save(State with { N = State.N + 1 }, (Signal)Activator.CreateInstance(type, amount)!).ConfigureAwait(true);
     }
 
     public sealed record Count
@@ -69,6 +74,16 @@ public sealed class GeneratedSourceFacts
         return state!.Value.GetProperty("spent").GetDecimal();
     }
 
+    private static void Collect()
+    {
+        for (var i = 0; i < 5; i++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+        }
+    }
+
     [Fact]
     public async Task ThePromiseHoldsFromTextToExecution()
     {
@@ -100,7 +115,8 @@ public sealed class GeneratedSourceFacts
         await Pay(os).Charge(50m);
         await os.Idle();
         Assert.Equal(100m, await Spent(os));
-        Assert.Empty(os.Synapses.Leaked);
+        Collect();
+        Assert.Empty(os.Loader.Lingering());
         Assert.Empty(os.Failures);
     }
 
@@ -125,7 +141,8 @@ public sealed class GeneratedSourceFacts
         var listed = Assert.Single(await os.Synapses.List(Brain, Ct));
         Assert.Equal((DeployStatus.Deployed, update.Hash), (listed.Status, listed.Hash));
         Assert.NotEmpty(os.Catalog.NeedsOf(WeeklyCapSource.Week).Slots);
-        Assert.Empty(os.Synapses.Leaked);
+        Collect();
+        Assert.Empty(os.Loader.Lingering());
         Assert.Empty(os.Failures);
     }
 
@@ -143,7 +160,8 @@ public sealed class GeneratedSourceFacts
         // No reaction is left on the alias: the publisher finds no Charging signal to publish.
         Assert.Empty(os.Catalog.For(WeeklyCapSource.Week));
         await Assert.ThrowsAsync<InvalidOperationException>(() => Pay(os).Charge(350m));
-        Assert.Empty(os.Synapses.Leaked);
+        Collect();
+        Assert.Empty(os.Loader.Lingering());
         Assert.Empty(os.Failures);
     }
 }

@@ -1,33 +1,29 @@
 using DigitalBrain.Confirmation;
+using DigitalBrain.Contracts;
 using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Units;
 
 /// <summary>
-/// The installs neuron of a brain: derives an app's needs from the catalog, asks a person once per distinct needs, records the
-/// approval with its bindings and schedules, and wires the host through <see cref="IInstallHooks"/>.
+/// The installs neuron of a brain: derives an app's needs from the catalog or proposed build, asks a person once per distinct needs,
+/// records the approval with its bindings and schedules, and wires the host through <see cref="IInstallHooks"/>.
 /// </summary>
 /// <remarks>
 /// An install is two-phase: <see cref="Install"/> records a <see cref="PendingInstall"/>, asks without awaiting the answer and returns
 /// <see cref="InstallStatus.Pending"/>; the neuron's brain-wide synapse on <see cref="ConfirmationResolved"/> completes it. A plan id
 /// that is not pending is ignored.
 /// </remarks>
-/// <param name="catalog">
-/// The live synapse catalog: needs and bindings come from <see cref="ISynapseCatalogSource.ForNeeds"/> (a staged build of the alias, else
-/// the current catalog); reaction edges from <see cref="ISynapseCatalogSource.Current"/>.
-/// </param>
+/// <param name="catalog">The synapse catalog source.</param>
 /// <param name="hooks">The host's install hooks.</param>
+/// <param name="units">The unit resolver for dynamic units, if available.</param>
 [Neuron("synapse.installs")]
-public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks hooks) : Neuron<InstallsState>, IInstalls, IInstallsCallbacks
+public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks hooks, UnitResolver? units = null) : Neuron<InstallsState>, IInstalls
 {
-    // Approvals waiting for their alias's source to be restored, by the one-use proof handed to the detached restore.
-    private readonly Dictionary<string, ConfirmationResolved> _restoring = new(StringComparer.Ordinal);
-
     /// <inheritdoc />
     public async Task<InstallOutcome> Install(InstallRequest request, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var (sentence, problem) = await Check(request, ct).ConfigureAwait(true);
+        var (sentence, problem, sourceCatalog) = await Check(request, ct).ConfigureAwait(true);
         if (problem is not null)
         {
             return new InstallOutcome(InstallStatus.Refused, sentence, problem);
@@ -35,7 +31,7 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
 
         var alias = request.Alias;
         var bindings = request.Bindings ?? new Dictionary<string, string>();
-        var needs = catalog.ForNeeds(alias).NeedsOf(alias);
+        var needs = sourceCatalog!.NeedsOf(alias);
         var hash = needs.Hash();
         var existing = State.FindRecord(alias);
         if (existing is not null && existing.NeedsHash == hash)
@@ -47,7 +43,7 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
                 status = InstallStatus.Updated;
             }
 
-            return new InstallOutcome(status, sentence, await Wire(alias, needs, ct).ConfigureAwait(true));
+            return new InstallOutcome(status, sentence, await Wire(alias, needs, ct, sourceCatalog).ConfigureAwait(true));
         }
 
         var plan = new ConfirmationPlan($"install:{alias}:{Guid.NewGuid():N}", ConfirmationAction.Other, Destructive: false, Title: alias, Body: sentence,
@@ -65,9 +61,8 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
                 await Save(State.RemovePendingPlan(pending.PlanId), [new InstallDenied(alias, pending.PlanId, reason)]).ConfigureAwait(true);
                 return new InstallOutcome(InstallStatus.Denied, sentence, reason);
             }
-            var source = catalog.ForNeeds(alias);
-            var needsResolved = source.NeedsOf(alias);
-            _ = await Wire(alias, needsResolved, ct).ConfigureAwait(true);
+            var needsResolved = sourceCatalog.NeedsOf(alias);
+            _ = await Wire(alias, needsResolved, ct, sourceCatalog).ConfigureAwait(true);
             await Save(State.CompleteInstall(pending, needsResolved, Context.Time.GetUtcNow()), [new Installed(alias, pending.NeedsHash)]).ConfigureAwait(true);
             return new InstallOutcome(InstallStatus.Installed, sentence, null);
         }
@@ -82,21 +77,25 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
     }
 
     // Why the request would be refused (unknown alias, an unbound slot, a binding the host rejects), or null; with the needs sentence.
-    private async Task<(string Sentence, string? Problem)> Check(InstallRequest request, CancellationToken ct)
+    private async Task<(string Sentence, string? Problem, SynapseCatalog? Source)> Check(InstallRequest request, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         var alias = request.Alias;
-        var source = alias is null ? null : catalog.ForNeeds(alias);
+        using var handle = units is not null
+            ? (await units.Resolve(Id.Brain, alias, UnitView.Proposed, ct).ConfigureAwait(true)
+               ?? await units.Resolve(Id.Brain, alias, UnitView.Live, ct).ConfigureAwait(true))
+            : null;
+        var source = handle?.Catalog ?? (catalog.Static.States.ContainsKey(alias) ? catalog.Static : null);
         if (alias is null || source is null || !source.States.ContainsKey(alias))
         {
-            return (string.Empty, $"no synapse app '{alias}'");
+            return (string.Empty, $"no synapse app '{alias}'", null);
         }
 
         var sentence = source.NeedsOf(alias).Sentence();
         var bindings = request.Bindings ?? new Dictionary<string, string>();
         if (source.NeedsOf(alias).Slots.FirstOrDefault(slot => !bindings.ContainsKey(slot.Name)) is { } unbound)
         {
-            return (sentence, $"slot '{unbound.Name}' has no binding");
+            return (sentence, $"slot '{unbound.Name}' has no binding", source);
         }
 
         ArgumentNullException.ThrowIfNull(hooks);
@@ -104,42 +103,20 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
         {
             if (await hooks.ValidateBinding(StateOf(alias), slot, bindings[slot.Name], ct).ConfigureAwait(true) is { } problem)
             {
-                return (sentence, problem);
+                return (sentence, problem, source);
             }
         }
 
-        return (sentence, null);
+        return (sentence, null, source);
     }
 
     /// <summary>Completes a pending install when its plan is resolved.</summary>
     /// <param name="resolved">The resolution.</param>
     /// <param name="ct">Cancellation.</param>
     [On]
-    public Task OnResolved(ConfirmationResolved resolved, CancellationToken ct)
+    public async Task OnResolved(ConfirmationResolved resolved, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(resolved);
-        return Judge(resolved, restore: true, ct);
-    }
-
-    /// <inheritdoc />
-    async Task IInstallsCallbacks.Restored(string proof)
-    {
-        ConfirmationResolved? resolved;
-        lock (_restoring)
-        {
-            resolved = _restoring.Remove(proof ?? "", out var found) ? found : null;
-        }
-
-        if (resolved is null)
-        {
-            throw new InvalidOperationException("Restored was called without a live proof.");
-        }
-
-        await Judge(resolved, restore: false, CancellationToken.None).ConfigureAwait(true);
-    }
-
-    private async Task Judge(ConfirmationResolved resolved, bool restore, CancellationToken ct)
-    {
         ArgumentNullException.ThrowIfNull(catalog);
         if (State.FindPendingByPlan(resolved.PlanId) is not { } pending) { return; }
         var alias = pending.Alias;
@@ -155,28 +132,43 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
             return;
         }
 
-        // After a restart the alias's source may not be live yet. The restore takes the synapse host's gate, and a deploy holding that gate
-        // may be waiting on this neuron, so the turn never awaits it: the ask stays pending, a detached restore runs, and its one-way
-        // callback judges the recorded answer again in a turn of its own. Approving an ask raised before a restart is never denied as unknown.
-        if (restore && !catalog.ForNeeds(alias).States.ContainsKey(alias))
-        {
-            var restorer = Seat.Services.GetService(typeof(ISynapseRestorer)) as ISynapseRestorer ?? NoSynapseRestorer.Instance;
-            var proof = Guid.NewGuid().ToString("N");
-            lock (_restoring) { _restoring[proof] = resolved; }
-            _ = RestoreThenJudge(restorer, alias, proof);
-            return;
-        }
-
-        var source = catalog.ForNeeds(alias);
-        if (!source.States.ContainsKey(alias))
+        using var handle = units is not null
+            ? (await units.Resolve(Id.Brain, alias, UnitView.Proposed, ct).ConfigureAwait(true)
+               ?? await units.Resolve(Id.Brain, alias, UnitView.Live, ct).ConfigureAwait(true))
+            : null;
+        var source = handle?.Catalog ?? (catalog.Static.States.ContainsKey(alias) ? catalog.Static : null);
+        if (source is null || !source.States.ContainsKey(alias))
         {
             await Save(State.RemovePendingPlan(pending.PlanId), [new InstallDenied(alias, pending.PlanId, "unknown alias")]).ConfigureAwait(true);
             return;
         }
 
         var needs = source.NeedsOf(alias);
-        _ = await Wire(alias, needs, ct).ConfigureAwait(true);
+        if (!string.Equals(needs.Hash(), pending.NeedsHash, StringComparison.Ordinal))
+        {
+            await Save(State.RemovePendingPlan(pending.PlanId), [new InstallDenied(alias, pending.PlanId, "superseded")]).ConfigureAwait(true);
+            return;
+        }
+
+        _ = await Wire(alias, needs, ct, source).ConfigureAwait(true);
         await Save(State.CompleteInstall(pending, needs, Context.Time.GetUtcNow()), [new Installed(alias, pending.NeedsHash)]).ConfigureAwait(true);
+    }
+
+    /// <inheritdoc />
+    public async Task Rewire(string alias, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(alias);
+        if (State.FindRecord(alias) is null) { return; }
+
+        using var handle = units is not null
+            ? await units.Resolve(Id.Brain, alias, UnitView.Live, ct).ConfigureAwait(true)
+            : null;
+        var source = handle?.Catalog ?? (catalog.Static.States.ContainsKey(alias) ? catalog.Static : null);
+        if (source is not null && source.States.ContainsKey(alias))
+        {
+            var needs = source.NeedsOf(alias);
+            await Wire(alias, needs, ct, source).ConfigureAwait(true);
+        }
     }
 
     /// <inheritdoc />
@@ -189,10 +181,6 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
     }
 
     /// <inheritdoc />
-    /// <remarks>
-    /// Pending asks of the alias are denied with reason <c>retired</c>. The record is removed and <see cref="Retired"/> published first; a failing hook is then swallowed, since
-    /// <see cref="IInstalls.Retire"/> reports nothing, and leaves edges or schedules the host must tolerate (they reach a retired app).
-    /// </remarks>
     public async Task Retire(string alias, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(hooks);
@@ -214,41 +202,30 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
     }
 
     /// <inheritdoc />
+    [ReadOnlyCall]
     public Task<InstallRecord?> Describe(string alias, CancellationToken ct) => Task.FromResult(State.FindRecord(alias));
 
     /// <inheritdoc />
+    [ReadOnlyCall]
     public Task<IReadOnlyList<InstallRecord>> List(CancellationToken ct) => Task.FromResult(State.Records);
 
     /// <inheritdoc />
+    [ReadOnlyCall]
     public Task<IReadOnlyList<PendingInstall>> Pending(CancellationToken ct) => Task.FromResult(State.Pending);
 
     /// <inheritdoc />
     protected override Task OnActivate(CancellationToken cancellationToken)
         => Context.Synapses.Ensure<ConfirmationResolved>(IConfirmationRequests.Of(Id.Brain));
 
-    // Detached from the turn: restores the alias, then posts the recorded answer back through the neuron's own mailbox.
-    private async Task RestoreThenJudge(ISynapseRestorer restorer, string alias, string proof)
-    {
-        try { await InstallRestore.EnsureInstalledAliases(catalog, [alias], restorer, Id.Brain, CancellationToken.None).ConfigureAwait(true); }
-        catch (Exception error) when (error is not OutOfMemoryException) { _ = error; } // judged as it is: an alias still missing is denied as unknown
-
-        try { await Context.Get<IInstallsCallbacks>(Id).Restored(proof).ConfigureAwait(true); }
-        catch (Exception error) when (error is not OutOfMemoryException)
-        {
-            // The ask stays pending; a later answer to a new ask of the alias completes it.
-            _ = error;
-            lock (_restoring) { _restoring.Remove(proof); }
-        }
-    }
-
     private NeuronId StateOf(string alias) => new(Id.Brain, alias, "default");
 
     // Runs the hooks; a failure comes back as a reason. The next Install of the alias retries.
-    private async Task<string?> Wire(string alias, SynapseNeeds needs, CancellationToken ct)
+    private async Task<string?> Wire(string alias, SynapseNeeds needs, CancellationToken ct, SynapseCatalog? sourceCatalog = null)
     {
         ArgumentNullException.ThrowIfNull(hooks);
         var state = StateOf(alias);
-        var reactions = catalog.Current.For(alias).Where(d => d.Kind == SynapseKind.Reaction).ToList();
+        var cat = sourceCatalog ?? catalog.Static;
+        var reactions = cat.For(alias).Where(d => d.Kind == SynapseKind.Reaction).ToList();
         var signals = reactions.Where(d => d.SignalAlias is null).Select(d => d.Signal!).Distinct().ToList();
         var aliases = reactions.Select(d => d.SignalAlias).OfType<string>().Distinct(StringComparer.Ordinal).ToList();
         try

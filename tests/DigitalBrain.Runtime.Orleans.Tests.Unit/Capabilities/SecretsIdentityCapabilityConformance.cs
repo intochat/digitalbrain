@@ -1,6 +1,7 @@
 using DigitalBrain.Modules;
 using System.Collections.Concurrent;
 using DigitalBrain.Capabilities;
+using DigitalBrain.Capabilities.Identity;
 using DigitalBrain.Runtime.Orleans.Capabilities;
 using DigitalBrain.Testing.Conformance;
 using DigitalBrain.Testing.Conformance.Identity;
@@ -58,13 +59,14 @@ public sealed class SecretsCapabilityConformance : SecretsConformance<SecretsCap
 }
 
 // The identity@1 kit against the runtime capabilities over the in-memory directory port.
-public sealed class IdentityCapabilityConformance : IdentityConformance<IdentityCapability>
+public sealed class IdentityCapabilityConformance : IdentityConformance<BoundIdentity>
 {
     protected override Task<IdentitySubject> Connect(CancellationToken ct)
     {
         var directory = new InMemoryIdentityDirectory();
-        var sessions = new SessionsCapability(directory, KitDeclarations.Identity);
-        return Task.FromResult(new IdentitySubject(new IdentityCapability(directory), new GrantsCapability(directory), new RuntimeCallerScope(), directory.SignIn)
+        var sessions = new BoundSessions(directory, static () => RuntimeCallerContext.Current, KitDeclarations.Identity.RequirePrivileged);
+        var identity = new BoundIdentity(directory, static () => RuntimeCallerContext.Current);
+        return Task.FromResult(new IdentitySubject(identity, identity, new RuntimeCallerScope(), directory.SignIn)
         {
             Sessions = sessions,
             Description = sessions,

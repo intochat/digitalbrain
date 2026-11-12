@@ -109,6 +109,7 @@ jobs:
             tests/DigitalBrain.Capabilities.Http.Tests.Unit \
             tests/DigitalBrain.Capabilities.Tools.Tests.Unit \
             tests/DigitalBrain.Identity.Local.Tests.Unit \
+            tests/DigitalBrain.Runtime.Synapses.Tests.Unit \
             examples/Calculator.Tests.Unit; do
             name=$(basename "$project")
             dotnet test --project "$project/$name.csproj" -c Release
@@ -177,7 +178,7 @@ jobs:
       - name: No Orleans in the core packages
         run: |
           status=0
-          for name in DigitalBrain DigitalBrain.UI DigitalBrain.Testing DigitalBrain.Analyzers DigitalBrain.Capabilities.Compute DigitalBrain.Capabilities.Connections DigitalBrain.Capabilities.Http DigitalBrain.Capabilities.Tools DigitalBrain.Identity.Local; do
+          for name in DigitalBrain DigitalBrain.Simulation DigitalBrain.UI DigitalBrain.Testing DigitalBrain.Analyzers DigitalBrain.Capabilities.Compute DigitalBrain.Capabilities.Connections DigitalBrain.Capabilities.Http DigitalBrain.Capabilities.Tools DigitalBrain.Identity.Local; do
             project="src/$name/$name.csproj"
             dotnet restore "$project" -v quiet
             if dotnet list "$project" package --include-transitive | grep -i orleans; then

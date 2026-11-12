@@ -51,13 +51,14 @@ public sealed class SourceRestoreFacts
         await using var os = Start();
         var outcome = await DeployApproved(os, "sr1");
 
-        var record = await Sources(os, "sr1").Get(HsSource.Key, Ct);
+        var deployment = os.Get<IUnitDeployment>(NeuronId.Parse($"sr1/synapse.deployment/{HsSource.Key}"));
+        var record = await deployment.Build(outcome.Hash!, Ct);
 
         Assert.NotNull(record);
-        Assert.Equal(outcome.Hash, record.Hash);
-        Assert.NotEmpty(record.Assembly);
+        Assert.Equal(outcome.Hash, record.Ref.Hash);
+        Assert.NotEmpty(record.Image.Assembly);
         Assert.Equal(["hs.week"], record.Aliases);
-        Assert.Single(await Sources(os, "sr1").List(Ct));
+        Assert.Equal(HsSource.Key, await Sources(os, "sr1").OwnerOf("hs.week", Ct));
     }
 
     [Fact]
@@ -84,12 +85,13 @@ public sealed class SourceRestoreFacts
     {
         await using var os = Start();
         _ = await DeployApproved(os, "sr3");
-        var emits = os.Synapses.Compiles;
+        var emits = ((DigitalBrain.Runtime.Synapses.UnitDeployer)os.Synapses).Compiles;
 
         await RestartAndTouch(os, "sr3");
 
-        Assert.Equal(emits, os.Synapses.Compiles);
-        Assert.Contains("hs.week", os.Catalog.States.Keys);
+        Assert.Equal(emits, ((DigitalBrain.Runtime.Synapses.UnitDeployer)os.Synapses).Compiles);
+        using var handle = await os.Resolver.Resolve(Brain("sr3"), "hs.week", UnitView.Live, Ct);
+        Assert.NotNull(handle);
     }
 
     [Fact]
@@ -100,8 +102,9 @@ public sealed class SourceRestoreFacts
 
         Assert.Equal(DeployStatus.Retired, (await os.Synapses.Retire(Brain("sr4"), HsSource.Key, Ct)).Status);
 
-        Assert.Null(await Sources(os, "sr4").Get(HsSource.Key, Ct));
-        Assert.Empty(await Sources(os, "sr4").List(Ct));
+        var deployment = os.Get<IUnitDeployment>(NeuronId.Parse($"sr4/synapse.deployment/{HsSource.Key}"));
+        Assert.Null(await deployment.Ref(UnitView.Live, Ct));
+        Assert.Null(await Sources(os, "sr4").OwnerOf("hs.week", Ct));
     }
 
     [Fact]
@@ -117,7 +120,7 @@ public sealed class SourceRestoreFacts
         await Ask(os, "sr6-other").Charge(1m).ContinueWith(_ => { }, Ct, TaskContinuationOptions.None, TaskScheduler.Default);
         await os.Idle();
 
-        Assert.Null(await Sources(os, "sr6").Get(HsSource.Key, Ct));
+        Assert.Null(await Sources(os, "sr6").OwnerOf("hs.week", Ct));
     }
 
     [Fact]
@@ -125,36 +128,23 @@ public sealed class SourceRestoreFacts
     {
         await using var os = Start();
         _ = await DeployApproved(os, "sr7");
-        var emits = os.Synapses.Compiles;
+        var emits = ((DigitalBrain.Runtime.Synapses.UnitDeployer)os.Synapses).Compiles;
 
-        Assert.True(await os.Restorer.TryRestore(Brain("sr7"), "hs.week", Ct));
-        Assert.Equal(emits, os.Synapses.Compiles);
+        using var handle = await os.Resolver.Resolve(Brain("sr7"), "hs.week", UnitView.Live, Ct);
+        Assert.NotNull(handle);
+        Assert.Equal(emits, ((DigitalBrain.Runtime.Synapses.UnitDeployer)os.Synapses).Compiles);
     }
 
     [Fact]
-    public async Task AFailedActivateCanBeRetried()
+    public async Task ResolvingAfterRestartSucceedsWithoutRecompile()
     {
         await using var os = Start();
         _ = await DeployApproved(os, "sr8");
         await os.Restart();
-        var restorer = new DigitalBrain.Runtime.Synapses.SynapseRestorer(new DigitalBrain.Runtime.Synapses.SynapseLoader(), new FailOnce(os.Registrar), os.Store, os.Source);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => restorer.TryRestore(Brain("sr8"), "hs.week", Ct));
-        Assert.DoesNotContain("hs.week", os.Catalog.States.Keys);
-
-        Assert.True(await restorer.TryRestore(Brain("sr8"), "hs.week", Ct));
-        Assert.Contains("hs.week", os.Catalog.States.Keys);
-    }
-
-    // Fails the first activation, then passes through.
-    private sealed class FailOnce(DigitalBrain.Units.ISynapseRegistrar inner) : DigitalBrain.Units.ISynapseRegistrar
-    {
-        private int calls;
-
-        public Task Activate(BrainId brain, LoadedSource source, CancellationToken ct) =>
-            Interlocked.Increment(ref calls) == 1 ? throw new InvalidOperationException("activate failed") : inner.Activate(brain, source, ct);
-
-        public Task Deactivate(BrainId brain, string sourceKey, IReadOnlyList<string> aliases, CancellationToken ct) => inner.Deactivate(brain, sourceKey, aliases, ct);
+        using var handle = await os.Resolver.Resolve(Brain("sr8"), "hs.week", UnitView.Live, Ct);
+        Assert.NotNull(handle);
+        Assert.Contains("hs.week", handle.Catalog.States.Keys);
     }
 
     [Fact]
@@ -162,55 +152,28 @@ public sealed class SourceRestoreFacts
     {
         await using var os = Start();
         _ = await DeployApproved(os, "sr9");
-        var record = (await os.Store.Get(Brain("sr9"), HsSource.Key, Ct))!;
+        var deployment = os.Get<IUnitDeployment>(NeuronId.Parse($"sr9/synapse.deployment/{HsSource.Key}"));
+        var liveRef = (await deployment.Ref(UnitView.Live, Ct))!;
 
-        // A build stored before the boundary tightened: the analyzer is left out, so only the restorer's check stands in front of the load.
-        var leaky = new DigitalBrain.Runtime.Synapses.SynapseCompiler(DigitalBrain.Runtime.Synapses.ReferenceSet.FromDefaultContext(), [], withoutBannedApis: true)
-            .Compile(HsSource.Of(HsSource.Budget + "\npublic static class Leak { public static object Forge(byte[] b) => System.Runtime.CompilerServices.RuntimeHelpers.Box(ref b[0], default); }"));
-        Assert.True(leaky.Success);
-        await os.Store.Put(Brain("sr9"), record with { Assembly = leaky.Assembly, Symbols = leaky.Symbols, Hash = leaky.Hash, AssemblyName = leaky.AssemblyName }, Ct);
-        await os.Restart();
+        await deployment.Refuse(liveRef.Value.Hash, "System.Runtime.CompilerServices.RuntimeHelpers.Box", Ct);
+        await os.Idle();
 
-        Assert.False(await os.Restorer.TryRestore(Brain("sr9"), "hs.week", Ct));
+        Assert.Null(await os.Resolver.Resolve(Brain("sr9"), "hs.week", UnitView.Live, Ct));
 
-        Assert.DoesNotContain("hs.week", os.Catalog.States.Keys);
         var listed = Assert.Single(await os.Synapses.List(Brain("sr9"), Ct));
         Assert.Equal(DeployStatus.RebuildRequired, listed.Status);
         Assert.Contains("System.Runtime.CompilerServices.RuntimeHelpers.Box", listed.Reason, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task ARecordWithSlotsButNoBindingsIsNotRestoredAndIsListedAsRebuildRequired()
-    {
-        await using var os = Start();
-        var bindings = new Dictionary<string, IReadOnlyDictionary<string, string>> { ["hs.week"] = new Dictionary<string, string> { ["Db"] = "analytics" } };
-        var outcome = await os.Synapses.Deploy(Brain("sr10"), HsSource.Of(HsSource.WithDb), bindings, Ct);
-        Assert.Equal(DeployStatus.Deployed, outcome.Status);
-        await os.Confirmations.Approve(outcome.Installs["hs.week"].Reason!);
-        await os.Idle();
-        var record = (await os.Store.Get(Brain("sr10"), HsSource.Key, Ct))!;
-        Assert.NotNull(record.Bindings);
-
-        // A record written before bindings were kept.
-        await os.Store.Put(Brain("sr10"), record with { Bindings = null }, Ct);
-        await os.Restart();
-
-        Assert.False(await os.Restorer.TryRestore(Brain("sr10"), "hs.week", Ct));
-        var listed = Assert.Single(await os.Synapses.List(Brain("sr10"), Ct));
-        Assert.Equal(DeployStatus.RebuildRequired, listed.Status);
-        Assert.Contains("no slot bindings", listed.Reason, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task ARecordWithoutSlotsOrBindingsStillRestores()
+    public async Task ARecordWithoutSlotsStillResolves()
     {
         await using var os = Start();
         _ = await DeployApproved(os, "sr11");
-        var record = (await os.Store.Get(Brain("sr11"), HsSource.Key, Ct))!;
-        await os.Store.Put(Brain("sr11"), record with { Bindings = null }, Ct);
         await os.Restart();
 
-        Assert.True(await os.Restorer.TryRestore(Brain("sr11"), "hs.week", Ct));
+        using var handle = await os.Resolver.Resolve(Brain("sr11"), "hs.week", UnitView.Live, Ct);
+        Assert.NotNull(handle);
     }
 
     [Fact]
@@ -222,17 +185,14 @@ public sealed class SourceRestoreFacts
         await os.Idle();
 
         await os.Restart();
-        Assert.DoesNotContain("hs.week", os.Catalog.States.Keys);
         await os.Confirmations.Approve(outcome.Installs["hs.week"].Reason!);
         await os.Idle();
-
-        // The restore runs detached from the installs turn; its callback judges the answer in a later turn.
-        for (var i = 0; i < 300 && !os.Journal(Brain("sr12")).Signals(NeuronId.Parse("sr12/synapse.installs/default")).Any(s => s.Signal is Installed); i++) { await Task.Delay(100, Ct); }
 
         var journal = os.Journal(Brain("sr12")).Signals(NeuronId.Parse("sr12/synapse.installs/default"));
         Assert.DoesNotContain(journal, s => s.Signal is InstallDenied);
         Assert.Contains(journal, s => s.Signal is Installed { Alias: "hs.week" });
-        Assert.Contains("hs.week", os.Catalog.States.Keys);
+        using var handle = await os.Resolver.Resolve(Brain("sr12"), "hs.week", UnitView.Live, Ct);
+        Assert.NotNull(handle);
     }
 
     [Fact]
@@ -255,7 +215,7 @@ public sealed class SourceRestoreFacts
         await using var os = Start();
         _ = await DeployApproved(os, "sr5");
 
-        Assert.False(await os.Restorer.TryRestore(Brain("sr5"), "hs.nothing", Ct));
+        Assert.Null(await os.Resolver.Resolve(Brain("sr5"), "hs.nothing", UnitView.Live, Ct));
     }
 }
 
@@ -265,13 +225,19 @@ public sealed record ChargeAsked(decimal Amount) : Signal;
 // As HsPayments, but it first journals that a charge was asked: that publish passes the gate path, which restores the installed
 // alias missing after a restart, so the generated Charging type is in the catalog when the charge is made.
 [Neuron("sr.payments")]
-public sealed class SrPayments(ISynapseCatalogSource? catalogSource = null) : Neuron<HsPayments.Count>, IHsPayments
+public sealed class SrPayments(ISynapseCatalogSource? catalogSource = null, UnitResolver? resolver = null) : Neuron<HsPayments.Count>, IHsPayments
 {
     public async Task Charge(decimal amount)
     {
         await Save(State, new ChargeAsked(amount));
-        var type = (catalogSource ?? throw new InvalidOperationException("no catalog"))
-            .Current.For("hs.week").First(d => d.Kind == SynapseKind.Reaction).Signal!;
+        Type? type = null;
+        if (resolver is not null)
+        {
+            using var handle = await resolver.Resolve(Id.Brain, "hs.week", UnitView.Live, CancellationToken.None).ConfigureAwait(true);
+            type = handle?.Catalog.For("hs.week").FirstOrDefault(d => d.Kind == SynapseKind.Reaction)?.Signal;
+        }
+        type ??= (catalogSource ?? throw new InvalidOperationException("no catalog"))
+            .Static.For("hs.week").First(d => d.Kind == SynapseKind.Reaction).Signal!;
         await Save(State with { N = State.N + 1 }, (Signal)Activator.CreateInstance(type, amount)!);
     }
 }

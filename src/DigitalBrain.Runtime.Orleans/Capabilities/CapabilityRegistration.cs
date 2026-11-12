@@ -29,21 +29,21 @@ public static class CapabilityRegistration
         return services;
     }
 
-    /// <summary>identity@1 (<see cref="IdentityCapability"/> and <see cref="GrantsCapability"/>) over <typeparamref name="TPort"/>.</summary>
+    /// <summary>identity@1 (<see cref="BoundIdentity"/>) over <typeparamref name="TPort"/>.</summary>
     public static IServiceCollection AddIdentityCapability<TPort>(this IServiceCollection services) where TPort : class, IIdentityDirectoryPort
     {
         ArgumentNullException.ThrowIfNull(services);
         CapabilityHosting.RemoveDeniedIdentityFallbacks(services);
         services.TryAddSingleton<TPort>();
-        services.AddKeyedSingleton<IIdentity>(Capability.Identity.V1Id, (sp, _) => new IdentityCapability(sp.GetRequiredService<TPort>()));
-        services.AddKeyedSingleton<IGrants>(Capability.Identity.V1Id, (sp, _) => new GrantsCapability(sp.GetRequiredService<TPort>()));
+        services.AddKeyedSingleton<IIdentity>(Capability.Identity.V1Id, (sp, _) => new BoundIdentity(CapabilityHosting.WrapPort(sp.GetRequiredService<TPort>()), static () => RuntimeCallerContext.Current));
+        services.AddKeyedSingleton<IGrants>(Capability.Identity.V1Id, (sp, _) => new BoundIdentity(CapabilityHosting.WrapPort(sp.GetRequiredService<TPort>()), static () => RuntimeCallerContext.Current));
         services.TryAddSingleton<IIdentity>(sp => sp.GetRequiredKeyedService<IIdentity>(Capability.Identity.V1Id));
         services.TryAddSingleton<IGrants>(sp => sp.GetRequiredKeyedService<IGrants>(Capability.Identity.V1Id));
         return services;
     }
 
     /// <summary>
-    /// identity@1 sessions and description (<see cref="SessionsCapability"/>: <see cref="ISessions"/> and
+    /// identity@1 sessions and description (<see cref="BoundSessions"/>: <see cref="ISessions"/> and
     /// <see cref="IIdentityProvider"/>) over <typeparamref name="TPort"/>. The privileged grants come from the manifests of the
     /// modules the host composed (<see cref="TopologyHosting.UseModuleTopology"/>); with none, every session call is refused.
     /// </summary>
@@ -53,9 +53,9 @@ public static class CapabilityRegistration
         CapabilityHosting.RemoveDeniedSessionsFallbacks(services);
         services.TryAddSingleton<TPort>();
         services.TryAddSingleton(TopologyHosting.ComposedDeclarations);
-        services.AddKeyedSingleton<SessionsCapability>(Capability.Identity.V1Id, (sp, _) => new SessionsCapability(sp.GetRequiredService<TPort>(), sp.GetRequiredService<ModuleDeclarations>()));
-        services.AddKeyedSingleton<ISessions>(Capability.Identity.V1Id, (sp, key) => sp.GetRequiredKeyedService<SessionsCapability>(key));
-        services.AddKeyedSingleton<IIdentityProvider>(Capability.Identity.V1Id, (sp, key) => sp.GetRequiredKeyedService<SessionsCapability>(key));
+        services.AddKeyedSingleton<BoundSessions>(Capability.Identity.V1Id, (sp, _) => new BoundSessions(CapabilityHosting.WrapPort(sp.GetRequiredService<TPort>()), static () => RuntimeCallerContext.Current, sp.GetRequiredService<ModuleDeclarations>().RequirePrivileged));
+        services.AddKeyedSingleton<ISessions>(Capability.Identity.V1Id, (sp, key) => sp.GetRequiredKeyedService<BoundSessions>(key));
+        services.AddKeyedSingleton<IIdentityProvider>(Capability.Identity.V1Id, (sp, key) => sp.GetRequiredKeyedService<BoundSessions>(key));
         return services;
     }
 

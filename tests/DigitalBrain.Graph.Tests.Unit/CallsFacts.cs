@@ -1,4 +1,4 @@
-﻿using DigitalBrain.Testing;
+using DigitalBrain.Testing;
 
 // What the DigitalBrain source generator writes for a build: the follower calls the ticker's contract and the ticker calls the follower's.
 [assembly: DigitalBrain.Calls("probe.follower", "probe.ticker")]

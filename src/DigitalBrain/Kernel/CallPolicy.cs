@@ -137,11 +137,24 @@ internal static class CallPolicy
     private static bool Declared((Type Class, MethodInfo Method) key)
     {
         if (Marked(key.Method)) { return true; }
-        if (key.Method.DeclaringType is not { IsInterface: true } contract || !contract.IsAssignableFrom(key.Class)) { return false; }
+        if (key.Method.DeclaringType is { IsInterface: true } contract && contract.IsAssignableFrom(key.Class))
+        {
+            var map = key.Class.GetInterfaceMap(contract);
+            var index = Array.IndexOf(map.InterfaceMethods, key.Method);
+            return index >= 0 && Marked(map.TargetMethods[index]);
+        }
 
-        var map = key.Class.GetInterfaceMap(contract);
-        var index = Array.IndexOf(map.InterfaceMethods, key.Method);
-        return index >= 0 && Marked(map.TargetMethods[index]);
+        foreach (var iface in key.Class.GetInterfaces())
+        {
+            var map = key.Class.GetInterfaceMap(iface);
+            var index = Array.IndexOf(map.TargetMethods, key.Method);
+            if (index >= 0 && Marked(map.InterfaceMethods[index]))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool Marked(MethodInfo method)

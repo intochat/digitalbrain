@@ -272,75 +272,75 @@ public sealed class FlowEmpiricalStressFacts
                 switch (kind)
                 {
                     case StressKind.FastThreeStep:
-                    {
-                        await flow.Start($"Flow-{i}", "user", null, state);
-                        await Drain(context);
+                        {
+                            await flow.Start($"Flow-{i}", "user", null, state);
+                            await Drain(context);
 
-                        Assert.Equal(FlowStatus.Completed, flow.Current.Status);
-                        Assert.Equal(["step1", "step2", "step3"], flow.Current.Done);
-                        completedFlows.Add(flowId.ToString());
-                        break;
-                    }
+                            Assert.Equal(FlowStatus.Completed, flow.Current.Status);
+                            Assert.Equal(["step1", "step2", "step3"], flow.Current.Done);
+                            completedFlows.Add(flowId.ToString());
+                            break;
+                        }
 
                     case StressKind.ApprovalWait:
-                    {
-                        await flow.Start($"Flow-{i}", "user", null, state);
-                        await Drain(context);
+                        {
+                            await flow.Start($"Flow-{i}", "user", null, state);
+                            await Drain(context);
 
-                        Assert.Equal(FlowStatus.Waiting, flow.Current.Status);
-                        Assert.Equal("step2", flow.Current.Waiting?.Step);
+                            Assert.Equal(FlowStatus.Waiting, flow.Current.Status);
+                            Assert.Equal("step2", flow.Current.Waiting?.Step);
 
-                        // Resolve approval
-                        confirmations.Answer($"plan-{i:D3}", ConfirmationOutcome.Approved);
-                        await flow.Deliver(Resolution($"plan-{i:D3}", ConfirmationOutcome.Approved));
-                        await Drain(context);
+                            // Resolve approval
+                            confirmations.Answer($"plan-{i:D3}", ConfirmationOutcome.Approved);
+                            await flow.Deliver(Resolution($"plan-{i:D3}", ConfirmationOutcome.Approved));
+                            await Drain(context);
 
-                        Assert.Equal(FlowStatus.Completed, flow.Current.Status);
-                        Assert.Equal(["step1", "step2", "step3"], flow.Current.Done);
-                        completedFlows.Add(flowId.ToString());
-                        break;
-                    }
+                            Assert.Equal(FlowStatus.Completed, flow.Current.Status);
+                            Assert.Equal(["step1", "step2", "step3"], flow.Current.Done);
+                            completedFlows.Add(flowId.ToString());
+                            break;
+                        }
 
                     case StressKind.CancelMidStep:
-                    {
-                        await flow.Start($"Flow-{i}", "user", null, state);
-                        var advancing = Drain(context);
-                        await flow.HangEntered.Task;
+                        {
+                            await flow.Start($"Flow-{i}", "user", null, state);
+                            var advancing = Drain(context);
+                            await flow.HangEntered.Task;
 
-                        await flow.Cancel($"cancel-{i}");
-                        await advancing;
-                        await Drain(context);
+                            await flow.Cancel($"cancel-{i}");
+                            await advancing;
+                            await Drain(context);
 
-                        Assert.Equal(FlowStatus.Cancelled, flow.Current.Status);
-                        Assert.True(flow.WasCancelled);
-                        cancelledFlows.Add(flowId.ToString());
-                        break;
-                    }
+                            Assert.Equal(FlowStatus.Cancelled, flow.Current.Status);
+                            Assert.True(flow.WasCancelled);
+                            cancelledFlows.Add(flowId.ToString());
+                            break;
+                        }
 
                     case StressKind.TransientInterruption:
-                    {
-                        await flow.Start($"Flow-{i}", "user", null, state);
-                        await Drain(context);
+                        {
+                            await flow.Start($"Flow-{i}", "user", null, state);
+                            await Drain(context);
 
-                        // The flow got interrupted on step 1 (interruption 1)
-                        Assert.Equal(FlowStatus.Running, flow.Current.Status);
-                        Assert.Equal(1, flow.Current.Interruptions);
+                            // The flow got interrupted on step 1 (interruption 1)
+                            Assert.Equal(FlowStatus.Running, flow.Current.Status);
+                            Assert.Equal(1, flow.Current.Interruptions);
 
-                        // Nudge 1: triggers second interruption
-                        await flow.Tick("flow-nudge");
-                        await Drain(context);
-                        Assert.Equal(2, flow.Current.Interruptions);
+                            // Nudge 1: triggers second interruption
+                            await flow.Tick("flow-nudge");
+                            await Drain(context);
+                            Assert.Equal(2, flow.Current.Interruptions);
 
-                        // Nudge 2: runs step 1 cleanly, then advances through step 2 and step 3
-                        await flow.Tick("flow-nudge");
-                        await Drain(context);
+                            // Nudge 2: runs step 1 cleanly, then advances through step 2 and step 3
+                            await flow.Tick("flow-nudge");
+                            await Drain(context);
 
-                        Assert.Equal(FlowStatus.Completed, flow.Current.Status);
-                        Assert.Equal(0, flow.Current.Interruptions);
-                        Assert.Equal(["step1", "step2", "step3"], flow.Current.Done);
-                        completedFlows.Add(flowId.ToString());
-                        break;
-                    }
+                            Assert.Equal(FlowStatus.Completed, flow.Current.Status);
+                            Assert.Equal(0, flow.Current.Interruptions);
+                            Assert.Equal(["step1", "step2", "step3"], flow.Current.Done);
+                            completedFlows.Add(flowId.ToString());
+                            break;
+                        }
                 }
             }
             catch (Exception ex)

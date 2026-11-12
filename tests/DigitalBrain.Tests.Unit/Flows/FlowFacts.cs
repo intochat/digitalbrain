@@ -1,4 +1,4 @@
-﻿using DigitalBrain.Units;
+using DigitalBrain.Units;
 using DigitalBrain.Confirmation;
 using DigitalBrain.Flows;
 using DigitalBrain.Neurons;

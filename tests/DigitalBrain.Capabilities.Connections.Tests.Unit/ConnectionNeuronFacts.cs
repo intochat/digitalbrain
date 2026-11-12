@@ -1,4 +1,5 @@
 using DigitalBrain.Neurons;
+using DigitalBrain.Capabilities.Connections.Catalog;
 using DigitalBrain.Capabilities.Connections.Connectors;
 using DigitalBrain.Capabilities.Connections.Sealing;
 using DigitalBrain.Capabilities.Secrets;
@@ -61,13 +62,12 @@ public sealed class ConnectionNeuronFacts
             new FakeSecretSealer(),
             [new ConnectorDefinition("demo", "Demo", ["api-key"], [])]);
         var os = TestOS.Local(options => options.Services = services);
+        os.Register<ConnectionCatalogNeuron>();
         os.Register<DemoConnectionNeuron>();
-        os.Register<StubConnectionIndexNeuron>();
-        os.Register<StubConnectionCatalogUpdatesNeuron>();
         return os;
     }
 
-    private sealed class DemoConnectionState : ConnectionState;
+    private sealed record DemoConnectionState : ConnectionState;
 
     [Neuron("demo")]
     private sealed class DemoConnectionNeuron : ConnectionNeuron<DemoConnectionState>
@@ -76,46 +76,17 @@ public sealed class ConnectionNeuronFacts
             => Task.FromResult(ConnectionProbeResult.Connected());
     }
 
-    [Neuron(IConnectionIndex.TypeName)]
-    private sealed class StubConnectionIndexNeuron : Neuron, IConnectionIndex
-    {
-        private readonly HashSet<string> _keys = new(StringComparer.Ordinal);
-
-        public Task<string[]> List() => Task.FromResult(_keys.ToArray());
-
-        public Task Track(string connectionKey)
-        {
-            _keys.Add(connectionKey);
-            return Task.CompletedTask;
-        }
-
-        public Task Untrack(string connectionKey)
-        {
-            _keys.Remove(connectionKey);
-            return Task.CompletedTask;
-        }
-    }
-
-    [Neuron(IConnectionCatalogUpdates.TypeName)]
-    private sealed class StubConnectionCatalogUpdatesNeuron : Neuron, IConnectionCatalogUpdates
-    {
-        public Task Changed(string connectionKey) => Task.CompletedTask;
-    }
-
     private sealed class FakeSecretSealer : ISecretSealer
     {
         public SealedSecret Seal(string name, string plaintext) => new() { KeyId = "mk-test", Cipher = $"sealed:{name}:{plaintext}" };
 
         public string Open(SealedSecret secret)
         {
-            const string prefix = "sealed:";
-            if (secret.Cipher.StartsWith(prefix, StringComparison.Ordinal))
-            {
-                var rest = secret.Cipher[prefix.Length..];
-                var colon = rest.IndexOf(':', StringComparison.Ordinal);
-                if (colon >= 0) { return rest[(colon + 1)..]; }
-            }
-            return secret.Cipher;
+            var value = secret.Cipher;
+            const string prefix = "sealed:value:";
+            return value.StartsWith(prefix, StringComparison.Ordinal)
+                ? value[prefix.Length..]
+                : value;
         }
     }
 
@@ -125,7 +96,6 @@ public sealed class ConnectionNeuronFacts
         {
             if (serviceType == typeof(ISecretSealer)) { return sealer; }
             if (serviceType == typeof(IReadOnlyList<ConnectorDefinition>)) { return connectors; }
-            if (serviceType == typeof(TimeProvider)) { return TimeProvider.System; }
             return null;
         }
     }

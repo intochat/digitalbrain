@@ -1,4 +1,4 @@
-﻿using DigitalBrain;
+using DigitalBrain;
 using DigitalBrain.Examples.Calculator;
 using DigitalBrain.Identity.Local;
 using DigitalBrain.Runtime.Orleans.Hosting;

@@ -108,14 +108,19 @@ internal sealed class SynapseRegistry : INudge
         await For(subscriber.Id).Ensure(from, aliases, _os.Clock.GetUtcNow()).ConfigureAwait(false);
     }
 
+    public async Task EnsureBrainWide(NeuronId subscriber, Type[] signals, bool exact = false, IReadOnlyList<string>? aliases = null)
+    {
+        var stringAliases = (aliases ?? []).Concat(signals.Select(SignalAliases.Of)).Distinct(StringComparer.Ordinal).ToArray();
+        await For(subscriber).EnsureBrainWide(stringAliases, _os.Clock.GetUtcNow(), exact).ConfigureAwait(false);
+    }
+
     public async Task EnsureBrainWide(TestNeuronHost subscriber, Type[] signals, bool exact = false, IReadOnlyList<string>? aliases = null)
     {
         if (subscriber.Class.IsDefined(typeof(StatelessNeuronAttribute), false))
         {
             throw new InvalidOperationException($"{subscriber.Class.FullName} is a [StatelessNeuron] and holds no synapses.");
         }
-        var stringAliases = (aliases ?? []).Concat(signals.Select(SignalAliases.Of)).Distinct(StringComparer.Ordinal).ToArray();
-        await For(subscriber.Id).EnsureBrainWide(stringAliases, _os.Clock.GetUtcNow(), exact).ConfigureAwait(false);
+        await EnsureBrainWide(subscriber.Id, signals, exact, aliases).ConfigureAwait(false);
     }
 
     public async Task Remove(NeuronId subscriber, NeuronId from)
@@ -150,6 +155,7 @@ internal sealed class SynapseRegistry : INudge
     public void Appended(NeuronId publisher, IReadOnlyList<JournaledSignal> written)
     {
         if (_os.TakePublishFault(publisher)) { return; }
+        _os.Listeners.Appended(publisher, written);
         var view = _os.Journal(publisher.Brain).MemoryJournal;
         FanoutFor(publisher.Brain).Appended(publisher, [.. written.Select(s => SignalAliases.Of(s.Signal))], view.Last);
     }

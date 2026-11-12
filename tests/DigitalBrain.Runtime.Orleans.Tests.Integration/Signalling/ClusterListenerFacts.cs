@@ -71,7 +71,7 @@ public sealed class ClusterListenerFacts(ClusterListenerSilo silo) : IClassFixtu
 
         await silo.Restart(ct);
         Assert.Equal(2, silo.Starts);
-        Assert.Equal(1, silo.Services.GetRequiredService<ClusterListeners>().Count);
+        Assert.Equal(3, silo.Services.GetRequiredService<ClusterListeners>().Count);
         await silo.Get<ICounter>("cl-one/probe.counter/c").Add(1);
         await Until(() => Has("cl-one:2"), ct);
         await Task.Delay(300, ct);

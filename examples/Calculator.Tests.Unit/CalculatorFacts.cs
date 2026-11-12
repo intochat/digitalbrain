@@ -1,4 +1,4 @@
-﻿using DigitalBrain;
+using DigitalBrain;
 using DigitalBrain.Examples.Calculator;
 using DigitalBrain.Rules;
 using DigitalBrain.Testing;

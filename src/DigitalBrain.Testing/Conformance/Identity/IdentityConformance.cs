@@ -507,6 +507,96 @@ public abstract class IdentityConformance<TIdentity>
         }
     }
 
+    /// <summary>EnsureMember called by a non-owner throws UnauthorizedAccessException.</summary>
+    [Fact(Timeout = Timeout)]
+    public async Task EnsureMemberByNonOwnerThrowsUnauthorized()
+    {
+        var (s, ct) = await Open().ConfigureAwait(false);
+        var owner = await Owner(s, ct).ConfigureAwait(false);
+        var guest = Guest(owner);
+        using (s.Callers.As(Caller(owner)))
+        {
+            await s.Identity.EnsureMember(guest, ct).ConfigureAwait(false);
+        }
+
+        var thirdMember = new Member
+        {
+            PrincipalId = Unique("p3"),
+            AccountId = Unique("a3"),
+            BrainId = owner.BrainId,
+            Role = MemberRole.Member,
+            DisplayName = "Third member",
+        };
+
+        using (s.Callers.As(Caller(guest)))
+        {
+            await Assert.ThrowsAnyAsync<UnauthorizedAccessException>(
+                () => s.Identity.EnsureMember(thirdMember, ct)).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>RemoveMember called by a non-owner throws UnauthorizedAccessException.</summary>
+    [Fact(Timeout = Timeout)]
+    public async Task RemoveMemberByNonOwnerThrowsUnauthorized()
+    {
+        var (s, ct) = await Open().ConfigureAwait(false);
+        var owner = await Owner(s, ct).ConfigureAwait(false);
+        var guest = Guest(owner);
+        using (s.Callers.As(Caller(owner)))
+        {
+            await s.Identity.EnsureMember(guest, ct).ConfigureAwait(false);
+        }
+
+        using (s.Callers.As(Caller(guest)))
+        {
+            await Assert.ThrowsAnyAsync<UnauthorizedAccessException>(
+                () => s.Identity.RemoveMember(owner.BrainId, owner.PrincipalId, ct)).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>A Once grant is consumed on first Authorize and subsequently denied.</summary>
+    [Fact(Timeout = Timeout)]
+    public async Task OnceGrantConsumesAndSubsequentCallDenies()
+    {
+        var (s, ct) = await Open().ConfigureAwait(false);
+        var owner = await Owner(s, ct).ConfigureAwait(false);
+        var appId = "app-once-test";
+        var grant = NewGrant(appId, owner.BrainId, GrantMode.Once);
+
+        using (s.Callers.As(Caller(owner)))
+        {
+            await s.Grants.GrantAsOwner(grant, ct).ConfigureAwait(false);
+        }
+
+        using (s.Callers.As(AppCaller(owner, appId)))
+        {
+            var firstDecision = await s.Grants.Authorize(Request(), ct).ConfigureAwait(false);
+            Assert.True(Allowed(firstDecision), "first Authorize with Once grant was denied");
+
+            var secondDecision = await s.Grants.Authorize(Request(), ct).ConfigureAwait(false);
+            Assert.False(Allowed(secondDecision), "second Authorize with Once grant was allowed after consumption");
+        }
+    }
+
+    /// <summary>CreateBrain operation ID is scoped to account, preventing cross-account collision or hijacking.</summary>
+    [Fact(Timeout = Timeout)]
+    public async Task CreateBrainOperationIdIsScopedToAccount()
+    {
+        var (s, ct) = await Open().ConfigureAwait(false);
+        var (account1, principal1) = await Account(s, ct).ConfigureAwait(false);
+        var (account2, principal2) = await Account(s, ct).ConfigureAwait(false);
+        var sharedOp = Unique("scoped-op");
+
+        var first = await s.Identity.CreateBrain(account1, principal1, sharedOp, "Brain 1", BrainKind.Circle, ct).ConfigureAwait(false);
+        var second = await s.Identity.CreateBrain(account2, principal2, sharedOp, "Brain 2", BrainKind.Circle, ct).ConfigureAwait(false);
+
+        Assert.True(first.NewBrain);
+        Assert.True(second.NewBrain);
+        Assert.NotEqual(first.Member.BrainId, second.Member.BrainId);
+        Assert.Equal(account1, (await s.Identity.OwnerOfBrain(first.Member.BrainId, ct).ConfigureAwait(false))?.AccountId);
+        Assert.Equal(account2, (await s.Identity.OwnerOfBrain(second.Member.BrainId, ct).ConfigureAwait(false))?.AccountId);
+    }
+
     private async Task<(IdentitySubject Subject, CancellationToken Ct)> Open()
     {
         var ct = TestContext.Current.CancellationToken;

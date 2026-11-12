@@ -69,7 +69,7 @@ DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.CompleteRegi
 DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.CreateBrain(string! accountId, string! principalId, string! operationId, string! displayName, DigitalBrain.Capabilities.Identity.BrainKind kind, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
 DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.Describe() -> DigitalBrain.Capabilities.Identity.IdentityProviderDescriptor!
 DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.Descriptor.get -> DigitalBrain.Capabilities.Identity.IdentityProviderDescriptor!
-DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.Descriptor.init -> void
+DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.Descriptor.set -> void
 DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.End(DigitalBrain.Capabilities.CapabilityCaller! caller, string! sessionId, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.EnsureAccount(DigitalBrain.Capabilities.Identity.Account! account, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.Conformance.Identity.InMemoryIdentityDirectory.EnsureBrain(DigitalBrain.Capabilities.Identity.Member! owner, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
@@ -487,17 +487,17 @@ DigitalBrain.Testing.TestOS.Instances(string? type, System.Threading.Cancellatio
 DigitalBrain.Testing.TestOS.Instances<T>(System.Threading.CancellationToken cancellationToken) -> System.Collections.Generic.IAsyncEnumerable<DigitalBrain.Kernel.BrainInstance!>!
 DigitalBrain.Testing.TestOS.IsActive(DigitalBrain.NeuronId id) -> bool
 DigitalBrain.Testing.TestOS.Journal(DigitalBrain.BrainId brain) -> DigitalBrain.Testing.TestJournal!
+DigitalBrain.Testing.TestOS.LiveBindings.get -> DigitalBrain.Units.LiveBindings!
+DigitalBrain.Testing.TestOS.Loader.get -> DigitalBrain.Units.IUnitLoader!
 DigitalBrain.Testing.TestOS.Options.get -> DigitalBrain.Testing.TestOSOptions!
 DigitalBrain.Testing.TestOS.Register(System.Reflection.Assembly! assembly) -> DigitalBrain.Testing.TestOS!
 DigitalBrain.Testing.TestOS.Register<TNeuron>() -> DigitalBrain.Testing.TestOS!
-DigitalBrain.Testing.TestOS.Registrar.get -> DigitalBrain.Units.ISynapseRegistrar!
+DigitalBrain.Testing.TestOS.Resolver.get -> DigitalBrain.Units.UnitResolver!
 DigitalBrain.Testing.TestOS.Restart() -> System.Threading.Tasks.Task!
-DigitalBrain.Testing.TestOS.Restorer.get -> DigitalBrain.Units.ISynapseRestorer!
 DigitalBrain.Testing.TestOS.SeedStoredState(DigitalBrain.NeuronId id, string! json) -> void
 DigitalBrain.Testing.TestOS.Services.get -> System.IServiceProvider!
 DigitalBrain.Testing.TestOS.Source.get -> DigitalBrain.Units.SynapseCatalogSource!
-DigitalBrain.Testing.TestOS.Store.get -> DigitalBrain.Units.ISourceStore!
-DigitalBrain.Testing.TestOS.Synapses.get -> DigitalBrain.Runtime.Synapses.SynapseHost!
+DigitalBrain.Testing.TestOS.Synapses.get -> DigitalBrain.Units.ISynapseHost!
 DigitalBrain.Testing.TestOS.SynapsesOf(DigitalBrain.NeuronId subscriber) -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Kernel.Synapse!>!
 DigitalBrain.Testing.TestOS.Types(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Kernel.BrainType![]!>!
 DigitalBrain.Testing.TestOS.Unregister(string! alias) -> DigitalBrain.Testing.TestOS!

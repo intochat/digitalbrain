@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using DigitalBrain.Capabilities;
 using DigitalBrain.Limits;
+using DigitalBrain.Runtime.Synapses;
 using DigitalBrain.Units;
 
 namespace DigitalBrain.Testing;
@@ -147,9 +148,18 @@ public sealed class CapabilityNotBoundException : InvalidOperationException
 }
 
 // Neurons and apps resolve from this: capability contracts from the fakes, ICapabilityBroker over the fakes, the rest from the options' services.
-internal sealed class TestOSServices(CapabilityFakes fakes, IServiceProvider inner, DigitalBrain.Units.IInstallHooks hooks, DigitalBrain.Units.ISlotResolver slots,
-    ISynapseCatalogSource catalog, Func<IReadOnlyList<ActionDescriptor>> actions, Func<DigitalBrain.Units.ISynapseRestorer>? restorer = null,
-    Func<DigitalBrain.Runtime.Synapses.SynapseCompiler>? compiler = null, Func<ISynapseHost>? host = null)
+internal sealed class TestOSServices(
+    CapabilityFakes fakes,
+    IServiceProvider inner,
+    DigitalBrain.Units.IInstallHooks hooks,
+    DigitalBrain.Units.ISlotResolver slots,
+    ISynapseCatalogSource catalog,
+    Func<IReadOnlyList<ActionDescriptor>> actions,
+    Func<IUnitLoader>? loader = null,
+    Func<UnitResolver>? resolver = null,
+    Func<LiveBindings>? live = null,
+    Func<DigitalBrain.Runtime.Synapses.SynapseCompiler>? compiler = null,
+    Func<ISynapseHost>? host = null)
     : IServiceProvider, ICapabilityBroker
 {
     public object? GetService(Type serviceType)
@@ -161,10 +171,12 @@ internal sealed class TestOSServices(CapabilityFakes fakes, IServiceProvider inn
         if (serviceType == typeof(IReadOnlyList<ActionDescriptor>)) { return inner.GetService(serviceType) ?? actions(); }
         if (serviceType == typeof(DigitalBrain.Units.ISlotResolver)) { return inner.GetService(serviceType) ?? slots; }
         if (serviceType == typeof(DigitalBrain.Units.IInstallHooks)) { return inner.GetService(serviceType) ?? hooks; }
-        if (serviceType == typeof(DigitalBrain.Units.ISynapseRestorer)) { return inner.GetService(serviceType) ?? restorer?.Invoke(); }
+        if (serviceType == typeof(IUnitLoader) || serviceType == typeof(UnitLoader)) { return inner.GetService(serviceType) ?? loader?.Invoke(); }
+        if (serviceType == typeof(UnitResolver)) { return inner.GetService(serviceType) ?? resolver?.Invoke(); }
+        if (serviceType == typeof(LiveBindings)) { return inner.GetService(serviceType) ?? live?.Invoke(); }
         // The TestOS's own compiler and synapse host, as the silo serves its singletons.
         if (serviceType == typeof(DigitalBrain.Runtime.Synapses.SynapseCompiler)) { return inner.GetService(serviceType) ?? compiler?.Invoke(); }
-        if (serviceType == typeof(ISynapseHost) || serviceType == typeof(DigitalBrain.Runtime.Synapses.SynapseHost)) { return inner.GetService(serviceType) ?? host?.Invoke(); }
+        if (serviceType == typeof(ISynapseHost) || serviceType == typeof(UnitDeployer)) { return inner.GetService(serviceType) ?? host?.Invoke(); }
         if (CapabilityFakes.IsContract(serviceType)) { return fakes.Resolve(serviceType); }
         return CapabilityFakes.ListedContract(serviceType) is { } contract ? fakes.All(contract) : inner.GetService(serviceType);
     }

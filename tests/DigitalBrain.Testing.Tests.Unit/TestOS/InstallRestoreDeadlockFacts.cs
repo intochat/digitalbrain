@@ -86,7 +86,7 @@ public sealed class InstallRestoreDeadlockFacts
         var journal = os.Journal(brain).Signals(installs);
         Assert.Contains(journal, s => s.Signal is Installed { Alias: "hs.week" });
         Assert.DoesNotContain(journal, s => s.Signal is InstallDenied { Alias: "hs.week" });
-        Assert.Contains("hs.week", os.Catalog.States.Keys);
+        Assert.NotNull(await os.Resolver.Resolve(brain, "hs.week", UnitView.Live, Ct));
     }
 
     private sealed class Services(IInstallHooks hooks) : IServiceProvider

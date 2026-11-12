@@ -1,77 +1,129 @@
+using System.Text.Json.Serialization;
 using DigitalBrain.Contracts;
 using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Units;
 
-/// <summary>The deployed generated sources of one brain, at <c>{brain}/synapse.sources/default</c>.</summary>
+/// <summary>An alias ownership conflict where an alias is already claimed by another source key.</summary>
+/// <param name="Alias">The conflicting state alias.</param>
+/// <param name="Owner">The current owning source key.</param>
+public sealed record AliasConflict(string Alias, string Owner);
+
+/// <summary>The alias ownership directory of one brain, at {brain}/synapse.sources/default.</summary>
 [NeuronAlias("synapse.sources")]
 public interface ISources
 {
-    /// <summary>Stores <paramref name="record"/>, replacing the record of its source key; journals <see cref="Deployed"/>.</summary>
-    /// <param name="record">The record.</param>
-    /// <param name="ct">Cancellation.</param>
-    Task Put(SourceRecord record, CancellationToken ct);
+    /// <summary>Claims aliases for a source key. Returns conflict if an alias is already owned by another key.</summary>
+    Task<AliasConflict?> Claim(string sourceKey, IReadOnlyList<string> aliases, CancellationToken ct = default);
 
-    /// <summary>Records that a build of <paramref name="sourceKey"/> is staged; journals <see cref="Staged"/>.</summary>
-    /// <param name="sourceKey">The source key.</param>
-    /// <param name="hash">The staged build hash.</param>
-    /// <param name="ct">Cancellation.</param>
-    Task Stage(string sourceKey, string hash, CancellationToken ct);
+    /// <summary>Releases aliases previously owned by a source key.</summary>
+    Task Release(string sourceKey, IReadOnlyList<string> aliases, CancellationToken ct = default);
 
-    /// <summary>Removes the record of <paramref name="sourceKey"/> and journals <see cref="Undeployed"/>; an unknown key is ignored.</summary>
-    /// <param name="sourceKey">The source key.</param>
-    /// <param name="ct">Cancellation.</param>
-    Task Remove(string sourceKey, CancellationToken ct);
-
-    /// <summary>The record of <paramref name="sourceKey"/>, or null.</summary>
-    /// <param name="sourceKey">The source key.</param>
-    /// <param name="ct">Cancellation.</param>
+    /// <summary>Looks up the source key owning the given state alias.</summary>
     [ReadOnlyCall]
-    Task<SourceRecord?> Get(string sourceKey, CancellationToken ct);
+    Task<string?> OwnerOf(string alias, CancellationToken ct = default);
 
-    /// <summary>Every record, ordered by source key.</summary>
-    /// <param name="ct">Cancellation.</param>
+    /// <summary>Returns all deployed source keys of this brain.</summary>
     [ReadOnlyCall]
-    Task<IReadOnlyList<SourceRecord>> List(CancellationToken ct);
+    Task<IReadOnlyList<string>> Keys(CancellationToken ct = default);
 }
 
-/// <summary>The state of the sources neuron: one record per deployed source key.</summary>
-/// <param name="Records">The records.</param>
-public sealed record SourcesState(IReadOnlyList<SourceRecord> Records)
+/// <summary>The state of the sources neuron: maps alias -> owner source key.</summary>
+public sealed record SourcesState
 {
-    /// <summary>No sources.</summary>
-    public SourcesState() : this([]) { }
+    /// <summary>Alias to owning source key.</summary>
+    public IReadOnlyDictionary<string, string> Owners { get; init; }
+
+    /// <summary>Initial empty state.</summary>
+    public SourcesState() : this(new Dictionary<string, string>(StringComparer.Ordinal)) { }
+
+    /// <summary>Constructor initialized with owners.</summary>
+    [JsonConstructor]
+    public SourcesState(IReadOnlyDictionary<string, string>? owners)
+    {
+        Owners = owners ?? new Dictionary<string, string>(StringComparer.Ordinal);
+    }
+
+    /// <summary>Deconstructs the sources state.</summary>
+    public void Deconstruct(out IReadOnlyDictionary<string, string> owners)
+    {
+        owners = Owners;
+    }
 }
 
-/// <summary>The sources neuron of a brain: keeps the deployed generated sources with their builds, so a host can restore them.</summary>
+/// <summary>Directory neuron keeping track of alias ownership across unit deployments.</summary>
 [Neuron("synapse.sources")]
 public sealed class SourcesNeuron : Neuron<SourcesState>, ISources
 {
     /// <inheritdoc />
-    public Task Put(SourceRecord record, CancellationToken ct)
+    public async Task<AliasConflict?> Claim(string sourceKey, IReadOnlyList<string> aliases, CancellationToken ct = default)
     {
-        ArgumentNullException.ThrowIfNull(record);
-        var next = State with { Records = [.. State.Records.Where(r => r.SourceKey != record.SourceKey), record] };
-        // A state change publishes a signal: a record of the same build (new bindings) is a deploy again.
-        return Save(next, new Deployed(record.SourceKey, record.Hash, record.Aliases));
+        ArgumentNullException.ThrowIfNull(sourceKey);
+        ArgumentNullException.ThrowIfNull(aliases);
+
+        foreach (var alias in aliases)
+        {
+            if (State.Owners.TryGetValue(alias, out var existingOwner) && !string.Equals(existingOwner, sourceKey, StringComparison.Ordinal))
+            {
+                return new AliasConflict(alias, existingOwner);
+            }
+        }
+
+        var nextOwners = new Dictionary<string, string>(State.Owners, StringComparer.Ordinal);
+        var newlyClaimed = new List<string>();
+        foreach (var alias in aliases)
+        {
+            if (!nextOwners.ContainsKey(alias))
+            {
+                newlyClaimed.Add(alias);
+            }
+            nextOwners[alias] = sourceKey;
+        }
+
+        if (newlyClaimed.Count > 0)
+        {
+            await Save(State with { Owners = nextOwners }, [new AliasesClaimed(sourceKey, newlyClaimed)]).ConfigureAwait(true);
+        }
+
+        return null;
     }
 
     /// <inheritdoc />
-    public Task Stage(string sourceKey, string hash, CancellationToken ct) => Save(State, new Staged(sourceKey, hash));
-
-    /// <inheritdoc />
-    public Task Remove(string sourceKey, CancellationToken ct)
+    public async Task Release(string sourceKey, IReadOnlyList<string> aliases, CancellationToken ct = default)
     {
-        if (Find(sourceKey) is null) { return Task.CompletedTask; }
-        return Save(State with { Records = [.. State.Records.Where(r => r.SourceKey != sourceKey)] }, new Undeployed(sourceKey));
+        ArgumentNullException.ThrowIfNull(sourceKey);
+        ArgumentNullException.ThrowIfNull(aliases);
+
+        var nextOwners = new Dictionary<string, string>(State.Owners, StringComparer.Ordinal);
+        var released = new List<string>();
+        foreach (var alias in aliases)
+        {
+            if (nextOwners.TryGetValue(alias, out var owner) && string.Equals(owner, sourceKey, StringComparison.Ordinal))
+            {
+                nextOwners.Remove(alias);
+                released.Add(alias);
+            }
+        }
+
+        if (released.Count > 0)
+        {
+            await Save(State with { Owners = nextOwners }, [new AliasesReleased(sourceKey, released)]).ConfigureAwait(true);
+        }
     }
 
     /// <inheritdoc />
-    public Task<SourceRecord?> Get(string sourceKey, CancellationToken ct) => Task.FromResult(Find(sourceKey));
+    [ReadOnlyCall]
+    public Task<string?> OwnerOf(string alias, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(alias);
+        return Task.FromResult(State.Owners.TryGetValue(alias, out var owner) ? owner : null);
+    }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<SourceRecord>> List(CancellationToken ct) =>
-        Task.FromResult<IReadOnlyList<SourceRecord>>([.. State.Records.OrderBy(r => r.SourceKey, StringComparer.Ordinal)]);
-
-    private SourceRecord? Find(string sourceKey) => State.Records.FirstOrDefault(r => r.SourceKey == sourceKey);
+    [ReadOnlyCall]
+    public Task<IReadOnlyList<string>> Keys(CancellationToken ct = default)
+    {
+        var keys = State.Owners.Values.Distinct(StringComparer.Ordinal);
+        return Task.FromResult<IReadOnlyList<string>>([.. keys.OrderBy(k => k, StringComparer.Ordinal)]);
+    }
 }

@@ -18,23 +18,15 @@ public sealed record LivePingedAgain : Signal;
 public sealed class LiveRegistryFacts
 {
     [Fact]
-    public void RegisterStateIsVisibleToTryGetAndBumpsVersion()
+    public void StateRegistrationCreatesUnitNeuronRegistration()
     {
-        var registry = new NeuronTypeRegistry(Array.Empty<System.Reflection.Assembly>());
-        var before = registry.Version;
+        var reg = NeuronTypeRegistry.StateRegistration("live.registry", typeof(LiveRegistryState));
 
-        registry.RegisterState("live.registry", typeof(LiveRegistryState));
-
-        Assert.True(registry.TryGet("live.registry", out var neuronClass));
-        Assert.NotNull(neuronClass);
-        Assert.Equal("UnitNeuron`1", neuronClass.Name);
-        Assert.Equal(typeof(LiveRegistryState), neuronClass.GetGenericArguments()[0]);
-        Assert.Equal(HostPolicy.Affine, registry.Require("live.registry").Policy);
-        Assert.Equal(NeuronTypeRegistry.DefaultStateName, registry.Require("live.registry").StateName);
-        Assert.True(registry.Version > before);
-
-        registry.UnregisterState("live.registry");
-        Assert.False(registry.TryGet("live.registry", out _));
+        Assert.NotNull(reg.Class);
+        Assert.Equal("UnitNeuron`1", reg.Class.Name);
+        Assert.Equal(typeof(LiveRegistryState), reg.Class.GetGenericArguments()[0]);
+        Assert.Equal(HostPolicy.Affine, reg.Policy);
+        Assert.Equal(NeuronTypeRegistry.DefaultStateName, reg.StateName);
     }
 
     [Fact]

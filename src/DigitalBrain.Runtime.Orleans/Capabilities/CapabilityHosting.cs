@@ -15,11 +15,17 @@ namespace DigitalBrain.Runtime.Orleans.Capabilities;
 /// <summary>Host configuration of the capability registry, read when the silo is configured.</summary>
 public static class CapabilityHosting
 {
+    internal static IIdentityDirectoryPort WrapPort(IIdentityDirectoryPort port)
+        => port is PlatformIdentityDirectoryPort ? port : new PlatformIdentityDirectoryPort(port);
+
+    internal static IIdentitySessionPort WrapPort(IIdentitySessionPort port)
+        => port is PlatformIdentitySessionPort ? port : new PlatformIdentitySessionPort(port);
+
     internal static readonly Func<IServiceProvider, object?, IIdentity> DeniedIdentityFactory =
-        static (sp, _) => new IdentityCapability(sp.GetService<IIdentityDirectoryPort>() ?? DeniedIdentityDirectoryPort.Instance);
+        static (sp, _) => new BoundIdentity(WrapPort(sp.GetService<IIdentityDirectoryPort>() ?? DeniedIdentityDirectoryPort.Instance), static () => RuntimeCallerContext.Current);
 
     internal static readonly Func<IServiceProvider, object?, IGrants> DeniedGrantsFactory =
-        static (sp, _) => new GrantsCapability(sp.GetService<IIdentityDirectoryPort>() ?? DeniedIdentityDirectoryPort.Instance);
+        static (sp, _) => new BoundIdentity(WrapPort(sp.GetService<IIdentityDirectoryPort>() ?? DeniedIdentityDirectoryPort.Instance), static () => RuntimeCallerContext.Current);
 
     internal static readonly Func<IServiceProvider, object?, ISecrets> DeniedSecretsFactory =
         static (sp, _) => new SecretsCapability(
@@ -29,16 +35,17 @@ public static class CapabilityHosting
             Declarations = TopologyHosting.ComposedDeclarations(sp),
         };
 
-    internal static readonly Func<IServiceProvider, object?, SessionsCapability> DeniedSessionsCapabilityFactory =
-        static (sp, _) => new SessionsCapability(
-            sp.GetService<IIdentitySessionPort>() ?? DeniedIdentitySessionPort.Instance,
-            TopologyHosting.ComposedDeclarations(sp));
+    internal static readonly Func<IServiceProvider, object?, BoundSessions> DeniedSessionsCapabilityFactory =
+        static (sp, _) => new BoundSessions(
+            WrapPort(sp.GetService<IIdentitySessionPort>() ?? DeniedIdentitySessionPort.Instance),
+            static () => RuntimeCallerContext.Current,
+            TopologyHosting.ComposedDeclarations(sp).RequirePrivileged);
 
     internal static readonly Func<IServiceProvider, object?, ISessions> DeniedSessionsFactory =
-        static (sp, key) => sp.GetRequiredKeyedService<SessionsCapability>(key);
+        static (sp, key) => sp.GetRequiredKeyedService<BoundSessions>(key);
 
     internal static readonly Func<IServiceProvider, object?, IIdentityProvider> DeniedIdentityDescriptorFactory =
-        static (sp, key) => sp.GetRequiredKeyedService<SessionsCapability>(key);
+        static (sp, key) => sp.GetRequiredKeyedService<BoundSessions>(key);
 
     /// <summary>
     /// Configures the one <see cref="CapabilityRegistry"/> of this host (for example <c>AcceptBinding(storage@1, typeof(IStorage))</c>).
@@ -119,7 +126,9 @@ public static class CapabilityHosting
     {
         if (services.GetService<IIdentityDirectoryPort>() is { } directory && !ReferenceEquals(directory, DeniedIdentityDirectoryPort.Instance))
         {
-            yield return directory.GetType().Assembly;
+            var unwrapped = directory is PlatformIdentityDirectoryPort platform ? platform.Inner : directory;
+            yield return unwrapped.GetType().Assembly;
+            yield return typeof(IIdentity).Assembly;
         }
         if (services.GetService<ISecretVaultPort>() is { } vault && !ReferenceEquals(vault, DeniedSecretVaultPort.Instance))
         {
@@ -149,7 +158,7 @@ public static class CapabilityHosting
         {
             services.AddKeyedSingleton(Capability.Secrets.V1Id, DeniedSecretsFactory);
         }
-        if (!services.Any(descriptor => descriptor.IsKeyedService && descriptor.ServiceType == typeof(SessionsCapability) && Capability.Identity.V1Id.Equals(descriptor.ServiceKey as string, StringComparison.Ordinal)))
+        if (!services.Any(descriptor => descriptor.IsKeyedService && descriptor.ServiceType == typeof(BoundSessions) && Capability.Identity.V1Id.Equals(descriptor.ServiceKey as string, StringComparison.Ordinal)))
         {
             services.AddKeyedSingleton(Capability.Identity.V1Id, DeniedSessionsCapabilityFactory);
         }

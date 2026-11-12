@@ -1,4 +1,4 @@
-﻿using DigitalBrain.Neurons;
+using DigitalBrain.Neurons;
 using DigitalBrain.Units;
 using System.Collections.Immutable;
 using DigitalBrain.Runtime.Synapses;

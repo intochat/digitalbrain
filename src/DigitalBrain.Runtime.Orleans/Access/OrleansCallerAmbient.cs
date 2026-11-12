@@ -1,4 +1,4 @@
-﻿using DigitalBrain.Modules;
+using DigitalBrain.Modules;
 using DigitalBrain.Access;
 using Orleans.Runtime;
 

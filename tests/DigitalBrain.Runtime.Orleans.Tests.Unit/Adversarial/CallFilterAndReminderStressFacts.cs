@@ -1,4 +1,4 @@
-﻿using DigitalBrain.Scheduling;
+using DigitalBrain.Scheduling;
 using System.Diagnostics;
 using System.Reflection;
 using DigitalBrain.Capabilities;

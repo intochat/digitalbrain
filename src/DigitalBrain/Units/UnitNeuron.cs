@@ -52,7 +52,7 @@ internal sealed class UnitNeuron<TState> : Neuron<StoredUnit<TState>>, ISynapseR
         ArgumentNullException.ThrowIfNull(slots);
         _catalog = catalog;
         _slots = slots;
-        var current = catalog.Current;
+        var current = catalog.Of(typeof(TState));
         _stateAlias = current.States.FirstOrDefault(s => s.Value == typeof(TState)).Key
             ?? throw new ArgumentException($"{typeof(TState).FullName} is not a [State] record of the catalog.", nameof(catalog));
     }
@@ -63,7 +63,7 @@ internal sealed class UnitNeuron<TState> : Neuron<StoredUnit<TState>>, ISynapseR
     {
         get
         {
-            var current = _catalog.Current;
+            var current = _catalog.Of(typeof(TState));
             if (ReferenceEquals(current, _boundTo) && _functions is not null) { return _functions; }
             _boundTo = current;
             return _functions = UnitFunctions<TState>.Bind(current) ?? _functions

@@ -63,8 +63,8 @@ public sealed class SecretsIdentityCapabilityFacts
     public async Task Identity_gated_members_without_a_stamped_caller_are_denied()
     {
         var directory = new InMemoryIdentityDirectory();
-        var identity = new IdentityCapability(directory);
-        var grants = new GrantsCapability(directory);
+        var identity = new BoundIdentity(directory, static () => RuntimeCallerContext.Current);
+        var grants = identity;
         var owner = (await identity.RegisterPrincipal("ada", "Ada", Ct)).Member;
         var guest = owner with { PrincipalId = "bob", AccountId = "bob-account", Role = MemberRole.Member };
 
@@ -84,8 +84,8 @@ public sealed class SecretsIdentityCapabilityFacts
     public async Task Grant_as_owner_uses_the_stamped_caller_not_a_parameter()
     {
         var directory = new InMemoryIdentityDirectory();
-        var identity = new IdentityCapability(directory);
-        var grants = new GrantsCapability(directory);
+        var identity = new BoundIdentity(directory, static () => RuntimeCallerContext.Current);
+        var grants = identity;
         var owner = (await identity.RegisterPrincipal("ada", "Ada", Ct)).Member;
         var grant = new Grant { AppId = "a", SemanticTypeId = "t", Mode = GrantMode.Always, WorkspaceId = owner.BrainId };
 
@@ -110,8 +110,8 @@ public sealed class SecretsIdentityCapabilityFacts
         var broker = new CapabilityBroker(new CapabilityRegistry(), new CapabilityBrokerFacts.FakeConnections(), provider, []);
 
         Assert.IsType<SecretsCapability>(await broker.Resolve<ISecrets>(new BrainId("b"), Ct));
-        Assert.IsType<IdentityCapability>(await broker.Resolve<IIdentity>(new BrainId("b"), Ct));
-        Assert.IsType<GrantsCapability>(await broker.Resolve<IGrants>(new BrainId("b"), Ct));
+        Assert.IsType<BoundIdentity>(await broker.Resolve<IIdentity>(new BrainId("b"), Ct));
+        Assert.IsType<BoundIdentity>(await broker.Resolve<IGrants>(new BrainId("b"), Ct));
         Assert.Same(provider.GetKeyedService<ISecrets>(Capability.Secrets.V1Id), await broker.Resolve<ISecrets>(new BrainId("b"), Ct));
         Assert.Empty(CapabilityBroker.SingleRegistrationIssues(new CapabilityRegistry(), services));
     }

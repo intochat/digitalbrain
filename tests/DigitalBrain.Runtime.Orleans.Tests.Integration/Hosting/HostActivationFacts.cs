@@ -1,4 +1,4 @@
-﻿using DigitalBrain.Modules;
+using DigitalBrain.Modules;
 using DigitalBrain.Neurons;
 using System.Reflection;
 using System.Reflection.Emit;

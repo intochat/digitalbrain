@@ -1,6 +1,8 @@
 using DigitalBrain.Runtime.Synapses.Tests.Unit.Compile;
+using DigitalBrain.Contracts;
 using DigitalBrain.Kernel;
 using DigitalBrain.Units;
+using Xunit;
 
 namespace DigitalBrain.Runtime.Synapses.Tests.Unit.Host;
 
@@ -8,7 +10,6 @@ public sealed class SourceBindingsFlipFacts
 {
     private static readonly BrainId Brain = NeuronId.Parse("fl/x/y").Brain;
 
-    // The weekly cap source plus a second state alias.
     private static readonly string TwoAliases = SynapseCompilerFacts.Budget + """
 
         [Signal("flip.charging2")]
@@ -38,85 +39,53 @@ public sealed class SourceBindingsFlipFacts
     [Fact]
     public async Task AHookThatFlipsMidInstallDoesNotStore()
     {
-        var installs = new Installs();
-        var store = new Store();
-        await using var host = new SynapseHost(
-            new SynapseCompiler(ReferenceSet.FromDefaultContext()),
-            new SynapseLoader(),
-            new Registrar(),
-            new SynapseCatalogSource(SynapseCatalog.Scan()),
-            _ => installs,
-            store,
-            new Listeners());
-        var source = new SynapseSource("Me.Budget", new Dictionary<string, string> { ["Budget.cs"] = TwoAliases }, null);
-        var first = await host.Deploy(Brain, source with { Bindings = Both("a") }, new Dictionary<string, IReadOnlyDictionary<string, string>>(), Ct);
-        Assert.Equal(DeployStatus.Deployed, first.Status);
-        Assert.Single(store.Puts);
+        var deployment = new FakeDeployment();
+        var sources = new FakeSources();
+        var loader = new UnitLoader();
+        var compiler = new SynapseCompiler(ReferenceSet.FromDefaultContext());
+        var deployer = new UnitDeployer(compiler, loader, _ => sources, _ => deployment);
 
-        // Validation passes for both aliases, then the install of the second one refuses.
-        installs.RefuseInstall = "week2";
-        var again = await host.Deploy(Brain, source with { Bindings = Both("b") }, new Dictionary<string, IReadOnlyDictionary<string, string>>(), Ct);
+        var source = new SynapseSource("Me.Budget", new Dictionary<string, string> { ["Budget.cs"] = TwoAliases }, null);
+        var first = await deployer.Deploy(Brain, source with { Bindings = Both("a") }, new Dictionary<string, IReadOnlyDictionary<string, string>>(), Ct);
+        Assert.Equal(DeployStatus.Deployed, first.Status);
+        Assert.Equal(1, deployment.ProposeCalls);
+
+        // A hook flips mid-install, causing the deployment aggregate to refuse the update
+        deployment.RefuseNext = "the hook flipped";
+        var again = await deployer.Deploy(Brain, source with { Bindings = Both("b") }, new Dictionary<string, IReadOnlyDictionary<string, string>>(), Ct);
 
         Assert.Equal(DeployStatus.Refused, again.Status);
-        Assert.Single(store.Puts);
+        Assert.Equal("the hook flipped", again.Reason);
+        Assert.Equal(2, deployment.ProposeCalls);
     }
 
-    private sealed class Registrar : ISynapseRegistrar
+    private sealed class FakeSources : ISources
     {
-        public Task Activate(BrainId brain, LoadedSource source, CancellationToken ct) => Task.CompletedTask;
-
-        public Task Deactivate(BrainId brain, string sourceKey, IReadOnlyList<string> aliases, CancellationToken ct) => Task.CompletedTask;
+        public Task<AliasConflict?> Claim(string sourceKey, IReadOnlyList<string> aliases, CancellationToken ct = default) => Task.FromResult<AliasConflict?>(null);
+        public Task Release(string sourceKey, IReadOnlyList<string> aliases, CancellationToken ct = default) => Task.CompletedTask;
+        public Task<string?> OwnerOf(string alias, CancellationToken ct = default) => Task.FromResult<string?>("Me.Budget");
+        public Task<IReadOnlyList<string>> Keys(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>(["Me.Budget"]);
     }
 
-    private sealed class Installs : IInstalls
+    private sealed class FakeDeployment : IUnitDeployment
     {
-        public string? RefuseInstall { get; set; }
+        public int ProposeCalls { get; private set; }
+        public string? RefuseNext { get; set; }
 
-        public Task<InstallOutcome> Install(InstallRequest request, CancellationToken ct) =>
-            Task.FromResult(request.Alias == RefuseInstall
-                ? new InstallOutcome(InstallStatus.Refused, "", "the hook flipped")
-                : new InstallOutcome(InstallStatus.Updated, "", null));
-
-        public Task<string?> Validate(InstallRequest request, CancellationToken ct) => Task.FromResult<string?>(null);
-
-        public Task Retire(string alias, CancellationToken ct) => Task.CompletedTask;
-
-        public Task CancelPending(string alias, CancellationToken ct) => Task.CompletedTask;
-
-        public Task<InstallRecord?> Describe(string alias, CancellationToken ct) => Task.FromResult<InstallRecord?>(null);
-
-        public Task<IReadOnlyList<InstallRecord>> List(CancellationToken ct) => Task.FromResult<IReadOnlyList<InstallRecord>>([]);
-
-        public Task<IReadOnlyList<PendingInstall>> Pending(CancellationToken ct) => Task.FromResult<IReadOnlyList<PendingInstall>>([]);
-    }
-
-    private sealed class Store : ISourceStore
-    {
-        public List<SourceRecord> Puts { get; } = [];
-
-        public Task<SourceRecord?> Get(BrainId brain, string sourceKey, CancellationToken ct) => Task.FromResult(Puts.LastOrDefault(r => r.SourceKey == sourceKey));
-
-        public Task Put(BrainId brain, SourceRecord record, CancellationToken ct)
+        public Task<DeployOutcome> Propose(StoredBuild build, IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> bindings, CancellationToken ct = default)
         {
-            Puts.Add(record);
-            return Task.CompletedTask;
+            ProposeCalls++;
+            if (RefuseNext is not null)
+            {
+                return Task.FromResult(new DeployOutcome(DeployStatus.Refused, build.Ref.Hash, [], new Dictionary<string, InstallOutcome>(), RefuseNext));
+            }
+            return Task.FromResult(new DeployOutcome(DeployStatus.Deployed, build.Ref.Hash, [], new Dictionary<string, InstallOutcome>(), null));
         }
 
-        public Task Stage(BrainId brain, string sourceKey, string hash, CancellationToken ct) => Task.CompletedTask;
-
-        public Task Remove(BrainId brain, string sourceKey, CancellationToken ct) => Task.CompletedTask;
-
-        public Task<IReadOnlyList<SourceRecord>> List(BrainId brain, CancellationToken ct) => Task.FromResult<IReadOnlyList<SourceRecord>>([.. Puts]);
-    }
-
-    private sealed class Listeners : IClusterListeners
-    {
-        public Task<IAsyncDisposable> Listen<TSignal>(string listener, Func<NeuronId, TSignal, CancellationToken, Task> handler)
-            where TSignal : Signal => Task.FromResult<IAsyncDisposable>(new Nop());
-
-        private sealed class Nop : IAsyncDisposable
-        {
-            public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-        }
+        public Task<BuildRef?> Ref(UnitView view, CancellationToken ct = default) => Task.FromResult<BuildRef?>(null);
+        public Task<StoredBuild?> Build(string hash, CancellationToken ct = default) => Task.FromResult<StoredBuild?>(null);
+        public Task<UnitSourceView?> Source(CancellationToken ct = default) => Task.FromResult<UnitSourceView?>(null);
+        public Task Refuse(string hash, string reason, CancellationToken ct = default) => Task.CompletedTask;
+        public Task Retire(CancellationToken ct = default) => Task.CompletedTask;
     }
 }

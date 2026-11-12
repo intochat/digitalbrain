@@ -53,7 +53,7 @@ internal sealed class AskBatchNeuron(ISynapseCatalogSource catalog, ISlotResolve
         var unit = state.Unit;
         var ask = state.Asks[index];
         var batch = BatchKey(unit);
-        if (DeferredSlot(catalog.Current.For(unit), ask.Slot) is not { } slot)
+        if (DeferredSlot(catalog.Static.For(unit), ask.Slot) is not { } slot)
         {
             await Settle(unit, new AskSettlement(batch, index, attempt, ask.Slot, ask.Operation, ask.Key, ask.Repeatable, AnswerStatus.Refused, AskRules.NoResult, "slot-dropped", Transient: false)).ConfigureAwait(true);
             return;

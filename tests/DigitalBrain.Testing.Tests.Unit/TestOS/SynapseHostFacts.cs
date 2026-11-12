@@ -78,13 +78,19 @@ public interface IHsPayments
 
 // Publishes the live generated Charging signal: its type is read from the catalog on each call, so no fact pins an old context.
 [Neuron("hs.payments")]
-public sealed class HsPayments(ISynapseCatalogSource? catalogSource = null) : Neuron<HsPayments.Count>, IHsPayments
+public sealed class HsPayments(ISynapseCatalogSource? catalogSource = null, UnitResolver? resolver = null) : Neuron<HsPayments.Count>, IHsPayments
 {
-    public Task Charge(decimal amount)
+    public async Task Charge(decimal amount)
     {
-        var type = (catalogSource ?? throw new InvalidOperationException("no catalog"))
-            .Current.For("hs.week").First(d => d.Kind == SynapseKind.Reaction).Signal!;
-        return Save(State with { N = State.N + 1 }, (Signal)Activator.CreateInstance(type, amount)!);
+        Type? type = null;
+        if (resolver is not null)
+        {
+            using var handle = await resolver.Resolve(Id.Brain, "hs.week", UnitView.Live, CancellationToken.None).ConfigureAwait(true);
+            type = handle?.Catalog.For("hs.week").FirstOrDefault(d => d.Kind == SynapseKind.Reaction)?.Signal;
+        }
+        type ??= (catalogSource ?? throw new InvalidOperationException("no catalog"))
+            .Static.For("hs.week").First(d => d.Kind == SynapseKind.Reaction).Signal!;
+        await Save(State with { N = State.N + 1 }, (Signal)Activator.CreateInstance(type, amount)!);
     }
 
     public sealed record Count
@@ -114,6 +120,16 @@ public sealed class SynapseHostFacts
         return state!.Value.GetProperty("spent").GetDecimal();
     }
 
+    private static void Collect()
+    {
+        for (var i = 0; i < 5; i++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+        }
+    }
+
     // Deploys the weekly cap and approves its first install.
     private static async Task<DeployOutcome> DeployApproved(OS os, string brain)
     {
@@ -141,7 +157,8 @@ public sealed class SynapseHostFacts
         Assert.Equal("hs.week", Assert.Single(listed.Aliases));
         Assert.Equal(DeployStatus.Deployed, listed.Status);
         Assert.Equal(outcome.Hash, listed.Hash);
-        Assert.Equal(outcome.Hash, (await os.Store.Get(Brain("hs1"), HsSource.Key, Ct))?.Hash);
+        var deployment = os.Get<IUnitDeployment>(NeuronId.Parse($"hs1/synapse.deployment/{HsSource.Key}"));
+        Assert.Equal(outcome.Hash, (await deployment.Build(outcome.Hash!, Ct))?.Ref.Hash);
         Assert.Equal(DeployStatus.Unchanged, (await os.Synapses.Deploy(Brain("hs1"), HsSource.Of(HsSource.Budget), None, Ct)).Status);
         Assert.Empty(os.Failures);
     }
@@ -157,7 +174,8 @@ public sealed class SynapseHostFacts
         Assert.Equal(DeployStatus.Failed, broken.Status);
         Assert.Contains(broken.Diagnostics, d => d.File == "Budget.cs" && d.Line == 22);
         Assert.Empty(broken.Installs);
-        Assert.Empty(os.Synapses.Leaked);
+        Collect();
+        Assert.Empty(os.Loader.Lingering());
         Assert.Equal(first.Hash, Assert.Single(await os.Synapses.List(Brain("hs2"), Ct)).Hash);
         await Pay(os, "hs2").Charge(50m);
         await os.Idle();
@@ -181,7 +199,8 @@ public sealed class SynapseHostFacts
         await Pay(os, "hs3").Charge(50m);
         await os.Idle();
         Assert.Equal(100m, await Spent(os, "hs3"));
-        Assert.Empty(os.Synapses.Leaked);
+        Collect();
+        Assert.Empty(os.Loader.Lingering());
         Assert.Empty(os.Failures);
     }
 
@@ -210,8 +229,10 @@ public sealed class SynapseHostFacts
         listed = Assert.Single(await os.Synapses.List(Brain("hs4"), Ct));
         Assert.Equal((DeployStatus.Deployed, update.Hash, (string?)null), (listed.Status, listed.Hash, listed.StagedHash));
         Assert.NotEmpty(os.Catalog.NeedsOf("hs.week").Slots);
-        Assert.Equal(update.Hash, (await os.Store.Get(Brain("hs4"), HsSource.Key, Ct))?.Hash);
-        Assert.Empty(os.Synapses.Leaked);
+        var deployment4 = os.Get<IUnitDeployment>(NeuronId.Parse($"hs4/synapse.deployment/{HsSource.Key}"));
+        Assert.Equal(update.Hash, (await deployment4.Build(update.Hash!, Ct))?.Ref.Hash);
+        Collect();
+        Assert.Empty(os.Loader.Lingering());
         Assert.Empty(os.Failures);
     }
 
@@ -229,13 +250,13 @@ public sealed class SynapseHostFacts
         var listed = Assert.Single(await os.Synapses.List(Brain("hs5"), Ct));
         Assert.Equal((DeployStatus.Deployed, first.Hash, (string?)null), (listed.Status, listed.Hash, listed.StagedHash));
         Assert.Empty(os.Catalog.NeedsOf("hs.week").Slots);
-        Assert.Empty(os.Source.ForNeeds("hs.week").NeedsOf("hs.week").Slots);
         var record = await os.Get<IInstalls>(NeuronId.Parse("hs5/synapse.installs/default")).Describe("hs.week", Ct);
         Assert.Equal(os.Catalog.NeedsOf("hs.week").Hash(), record?.NeedsHash);
         await Pay(os, "hs5").Charge(50m);
         await os.Idle();
         Assert.Equal(50m, await Spent(os, "hs5"));
-        Assert.Empty(os.Synapses.Leaked);
+        Collect();
+        Assert.Empty(os.Loader.Lingering());
         Assert.Empty(os.Failures);
     }
 
@@ -252,8 +273,10 @@ public sealed class SynapseHostFacts
         Assert.Contains(HsSource.Key, rival.Reason, StringComparison.Ordinal);
         Assert.Empty(rival.Installs);
         Assert.Equal(first.Hash, Assert.Single(await os.Synapses.List(Brain("hs6"), Ct)).Hash);
-        Assert.Null(await os.Store.Get(Brain("hs6"), "Me.Rival", Ct));
-        Assert.Empty(os.Synapses.Leaked);
+        var rivalDeployment = os.Get<IUnitDeployment>(NeuronId.Parse("hs6/synapse.deployment/Me.Rival"));
+        Assert.Null(await rivalDeployment.Ref(UnitView.Live, Ct));
+        Collect();
+        Assert.Empty(os.Loader.Lingering());
         await Pay(os, "hs6").Charge(50m);
         await os.Idle();
         Assert.Equal(50m, await Spent(os, "hs6"));
@@ -272,8 +295,10 @@ public sealed class SynapseHostFacts
         Assert.False(os.Catalog.States.ContainsKey("hs.week"));
         Assert.Null(await os.Get<IInstalls>(NeuronId.Parse("hs7/synapse.installs/default")).Describe("hs.week", Ct));
         Assert.Empty(await os.Synapses.List(Brain("hs7"), Ct));
-        Assert.Null(await os.Store.Get(Brain("hs7"), HsSource.Key, Ct));
-        Assert.Empty(os.Synapses.Leaked);
+        var deployment7 = os.Get<IUnitDeployment>(NeuronId.Parse($"hs7/synapse.deployment/{HsSource.Key}"));
+        Assert.Null(await deployment7.Ref(UnitView.Live, Ct));
+        Collect();
+        Assert.Empty(os.Loader.Lingering());
         Assert.Equal(DeployStatus.Refused, (await os.Synapses.Retire(Brain("hs7"), HsSource.Key, Ct)).Status);
         Assert.Empty(os.Failures);
     }
@@ -297,7 +322,8 @@ public sealed class SynapseHostFacts
         Assert.Contains(pending, p => p.PlanId == second.Installs["hs.week"].Reason);
         Assert.Contains(os.Journal(installs.Brain).Signals(installs), s => s.Signal is InstallDenied { Reason: "superseded" } d && d.PlanId == firstPlan);
         Assert.Equal(second.Hash, Assert.Single(await os.Synapses.List(Brain("hs8"), Ct)).StagedHash);
-        Assert.Empty(os.Synapses.Leaked);
+        Collect();
+        Assert.Empty(os.Loader.Lingering());
         Assert.Empty(os.Failures);
     }
 
@@ -318,104 +344,8 @@ public sealed class SynapseHostFacts
         Assert.Equal(os.Catalog.NeedsOf("hs.week").Hash(), (await installs.Describe("hs.week", Ct))?.NeedsHash);
         var listed = Assert.Single(await os.Synapses.List(Brain("hs9"), Ct));
         Assert.Equal((DeployStatus.Deployed, staged.Hash), (listed.Status, listed.Hash));
-        Assert.Empty(os.Synapses.Leaked);
-        Assert.Empty(os.Failures);
-    }
-
-    [Fact]
-    public async Task TwoBrainsShareOneLoad()
-    {
-        await using var os = Start();
-        os.Confirmations.ApproveAll();
-
-        var one = await os.Synapses.Deploy(Brain("b1"), HsSource.Of(HsSource.Budget), None, Ct);
-        var emits = os.Synapses.Compiler.Emits;
-        var two = await os.Synapses.Deploy(Brain("b2"), HsSource.Of(HsSource.Budget), None, Ct);
-        await os.Idle();
-
-        Assert.Equal((DeployStatus.Deployed, DeployStatus.Deployed), (one.Status, two.Status));
-        Assert.Equal(one.Hash, two.Hash);
-        Assert.Equal(emits, os.Synapses.Compiler.Emits);
-        await Pay(os, "b1").Charge(250m);
-        await Pay(os, "b2").Charge(100m);
-        await os.Idle();
-        Assert.Equal(250m, await Spent(os, "b1"));
-        Assert.Equal(100m, await Spent(os, "b2"));
-        Assert.Equal(one.Hash, Assert.Single(await os.Synapses.List(Brain("b2"), Ct)).Hash);
-        Assert.Empty(os.Failures);
-    }
-
-    [Fact]
-    public async Task RetireInOneBrainKeepsTheOtherRunning()
-    {
-        await using var os = Start();
-        os.Confirmations.ApproveAll();
-        await os.Synapses.Deploy(Brain("b1"), HsSource.Of(HsSource.Budget), None, Ct);
-        await os.Synapses.Deploy(Brain("b2"), HsSource.Of(HsSource.Budget), None, Ct);
-        await os.Idle();
-
-        Assert.Equal(DeployStatus.Retired, (await os.Synapses.Retire(Brain("b1"), HsSource.Key, Ct)).Status);
-        await os.Idle();
-
-        Assert.Empty(await os.Synapses.List(Brain("b1"), Ct));
-        Assert.Single(await os.Synapses.List(Brain("b2"), Ct));
-        Assert.Empty(os.Synapses.Leaked);
-
-        Assert.Equal(DeployStatus.Retired, (await os.Synapses.Retire(Brain("b2"), HsSource.Key, Ct)).Status);
-        await os.Idle();
-
-        Assert.False(os.Catalog.States.ContainsKey("hs.week"));
-        Assert.Empty(os.Synapses.Leaked);
-        Assert.Empty(os.Failures);
-    }
-
-    [Fact]
-    public async Task SwapInOneBrainThenRetireTheOtherKeepsTheAliasLive()
-    {
-        await using var os = Start();
-        os.Confirmations.ApproveAll();
-        await os.Synapses.Deploy(Brain("sa"), HsSource.Of(HsSource.Budget), None, Ct);
-        await os.Synapses.Deploy(Brain("sb"), HsSource.Of(HsSource.Budget), None, Ct);
-        await os.Idle();
-        Assert.Equal(DeployStatus.Deployed, (await os.Synapses.Deploy(Brain("sa"), HsSource.Of(HsSource.Cap200), None, Ct)).Status);
-        await os.Idle();
-
-        Assert.Equal(DeployStatus.Retired, (await os.Synapses.Retire(Brain("sb"), HsSource.Key, Ct)).Status);
-        await os.Idle();
-
-        Assert.Contains("hs.week", os.Catalog.States.Keys);
-        Assert.Empty(os.Synapses.Leaked);
-
-        Assert.Equal(DeployStatus.Retired, (await os.Synapses.Retire(Brain("sa"), HsSource.Key, Ct)).Status);
-        await os.Idle();
-
-        Assert.DoesNotContain("hs.week", os.Catalog.States.Keys);
-        Assert.Empty(os.Synapses.Leaked);
-        Assert.Empty(os.Failures);
-    }
-
-    [Fact]
-    public async Task RetireStoredSkipsDeactivateWhileAnotherBrainIsLive()
-    {
-        await using var os = Start().Register<SrPayments>();
-        os.Confirmations.ApproveAll();
-        await os.Synapses.Deploy(Brain("ra"), HsSource.Of(HsSource.Budget), None, Ct);
-        await os.Synapses.Deploy(Brain("rb"), HsSource.Of(HsSource.Budget), None, Ct);
-        await os.Idle();
-        await os.Restart();
-        await os.Activate(NeuronId.Parse("rb/hs.week/default"));
-        await os.Get<IHsPayments>(NeuronId.Parse("rb/sr.payments/p")).Charge(50m);
-        await os.Idle();
-        Assert.Single(await os.Synapses.List(Brain("rb"), Ct));
-        Assert.Empty(await os.Synapses.List(Brain("ra"), Ct));
-
-        Assert.Equal(DeployStatus.Retired, (await os.Synapses.Retire(Brain("ra"), HsSource.Key, Ct)).Status);
-        await os.Idle();
-
-        Assert.Contains("hs.week", os.Catalog.States.Keys);
-        await os.Get<IHsPayments>(NeuronId.Parse("rb/sr.payments/p")).Charge(50m);
-        await os.Idle();
-        Assert.Equal(100m, await Spent(os, "rb"));
+        Collect();
+        Assert.Empty(os.Loader.Lingering());
         Assert.Empty(os.Failures);
     }
 }

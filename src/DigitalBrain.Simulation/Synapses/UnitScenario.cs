@@ -185,13 +185,12 @@ public static class UnitScenario
     private static ScenarioTranscript Failed(List<string> failures) => new(false, [], failures.Count == 0 ? ["failed"] : failures, [], []);
 
     // The aliases the compiled source declares, scanned from the build the host would load; the load context is unloaded again.
-    private static async Task<IReadOnlyList<string>> StateAliases(SynapseBuild build)
+    private static Task<IReadOnlyList<string>> StateAliases(SynapseBuild build)
     {
-        var loader = new SynapseLoader();
-        var loaded = loader.Load(build);
-        var aliases = loaded.Catalog.States.Keys.ToList();
-        _ = await loader.Unload(loaded, gcRounds: 0).ConfigureAwait(false);
-        return aliases;
+        var loader = new UnitLoader();
+        var image = new BuildImage(new BuildRef("scenario", build.Hash), build.AssemblyName, build.Assembly, build.Symbols);
+        using var handle = loader.Acquire(image);
+        return Task.FromResult<IReadOnlyList<string>>(handle.Catalog.States.Keys.ToList());
     }
 
     private static async Task<long> Drain(TestJournal journal, long position, int step, List<ScenarioEvent> events, CancellationToken ct)

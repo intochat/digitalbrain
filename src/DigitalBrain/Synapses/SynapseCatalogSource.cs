@@ -1,92 +1,62 @@
 namespace DigitalBrain.Units;
 
 /// <summary>
-/// A thread-safe <see cref="ISynapseCatalogSource"/>: changes are serialized under a lock and <see cref="Current"/> is a volatile read of
-/// an immutable catalog. <see cref="Merge"/>, <see cref="Replace"/> and <see cref="Remove"/> bump <see cref="Version"/> and raise
-/// <see cref="Changed"/>; staging never changes <see cref="Current"/>.
+/// Thread-safe <see cref="ISynapseCatalogSource"/> providing the static framework catalog and delegating dynamic state record lookups to <see cref="IUnitLoader"/>.
 /// </summary>
-/// <param name="initial">The catalog in force at start.</param>
-public sealed class SynapseCatalogSource(SynapseCatalog initial) : ISynapseCatalogSource
+public sealed class SynapseCatalogSource : ISynapseCatalogSource
 {
     private readonly Lock _gate = new();
-    private readonly Dictionary<string, SynapseCatalog> _staged = new(StringComparer.Ordinal);
-    private SynapseCatalog _current = initial ?? throw new ArgumentNullException(nameof(initial));
-    private long _version;
+    private SynapseCatalog _current;
+    private readonly Func<IUnitLoader?>? _units;
+
+    /// <summary>Creates a catalog source without a dynamic unit loader.</summary>
+    public SynapseCatalogSource(SynapseCatalog initial)
+        : this(initial, (Func<IUnitLoader?>?)null)
+    {
+    }
+
+    /// <summary>Creates a catalog source with an optional unit loader.</summary>
+    public SynapseCatalogSource(SynapseCatalog initial, IUnitLoader? units)
+        : this(initial, units is null ? null : () => units)
+    {
+    }
+
+    /// <summary>Creates a catalog source with a lazy unit loader factory.</summary>
+    public SynapseCatalogSource(SynapseCatalog initial, Func<IUnitLoader?>? units)
+    {
+        _current = initial ?? throw new ArgumentNullException(nameof(initial));
+        _units = units;
+    }
 
     /// <inheritdoc />
-    public SynapseCatalog Current => Volatile.Read(ref _current);
+    public SynapseCatalog Static => Volatile.Read(ref _current);
 
     /// <inheritdoc />
-    public long Version => Interlocked.Read(ref _version);
-
-    /// <inheritdoc />
-    public event Action<SynapseCatalog>? Changed;
+    public SynapseCatalog Of(Type stateRecord)
+    {
+        ArgumentNullException.ThrowIfNull(stateRecord);
+        return _units?.Invoke()?.CatalogOf(stateRecord) ?? Static;
+    }
 
     /// <summary>Adds the states and synapses of <paramref name="catalog"/>.</summary>
-    /// <param name="catalog">The catalog to add.</param>
-    /// <exception cref="SynapseShapeException">A state alias is already in <see cref="Current"/>.</exception>
     public void Merge(SynapseCatalog catalog)
     {
         ArgumentNullException.ThrowIfNull(catalog);
-        Publish(current => current.Merge(catalog));
+        lock (_gate) { _current = _current.Merge(catalog); }
     }
 
     /// <summary>Drops <paramref name="alias"/> and every alias of <paramref name="catalog"/>, then merges <paramref name="catalog"/>.</summary>
-    /// <param name="alias">The state alias being replaced.</param>
-    /// <param name="catalog">The catalog that replaces it.</param>
     public void Replace(string alias, SynapseCatalog catalog)
     {
         ArgumentNullException.ThrowIfNull(alias);
         ArgumentNullException.ThrowIfNull(catalog);
-        Publish(current => current.Without(alias).Replace(catalog));
+        lock (_gate) { _current = _current.Without(alias).Replace(catalog); }
     }
 
     /// <summary>Drops the state <paramref name="alias"/> and its synapses.</summary>
-    /// <param name="alias">The state alias.</param>
     public void Remove(string alias)
     {
         ArgumentNullException.ThrowIfNull(alias);
-        Publish(current => current.Without(alias));
-    }
-
-    /// <summary>Stages <paramref name="staged"/> under <paramref name="sourceKey"/> for <see cref="ForNeeds"/>, replacing an earlier stage of the key.</summary>
-    /// <param name="sourceKey">The key of the stage, such as an upload id.</param>
-    /// <param name="staged">The catalog to serve for the aliases it declares.</param>
-    public void Stage(string sourceKey, SynapseCatalog staged)
-    {
-        ArgumentNullException.ThrowIfNull(sourceKey);
-        ArgumentNullException.ThrowIfNull(staged);
-        lock (_gate) { _staged[sourceKey] = staged; }
-    }
-
-    /// <summary>Drops the stage of <paramref name="sourceKey"/>; an unknown key is ignored.</summary>
-    /// <param name="sourceKey">The key of the stage.</param>
-    public void Unstage(string sourceKey)
-    {
-        ArgumentNullException.ThrowIfNull(sourceKey);
-        lock (_gate) { _staged.Remove(sourceKey); }
-    }
-
-    /// <inheritdoc />
-    public SynapseCatalog ForNeeds(string alias)
-    {
-        ArgumentNullException.ThrowIfNull(alias);
-        lock (_gate)
-        {
-            return _staged.Values.LastOrDefault(staged => staged.States.ContainsKey(alias)) ?? _current;
-        }
-    }
-
-    private void Publish(Func<SynapseCatalog, SynapseCatalog> change)
-    {
-        SynapseCatalog next;
-        lock (_gate)
-        {
-            next = change(_current);
-            Volatile.Write(ref _current, next);
-            Interlocked.Increment(ref _version);
-        }
-
-        Changed?.Invoke(next);
+        lock (_gate) { _current = _current.Without(alias); }
     }
 }

@@ -15,6 +15,7 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="DigitalBrain.Capabilities.Connections.Tests.Unit" />
+    <InternalsVisibleTo Include="DigitalBrain.Identity.Local.Tests.Unit" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../DigitalBrain/DigitalBrain.csproj" />

@@ -300,3 +300,311 @@ static DigitalBrain.Capabilities.Identity.SessionIssued.operator !=(DigitalBrain
 static DigitalBrain.Capabilities.Identity.SessionIssued.operator ==(DigitalBrain.Capabilities.Identity.SessionIssued? left, DigitalBrain.Capabilities.Identity.SessionIssued? right) -> bool
 static DigitalBrain.Capabilities.Identity.SessionRequest.operator !=(DigitalBrain.Capabilities.Identity.SessionRequest? left, DigitalBrain.Capabilities.Identity.SessionRequest? right) -> bool
 static DigitalBrain.Capabilities.Identity.SessionRequest.operator ==(DigitalBrain.Capabilities.Identity.SessionRequest? left, DigitalBrain.Capabilities.Identity.SessionRequest? right) -> bool
+~DigitalBrain.Capabilities.Identity.Model.Outcome<TState>.Equals(DigitalBrain.Capabilities.Identity.Model.Outcome<TState> other) -> bool
+~override DigitalBrain.Capabilities.Identity.Model.Outcome<TState>.Equals(object obj) -> bool
+~override DigitalBrain.Capabilities.Identity.Model.Outcome<TState>.ToString() -> string
+~static DigitalBrain.Capabilities.Identity.Model.Outcome<TState>.operator !=(DigitalBrain.Capabilities.Identity.Model.Outcome<TState> left, DigitalBrain.Capabilities.Identity.Model.Outcome<TState> right) -> bool
+~static DigitalBrain.Capabilities.Identity.Model.Outcome<TState>.operator ==(DigitalBrain.Capabilities.Identity.Model.Outcome<TState> left, DigitalBrain.Capabilities.Identity.Model.Outcome<TState> right) -> bool
+DigitalBrain.Capabilities.Identity.BoundIdentity
+DigitalBrain.Capabilities.Identity.BoundIdentity.Authorize(DigitalBrain.Capabilities.Identity.CallRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.CallDecision?>!
+DigitalBrain.Capabilities.Identity.BoundIdentity.BoundIdentity(DigitalBrain.Capabilities.Identity.IIdentityDirectoryPort! port, System.Func<DigitalBrain.Capabilities.CapabilityCaller?>! caller) -> void
+DigitalBrain.Capabilities.Identity.BoundIdentity.BrainExists(string! brainScopeId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Capabilities.Identity.BoundIdentity.BrainsOf(string! principalId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Identity.BrainEntry!>!>!
+DigitalBrain.Capabilities.Identity.BoundIdentity.CompleteRegistration(string! principalId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision?>!
+DigitalBrain.Capabilities.Identity.BoundIdentity.CreateBrain(string! accountId, string! principalId, string! operationId, string! displayName, DigitalBrain.Capabilities.Identity.BrainKind kind, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Capabilities.Identity.BoundIdentity.EnsureAccount(DigitalBrain.Capabilities.Identity.Account! account, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Identity.BoundIdentity.EnsureBrain(DigitalBrain.Capabilities.Identity.Member! owner, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Capabilities.Identity.BoundIdentity.EnsureMember(DigitalBrain.Capabilities.Identity.Member! member, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member?>!
+DigitalBrain.Capabilities.Identity.BoundIdentity.GrantAsOwner(DigitalBrain.Capabilities.Identity.Grant! grant, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Grant!>!
+DigitalBrain.Capabilities.Identity.BoundIdentity.IsRegistered(string! principalId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
+DigitalBrain.Capabilities.Identity.BoundIdentity.KindOf(string! brainScopeId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainKind>!
+DigitalBrain.Capabilities.Identity.BoundIdentity.ListGrants(string! brainScopeId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Identity.Grant!>!>!
+DigitalBrain.Capabilities.Identity.BoundIdentity.Membership(string! brainScopeId, string! principalId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member?>!
+DigitalBrain.Capabilities.Identity.BoundIdentity.OwnerOfBrain(string! brainId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Account?>!
+DigitalBrain.Capabilities.Identity.BoundIdentity.ProvisionOwner(DigitalBrain.Capabilities.Identity.Member! owner, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Capabilities.Identity.BoundIdentity.ReadAccount(string! accountId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Account?>!
+DigitalBrain.Capabilities.Identity.BoundIdentity.RegisterPrincipal(string! principalId, string! displayName, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.BrainProvision!>!
+DigitalBrain.Capabilities.Identity.BoundIdentity.RemoveMember(string! brainScopeId, string! accountId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Identity.BoundIdentity.RemovePrincipalMember(string! brainScopeId, string! principalId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Identity.BoundIdentity.RevokeAsOwner(string! appId, string! semanticTypeId, DigitalBrain.Capabilities.Identity.GrantMode mode, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Identity.BoundSessions
+DigitalBrain.Capabilities.Identity.BoundSessions.BoundSessions(DigitalBrain.Capabilities.Identity.IIdentitySessionPort! port, System.Func<DigitalBrain.Capabilities.CapabilityCaller?>! caller, System.Action<string?, DigitalBrain.Capabilities.CapabilityId, string!>? requirePrivileged = null) -> void
+DigitalBrain.Capabilities.Identity.BoundSessions.Describe() -> DigitalBrain.Capabilities.Identity.IdentityProviderDescriptor!
+DigitalBrain.Capabilities.Identity.BoundSessions.End(string! sessionId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+DigitalBrain.Capabilities.Identity.BoundSessions.Issue(DigitalBrain.Capabilities.Identity.SessionRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.SessionIssued!>!
+DigitalBrain.Capabilities.Identity.BoundSessions.Validate(string! sessionId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Identity.Member?>!
+DigitalBrain.Capabilities.Identity.Model.AccountBook
+DigitalBrain.Capabilities.Identity.Model.AccountBook.<Clone>$() -> DigitalBrain.Capabilities.Identity.Model.AccountBook!
+DigitalBrain.Capabilities.Identity.Model.AccountBook.AccountBook() -> void
+DigitalBrain.Capabilities.Identity.Model.AccountBook.AccountOf(string! accountId) -> DigitalBrain.Capabilities.Identity.Account?
+DigitalBrain.Capabilities.Identity.Model.AccountBook.Accounts.get -> System.Collections.Immutable.ImmutableArray<DigitalBrain.Capabilities.Identity.Account!>
+DigitalBrain.Capabilities.Identity.Model.AccountBook.Accounts.init -> void
+DigitalBrain.Capabilities.Identity.Model.AccountBook.CompleteRegistration(string! principalId) -> DigitalBrain.Capabilities.Identity.BrainProvision?
+DigitalBrain.Capabilities.Identity.Model.AccountBook.CreateBrain(string! accountId, string! principalId, string! operationId, string! displayName, DigitalBrain.Capabilities.Identity.BrainKind kind, System.DateTimeOffset now) -> (DigitalBrain.Capabilities.Identity.Model.AccountBook! Next, DigitalBrain.Capabilities.Identity.BrainProvision! Provision, System.Collections.Immutable.ImmutableArray<DigitalBrain.Signal!> Facts)
+DigitalBrain.Capabilities.Identity.Model.AccountBook.EnsureAccount(string! accountId, string! name, string! ownerPrincipalId, System.DateTimeOffset createdAt, System.DateTimeOffset now) -> (DigitalBrain.Capabilities.Identity.Model.AccountBook! Next, DigitalBrain.Capabilities.Identity.Account! Account, System.Collections.Immutable.ImmutableArray<DigitalBrain.Signal!> Facts)
+DigitalBrain.Capabilities.Identity.Model.AccountBook.Equals(DigitalBrain.Capabilities.Identity.Model.AccountBook? other) -> bool
+DigitalBrain.Capabilities.Identity.Model.AccountBook.IsRegistered(string! principalId) -> bool
+DigitalBrain.Capabilities.Identity.Model.AccountBook.Operations.get -> System.Collections.Immutable.ImmutableArray<DigitalBrain.Capabilities.Identity.Model.BrainCreation!>
+DigitalBrain.Capabilities.Identity.Model.AccountBook.Operations.init -> void
+DigitalBrain.Capabilities.Identity.Model.AccountBook.PrincipalOf(string! principalId) -> DigitalBrain.Capabilities.Identity.Model.PrincipalRecord?
+DigitalBrain.Capabilities.Identity.Model.AccountBook.Principals.get -> System.Collections.Immutable.ImmutableArray<DigitalBrain.Capabilities.Identity.Model.PrincipalRecord!>
+DigitalBrain.Capabilities.Identity.Model.AccountBook.Principals.init -> void
+DigitalBrain.Capabilities.Identity.Model.AccountBook.RegisterPrincipal(string! principalId, string! displayName, System.DateTimeOffset now) -> (DigitalBrain.Capabilities.Identity.Model.AccountBook! Next, DigitalBrain.Capabilities.Identity.BrainProvision! Provision, System.Collections.Immutable.ImmutableArray<DigitalBrain.Signal!> Facts)
+DigitalBrain.Capabilities.Identity.Model.AccountEnsured
+DigitalBrain.Capabilities.Identity.Model.AccountEnsured.Account.get -> DigitalBrain.Capabilities.Identity.Account!
+DigitalBrain.Capabilities.Identity.Model.AccountEnsured.Account.init -> void
+DigitalBrain.Capabilities.Identity.Model.AccountEnsured.AccountEnsured(DigitalBrain.Capabilities.Identity.Account! Account) -> void
+DigitalBrain.Capabilities.Identity.Model.AccountEnsured.Deconstruct(out DigitalBrain.Capabilities.Identity.Account! Account) -> void
+DigitalBrain.Capabilities.Identity.Model.AccountEnsured.Equals(DigitalBrain.Capabilities.Identity.Model.AccountEnsured? other) -> bool
+DigitalBrain.Capabilities.Identity.Model.BrainCreated
+DigitalBrain.Capabilities.Identity.Model.BrainCreated.AccountId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.BrainCreated.AccountId.init -> void
+DigitalBrain.Capabilities.Identity.Model.BrainCreated.BrainCreated(string! BrainId, string! AccountId, DigitalBrain.Capabilities.Identity.BrainKind Kind) -> void
+DigitalBrain.Capabilities.Identity.Model.BrainCreated.BrainId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.BrainCreated.BrainId.init -> void
+DigitalBrain.Capabilities.Identity.Model.BrainCreated.Deconstruct(out string! BrainId, out string! AccountId, out DigitalBrain.Capabilities.Identity.BrainKind Kind) -> void
+DigitalBrain.Capabilities.Identity.Model.BrainCreated.Equals(DigitalBrain.Capabilities.Identity.Model.BrainCreated? other) -> bool
+DigitalBrain.Capabilities.Identity.Model.BrainCreated.Kind.get -> DigitalBrain.Capabilities.Identity.BrainKind
+DigitalBrain.Capabilities.Identity.Model.BrainCreated.Kind.init -> void
+DigitalBrain.Capabilities.Identity.Model.BrainCreation
+DigitalBrain.Capabilities.Identity.Model.BrainCreation.<Clone>$() -> DigitalBrain.Capabilities.Identity.Model.BrainCreation!
+DigitalBrain.Capabilities.Identity.Model.BrainCreation.AccountId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.BrainCreation.AccountId.init -> void
+DigitalBrain.Capabilities.Identity.Model.BrainCreation.BrainCreation() -> void
+DigitalBrain.Capabilities.Identity.Model.BrainCreation.BrainCreation(string! accountId, string! operationId, DigitalBrain.Capabilities.Identity.Member! member) -> void
+DigitalBrain.Capabilities.Identity.Model.BrainCreation.Equals(DigitalBrain.Capabilities.Identity.Model.BrainCreation? other) -> bool
+DigitalBrain.Capabilities.Identity.Model.BrainCreation.Member.get -> DigitalBrain.Capabilities.Identity.Member!
+DigitalBrain.Capabilities.Identity.Model.BrainCreation.Member.init -> void
+DigitalBrain.Capabilities.Identity.Model.BrainCreation.OperationId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.BrainCreation.OperationId.init -> void
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.<Clone>$() -> DigitalBrain.Capabilities.Identity.Model.BrainDirectory!
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.AccountId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.AccountId.init -> void
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.AddMember(DigitalBrain.Capabilities.CapabilityCaller! by, DigitalBrain.Capabilities.Identity.Member! member, System.DateTimeOffset now) -> DigitalBrain.Capabilities.Identity.Model.Outcome<DigitalBrain.Capabilities.Identity.Model.BrainDirectory!>
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.Authorize(DigitalBrain.Capabilities.CapabilityCaller! caller, DigitalBrain.Capabilities.Identity.CallRequest! request) -> (DigitalBrain.Capabilities.Identity.Model.Outcome<DigitalBrain.Capabilities.Identity.Model.BrainDirectory!> Outcome, DigitalBrain.Capabilities.Identity.CallDecision! Decision)
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.BrainDirectory() -> void
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.BrainId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.BrainId.init -> void
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.Equals(DigitalBrain.Capabilities.Identity.Model.BrainDirectory? other) -> bool
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.Grants.get -> System.Collections.Immutable.ImmutableArray<DigitalBrain.Capabilities.Identity.Grant!>
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.Grants.init -> void
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.Kind.get -> DigitalBrain.Capabilities.Identity.BrainKind
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.Kind.init -> void
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.MemberOf(string! principalId) -> DigitalBrain.Capabilities.Identity.Member?
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.Members.get -> System.Collections.Immutable.ImmutableArray<DigitalBrain.Capabilities.Identity.Member!>
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.Members.init -> void
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.OwnedBy(DigitalBrain.Capabilities.CapabilityCaller! caller) -> bool
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.Owner.get -> DigitalBrain.Capabilities.Identity.Member?
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.RecordGrant(DigitalBrain.Capabilities.CapabilityCaller! by, DigitalBrain.Capabilities.Identity.Grant! grant, System.DateTimeOffset grantedAt) -> DigitalBrain.Capabilities.Identity.Model.Outcome<DigitalBrain.Capabilities.Identity.Model.BrainDirectory!>
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.RemoveMember(DigitalBrain.Capabilities.CapabilityCaller! by, string! accountId) -> DigitalBrain.Capabilities.Identity.Model.Outcome<DigitalBrain.Capabilities.Identity.Model.BrainDirectory!>
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.RemovePrincipal(DigitalBrain.Capabilities.CapabilityCaller! by, string! principalId) -> DigitalBrain.Capabilities.Identity.Model.Outcome<DigitalBrain.Capabilities.Identity.Model.BrainDirectory!>
+DigitalBrain.Capabilities.Identity.Model.BrainDirectory.RevokeGrant(DigitalBrain.Capabilities.CapabilityCaller! by, string! appId, string! semanticTypeId, DigitalBrain.Capabilities.Identity.GrantMode mode) -> DigitalBrain.Capabilities.Identity.Model.Outcome<DigitalBrain.Capabilities.Identity.Model.BrainDirectory!>
+DigitalBrain.Capabilities.Identity.Model.GrantConsumed
+DigitalBrain.Capabilities.Identity.Model.GrantConsumed.AppId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.GrantConsumed.AppId.init -> void
+DigitalBrain.Capabilities.Identity.Model.GrantConsumed.Deconstruct(out string! WorkspaceId, out string! AppId, out string! SemanticTypeId) -> void
+DigitalBrain.Capabilities.Identity.Model.GrantConsumed.Equals(DigitalBrain.Capabilities.Identity.Model.GrantConsumed? other) -> bool
+DigitalBrain.Capabilities.Identity.Model.GrantConsumed.GrantConsumed(string! WorkspaceId, string! AppId, string! SemanticTypeId) -> void
+DigitalBrain.Capabilities.Identity.Model.GrantConsumed.SemanticTypeId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.GrantConsumed.SemanticTypeId.init -> void
+DigitalBrain.Capabilities.Identity.Model.GrantConsumed.WorkspaceId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.GrantConsumed.WorkspaceId.init -> void
+DigitalBrain.Capabilities.Identity.Model.GrantRecorded
+DigitalBrain.Capabilities.Identity.Model.GrantRecorded.Deconstruct(out DigitalBrain.Capabilities.Identity.Grant! Grant) -> void
+DigitalBrain.Capabilities.Identity.Model.GrantRecorded.Equals(DigitalBrain.Capabilities.Identity.Model.GrantRecorded? other) -> bool
+DigitalBrain.Capabilities.Identity.Model.GrantRecorded.Grant.get -> DigitalBrain.Capabilities.Identity.Grant!
+DigitalBrain.Capabilities.Identity.Model.GrantRecorded.Grant.init -> void
+DigitalBrain.Capabilities.Identity.Model.GrantRecorded.GrantRecorded(DigitalBrain.Capabilities.Identity.Grant! Grant) -> void
+DigitalBrain.Capabilities.Identity.Model.GrantRevoked
+DigitalBrain.Capabilities.Identity.Model.GrantRevoked.AppId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.GrantRevoked.AppId.init -> void
+DigitalBrain.Capabilities.Identity.Model.GrantRevoked.Deconstruct(out string! WorkspaceId, out string! AppId, out string! SemanticTypeId, out DigitalBrain.Capabilities.Identity.GrantMode Mode) -> void
+DigitalBrain.Capabilities.Identity.Model.GrantRevoked.Equals(DigitalBrain.Capabilities.Identity.Model.GrantRevoked? other) -> bool
+DigitalBrain.Capabilities.Identity.Model.GrantRevoked.GrantRevoked(string! WorkspaceId, string! AppId, string! SemanticTypeId, DigitalBrain.Capabilities.Identity.GrantMode Mode) -> void
+DigitalBrain.Capabilities.Identity.Model.GrantRevoked.Mode.get -> DigitalBrain.Capabilities.Identity.GrantMode
+DigitalBrain.Capabilities.Identity.Model.GrantRevoked.Mode.init -> void
+DigitalBrain.Capabilities.Identity.Model.GrantRevoked.SemanticTypeId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.GrantRevoked.SemanticTypeId.init -> void
+DigitalBrain.Capabilities.Identity.Model.GrantRevoked.WorkspaceId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.GrantRevoked.WorkspaceId.init -> void
+DigitalBrain.Capabilities.Identity.Model.MemberAdded
+DigitalBrain.Capabilities.Identity.Model.MemberAdded.Deconstruct(out DigitalBrain.Capabilities.Identity.Member! Member) -> void
+DigitalBrain.Capabilities.Identity.Model.MemberAdded.Equals(DigitalBrain.Capabilities.Identity.Model.MemberAdded? other) -> bool
+DigitalBrain.Capabilities.Identity.Model.MemberAdded.Member.get -> DigitalBrain.Capabilities.Identity.Member!
+DigitalBrain.Capabilities.Identity.Model.MemberAdded.Member.init -> void
+DigitalBrain.Capabilities.Identity.Model.MemberAdded.MemberAdded(DigitalBrain.Capabilities.Identity.Member! Member) -> void
+DigitalBrain.Capabilities.Identity.Model.MemberRemoved
+DigitalBrain.Capabilities.Identity.Model.MemberRemoved.AccountId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.MemberRemoved.AccountId.init -> void
+DigitalBrain.Capabilities.Identity.Model.MemberRemoved.BrainId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.MemberRemoved.BrainId.init -> void
+DigitalBrain.Capabilities.Identity.Model.MemberRemoved.Deconstruct(out string! BrainId, out string! PrincipalId, out string! AccountId) -> void
+DigitalBrain.Capabilities.Identity.Model.MemberRemoved.Equals(DigitalBrain.Capabilities.Identity.Model.MemberRemoved? other) -> bool
+DigitalBrain.Capabilities.Identity.Model.MemberRemoved.MemberRemoved(string! BrainId, string! PrincipalId, string! AccountId) -> void
+DigitalBrain.Capabilities.Identity.Model.MemberRemoved.PrincipalId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.MemberRemoved.PrincipalId.init -> void
+DigitalBrain.Capabilities.Identity.Model.Outcome<TState>
+DigitalBrain.Capabilities.Identity.Model.Outcome<TState>.Changed.get -> bool
+DigitalBrain.Capabilities.Identity.Model.Outcome<TState>.Deconstruct(out TState! Next, out System.Collections.Immutable.ImmutableArray<DigitalBrain.Signal!> Facts, out DigitalBrain.Capabilities.Identity.Model.Refusal Refused) -> void
+DigitalBrain.Capabilities.Identity.Model.Outcome<TState>.Facts.get -> System.Collections.Immutable.ImmutableArray<DigitalBrain.Signal!>
+DigitalBrain.Capabilities.Identity.Model.Outcome<TState>.Facts.init -> void
+DigitalBrain.Capabilities.Identity.Model.Outcome<TState>.Next.get -> TState!
+DigitalBrain.Capabilities.Identity.Model.Outcome<TState>.Next.init -> void
+DigitalBrain.Capabilities.Identity.Model.Outcome<TState>.OrThrow(DigitalBrain.Capabilities.CapabilityCaller! by, string! brainId) -> TState!
+DigitalBrain.Capabilities.Identity.Model.Outcome<TState>.Outcome() -> void
+DigitalBrain.Capabilities.Identity.Model.Outcome<TState>.Outcome(TState! Next, System.Collections.Immutable.ImmutableArray<DigitalBrain.Signal!> Facts, DigitalBrain.Capabilities.Identity.Model.Refusal Refused = DigitalBrain.Capabilities.Identity.Model.Refusal.None) -> void
+DigitalBrain.Capabilities.Identity.Model.Outcome<TState>.Refused.get -> DigitalBrain.Capabilities.Identity.Model.Refusal
+DigitalBrain.Capabilities.Identity.Model.Outcome<TState>.Refused.init -> void
+DigitalBrain.Capabilities.Identity.Model.PrincipalRecord
+DigitalBrain.Capabilities.Identity.Model.PrincipalRecord.<Clone>$() -> DigitalBrain.Capabilities.Identity.Model.PrincipalRecord!
+DigitalBrain.Capabilities.Identity.Model.PrincipalRecord.DefaultMembership.get -> DigitalBrain.Capabilities.Identity.Member?
+DigitalBrain.Capabilities.Identity.Model.PrincipalRecord.DefaultMembership.init -> void
+DigitalBrain.Capabilities.Identity.Model.PrincipalRecord.Equals(DigitalBrain.Capabilities.Identity.Model.PrincipalRecord? other) -> bool
+DigitalBrain.Capabilities.Identity.Model.PrincipalRecord.PrincipalId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.PrincipalRecord.PrincipalId.init -> void
+DigitalBrain.Capabilities.Identity.Model.PrincipalRecord.PrincipalRecord() -> void
+DigitalBrain.Capabilities.Identity.Model.PrincipalRecord.PrincipalRecord(string! principalId, DigitalBrain.Capabilities.Identity.Member? defaultMembership, bool registrationComplete = false) -> void
+DigitalBrain.Capabilities.Identity.Model.PrincipalRecord.RegistrationComplete.get -> bool
+DigitalBrain.Capabilities.Identity.Model.PrincipalRecord.RegistrationComplete.init -> void
+DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered
+DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered.Deconstruct(out string! PrincipalId, out DigitalBrain.Capabilities.Identity.Member! DefaultMembership) -> void
+DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered.DefaultMembership.get -> DigitalBrain.Capabilities.Identity.Member!
+DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered.DefaultMembership.init -> void
+DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered.Equals(DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered? other) -> bool
+DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered.PrincipalId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered.PrincipalId.init -> void
+DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered.PrincipalRegistered(string! PrincipalId, DigitalBrain.Capabilities.Identity.Member! DefaultMembership) -> void
+DigitalBrain.Capabilities.Identity.Model.Refusal
+DigitalBrain.Capabilities.Identity.Model.Refusal.None = 0 -> DigitalBrain.Capabilities.Identity.Model.Refusal
+DigitalBrain.Capabilities.Identity.Model.Refusal.NotOwner = 1 -> DigitalBrain.Capabilities.Identity.Model.Refusal
+DigitalBrain.Capabilities.Identity.Model.Refusal.OwnerStays = 2 -> DigitalBrain.Capabilities.Identity.Model.Refusal
+DigitalBrain.Capabilities.Identity.Model.Session
+DigitalBrain.Capabilities.Identity.Model.Session.<Clone>$() -> DigitalBrain.Capabilities.Identity.Model.Session!
+DigitalBrain.Capabilities.Identity.Model.Session.BrainId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.Session.BrainId.init -> void
+DigitalBrain.Capabilities.Identity.Model.Session.Deconstruct(out string! TokenHash, out string! BrainId, out string! PrincipalId, out System.DateTimeOffset ExpiresAt) -> void
+DigitalBrain.Capabilities.Identity.Model.Session.Equals(DigitalBrain.Capabilities.Identity.Model.Session? other) -> bool
+DigitalBrain.Capabilities.Identity.Model.Session.ExpiresAt.get -> System.DateTimeOffset
+DigitalBrain.Capabilities.Identity.Model.Session.ExpiresAt.init -> void
+DigitalBrain.Capabilities.Identity.Model.Session.PrincipalId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.Session.PrincipalId.init -> void
+DigitalBrain.Capabilities.Identity.Model.Session.Session(string! TokenHash, string! BrainId, string! PrincipalId, System.DateTimeOffset ExpiresAt) -> void
+DigitalBrain.Capabilities.Identity.Model.Session.TokenHash.get -> string!
+DigitalBrain.Capabilities.Identity.Model.Session.TokenHash.init -> void
+DigitalBrain.Capabilities.Identity.Model.SessionBook
+DigitalBrain.Capabilities.Identity.Model.SessionBook.<Clone>$() -> DigitalBrain.Capabilities.Identity.Model.SessionBook!
+DigitalBrain.Capabilities.Identity.Model.SessionBook.End(string! tokenHash) -> (DigitalBrain.Capabilities.Identity.Model.SessionBook! Next, System.Collections.Immutable.ImmutableArray<DigitalBrain.Signal!> Facts)
+DigitalBrain.Capabilities.Identity.Model.SessionBook.Equals(DigitalBrain.Capabilities.Identity.Model.SessionBook? other) -> bool
+DigitalBrain.Capabilities.Identity.Model.SessionBook.Find(string! tokenHash, System.DateTimeOffset now) -> DigitalBrain.Capabilities.Identity.Model.Session?
+DigitalBrain.Capabilities.Identity.Model.SessionBook.SessionBook() -> void
+DigitalBrain.Capabilities.Identity.Model.SessionBook.Sessions.get -> System.Collections.Immutable.ImmutableArray<DigitalBrain.Capabilities.Identity.Model.Session!>
+DigitalBrain.Capabilities.Identity.Model.SessionBook.Sessions.init -> void
+DigitalBrain.Capabilities.Identity.Model.SessionBook.Start(string! tokenHash, string! brainId, string! principalId, System.DateTimeOffset expiresAt, System.DateTimeOffset now) -> (DigitalBrain.Capabilities.Identity.Model.SessionBook! Next, DigitalBrain.Capabilities.Identity.Model.Session! Session, System.Collections.Immutable.ImmutableArray<DigitalBrain.Signal!> Facts)
+DigitalBrain.Capabilities.Identity.Model.SessionStarted
+DigitalBrain.Capabilities.Identity.Model.SessionStarted.BrainId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.SessionStarted.BrainId.init -> void
+DigitalBrain.Capabilities.Identity.Model.SessionStarted.Deconstruct(out string! TokenHash, out string! BrainId, out string! PrincipalId, out System.DateTimeOffset ExpiresAt) -> void
+DigitalBrain.Capabilities.Identity.Model.SessionStarted.Equals(DigitalBrain.Capabilities.Identity.Model.SessionStarted? other) -> bool
+DigitalBrain.Capabilities.Identity.Model.SessionStarted.ExpiresAt.get -> System.DateTimeOffset
+DigitalBrain.Capabilities.Identity.Model.SessionStarted.ExpiresAt.init -> void
+DigitalBrain.Capabilities.Identity.Model.SessionStarted.PrincipalId.get -> string!
+DigitalBrain.Capabilities.Identity.Model.SessionStarted.PrincipalId.init -> void
+DigitalBrain.Capabilities.Identity.Model.SessionStarted.SessionStarted(string! TokenHash, string! BrainId, string! PrincipalId, System.DateTimeOffset ExpiresAt) -> void
+DigitalBrain.Capabilities.Identity.Model.SessionStarted.TokenHash.get -> string!
+DigitalBrain.Capabilities.Identity.Model.SessionStarted.TokenHash.init -> void
+override DigitalBrain.Capabilities.Identity.Model.AccountBook.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Identity.Model.AccountBook.GetHashCode() -> int
+override DigitalBrain.Capabilities.Identity.Model.AccountBook.ToString() -> string!
+override DigitalBrain.Capabilities.Identity.Model.AccountEnsured.<Clone>$() -> DigitalBrain.Capabilities.Identity.Model.AccountEnsured!
+override DigitalBrain.Capabilities.Identity.Model.AccountEnsured.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Identity.Model.AccountEnsured.GetHashCode() -> int
+override DigitalBrain.Capabilities.Identity.Model.AccountEnsured.ToString() -> string!
+override DigitalBrain.Capabilities.Identity.Model.BrainCreated.<Clone>$() -> DigitalBrain.Capabilities.Identity.Model.BrainCreated!
+override DigitalBrain.Capabilities.Identity.Model.BrainCreated.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Identity.Model.BrainCreated.GetHashCode() -> int
+override DigitalBrain.Capabilities.Identity.Model.BrainCreated.ToString() -> string!
+override DigitalBrain.Capabilities.Identity.Model.BrainCreation.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Identity.Model.BrainCreation.GetHashCode() -> int
+override DigitalBrain.Capabilities.Identity.Model.BrainCreation.ToString() -> string!
+override DigitalBrain.Capabilities.Identity.Model.BrainDirectory.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Identity.Model.BrainDirectory.GetHashCode() -> int
+override DigitalBrain.Capabilities.Identity.Model.BrainDirectory.ToString() -> string!
+override DigitalBrain.Capabilities.Identity.Model.GrantConsumed.<Clone>$() -> DigitalBrain.Capabilities.Identity.Model.GrantConsumed!
+override DigitalBrain.Capabilities.Identity.Model.GrantConsumed.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Identity.Model.GrantConsumed.GetHashCode() -> int
+override DigitalBrain.Capabilities.Identity.Model.GrantConsumed.ToString() -> string!
+override DigitalBrain.Capabilities.Identity.Model.GrantRecorded.<Clone>$() -> DigitalBrain.Capabilities.Identity.Model.GrantRecorded!
+override DigitalBrain.Capabilities.Identity.Model.GrantRecorded.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Identity.Model.GrantRecorded.GetHashCode() -> int
+override DigitalBrain.Capabilities.Identity.Model.GrantRecorded.ToString() -> string!
+override DigitalBrain.Capabilities.Identity.Model.GrantRevoked.<Clone>$() -> DigitalBrain.Capabilities.Identity.Model.GrantRevoked!
+override DigitalBrain.Capabilities.Identity.Model.GrantRevoked.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Identity.Model.GrantRevoked.GetHashCode() -> int
+override DigitalBrain.Capabilities.Identity.Model.GrantRevoked.ToString() -> string!
+override DigitalBrain.Capabilities.Identity.Model.MemberAdded.<Clone>$() -> DigitalBrain.Capabilities.Identity.Model.MemberAdded!
+override DigitalBrain.Capabilities.Identity.Model.MemberAdded.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Identity.Model.MemberAdded.GetHashCode() -> int
+override DigitalBrain.Capabilities.Identity.Model.MemberAdded.ToString() -> string!
+override DigitalBrain.Capabilities.Identity.Model.MemberRemoved.<Clone>$() -> DigitalBrain.Capabilities.Identity.Model.MemberRemoved!
+override DigitalBrain.Capabilities.Identity.Model.MemberRemoved.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Identity.Model.MemberRemoved.GetHashCode() -> int
+override DigitalBrain.Capabilities.Identity.Model.MemberRemoved.ToString() -> string!
+override DigitalBrain.Capabilities.Identity.Model.Outcome<TState>.GetHashCode() -> int
+override DigitalBrain.Capabilities.Identity.Model.PrincipalRecord.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Identity.Model.PrincipalRecord.GetHashCode() -> int
+override DigitalBrain.Capabilities.Identity.Model.PrincipalRecord.ToString() -> string!
+override DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered.<Clone>$() -> DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered!
+override DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered.GetHashCode() -> int
+override DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered.ToString() -> string!
+override DigitalBrain.Capabilities.Identity.Model.Session.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Identity.Model.Session.GetHashCode() -> int
+override DigitalBrain.Capabilities.Identity.Model.Session.ToString() -> string!
+override DigitalBrain.Capabilities.Identity.Model.SessionBook.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Identity.Model.SessionBook.GetHashCode() -> int
+override DigitalBrain.Capabilities.Identity.Model.SessionBook.ToString() -> string!
+override DigitalBrain.Capabilities.Identity.Model.SessionStarted.<Clone>$() -> DigitalBrain.Capabilities.Identity.Model.SessionStarted!
+override DigitalBrain.Capabilities.Identity.Model.SessionStarted.Equals(object? obj) -> bool
+override DigitalBrain.Capabilities.Identity.Model.SessionStarted.GetHashCode() -> int
+override DigitalBrain.Capabilities.Identity.Model.SessionStarted.ToString() -> string!
+override sealed DigitalBrain.Capabilities.Identity.Model.AccountEnsured.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Capabilities.Identity.Model.BrainCreated.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Capabilities.Identity.Model.GrantConsumed.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Capabilities.Identity.Model.GrantRecorded.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Capabilities.Identity.Model.GrantRevoked.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Capabilities.Identity.Model.MemberAdded.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Capabilities.Identity.Model.MemberRemoved.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.Capabilities.Identity.Model.SessionStarted.Equals(DigitalBrain.Signal? other) -> bool
+static DigitalBrain.Capabilities.Identity.Model.AccountBook.operator !=(DigitalBrain.Capabilities.Identity.Model.AccountBook? left, DigitalBrain.Capabilities.Identity.Model.AccountBook? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.AccountBook.operator ==(DigitalBrain.Capabilities.Identity.Model.AccountBook? left, DigitalBrain.Capabilities.Identity.Model.AccountBook? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.AccountEnsured.operator !=(DigitalBrain.Capabilities.Identity.Model.AccountEnsured? left, DigitalBrain.Capabilities.Identity.Model.AccountEnsured? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.AccountEnsured.operator ==(DigitalBrain.Capabilities.Identity.Model.AccountEnsured? left, DigitalBrain.Capabilities.Identity.Model.AccountEnsured? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.BrainCreated.operator !=(DigitalBrain.Capabilities.Identity.Model.BrainCreated? left, DigitalBrain.Capabilities.Identity.Model.BrainCreated? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.BrainCreated.operator ==(DigitalBrain.Capabilities.Identity.Model.BrainCreated? left, DigitalBrain.Capabilities.Identity.Model.BrainCreated? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.BrainCreation.operator !=(DigitalBrain.Capabilities.Identity.Model.BrainCreation? left, DigitalBrain.Capabilities.Identity.Model.BrainCreation? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.BrainCreation.operator ==(DigitalBrain.Capabilities.Identity.Model.BrainCreation? left, DigitalBrain.Capabilities.Identity.Model.BrainCreation? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.BrainDirectory.operator !=(DigitalBrain.Capabilities.Identity.Model.BrainDirectory? left, DigitalBrain.Capabilities.Identity.Model.BrainDirectory? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.BrainDirectory.operator ==(DigitalBrain.Capabilities.Identity.Model.BrainDirectory? left, DigitalBrain.Capabilities.Identity.Model.BrainDirectory? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.GrantConsumed.operator !=(DigitalBrain.Capabilities.Identity.Model.GrantConsumed? left, DigitalBrain.Capabilities.Identity.Model.GrantConsumed? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.GrantConsumed.operator ==(DigitalBrain.Capabilities.Identity.Model.GrantConsumed? left, DigitalBrain.Capabilities.Identity.Model.GrantConsumed? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.GrantRecorded.operator !=(DigitalBrain.Capabilities.Identity.Model.GrantRecorded? left, DigitalBrain.Capabilities.Identity.Model.GrantRecorded? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.GrantRecorded.operator ==(DigitalBrain.Capabilities.Identity.Model.GrantRecorded? left, DigitalBrain.Capabilities.Identity.Model.GrantRecorded? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.GrantRevoked.operator !=(DigitalBrain.Capabilities.Identity.Model.GrantRevoked? left, DigitalBrain.Capabilities.Identity.Model.GrantRevoked? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.GrantRevoked.operator ==(DigitalBrain.Capabilities.Identity.Model.GrantRevoked? left, DigitalBrain.Capabilities.Identity.Model.GrantRevoked? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.MemberAdded.operator !=(DigitalBrain.Capabilities.Identity.Model.MemberAdded? left, DigitalBrain.Capabilities.Identity.Model.MemberAdded? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.MemberAdded.operator ==(DigitalBrain.Capabilities.Identity.Model.MemberAdded? left, DigitalBrain.Capabilities.Identity.Model.MemberAdded? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.MemberRemoved.operator !=(DigitalBrain.Capabilities.Identity.Model.MemberRemoved? left, DigitalBrain.Capabilities.Identity.Model.MemberRemoved? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.MemberRemoved.operator ==(DigitalBrain.Capabilities.Identity.Model.MemberRemoved? left, DigitalBrain.Capabilities.Identity.Model.MemberRemoved? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.PrincipalRecord.operator !=(DigitalBrain.Capabilities.Identity.Model.PrincipalRecord? left, DigitalBrain.Capabilities.Identity.Model.PrincipalRecord? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.PrincipalRecord.operator ==(DigitalBrain.Capabilities.Identity.Model.PrincipalRecord? left, DigitalBrain.Capabilities.Identity.Model.PrincipalRecord? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered.operator !=(DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered? left, DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered.operator ==(DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered? left, DigitalBrain.Capabilities.Identity.Model.PrincipalRegistered? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.Session.operator !=(DigitalBrain.Capabilities.Identity.Model.Session? left, DigitalBrain.Capabilities.Identity.Model.Session? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.Session.operator ==(DigitalBrain.Capabilities.Identity.Model.Session? left, DigitalBrain.Capabilities.Identity.Model.Session? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.SessionBook.HashToken(string! token) -> string!
+static DigitalBrain.Capabilities.Identity.Model.SessionBook.operator !=(DigitalBrain.Capabilities.Identity.Model.SessionBook? left, DigitalBrain.Capabilities.Identity.Model.SessionBook? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.SessionBook.operator ==(DigitalBrain.Capabilities.Identity.Model.SessionBook? left, DigitalBrain.Capabilities.Identity.Model.SessionBook? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.SessionStarted.operator !=(DigitalBrain.Capabilities.Identity.Model.SessionStarted? left, DigitalBrain.Capabilities.Identity.Model.SessionStarted? right) -> bool
+static DigitalBrain.Capabilities.Identity.Model.SessionStarted.operator ==(DigitalBrain.Capabilities.Identity.Model.SessionStarted? left, DigitalBrain.Capabilities.Identity.Model.SessionStarted? right) -> bool

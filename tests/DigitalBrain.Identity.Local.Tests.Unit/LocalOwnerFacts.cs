@@ -14,7 +14,8 @@ public sealed class LocalOwnerFacts
         await using var os = TestOS.Local();
         os.Register<DirectoryNeuron>();
         var port = new LocalDirectoryPort((contract, fullKey) => LocalIdentityConformance.ResolveNeuron(os, contract, fullKey));
-        var identity = new LocalIdentityConformance.PortIdentity(port, new AmbientCallerScope());
+        var callers = new AmbientCallerScope();
+        var identity = new BoundIdentity(port, () => callers.Current);
 
         var member = await LocalOwner.Ensure(identity, ct);
 
@@ -34,7 +35,8 @@ public sealed class LocalOwnerFacts
         await using var os = TestOS.Local();
         os.Register<DirectoryNeuron>();
         var port = new LocalDirectoryPort((contract, fullKey) => LocalIdentityConformance.ResolveNeuron(os, contract, fullKey));
-        var identity = new LocalIdentityConformance.PortIdentity(port, new AmbientCallerScope());
+        var callers = new AmbientCallerScope();
+        var identity = new BoundIdentity(port, () => callers.Current);
 
         var first = await LocalOwner.Ensure(identity, ct);
         var second = await LocalOwner.Ensure(identity, ct);

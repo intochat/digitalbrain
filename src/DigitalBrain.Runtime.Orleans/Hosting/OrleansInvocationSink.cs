@@ -69,14 +69,19 @@ internal sealed class OrleansInvocationSink(
         string? grainType;
         if (types is not null)
         {
-            if (!types.TryGet(target.Type, out neuronClass))
-            { throw new BindingException($"No neuron class is hosted for type '{target.Type}'."); }
-            grainType = NeuronTypeRegistry.GrainTypeOf(NeuronTypeRegistry.PolicyOf(neuronClass));
+            if (types.TryGet(target.Type, out neuronClass))
+            {
+                grainType = NeuronTypeRegistry.GrainTypeOf(NeuronTypeRegistry.PolicyOf(neuronClass));
+            }
+            else
+            {
+                grainType = "neuron.host";
+            }
         }
         else
         {
             grainType = await grains.GetGrain<INeuronHostCatalog>("/").HostType(target.Type).WaitAsync(cancellationToken).ConfigureAwait(false)
-                ?? throw new BindingException($"No neuron class is hosted for type '{target.Type}'.");
+                ?? "neuron.host";
         }
         return (grains.GetGrain<INeuronHost>(GrainId.Create(grainType, key)), neuronClass);
     }

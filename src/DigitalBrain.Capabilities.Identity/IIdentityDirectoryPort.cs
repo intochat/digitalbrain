@@ -49,7 +49,7 @@ public interface IIdentityDirectoryPort
     /// <summary>See <see cref="IIdentity.Membership"/>.</summary>
     Task<Member?> Membership(string brainScopeId, string principalId, CancellationToken cancellationToken);
 
-    /// <summary>Adds the member when <paramref name="caller"/> may; null when it may not.</summary>
+    /// <summary>Adds the member when <paramref name="caller"/> may; throws <see cref="UnauthorizedAccessException"/> when it may not.</summary>
     Task<Member?> EnsureMember(CapabilityCaller caller, Member member, CancellationToken cancellationToken);
 
     /// <summary>Removes the account's memberships as <paramref name="caller"/>; never the owner.</summary>

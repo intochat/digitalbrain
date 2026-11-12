@@ -31,8 +31,6 @@ DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.ConnectorKind.ge
 DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.ConnectorKind.init -> void
 DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Deconstruct(out DigitalBrain.Capabilities.Connections.Broker.ICapabilityConnections! Connections, out DigitalBrain.Capabilities.Connections.Requests.IConnectionRequests! Requests, out DigitalBrain.Testing.Conformance.CallerScope! Callers) -> void
 DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Equals(DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject? other) -> bool
-DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Index.get -> DigitalBrain.Capabilities.Connections.IConnectionIndex?
-DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Index.init -> void
 DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.RequestedSignals.get -> System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DigitalBrain.Capabilities.Connections.Requests.ConnectionRequested!>!>!>?
 DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.RequestedSignals.init -> void
 DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.Requests.get -> DigitalBrain.Capabilities.Connections.Requests.IConnectionRequests!
@@ -246,3 +244,9 @@ virtual DigitalBrain.Testing.Conformance.Secrets.SecretsConformance<TSecrets>.Ow
 virtual DigitalBrain.Testing.Conformance.Secrets.SecretsConformance<TSecrets>.Stranger.get -> DigitalBrain.Capabilities.CapabilityCaller!
 virtual DigitalBrain.Testing.Conformance.Storage.StorageConformance<TStorage>.MissingId() -> DigitalBrain.Capabilities.Storage.ItemId
 virtual DigitalBrain.Testing.Conformance.Storage.StorageConformance<TStorage>.SeedFolder(DigitalBrain.Capabilities.Storage.IStorage! storage, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Capabilities.Storage.ItemId>!
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.AddConnection.init -> void
+DigitalBrain.Testing.Conformance.Connections.ConnectionsSubject.AddConnection.get -> System.Func<string!, System.Threading.Tasks.Task!>?
+DigitalBrain.Testing.Conformance.Identity.IdentityConformance<TIdentity>.EnsureMemberByNonOwnerThrowsUnauthorized() -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Identity.IdentityConformance<TIdentity>.RemoveMemberByNonOwnerThrowsUnauthorized() -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Identity.IdentityConformance<TIdentity>.OnceGrantConsumesAndSubsequentCallDenies() -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.Conformance.Identity.IdentityConformance<TIdentity>.CreateBrainOperationIdIsScopedToAccount() -> System.Threading.Tasks.Task!

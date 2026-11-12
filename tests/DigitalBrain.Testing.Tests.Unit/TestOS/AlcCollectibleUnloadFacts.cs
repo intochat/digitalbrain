@@ -46,45 +46,58 @@ public sealed class AlcCollectibleUnloadFacts
     [Fact]
     public async Task InspectStateUsingOptionsFor_AllowsCollectibleAlcToUnloadCleanly()
     {
-        var loader = new SynapseLoader();
+        var loader = new UnitLoader();
         var build = CompileSource("Me.TestAlcClean");
 
-        var (unloadTask, weakAlc, inspectedJson) = await RunInspectAndTriggerUnload(loader, build);
+        var (weakAlc, inspectedJson) = RunInspectAndTriggerUnload(loader, build);
 
         // Verify state was inspected accurately via IStateInspectable
         Assert.NotNull(inspectedJson);
         Assert.Equal(42m, inspectedJson.Value.GetProperty("spent").GetDecimal());
 
-        // Await the unload and collection task
-        var collected = await unloadTask;
-        Assert.True(collected, "The collectible ALC must unload cleanly after IStateInspectable.InspectState was invoked.");
-        Assert.False(weakAlc.TryGetTarget(out _), "WeakReference to AssemblyLoadContext must be dead.");
+        for (var i = 0; i < 10 && !IsDead(weakAlc); i++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            await Task.Delay(20, TestContext.Current.CancellationToken);
+        }
+        Assert.True(IsDead(weakAlc), "The collectible ALC must unload cleanly after IStateInspectable.InspectState was invoked.");
     }
 
     [Fact]
     public async Task SerializingThroughRuntimeProtocolJson_PinsCollectibleAlc_PreventingCleanUnload()
     {
-        var loader = new SynapseLoader();
+        var loader = new UnitLoader();
         var build = CompileSource("Me.TestAlcPin");
 
-        var (unloadTask, weakAlc) = RunPoisonousSerializeAndTriggerUnload(loader, build);
+        var weakAlc = RunPoisonousSerializeAndTriggerUnload(loader, build);
+
+        for (var i = 0; i < 5; i++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            await Task.Delay(10, TestContext.Current.CancellationToken);
+        }
 
         // The ALC is pinned in the process-wide RuntimeProtocol.Json cache, so unload MUST fail!
-        var collected = await unloadTask;
-        Assert.False(collected, "Serializing a collectible type via static RuntimeProtocol.Json must pin the ALC, preventing unload.");
-        Assert.True(weakAlc.TryGetTarget(out _), "WeakReference to AssemblyLoadContext must still be alive (pinned).");
+        Assert.False(IsDead(weakAlc), "WeakReference to AssemblyLoadContext must still be alive (pinned).");
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static async Task<(Task<bool> UnloadTask, WeakReference<AssemblyLoadContext> WeakAlc, JsonElement? InspectedJson)> RunInspectAndTriggerUnload(SynapseLoader loader, SynapseBuild build)
-    {
-        var loaded = loader.Load(build);
-        var alc = AssemblyLoadContext.GetLoadContext(loaded.Assembly)!;
-        var weakAlc = new WeakReference<AssemblyLoadContext>(alc);
+    private static bool IsDead(WeakReference<AssemblyLoadContext> weak) => !weak.TryGetTarget(out _);
 
-        var stateType = loaded.States[0];
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (WeakReference<AssemblyLoadContext> WeakAlc, JsonElement? InspectedJson) RunInspectAndTriggerUnload(UnitLoader loader, SynapseBuild build)
+    {
+        var image = new BuildImage(new BuildRef("Me.TestAlcClean", build.Hash), build.AssemblyName, build.Assembly, build.Symbols);
+        var handle = loader.Acquire(image);
+        var weakAlc = GetWeak(handle);
+
+        var stateType = handle.Catalog.States["alc.week"];
         var neuronType = typeof(UnitNeuron<>).MakeGenericType(stateType);
-        var catalogSource = new SynapseCatalogSource(loaded.Catalog);
+        var catalogSource = new SynapseCatalogSource(SynapseCatalog.Scan(), loader);
         var slotResolver = new UnboundSlotResolver();
 
         var neuron = (Neuron)Activator.CreateInstance(neuronType, catalogSource, slotResolver)!;
@@ -97,32 +110,39 @@ public sealed class AlcCollectibleUnloadFacts
         var storedType = typeof(StoredUnit<>).MakeGenericType(stateType);
         var initialCustomState = Activator.CreateInstance(stateType, 42m)!;
         var storedUnit = Activator.CreateInstance(storedType, initialCustomState, null)!;
-        await context.MemoryState.Save(storedUnit, []);
-        await NeuronAttachment.Activate(neuron, CancellationToken.None);
+        context.MemoryState.Save(storedUnit, []).GetAwaiter().GetResult();
+        NeuronAttachment.Activate(neuron, CancellationToken.None).GetAwaiter().GetResult();
 
         // Inspect state using IStateInspectable (which internally calls RuntimeProtocol.OptionsFor)
         var inspectable = (IStateInspectable)neuron;
-        var element = await inspectable.InspectState(CancellationToken.None);
+        var element = inspectable.InspectState(CancellationToken.None).GetAwaiter().GetResult();
+
+        NeuronAttachment.Deactivate(neuron, DeactivationCause.Shutdown, CancellationToken.None).GetAwaiter().GetResult();
+        context.MemoryState.Clear().GetAwaiter().GetResult();
 
         // Trigger unload
-        var unloadTask = loader.Unload(loaded);
-        return (unloadTask, weakAlc, element);
+        handle.Dispose();
+        return (weakAlc, element);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (Task<bool> UnloadTask, WeakReference<AssemblyLoadContext> WeakAlc) RunPoisonousSerializeAndTriggerUnload(SynapseLoader loader, SynapseBuild build)
-    {
-        var loaded = loader.Load(build);
-        var alc = AssemblyLoadContext.GetLoadContext(loaded.Assembly)!;
-        var weakAlc = new WeakReference<AssemblyLoadContext>(alc);
+    private static WeakReference<AssemblyLoadContext> GetWeak(UnitHandle handle)
+        => new(AssemblyLoadContext.GetLoadContext(handle.Catalog.States["alc.week"].Assembly)!);
 
-        var stateType = loaded.States[0];
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference<AssemblyLoadContext> RunPoisonousSerializeAndTriggerUnload(UnitLoader loader, SynapseBuild build)
+    {
+        var image = new BuildImage(new BuildRef("Me.TestAlcPin", build.Hash), build.AssemblyName, build.Assembly, build.Symbols);
+        var handle = loader.Acquire(image);
+        var weakAlc = GetWeak(handle);
+
+        var stateType = handle.Catalog.States["alc.week"];
         var initialCustomState = Activator.CreateInstance(stateType, 99m)!;
 
         // Deliberately serialize using the global static RuntimeProtocol.Json instead of OptionsFor(stateType)
         _ = JsonSerializer.SerializeToElement(initialCustomState, stateType, RuntimeProtocol.Json);
 
-        var unloadTask = loader.Unload(loaded, gcRounds: 3);
-        return (unloadTask, weakAlc);
+        handle.Dispose();
+        return weakAlc;
     }
 }

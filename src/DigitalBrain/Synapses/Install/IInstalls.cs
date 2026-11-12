@@ -106,17 +106,9 @@ public interface IInstalls
     /// <param name="ct">Cancellation.</param>
     [ReadOnlyCall]
     Task<IReadOnlyList<PendingInstall>> Pending(CancellationToken ct);
-}
 
-/// <summary>
-/// What the installs neuron's own detached work calls back on it, so a restored alias's answer is judged in a turn. Not for other
-/// callers: the call carries a one-use proof the neuron handed its detached restore, and a call without a live one throws.
-/// </summary>
-public interface IInstallsCallbacks
-{
-    /// <summary>The alias's source was restored (or could not be): judges the recorded answer the proof names.</summary>
-    /// <param name="proof">The proof the neuron handed its detached restore.</param>
-    /// <returns>A task that completes when the answer is judged.</returns>
-    [OneWayCall]
-    Task Restored(string proof);
+    /// <summary>Re-runs host wiring hooks for an installed alias against its current needs.</summary>
+    /// <param name="alias">The state alias.</param>
+    /// <param name="ct">Cancellation.</param>
+    Task Rewire(string alias, CancellationToken ct = default);
 }

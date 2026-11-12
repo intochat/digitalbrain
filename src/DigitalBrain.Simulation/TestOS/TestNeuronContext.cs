@@ -1,4 +1,4 @@
-﻿using DigitalBrain.Access;
+using DigitalBrain.Access;
 using DigitalBrain.Capabilities.Storage;
 using DigitalBrain.Confirmation;
 using DigitalBrain.Kernel;

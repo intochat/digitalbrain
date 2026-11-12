@@ -1,4 +1,5 @@
 using DigitalBrain.Testing.Tests.Unit.Apps;
+using TestOS = DigitalBrain.Testing.TestOS;
 
 namespace DigitalBrain.Testing.Tests.Unit.Hosting;
 
@@ -11,14 +12,14 @@ public sealed class TestBrainFacts
     [Fact]
     public async Task TestBrainLocalIsTestOSLocal()
     {
-        var viaOS = await Heard(configure => TestOS.Local(configure));
+        var viaOS = await Heard(configure => DigitalBrain.Testing.TestOS.Local(configure));
         var viaBrain = await Heard(configure => TestBrain.Local(configure));
 
         Assert.Equal(["n:7"], viaOS);
         Assert.Equal(viaOS, viaBrain);
     }
 
-    private static async Task<IReadOnlyList<string>> Heard(Func<Action<TestOSOptions>, TestOS> local)
+    private static async Task<IReadOnlyList<string>> Heard(Func<Action<TestOSOptions>, DigitalBrain.Testing.TestOS> local)
     {
         var probe = new Probe();
         await using var os = local(options => options.Services = probe).Register(typeof(NumberSink).Assembly);

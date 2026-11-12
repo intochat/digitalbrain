@@ -1,4 +1,4 @@
-﻿using DigitalBrain.Kernel;
+using DigitalBrain.Kernel;
 using DigitalBrain.Neurons;
 using DigitalBrain.Units;
 using DigitalBrain.Capabilities;

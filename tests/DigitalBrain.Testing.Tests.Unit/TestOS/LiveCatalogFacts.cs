@@ -55,14 +55,12 @@ public sealed class LiveCatalogFacts
         await using var os = await Start("ledger");
         await os.Activate(Books);
         await os.Idle();
-        var before = os.Source.Version;
 
         os.Source.Replace("ledger", SynapseCatalog.Scan([typeof(Ledger), typeof(Synapses.Books), LateBooks.Emit()]));
         await os.Get<IPayments>(Pay).Charge(5m);
         await os.Idle();
 
         Assert.True(os.IsActive(Books));
-        Assert.True(os.Source.Version > before);
         var state = await ((IBrainObserver)os).State(Books, Ct);
         Assert.Equal(55m, state?.GetProperty("spent").GetDecimal());
         Assert.Empty(os.Failures);

@@ -54,14 +54,12 @@ public sealed class ContextMapFacts
         "DigitalBrain.Screen`1+<StoreState>d__16 -> DigitalBrain.Units.PublishedView",
         "DigitalBrain.StoredState`1 -> DigitalBrain.Units.PublishedView",
         "DigitalBrain.Units.InstallsNeuron -> DigitalBrain.Confirmation.ConfirmationResolved",
-        "DigitalBrain.Units.InstallsNeuron+<DigitalBrain-Units-IInstallsCallbacks-Restored>d__8 -> DigitalBrain.Confirmation.ConfirmationResolved",
         "DigitalBrain.Units.InstallsNeuron+<Install>d__4 -> DigitalBrain.Confirmation.ConfirmationPlan",
         "DigitalBrain.Units.InstallsNeuron+<Install>d__4 -> DigitalBrain.Confirmation.ConfirmationResult",
         "DigitalBrain.Units.InstallsNeuron+<Install>d__4 -> DigitalBrain.Confirmation.IConfirmationRequests",
-        "DigitalBrain.Units.InstallsNeuron+<Judge>d__9 -> DigitalBrain.Confirmation.ConfirmationResolved",
-        "DigitalBrain.Units.InstallsNeuron+<Judge>d__9 -> DigitalBrain.Confirmation.ConfirmationResult",
-        "DigitalBrain.Units.InstallsNeuron+<Judge>d__9 -> DigitalBrain.Confirmation.IConfirmationRequests",
-        "DigitalBrain.Units.InstallsNeuron+<RestoreThenJudge>d__16 -> DigitalBrain.Confirmation.ConfirmationResolved",
+        "DigitalBrain.Units.InstallsNeuron+<OnResolved>d__7 -> DigitalBrain.Confirmation.ConfirmationResolved",
+        "DigitalBrain.Units.InstallsNeuron+<OnResolved>d__7 -> DigitalBrain.Confirmation.ConfirmationResult",
+        "DigitalBrain.Units.InstallsNeuron+<OnResolved>d__7 -> DigitalBrain.Confirmation.IConfirmationRequests",
     };
 
     // Compiler-embedded and generated types live in System.* and Microsoft.* namespaces inside the assembly; they are not ours.

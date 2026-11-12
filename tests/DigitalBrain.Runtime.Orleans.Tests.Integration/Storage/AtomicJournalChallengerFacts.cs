@@ -433,7 +433,7 @@ public sealed class AtomicJournalChallengerFacts
     // =========================================================================
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (WeakReference WeakContext, Task<bool> UnloadTask) LoadUseAndUnload(SynapseLoader loader)
+    private static WeakReference LoadUseAndUnload(UnitLoader loader)
     {
         var sourceText = """
             namespace Me.TestCollectible;
@@ -453,27 +453,33 @@ public sealed class AtomicJournalChallengerFacts
         var compiler = new SynapseCompiler(ReferenceSet.FromDefaultContext());
         var build = compiler.Compile(new SynapseSource("Me.TestCollectible", new Dictionary<string, string> { ["Source.cs"] = sourceText }, null));
         Assert.True(build.Success, string.Join("\n", build.Diagnostics));
-        var loaded = loader.Load(build);
-        var alc = AssemblyLoadContext.GetLoadContext(loaded.Assembly)!;
+        var image = new BuildImage(new BuildRef("Me.TestCollectible", build.Hash), build.AssemblyName, build.Assembly, build.Symbols);
+        var handle = loader.Acquire(image);
+        var alc = AssemblyLoadContext.GetLoadContext(handle.Catalog.States["item"].Assembly)!;
         var weak = new WeakReference(alc);
 
         // Verify RuntimeProtocol does not leak options or pin the collectible ALC
-        var stateType = loaded.States[0];
+        var stateType = handle.Catalog.States["item"];
         var options = RuntimeProtocol.OptionsFor(stateType);
         Assert.NotNull(options);
         RuntimeProtocol.Forget(alc);
 
-        var unloadTask = loader.Unload(loaded);
-        return (weak, unloadTask);
+        handle.Dispose();
+        return weak;
     }
 
     [Fact]
     public async Task Collectible_synapse_assembly_unloads_cleanly_without_retaining_ALC_references()
     {
-        var loader = new SynapseLoader();
-        var (weakContext, unloadTask) = LoadUseAndUnload(loader);
-        var collected = await unloadTask;
-        Assert.True(collected);
+        var loader = new UnitLoader();
+        var weakContext = LoadUseAndUnload(loader);
+        for (var i = 0; i < 10 && weakContext.IsAlive; i++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            await Task.Delay(20, TestContext.Current.CancellationToken);
+        }
         Assert.False(weakContext.IsAlive);
+        Assert.Empty(loader.Lingering());
     }
 }

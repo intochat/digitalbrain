@@ -64,22 +64,21 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     private TaskCompletionSource _quiet = Quiet();
     private readonly Lazy<DigitalBrain.Runtime.Synapses.SynapseCompiler> _compiler =
         new(() => new DigitalBrain.Runtime.Synapses.SynapseCompiler(DigitalBrain.Runtime.Synapses.ReferenceSet.FromDefaultContext()));
-    private (DigitalBrain.Runtime.Synapses.SynapseHost Host, ISynapseRestorer Restorer)? _runtime;
-    private readonly ConcurrentDictionary<string, byte> _generated = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ActionDescriptor> _actions = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<Assembly, byte> _scannedModules = new();
     private readonly ConcurrentDictionary<string, Type> _signalTypes = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<(BrainId Brain, string SourceKey), IReadOnlyList<string>> _sourceAliases = new();
 
     internal IReadOnlyList<BrainId> AllBrains => [.. _hosts.Keys.Select(h => h.Brain).Union(_journals.Keys).Distinct()];
 
     internal Type? TypeOf(string alias)
     {
         if (_signalTypes.TryGetValue(alias, out var type)) { return type; }
-        foreach (var desc in Source.Current.Synapses)
+        foreach (var desc in Source.Static.Synapses)
         {
             if (desc.Signal is { } signalType && SignalAliases.Of(signalType) == alias)
             {
-                if (!signalType.IsCollectible) { _signalTypes[alias] = signalType; }
+                _signalTypes[alias] = signalType;
                 return signalType;
             }
         }
@@ -99,6 +98,13 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
             }
             catch { }
         }
+        foreach (var desc in Catalog.Synapses)
+        {
+            if (desc.Signal is { } signalType && SignalAliases.Of(signalType) == alias)
+            {
+                return signalType;
+            }
+        }
         return null;
     }
 
@@ -107,13 +113,24 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         Options = options;
         Clock = new TestClock(options.Start);
         Capabilities = new CapabilityFakes();
-        Source = new SynapseCatalogSource(SynapseCatalog.Scan());
-        Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance, new TestInstallHooks(this), new TestSlotResolver(this), Source, () => [.. _actions.Values], () => Restorer, () => _compiler.Value, () => Synapses);
+        Loader = new DigitalBrain.Runtime.Synapses.UnitLoader();
+        LiveBindings = new LiveBindings();
+        Source = new SynapseCatalogSource(SynapseCatalog.Scan(), () => Loader);
+        Resolver = new UnitResolver(
+            Loader,
+            Source,
+            LiveBindings,
+            id => Get<ISources>(id),
+            id => Get<IUnitDeployment>(id));
+        Synapses = new DigitalBrain.Runtime.Synapses.UnitDeployer(
+            _compiler.Value,
+            Loader,
+            id => Get<ISources>(id),
+            id => Get<IUnitDeployment>(id));
+        Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance, new TestInstallHooks(this), new TestSlotResolver(this), Source, () => [.. _actions.Values], () => Loader, () => Resolver, () => LiveBindings, () => _compiler.Value, () => Synapses);
         Delivery = new SynapseRegistry(this);
         Confirmations = new TestConfirmations(Clock);
         Listeners = new TestClusterListeners(this);
-        Registrar = new TestSynapseRegistrar(this);
-        Store = new DigitalBrain.Runtime.Synapses.NeuronSourceStore(brain => Get<ISources>(new NeuronId(brain, SourcesType, "default")));
         AccessOptions = new AccessOptions { UnstampedEdgeIsKernel = true, AuditContractInternal = true };
         AccessCounters = new AccessCounters();
         Access = new AccessGate(TestCallerAmbient.Instance, AccessOptions, AccessCounters);
@@ -124,10 +141,55 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         Register<TimeNeuron>();
         Register<DigitalBrain.Operations.OperationNeuron>();
         Register<DigitalBrain.Confirmation.ConfirmationsNeuron>();
+        Register<UnitDeployment>();
+
+        _ = Listeners.Listen<Deployed>("testos.live.catalog", async (pub, s, ct) =>
+        {
+            _sourceAliases[(pub.Brain, s.SourceKey)] = s.Aliases;
+            LiveBindings.Set(pub.Brain, new BuildRef(s.SourceKey, s.Hash));
+            foreach (var alias in s.Aliases)
+            {
+                await DropHosts(pub.Brain, alias).ConfigureAwait(false);
+            }
+        });
+
+        _ = Listeners.Listen<Undeployed>("testos.live.catalog", async (pub, s, ct) =>
+        {
+            LiveBindings.Retire(pub.Brain, s.SourceKey);
+            if (_sourceAliases.TryRemove((pub.Brain, s.SourceKey), out var aliases))
+            {
+                foreach (var alias in aliases)
+                {
+                    await DropHosts(pub.Brain, alias).ConfigureAwait(false);
+                }
+            }
+        });
     }
 
-    /// <summary>The <c>[State]</c> records and synapse functions in force now: <see cref="Source"/>'s current catalog.</summary>
-    public SynapseCatalog Catalog => Source.Current;
+    /// <summary>The <c>[State]</c> records and synapse functions in force now: <see cref="Source"/>'s static catalog plus live unit catalogs.</summary>
+    public SynapseCatalog Catalog
+    {
+        get
+        {
+            var cat = Source.Static;
+            foreach (var brain in AllBrains)
+            {
+                try
+                {
+                    var brainCatalogs = Resolver.Catalogs(brain).GetAwaiter().GetResult();
+                    foreach (var c in brainCatalogs)
+                    {
+                        if (!ReferenceEquals(c, Source.Static))
+                        {
+                            cat = cat.Merge(c);
+                        }
+                    }
+                }
+                catch { }
+            }
+            return cat;
+        }
+    }
 
     /// <summary>
     /// The live catalog every state neuron, the installs neuron and <see cref="Gates"/> read on each turn or call, so a change reaches
@@ -135,27 +197,19 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     /// </summary>
     public SynapseCatalogSource Source { get; }
 
-    /// <summary>
-    /// Makes a loaded synapse source live on this TestOS, or removes it: <see cref="Source"/>, the state neuron classes and the hosts of a
-    /// replaced alias. TestOS journals typed signal objects, so a generated <c>[Signal]</c> needs no registration.
-    /// </summary>
-    public ISynapseRegistrar Registrar { get; }
+    /// <summary>The unit loader managing collectible unit contexts on this TestOS.</summary>
+    public IUnitLoader Loader { get; private set; }
+
+    /// <summary>The unit resolver mapping (brain, alias) to executable unit handles.</summary>
+    public UnitResolver Resolver { get; private set; }
+
+    /// <summary>Silo-local live bindings hint.</summary>
+    public LiveBindings LiveBindings { get; private set; }
 
     /// <summary>
-    /// The synapse host of this TestOS: deploys generated sources through <see cref="Registrar"/>, <see cref="Source"/>, each brain's
-    /// <see cref="IInstalls"/> neuron, <see cref="Store"/> and <see cref="ClusterListeners"/>. Created on first use.
+    /// The synapse host of this TestOS: compiles and deploys generated sources.
     /// </summary>
-    public DigitalBrain.Runtime.Synapses.SynapseHost Synapses => Runtime().Host;
-
-    /// <summary>Where <see cref="Synapses"/> keeps the deployed sources: each brain's <see cref="ISources"/> neuron, so they survive <see cref="Restart"/>.</summary>
-    public ISourceStore Store { get; }
-
-    /// <summary>
-    /// Restores a generated source when an activation misses its alias, as after <see cref="Restart"/>: the <see cref="ISynapseRestorer"/>
-    /// of <see cref="TestOSOptions.Services"/> if any, else one that loads the stored build through <see cref="Registrar"/> and gives it to
-    /// <see cref="Synapses"/>.
-    /// </summary>
-    public ISynapseRestorer Restorer => Runtime().Restorer;
+    public ISynapseHost Synapses { get; private set; }
 
     /// <summary>Host-level listeners on the signals of every brain of this TestOS (04-19); they survive <see cref="Restart"/>.</summary>
     public DigitalBrain.Kernel.IClusterListeners ClusterListeners => Listeners;
@@ -422,7 +476,31 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         {
             await Track(host.Deactivate(DeactivationCause.Shutdown)).ConfigureAwait(false);
         }
-        await ForgetGenerated().ConfigureAwait(false);
+        foreach (var host in _hosts.Values.ToList())
+        {
+            if (_hosts.TryRemove(new KeyValuePair<NeuronId, TestNeuronHost>(host.Id, host)))
+            {
+                Delivery.RemoveSubscriber(host.Id);
+                host.Dispose();
+            }
+        }
+        _signalTypes.Clear();
+        _sourceAliases.Clear();
+
+        Loader = new DigitalBrain.Runtime.Synapses.UnitLoader();
+        LiveBindings = new LiveBindings();
+        Resolver = new UnitResolver(
+            Loader,
+            Source,
+            LiveBindings,
+            id => Get<ISources>(id),
+            id => Get<IUnitDeployment>(id));
+        Synapses = new DigitalBrain.Runtime.Synapses.UnitDeployer(
+            _compiler.Value,
+            Loader,
+            id => Get<ISources>(id),
+            id => Get<IUnitDeployment>(id));
+
         foreach (var subscriber in Delivery.Behind())
         {
             if (TryHost(subscriber, out var host))
@@ -448,7 +526,6 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        if (_runtime is { } runtime) { await runtime.Host.DisposeAsync().ConfigureAwait(false); }
         foreach (var host in _hosts.Values)
         {
             try { await host.Deactivate(DeactivationCause.Shutdown).ConfigureAwait(false); }
@@ -460,86 +537,36 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     internal TestNeuronHost Host(NeuronId id)
     {
         if (_hosts.TryGetValue(id, out var host)) { return host; }
-        if (!_types.TryGetValue(id.Type, out var type) && !(Restore(id) && _types.TryGetValue(id.Type, out type)))
+        UnitHandle? handle = null;
+        if (!_types.TryGetValue(id.Type, out var type))
         {
-            throw new InvalidOperationException($"No neuron class is registered for type '{id.Type}'. Call Register<TNeuron>() first.");
+            handle = Resolver.Resolve(id.Brain, id.Type, UnitView.Live, CancellationToken.None).GetAwaiter().GetResult();
+            if (handle is not null)
+            {
+                type = typeof(UnitNeuron<>).MakeGenericType(handle.StateOf(id.Type));
+            }
+            else
+            {
+                throw new InvalidOperationException($"No neuron class is registered for type '{id.Type}'. Call Register<TNeuron>() first.");
+            }
         }
-        var created = new TestNeuronHost(this, id, type);
+        var created = new TestNeuronHost(this, id, type, handle);
         var added = _hosts.GetOrAdd(id, created);
         if (!ReferenceEquals(added, created)) { created.Dispose(); }
         return added;
     }
 
-    // On a miss, Restorer may restore the alias once.
-    private bool Restore(NeuronId id) => Restorer.TryRestore(id.Brain, id.Type, CancellationToken.None).GetAwaiter().GetResult();
-
-    // A generated source's alias is live: Restart forgets it.
-    internal void MarkGenerated(string alias) => _generated[alias] = 0;
-
-    internal void UnmarkGenerated(string alias) => _generated.TryRemove(alias, out _);
-
-    // The synapse host and its restorer, sharing one loader; Restart replaces both, as a new process would. The compiler and its cache stay.
-    private (DigitalBrain.Runtime.Synapses.SynapseHost Host, ISynapseRestorer Restorer) Runtime()
-    {
-        lock (_gate)
-        {
-            if (_runtime is { } runtime) { return runtime; }
-            var loader = new DigitalBrain.Runtime.Synapses.SynapseLoader();
-            var host = new DigitalBrain.Runtime.Synapses.SynapseHost(
-                _compiler.Value,
-                loader,
-                Registrar,
-                Source,
-                brain => Get<IInstalls>(NeuronId.Parse($"{brain}/synapse.installs/default")),
-                Store,
-                Listeners,
-                track: work => _ = Track(work));
-            var restorer = Options.Services?.GetService(typeof(ISynapseRestorer)) as ISynapseRestorer
-                ?? new DigitalBrain.Runtime.Synapses.SynapseRestorer(loader, Registrar, Store, Source, host);
-            _runtime = (host, restorer);
-            return (host, restorer);
-        }
-    }
-
-    // The restart of a host: the generated aliases leave the registry, their (ended) hosts are dropped and the synapse host is replaced.
-    // The old contexts are not unloaded: the journal keeps typed signals of their types, as a dead process would simply be gone.
-    private async Task ForgetGenerated()
-    {
-        foreach (var alias in _generated.Keys.ToList())
-        {
-            _ = Unregister(alias);
-            foreach (var host in _hosts.Values.Where(host => host.Id.Type == alias).ToList())
-            {
-                if (_hosts.TryRemove(new KeyValuePair<NeuronId, TestNeuronHost>(host.Id, host)))
-                {
-                    Delivery.RemoveSubscriber(host.Id);
-                    host.Dispose();
-                }
-            }
-        }
-        _generated.Clear();
-        _signalTypes.Clear();
-        (DigitalBrain.Runtime.Synapses.SynapseHost Host, ISynapseRestorer Restorer)? old;
-        lock (_gate)
-        {
-            old = _runtime;
-            _runtime = null;
-        }
-        if (old is { } stopped) { await stopped.Host.DisposeAsync().ConfigureAwait(false); }
-    }
-
     // Hosts alias as the unit neuron of record from now on.
     internal void ReplaceStateType(string alias, Type record) => _types[alias] = typeof(UnitNeuron<>).MakeGenericType(record);
 
-    // Ends and forgets every host of alias, so the next call constructs the class registered then; state and synapses survive.
-    internal async Task DropHosts(string alias)
+    // Ends and forgets every host of alias in brain, so the next call constructs the class registered then; state and synapses survive.
+    internal async Task DropHosts(BrainId brain, string alias)
     {
-        foreach (var host in _hosts.Values.Where(host => host.Id.Type == alias).ToList())
+        foreach (var host in _hosts.Values.Where(host => host.Id.Brain == brain && host.Id.Type == alias).ToList())
         {
             await Track(host.Deactivate(DeactivationCause.Requested)).ConfigureAwait(false);
             if (_hosts.TryRemove(new KeyValuePair<NeuronId, TestNeuronHost>(host.Id, host)))
             {
-                Delivery.RemoveSubscriber(host.Id);
                 host.Dispose();
             }
         }
@@ -554,9 +581,16 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     internal bool TryHost(NeuronId id, out TestNeuronHost host)
     {
         if (_hosts.TryGetValue(id, out host!)) { return true; }
-        if (!_types.ContainsKey(id.Type)) { return false; }
-        host = Host(id);
-        return true;
+        try
+        {
+            host = Host(id);
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            host = null!;
+            return false;
+        }
     }
 
     internal T Proxy<T>(NeuronId caller, NeuronId target) where T : class
