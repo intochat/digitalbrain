@@ -234,4 +234,69 @@ public sealed class FlowStateFacts
         var state = new FlowState<TestInner>().Relate(rel)!.Value.Next;
         Assert.Null(state.Relate(rel));
     }
+
+    [Fact]
+    public void Skip_MarksStepDoneAndEmitsSkipped()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var running = new FlowState<TestInner>().Start("T", "O", null, new TestInner(), now, null, "test")!.Value.Next;
+        var withStep = running.StartStep(["stepA", "stepB"], now)!.Value.Next;
+
+        var result = StepResult<TestInner>.Skip(new TestInner(), "condition not met");
+        var transition = withStep.Skip("stepA", result, result.Reason);
+
+        Assert.NotNull(transition);
+        Assert.Contains("stepA", transition.Value.Next.Done);
+        Assert.Null(transition.Value.Next.Current);
+        var signal = Assert.IsType<FlowStep>(Assert.Single(transition.Value.Signals));
+        Assert.Equal(StepOutcome.Skipped, signal.Outcome);
+        Assert.Equal("condition not met", signal.Detail);
+
+        var nextStep = transition.Value.Next.StartStep(["stepA", "stepB"], now);
+        Assert.NotNull(nextStep);
+        Assert.Equal("stepB", nextStep.Value.Next.Current);
+    }
+
+    [Fact]
+    public void Repeat_KeepsStepNotDoneAndEmitsRepeated()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var running = new FlowState<TestInner>().Start("T", "O", null, new TestInner(), now, null, "test")!.Value.Next;
+        var withStep = running.StartStep(["stepA"], now)!.Value.Next;
+
+        var result = StepResult<TestInner>.Repeat(new TestInner());
+        var transition = withStep.Repeat("stepA", result);
+
+        Assert.NotNull(transition);
+        Assert.DoesNotContain("stepA", transition.Value.Next.Done);
+        Assert.Null(transition.Value.Next.Current);
+        var signal = Assert.IsType<FlowStep>(Assert.Single(transition.Value.Signals));
+        Assert.Equal(StepOutcome.Repeated, signal.Outcome);
+
+        var nextStep = transition.Value.Next.StartStep(["stepA"], now);
+        Assert.NotNull(nextStep);
+        Assert.Equal("stepA", nextStep.Value.Next.Current);
+    }
+
+    [Fact]
+    public void WaitForChildren_TransitionsToWaitingWithReasonChildren()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var running = new FlowState<TestInner>().Start("T", "O", null, new TestInner(), now, null, "test")!.Value.Next;
+        var withStep = running.StartStep(["stepA"], now)!.Value.Next;
+
+        var result = StepResult<TestInner>.WaitForChildren(new TestInner(), ["child-run-1", "child-run-2"]);
+        var transition = withStep.Wait("stepA", result, result.Wait!, null);
+
+        Assert.NotNull(transition);
+        Assert.Equal(FlowStatus.Waiting, transition.Value.Next.Status);
+        Assert.NotNull(transition.Value.Next.Waiting);
+        Assert.Equal(WaitReason.Children, transition.Value.Next.Waiting!.Reason);
+        Assert.Equal(["child-run-1", "child-run-2"], transition.Value.Next.Waiting!.Children);
+
+        var resolve = transition.Value.Next.Resolve("stepA", WaitOutcome.Arrived, null, now);
+        Assert.NotNull(resolve);
+        Assert.Equal(FlowStatus.Running, resolve.Value.Next.Status);
+        Assert.Contains("stepA", resolve.Value.Next.Done);
+    }
 }

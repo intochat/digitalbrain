@@ -103,6 +103,7 @@ public static class RuntimeSiloBuilderExtensions
             id => NeuronHosting.Get<ISources>(sp, id),
             id => NeuronHosting.Get<IUnitDeployment>(sp, id),
             brain => RuntimeCallerContext.StampScope(CapabilityCallers.Platform(brain.Value, brain.Value, brain.Value))));
+        silo.Services.TryAddSingleton<IUnitResolver>(sp => sp.GetRequiredService<UnitResolver>());
         silo.Services.TryAddSingleton(sp => new UnitDeployer(
             sp.GetRequiredService<SynapseCompiler>(),
             sp.GetRequiredService<IUnitLoader>(),

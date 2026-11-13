@@ -44,7 +44,8 @@ internal sealed record AskSettlement(
     AnswerStatus Status,
     JsonElement Result,
     string? Error,
-    bool Transient);
+    bool Transient,
+    string? Detail = null);
 
 [NeuronAlias(AskRules.BatchNeuronType)]
 internal interface IAskBatch

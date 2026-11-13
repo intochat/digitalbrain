@@ -10,7 +10,7 @@ public sealed class UnitResolver(
     LiveBindings live,
     Func<NeuronId, ISources> sources,
     Func<NeuronId, IUnitDeployment> deployments,
-    Func<BrainId, IDisposable>? stampPlatform = null)
+    Func<BrainId, IDisposable>? stampPlatform = null) : IUnitResolver
 {
     /// <summary>Resolves a state alias for the specified brain and view (Live or Proposed) to a refcounted unit handle.</summary>
     public async Task<UnitHandle?> Resolve(BrainId brain, string alias, UnitView view, CancellationToken ct = default)

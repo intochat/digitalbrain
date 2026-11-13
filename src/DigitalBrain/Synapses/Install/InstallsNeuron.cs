@@ -195,11 +195,16 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
         var state = StateOf(alias);
         try
         {
+            var asks = Context.Get<IAsks>(AskRules.AsksOf(state));
+            await asks.Detach(ct).ConfigureAwait(true);
             await hooks.RemoveReactionEdges(state, ct).ConfigureAwait(true);
             await hooks.UnregisterSchedules(state, ct).ConfigureAwait(true);
         }
         catch (Exception error) when (error is not OutOfMemoryException) { _ = error; }
     }
+
+    /// <inheritdoc />
+    public Task Uninstall(string alias, CancellationToken ct = default) => Retire(alias, ct);
 
     /// <inheritdoc />
     [ReadOnlyCall]
@@ -232,6 +237,12 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
         {
             await hooks.EnsureReactionEdges(state, signals, aliases, ct).ConfigureAwait(true);
             await hooks.RegisterSchedules(state, needs.Schedules, ct).ConfigureAwait(true);
+            try
+            {
+                var asks = Context.Get<IAsks>(AskRules.AsksOf(state));
+                await asks.Attach(ct).ConfigureAwait(true);
+            }
+            catch (Exception error) when (error is not OutOfMemoryException) { _ = error; }
             return null;
         }
         catch (Exception error) when (error is not OutOfMemoryException) { return $"hooks failed: {error.Message}"; }

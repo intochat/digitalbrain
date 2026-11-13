@@ -14,11 +14,9 @@ internal sealed class GrainNudge(IGrainFactory grains, NeuronTypeRegistry types,
         {
             throw new InvalidOperationException("PublishFaults: FailAfterAppend.");
         }
-        if (!types.TryGetRegistration(subscriber.Type, out var registration))
-        {
-            return;
-        }
-        var grainType = NeuronTypeRegistry.GrainTypeOf(registration.Policy);
+        var grainType = types.TryGetRegistration(subscriber.Type, out var registration)
+            ? NeuronTypeRegistry.GrainTypeOf(registration.Policy)
+            : NeuronTypeRegistry.AffineGrainType;
         var grainId = GrainId.Create(grainType, subscriber.ToString());
         var host = grains.GetGrain<ISynapseHost>(grainId);
         _ = host.Nudge(upTo.Value);

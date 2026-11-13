@@ -83,6 +83,11 @@ public interface IInstalls
     /// <param name="ct">Cancellation.</param>
     Task Retire(string alias, CancellationToken ct);
 
+    /// <summary>Uninstalls an installed app and cancels its pending asks; an alias that is neither is ignored.</summary>
+    /// <param name="alias">The state alias.</param>
+    /// <param name="ct">Cancellation.</param>
+    Task Uninstall(string alias, CancellationToken ct = default);
+
     /// <summary>
     /// Cancels every pending ask of <paramref name="alias"/>, journaling <see cref="InstallDenied"/> with reason <c>superseded</c> for each;
     /// the record, if any, stays. A later answer to a cancelled ask is ignored.

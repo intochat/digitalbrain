@@ -41,6 +41,9 @@ public enum WaitReason
 
     /// <summary>A time: when <see cref="Waiting.Expires"/> is reached the wait arrives and the flow goes on (or <see cref="Flow{T}.Resume"/> ends it earlier).</summary>
     Schedule,
+
+    /// <summary>Child flows running in parallel to be joined before this flow continues.</summary>
+    Children,
 }
 
 /// <summary>How one flow relates to another.</summary>
@@ -86,14 +89,71 @@ public sealed record FlowRelation(string TargetFlowId, RelationKind Kind, TimeSp
 /// The confirmation plan of an <see cref="WaitReason.Approval"/> wait, which the base sets; on an <see cref="WaitReason.External"/> wait a
 /// caller-supplied plan id is kept as given (the flow does not resolve it); null on any other wait.
 /// </param>
-public sealed record Waiting(string Step, WaitReason Reason, DateTimeOffset? Expires, string? ConfirmationPlanId);
+/// <param name="Children">Child flow ids this step waits for when reason is <see cref="WaitReason.Children"/>.</param>
+/// <param name="IsRepeat">Whether this wait is a delay before repeating the current step.</param>
+public sealed record Waiting(
+    string Step,
+    WaitReason Reason,
+    DateTimeOffset? Expires,
+    string? ConfirmationPlanId,
+    IReadOnlyList<string>? Children = null,
+    bool IsRepeat = false);
+
+/// <summary>How a step execution result is handled.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<StepDisposition>))]
+public enum StepDisposition
+{
+    /// <summary>The step completed normally.</summary>
+    Complete,
+
+    /// <summary>The step was skipped.</summary>
+    Skip,
+
+    /// <summary>The step should be repeated.</summary>
+    Repeat,
+
+    /// <summary>The step is waiting on an approval, schedule, external signal or child flows.</summary>
+    Wait,
+}
 
 /// <summary>What a step body returns.</summary>
 /// <typeparam name="T">The flow's own state.</typeparam>
 /// <param name="Next">The flow's own state after the step.</param>
 /// <param name="Wait">Set when the step waits; the step completes when the wait is approved or arrives.</param>
 /// <param name="Emits">Signals saved with the step's completion.</param>
-public sealed record StepResult<T>(T Next, Waiting? Wait = null, IReadOnlyList<Signal>? Emits = null);
+/// <param name="Disposition">How the step outcome should be handled.</param>
+/// <param name="Reason">Optional reason if the step is skipped or repeated.</param>
+/// <param name="Delay">Optional delay if repeating the step.</param>
+/// <param name="ChildRunIds">Child run ids if waiting for children.</param>
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1000:Do not declare static members on generic types", Justification = "Fluent step result factory methods per kernel API design.")]
+public sealed record StepResult<T>(
+    T Next,
+    Waiting? Wait = null,
+    IReadOnlyList<Signal>? Emits = null,
+    StepDisposition Disposition = StepDisposition.Complete,
+    string? Reason = null,
+    TimeSpan? Delay = null,
+    IReadOnlyList<string>? ChildRunIds = null)
+{
+    /// <summary>Creates a step result that completes normally.</summary>
+    public static StepResult<T> Complete(T next, IReadOnlyList<Signal>? emits = null) =>
+        new(next, null, emits, StepDisposition.Complete);
+
+    /// <summary>Creates a step result that skips the current step.</summary>
+    public static StepResult<T> Skip(T next, string? reason = null) =>
+        new(next, null, null, StepDisposition.Skip, Reason: reason);
+
+    /// <summary>Creates a step result that repeats the current step after an optional delay.</summary>
+    public static StepResult<T> Repeat(T next, TimeSpan? delay = null) =>
+        new(next, null, null, StepDisposition.Repeat, Delay: delay);
+
+    /// <summary>Creates a step result that pauses the flow until the specified child runs have finished.</summary>
+    public static StepResult<T> WaitForChildren(T next, IReadOnlyList<string> childRunIds)
+    {
+        ArgumentNullException.ThrowIfNull(childRunIds);
+        return new(next, new Waiting(string.Empty, WaitReason.Children, null, null, Children: childRunIds), null, StepDisposition.Wait, ChildRunIds: childRunIds);
+    }
+}
 
 /// <summary>The persisted state of a <see cref="Flow{T}"/>. Persisted fields are only ever added.</summary>
 /// <typeparam name="T">The flow's own state.</typeparam>
@@ -188,6 +248,20 @@ public sealed record FlowState<T>(
                 [new FlowStep(FlowId, step, StepOutcome.Completed, null), .. result.Emits ?? []])
             : null;
 
+    /// <summary>Skips the running step with its result.</summary>
+    public FlowTransition<T>? Skip(string step, StepResult<T> result, string? reason = null)
+        => Runs(step)
+            ? new(this with { Done = Done.Add(step), Current = null, Inner = result.Next, Interruptions = 0 },
+                [new FlowStep(FlowId, step, StepOutcome.Skipped, reason), .. result.Emits ?? []])
+            : null;
+
+    /// <summary>Repeats the running step without marking it as done.</summary>
+    public FlowTransition<T>? Repeat(string step, StepResult<T> result)
+        => Runs(step)
+            ? new(this with { Current = null, Inner = result.Next, Interruptions = 0 },
+                [new FlowStep(FlowId, step, StepOutcome.Repeated, null), .. result.Emits ?? []])
+            : null;
+
     /// <summary>Transitions the running step into a waiting state.</summary>
     public FlowTransition<T>? Wait(string step, StepResult<T> result, Waiting wait, string? planId)
         => Runs(step)
@@ -225,8 +299,9 @@ public sealed record FlowState<T>(
         var resolve = new FlowResolve(FlowId, step, outcome, by);
         if (outcome is WaitOutcome.Approved or WaitOutcome.Arrived)
         {
-            return new(this with { Status = FlowStatus.Running, Waiting = null, Current = null, Done = Done.Add(step), Interruptions = 0 },
-                [resolve, new FlowStep(FlowId, step, StepOutcome.Completed, null)]);
+            var nextDone = waiting.IsRepeat ? Done : Done.Add(step);
+            return new(this with { Status = FlowStatus.Running, Waiting = null, Current = null, Done = nextDone, Interruptions = 0 },
+                [resolve, new FlowStep(FlowId, step, waiting.IsRepeat ? StepOutcome.Repeated : StepOutcome.Completed, null)]);
         }
         return new(this with { Status = FlowStatus.Cancelled, Waiting = null, Current = null, Ended = now },
             [resolve, new FlowDone(FlowId, FlowOutcome.Cancelled, outcome.ToString())]);

@@ -166,4 +166,17 @@ public sealed class InstallsFacts
         Assert.Equal(InstallStatus.Unchanged, again.Status);
         Assert.Equal("hooks failed: edges down", again.Reason);
     }
+
+    [Fact]
+    public async Task Uninstall_RemovesInstallRecordAndEmitsRetired()
+    {
+        var hooks = new RecordingHooks();
+        await using var os = Start(hooks);
+        await Answer(os, "week", approve: true);
+        Assert.NotNull(await os.Get<IInstalls>(Installs).Describe("week", Ct));
+
+        await os.Get<IInstalls>(Installs).Uninstall("week", Ct);
+        Assert.Null(await os.Get<IInstalls>(Installs).Describe("week", Ct));
+        Assert.Contains(os.Journal(Installs.Brain).Signals(Installs), item => item.Signal is Retired { Alias: "week" });
+    }
 }
