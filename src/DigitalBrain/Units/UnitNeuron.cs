@@ -35,7 +35,7 @@ internal static partial class UnitLog
     public static partial void ViewDeclaresBy(Microsoft.Extensions.Logging.ILogger logger, string synapse);
 }
 
-internal sealed class UnitNeuron<TState> : Neuron<StoredUnit<TState>>, ISynapseReceiver, IViewReader, IStateReader, IStateInspectable
+internal sealed class UnitNeuron<TState> : Neuron<StoredUnit<TState>>, ISynapseReceiver, IViewReader, IScreen, IUnit, IStateReader, IStateInspectable
     where TState : class, new()
 {
     private readonly ISynapseCatalogSource _catalog;
@@ -80,8 +80,65 @@ internal sealed class UnitNeuron<TState> : Neuron<StoredUnit<TState>>, ISynapseR
         return Task.FromResult<JsonElement?>(JsonSerializer.SerializeToElement(state, type, RuntimeProtocol.OptionsFor(type)));
     }
 
-    public Task<PublishedView?> Read(string alias) =>
-        Task.FromResult(State.View is { } view && string.Equals(view.Alias, alias, StringComparison.Ordinal) ? view : null);
+    protected override Task OnActivate(CancellationToken cancellationToken) => OnActivateAsync(cancellationToken);
+
+    private async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        await base.OnActivate(cancellationToken).ConfigureAwait(true);
+        var isRuntimeUnit = !_catalog.Static.States.ContainsKey(_stateAlias);
+        if (isRuntimeUnit && State.View is null)
+        {
+            await RenderView().ConfigureAwait(true);
+        }
+    }
+
+    private async Task RenderView()
+    {
+        var functions = Functions;
+        var step = Machine.Start(State);
+        foreach (var view in functions.Views)
+        {
+#pragma warning disable CA1031
+            try
+            {
+                await Run(view, UnitCall.None, step.State, null, result =>
+                {
+                    (step, var outcome) = Machine.Viewed(step, result);
+                    if (outcome == ViewOutcome.DeclaresBy) { UnitLog.ViewDeclaresBy(Logger(), view.Name); }
+                    else if (outcome == ViewOutcome.NotAView && _warned.Add(view.Name)) { UnitLog.ViewNotStored(Logger(), view.Name, result?.GetType().FullName ?? "null"); }
+                    return Task.FromResult(outcome == ViewOutcome.DeclaresBy ? "refused" : "viewed");
+                }, CancellationToken.None).ConfigureAwait(true);
+            }
+            catch { }
+#pragma warning restore CA1031
+        }
+
+        if (step.View is null)
+        {
+            var empty = JsonSerializer.SerializeToElement(new { });
+            var view = new PublishedView(_stateAlias, 1, empty);
+            step = step with { View = view, Signals = [.. step.Signals, new ViewChanged(_stateAlias, 1)] };
+        }
+
+        if (step.Signals.Count > 0)
+        {
+            var stored = new StoredUnit<TState>(State.State, step.View);
+            await Save(stored, step.Signals).ConfigureAwait(true);
+        }
+    }
+
+    public Task<PublishedView?> Open() => Read(_stateAlias);
+
+    public Task Act(ScreenAction action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        return Activate(action.Alias ?? _stateAlias, action.Generation, action.NodeKey, action.FieldValue, Context.Caller?.ToString());
+    }
+
+    public Task<PublishedView?> Read(string? alias = null) =>
+        Task.FromResult(State.View is { } view && (alias is null || string.Equals(view.Alias, alias, StringComparison.Ordinal)) ? view : null);
+
+    Task<PublishedView?> IViewReader.Read(string alias) => Read(alias);
 
     Task<JsonElement> IStateReader.Read(string alias) =>
         Task.FromResult(State.State is not null && string.Equals(Functions.Alias, alias, StringComparison.Ordinal)
@@ -102,12 +159,62 @@ internal sealed class UnitNeuron<TState> : Neuron<StoredUnit<TState>>, ISynapseR
             causeAddress: Causation.Address(journaled.Publisher, journaled.Sequence));
     }
 
-    public async Task Activate(string alias, long generation, string nodeKey, string? fieldValue, string? by)
+    public async Task Activate(string alias, long generation, string nodeKey, string? fieldValue = null, string? by = null)
     {
         ArgumentNullException.ThrowIfNull(alias);
         ArgumentNullException.ThrowIfNull(nodeKey);
         var pressed = Machine.Press(State.View, alias, generation, nodeKey, fieldValue, by);
         await Turn(pressed, Context.TraceId, null, said: pressed, CancellationToken.None).ConfigureAwait(true);
+    }
+
+    public Task Request(string signal, JsonElement? args = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(signal);
+        var emitted = new EmittedSignal(signal, ViewNodes.Payload(args, fieldValue: null, by: null));
+        return Turn(emitted, Context.TraceId, null, said: emitted, CancellationToken.None);
+    }
+
+    public async Task<Answer> Handle(Ask ask, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(ask);
+        ct.ThrowIfCancellationRequested();
+        try
+        {
+            if (string.Equals(ask.Operation, "state", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(ask.Operation, "readState", StringComparison.OrdinalIgnoreCase))
+            {
+                var val = State.State is not null
+                    ? JsonSerializer.SerializeToElement(State.State, RuntimeProtocol.OptionsFor(typeof(TState)))
+                    : JsonSerializer.SerializeToElement<object?>(null);
+                return new Answer(ask.Slot, ask.Operation, ask.Key, AnswerStatus.Ok, val, null, 0);
+            }
+            if (string.Equals(ask.Operation, "view", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(ask.Operation, "readView", StringComparison.OrdinalIgnoreCase))
+            {
+                var val = State.View is not null
+                    ? JsonSerializer.SerializeToElement(State.View, RuntimeProtocol.OptionsFor(typeof(PublishedView)))
+                    : JsonSerializer.SerializeToElement<object?>(null);
+                return new Answer(ask.Slot, ask.Operation, ask.Key, AnswerStatus.Ok, val, null, 0);
+            }
+
+            var payload = ask.Arguments.ValueKind is JsonValueKind.Undefined
+                ? JsonSerializer.SerializeToElement<object?>(null)
+                : ask.Arguments;
+            var signal = new EmittedSignal(ask.Operation, payload);
+            await Turn(signal, Context.TraceId, null, said: signal, ct).ConfigureAwait(true);
+            var resultState = State.State is not null
+                ? JsonSerializer.SerializeToElement(State.State, RuntimeProtocol.OptionsFor(typeof(TState)))
+                : JsonSerializer.SerializeToElement<object?>(null);
+            return new Answer(ask.Slot, ask.Operation, ask.Key, AnswerStatus.Ok, resultState, null, 0);
+        }
+        catch (OperationCanceledException)
+        {
+            return new Answer(ask.Slot, ask.Operation, ask.Key, AnswerStatus.Cancelled, default, "Cancelled", 0, "Operation cancelled or timed out.");
+        }
+        catch (Exception ex)
+        {
+            return new Answer(ask.Slot, ask.Operation, ask.Key, AnswerStatus.Failed, default, ex.Message, 0, ex.GetType().Name);
+        }
     }
 
     private async Task Turn(Signal signal, string? traceId, string? causationId, Signal? said, CancellationToken ct, bool fromAsks = false, string? causeAddress = null)

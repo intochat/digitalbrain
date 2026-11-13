@@ -1,3 +1,4 @@
+using DigitalBrain;
 using DigitalBrain.Limits;
 using DigitalBrain.Units;
 using System.Collections.Concurrent;
@@ -47,6 +48,10 @@ internal sealed class SignalTypeMap
         Add(typeof(DigitalBrain.Time.Tick));
         Add(typeof(DigitalBrain.Time.Registered));
         Add(typeof(DigitalBrain.Time.Unregistered));
+        Add(typeof(Asked));
+        Add(typeof(Answered));
+        Add(typeof(ViewChanged));
+        Add(typeof(BuildRefused));
         foreach (var assembly in assemblies.Distinct())
         {
             foreach (var type in Loadable(assembly))

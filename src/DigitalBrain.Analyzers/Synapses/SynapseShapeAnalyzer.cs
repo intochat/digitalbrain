@@ -14,9 +14,12 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
     private const string TaskType = "System.Threading.Tasks.Task`1";
     private const string ReactionType = "DigitalBrain.Reaction`1";
     private const string EnvelopeType = "DigitalBrain.SignalEnvelope";
-    private const string AsksType = "DigitalBrain.Units.Asks`1";
-    private const string AnswerType = "DigitalBrain.Units.Answer";
-    private const string AnsweredType = "DigitalBrain.Units.Answered";
+    private const string AsksType = "DigitalBrain.Asks`1";
+    private const string LegacyAsksType = "DigitalBrain.Units.Asks`1";
+    private const string AnswerType = "DigitalBrain.Answer";
+    private const string LegacyAnswerType = "DigitalBrain.Units.Answer";
+    private const string AnsweredType = "DigitalBrain.Answered";
+    private const string LegacyAnsweredType = "DigitalBrain.Units.Answered";
 
     // Mirrors DigitalBrain.Time.Schedule: HH:mm, Day HH:mm, every Nm / every Nh (N from 1 to 999999).
     private static readonly Regex ScheduleRule = new Regex(
@@ -95,7 +98,7 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
             if (Rules.Has(method.Parameters[i], Rules.SlotAttribute))
             {
                 var deferred = type is INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 1 } asks
-                    && Rules.FullName(asks.OriginalDefinition) == AsksType;
+                    && (Rules.FullName(asks.OriginalDefinition) == AsksType || Rules.FullName(asks.OriginalDefinition) == LegacyAsksType);
                 var contract = deferred ? ((INamedTypeSymbol)type).TypeArguments[0] : type;
                 if (contract.TypeKind != TypeKind.Interface || !Rules.Has(contract, Rules.CapabilityAttribute))
                 {
@@ -119,7 +122,7 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
                 tokens++;
                 misplacedToken |= i != method.Parameters.Length - 1;
             }
-            else if (Rules.FullName(type as INamedTypeSymbol) == AnswerType)
+            else if (Rules.FullName(type as INamedTypeSymbol) == AnswerType || Rules.FullName(type as INamedTypeSymbol) == LegacyAnswerType)
             {
                 answers++;
             }
@@ -170,7 +173,8 @@ public sealed class SynapseShapeAnalyzer : DiagnosticAnalyzer
         }
 
         var declared = hasSignal && !byAlias ? args[0].Value as INamedTypeSymbol : null;
-        if (answers > 0 && (answers > 1 || Rules.FullName(declared) != AnsweredType || !isReaction || isAsync || tokens > 0 || callingSlots > 0))
+        var declaredFullName = Rules.FullName(declared);
+        if (answers > 0 && (answers > 1 || (declaredFullName != AnsweredType && declaredFullName != LegacyAnsweredType) || !isReaction || isAsync || tokens > 0 || callingSlots > 0))
         {
             return $"an {Rules.SynapseReasons.AnswerNeedsAnswered}.";
         }

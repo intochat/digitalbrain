@@ -142,6 +142,8 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         Register<DigitalBrain.Operations.OperationNeuron>();
         Register<DigitalBrain.Confirmation.ConfirmationsNeuron>();
         Register<UnitDeployment>();
+        Register<AsksNeuron>();
+        Register<AskBatchNeuron>();
 
         _ = Listeners.Listen<Deployed>("testos.live.catalog", async (pub, s, ct) =>
         {

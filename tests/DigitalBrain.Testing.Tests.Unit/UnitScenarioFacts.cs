@@ -199,7 +199,7 @@ public sealed class UnitScenarioFacts
         var failing = await UnitScenario.Run(Source(XWatch), OnePost(),
             [new ExpectView("x.watch", "1"), new Tick(Start.AddMinutes(6)), new ExpectView("x.watch", "nope"), new ExpectNoSignal("x.polled")], Ct);
         Assert.Equal(
-            ["step 0 ExpectView x.watch: no view published",
+            ["step 0 ExpectView x.watch: no text contains \"1\"",
              "step 2 ExpectView x.watch: no text contains \"nope\"",
              "step 3 ExpectNoSignal x.polled: journaled at step 1"], failing.Failures);
     }

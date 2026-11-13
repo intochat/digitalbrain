@@ -1,6 +1,7 @@
 using DigitalBrain.Modules;
 using DigitalBrain.Units;
 using System.Reflection;
+using DigitalBrain.Brains;
 using DigitalBrain.Confirmation;
 using DigitalBrain.Contracts;
 using DigitalBrain.Neurons;
@@ -225,6 +226,35 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         }
     }
 
+    /// <summary>
+    /// Checks a children wait when a child flow finishes; other signals are ignored.
+    /// </summary>
+    [On]
+    protected async Task OnFlowDone(FlowDone done)
+    {
+        ArgumentNullException.ThrowIfNull(done);
+        if (State is not { Status: FlowStatus.Waiting, Waiting: { Reason: WaitReason.Children, Children: { } children } waiting })
+        {
+            return;
+        }
+
+        var matching = children.FirstOrDefault(c => string.Equals(c, done.FlowId, StringComparison.Ordinal)
+            || done.FlowId.EndsWith("/" + c, StringComparison.Ordinal));
+        if (matching is null) { return; }
+
+        var remaining = children.Where(c => !string.Equals(c, matching, StringComparison.Ordinal) && !done.FlowId.EndsWith("/" + c, StringComparison.Ordinal)).ToList();
+        if (remaining.Count == 0)
+        {
+            await Resolve(waiting.Step, WaitOutcome.Arrived, null).ConfigureAwait(true);
+        }
+        else
+        {
+            var nextWaiting = waiting with { Children = remaining };
+            var nextState = State with { Waiting = nextWaiting };
+            await Save(nextState, [new FlowStep(FlowId, waiting.Step, StepOutcome.Started, $"Child {matching} finished; {remaining.Count} remaining.")]).ConfigureAwait(true);
+        }
+    }
+
     /// <summary>The confirmation plan an approval wait of <paramref name="step"/> raises.</summary>
     /// <param name="step">The waiting step.</param>
     /// <param name="inner">The flow's own state after the step's body.</param>
@@ -341,8 +371,55 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
             _running = null;
             // Cancelled while the body ran: its result is dropped.
             if (State.Status != FlowStatus.Running || result is null || _cancelRequested is not null) { return; }
+
+            if (result.Disposition == StepDisposition.Skip)
+            {
+                var skipTransition = State.Skip(step, result, result.Reason);
+                if (skipTransition is not null)
+                {
+                    await Save(skipTransition.Value.Next, skipTransition.Value.Signals).ConfigureAwait(true);
+                }
+                continue;
+            }
+
+            if (result.Disposition == StepDisposition.Repeat)
+            {
+                if (result.Delay is { } delay && delay > TimeSpan.Zero)
+                {
+                    var now = Context.Time.GetUtcNow();
+                    var expires = now + delay;
+                    var repeatWait = new Waiting(step, WaitReason.Schedule, expires, null, IsRepeat: true);
+                    var transition = State.Wait(step, result, repeatWait, null);
+                    if (transition is not null)
+                    {
+                        await Save(transition.Value.Next, [new FlowStep(FlowId, step, StepOutcome.Repeated, null), .. transition.Value.Signals]).ConfigureAwait(true);
+                        await Context.Reminders.Start(ExpiryReminder, delay, ExpiryPeriod).ConfigureAwait(true);
+                    }
+                    await StopNudge().ConfigureAwait(true);
+                    return;
+                }
+                else
+                {
+                    var repeatTransition = State.Repeat(step, result);
+                    if (repeatTransition is not null)
+                    {
+                        await Save(repeatTransition.Value.Next, repeatTransition.Value.Signals).ConfigureAwait(true);
+                    }
+                    continue;
+                }
+            }
+
             if (result.Wait is { } wait)
             {
+                if (wait.Reason == WaitReason.Children && (wait.Children is null || wait.Children.Count == 0))
+                {
+                    var complete = State.Complete(step, result);
+                    if (complete is not null)
+                    {
+                        await Save(complete.Value.Next, complete.Value.Signals).ConfigureAwait(true);
+                    }
+                    continue;
+                }
                 await Wait(step, result, wait).ConfigureAwait(true);
                 return;
             }
@@ -414,6 +491,16 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         }
 
         await StopNudge().ConfigureAwait(true);
+        if (wait.Reason == WaitReason.Children && wait.Children is { Count: > 0 } children)
+        {
+            foreach (var childId in children)
+            {
+                var neuronId = NeuronAddress.IsBrainId(childId.Split('/')[0])
+                    ? NeuronId.Parse(childId)
+                    : new NeuronId(Id.Brain, "flow", childId);
+                await Context.Synapses.Ensure<FlowDone>(neuronId).ConfigureAwait(true);
+            }
+        }
         if (wait.Expires is { } expires) { await Context.Reminders.Start(ExpiryReminder, Positive(expires - now), ExpiryPeriod).ConfigureAwait(true); }
     }
 

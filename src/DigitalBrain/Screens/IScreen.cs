@@ -6,13 +6,40 @@ using DigitalBrain.Units;
 
 namespace DigitalBrain;
 
+/// <summary>An action performed against a screen view.</summary>
+/// <param name="Alias">The view alias owner (optional; defaults to the screen's own alias).</param>
+/// <param name="Generation">The generation of the view seen by the caller.</param>
+/// <param name="NodeKey">The unique key of the activated view node.</param>
+/// <param name="FieldValue">Optional field value if node is an input field.</param>
+public sealed record ScreenAction(string? Alias, long Generation, string NodeKey, string? FieldValue = null)
+{
+    /// <summary>Creates a screen action without an explicit view alias.</summary>
+    public ScreenAction(long generation, string nodeKey, string? fieldValue)
+        : this(null, generation, nodeKey, fieldValue)
+    {
+    }
+
+    /// <summary>Creates a screen action without an explicit view alias or field value.</summary>
+    public ScreenAction(long generation, string nodeKey)
+        : this(null, generation, nodeKey, null)
+    {
+    }
+}
+
 /// <summary>
 /// A screen: an Orleans virtual actor grain that holds domain state and renders a declarative UI View.
-/// Interacted with directly via Read, Activate (UI clicks), and Request (one-way external signals).
+/// Interacted with directly via Read, Open, Activate, Act, and Request.
 /// </summary>
 [NeuronAlias("screen")]
 public interface IScreen
 {
+    /// <summary>Opens the screen, returning its current published view.</summary>
+    [ReadOnlyCall]
+    Task<PublishedView?> Open();
+
+    /// <summary>Acts on the screen according to the specified action.</summary>
+    Task Act(ScreenAction action);
+
     /// <summary>Reads the current published view of this screen; null if uninitialized or alias mismatches.</summary>
     /// <param name="alias">The view alias (defaults to the screen neuron type).</param>
     [ReadOnlyCall]

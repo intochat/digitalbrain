@@ -365,6 +365,8 @@ public sealed class HostRefusesBannedApisFacts
 
         public Task CancelPending(string alias, CancellationToken ct) => Task.CompletedTask;
 
+        public Task Uninstall(string alias, CancellationToken ct = default) => Task.CompletedTask;
+
         public Task Rewire(string alias, CancellationToken ct = default) => Task.CompletedTask;
 
         public Task<InstallRecord?> Describe(string alias, CancellationToken ct) =>

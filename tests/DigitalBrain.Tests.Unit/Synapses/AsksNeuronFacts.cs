@@ -369,4 +369,27 @@ public sealed class AsksNeuronFacts
         public Task<IReadOnlyList<string>> Names() =>
             Task.FromResult<IReadOnlyList<string>>([.. Reminders.Select(r => r.Name).Except(StoppedReminders, StringComparer.Ordinal).Distinct(StringComparer.Ordinal)]);
     }
+
+    [Fact]
+    public void AskTypesAreInDigitalBrainNamespace()
+    {
+        Assert.Equal("DigitalBrain", typeof(Ask).Namespace);
+        Assert.Equal("DigitalBrain", typeof(Asks<>).Namespace);
+        Assert.Equal("DigitalBrain", typeof(Answer).Namespace);
+        Assert.Equal("DigitalBrain", typeof(Answered).Namespace);
+        Assert.Equal("DigitalBrain", typeof(AnswerStatus).Namespace);
+        Assert.Equal("DigitalBrain", typeof(AskLimits).Namespace);
+    }
+
+    [Fact]
+    public void AsksNeuronAndBatchNeuronHaveNeuronAttribute()
+    {
+        var asksAttr = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<NeuronAttribute>(typeof(AsksNeuron));
+        Assert.NotNull(asksAttr);
+        Assert.Equal(AskRules.AsksNeuronType, asksAttr.Type);
+
+        var batchAttr = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<NeuronAttribute>(typeof(AskBatchNeuron));
+        Assert.NotNull(batchAttr);
+        Assert.Equal(AskRules.BatchNeuronType, batchAttr.Type);
+    }
 }

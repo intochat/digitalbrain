@@ -5,8 +5,9 @@ using DigitalBrain.Neurons;
 namespace DigitalBrain.Units;
 
 [Neuron(AskRules.AsksNeuronType)]
-internal sealed class AsksNeuron(ISynapseCatalogSource catalog) : Neuron, IAsks
+internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? units = null) : Neuron, IAsks
 {
+    private readonly IUnitResolver? _units = units;
     internal const string DueTimer = "asks-due";
     internal const string NudgeReminder = "asks-nudge";
     internal static readonly TimeSpan Nudge = TimeSpan.FromMinutes(1);
@@ -220,7 +221,7 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog) : Neuron, IAsks
         {
             var nextSettled = batch.Settled + 1;
             var remaining = OpenCount(_state.Batches) - 1;
-            var answer = new Answer(settlement.Slot, settlement.Operation, settlement.Key, settlement.Status, settlement.Result, settlement.Error, remaining);
+            var answer = new Answer(settlement.Slot, settlement.Operation, settlement.Key, settlement.Status, settlement.Result, settlement.Error, remaining, settlement.Detail);
             IReadOnlyList<Answer> nextUnsent = [.. _state.Unsent, answer];
             var nextUnsentSince = _state.Unsent.Count == 0 ? now : _state.UnsentSince ?? now;
             var closed = nextSettled == batch.Count && nextFlying.Count == 0 && batch.Waiting.Count == 0;

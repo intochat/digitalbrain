@@ -15,7 +15,10 @@ public static class PlainNeuronContracts
     {
         ArgumentNullException.ThrowIfNull(type);
         return type.IsInterface
-            && (type.IsDefined(typeof(DefaultNeuronTypeAttribute), inherit: false) || IsConnection(type));
+            && (type.IsDefined(typeof(DefaultNeuronTypeAttribute), inherit: false)
+                || IsConnection(type)
+                || type == typeof(IScreen)
+                || type == typeof(Units.IViewReader));
     }
 
     // A contract every connection neuron may implement (IConnection, IStorage): it names no neuron type, the
@@ -39,6 +42,8 @@ public static class PlainNeuronContracts
     public static string? TypeOf(Type contract)
     {
         ArgumentNullException.ThrowIfNull(contract);
+        if (contract == typeof(IScreen)) { return "screen"; }
+        if (contract == typeof(Units.IViewReader)) { return "synapse.view"; }
         return Is(contract) ? contract.GetCustomAttribute<DefaultNeuronTypeAttribute>(inherit: false)?.Type : null;
     }
 

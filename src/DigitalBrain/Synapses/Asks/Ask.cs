@@ -1,6 +1,7 @@
+using System.Buffers;
 using System.Text.Json;
 
-namespace DigitalBrain.Units;
+namespace DigitalBrain;
 
 /// <summary>One thing a unit asks the kernel to do. Data only.</summary>
 /// <param name="Slot">The <c>[Slot]</c> parameter name the person approved and bound.</param>
@@ -59,7 +60,16 @@ public enum AnswerStatus
 /// <param name="Result">The capability's JSON return value when <paramref name="Status"/> is <see cref="AnswerStatus.Ok"/>; default otherwise.</param>
 /// <param name="Error">The failure or refusal reason when <paramref name="Status"/> is not <see cref="AnswerStatus.Ok"/>; <see langword="null"/> otherwise.</param>
 /// <param name="Remaining">The number of asks of the unit still open after this answer.</param>
-public sealed record Answer(string Slot, string Operation, string Key, AnswerStatus Status, JsonElement Result, string? Error, int Remaining)
+/// <param name="Detail">Safe diagnostic detail describing why the ask failed or settled.</param>
+public sealed record Answer(
+    string Slot,
+    string Operation,
+    string Key,
+    AnswerStatus Status,
+    JsonElement Result,
+    string? Error,
+    int Remaining,
+    string? Detail = null)
 {
     /// <summary>True when <see cref="Status"/> is <see cref="AnswerStatus.Ok"/>.</summary>
     public bool Ok => Status == AnswerStatus.Ok;
@@ -115,4 +125,56 @@ public static class AskLimits
 
     /// <summary>Age after which an unanswered ask settles as <see cref="AnswerStatus.Expired"/>.</summary>
     public static readonly TimeSpan MaxAge = TimeSpan.FromHours(24);
+}
+
+/// <summary>Async helper extensions for unit asks and invocation.</summary>
+public static class AsksExtensions
+{
+    /// <summary>Invokes an operation on the unit asynchronously.</summary>
+    public static async Task<Answer> Invoke(this IUnit unit, string operation, JsonElement arguments, string? key = null, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(unit);
+        ArgumentNullException.ThrowIfNull(operation);
+        var ask = new Ask(string.Empty, operation, arguments, key ?? Guid.NewGuid().ToString("N"));
+        return await unit.Handle(ask, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Gets a JSON result from the unit operation.</summary>
+    public static async Task<JsonElement> GetJson(this IUnit unit, string operation, JsonElement arguments, string? key = null, CancellationToken ct = default)
+    {
+        var answer = await unit.Invoke(operation, arguments, key, ct).ConfigureAwait(false);
+        if (!answer.Ok)
+        {
+            throw new InvalidOperationException(answer.Error ?? answer.Detail ?? "GetJson failed");
+        }
+        return answer.Result;
+    }
+
+    /// <summary>Reads text from the unit operation.</summary>
+    public static async Task<string> ReadText(this IUnit unit, string operation, JsonElement arguments, string? key = null, CancellationToken ct = default)
+    {
+        var answer = await unit.Invoke(operation, arguments, key, ct).ConfigureAwait(false);
+        if (!answer.Ok)
+        {
+            throw new InvalidOperationException(answer.Error ?? answer.Detail ?? "ReadText failed");
+        }
+        return answer.Result.ValueKind == JsonValueKind.String ? answer.Result.GetString()! : answer.Result.GetRawText();
+    }
+
+    /// <summary>Writes text to the unit operation.</summary>
+    public static async Task<Answer> WriteText(this IUnit unit, string operation, string text, string? key = null, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(unit);
+        ArgumentNullException.ThrowIfNull(operation);
+        ArgumentNullException.ThrowIfNull(text);
+        var buffer = new ArrayBufferWriter<byte>();
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("text"u8, text);
+            writer.WriteEndObject();
+            writer.Flush();
+        }
+        return await unit.Invoke(operation, JsonElement.Parse(buffer.WrittenSpan), key, ct).ConfigureAwait(false);
+    }
 }

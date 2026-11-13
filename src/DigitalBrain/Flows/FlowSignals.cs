@@ -17,6 +17,12 @@ public enum StepOutcome
 
     /// <summary>The body was interrupted (cancelled, the activation ended or the host stopped); the step runs again.</summary>
     Interrupted,
+
+    /// <summary>The step was skipped.</summary>
+    Skipped,
+
+    /// <summary>The step was repeated.</summary>
+    Repeated,
 }
 
 /// <summary>How a wait ended.</summary>

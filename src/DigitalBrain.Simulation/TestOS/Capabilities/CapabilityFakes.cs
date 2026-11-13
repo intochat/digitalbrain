@@ -172,7 +172,7 @@ internal sealed class TestOSServices(
         if (serviceType == typeof(DigitalBrain.Units.ISlotResolver)) { return inner.GetService(serviceType) ?? slots; }
         if (serviceType == typeof(DigitalBrain.Units.IInstallHooks)) { return inner.GetService(serviceType) ?? hooks; }
         if (serviceType == typeof(IUnitLoader) || serviceType == typeof(UnitLoader)) { return inner.GetService(serviceType) ?? loader?.Invoke(); }
-        if (serviceType == typeof(UnitResolver)) { return inner.GetService(serviceType) ?? resolver?.Invoke(); }
+        if (serviceType == typeof(UnitResolver) || serviceType == typeof(IUnitResolver)) { return inner.GetService(serviceType) ?? resolver?.Invoke(); }
         if (serviceType == typeof(LiveBindings)) { return inner.GetService(serviceType) ?? live?.Invoke(); }
         // The TestOS's own compiler and synapse host, as the silo serves its singletons.
         if (serviceType == typeof(DigitalBrain.Runtime.Synapses.SynapseCompiler)) { return inner.GetService(serviceType) ?? compiler?.Invoke(); }
