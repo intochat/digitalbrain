@@ -1,6 +1,41 @@
+using System.Collections.Frozen;
+using System.Reflection;
 using System.Text.Json.Serialization;
 
 namespace DigitalBrain.UI;
+
+/// <summary>Marks a concrete <see cref="Node"/> record with its wire discriminator <paramref name="kind"/> for schema reflection and code generation.</summary>
+/// <param name="kind">The polymorphic <c>kind</c> discriminator written in JSON.</param>
+[AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
+public sealed class ViewNodeAttribute(string kind) : Attribute
+{
+    /// <summary>The polymorphic <c>kind</c> discriminator written in JSON.</summary>
+    public string Kind { get; } = string.IsNullOrWhiteSpace(kind)
+        ? throw new ArgumentException("A view node kind cannot be empty.", nameof(kind))
+        : kind;
+
+    /// <summary>Discovers every concrete <see cref="Node"/> type in <c>DigitalBrain.UI</c> keyed by its <see cref="Kind"/> discriminator.</summary>
+    public static IReadOnlyDictionary<string, Type> DiscoverAll()
+    {
+        var map = new Dictionary<string, Type>(StringComparer.Ordinal);
+        foreach (var type in typeof(Node).Assembly.GetTypes())
+        {
+            if (type.IsAbstract || !typeof(Node).IsAssignableFrom(type))
+            {
+                continue;
+            }
+
+            var attr = type.GetCustomAttribute<ViewNodeAttribute>(inherit: false)
+                ?? throw new InvalidOperationException($"Concrete Node '{type.FullName}' is missing [ViewNode].");
+            if (!map.TryAdd(attr.Kind, type))
+            {
+                throw new InvalidOperationException($"Duplicate [ViewNode(\"{attr.Kind}\")] on '{type.FullName}' and '{map[attr.Kind].FullName}'.");
+            }
+        }
+
+        return map.ToFrozenDictionary(StringComparer.Ordinal);
+    }
+}
 
 /// <summary>A screen an app returns: a title and a tree of nodes. Renderer-neutral.</summary>
 public sealed record View(string Title, Node Root);
@@ -51,6 +86,7 @@ public sealed record View(string Title, Node Root);
 public abstract record Node;
 
 /// <summary>Children laid out top to bottom.</summary>
+[ViewNode("column")]
 public sealed record Column(IReadOnlyList<Node> Children) : Node
 {
     /// <summary>Vertical spacing between children in logical pixels.</summary>
@@ -71,6 +107,7 @@ public sealed record Column(IReadOnlyList<Node> Children) : Node
 }
 
 /// <summary>Children laid out left to right.</summary>
+[ViewNode("row")]
 public sealed record Row(IReadOnlyList<Node> Children) : Node
 {
     /// <summary>Horizontal spacing between children in logical pixels.</summary>
@@ -91,6 +128,7 @@ public sealed record Row(IReadOnlyList<Node> Children) : Node
 }
 
 /// <summary>Children arranged in a multi-column grid.</summary>
+[ViewNode("grid")]
 public sealed record Grid(int Columns, IReadOnlyList<Node> Children, double Gap = 12) : Node
 {
     /// <inheritdoc />
@@ -101,6 +139,7 @@ public sealed record Grid(int Columns, IReadOnlyList<Node> Children, double Gap 
 }
 
 /// <summary>Two-pane desktop split view.</summary>
+[ViewNode("splitPane")]
 public sealed record SplitPane(Node Leading, Node Trailing, double LeadingExtent = 280, double Gap = 16) : Node;
 
 /// <summary>Known surface materiality kinds.</summary>
@@ -120,6 +159,7 @@ public static class SurfaceKind
 }
 
 /// <summary>A glassmorphic, elevated, or recessed container surface.</summary>
+[ViewNode("surface")]
 public sealed record Surface(
     IReadOnlyList<Node> Children,
     [property: JsonPropertyName("surfaceKind")] string Kind = SurfaceKind.Acrylic,
@@ -138,6 +178,7 @@ public sealed record Surface(
 public sealed record TabItem(string Key, string Id, string Label, Emit Emit, string? Icon = null);
 
 /// <summary>A horizontal tab bar.</summary>
+[ViewNode("tabs")]
 public sealed record Tabs(IReadOnlyList<TabItem> Items, string SelectedId) : Node
 {
     /// <inheritdoc />
@@ -148,12 +189,15 @@ public sealed record Tabs(IReadOnlyList<TabItem> Items, string SelectedId) : Nod
 }
 
 /// <summary>A hairline section divider with an optional label.</summary>
+[ViewNode("divider")]
 public sealed record Divider(string? Label = null) : Node;
 
 /// <summary>Fixed empty space between elements.</summary>
+[ViewNode("spacer")]
 public sealed record Spacer(double Size = 12) : Node;
 
 /// <summary>A list of entries.</summary>
+[ViewNode("collection")]
 public sealed record Collection(IReadOnlyList<Entry> Entries) : Node
 {
     /// <inheritdoc />
@@ -172,9 +216,11 @@ public sealed record Entry(string Id, string Title, string? Subtitle)
 }
 
 /// <summary>Display heading rendered in <c>InterDisplay</c>.</summary>
+[ViewNode("heading")]
 public sealed record Heading(string Value, int Level = 2, string? Subtitle = null) : Node;
 
 /// <summary>Read-only text.</summary>
+[ViewNode("text")]
 public sealed record Text(string Value) : Node
 {
     /// <summary>Semantic tone (<c>neutral</c>, <c>muted</c>, <c>strong</c>, <c>accent</c>, <c>done</c>, <c>working</c>, <c>error</c>).</summary>
@@ -192,9 +238,11 @@ public sealed record Text(string Value) : Node
 }
 
 /// <summary>Compact status badge.</summary>
+[ViewNode("badge")]
 public sealed record Badge(string Label, string Tone = "neutral", string? Icon = null) : Node;
 
 /// <summary>22px desktop tag pill with tabular figures and optional Lucide icon.</summary>
+[ViewNode("tagPill")]
 public sealed record TagPill(string Label, string Tone = "neutral", string? Icon = null) : Node;
 
 /// <summary>What an editable field holds; the client picks the input and its keyboard from it.</summary>
@@ -229,15 +277,18 @@ public enum FieldKind
 /// <param name="Kind">What the field holds.</param>
 /// <param name="Placeholder">Hint shown while empty.</param>
 /// <param name="OnSubmit">The signal a submit emits.</param>
+[ViewNode("field")]
 public sealed record Field(string Key, string Name, [property: JsonPropertyName("fieldKind")] FieldKind Kind, string? Placeholder = null, Emit? OnSubmit = null) : Node;
 
 /// <summary>A 36x20px pill toggle switch.</summary>
+[ViewNode("switch")]
 public sealed record Switch(string Key, string Label, bool IsOn, Emit? Emit = null, bool Locked = false) : Node;
 
 /// <summary>An option in a <see cref="Select"/> control.</summary>
 public sealed record SelectOption(string Key, string Id, string Label, Emit? Emit = null);
 
 /// <summary>A desktop dropdown / segmented selector.</summary>
+[ViewNode("select")]
 public sealed record Select(string Label, string Selected, IReadOnlyList<SelectOption> Options) : Node
 {
     /// <inheritdoc />
@@ -248,18 +299,22 @@ public sealed record Select(string Label, string Selected, IReadOnlyList<SelectO
 }
 
 /// <summary>A progress bar with label and percentage.</summary>
+[ViewNode("progress")]
 public sealed record Progress(string Label, double Value, string? Detail = null) : Node;
 
 /// <summary>An inline status/alert banner.</summary>
+[ViewNode("infoBar")]
 public sealed record InfoBar(string Title, string Message, string Tone = "neutral", Button? Action = null) : Node;
 
 /// <summary>A transient message.</summary>
+[ViewNode("toast")]
 public sealed record Toast(string Message) : Node;
 
 /// <summary>A card: a title, a body and child nodes below them (the os <c>card</c> control).</summary>
 /// <param name="Title">The card title.</param>
 /// <param name="Body">The card body.</param>
 /// <param name="Children">Nodes shown below the body, in order.</param>
+[ViewNode("card")]
 public sealed record Card(string Title, string Body, IReadOnlyList<Node> Children) : Node
 {
     /// <inheritdoc />
@@ -286,6 +341,7 @@ public static class ButtonTone
 /// <param name="Intent">The client-local intent a click performs.</param>
 /// <param name="Enabled">False shows the button disabled.</param>
 /// <param name="Tone"><see cref="ButtonTone.Neutral"/> or <see cref="ButtonTone.Accent"/>.</param>
+[ViewNode("button")]
 public sealed record Button(string Key, string Label, Emit? Emit = null, Intent? Intent = null, bool Enabled = true, string Tone = ButtonTone.Neutral) : Node
 {
     // Not serialised (private); a button that emits and intends, or does neither, cannot be built.
@@ -334,6 +390,7 @@ public enum IntentKind
 /// <summary>What a button does in the client itself, without a round trip to the server.</summary>
 /// <param name="Kind">What to do.</param>
 /// <param name="Arg">The text, window or page the intent acts on.</param>
+[ViewNode("intent")]
 public sealed record Intent([property: JsonPropertyName("intentKind")] IntentKind Kind, string? Arg = null) : Node;
 
 /// <summary>An approval card's resolution: the OS inbox surface answers plan <paramref name="PlanId"/> (approve or deny); never an <see cref="Emit"/>.</summary>
@@ -341,6 +398,7 @@ public sealed record Intent([property: JsonPropertyName("intentKind")] IntentKin
 public sealed record Resolve(string PlanId);
 
 /// <summary>Sortable tabular data card with optional <c>neuron://</c> source URI.</summary>
+[ViewNode("dataTable")]
 public sealed record DataTable(
     string Title,
     IReadOnlyList<string> Columns,
@@ -366,6 +424,7 @@ public sealed record DataTable(
 public sealed record ChartPointNode(string Label, double Value);
 
 /// <summary>Single-series or period-comparison chart card (<c>columns</c> or <c>line</c>).</summary>
+[ViewNode("chart")]
 public sealed record Chart(
     [property: JsonPropertyName("chartKind")] string Kind,
     string Title,
@@ -399,6 +458,7 @@ public sealed record Chart(
 public sealed record ApprovalRowNode(string Label, string OldValue, string NewValue, string? Amount = null, bool Warn = false);
 
 /// <summary>Pre-filled inline approval card.</summary>
+[ViewNode("approvalCard")]
 public sealed record ApprovalCardNode(
     string Key,
     string Id,
@@ -409,7 +469,9 @@ public sealed record ApprovalCardNode(
     string SystemName = "DigitalBrain",
     string Status = "pending",
     Resolve? Resolve = null,
-    string? SourceNeuronUri = null) : Node
+    string? SourceNeuronUri = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Icon = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? CapabilityLabel = null) : Node
 {
     /// <inheritdoc />
     public bool Equals(ApprovalCardNode? other) =>
@@ -421,6 +483,8 @@ public sealed record ApprovalCardNode(
         SystemName == other.SystemName &&
         Status == other.Status &&
         SourceNeuronUri == other.SourceNeuronUri &&
+        Icon == other.Icon &&
+        CapabilityLabel == other.CapabilityLabel &&
         Key == other.Key &&
         Equals(Resolve, other.Resolve) &&
         Rows.SequenceEqual(other.Rows);
@@ -433,6 +497,7 @@ public sealed record ApprovalCardNode(
 public sealed record ChoiceOptionNode(string Title, string? Detail = null, Button? Pick = null, string? Icon = null);
 
 /// <summary>Disambiguation choice card (2 to 5 options).</summary>
+[ViewNode("choiceCard")]
 public sealed record ChoiceCardNode(
     string Id,
     string Question,
@@ -452,6 +517,7 @@ public sealed record ChoiceCardNode(
 }
 
 /// <summary>Pre-filled outbound message draft card (email, Slack, SMS).</summary>
+[ViewNode("draftCard")]
 public sealed record DraftCardNode(
     string Id,
     string Channel,
@@ -467,6 +533,7 @@ public sealed record DraftCardNode(
 public sealed record RecordFieldNode(string Label, string Value, bool Warn = false);
 
 /// <summary>Structured record summary card.</summary>
+[ViewNode("recordCard")]
 public sealed record RecordCardNode(
     string ObjectLabel,
     string Name,
@@ -490,6 +557,7 @@ public sealed record RecordCardNode(
 }
 
 /// <summary>Secure credential request card.</summary>
+[ViewNode("secretCard")]
 public sealed record SecretCardNode(
     string Name,
     string Why,
@@ -502,6 +570,7 @@ public sealed record SecretCardNode(
 public sealed record JobStepNode(string Label, string Status = "waiting", string? Detail = null);
 
 /// <summary>Multi-step background job progress card.</summary>
+[ViewNode("jobCard")]
 public sealed record JobCardNode(
     string Title,
     IReadOnlyList<JobStepNode> Steps,
@@ -545,6 +614,7 @@ public sealed record BrainGraphSynapse(
     bool Active = false);
 
 /// <summary>Interactive 3D neural topology scene.</summary>
+[ViewNode("brainScene")]
 public sealed record BrainSceneNode(
     IReadOnlyList<BrainGraphNode> Nodes,
     IReadOnlyList<BrainGraphSynapse> Synapses,
@@ -575,6 +645,7 @@ public sealed record BrainSceneNode(
 }
 
 /// <summary>Declarative WASM / web studio viewport embedded inside an app view.</summary>
+[ViewNode("webBrowser")]
 public sealed record WebBrowser(
     string Key,
     string Url,
@@ -583,6 +654,7 @@ public sealed record WebBrowser(
     string ExecutionMode = "wasm-ui") : Node;
 
 /// <summary>Reference to a live neuron control in the same brain.</summary>
+[ViewNode("neuronRef")]
 public sealed record NeuronRef([property: JsonPropertyName("refKind")] string Kind, string NeuronUri) : Node;
 
 /// <summary>Semantic tone for status badges and stat cards.</summary>
@@ -605,6 +677,7 @@ public enum BadgeTone
 }
 
 /// <summary>Studio-grade desktop application shell with optional Acrylic sidebar, top toolbar, main body, and right-hand inspector.</summary>
+[ViewNode("appShell")]
 public sealed record AppShellNode(
     string Key,
     Node? Sidebar,
@@ -613,6 +686,7 @@ public sealed record AppShellNode(
     Node? Inspector = null) : Node;
 
 /// <summary>Navigation rail / sidebar item with icon, active indicator, and optional count/status badge.</summary>
+[ViewNode("navItem")]
 public sealed record NavItemNode(
     string Key,
     string Label,
@@ -623,6 +697,7 @@ public sealed record NavItemNode(
     Emit? Emit = null) : Node;
 
 /// <summary>Compact KPI / telemetry card with tabular-numeral (<c>tnum</c>) metric value and optional delta pill.</summary>
+[ViewNode("statCard")]
 public sealed record StatCardNode(
     string Key,
     string Label,
@@ -632,6 +707,7 @@ public sealed record StatCardNode(
     string? Icon = null) : Node;
 
 /// <summary>A conversation timeline, composer, waiting state, error banner, stop button, and empty state.</summary>
+[ViewNode("conversation")]
 public sealed record Conversation(
     string Key,
     IReadOnlyList<MessageNode> Messages,
@@ -667,7 +743,9 @@ public sealed record MessageNode(
     IReadOnlyList<ActivityNode>? Activities = null,
     string Status = "completed",
     string? Model = null,
-    Button? Retry = null)
+    Button? Retry = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ModelLabel = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ProviderIcon = null)
 {
     /// <inheritdoc />
     public bool Equals(MessageNode? other) =>
@@ -679,6 +757,8 @@ public sealed record MessageNode(
         && SequenceEquals(Activities, other.Activities)
         && Status == other.Status
         && Model == other.Model
+        && ModelLabel == other.ModelLabel
+        && ProviderIcon == other.ProviderIcon
         && Equals(Retry, other.Retry);
 
     /// <inheritdoc />
@@ -693,22 +773,28 @@ public sealed record ActivityNode(
     string Id,
     string Title,
     string Status = "done",
-    string? Detail = null);
+    string? Detail = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Icon = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Category = null);
 
 /// <summary>The message input composer at the bottom of a <see cref="Conversation"/>.</summary>
 public sealed record ComposerNode(
     string Key,
     Emit OnSubmit,
     string Placeholder = "Message",
-    bool Enabled = true);
+    bool Enabled = true,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ActiveModelLabel = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ActiveProviderIcon = null);
 
 /// <summary>Inline recoverable error line with optional detail and retry/recovery button.</summary>
+[ViewNode("errorLine")]
 public sealed record ErrorLineNode(
     string What,
     string? Detail = null,
     Button? Action = null) : Node;
 
 /// <summary>Empty state prompt with optional body and suggestion buttons.</summary>
+[ViewNode("emptyState")]
 public sealed record EmptyStateNode(
     string Title,
     string? Body = null,
@@ -727,6 +813,7 @@ public sealed record EmptyStateNode(
 }
 
 /// <summary>Micro-app telemetry tile with tabular-numeral metric, optional sparkline series, threshold line, and quick actions.</summary>
+[ViewNode("metricTile")]
 public sealed record MetricTileNode(
     string Id,
     string AppId,
@@ -760,6 +847,7 @@ public sealed record MetricTileNode(
 }
 
 /// <summary>Structured code diff preview card for Feature-to-PR workflows.</summary>
+[ViewNode("diffCard")]
 public sealed record DiffCardNode(
     string Id,
     string Repo,

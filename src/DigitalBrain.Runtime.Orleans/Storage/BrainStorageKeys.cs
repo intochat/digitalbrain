@@ -26,6 +26,9 @@ public sealed class BrainStoreOptions
 
     /// <summary>When uncompacted journal entries reach or exceed this threshold, an automatic checkpoint is triggered. Default 500 entries.</summary>
     public int CheckpointEntriesThreshold { get; set; } = 500;
+
+    /// <summary>Optional elapsed interval after which uncompacted tail entries trigger a periodic checkpoint even below byte or entry thresholds.</summary>
+    public TimeSpan? CheckpointInterval { get; set; }
 }
 
 // Default custody: an HKDF-derived master per account from the configured master key (the os configured custody's derivation).

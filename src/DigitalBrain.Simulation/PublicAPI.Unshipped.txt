@@ -464,6 +464,7 @@ DigitalBrain.Testing.TestOS
 DigitalBrain.Testing.TestOS.AccessCounters.get -> DigitalBrain.Access.AccessCounters!
 DigitalBrain.Testing.TestOS.AccessOptions.get -> DigitalBrain.Access.AccessOptions!
 DigitalBrain.Testing.TestOS.Activate(DigitalBrain.NeuronId id) -> System.Threading.Tasks.Task!
+DigitalBrain.Testing.TestOS.AskProgress.get -> DigitalBrain.IAskProgress!
 DigitalBrain.Testing.TestOS.Brains(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string![]!>!
 DigitalBrain.Testing.TestOS.Caller.get -> DigitalBrain.Capabilities.CapabilityCaller?
 DigitalBrain.Testing.TestOS.Caller.set -> void

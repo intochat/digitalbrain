@@ -160,7 +160,8 @@ internal sealed class TestOSServices(
     Func<LiveBindings>? live = null,
     Func<DigitalBrain.Runtime.Synapses.SynapseCompiler>? compiler = null,
     Func<ISynapseHost>? host = null,
-    Func<DigitalBrain.Confirmation.ConfirmationPolicies>? confirmationPolicies = null)
+    Func<DigitalBrain.Confirmation.ConfirmationPolicies>? confirmationPolicies = null,
+    IAskProgress? askProgress = null)
     : IServiceProvider, ICapabilityBroker
 {
     public object? GetService(Type serviceType)
@@ -169,6 +170,7 @@ internal sealed class TestOSServices(
         if (serviceType == typeof(ICapabilityBroker)) { return this; }
         if (serviceType == typeof(CapabilityFakes)) { return fakes; }
         if (serviceType == typeof(ISynapseCatalogSource)) { return catalog; }
+        if (serviceType == typeof(IAskProgress) || serviceType == typeof(AskProgressHub)) { return inner.GetService(serviceType) ?? askProgress; }
         if (serviceType == typeof(IReadOnlyList<ActionDescriptor>)) { return inner.GetService(serviceType) ?? actions(); }
         if (serviceType == typeof(DigitalBrain.Units.ISlotResolver)) { return inner.GetService(serviceType) ?? slots; }
         if (serviceType == typeof(DigitalBrain.Units.IInstallHooks)) { return inner.GetService(serviceType) ?? hooks; }

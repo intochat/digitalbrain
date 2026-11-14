@@ -100,6 +100,8 @@ DigitalBrain.Runtime.Orleans.BrainStoreOptions.CheckpointBytesThreshold.get -> l
 DigitalBrain.Runtime.Orleans.BrainStoreOptions.CheckpointBytesThreshold.set -> void
 DigitalBrain.Runtime.Orleans.BrainStoreOptions.CheckpointEntriesThreshold.get -> int
 DigitalBrain.Runtime.Orleans.BrainStoreOptions.CheckpointEntriesThreshold.set -> void
+DigitalBrain.Runtime.Orleans.BrainStoreOptions.CheckpointInterval.get -> System.TimeSpan?
+DigitalBrain.Runtime.Orleans.BrainStoreOptions.CheckpointInterval.set -> void
 DigitalBrain.Runtime.Orleans.BrainStoreOptions.Directory.get -> string!
 DigitalBrain.Runtime.Orleans.BrainStoreOptions.Directory.set -> void
 DigitalBrain.Runtime.Orleans.Capabilities.CapabilityBroker

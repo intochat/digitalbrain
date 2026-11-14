@@ -13,11 +13,15 @@ const DigitalBrain.UI.SurfaceKind.Recessed = "recessed" -> string!
 const DigitalBrain.UI.SurfaceKind.Subtle = "subtle" -> string!
 DigitalBrain.UI.ActivityNode
 DigitalBrain.UI.ActivityNode.<Clone>$() -> DigitalBrain.UI.ActivityNode!
-DigitalBrain.UI.ActivityNode.ActivityNode(string! Id, string! Title, string! Status = "done", string? Detail = null) -> void
-DigitalBrain.UI.ActivityNode.Deconstruct(out string! Id, out string! Title, out string! Status, out string? Detail) -> void
+DigitalBrain.UI.ActivityNode.ActivityNode(string! Id, string! Title, string! Status = "done", string? Detail = null, string? Icon = null, string? Category = null) -> void
+DigitalBrain.UI.ActivityNode.Category.get -> string?
+DigitalBrain.UI.ActivityNode.Category.init -> void
+DigitalBrain.UI.ActivityNode.Deconstruct(out string! Id, out string! Title, out string! Status, out string? Detail, out string? Icon, out string? Category) -> void
 DigitalBrain.UI.ActivityNode.Detail.get -> string?
 DigitalBrain.UI.ActivityNode.Detail.init -> void
 DigitalBrain.UI.ActivityNode.Equals(DigitalBrain.UI.ActivityNode? other) -> bool
+DigitalBrain.UI.ActivityNode.Icon.get -> string?
+DigitalBrain.UI.ActivityNode.Icon.init -> void
 DigitalBrain.UI.ActivityNode.Id.get -> string!
 DigitalBrain.UI.ActivityNode.Id.init -> void
 DigitalBrain.UI.ActivityNode.Status.get -> string!
@@ -25,9 +29,13 @@ DigitalBrain.UI.ActivityNode.Status.init -> void
 DigitalBrain.UI.ActivityNode.Title.get -> string!
 DigitalBrain.UI.ActivityNode.Title.init -> void
 DigitalBrain.UI.ApprovalCardNode
-DigitalBrain.UI.ApprovalCardNode.ApprovalCardNode(string! Key, string! Id, string! Title, string! Summary, System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.ApprovalRowNode!>! Rows, string! ValueLabel = "Value", string! SystemName = "DigitalBrain", string! Status = "pending", DigitalBrain.UI.Resolve? Resolve = null, string? SourceNeuronUri = null) -> void
-DigitalBrain.UI.ApprovalCardNode.Deconstruct(out string! Key, out string! Id, out string! Title, out string! Summary, out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.ApprovalRowNode!>! Rows, out string! ValueLabel, out string! SystemName, out string! Status, out DigitalBrain.UI.Resolve? Resolve, out string? SourceNeuronUri) -> void
+DigitalBrain.UI.ApprovalCardNode.ApprovalCardNode(string! Key, string! Id, string! Title, string! Summary, System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.ApprovalRowNode!>! Rows, string! ValueLabel = "Value", string! SystemName = "DigitalBrain", string! Status = "pending", DigitalBrain.UI.Resolve? Resolve = null, string? SourceNeuronUri = null, string? Icon = null, string? CapabilityLabel = null) -> void
+DigitalBrain.UI.ApprovalCardNode.CapabilityLabel.get -> string?
+DigitalBrain.UI.ApprovalCardNode.CapabilityLabel.init -> void
+DigitalBrain.UI.ApprovalCardNode.Deconstruct(out string! Key, out string! Id, out string! Title, out string! Summary, out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.ApprovalRowNode!>! Rows, out string! ValueLabel, out string! SystemName, out string! Status, out DigitalBrain.UI.Resolve? Resolve, out string? SourceNeuronUri, out string? Icon, out string? CapabilityLabel) -> void
 DigitalBrain.UI.ApprovalCardNode.Equals(DigitalBrain.UI.ApprovalCardNode? other) -> bool
+DigitalBrain.UI.ApprovalCardNode.Icon.get -> string?
+DigitalBrain.UI.ApprovalCardNode.Icon.init -> void
 DigitalBrain.UI.ApprovalCardNode.Id.get -> string!
 DigitalBrain.UI.ApprovalCardNode.Id.init -> void
 DigitalBrain.UI.ApprovalCardNode.Key.get -> string!
@@ -256,8 +264,12 @@ DigitalBrain.UI.Column.Padding.get -> double
 DigitalBrain.UI.Column.Padding.init -> void
 DigitalBrain.UI.ComposerNode
 DigitalBrain.UI.ComposerNode.<Clone>$() -> DigitalBrain.UI.ComposerNode!
-DigitalBrain.UI.ComposerNode.ComposerNode(string! Key, DigitalBrain.UI.Emit! OnSubmit, string! Placeholder = "Message", bool Enabled = true) -> void
-DigitalBrain.UI.ComposerNode.Deconstruct(out string! Key, out DigitalBrain.UI.Emit! OnSubmit, out string! Placeholder, out bool Enabled) -> void
+DigitalBrain.UI.ComposerNode.ActiveModelLabel.get -> string?
+DigitalBrain.UI.ComposerNode.ActiveModelLabel.init -> void
+DigitalBrain.UI.ComposerNode.ActiveProviderIcon.get -> string?
+DigitalBrain.UI.ComposerNode.ActiveProviderIcon.init -> void
+DigitalBrain.UI.ComposerNode.ComposerNode(string! Key, DigitalBrain.UI.Emit! OnSubmit, string! Placeholder = "Message", bool Enabled = true, string? ActiveModelLabel = null, string? ActiveProviderIcon = null) -> void
+DigitalBrain.UI.ComposerNode.Deconstruct(out string! Key, out DigitalBrain.UI.Emit! OnSubmit, out string! Placeholder, out bool Enabled, out string? ActiveModelLabel, out string? ActiveProviderIcon) -> void
 DigitalBrain.UI.ComposerNode.Enabled.get -> bool
 DigitalBrain.UI.ComposerNode.Enabled.init -> void
 DigitalBrain.UI.ComposerNode.Equals(DigitalBrain.UI.ComposerNode? other) -> bool
@@ -517,13 +529,17 @@ DigitalBrain.UI.MessageNode.Activities.get -> System.Collections.Generic.IReadOn
 DigitalBrain.UI.MessageNode.Activities.init -> void
 DigitalBrain.UI.MessageNode.Cards.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>?
 DigitalBrain.UI.MessageNode.Cards.init -> void
-DigitalBrain.UI.MessageNode.Deconstruct(out string! Id, out string! Role, out string! Text, out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>? Cards, out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.ActivityNode!>? Activities, out string! Status, out string? Model, out DigitalBrain.UI.Button? Retry) -> void
+DigitalBrain.UI.MessageNode.Deconstruct(out string! Id, out string! Role, out string! Text, out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>? Cards, out System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.ActivityNode!>? Activities, out string! Status, out string? Model, out DigitalBrain.UI.Button? Retry, out string? ModelLabel, out string? ProviderIcon) -> void
 DigitalBrain.UI.MessageNode.Equals(DigitalBrain.UI.MessageNode? other) -> bool
 DigitalBrain.UI.MessageNode.Id.get -> string!
 DigitalBrain.UI.MessageNode.Id.init -> void
-DigitalBrain.UI.MessageNode.MessageNode(string! Id, string! Role, string! Text, System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>? Cards = null, System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.ActivityNode!>? Activities = null, string! Status = "completed", string? Model = null, DigitalBrain.UI.Button? Retry = null) -> void
+DigitalBrain.UI.MessageNode.MessageNode(string! Id, string! Role, string! Text, System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.Node!>? Cards = null, System.Collections.Generic.IReadOnlyList<DigitalBrain.UI.ActivityNode!>? Activities = null, string! Status = "completed", string? Model = null, DigitalBrain.UI.Button? Retry = null, string? ModelLabel = null, string? ProviderIcon = null) -> void
 DigitalBrain.UI.MessageNode.Model.get -> string?
 DigitalBrain.UI.MessageNode.Model.init -> void
+DigitalBrain.UI.MessageNode.ModelLabel.get -> string?
+DigitalBrain.UI.MessageNode.ModelLabel.init -> void
+DigitalBrain.UI.MessageNode.ProviderIcon.get -> string?
+DigitalBrain.UI.MessageNode.ProviderIcon.init -> void
 DigitalBrain.UI.MessageNode.Retry.get -> DigitalBrain.UI.Button?
 DigitalBrain.UI.MessageNode.Retry.init -> void
 DigitalBrain.UI.MessageNode.Role.get -> string!
@@ -808,6 +824,9 @@ DigitalBrain.UI.View.Root.init -> void
 DigitalBrain.UI.View.Title.get -> string!
 DigitalBrain.UI.View.Title.init -> void
 DigitalBrain.UI.View.View(string! Title, DigitalBrain.UI.Node! Root) -> void
+DigitalBrain.UI.ViewNodeAttribute
+DigitalBrain.UI.ViewNodeAttribute.Kind.get -> string!
+DigitalBrain.UI.ViewNodeAttribute.ViewNodeAttribute(string! kind) -> void
 DigitalBrain.UI.WebBrowser
 DigitalBrain.UI.WebBrowser.Deconstruct(out string! Key, out string! Url, out string? Title, out double Height, out string! ExecutionMode) -> void
 DigitalBrain.UI.WebBrowser.Equals(DigitalBrain.UI.WebBrowser? other) -> bool
@@ -1209,6 +1228,7 @@ static DigitalBrain.UI.Ui.StatCard(string! key, string! label, string! value, st
 static DigitalBrain.UI.Ui.WebBrowser(string! url, string? title = null, string! key = "web-browser", double height = 520, string! executionMode = "wasm-ui") -> DigitalBrain.UI.WebBrowser!
 static DigitalBrain.UI.View.operator !=(DigitalBrain.UI.View? left, DigitalBrain.UI.View? right) -> bool
 static DigitalBrain.UI.View.operator ==(DigitalBrain.UI.View? left, DigitalBrain.UI.View? right) -> bool
+static DigitalBrain.UI.ViewNodeAttribute.DiscoverAll() -> System.Collections.Generic.IReadOnlyDictionary<string!, System.Type!>!
 static DigitalBrain.UI.WebBrowser.operator !=(DigitalBrain.UI.WebBrowser? left, DigitalBrain.UI.WebBrowser? right) -> bool
 static DigitalBrain.UI.WebBrowser.operator ==(DigitalBrain.UI.WebBrowser? left, DigitalBrain.UI.WebBrowser? right) -> bool
 virtual DigitalBrain.UI.Node.EqualityContract.get -> System.Type!

@@ -44,6 +44,8 @@ internal static class RuntimeServicesHosting
         });
         silo.Services.AddJournalPayloads(typeof(OperationStarted).Assembly);
 
+        silo.Services.TryAddSingleton(sp => new AskProgressHub(sp.GetService<TimeProvider>() ?? TimeProvider.System));
+        silo.Services.TryAddSingleton<IAskProgress>(sp => sp.GetRequiredService<AskProgressHub>());
         silo.Services.TryAddSingleton<ApprovalWaiters>();
         silo.Services.AddSingleton(new NeuronBinding(typeof(IOperations), (sp, id) => new NeuronOperations(sp, id.Brain, id.ToString())));
         silo.Services.AddSingleton(new NeuronBinding(typeof(IOperationsQuery), (sp, id) => new NeuronOperationsQuery(sp, id.Brain)));

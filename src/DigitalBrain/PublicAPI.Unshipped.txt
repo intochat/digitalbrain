@@ -254,6 +254,8 @@ DigitalBrain.Ask.Arguments.init -> void
 DigitalBrain.Ask.Ask(string! Slot, string! Operation, System.Text.Json.JsonElement Arguments, string! Key) -> void
 DigitalBrain.Ask.Deconstruct(out string! Slot, out string! Operation, out System.Text.Json.JsonElement Arguments, out string! Key) -> void
 DigitalBrain.Ask.Equals(DigitalBrain.Ask? other) -> bool
+DigitalBrain.Ask.KeepAlive.get -> bool
+DigitalBrain.Ask.KeepAlive.init -> void
 DigitalBrain.Ask.Key.get -> string!
 DigitalBrain.Ask.Key.init -> void
 DigitalBrain.Ask.Operation.get -> string!
@@ -265,6 +267,30 @@ DigitalBrain.Ask.Slot.init -> void
 DigitalBrain.Ask.Timeout.get -> System.TimeSpan?
 DigitalBrain.Ask.Timeout.init -> void
 DigitalBrain.AskLimits
+DigitalBrain.AskProgressed
+DigitalBrain.AskProgressed.AskProgressed(string! Unit, string! RunId, string! Key, string! Status, double? Fraction = null) -> void
+DigitalBrain.AskProgressed.Deconstruct(out string! Unit, out string! RunId, out string! Key, out string! Status, out double? Fraction) -> void
+DigitalBrain.AskProgressed.Equals(DigitalBrain.AskProgressed? other) -> bool
+DigitalBrain.AskProgressed.Fraction.get -> double?
+DigitalBrain.AskProgressed.Fraction.init -> void
+DigitalBrain.AskProgressed.Key.get -> string!
+DigitalBrain.AskProgressed.Key.init -> void
+DigitalBrain.AskProgressed.RunId.get -> string!
+DigitalBrain.AskProgressed.RunId.init -> void
+DigitalBrain.AskProgressed.Status.get -> string!
+DigitalBrain.AskProgressed.Status.init -> void
+DigitalBrain.AskProgressed.Unit.get -> string!
+DigitalBrain.AskProgressed.Unit.init -> void
+DigitalBrain.AskProgressHub
+DigitalBrain.AskProgressHub.AskProgressHub(System.TimeProvider? time = null) -> void
+DigitalBrain.AskProgressHub.ReportProgress(string! runId, string! status, double? fraction = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+DigitalBrain.AskProgressHub.Subscribe(System.Action<DigitalBrain.AskProgressed!>! follower, string? unit = null, string? runId = null) -> System.IDisposable!
+DigitalBrain.AskRun
+DigitalBrain.AskRun.Key.get -> string!
+DigitalBrain.AskRun.RenewLease(System.TimeSpan? extension = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<bool>
+DigitalBrain.AskRun.ReportProgress(string! status, double? fraction = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+DigitalBrain.AskRun.RunId.get -> string!
+DigitalBrain.AskRun.Unit.get -> string!
 DigitalBrain.Asks<TContract>
 DigitalBrain.Asks<TContract>.Asks() -> void
 DigitalBrain.Asks<TContract>.Asks(string! Slot) -> void
@@ -871,6 +897,9 @@ DigitalBrain.Hosting.InProcessHostOptions.Home.set -> void
 DigitalBrain.Hosting.InProcessHostOptions.InProcessHostOptions() -> void
 DigitalBrain.Hosting.InProcessHostOptions.Modules.get -> System.Collections.Generic.IReadOnlyList<System.Type!>!
 DigitalBrain.Hosting.InProcessHostOptions.Modules.set -> void
+DigitalBrain.IAskProgress
+DigitalBrain.IAskProgress.ReportProgress(string! runId, string! status, double? fraction = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+DigitalBrain.IAskProgress.Subscribe(System.Action<DigitalBrain.AskProgressed!>! follower, string? unit = null, string? runId = null) -> System.IDisposable!
 DigitalBrain.Identity.CompoundGrainKey
 DigitalBrain.Identity.CompoundGrainKey.Brain.get -> DigitalBrain.BrainId
 DigitalBrain.Identity.CompoundGrainKey.CompoundGrainKey() -> void
@@ -2683,6 +2712,10 @@ override DigitalBrain.Answered.ToString() -> string!
 override DigitalBrain.Ask.Equals(object? obj) -> bool
 override DigitalBrain.Ask.GetHashCode() -> int
 override DigitalBrain.Ask.ToString() -> string!
+override DigitalBrain.AskProgressed.<Clone>$() -> DigitalBrain.AskProgressed!
+override DigitalBrain.AskProgressed.Equals(object? obj) -> bool
+override DigitalBrain.AskProgressed.GetHashCode() -> int
+override DigitalBrain.AskProgressed.ToString() -> string!
 override DigitalBrain.Asks<TContract>.GetHashCode() -> int
 override DigitalBrain.BrainId.GetHashCode() -> int
 override DigitalBrain.BrainId.ToString() -> string!
@@ -3168,6 +3201,7 @@ override sealed DigitalBrain.Access.Actor.Module.Equals(DigitalBrain.Access.Acto
 override sealed DigitalBrain.Access.Actor.Person.Equals(DigitalBrain.Access.Actor? other) -> bool
 override sealed DigitalBrain.Access.Actor.Scheduler.Equals(DigitalBrain.Access.Actor? other) -> bool
 override sealed DigitalBrain.Answered.Equals(DigitalBrain.Signal? other) -> bool
+override sealed DigitalBrain.AskProgressed.Equals(DigitalBrain.Signal? other) -> bool
 override sealed DigitalBrain.Confirmation.ConfirmationRequested.Equals(DigitalBrain.Signal? other) -> bool
 override sealed DigitalBrain.Confirmation.ConfirmationResolved.Equals(DigitalBrain.Signal? other) -> bool
 override sealed DigitalBrain.Flows.FlowDone.Equals(DigitalBrain.Signal? other) -> bool
@@ -3246,6 +3280,11 @@ static DigitalBrain.Answered.operator !=(DigitalBrain.Answered? left, DigitalBra
 static DigitalBrain.Answered.operator ==(DigitalBrain.Answered? left, DigitalBrain.Answered? right) -> bool
 static DigitalBrain.Ask.operator !=(DigitalBrain.Ask? left, DigitalBrain.Ask? right) -> bool
 static DigitalBrain.Ask.operator ==(DigitalBrain.Ask? left, DigitalBrain.Ask? right) -> bool
+static DigitalBrain.AskProgressed.operator !=(DigitalBrain.AskProgressed? left, DigitalBrain.AskProgressed? right) -> bool
+static DigitalBrain.AskProgressed.operator ==(DigitalBrain.AskProgressed? left, DigitalBrain.AskProgressed? right) -> bool
+static DigitalBrain.AskRun.Current.get -> DigitalBrain.AskRun?
+static DigitalBrain.AskRun.Heartbeat(System.TimeSpan? extension = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<bool>
+static DigitalBrain.AskRun.Report(string! status, double? fraction = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 static DigitalBrain.AsksExtensions.GetJson(this DigitalBrain.IUnit! unit, string! operation, System.Text.Json.JsonElement arguments, string? key = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Text.Json.JsonElement>!
 static DigitalBrain.AsksExtensions.Invoke(this DigitalBrain.IUnit! unit, string! operation, System.Text.Json.JsonElement arguments, string? key = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<DigitalBrain.Answer!>!
 static DigitalBrain.AsksExtensions.ReadText(this DigitalBrain.IUnit! unit, string! operation, System.Text.Json.JsonElement arguments, string? key = null, System.Threading.CancellationToken ct = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
@@ -3662,6 +3701,7 @@ static readonly DigitalBrain.AskLimits.AnswerFlush -> System.TimeSpan
 static readonly DigitalBrain.AskLimits.DefaultTimeout -> System.TimeSpan
 static readonly DigitalBrain.AskLimits.MaxAge -> System.TimeSpan
 static readonly DigitalBrain.AskLimits.MaxTimeout -> System.TimeSpan
+static readonly DigitalBrain.AskLimits.ProgressThrottle -> System.TimeSpan
 static readonly DigitalBrain.Invocation.RuntimeProtocol.Json -> System.Text.Json.JsonSerializerOptions!
 virtual DigitalBrain.Access.Actor.EqualityContract.get -> System.Type!
 virtual DigitalBrain.Access.Actor.Equals(DigitalBrain.Access.Actor? other) -> bool

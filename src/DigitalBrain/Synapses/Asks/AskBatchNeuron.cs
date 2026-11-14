@@ -7,9 +7,10 @@ namespace DigitalBrain.Units;
 
 // Reentrant by design: the state is written once by Put and only read afterwards; each Run is one ask's I/O, and interleaving the Runs is the concurrency.
 [Neuron(AskRules.BatchNeuronType), Reentrant]
-internal sealed class AskBatchNeuron(ISynapseCatalogSource catalog, ISlotResolver slots, IUnitResolver? units = null) : Neuron, IAskBatch
+internal sealed class AskBatchNeuron(ISynapseCatalogSource catalog, ISlotResolver slots, IUnitResolver? units = null, AskProgressHub? progress = null) : Neuron, IAskBatch
 {
     private const int MaxErrorLength = 500;
+    private static readonly TimeSpan MaxHeartbeatPeriod = TimeSpan.FromSeconds(10);
 
     private AskBatchState? _state;
     private bool _putting;
@@ -55,6 +56,8 @@ internal sealed class AskBatchNeuron(ISynapseCatalogSource catalog, ISlotResolve
         var unit = state.Unit;
         var ask = state.Asks[index];
         var batch = BatchKey(unit);
+        var runId = $"{unit}/{batch}/{index}/{attempt}";
+        var startedAt = Context.Time.GetUtcNow();
 
         var requested = ask.Timeout ?? AskLimits.DefaultTimeout;
         var timeout = requested < AskLimits.MaxTimeout ? requested : AskLimits.MaxTimeout;
@@ -63,7 +66,40 @@ internal sealed class AskBatchNeuron(ISynapseCatalogSource catalog, ISlotResolve
             timeout = TimeSpan.Zero;
         }
 
-        using var cts = new CancellationTokenSource(timeout, Context.Time);
+        using var lease = new RenewableAskLease(Context.Time, startedAt, timeout);
+        var asksNeuron = Context.Get<IAsks>(new NeuronId(Id.Brain, AskRules.AsksNeuronType, unit));
+
+        async ValueTask ReportProgressLocal(string progressStatus, double? fraction, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!lease.Renew(timeout))
+            {
+                return;
+            }
+
+            await asksNeuron.ReportProgress(new AskProgressReport(batch, index, attempt, runId, ask.Key, progressStatus, fraction, timeout)).ConfigureAwait(true);
+        }
+
+        async ValueTask<bool> RenewLeaseLocal(TimeSpan? extension, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            var window = ClampWindow(extension ?? timeout, timeout);
+            if (!lease.Renew(window))
+            {
+                return false;
+            }
+
+            await asksNeuron.Renew(new AskLeaseRenewal(batch, index, attempt, window)).ConfigureAwait(true);
+            return true;
+        }
+
+        using var hubRegistration = progress?.RegisterRun(runId, unit, ask.Key, ReportProgressLocal);
+        using var ambientRun = AskRun.Enter(new AskRun(runId, unit, ask.Key, ReportProgressLocal, RenewLeaseLocal));
+        using var keepAliveTimer = ask.KeepAlive && timeout > TimeSpan.Zero
+            ? StartKeepAlive(Context.Time, timeout, () => RenewLeaseLocal(timeout, CancellationToken.None).AsTask())
+            : null;
+
+        var cts = lease.TokenSource;
         AnswerStatus status;
         var result = AskRules.NoResult;
         string? error = null;
@@ -269,6 +305,118 @@ internal sealed class AskBatchNeuron(ISynapseCatalogSource catalog, ISlotResolve
 
     private static string Cap(string message) =>
         message.Length > MaxErrorLength ? message[..MaxErrorLength] : message;
+
+    private static TimeSpan ClampWindow(TimeSpan requested, TimeSpan fallback) =>
+        requested <= TimeSpan.Zero
+            ? fallback
+            : requested < AskLimits.MaxTimeout
+                ? requested
+                : AskLimits.MaxTimeout;
+
+    private static ITimer StartKeepAlive(TimeProvider time, TimeSpan timeout, Func<Task> renew)
+    {
+        var half = TimeSpan.FromTicks(Math.Max(1L, timeout.Ticks / 2));
+        var period = half < MaxHeartbeatPeriod ? half : MaxHeartbeatPeriod;
+        return time.CreateTimer(
+            static state =>
+            {
+                var callback = (Func<Task>)state!;
+                _ = callback();
+            },
+            renew,
+            period,
+            period);
+    }
+
+    private sealed class RenewableAskLease : IDisposable
+    {
+        private readonly TimeProvider _time;
+        private readonly DateTimeOffset _maxExpiry;
+        private readonly Lock _gate = new();
+        private readonly ITimer _timer;
+        private bool _disposed;
+
+        public RenewableAskLease(TimeProvider time, DateTimeOffset startedAt, TimeSpan initialTimeout)
+        {
+            _time = time;
+            _maxExpiry = startedAt + AskLimits.MaxAge;
+            TokenSource = new CancellationTokenSource();
+            _timer = time.CreateTimer(static state => ((RenewableAskLease)state!).Cancel(), this, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+            if (initialTimeout == TimeSpan.Zero)
+            {
+                TokenSource.Cancel();
+            }
+            else
+            {
+                var capped = initialTimeout < AskLimits.MaxAge ? initialTimeout : AskLimits.MaxAge;
+                _timer.Change(capped, Timeout.InfiniteTimeSpan);
+            }
+        }
+
+        public CancellationTokenSource TokenSource { get; }
+
+        public bool Renew(TimeSpan window)
+        {
+            lock (_gate)
+            {
+                if (_disposed || TokenSource.IsCancellationRequested)
+                {
+                    return false;
+                }
+
+                var now = _time.GetUtcNow();
+                if (now >= _maxExpiry)
+                {
+                    return false;
+                }
+
+                var remaining = _maxExpiry - now;
+                var nextDue = window < remaining ? window : remaining;
+                if (nextDue <= TimeSpan.Zero)
+                {
+                    return false;
+                }
+
+                _timer.Change(nextDue, Timeout.InfiniteTimeSpan);
+                return true;
+            }
+        }
+
+        public void Dispose()
+        {
+            lock (_gate)
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _disposed = true;
+            }
+
+            _timer.Dispose();
+            TokenSource.Dispose();
+        }
+
+        private void Cancel()
+        {
+            lock (_gate)
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+            }
+
+            try
+            {
+                TokenSource.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
+    }
 }
 
 internal sealed record AskBatchState(string Unit, IReadOnlyList<Ask> Asks);

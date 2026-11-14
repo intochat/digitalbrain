@@ -134,7 +134,8 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         Access = new AccessGate(TestCallerAmbient.Instance, AccessOptions, AccessCounters);
         Edge = new EdgeAuthority(TestCallerAmbient.Instance);
         Confirmations = new TestConfirmations(Clock, this);
-        Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance, new TestInstallHooks(this), new TestSlotResolver(this), Source, () => [.. _actions.Values], () => Loader, () => Resolver, () => LiveBindings, () => _compiler.Value, () => Synapses, () => new DigitalBrain.Confirmation.ConfirmationPolicies { DefaultPolicy = Confirmations.Policy });
+        AskProgress = new AskProgressHub(Clock);
+        Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance, new TestInstallHooks(this), new TestSlotResolver(this), Source, () => [.. _actions.Values], () => Loader, () => Resolver, () => LiveBindings, () => _compiler.Value, () => Synapses, () => new DigitalBrain.Confirmation.ConfirmationPolicies { DefaultPolicy = Confirmations.Policy }, AskProgress);
         Register<InstallsNeuron>();
         Register<SourcesNeuron>();
         Register<PoliciesNeuron>();
@@ -239,6 +240,9 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
 
     /// <summary>The confirmation gate every neuron's <c>Context.Confirm</c> asks (07 D-03); set its policy and answer as a person here.</summary>
     public TestConfirmations Confirmations { get; }
+
+    /// <summary>The in-memory ephemeral progress hub for in-flight asks on this TestOS.</summary>
+    public IAskProgress AskProgress { get; }
 
     /// <summary>The options this TestOS runs with.</summary>
     public TestOSOptions Options { get; }

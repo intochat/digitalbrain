@@ -258,5 +258,29 @@ internal sealed class Journal<TSignal>
         _held.Clear();
         _held.AddRange(held);
         _trimmed.Clear();
+        _floors.Clear();
+        foreach (var (pub, range) in _marks)
+        {
+            if (range.Floor <= 0)
+            {
+                continue;
+            }
+
+            long? firstHeldPosition = null;
+            foreach (var entry in _held)
+            {
+                if (string.Equals(entry.Publisher, pub, StringComparison.Ordinal))
+                {
+                    firstHeldPosition = entry.FirstPosition;
+                    break;
+                }
+            }
+
+            var floorPos = firstHeldPosition is { } first ? first - 1 : range.LastPosition;
+            if (floorPos > 0)
+            {
+                _floors[pub] = floorPos;
+            }
+        }
     }
 }

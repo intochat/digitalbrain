@@ -5,9 +5,11 @@ using DigitalBrain.Neurons;
 namespace DigitalBrain.Units;
 
 [Neuron(AskRules.AsksNeuronType)]
-internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? units = null) : Neuron, IAsks
+internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? units = null, AskProgressHub? progress = null) : Neuron, IAsks
 {
     private readonly IUnitResolver? _units = units;
+    private readonly AskProgressHub? _progress = progress;
+    private readonly Dictionary<(string Batch, int Index, int Attempt), DateTimeOffset> _leases = [];
     internal const string DueTimer = "asks-due";
     internal const string NudgeReminder = "asks-nudge";
     internal static readonly TimeSpan Nudge = TimeSpan.FromMinutes(1);
@@ -197,6 +199,7 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
     public async Task Detach(CancellationToken ct)
     {
         _ = ct;
+        _leases.Clear();
         var batches = _state.Batches;
         for (var i = 0; i < batches.Count; i++)
         {
@@ -207,6 +210,53 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
         Context.Timers.Stop(DueTimer);
         await Context.Reminders.Stop(NudgeReminder).ConfigureAwait(true);
         await Save(new AsksState(), []).ConfigureAwait(true);
+    }
+
+    public Task Renew(AskLeaseRenewal renewal)
+    {
+        if (renewal is null || string.IsNullOrEmpty(renewal.Batch))
+        {
+            return Task.CompletedTask;
+        }
+
+        if (Context.Caller is { } caller && caller.Via != AskRules.BatchOf(Id, renewal.Batch))
+        {
+            throw new UnauthorizedAccessException("Only the batch neuron of this ask may renew its lease.");
+        }
+
+        if (ExtendLease(renewal.Batch, renewal.Index, renewal.Attempt, renewal.Extension))
+        {
+            ScheduleDue(Context.Time.GetUtcNow());
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public async Task ReportProgress(AskProgressReport report)
+    {
+        if (report is null || string.IsNullOrEmpty(report.Batch))
+        {
+            return;
+        }
+
+        if (Context.Caller is { } caller && caller.Via != AskRules.BatchOf(Id, report.Batch))
+        {
+            throw new UnauthorizedAccessException("Only the batch neuron of this ask may report its progress.");
+        }
+
+        if (!ExtendLease(report.Batch, report.Index, report.Attempt, report.LeaseExtension))
+        {
+            return;
+        }
+
+        ScheduleDue(Context.Time.GetUtcNow());
+        var progressed = new AskProgressed(Id.Key, report.RunId, report.Key, report.Status, report.Fraction);
+        if (_progress is not null && !_progress.Dispatch(progressed))
+        {
+            return;
+        }
+
+        await PublishEphemeral(progressed).ConfigureAwait(true);
     }
 
     public async Task Settled(AskSettlement settlement)
@@ -234,6 +284,7 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
             return;
         }
 
+        _leases.Remove((settlement.Batch, settlement.Index, settlement.Attempt));
         var now = Context.Time.GetUtcNow();
         var nextFlying = RemoveAt(batch.Flying, flyingIndex);
         var nextBatches = new List<OpenBatch>(_state.Batches.Count);
@@ -307,6 +358,7 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
             if (batch.AskedAt + AskLimits.MaxAge <= now)
             {
                 changed = true;
+                RemoveBatchLeases(batch.Id);
                 var asks = await Get<IAskBatch>(AskRules.BatchOf(Id, batch.Id)).All().ConfigureAwait(true);
                 var unsettled = UnsettledIndexes(batch);
                 for (var j = 0; j < unsettled.Count; j++)
@@ -329,7 +381,7 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
                 continue;
             }
 
-            if (!HasDueFlying(batch.Flying, now))
+            if (!HasDueFlying(batch.Id, batch.Flying, now))
             {
                 nextBatches.Add(batch);
                 continue;
@@ -344,12 +396,13 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
             for (var j = 0; j < batch.Flying.Count; j++)
             {
                 var flying = batch.Flying[j];
-                if (flying.Due > now)
+                if (EffectiveDue(batch.Id, flying) > now)
                 {
                     nextFlying.Add(flying);
                     continue;
                 }
 
+                _leases.Remove((batch.Id, flying.Index, flying.Attempt));
                 if ((uint)flying.Index < (uint)storedAsks.Count)
                 {
                     var ask = storedAsks[flying.Index];
@@ -513,7 +566,7 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
             var batch = _state.Batches[i];
             for (var j = 0; j < batch.Flying.Count; j++)
             {
-                earliest = Earlier(earliest, batch.Flying[j].Due);
+                earliest = Earlier(earliest, EffectiveDue(batch.Id, batch.Flying[j]));
             }
 
             if (flyingCount < AskLimits.Concurrency)
@@ -620,11 +673,84 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
         return next;
     }
 
-    private static bool HasDueFlying(IReadOnlyList<FlyingAsk> flying, DateTimeOffset now)
+    private bool ExtendLease(string batchId, int index, int attempt, TimeSpan? extension)
+    {
+        var batchIndex = FindBatchIndex(_state.Batches, batchId);
+        if (batchIndex < 0)
+        {
+            return false;
+        }
+
+        var batch = _state.Batches[batchIndex];
+        var flyingIndex = FindFlyingIndex(batch.Flying, index, attempt);
+        if (flyingIndex < 0)
+        {
+            return false;
+        }
+
+        var now = Context.Time.GetUtcNow();
+        var maxExpiry = batch.AskedAt + AskLimits.MaxAge;
+        if (now >= maxExpiry)
+        {
+            return false;
+        }
+
+        var requested = extension ?? batch.Timeout;
+        var clamped = requested <= TimeSpan.Zero
+            ? batch.Timeout
+            : requested < AskLimits.MaxTimeout
+                ? requested
+                : AskLimits.MaxTimeout;
+        var candidate = now + clamped + Grace;
+        if (candidate > maxExpiry)
+        {
+            candidate = maxExpiry;
+        }
+
+        var current = EffectiveDue(batchId, batch.Flying[flyingIndex]);
+        if (candidate > current)
+        {
+            _leases[(batchId, index, attempt)] = candidate;
+        }
+
+        return true;
+    }
+
+    private DateTimeOffset EffectiveDue(string batchId, FlyingAsk flying) =>
+        _leases.TryGetValue((batchId, flying.Index, flying.Attempt), out var extended) && extended > flying.Due
+            ? extended
+            : flying.Due;
+
+    private void RemoveBatchLeases(string batchId)
+    {
+        if (_leases.Count == 0)
+        {
+            return;
+        }
+
+        List<(string Batch, int Index, int Attempt)>? keys = null;
+        foreach (var key in _leases.Keys)
+        {
+            if (string.Equals(key.Batch, batchId, StringComparison.Ordinal))
+            {
+                (keys ??= []).Add(key);
+            }
+        }
+
+        if (keys is not null)
+        {
+            for (var i = 0; i < keys.Count; i++)
+            {
+                _leases.Remove(keys[i]);
+            }
+        }
+    }
+
+    private bool HasDueFlying(string batchId, IReadOnlyList<FlyingAsk> flying, DateTimeOffset now)
     {
         for (var i = 0; i < flying.Count; i++)
         {
-            if (flying[i].Due <= now)
+            if (EffectiveDue(batchId, flying[i]) <= now)
             {
                 return true;
             }

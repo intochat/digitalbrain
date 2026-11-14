@@ -8,11 +8,25 @@ namespace DigitalBrain.Tests.Unit.Synapses;
 internal sealed class FakeAsks : IAsks
 {
     public List<AskSettlement> Settlements { get; } = [];
+    public List<AskProgressReport> ProgressReports { get; } = [];
+    public List<AskLeaseRenewal> Renewals { get; } = [];
     public int Woken { get; private set; }
 
     public Task Attach(CancellationToken ct) => Task.CompletedTask;
 
     public Task Detach(CancellationToken ct) => Task.CompletedTask;
+
+    public Task Renew(AskLeaseRenewal renewal)
+    {
+        Renewals.Add(renewal);
+        return Task.CompletedTask;
+    }
+
+    public Task ReportProgress(AskProgressReport report)
+    {
+        ProgressReports.Add(report);
+        return Task.CompletedTask;
+    }
 
     public Task Settled(AskSettlement settlement)
     {

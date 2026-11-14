@@ -32,10 +32,17 @@ public sealed partial class WorkflowFacts
     }
 
     [Fact]
-    public void CiWorkflowDoesNotPushToGitHubPackages()
+    public void CiWorkflowGatesGitHubPackagesPublishToDefaultBranchPushAfterCi()
     {
         var content = File.ReadAllText(CiPath);
-        Assert.DoesNotContain("nuget.pkg.github.com", content, StringComparison.OrdinalIgnoreCase);
+        if (content.Contains("nuget.pkg.github.com", StringComparison.OrdinalIgnoreCase))
+        {
+            Assert.Contains("publish-github-packages:", content, StringComparison.Ordinal);
+            Assert.Contains("needs: [ci]", content, StringComparison.Ordinal);
+            Assert.Contains("github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')", content, StringComparison.Ordinal);
+        }
+
+        Assert.DoesNotContain("api.nuget.org", content, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

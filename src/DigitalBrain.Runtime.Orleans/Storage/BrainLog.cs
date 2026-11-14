@@ -39,6 +39,9 @@ internal sealed class BrainLog : IAsyncDisposable, IJournalView
     private string generation = "initial";
     private long uncompactedBytes;
     private int uncompactedEntries;
+    private long checkpointCount;
+    private DateTimeOffset lastCheckpointAt;
+    private Task? autoCheckpointTask;
     // Read without the gate; written only under it.
     private volatile Exception? failure;
     private volatile bool disposed;
@@ -58,6 +61,7 @@ internal sealed class BrainLog : IAsyncDisposable, IJournalView
         this.payloads = payloads;
         this.time = time;
         this.retention = retention;
+        this.lastCheckpointAt = time.GetUtcNow();
         try
         {
             Recover();
@@ -67,6 +71,38 @@ internal sealed class BrainLog : IAsyncDisposable, IJournalView
     }
 
     public string BrainId => brainId;
+
+    internal string Generation
+    {
+        get
+        {
+            lock (stateLock) { return generation; }
+        }
+    }
+
+    internal long CheckpointCount
+    {
+        get
+        {
+            lock (stateLock) { return checkpointCount; }
+        }
+    }
+
+    internal int UncompactedEntries
+    {
+        get
+        {
+            lock (stateLock) { return uncompactedEntries; }
+        }
+    }
+
+    internal long UncompactedBytes
+    {
+        get
+        {
+            lock (stateLock) { return uncompactedBytes; }
+        }
+    }
 
     public JournalPayloads Payloads => payloads;
 
@@ -542,6 +578,8 @@ internal sealed class BrainLog : IAsyncDisposable, IJournalView
                     generation = next;
                     uncompactedBytes = 0;
                     uncompactedEntries = 0;
+                    checkpointCount++;
+                    lastCheckpointAt = time.GetUtcNow();
                 }
                 // Old complete generation remains until the manifest points to the new one.
                 foreach (var suffix in new[] { ".snapshot", ".log" })
@@ -549,6 +587,7 @@ internal sealed class BrainLog : IAsyncDisposable, IJournalView
                     // Unreachable generations may be removed on a later maintenance run.
                     TryDelete(Path.Combine(directory, previous + suffix));
                 }
+                SweepStaleFiles(next);
             }
             finally { gate.Release(); }
         }
@@ -644,6 +683,35 @@ internal sealed class BrainLog : IAsyncDisposable, IJournalView
         }
         if (valid != stream.Length) { stream.SetLength(valid); FlushToDisk(stream); }
         uncompactedBytes = valid;
+        SweepStaleFiles(generation);
+    }
+
+    private void SweepStaleFiles(string activeGeneration)
+    {
+        if (!Directory.Exists(directory)) { return; }
+        string[] paths;
+        try { paths = Directory.GetFiles(directory); }
+        catch (IOException) { return; }
+
+        foreach (var path in paths)
+        {
+            var fileName = Path.GetFileName(path);
+            if (fileName.StartsWith("current.", StringComparison.Ordinal) && fileName.EndsWith(".tmp", StringComparison.Ordinal))
+            {
+                TryDelete(path);
+                continue;
+            }
+
+            var extension = Path.GetExtension(fileName);
+            if (extension is ".snapshot" or ".log")
+            {
+                var stem = Path.GetFileNameWithoutExtension(fileName);
+                if (!string.Equals(stem, activeGeneration, StringComparison.Ordinal))
+                {
+                    TryDelete(path);
+                }
+            }
+        }
     }
 
     // Held signals of each publisher run contiguously from Floor + 1 to Last; positions rise strictly.
@@ -802,44 +870,127 @@ internal sealed class BrainLog : IAsyncDisposable, IJournalView
         if (failure is not null) { throw new IOException("The brain store must be reopened after a failed append or checkpoint.", failure); }
     }
 
+    internal async Task WaitForAutoCheckpointAsync(CancellationToken ct = default)
+    {
+        while (true)
+        {
+            Task? pending;
+            lock (stateLock)
+            {
+                pending = autoCheckpointTask;
+            }
+
+            if (pending is null)
+            {
+                return;
+            }
+
+            await pending.WaitAsync(ct).ConfigureAwait(false);
+            if (ReferenceEquals(pending, Volatile.Read(ref autoCheckpointTask)))
+            {
+                return;
+            }
+        }
+    }
+
+    private bool NeedsAutoCheckpoint()
+    {
+        if (options.CheckpointBytesThreshold > 0 && uncompactedBytes >= options.CheckpointBytesThreshold)
+        {
+            return true;
+        }
+
+        if (options.CheckpointEntriesThreshold > 0 && uncompactedEntries >= options.CheckpointEntriesThreshold)
+        {
+            return true;
+        }
+
+        if (options.CheckpointInterval is { } interval
+            && interval > TimeSpan.Zero
+            && uncompactedEntries > 0
+            && time.GetUtcNow() - lastCheckpointAt >= interval)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     private void TryTriggerAutoCheckpoint()
     {
         if (disposed || failure is not null || !ownership.IsHeld) { return; }
-        if (uncompactedBytes < options.CheckpointBytesThreshold && uncompactedEntries < options.CheckpointEntriesThreshold) { return; }
-        _ = Task.Run(async () =>
+        lock (stateLock)
         {
-            try
+            if (disposed || failure is not null || !ownership.IsHeld) { return; }
+            if (autoCheckpointTask is { IsCompleted: false }) { return; }
+            if (!NeedsAutoCheckpoint()) { return; }
+            autoCheckpointTask = Task.Run(RunAutoCheckpointAsync);
+        }
+    }
+
+    private async Task RunAutoCheckpointAsync()
+    {
+        try
+        {
+            while (!disposed && failure is null && ownership.IsHeld)
             {
-                if (disposed || failure is not null || !ownership.IsHeld) { return; }
+                bool shouldRun;
+                lock (stateLock)
+                {
+                    shouldRun = NeedsAutoCheckpoint();
+                }
+
+                if (!shouldRun)
+                {
+                    break;
+                }
+
                 await Checkpoint(CancellationToken.None).ConfigureAwait(false);
             }
-            catch (Exception ex)
+        }
+        catch (Exception ex)
+        {
+            // In auto-checkpoint background runs, failures to checkpoint do not corrupt the journal;
+            // if ownership was lost or I/O failed, record failure if critical.
+            if (ex is BrainNotOwnedException or IOException)
             {
-                // In auto-checkpoint background runs, failures to checkpoint do not corrupt the journal;
-                // if ownership was lost or I/O failed, record failure if critical.
-                if (ex is BrainNotOwnedException or IOException)
-                {
-                    failure = ex;
-                }
+                failure = ex;
             }
-        });
+        }
+        finally
+        {
+            lock (stateLock)
+            {
+                autoCheckpointTask = null;
+            }
+        }
     }
 
     public async ValueTask DisposeAsync()
     {
-        await checkpointGate.WaitAsync();
+        Task? pending;
+        await checkpointGate.WaitAsync().ConfigureAwait(false);
         try
         {
-            await gate.WaitAsync();
+            await gate.WaitAsync().ConfigureAwait(false);
             try
             {
                 if (disposed) { return; }
                 disposed = true;
+                lock (stateLock)
+                {
+                    pending = autoCheckpointTask;
+                }
             }
             finally { gate.Release(); }
         }
         finally { checkpointGate.Release(); }
-        await ownership.DisposeAsync();
+        if (pending is not null)
+        {
+            try { await pending.ConfigureAwait(false); }
+            catch { }
+        }
+        await ownership.DisposeAsync().ConfigureAwait(false);
     }
 
     // A failed open cannot await in a constructor: the release starts at once and its outcome is observed, never blocked on.

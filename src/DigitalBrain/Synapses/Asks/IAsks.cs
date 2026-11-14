@@ -16,10 +16,36 @@ internal interface IAsks
     [OneWayCall]
     Task Settled(AskSettlement settlement);
 
+    /// <summary>Renews the in-memory execution lease of an in-flight ask attempt without writing to durable storage.</summary>
+    [OneWayCall]
+    Task Renew(AskLeaseRenewal renewal);
+
+    /// <summary>Reports ephemeral progress for an in-flight ask attempt without writing to durable storage.</summary>
+    [OneWayCall]
+    Task ReportProgress(AskProgressReport report);
+
     /// <summary>Does nothing by itself: the call activates the neuron, and an activation catches up on its unit's <c>unit.asked</c> signals from its cursor.</summary>
     [OneWayCall]
     Task Wake();
 }
+
+/// <summary>Ephemeral lease keepalive packet sent by <see cref="AskBatchNeuron"/> to the unit's asks neuron.</summary>
+internal sealed record AskLeaseRenewal(
+    string Batch,
+    int Index,
+    int Attempt,
+    TimeSpan? Extension = null);
+
+/// <summary>Ephemeral progress packet reported by <see cref="AskBatchNeuron"/> to the unit's asks neuron.</summary>
+internal sealed record AskProgressReport(
+    string Batch,
+    int Index,
+    int Attempt,
+    string RunId,
+    string Key,
+    string Status,
+    double? Fraction = null,
+    TimeSpan? LeaseExtension = null);
 
 /// <summary>The outcome of one attempt reported by <see cref="AskBatchNeuron"/> to the unit's asks neuron.</summary>
 /// <param name="Batch">The batch id within the unit.</param>
