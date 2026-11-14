@@ -12,6 +12,13 @@ public interface IGsPayments
     Task Charge(decimal amount);
 }
 
+[Capability("fx-quote", 1)]
+[System.ComponentModel.Description("live FX rate")]
+public interface IFxQuote
+{
+    Task<decimal> Rate(string pair, CancellationToken ct = default);
+}
+
 // Publishes the live generated Charging signal: its type is read from the catalog on each call, as the source declares it.
 [Neuron("gs.payments")]
 public sealed class GsPayments(ISynapseCatalogSource? source = null, UnitResolver? resolver = null) : Neuron<GsPayments.Count>, IGsPayments
@@ -42,10 +49,24 @@ public sealed class GeneratedSourceFacts
         public Task<T> Scalar<T>(string sql, object? args, CancellationToken ct) => Task.FromResult((T)(object)1);
     }
 
+    private sealed class FakeFx : IFxQuote
+    {
+        public int Calls { get; private set; }
+
+        public Task<decimal> Rate(string pair, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.FromResult(pair == "EURUSD" ? 42.5m : 1m);
+        }
+    }
+
     private static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> None = new Dictionary<string, IReadOnlyDictionary<string, string>>();
 
     private static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> DbBindings =
         new Dictionary<string, IReadOnlyDictionary<string, string>> { [WeeklyCapSource.Week] = new Dictionary<string, string> { ["Db"] = "analytics" } };
+
+    private static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> FxBindings =
+        new Dictionary<string, IReadOnlyDictionary<string, string>> { [WeeklyCapSource.Week] = new Dictionary<string, string> { ["Fx"] = "ecb" } };
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -162,6 +183,26 @@ public sealed class GeneratedSourceFacts
         await Assert.ThrowsAsync<InvalidOperationException>(() => Pay(os).Charge(350m));
         Collect();
         Assert.Empty(os.Loader.Lingering());
+        Assert.Empty(os.Failures);
+    }
+
+    [Fact]
+    public async Task RuntimeCompiledAsksExecuteSlotAndDeliverAnswered()
+    {
+        var fx = new FakeFx();
+        await using var os = Start().With<IFxQuote>("ecb", fx);
+
+        var deployed = await os.Synapses.Deploy(Brain, Of(WeeklyCapSource.WithAsks), FxBindings, Ct);
+        Assert.True(deployed.Status == DeployStatus.Deployed, string.Join(" | ", deployed.Diagnostics.Select(d => $"{d.Id}: {d.Message}")));
+        Assert.Equal(InstallStatus.Pending, deployed.Installs[WeeklyCapSource.Week].Status);
+        await os.Confirmations.Approve(deployed.Installs[WeeklyCapSource.Week].Reason!);
+        await os.Idle();
+
+        await Pay(os).Charge(1m);
+        await os.Idle();
+
+        Assert.Equal(1, fx.Calls);
+        Assert.Equal(42.5m, await Spent(os));
         Assert.Empty(os.Failures);
     }
 }

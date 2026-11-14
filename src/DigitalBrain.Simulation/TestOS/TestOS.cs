@@ -127,14 +127,14 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
             Loader,
             id => Get<ISources>(id),
             id => Get<IUnitDeployment>(id));
-        Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance, new TestInstallHooks(this), new TestSlotResolver(this), Source, () => [.. _actions.Values], () => Loader, () => Resolver, () => LiveBindings, () => _compiler.Value, () => Synapses);
         Delivery = new SynapseRegistry(this);
-        Confirmations = new TestConfirmations(Clock);
         Listeners = new TestClusterListeners(this);
         AccessOptions = new AccessOptions { UnstampedEdgeIsKernel = true, AuditContractInternal = true };
         AccessCounters = new AccessCounters();
         Access = new AccessGate(TestCallerAmbient.Instance, AccessOptions, AccessCounters);
         Edge = new EdgeAuthority(TestCallerAmbient.Instance);
+        Confirmations = new TestConfirmations(Clock, this);
+        Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance, new TestInstallHooks(this), new TestSlotResolver(this), Source, () => [.. _actions.Values], () => Loader, () => Resolver, () => LiveBindings, () => _compiler.Value, () => Synapses, () => new DigitalBrain.Confirmation.ConfirmationPolicies { DefaultPolicy = Confirmations.Policy });
         Register<InstallsNeuron>();
         Register<SourcesNeuron>();
         Register<PoliciesNeuron>();
@@ -328,11 +328,6 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
     /// <exception cref="InvalidOperationException">No class is registered for the id's type.</exception>
     public T Get<T>(NeuronId id) where T : class
     {
-        if (id.Type == DigitalBrain.Confirmation.ConfirmationsNeuron.NeuronType)
-        {
-            if (typeof(T) == typeof(DigitalBrain.Confirmation.IConfirmationRequests)) { return (T)(object)new BrainConfirmationRequests(Confirmations, this, id.Brain); }
-            if (typeof(T) == typeof(DigitalBrain.Confirmation.IConfirmationInbox)) { return (T)(object)Confirmations; }
-        }
         _ = Host(id);
         return NeuronProxy.Create<T>(id, new CallerSink(this, null));
     }

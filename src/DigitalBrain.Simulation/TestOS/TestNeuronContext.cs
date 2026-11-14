@@ -33,7 +33,7 @@ internal sealed class TestNeuronContext : INeuronContext, INeuronSeat
 
         var runner = TestOSOperations.Runner(host.OS.Services, host.Id.Brain);
         var confirmations = host.OS.Services.GetService(typeof(IConfirmations)) as IConfirmations
-            ?? host.OS.Confirmations.For(ConfirmationPrincipal.App(host.Id.ToString()), Publish);
+            ?? host.OS.Confirmations.ForNeuron(host.Id);
         var operations = new FakeOperations(runner, Publish, confirmations);
 
         NeuronBinding[] bindings =
@@ -84,11 +84,6 @@ internal sealed class TestNeuronContext : INeuronContext, INeuronSeat
     public T Get<T>(NeuronId id) where T : class
     {
         if (id.Brain != Id.Brain) { throw new ArgumentException($"Neuron {id} belongs to another brain than {Id}.", nameof(id)); }
-        if (id == DigitalBrain.Confirmation.IConfirmationRequests.Of(Id.Brain))
-        {
-            if (typeof(T) == typeof(DigitalBrain.Confirmation.IConfirmationRequests)) { return (T)(object)new BrainConfirmationRequests(_host.OS.Confirmations, _host.OS, Id.Brain); }
-            if (typeof(T) == typeof(DigitalBrain.Confirmation.IConfirmationInbox)) { return (T)(object)_host.OS.Confirmations; }
-        }
         return _host.OS.Proxy<T>(Id, id);
     }
 

@@ -159,7 +159,8 @@ internal sealed class TestOSServices(
     Func<UnitResolver>? resolver = null,
     Func<LiveBindings>? live = null,
     Func<DigitalBrain.Runtime.Synapses.SynapseCompiler>? compiler = null,
-    Func<ISynapseHost>? host = null)
+    Func<ISynapseHost>? host = null,
+    Func<DigitalBrain.Confirmation.ConfirmationPolicies>? confirmationPolicies = null)
     : IServiceProvider, ICapabilityBroker
 {
     public object? GetService(Type serviceType)
@@ -177,6 +178,7 @@ internal sealed class TestOSServices(
         // The TestOS's own compiler and synapse host, as the silo serves its singletons.
         if (serviceType == typeof(DigitalBrain.Runtime.Synapses.SynapseCompiler)) { return inner.GetService(serviceType) ?? compiler?.Invoke(); }
         if (serviceType == typeof(ISynapseHost) || serviceType == typeof(UnitDeployer)) { return inner.GetService(serviceType) ?? host?.Invoke(); }
+        if (serviceType == typeof(DigitalBrain.Confirmation.ConfirmationPolicies)) { return inner.GetService(serviceType) ?? confirmationPolicies?.Invoke(); }
         if (CapabilityFakes.IsContract(serviceType)) { return fakes.Resolve(serviceType); }
         return CapabilityFakes.ListedContract(serviceType) is { } contract ? fakes.All(contract) : inner.GetService(serviceType);
     }

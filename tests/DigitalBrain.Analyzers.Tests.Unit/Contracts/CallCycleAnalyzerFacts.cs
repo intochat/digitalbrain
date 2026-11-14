@@ -49,6 +49,30 @@ public sealed class CallCycleAnalyzerFacts
         """);
 
     [Fact]
+    public Task Contracts_namespace_oneway_notification_loop_reports_nothing() => Verify<CallCycleAnalyzer>.Diagnostics("""
+        using System.Threading.Tasks;
+        using DigitalBrain;
+        using DigitalBrain.Contracts;
+
+        public interface IA { Task Ping(IB b); }
+        public interface IB
+        {
+            [DigitalBrain.Contracts.OneWayCall]
+            Task Pong(IA a);
+        }
+
+        public sealed class NeuronA : Neuron, IA
+        {
+            public async Task Ping(IB b) => await b.Pong(this);
+        }
+
+        public sealed class NeuronB : Neuron, IB
+        {
+            public async Task Pong(IA a) => await a.Ping(this);
+        }
+        """);
+
+    [Fact]
     public Task Linear_chain_without_cycle_reports_nothing() => Verify<CallCycleAnalyzer>.Diagnostics("""
         using System.Threading.Tasks;
         using DigitalBrain;

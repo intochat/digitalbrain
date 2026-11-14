@@ -210,7 +210,7 @@ public sealed class ConfirmationFacts
 
         Assert.Equal("Approved:None:False", await asked);
         Assert.Equal(ConfirmationPrincipal.Person("ada"), Assert.Single(os.Confirmations.Audit).Approver);
-        var journal = await os.Journal(new BrainId("ada")).Read(new NeuronId(new BrainId("ada"), "test.confirmer", "c"), 0, SignalPage.MaxLimit, Ct);
+        var journal = await os.Journal(new BrainId("ada")).Read(IConfirmationRequests.Of(new BrainId("ada")), 0, SignalPage.MaxLimit, Ct);
         Assert.Contains(journal.Signals, item => item.Signal is ConfirmationRequested);
         Assert.Contains(journal.Signals, item => item.Signal is ConfirmationResolved);
     }

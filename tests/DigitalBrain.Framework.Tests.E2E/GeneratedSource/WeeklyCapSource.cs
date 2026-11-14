@@ -52,4 +52,39 @@ internal static class WeeklyCapSource
     internal static readonly string WithSlot = Budget
         .Replace("namespace Me.GeneratedBudget;", "using DigitalBrain.Framework.Tests.E2E.MorningStats;\n\nnamespace Me.GeneratedBudget;", StringComparison.Ordinal)
         .Replace("WeeklyCap(Charging s, WeekSpend t)", "WeeklyCap(Charging s, WeekSpend t, [Slot] ISqlRead Db)", StringComparison.Ordinal);
+
+    // Runtime-compiled deferred Asks<T>: reaction emits an Ask on IFxQuote and settles Answered into state.
+    internal const string WithAsks = """
+        using System.Text.Json;
+        using DigitalBrain.Framework.Tests.E2E.GeneratedSource;
+        using DigitalBrain.Modules;
+        using DigitalBrain.UI;
+
+        namespace Me.GeneratedBudget;
+
+        [Signal("gs.charging")]
+        public sealed record Charging(decimal Amount) : Signal;
+
+        [State("gs.week")]
+        public sealed record WeekSpend(DateOnly Week = default, decimal Spent = 0)
+        {
+            public WeekSpend() : this(default, 0) { }
+        }
+
+        public static class Budget
+        {
+            [Synapse(typeof(Charging), "gs.week")]
+            public static Reaction<WeekSpend> AskRate(Charging s, WeekSpend t, [Slot] Asks<IFxQuote> Fx) =>
+                Reaction<WeekSpend>.Of(t).Ask(
+                    Fx.Call("Rate", $"fx-{s.Amount}", JsonElement.Parse("{\"pair\":\"EURUSD\"}")) with { Repeatable = true });
+
+            [Synapse(typeof(Answered), "gs.week")]
+            public static WeekSpend OnRate(Answered all, Answer one, WeekSpend t) =>
+                one.Ok ? t with { Spent = t.Spent + one.Result.GetDecimal() } : t;
+
+            [Synapse("gs.week")]
+            public static View Show(WeekSpend t) =>
+                new("This week", new Column([new MetricTileNode("spent", "gs.week", "Spent", $"{t.Spent}", Delta: "+2.5%", DeltaTone: "success", Sparkline: [1.0, 2.0, (double)t.Spent])]));
+        }
+        """;
 }

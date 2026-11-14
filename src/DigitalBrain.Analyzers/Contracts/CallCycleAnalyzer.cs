@@ -14,7 +14,8 @@ namespace DigitalBrain.Analyzers.Contracts;
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class CallCycleAnalyzer : DiagnosticAnalyzer
 {
-    private const string OneWayCallAttribute = "DigitalBrain.OneWayCallAttribute";
+    private const string ContractsOneWayCallAttribute = "DigitalBrain.Contracts.OneWayCallAttribute";
+    private const string RootOneWayCallAttribute = "DigitalBrain.OneWayCallAttribute";
 
     /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rules.CallCycle);
@@ -87,7 +88,7 @@ public sealed class CallCycleAnalyzer : DiagnosticAnalyzer
                                 continue;
                             }
 
-                            if (Rules.Has(targetMethod, OneWayCallAttribute))
+                            if (Rules.Has(targetMethod, ContractsOneWayCallAttribute) || Rules.Has(targetMethod, RootOneWayCallAttribute))
                             {
                                 continue;
                             }

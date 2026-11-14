@@ -21,6 +21,7 @@ internal sealed class AskBatchNeuron(ISynapseCatalogSource catalog, ISlotResolve
     {
         ArgumentException.ThrowIfNullOrEmpty(unit);
         ArgumentNullException.ThrowIfNull(asks);
+        RequireAsksCaller(unit);
         if (_state is not null || _putting)
         {
             return;
@@ -45,6 +46,7 @@ internal sealed class AskBatchNeuron(ISynapseCatalogSource catalog, ISlotResolve
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(slots);
+        RequireAsksCaller();
         if (_state is not { } state || (uint)index >= (uint)state.Asks.Count)
         {
             return;
@@ -205,6 +207,7 @@ internal sealed class AskBatchNeuron(ISynapseCatalogSource catalog, ISlotResolve
 
     public async Task Drop()
     {
+        RequireAsksCaller();
         if (_state is null)
         {
             return;
@@ -212,6 +215,22 @@ internal sealed class AskBatchNeuron(ISynapseCatalogSource catalog, ISlotResolve
 
         _state = null;
         await Seat.Clear().ConfigureAwait(true);
+    }
+
+    private void RequireAsksCaller(string? unit = null)
+    {
+        var tilde = Id.Key.IndexOf('~', StringComparison.Ordinal);
+        var owner = tilde >= 0 ? Id.Key[..tilde] : Id.Key;
+        if (unit is not null && tilde >= 0 && !string.Equals(unit, owner, StringComparison.Ordinal))
+        {
+            throw new UnauthorizedAccessException("Only the asks neuron of the unit stores and runs its asks.");
+        }
+
+        if (Context.Caller is { } caller
+            && caller.Via != AskRules.AsksOf(new NeuronId(Id.Brain, owner, "default")))
+        {
+            throw new UnauthorizedAccessException("Only the asks neuron of the unit stores and runs its asks.");
+        }
     }
 
     private string BatchKey(string unit)

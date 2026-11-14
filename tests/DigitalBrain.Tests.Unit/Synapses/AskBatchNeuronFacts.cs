@@ -167,4 +167,32 @@ public sealed class AskBatchNeuronFacts
         Assert.Single(Asks.Settlements);
         Assert.Equal(["reloaded"], (await reloaded.All()).Select(a => a.Key));
     }
+
+    [Fact]
+    public async Task PutRunAndDropEnforceOwningAsksCallerViaWhenStamped()
+    {
+        var batch = Attach();
+        Context.Caller = new DigitalBrain.Access.Caller(
+            new DigitalBrain.Access.Actor.Kernel(),
+            Id.Brain,
+            via: new NeuronId(Id.Brain, "rogue", "default"),
+            inside: true);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => batch.Put("asker", [Ask("k1")]));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => batch.Run(0, 1));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => batch.Drop());
+
+        Context.Caller = new DigitalBrain.Access.Caller(
+            new DigitalBrain.Access.Actor.Kernel(),
+            Id.Brain,
+            via: AsksId,
+            inside: true);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => batch.Put("other", [Ask("k1")]));
+        await batch.Put("asker", [Ask("k1")]);
+        await batch.Run(0, 1);
+        Assert.Single(Asks.Settlements);
+        await batch.Drop();
+        Assert.Empty(await batch.All());
+    }
 }

@@ -68,6 +68,10 @@ internal static class Verify<TAnalyzer> where TAnalyzer : DiagnosticAnalyzer, ne
             public abstract record Rule(string Name) { public abstract bool Broken { get; } public abstract string Message { get; } }
             public sealed class Check { }
         }
+        namespace DigitalBrain.Contracts
+        {
+            public sealed class OneWayCallAttribute : System.Attribute;
+        }
         namespace DigitalBrain.Access
         {
             [System.AttributeUsage(System.AttributeTargets.Interface | System.AttributeTargets.Class)]
