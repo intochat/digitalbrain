@@ -44,5 +44,10 @@ public sealed class NoPortMeansDeniedFacts
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() => grants.GrantAsOwner(grant, ct));
             await Assert.ThrowsAsync<UnauthorizedAccessException>(() => grants.RevokeAsOwner("calculator", "math.op", GrantMode.Always, ct));
         }
+
+        // B02: When no IIdentitySessionPort is registered on the host, GetService<ISessions>() returns null
+        // instead of a refusing DeniedSessionsFactory stub that would fail local sign-in with HTTP 500.
+        Assert.Null(host.Services.GetService<ISessions>());
+        Assert.Null(host.Services.GetService<IIdentityProvider>());
     }
 }

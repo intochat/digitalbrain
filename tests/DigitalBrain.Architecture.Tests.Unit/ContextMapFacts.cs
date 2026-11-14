@@ -48,8 +48,6 @@ public sealed class ContextMapFacts
         "DigitalBrain.Screen`1 -> DigitalBrain.Neurons.IStateInspectable",
         "DigitalBrain.Screen`1 -> DigitalBrain.Neurons.Neuron`1",
         "DigitalBrain.Screen`1 -> DigitalBrain.Units.PublishedView",
-        "DigitalBrain.Screen`1+<Activate>d__11 -> DigitalBrain.Units.PublishedView",
-        "DigitalBrain.Screen`1+<StoreState>d__17 -> DigitalBrain.Units.PublishedView",
         "DigitalBrain.StoredState`1 -> DigitalBrain.Units.PublishedView",
         "DigitalBrain.Units.InstallsNeuron -> DigitalBrain.Confirmation.ConfirmationResolved",
         "DigitalBrain.Units.InstallsNeuron+<Install>d__4 -> DigitalBrain.Confirmation.ConfirmationPlan",

@@ -46,6 +46,12 @@ public abstract class Screen<TState> : Neuron<TState>, IScreen where TState : cl
     protected override async Task OnActivate(CancellationToken cancellationToken)
     {
         if (_view is not null) { return; }
+        if (ReferenceEquals(_cause, LoadedMarker))
+        {
+            _cause = "reaction";
+            _view = new PublishedView(Alias, 1, RenderValidated(State));
+            return;
+        }
         _cause = "activate";
         try { await Show(State).ConfigureAwait(true); }
         finally { _cause = "reaction"; }
@@ -66,7 +72,7 @@ public abstract class Screen<TState> : Neuron<TState>, IScreen where TState : cl
         => Task.FromResult(_view is { } view && (alias is null || string.Equals(view.Alias, alias, StringComparison.Ordinal)) ? view : null);
 
     /// <inheritdoc />
-    public async Task Activate(string alias, long generation, string nodeKey, string? fieldValue = null, string? by = null)
+    public Task Activate(string alias, long generation, string nodeKey, string? fieldValue = null, string? by = null)
     {
         ArgumentNullException.ThrowIfNull(alias);
         ArgumentNullException.ThrowIfNull(nodeKey);
@@ -84,7 +90,7 @@ public abstract class Screen<TState> : Neuron<TState>, IScreen where TState : cl
         {
             throw new ActivationRefusedException(ActivationRefusedException.ForeignOwner);
         }
-        await Handle(emit.Signal, ViewNodes.Payload(emit.Args, fieldValue, by)).ConfigureAwait(true);
+        return Handle(emit.Signal, ViewNodes.Payload(emit.Args, fieldValue, by));
     }
 
     /// <inheritdoc />
@@ -105,16 +111,56 @@ public abstract class Screen<TState> : Neuron<TState>, IScreen where TState : cl
         finally { _cause = "reaction"; }
     }
 
+    private static readonly string LoadedMarker = new("loaded".ToCharArray());
+
     internal override async Task<TState?> LoadState()
     {
+        _cause = "reaction";
+        _view = null;
+        if (await Seat.Load<System.Text.Json.Nodes.JsonObject>().ConfigureAwait(true) is { } json)
+        {
+            if (IsLegacyStoredStateEnvelope(json))
+            {
+                var legacy = json.Deserialize<StoredState<TState>>(RuntimeProtocol.OptionsFor(typeof(StoredState<TState>)));
+                _view = legacy?.View;
+                if (legacy?.State is not null && legacy.View is not null) { _cause = LoadedMarker; }
+                return legacy?.State;
+            }
+            var loaded = json.Deserialize<TState>(RuntimeProtocol.OptionsFor(typeof(TState)));
+            if (loaded is not null) { _cause = LoadedMarker; }
+            return loaded;
+        }
+        if (await Seat.Load<TState>().ConfigureAwait(true) is { } direct)
+        {
+            _cause = LoadedMarker;
+            return direct;
+        }
         var stored = await Seat.Load<StoredState<TState>>().ConfigureAwait(true);
         _view = stored?.View;
+        if (stored?.State is not null && stored.View is not null) { _cause = LoadedMarker; }
         return stored?.State;
     }
 
-    internal override async Task StoreState(TState next, IReadOnlyList<Signal> signals)
+    internal override Task StoreState(TState next, IReadOnlyList<Signal> signals)
     {
-        var wire = JsonSerializer.SerializeToElement(Render(next), RuntimeProtocol.OptionsFor(typeof(View)));
+        var wire = RenderValidated(next);
+        var shown = _view is { } current && current.View.GetRawText() == wire.GetRawText()
+            ? current
+            : new PublishedView(Alias, (_view?.Generation ?? 0) + 1, wire);
+        IReadOnlyList<Signal> entry = ReferenceEquals(shown, _view) ? signals : [.. signals, new ViewChanged(Alias, shown.Generation)];
+        return SaveAndCacheView(next, entry, shown);
+    }
+
+    private async Task SaveAndCacheView(TState next, IReadOnlyList<Signal> entry, object shown)
+    {
+        await Seat.Save(next, entry).ConfigureAwait(true);
+        _view = (PublishedView)shown;
+        _cause = "reaction";
+    }
+
+    private JsonElement RenderValidated(TState state)
+    {
+        var wire = JsonSerializer.SerializeToElement(Render(state), RuntimeProtocol.OptionsFor(typeof(View)));
         if (System.Text.Encoding.UTF8.GetByteCount(wire.GetRawText()) > UnitLimits.MaxStateBytes)
         {
             throw new InvalidOperationException($"The view of '{Alias}' exceeds the {UnitLimits.MaxStateBytes}-byte cap.");
@@ -123,12 +169,31 @@ public abstract class Screen<TState> : Neuron<TState>, IScreen where TState : cl
         {
             throw new InvalidOperationException($"The view of '{Alias}' declares the host-reserved 'by' in an emit's args.");
         }
-        var shown = _view is { } current && current.View.GetRawText() == wire.GetRawText()
-            ? current
-            : new PublishedView(Alias, (_view?.Generation ?? 0) + 1, wire);
-        IReadOnlyList<Signal> entry = ReferenceEquals(shown, _view) ? signals : [.. signals, new ViewChanged(Alias, shown.Generation)];
-        await Seat.Save(new StoredState<TState>(next, shown), entry).ConfigureAwait(true);
-        _view = shown;
+        return wire;
+    }
+
+    private static bool IsLegacyStoredStateEnvelope(System.Text.Json.Nodes.JsonObject json)
+    {
+        if (json.Count is 0 or > 2) { return false; }
+        var hasState = false;
+        var hasView = false;
+        foreach (var pair in json)
+        {
+            if (string.Equals(pair.Key, "state", StringComparison.OrdinalIgnoreCase)) { hasState = true; }
+            else if (string.Equals(pair.Key, "view", StringComparison.OrdinalIgnoreCase))
+            {
+                if (pair.Value is not null && (pair.Value is not System.Text.Json.Nodes.JsonObject viewObj
+                    || !viewObj.Any(p => string.Equals(p.Key, "alias", StringComparison.OrdinalIgnoreCase))
+                    || !viewObj.Any(p => string.Equals(p.Key, "generation", StringComparison.OrdinalIgnoreCase))))
+                {
+                    return false;
+                }
+                hasView = true;
+            }
+            else { return false; }
+        }
+        return hasView || (hasState && !typeof(TState).GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Any(p => string.Equals(p.Name, "State", StringComparison.OrdinalIgnoreCase)));
     }
 
     private NeuronId IdOf(Type contract, string key)

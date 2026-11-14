@@ -41,8 +41,8 @@ public static class ConfirmationAudit
 /// Pure state of the confirmations neuron. Enforces the four core invariants:
 /// 1. Maximum of 20 pending confirmations per brain.
 /// 2. Plan id length up to 128 characters and positive expiry.
-/// 3. Expiry capped at DefaultExpiry (5 minutes).
-/// 4. Idempotent re-raise by same caller/neuron.
+/// 3. Expiry capped at DefaultExpiry (5 minutes), or up to 7 days for person-required / held neuron plans.
+/// 4. Idempotent re-raise by same caller/neuron and matching plan shape.
 /// </summary>
 [ExportableState]
 public sealed record ConfirmationState
@@ -50,6 +50,7 @@ public sealed record ConfirmationState
     public const int PendingLimit = 20;
     public const int MaxEntries = 50;
     public const int MaxIdLength = 128;
+    internal static readonly TimeSpan MaxPersonExpiry = TimeSpan.FromDays(7);
 
     public long Revision { get; init; }
     public ConfirmationEntry[] Entries { get; init; } = [];
@@ -63,6 +64,15 @@ public sealed record ConfirmationState
         string raisedBy,
         ConfirmationPolicy policy,
         DateTimeOffset now)
+        => Request(plan, requester, raisedBy, policy, now, held: false);
+
+    internal ConfirmationTransition? Request(
+        ConfirmationPlan plan,
+        ConfirmationPrincipal requester,
+        string raisedBy,
+        ConfirmationPolicy policy,
+        DateTimeOffset now,
+        bool held)
     {
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentException.ThrowIfNullOrWhiteSpace(plan.Id);
@@ -74,8 +84,11 @@ public sealed record ConfirmationState
 
         if (Entries.FirstOrDefault(entry => entry.Request.PlanId == plan.Id) is { } known)
         {
-            var same = known.RaisedBy is { } by ? by == raisedBy : known.Request.Requester == requester;
-            return same ? null : throw new InvalidOperationException("This confirmation plan was already requested.");
+            var sameCaller = known.RaisedBy is { } by ? string.Equals(by, raisedBy, StringComparison.Ordinal) : known.Request.Requester == requester;
+            var sameShape = known.Request.Plan.RequiresPerson == plan.RequiresPerson
+                && string.Equals(known.Request.Plan.Kind, plan.Kind, StringComparison.Ordinal)
+                && string.Equals(known.Request.Plan.Subject, plan.Subject, StringComparison.Ordinal);
+            return sameCaller && sameShape ? null : throw new InvalidOperationException("This confirmation plan was already requested.");
         }
 
         if (Entries.Count(entry => entry.Result is null) >= PendingLimit)
@@ -83,7 +96,8 @@ public sealed record ConfirmationState
             throw new InvalidOperationException("This brain already has 20 confirmations waiting.");
         }
 
-        var expiry = plan.Expiry < ConfirmationRules.DefaultExpiry ? plan.Expiry : ConfirmationRules.DefaultExpiry;
+        var maxExpiry = (plan.RequiresPerson || held) ? MaxPersonExpiry : ConfirmationRules.DefaultExpiry;
+        var expiry = plan.Expiry < maxExpiry ? plan.Expiry : maxExpiry;
         var request = new ConfirmationRequested(plan.Id, plan with { Expiry = expiry }, requester, policy, now + expiry);
 
         var asks = ConfirmationRules.Asks(policy, plan);
@@ -151,11 +165,14 @@ public sealed record ConfirmationState
     {
         if (entries.Length <= MaxEntries) { return entries; }
         var pending = entries.Where(e => e.Result is null).ToList();
-        var completed = entries.Where(e => e.Result is not null).ToList();
         var allowedCompleted = Math.Max(0, MaxEntries - pending.Count);
+        var answered = entries.Where(e => e.Result is { Skipped: false }).ToList();
+        var unasked = entries.Where(e => e.Result is { Skipped: true }).ToList();
+        var keptAnswered = answered.Count > allowedCompleted ? answered.TakeLast(allowedCompleted).ToList() : answered;
+        var remainingUnasked = Math.Max(0, allowedCompleted - keptAnswered.Count);
+        var keptUnasked = unasked.Count > remainingUnasked ? unasked.TakeLast(remainingUnasked) : unasked;
         var keptPlanIds = new HashSet<string>(
-            (completed.Count > allowedCompleted ? completed.TakeLast(allowedCompleted) : completed)
-                .Select(e => e.Request.PlanId),
+            keptAnswered.Concat(keptUnasked).Select(e => e.Request.PlanId),
             StringComparer.Ordinal);
         return entries.Where(e => e.Result is null || keptPlanIds.Contains(e.Request.PlanId)).ToArray();
     }

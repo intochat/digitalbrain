@@ -185,4 +185,80 @@ public sealed class ConfirmationStateFacts
         Assert.Equal(ConfirmationDenyReason.Expired, transition.Value.Result?.Reason);
         Assert.Empty(Pending(transition.Value.Next));
     }
+
+    [Fact]
+    public void RequestPreserves48HourExpiryForRequiresPersonAndCapsAt7Days()
+    {
+        var state = new ConfirmationState();
+        var plan48h = Plan("cf-48h", expiry: TimeSpan.FromHours(48)) with { RequiresPerson = true };
+
+        var t48 = state.Request(plan48h, Requester, "flow-1", ConfirmationPolicy.Always, T0);
+        Assert.NotNull(t48);
+        var entry48 = Pending(t48.Value.Next)[0];
+        Assert.Equal(TimeSpan.FromHours(48), entry48.Plan.Expiry);
+        Assert.Equal(T0.AddHours(48), entry48.ExpiresAt);
+
+        var plan14d = Plan("cf-14d", expiry: TimeSpan.FromDays(14)) with { RequiresPerson = true };
+        var t14 = t48.Value.Next.Request(plan14d, Requester, "flow-1", ConfirmationPolicy.Always, T0);
+        Assert.NotNull(t14);
+        var entry14 = Pending(t14.Value.Next).Single(e => e.PlanId == "cf-14d");
+        Assert.Equal(TimeSpan.FromDays(7), entry14.Plan.Expiry);
+        Assert.Equal(T0.AddDays(7), entry14.ExpiresAt);
+    }
+
+    [Fact]
+    public void RequestRejectsSameIdWithMismatchedShapeFromSameCaller()
+    {
+        var state = new ConfirmationState();
+        var original = Plan("cf-squat") with
+        {
+            RequiresPerson = false,
+            Kind = "benign",
+            Subject = "item-1",
+        };
+        state = state.Request(original, Requester, "caller-1", ConfirmationPolicy.Always, T0)!.Value.Next;
+
+        // Mismatched RequiresPerson
+        Assert.Throws<InvalidOperationException>(() =>
+            state.Request(original with { RequiresPerson = true }, Requester, "caller-1", ConfirmationPolicy.Always, T0));
+
+        // Mismatched Kind
+        Assert.Throws<InvalidOperationException>(() =>
+            state.Request(original with { Kind = "pr-merge" }, Requester, "caller-1", ConfirmationPolicy.Always, T0));
+
+        // Mismatched Subject
+        Assert.Throws<InvalidOperationException>(() =>
+            state.Request(original with { Subject = "item-2" }, Requester, "caller-1", ConfirmationPolicy.Always, T0));
+    }
+
+    [Fact]
+    public void BoundNeverEvictsPersonAnsweredEntriesWithUnaskedEntries()
+    {
+        var state = new ConfirmationState();
+        var approver = ConfirmationPrincipal.Person("alice");
+
+        // Record 5 person-answered plans
+        for (var i = 0; i < 5; i++)
+        {
+            var p = Plan($"answered-{i}") with { RequiresPerson = true };
+            state = state.Request(p, Requester, "flow", ConfirmationPolicy.Always, T0)!.Value.Next;
+            state = state.Answer($"answered-{i}", approve: true, person: true, approver, T1)!.Value.Next;
+        }
+
+        // Flood with 60 unasked (Skipped = true) entries under Never policy
+        for (var i = 0; i < 60; i++)
+        {
+            var unasked = Plan($"unasked-{i}", destructive: false);
+            state = state.Request(unasked, Requester, "app", ConfirmationPolicy.DestructiveOnly, T1)!.Value.Next;
+        }
+
+        Assert.Equal(ConfirmationState.MaxEntries, state.Entries.Length);
+        for (var i = 0; i < 5; i++)
+        {
+            var known = state.Known($"answered-{i}");
+            Assert.NotNull(known);
+            Assert.False(known.Skipped);
+            Assert.Equal(ConfirmationOutcome.Approved, known.Outcome);
+        }
+    }
 }

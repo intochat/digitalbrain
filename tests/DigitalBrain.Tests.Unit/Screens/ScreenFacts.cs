@@ -249,4 +249,51 @@ public sealed class ScreenFacts
         await Assert.ThrowsAsync<ArgumentException>(() => screen.Request(""));
         await Assert.ThrowsAsync<ArgumentException>(() => screen.Request("nonexistent.signal"));
     }
+
+    [Fact]
+    public async Task StoreState_PersistsDomainStateWithoutPublishedViewJsonBloat_AndReadsLegacyEnvelope()
+    {
+        var (screen, context) = await Attached<SampleCounterScreen>();
+        await screen.Request<Increment>(new Increment(7));
+
+        // Verify persisted state is SampleCounterState directly, NOT StoredState<SampleCounterState> with PublishedView JSON
+        var latestWrite = context.Writes[^1].State;
+        var savedState = Assert.IsType<SampleCounterState>(latestWrite);
+        Assert.Equal(7, savedState.Count);
+
+        var serializedBytes = JsonSerializer.SerializeToUtf8Bytes(savedState, DigitalBrain.Invocation.RuntimeProtocol.OptionsFor(typeof(SampleCounterState)));
+        var serializedJson = System.Text.Encoding.UTF8.GetString(serializedBytes);
+        Assert.DoesNotContain("Sample Counter", serializedJson);
+        Assert.DoesNotContain("generation", serializedJson, StringComparison.OrdinalIgnoreCase);
+
+        // Reloading from raw TState UTF-8 bytes restores state and renders view in memory without extra journal writes
+        var reloaded = new SampleCounterScreen();
+        var reloadContext = new RecordingContext(new NeuronId(new BrainId("alice"), "app.sample-counter", "default"));
+        reloadContext.Store(serializedBytes);
+        NeuronAttachment.Attach(reloaded, reloadContext);
+        await NeuronAttachment.Activate(reloaded, CancellationToken.None);
+
+        Assert.Empty(reloadContext.Writes);
+        var reloadedView = await reloaded.Read();
+        Assert.NotNull(reloadedView);
+        Assert.Equal(1, reloadedView.Generation);
+        Assert.Contains("Count: 7", reloadedView.View.GetRawText());
+
+        // Legacy StoredState<SampleCounterState> JSON bytes also load backward-compatibly
+        var legacyEnvelopeBytes = JsonSerializer.SerializeToUtf8Bytes(
+            new StoredState<SampleCounterState>(new SampleCounterState { Count = 42, LastBy = "legacy" }, reloadedView),
+            DigitalBrain.Invocation.RuntimeProtocol.OptionsFor(typeof(StoredState<SampleCounterState>)));
+        var legacyScreen = new SampleCounterScreen();
+        var legacyContext = new RecordingContext(new NeuronId(new BrainId("alice"), "app.sample-counter", "default"));
+        legacyContext.Store(legacyEnvelopeBytes);
+        NeuronAttachment.Attach(legacyScreen, legacyContext);
+        await NeuronAttachment.Activate(legacyScreen, CancellationToken.None);
+
+        var legacyLoadedView = await legacyScreen.Read();
+        Assert.NotNull(legacyLoadedView);
+        await legacyScreen.Request<Increment>(new Increment(1));
+        var updatedAfterLegacy = await legacyScreen.Read();
+        Assert.NotNull(updatedAfterLegacy);
+        Assert.Contains("Count: 43", updatedAfterLegacy.View.GetRawText());
+    }
 }

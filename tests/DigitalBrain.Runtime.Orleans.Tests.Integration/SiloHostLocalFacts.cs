@@ -36,4 +36,44 @@ public sealed class SiloHostLocalFacts
         Assert.Equal(1, fake.Registered);
         Assert.True(File.Exists(Path.Combine(home.Path, "secrets", MachineKeyConfigurationSource.FileName)));
     }
+
+    [Fact]
+    public async Task Platform_grain_storage_and_file_reminder_table_survive_silo_restart_and_fresh_host_reload()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var home = new TempHome();
+        var reminderGrainId = global::Orleans.Runtime.GrainId.Create("confirmations", "b1|confirmations");
+        var dueAt = DateTime.UtcNow.AddHours(48);
+
+        await using (var host = await new LocalSiloHostFactory(new FakeClusterStore()).Start(new InProcessHostOptions { Home = home.Path }, ct))
+        {
+            await host.Services.GetRequiredService<IGrainFactory>().GetGrain<IProbeGrain>("persisted-cfg").Set(9001);
+            var reminders = Assert.IsType<FileReminderTable>(host.Services.GetRequiredService<IReminderTable>());
+            var etag = await reminders.UpsertRow(new global::Orleans.ReminderEntry
+            {
+                GrainId = reminderGrainId,
+                ReminderName = "confirmation-expiry",
+                StartAt = dueAt,
+                Period = TimeSpan.FromDays(2),
+            });
+            Assert.False(string.IsNullOrEmpty(etag));
+        }
+
+        var remindersFile = Path.Combine(home.Path, "state", "reminders.json");
+        Assert.True(File.Exists(remindersFile));
+        Assert.NotEmpty(Directory.GetFiles(Path.Combine(home.Path, "state", "files", RuntimeOptions.Default.PlatformGrainStorage), "*.json"));
+
+        // Fresh LocalSiloHostFactory instance on the same Home directory reloads both platform grain state and reminders from disk
+        await using (var reloaded = await new LocalSiloHostFactory(new FakeClusterStore()).Start(new InProcessHostOptions { Home = home.Path }, ct))
+        {
+            var value = await reloaded.Services.GetRequiredService<IGrainFactory>().GetGrain<IProbeGrain>("persisted-cfg").Get();
+            Assert.Equal(9001, value);
+
+            var reminders = Assert.IsType<FileReminderTable>(reloaded.Services.GetRequiredService<IReminderTable>());
+            var row = await reminders.ReadRow(reminderGrainId, "confirmation-expiry");
+            Assert.NotNull(row);
+            Assert.Equal(TimeSpan.FromDays(2), row.Period);
+            Assert.Equal(dueAt.Ticks, row.StartAt.Ticks);
+        }
+    }
 }

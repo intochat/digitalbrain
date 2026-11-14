@@ -36,7 +36,7 @@ public sealed class ConfirmationsNeuron : Neuron<ConfirmationState>, IConfirmati
         var raisedBy = caller?.Via?.ToString() ?? caller?.Actor.ToString() ?? "edge";
         var requester = Principal(caller);
 
-        if (State.Request(plan, requester, raisedBy, Policy, Clock.GetUtcNow()) is not { } requested)
+        if (State.Request(plan, requester, raisedBy, Policy, Clock.GetUtcNow(), held: caller?.Via is not null) is not { } requested)
         {
             return State.Known(plan.Id);
         }
@@ -53,7 +53,16 @@ public sealed class ConfirmationsNeuron : Neuron<ConfirmationState>, IConfirmati
 
     public async Task Withdraw(string planId)
     {
+        var caller = RequireCaller(required: false);
+        var person = caller is { Direct: true, Conversation: null, Actor: Actor.Person };
+        var raisedBy = caller?.Via?.ToString() ?? caller?.Actor.ToString() ?? "edge";
         await Expire().ConfigureAwait(true);
+        if (State.Entries.FirstOrDefault(e => e.Request.PlanId == planId && e.Result is null) is { } open
+            && !person
+            && !string.Equals(open.RaisedBy, raisedBy, StringComparison.Ordinal))
+        {
+            throw new UnauthorizedAccessException("Only who raised this question withdraws it.");
+        }
         if (State.Withdraw(planId, Clock.GetUtcNow()) is { } withdrawn)
         {
             await Commit(withdrawn).ConfigureAwait(true);
@@ -70,9 +79,15 @@ public sealed class ConfirmationsNeuron : Neuron<ConfirmationState>, IConfirmati
     public async Task Resolve(string planId, bool approve)
     {
         var caller = RequireCaller(required: false);
-        var person = caller is null || caller is { Direct: true, Conversation: null, Actor: Actor.Person };
-        var approver = caller is null ? ConfirmationPrincipal.Person("person") : Principal(caller);
+        var person = caller is { Direct: true, Conversation: null, Actor: Actor.Person };
+        var approver = Principal(caller);
         await Expire().ConfigureAwait(true);
+        if (State.Entries.FirstOrDefault(e => e.Request.PlanId == planId && e.Result is null) is { } open
+            && open.Request.Plan.RequiresPerson
+            && !person)
+        {
+            throw new UnauthorizedAccessException("Only a person answers this question.");
+        }
         if (State.Answer(planId, approve, person, approver, Clock.GetUtcNow()) is { } answered)
         {
             await Commit(answered).ConfigureAwait(true);

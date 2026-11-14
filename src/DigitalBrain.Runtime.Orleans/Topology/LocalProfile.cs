@@ -48,8 +48,8 @@ public sealed class LocalProfile : ITopologyProfile, IRuntimeOptionsHolder
     /// <summary>The local bindings, shared by local+cloud.</summary>
     public static Bindings LocalBindings { get; } = new(
         ClusteringBinding.Localhost,
-        GrainStoreBinding.Memory,
-        RemindersBinding.Memory,
+        GrainStoreBinding.File,
+        RemindersBinding.File,
         SecretsBinding.MachineKey,
         HttpBinding.Direct,
         SandboxBinding.LocalContainer,
@@ -130,15 +130,20 @@ public sealed class LocalProfile : ITopologyProfile, IRuntimeOptionsHolder
         stores.AddRange(context.Modules.SelectMany(m => m.Needs)
             .Where(n => n.Kind == NeedKind.State && n.Name is not null && n.Name != _options.ClusterGrainStorage && !_reserved.Contains(n.Name))
             .Select(n => n.Name!));
+        var diskBacked = !string.IsNullOrWhiteSpace(context.Home.State) && Path.IsPathFullyQualified(context.Home.State);
         foreach (var name in stores.Distinct(StringComparer.Ordinal))
         {
-            silo.Services.AddKeyedSingleton<IGrainStorage>(name, (_, _) => new LocalMemoryGrainStorage(context.Home.State, name));
+            silo.Services.AddKeyedSingleton<IGrainStorage>(name, (sp, _) => diskBacked
+                ? new LocalFileGrainStorage(StoreDirectory(context.Home, name), sp.GetService<global::Orleans.Serialization.Serializer>())
+                : new LocalMemoryGrainStorage(context.Home.State, name));
         }
         // Replaced by the host-bound registration, which ConfigureTopologySilo runs after this.
         silo.Services.AddKeyedSingleton<IGrainStorage>(_options.ClusterGrainStorage, new UnregisteredClusterStorage());
 
         silo.AddReminders();
-        silo.Services.AddSingleton<IReminderTable>(_ => MemoryReminderTable.For(context.Home.State));
+        silo.Services.AddSingleton<IReminderTable>(_ => diskBacked
+            ? new FileReminderTable(Path.Combine(context.Home.State, "reminders.json"))
+            : MemoryReminderTable.For(context.Home.State));
     }
 
     /// <inheritdoc />

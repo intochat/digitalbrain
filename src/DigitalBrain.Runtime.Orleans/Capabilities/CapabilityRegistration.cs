@@ -52,10 +52,13 @@ public static class CapabilityRegistration
         ArgumentNullException.ThrowIfNull(services);
         CapabilityHosting.RemoveDeniedSessionsFallbacks(services);
         services.TryAddSingleton<TPort>();
+        services.TryAddSingleton<IIdentitySessionPort>(sp => sp.GetRequiredService<TPort>());
         services.TryAddSingleton(TopologyHosting.ComposedDeclarations);
         services.AddKeyedSingleton<BoundSessions>(Capability.Identity.V1Id, (sp, _) => new BoundSessions(CapabilityHosting.WrapPort(sp.GetRequiredService<TPort>()), static () => RuntimeCallerContext.Current, sp.GetRequiredService<ModuleDeclarations>().RequirePrivileged));
         services.AddKeyedSingleton<ISessions>(Capability.Identity.V1Id, (sp, key) => sp.GetRequiredKeyedService<BoundSessions>(key));
         services.AddKeyedSingleton<IIdentityProvider>(Capability.Identity.V1Id, (sp, key) => sp.GetRequiredKeyedService<BoundSessions>(key));
+        services.TryAddSingleton<ISessions>(sp => sp.GetRequiredKeyedService<ISessions>(Capability.Identity.V1Id));
+        services.TryAddSingleton<IIdentityProvider>(sp => sp.GetRequiredKeyedService<IIdentityProvider>(Capability.Identity.V1Id));
         return services;
     }
 

@@ -57,4 +57,97 @@ public sealed class ConfirmationsNeuronFacts
         Assert.Equal(ConfirmationOutcome.Denied, outcome.Outcome);
         Assert.Equal(ConfirmationDenyReason.PlanInvalid, outcome.Reason);
     }
+
+    [Fact]
+    public async Task Resolve_RequiresPerson_RejectsNullAndAgentCallersWithoutPoisoningPendingPlan_ThenPersonSucceeds()
+    {
+        var brain = new BrainId("b1");
+        var context = new FakeNeuronContext(new NeuronId(brain, "runtime.confirmations", "confirmations"));
+        var raiserNeuron = new NeuronId(brain, "flow.feature-pr", "run-1");
+        var alice = new DigitalBrain.Access.Actor.Person("alice", "acc-1");
+        context.Caller = new DigitalBrain.Access.Caller(alice, brain, via: raiserNeuron);
+
+        var neuron = new ConfirmationsNeuron();
+        NeuronAttachment.Attach(neuron, context);
+
+        var plan = Plan("cf-pr-human") with
+        {
+            RequiresPerson = true,
+            Kind = "pr-approval",
+            Subject = "repo#42",
+            Expiry = TimeSpan.FromHours(48),
+        };
+
+        Assert.Null(await neuron.Request(plan));
+
+        // 1. Unstamped / null caller MUST NOT count as a person and MUST NOT cancel/poison the pending plan
+        context.Caller = null;
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => neuron.Resolve("cf-pr-human", approve: true));
+        Assert.Null(await neuron.Outcome("cf-pr-human"));
+        Assert.Single((await neuron.Read()).Pending);
+
+        // 2. Agent caller MUST throw UnauthorizedAccessException and leave plan Pending
+        context.Caller = new DigitalBrain.Access.Caller(new DigitalBrain.Access.Actor.Agent(alice), brain);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => neuron.Resolve("cf-pr-human", approve: true));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => neuron.Resolve("cf-pr-human", approve: false));
+        Assert.Null(await neuron.Outcome("cf-pr-human"));
+        Assert.Single((await neuron.Read()).Pending);
+
+        // 3. Relayed person caller (via != null or conversation != null) MUST also throw and leave plan Pending
+        context.Caller = new DigitalBrain.Access.Caller(alice, brain, via: raiserNeuron);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => neuron.Resolve("cf-pr-human", approve: true));
+        context.Caller = new DigitalBrain.Access.Caller(alice, brain, conversation: "conv-1");
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => neuron.Resolve("cf-pr-human", approve: true));
+        Assert.Null(await neuron.Outcome("cf-pr-human"));
+
+        // 4. Direct person caller without conversation succeeds and approves the preserved 48h plan
+        context.Caller = new DigitalBrain.Access.Caller(alice, brain);
+        var inbox = await neuron.Read();
+        var pending = Assert.Single(inbox.Pending);
+        Assert.Equal(TimeSpan.FromHours(48), pending.Plan.Expiry);
+
+        await neuron.Resolve("cf-pr-human", approve: true);
+
+        var outcome = await neuron.Outcome("cf-pr-human");
+        Assert.NotNull(outcome);
+        Assert.Equal(ConfirmationOutcome.Approved, outcome.Outcome);
+        Assert.Empty((await neuron.Read()).Pending);
+    }
+
+    [Fact]
+    public async Task Withdraw_OnlyRaiserOrDirectPersonMayWithdraw()
+    {
+        var brain = new BrainId("b1");
+        var context = new FakeNeuronContext(new NeuronId(brain, "runtime.confirmations", "confirmations"));
+        var raiserNeuron = new NeuronId(brain, "flow.feature-pr", "run-1");
+        var otherNeuron = new NeuronId(brain, "app.rogue", "main");
+        var alice = new DigitalBrain.Access.Actor.Person("alice", "acc-1");
+        context.Caller = new DigitalBrain.Access.Caller(alice, brain, via: raiserNeuron);
+
+        var neuron = new ConfirmationsNeuron();
+        NeuronAttachment.Attach(neuron, context);
+
+        var plan = Plan("cf-withdraw-guard") with { RequiresPerson = true };
+        Assert.Null(await neuron.Request(plan));
+
+        // Unrelated neuron/agent cannot withdraw
+        context.Caller = new DigitalBrain.Access.Caller(alice, brain, via: otherNeuron);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => neuron.Withdraw("cf-withdraw-guard"));
+
+        context.Caller = new DigitalBrain.Access.Caller(new DigitalBrain.Access.Actor.Agent(alice), brain);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => neuron.Withdraw("cf-withdraw-guard"));
+
+        context.Caller = null;
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => neuron.Withdraw("cf-withdraw-guard"));
+        Assert.Null(await neuron.Outcome("cf-withdraw-guard"));
+
+        // Original raiser CAN withdraw
+        context.Caller = new DigitalBrain.Access.Caller(alice, brain, via: raiserNeuron);
+        await neuron.Withdraw("cf-withdraw-guard");
+
+        var outcome = await neuron.Outcome("cf-withdraw-guard");
+        Assert.NotNull(outcome);
+        Assert.Equal(ConfirmationOutcome.Denied, outcome.Outcome);
+        Assert.Equal(ConfirmationDenyReason.PlanInvalid, outcome.Reason);
+    }
 }

@@ -158,23 +158,28 @@ public static class CapabilityHosting
         {
             services.AddKeyedSingleton(Capability.Secrets.V1Id, DeniedSecretsFactory);
         }
-        if (!services.Any(descriptor => descriptor.IsKeyedService && descriptor.ServiceType == typeof(BoundSessions) && Capability.Identity.V1Id.Equals(descriptor.ServiceKey as string, StringComparison.Ordinal)))
+        var hasSessionPort = services.Any(descriptor => !descriptor.IsKeyedService && descriptor.ServiceType == typeof(IIdentitySessionPort))
+            || services.Any(descriptor => descriptor.IsKeyedService && descriptor.ServiceType == typeof(ISessions) && Capability.Identity.V1Id.Equals(descriptor.ServiceKey as string, StringComparison.Ordinal));
+        if (hasSessionPort)
         {
-            services.AddKeyedSingleton(Capability.Identity.V1Id, DeniedSessionsCapabilityFactory);
-        }
-        if (!services.Any(descriptor => descriptor.IsKeyedService && descriptor.ServiceType == typeof(ISessions) && Capability.Identity.V1Id.Equals(descriptor.ServiceKey as string, StringComparison.Ordinal)))
-        {
-            services.AddKeyedSingleton(Capability.Identity.V1Id, DeniedSessionsFactory);
-        }
-        if (!services.Any(descriptor => descriptor.IsKeyedService && descriptor.ServiceType == typeof(IIdentityProvider) && Capability.Identity.V1Id.Equals(descriptor.ServiceKey as string, StringComparison.Ordinal)))
-        {
-            services.AddKeyedSingleton(Capability.Identity.V1Id, DeniedIdentityDescriptorFactory);
+            if (!services.Any(descriptor => descriptor.IsKeyedService && descriptor.ServiceType == typeof(BoundSessions) && Capability.Identity.V1Id.Equals(descriptor.ServiceKey as string, StringComparison.Ordinal)))
+            {
+                services.AddKeyedSingleton(Capability.Identity.V1Id, DeniedSessionsCapabilityFactory);
+            }
+            if (!services.Any(descriptor => descriptor.IsKeyedService && descriptor.ServiceType == typeof(ISessions) && Capability.Identity.V1Id.Equals(descriptor.ServiceKey as string, StringComparison.Ordinal)))
+            {
+                services.AddKeyedSingleton(Capability.Identity.V1Id, DeniedSessionsFactory);
+            }
+            if (!services.Any(descriptor => descriptor.IsKeyedService && descriptor.ServiceType == typeof(IIdentityProvider) && Capability.Identity.V1Id.Equals(descriptor.ServiceKey as string, StringComparison.Ordinal)))
+            {
+                services.AddKeyedSingleton(Capability.Identity.V1Id, DeniedIdentityDescriptorFactory);
+            }
+            services.TryAddSingleton<ISessions>(sp => sp.GetRequiredKeyedService<ISessions>(Capability.Identity.V1Id));
+            services.TryAddSingleton<IIdentityProvider>(sp => sp.GetRequiredKeyedService<IIdentityProvider>(Capability.Identity.V1Id));
         }
         services.TryAddSingleton<IIdentity>(sp => sp.GetRequiredKeyedService<IIdentity>(Capability.Identity.V1Id));
         services.TryAddSingleton<IGrants>(sp => sp.GetRequiredKeyedService<IGrants>(Capability.Identity.V1Id));
         services.TryAddSingleton<ISecrets>(sp => sp.GetRequiredKeyedService<ISecrets>(Capability.Secrets.V1Id));
-        services.TryAddSingleton<ISessions>(sp => sp.GetRequiredKeyedService<ISessions>(Capability.Identity.V1Id));
-        services.TryAddSingleton<IIdentityProvider>(sp => sp.GetRequiredKeyedService<IIdentityProvider>(Capability.Identity.V1Id));
         services.TryAddSingleton(sp => new CapabilityBroker(
             registry,
             sp.GetService<ICapabilityConnections>() ?? DeniedCapabilityConnections.Instance,

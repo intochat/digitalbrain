@@ -22,6 +22,8 @@ public sealed class SessionsCapabilityFacts
     {
         var services = new ServiceCollection().AddIdentitySessions<InMemoryIdentityDirectory>().BuildServiceProvider();
         var sessions = services.GetRequiredKeyedService<ISessions>(Capability.Identity.V1Id);
+        Assert.Same(sessions, services.GetRequiredService<ISessions>());
+        Assert.Same(sessions, services.GetRequiredService<IIdentityProvider>());
         Assert.Same(sessions, services.GetRequiredKeyedService<IIdentityProvider>(Capability.Identity.V1Id));
         Assert.Equal(IdentityPosture.Secured, services.GetRequiredKeyedService<IIdentityProvider>(Capability.Identity.V1Id).Describe().Posture);
         using (RuntimeCallerContext.Stamp(new CapabilityCaller("app:kit-auth", "a", "b", KitDeclarations.PrivilegedModule)))
