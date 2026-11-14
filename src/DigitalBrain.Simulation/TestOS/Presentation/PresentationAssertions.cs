@@ -58,7 +58,13 @@ public sealed class PresentedView
             Text text => [text.Value],
             Heading { Subtitle: { Length: > 0 } sub } heading => new[] { heading.Value, sub },
             Heading heading => [heading.Value],
+            Button button => [button.Label],
             InfoBar info => new[] { info.Title, info.Message },
+            Conversation conv => conv.Messages.Select(m => m.Text).Where(s => s.Length > 0).ToArray(),
+            ErrorLineNode err => new[] { err.What, err.Detail ?? string.Empty }.Where(s => s.Length > 0).ToArray(),
+            EmptyStateNode empty => new[] { empty.Title, empty.Body ?? string.Empty }.Where(s => s.Length > 0).ToArray(),
+            MetricTileNode tile => new[] { tile.Title, tile.Value, tile.Delta ?? string.Empty, tile.StatusLabel ?? string.Empty }.Where(s => s.Length > 0).ToArray(),
+            DiffCardNode diff => new[] { diff.Repo, diff.TargetBranch, diff.HeadSha }.Concat(diff.Files.Select(f => f.Path)).Where(s => s.Length > 0).ToArray(),
             ApprovalCardNode approval => new[] { approval.Title, approval.Summary, approval.Status, approval.SourceNeuronUri ?? string.Empty }.Where(s => s.Length > 0).ToArray(),
             DataTable table => new[] { table.Title, table.SourceNeuronUri ?? string.Empty }.Where(s => s.Length > 0).ToArray(),
             Chart chart => new[] { chart.Title, chart.SourceNeuronUri ?? string.Empty }.Where(s => s.Length > 0).ToArray(),
@@ -102,8 +108,29 @@ public sealed class PresentedView
             SplitPane split => [split.Leading, split.Trailing],
             Surface surface => surface.Children,
             Card card => card.Children,
+            AppShellNode shell => new Node?[] { shell.Sidebar, shell.Toolbar, shell.Body, shell.Inspector }.OfType<Node>(),
+            Conversation conv => ConversationChildren(conv),
+            ErrorLineNode { Action: { } action } => [action],
+            EmptyStateNode { Suggestions: { } suggestions } => suggestions,
+            MetricTileNode { Actions: { } actions } => actions,
             _ => [],
         };
         foreach (var child in children.SelectMany(Walk)) { yield return child; }
+    }
+
+    private static IEnumerable<Node> ConversationChildren(Conversation conv)
+    {
+        foreach (var message in conv.Messages)
+        {
+            if (message.Cards is { } cards)
+            {
+                foreach (var card in cards) { yield return card; }
+            }
+            if (message.Retry is { } retry) { yield return retry; }
+        }
+        if (conv.Waiting is { } waiting) { yield return waiting; }
+        if (conv.Error is { } error) { yield return error; }
+        if (conv.Stop is { } stop) { yield return stop; }
+        if (conv.Empty is { } empty) { yield return empty; }
     }
 }

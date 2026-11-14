@@ -392,4 +392,48 @@ public sealed class AsksNeuronFacts
         Assert.NotNull(batchAttr);
         Assert.Equal(AskRules.BatchNeuronType, batchAttr.Type);
     }
+
+    [Fact]
+    public async Task LiveUnitResolverValidatesAsksWhenStaticCatalogIsEmpty()
+    {
+        var emptyCatalog = new SynapseCatalogSource(SynapseCatalog.Scan());
+        var liveCatalog = SynapseCatalog.Scan([typeof(Asker), typeof(AskerFunctions)]);
+        var resolver = new StubUnitResolver(liveCatalog);
+        var asks = new AsksNeuron(emptyCatalog, resolver);
+        NeuronAttachment.Attach(asks, Context);
+        await NeuronAttachment.Activate(asks, Ct);
+
+        await asks.OnAsked(Batch("b1", 2), Ct);
+
+        Assert.Equal(2, Assert.Single(B1.Puts).Count);
+        Assert.Equal([(0, 1), (1, 1)], B1.Runs);
+    }
+
+    [Fact]
+    public async Task SettledRejectsStampedCallerWithWrongViaAndAcceptsBatchVia()
+    {
+        var asks = await Activated();
+        await asks.OnAsked(Batch("b1", 1), Ct);
+
+        Context.Caller = new DigitalBrain.Access.Caller(
+            new DigitalBrain.Access.Actor.Kernel(),
+            Id.Brain,
+            via: new NeuronId(Id.Brain, "rogue", "default"),
+            inside: true);
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => asks.Settled(Settle("b1", 0, 1)));
+
+        Context.Caller = new DigitalBrain.Access.Caller(
+            new DigitalBrain.Access.Actor.Kernel(),
+            Id.Brain,
+            via: AskRules.BatchOf(Id, "b1"),
+            inside: true);
+        await asks.Settled(Settle("b1", 0, 1));
+        Assert.Single(Sent());
+    }
+
+    private sealed class StubUnitResolver(SynapseCatalog catalog) : IUnitResolver
+    {
+        public Task<UnitHandle?> Resolve(BrainId brain, string alias, UnitView view, CancellationToken ct = default) =>
+            Task.FromResult<UnitHandle?>(UnitHandle.Static(catalog));
+    }
 }

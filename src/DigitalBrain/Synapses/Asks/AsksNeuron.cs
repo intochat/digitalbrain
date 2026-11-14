@@ -61,9 +61,36 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
         }
 
         ArgumentNullException.ThrowIfNull(catalog);
+        var descriptors = catalog.Static.For(Id.Key);
+        if (descriptors.Count == 0 && _units is not null)
+        {
+            using var handle = await _units.Resolve(Id.Brain, Id.Key, UnitView.Live, ct).ConfigureAwait(true);
+            if (handle is not null)
+            {
+                descriptors = handle.Catalog.For(Id.Key);
+            }
+        }
+
         try
         {
-            _ = AskRules.Checked(asked.Asks, catalog.Static.For(Id.Key));
+            _ = AskRules.Checked(asked.Asks, descriptors);
+        }
+        catch (InvalidOperationException) when (_units is not null)
+        {
+            using var handle = await _units.Resolve(Id.Brain, Id.Key, UnitView.Live, ct).ConfigureAwait(true);
+            if (handle is null)
+            {
+                return;
+            }
+
+            try
+            {
+                _ = AskRules.Checked(asked.Asks, handle.Catalog.For(Id.Key));
+            }
+            catch (InvalidOperationException)
+            {
+                return;
+            }
         }
         catch (InvalidOperationException)
         {
@@ -187,6 +214,11 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
         if (settlement is null || string.IsNullOrEmpty(settlement.Batch))
         {
             return;
+        }
+
+        if (Context.Caller is { } caller && caller.Via != AskRules.BatchOf(Id, settlement.Batch))
+        {
+            throw new UnauthorizedAccessException("Only the batch neuron of this ask may settle it.");
         }
 
         var batchIndex = FindBatchIndex(_state.Batches, settlement.Batch);

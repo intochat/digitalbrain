@@ -1,3 +1,4 @@
+using DigitalBrain.Access;
 using DigitalBrain.Confirmation;
 using DigitalBrain.UI;
 using DigitalBrain.UI.Confirmation;
@@ -5,17 +6,24 @@ using DigitalBrain.UI.Confirmation;
 namespace DigitalBrain.Testing;
 
 /// <summary>
-/// The confirmation gate in tests (07 D-03, D-09, D-16, D-19): uses pure <see cref="ConfirmationState"/> to enforce
-/// all 4 core invariants (20 pending limit, 128 ID length cap, 5 minute default expiry cap, idempotent re-raise by same caller/neuron).
+/// The confirmation gate in tests (07 D-03, D-09, D-16, D-19): when attached to a <see cref="TestOS"/>, drives and observes the
+/// real <see cref="ConfirmationsNeuron"/> hosted in each brain with stamped <see cref="Caller"/> authority; standalone (unit harness
+/// without <see cref="TestOS"/>), uses pure <see cref="ConfirmationState"/> directly.
 /// </summary>
 public sealed class TestConfirmations : IConfirmationRequests, IConfirmationInbox
 {
     private readonly Lock _gate = new();
     private readonly TimeProvider _clock;
+    private readonly TestOS? _os;
     private ConfirmationState _state = new();
     private readonly Dictionary<string, TaskCompletionSource<ConfirmationResult>> _done = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (Func<Signal, Task>? Publish, ITimer? Expiry)> _pending = new(StringComparer.Ordinal);
+    private readonly List<ConfirmationRequested> _osRequested = [];
+    private readonly List<ConfirmationRequested> _osWaiting = [];
+    private readonly Dictionary<string, BrainId> _osPlanBrains = new(StringComparer.Ordinal);
+    private readonly Dictionary<BrainId, long> _syncedSeq = [];
     private readonly List<ConfirmationResolved> _audit = [];
+    private readonly ApprovalWaiters _waiters = new();
     private bool _approveAll;
 
     /// <summary>Confirmations on <paramref name="clock"/>.</summary>
@@ -23,6 +31,32 @@ public sealed class TestConfirmations : IConfirmationRequests, IConfirmationInbo
     {
         ArgumentNullException.ThrowIfNull(clock);
         _clock = clock;
+    }
+
+    internal TestConfirmations(TimeProvider clock, TestOS os)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(os);
+        _clock = clock;
+        _os = os;
+
+        _ = os.Listeners.Listen<ConfirmationRequested>("testos.confirmations.requested", async (publisher, signal, _) =>
+        {
+            if (publisher.Type != ConfirmationsNeuron.NeuronType) { return; }
+            lock (_gate) { SyncFromJournals(); }
+            if (Volatile.Read(ref _approveAll))
+            {
+                await ResolveInBrain(publisher.Brain, signal.PlanId, approve: true, Current).ConfigureAwait(false);
+            }
+        });
+
+        _ = os.Listeners.Listen<ConfirmationResolved>("testos.confirmations.resolved", (publisher, signal, _) =>
+        {
+            if (publisher.Type != ConfirmationsNeuron.NeuronType) { return Task.CompletedTask; }
+            lock (_gate) { SyncFromJournals(); }
+            _waiters.Complete(signal.PlanId, new ConfirmationResult(signal.PlanId, signal.Outcome, signal.Reason, signal.Skipped));
+            return Task.CompletedTask;
+        });
     }
 
     /// <summary>The brain policy. Default <see cref="ConfirmationPolicy.DestructiveOnly"/>.</summary>
@@ -34,19 +68,48 @@ public sealed class TestConfirmations : IConfirmationRequests, IConfirmationInbo
     /// <summary>Every plan put to a person, oldest first.</summary>
     public IReadOnlyList<ConfirmationRequested> Requested
     {
-        get { lock (_gate) { return [.. _state.Entries.Where(e => e.Result?.Skipped != true).Select(e => e.Request)]; } }
+        get
+        {
+            lock (_gate)
+            {
+                if (_os is not null)
+                {
+                    SyncFromJournals();
+                    return [.. _osRequested];
+                }
+                return [.. _state.Entries.Where(e => e.Result?.Skipped != true).Select(e => e.Request)];
+            }
+        }
     }
 
     /// <summary>The plans still waiting for an answer.</summary>
     public IReadOnlyList<ConfirmationRequested> Waiting
     {
-        get { lock (_gate) { return [.. _state.Entries.Where(e => e.Result is null).Select(e => e.Request)]; } }
+        get
+        {
+            lock (_gate)
+            {
+                if (_os is not null)
+                {
+                    SyncFromJournals();
+                    return [.. _osWaiting];
+                }
+                return [.. _state.Entries.Where(e => e.Result is null).Select(e => e.Request)];
+            }
+        }
     }
 
     /// <summary>Every resolution, skipped ones included, oldest first: the audit record.</summary>
     public IReadOnlyList<ConfirmationResolved> Audit
     {
-        get { lock (_gate) { return [.. _audit]; } }
+        get
+        {
+            lock (_gate)
+            {
+                if (_os is not null) { SyncFromJournals(); }
+                return [.. _audit];
+            }
+        }
     }
 
     /// <summary>The gate as <paramref name="requester"/> sees it; signals also go to <paramref name="publish"/> when given.</summary>
@@ -54,6 +117,12 @@ public sealed class TestConfirmations : IConfirmationRequests, IConfirmationInbo
     {
         ArgumentNullException.ThrowIfNull(requester);
         return new Requester(this, requester, publish);
+    }
+
+    internal IConfirmations ForNeuron(NeuronId owner)
+    {
+        if (_os is null) { throw new InvalidOperationException("Not attached to a TestOS."); }
+        return new NeuronBackedConfirmations(this, _os, owner);
     }
 
     /// <summary>
@@ -82,6 +151,27 @@ public sealed class TestConfirmations : IConfirmationRequests, IConfirmationInbo
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(planId);
         ArgumentNullException.ThrowIfNull(approver);
+
+        if (_os is not null)
+        {
+            BrainId? known = null;
+            lock (_gate)
+            {
+                SyncFromJournals();
+                if (_osPlanBrains.TryGetValue(planId, out var brain)) { known = brain; }
+            }
+            if (known is { } targetBrain)
+            {
+                await ResolveInBrain(targetBrain, planId, approve, approver).ConfigureAwait(false);
+                return;
+            }
+            foreach (var brain in _os.AllBrains)
+            {
+                await ResolveInBrain(brain, planId, approve, approver).ConfigureAwait(false);
+            }
+            return;
+        }
+
         var now = _clock.GetUtcNow();
         ConfirmationTransition? transition;
         Func<Signal, Task>? publish = null;
@@ -108,18 +198,71 @@ public sealed class TestConfirmations : IConfirmationRequests, IConfirmationInbo
     }
 
     // IConfirmationRequests
-    public Task<ConfirmationResult?> Request(ConfirmationPlan plan) => Request(plan, Current, "edge", null);
-
-    public Task<ConfirmationResult?> Outcome(string planId)
+    public Task<ConfirmationResult?> Request(ConfirmationPlan plan)
     {
+        if (_os is not null)
+        {
+            var brains = _os.AllBrains;
+            var brain = brains.Count > 0 ? brains[0] : new BrainId("default");
+            using var _ = _os.Edge.Enter(CallerFor(Current, brain));
+            return _os.Get<IConfirmationRequests>(IConfirmationRequests.Of(brain)).Request(plan);
+        }
+        return Request(plan, Current, "edge", null);
+    }
+
+    public async Task<ConfirmationResult?> Outcome(string planId)
+    {
+        if (_os is not null)
+        {
+            BrainId? known = null;
+            lock (_gate)
+            {
+                SyncFromJournals();
+                if (_osPlanBrains.TryGetValue(planId, out var brain)) { known = brain; }
+            }
+            if (known is { } targetBrain)
+            {
+                using var _ = _os.Edge.Enter(CallerFor(Current, targetBrain));
+                return await _os.Get<IConfirmationRequests>(IConfirmationRequests.Of(targetBrain)).Outcome(planId).ConfigureAwait(false);
+            }
+            foreach (var brain in _os.AllBrains)
+            {
+                using var _ = _os.Edge.Enter(CallerFor(Current, brain));
+                var found = await _os.Get<IConfirmationRequests>(IConfirmationRequests.Of(brain)).Outcome(planId).ConfigureAwait(false);
+                if (found is not null) { return found; }
+            }
+            return null;
+        }
         lock (_gate)
         {
-            return Task.FromResult(_state.Known(planId));
+            return _state.Known(planId);
         }
     }
 
     public async Task Withdraw(string planId)
     {
+        if (_os is not null)
+        {
+            BrainId? known = null;
+            lock (_gate)
+            {
+                SyncFromJournals();
+                if (_osPlanBrains.TryGetValue(planId, out var brain)) { known = brain; }
+            }
+            if (known is { } targetBrain)
+            {
+                using var _ = _os.Edge.Enter(CallerFor(Current, targetBrain));
+                await _os.Get<IConfirmationRequests>(IConfirmationRequests.Of(targetBrain)).Withdraw(planId).ConfigureAwait(false);
+                return;
+            }
+            foreach (var brain in _os.AllBrains)
+            {
+                using var _ = _os.Edge.Enter(CallerFor(Current, brain));
+                await _os.Get<IConfirmationRequests>(IConfirmationRequests.Of(brain)).Withdraw(planId).ConfigureAwait(false);
+            }
+            return;
+        }
+
         ConfirmationTransition? transition;
         Func<Signal, Task>? publish = null;
         lock (_gate)
@@ -145,11 +288,25 @@ public sealed class TestConfirmations : IConfirmationRequests, IConfirmationInbo
     }
 
     // IConfirmationInbox
-    public Task<ConfirmationInbox> Read()
+    public async Task<ConfirmationInbox> Read()
     {
+        if (_os is not null)
+        {
+            var pending = new List<ConfirmationRequested>();
+            long revision = 0;
+            foreach (var brain in _os.AllBrains)
+            {
+                using var _ = _os.Edge.Enter(CallerFor(Current, brain));
+                var inbox = await _os.Get<IConfirmationInbox>(IConfirmationRequests.Of(brain)).Read().ConfigureAwait(false);
+                revision += inbox.Revision;
+                pending.AddRange(inbox.Pending);
+            }
+            return new ConfirmationInbox(revision, [.. pending]);
+        }
+
         lock (_gate)
         {
-            return Task.FromResult(new ConfirmationInbox(_state.Revision, [.. _state.Entries.Where(e => e.Result is null).Select(e => e.Request)]));
+            return new ConfirmationInbox(_state.Revision, [.. _state.Entries.Where(e => e.Result is null).Select(e => e.Request)]);
         }
     }
 
@@ -210,6 +367,50 @@ public sealed class TestConfirmations : IConfirmationRequests, IConfirmationInbo
         return await tcs.Task.WaitAsync(ct).ConfigureAwait(false);
     }
 
+    private void SyncFromJournals()
+    {
+        if (_os is null) { return; }
+        foreach (var brain in _os.AllBrains)
+        {
+            var last = _syncedSeq.GetValueOrDefault(brain, 0L);
+            foreach (var entry in _os.Journal(brain).Signals(IConfirmationRequests.Of(brain)))
+            {
+                if (entry.Sequence <= last) { continue; }
+                last = entry.Sequence;
+                switch (entry.Signal)
+                {
+                    case ConfirmationRequested req:
+                        _osPlanBrains[req.PlanId] = brain;
+                        _osRequested.Add(req);
+                        if (_osWaiting.All(w => w.PlanId != req.PlanId))
+                        {
+                            _osWaiting.Add(req);
+                        }
+                        break;
+                    case ConfirmationResolved res:
+                        _osPlanBrains[res.PlanId] = brain;
+                        _osWaiting.RemoveAll(w => w.PlanId == res.PlanId);
+                        _audit.Add(res);
+                        break;
+                }
+            }
+            _syncedSeq[brain] = last;
+        }
+    }
+
+    private async Task ResolveInBrain(BrainId brain, string planId, bool approve, ConfirmationPrincipal approver)
+    {
+        using var _ = _os!.Edge.Enter(CallerFor(approver, brain));
+        await _os.Get<IConfirmationInbox>(IConfirmationRequests.Of(brain)).Resolve(planId, approve).ConfigureAwait(false);
+    }
+
+    private Caller CallerFor(ConfirmationPrincipal principal, BrainId brain) => principal.Kind switch
+    {
+        PrincipalKind.Person => _os!.Edge.Person(principal.Id, principal.Id, brain),
+        PrincipalKind.App => _os!.Edge.App(principal.Id, new Actor.Person("owner", "owner"), brain),
+        _ => _os!.Edge.Agent(new Actor.Person(principal.Id, principal.Id), brain),
+    };
+
     private async Task Expire(string planId)
     {
         ConfirmationTransition? transition;
@@ -245,5 +446,42 @@ public sealed class TestConfirmations : IConfirmationRequests, IConfirmationInbo
 
         public Task Resolve(string planId, bool approve, CancellationToken ct = default)
             => owner.Resolve(planId, approve, requester);
+    }
+
+    private sealed class NeuronBackedConfirmations(TestConfirmations owner, TestOS os, NeuronId callerNeuron) : IConfirmations
+    {
+        public ConfirmationPolicy Policy =>
+            (os.Services.GetService(typeof(ConfirmationPolicies)) as ConfirmationPolicies)?.For(callerNeuron.Brain.Value!)
+            ?? owner.Policy;
+
+        public async Task<ConfirmationResult> Confirm(ConfirmationPlan plan, CancellationToken ct = default)
+        {
+            var target = IConfirmationRequests.Of(callerNeuron.Brain);
+            var req = os.Proxy<IConfirmationRequests>(callerNeuron, target);
+            var inbox = os.Proxy<IConfirmationInbox>(callerNeuron, target);
+            var awaited = new AwaitedConfirmations(req, inbox, Policy, owner._waiters);
+            using var scope = EnsureAppCallerIfUnstamped();
+            return await awaited.Confirm(plan, ct).ConfigureAwait(false);
+        }
+
+        public async Task Resolve(string planId, bool approve, CancellationToken ct = default)
+        {
+            var target = IConfirmationRequests.Of(callerNeuron.Brain);
+            var req = os.Proxy<IConfirmationRequests>(callerNeuron, target);
+            var inbox = os.Proxy<IConfirmationInbox>(callerNeuron, target);
+            var awaited = new AwaitedConfirmations(req, inbox, Policy, owner._waiters);
+            using var scope = EnsureAppCallerIfUnstamped();
+            await awaited.Resolve(planId, approve, ct).ConfigureAwait(false);
+        }
+
+        private IDisposable? EnsureAppCallerIfUnstamped()
+        {
+            var current = TestCallerAmbient.Instance.Current;
+            if (current is not null && current.Actor is not Actor.Kernel)
+            {
+                return null;
+            }
+            return os.Edge.Enter(os.Edge.App(callerNeuron.ToString(), new Actor.Person("owner", "owner"), callerNeuron.Brain));
+        }
     }
 }

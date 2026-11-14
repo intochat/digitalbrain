@@ -43,6 +43,11 @@ public sealed record View(string Title, Node Root);
 [JsonDerivedType(typeof(NavItemNode), "navItem")]
 [JsonDerivedType(typeof(StatCardNode), "statCard")]
 [JsonDerivedType(typeof(WebBrowser), "webBrowser")]
+[JsonDerivedType(typeof(Conversation), "conversation")]
+[JsonDerivedType(typeof(ErrorLineNode), "errorLine")]
+[JsonDerivedType(typeof(EmptyStateNode), "emptyState")]
+[JsonDerivedType(typeof(MetricTileNode), "metricTile")]
+[JsonDerivedType(typeof(DiffCardNode), "diffCard")]
 public abstract record Node;
 
 /// <summary>Children laid out top to bottom.</summary>
@@ -626,6 +631,197 @@ public sealed record StatCardNode(
     BadgeTone Tone = BadgeTone.Neutral,
     string? Icon = null) : Node;
 
+/// <summary>A conversation timeline, composer, waiting state, error banner, stop button, and empty state.</summary>
+public sealed record Conversation(
+    string Key,
+    IReadOnlyList<MessageNode> Messages,
+    ComposerNode Composer,
+    Node? Waiting = null,
+    string Status = "ready",
+    ErrorLineNode? Error = null,
+    Button? Stop = null,
+    EmptyStateNode? Empty = null) : Node
+{
+    /// <inheritdoc />
+    public bool Equals(Conversation? other) =>
+        other is not null
+        && Key == other.Key
+        && Messages.SequenceEqual(other.Messages)
+        && Equals(Composer, other.Composer)
+        && Equals(Waiting, other.Waiting)
+        && Status == other.Status
+        && Equals(Error, other.Error)
+        && Equals(Stop, other.Stop)
+        && Equals(Empty, other.Empty);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => HashCode.Combine(Key, Messages.Count, Status);
+}
+
+/// <summary>One message in a <see cref="Conversation"/>.</summary>
+public sealed record MessageNode(
+    string Id,
+    string Role,
+    string Text,
+    IReadOnlyList<Node>? Cards = null,
+    IReadOnlyList<ActivityNode>? Activities = null,
+    string Status = "completed",
+    string? Model = null,
+    Button? Retry = null)
+{
+    /// <inheritdoc />
+    public bool Equals(MessageNode? other) =>
+        other is not null
+        && Id == other.Id
+        && Role == other.Role
+        && Text == other.Text
+        && SequenceEquals(Cards, other.Cards)
+        && SequenceEquals(Activities, other.Activities)
+        && Status == other.Status
+        && Model == other.Model
+        && Equals(Retry, other.Retry);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => HashCode.Combine(Id, Role, Text, Status);
+
+    private static bool SequenceEquals<T>(IReadOnlyList<T>? a, IReadOnlyList<T>? b) =>
+        ReferenceEquals(a, b) || (a is not null && b is not null && a.SequenceEqual(b));
+}
+
+/// <summary>One tool / activity step inside a <see cref="MessageNode"/>.</summary>
+public sealed record ActivityNode(
+    string Id,
+    string Title,
+    string Status = "done",
+    string? Detail = null);
+
+/// <summary>The message input composer at the bottom of a <see cref="Conversation"/>.</summary>
+public sealed record ComposerNode(
+    string Key,
+    Emit OnSubmit,
+    string Placeholder = "Message",
+    bool Enabled = true);
+
+/// <summary>Inline recoverable error line with optional detail and retry/recovery button.</summary>
+public sealed record ErrorLineNode(
+    string What,
+    string? Detail = null,
+    Button? Action = null) : Node;
+
+/// <summary>Empty state prompt with optional body and suggestion buttons.</summary>
+public sealed record EmptyStateNode(
+    string Title,
+    string? Body = null,
+    IReadOnlyList<Button>? Suggestions = null) : Node
+{
+    /// <inheritdoc />
+    public bool Equals(EmptyStateNode? other) =>
+        other is not null
+        && Title == other.Title
+        && Body == other.Body
+        && (ReferenceEquals(Suggestions, other.Suggestions)
+            || (Suggestions is not null && other.Suggestions is not null && Suggestions.SequenceEqual(other.Suggestions)));
+
+    /// <inheritdoc />
+    public override int GetHashCode() => HashCode.Combine(Title, Body, Suggestions?.Count ?? 0);
+}
+
+/// <summary>Micro-app telemetry tile with tabular-numeral metric, optional sparkline series, threshold line, and quick actions.</summary>
+public sealed record MetricTileNode(
+    string Id,
+    string AppId,
+    string Title,
+    string Value,
+    string? Delta = null,
+    string DeltaTone = "neutral",
+    string? StatusLabel = null,
+    string StatusTone = "neutral",
+    IReadOnlyList<double>? Sparkline = null,
+    double? Threshold = null,
+    IReadOnlyList<Button>? Actions = null) : Node
+{
+    /// <inheritdoc />
+    public bool Equals(MetricTileNode? other) =>
+        other is not null
+        && Id == other.Id
+        && AppId == other.AppId
+        && Title == other.Title
+        && Value == other.Value
+        && Delta == other.Delta
+        && DeltaTone == other.DeltaTone
+        && StatusLabel == other.StatusLabel
+        && StatusTone == other.StatusTone
+        && (ReferenceEquals(Sparkline, other.Sparkline) || (Sparkline is not null && other.Sparkline is not null && Sparkline.SequenceEqual(other.Sparkline)))
+        && Nullable.Equals(Threshold, other.Threshold)
+        && (ReferenceEquals(Actions, other.Actions) || (Actions is not null && other.Actions is not null && Actions.SequenceEqual(other.Actions)));
+
+    /// <inheritdoc />
+    public override int GetHashCode() => HashCode.Combine(Id, AppId, Title, Value);
+}
+
+/// <summary>Structured code diff preview card for Feature-to-PR workflows.</summary>
+public sealed record DiffCardNode(
+    string Id,
+    string Repo,
+    string TargetBranch,
+    string HeadSha,
+    int FilesChanged,
+    int Additions,
+    int Deletions,
+    IReadOnlyList<DiffFileNode> Files) : Node
+{
+    /// <inheritdoc />
+    public bool Equals(DiffCardNode? other) =>
+        other is not null
+        && Id == other.Id
+        && Repo == other.Repo
+        && TargetBranch == other.TargetBranch
+        && HeadSha == other.HeadSha
+        && FilesChanged == other.FilesChanged
+        && Additions == other.Additions
+        && Deletions == other.Deletions
+        && Files.SequenceEqual(other.Files);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => HashCode.Combine(Id, Repo, TargetBranch, HeadSha, Files.Count);
+}
+
+/// <summary>One changed file inside a <see cref="DiffCardNode"/>.</summary>
+public sealed record DiffFileNode(
+    string Path,
+    string ChangeKind,
+    int Additions,
+    int Deletions,
+    IReadOnlyList<DiffHunkNode> Hunks)
+{
+    /// <inheritdoc />
+    public bool Equals(DiffFileNode? other) =>
+        other is not null
+        && Path == other.Path
+        && ChangeKind == other.ChangeKind
+        && Additions == other.Additions
+        && Deletions == other.Deletions
+        && Hunks.SequenceEqual(other.Hunks);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => HashCode.Combine(Path, ChangeKind, Additions, Deletions, Hunks.Count);
+}
+
+/// <summary>One unified diff hunk inside a <see cref="DiffFileNode"/>.</summary>
+public sealed record DiffHunkNode(
+    string Header,
+    IReadOnlyList<string> Lines)
+{
+    /// <inheritdoc />
+    public bool Equals(DiffHunkNode? other) =>
+        other is not null
+        && Header == other.Header
+        && Lines.SequenceEqual(other.Lines);
+
+    /// <inheritdoc />
+    public override int GetHashCode() => HashCode.Combine(Header, Lines.Count);
+}
+
 /// <summary>Ergonomic high-level builders for authoring <c>App&lt;TState&gt;</c> desktop views in ~30 lines of C#.</summary>
 public static class Ui
 {
@@ -667,4 +863,31 @@ public static class Ui
         double height = 520,
         string executionMode = "wasm-ui") =>
         new(key, url, title, height, executionMode);
+
+    /// <summary>Creates a micro-app telemetry tile with optional sparkline, threshold, and quick actions.</summary>
+    public static MetricTileNode MetricTile(
+        string id,
+        string appId,
+        string title,
+        string value,
+        string? delta = null,
+        string deltaTone = "neutral",
+        string? statusLabel = null,
+        string statusTone = "neutral",
+        IReadOnlyList<double>? sparkline = null,
+        double? threshold = null,
+        IReadOnlyList<Button>? actions = null) =>
+        new(id, appId, title, value, delta, deltaTone, statusLabel, statusTone, sparkline, threshold, actions);
+
+    /// <summary>Creates a structured diff preview card for Feature-to-PR workflows.</summary>
+    public static DiffCardNode DiffCard(
+        string id,
+        string repo,
+        string targetBranch,
+        string headSha,
+        int filesChanged,
+        int additions,
+        int deletions,
+        IReadOnlyList<DiffFileNode> files) =>
+        new(id, repo, targetBranch, headSha, filesChanged, additions, deletions, files);
 }

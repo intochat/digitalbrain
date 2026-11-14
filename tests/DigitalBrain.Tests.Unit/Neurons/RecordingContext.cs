@@ -45,7 +45,7 @@ internal sealed class RecordingContext(NeuronId id) : INeuronContext, INeuronSea
 
     public string? TraceId { get; set; }
 
-    public DigitalBrain.Access.Caller? Caller => null;
+    public DigitalBrain.Access.Caller? Caller { get; set; }
 
     public List<Synapse> SynapseList { get; } = [];
 
