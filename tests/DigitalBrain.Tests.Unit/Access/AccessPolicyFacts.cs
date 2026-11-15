@@ -25,17 +25,40 @@ public sealed class AccessPolicyFacts
         }
     }
 
-    [Fact]
-    public void CrossBrainCallIsRefusedWithOutsideBrainRegardlessOfAccessLevel()
+    [Theory]
+    [InlineData(OperationAccess.Owner)]
+    [InlineData(OperationAccess.Internal)]
+    public void CrossBrainCallIsRefusedWithOutsideBrainForOwnerAndInternalOperations(OperationAccess access)
     {
         var edge = EdgeAuthority.CreateInternal();
         var caller = edge.Person("alice-user", "acct_1", Bob); // Caller is in Bob's brain
 
-        foreach (var access in Enum.GetValues<OperationAccess>())
+        var decision = AccessPolicy.Decide(caller, AliceTarget, access);
+        Assert.False(decision.Allowed);
+        Assert.Equal(AccessDenial.OutsideBrain, decision.Denial);
+    }
+
+    [Theory]
+    [InlineData(OperationAccess.Public)]
+    [InlineData(OperationAccess.Shared)]
+    public void CrossBrainCallIsAllowedForPublicAndSharedOperations(OperationAccess access)
+    {
+        var edge = EdgeAuthority.CreateInternal();
+        var person = new Actor.Person("bob-user", "acct_2");
+        Caller[] callers =
+        [
+            edge.Person("bob-user", "acct_2", Bob),
+            edge.Agent(person, Bob),
+            edge.App("app1", person, Bob),
+            edge.Module("mod1", Bob),
+            edge.Scheduler(Bob),
+        ];
+
+        foreach (var caller in callers)
         {
             var decision = AccessPolicy.Decide(caller, AliceTarget, access);
-            Assert.False(decision.Allowed);
-            Assert.Equal(AccessDenial.OutsideBrain, decision.Denial);
+            Assert.True(decision.Allowed);
+            Assert.Equal(AccessDenial.None, decision.Denial);
         }
     }
 

@@ -13,7 +13,7 @@ namespace DigitalBrain.Analyzers.Screens;
 /// </summary>
 public static class AnalyzerSet
 {
-    /// <summary>All analyzers: DB0001, DB0003, DB0013, DB0022, DB0025, DB0027, DB0028, DB0031-DB0033 (10 analyzers, one rule each).</summary>
+    /// <summary>All analyzers: DB0001, DB0003, DB0013, DB0022, DB0025, DB0027, DB0028, DB0031-DB0033, DB0040 (11 analyzers, one rule each).</summary>
     public static ImmutableArray<DiagnosticAnalyzer> All { get; } = ImmutableArray.Create<DiagnosticAnalyzer>(
         new ModuleShapeAnalyzer(),
         new OrleansAttributeAnalyzer(),
@@ -24,7 +24,8 @@ public static class AnalyzerSet
         new SuppressionAnalyzer(),
         new ShareableContractAnalyzer(),
         new ReentrancyJustificationAnalyzer(),
-        new CallCycleAnalyzer());
+        new CallCycleAnalyzer(),
+        new BareInvariantAnalyzer());
 
     /// <summary>The synapse analyzers: DB0041-DB0045, applied by the synapse compiler on top of <see cref="All"/>.</summary>
     public static ImmutableArray<DiagnosticAnalyzer> Synapses { get; } = ImmutableArray.Create<DiagnosticAnalyzer>(

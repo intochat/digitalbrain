@@ -33,12 +33,12 @@ public sealed class ScreenRulesFacts
 public sealed class AnalyzerSetFacts
 {
     [Fact]
-    public void All_holds_ten_analyzers_covering_every_rule_once()
+    public void All_holds_eleven_analyzers_covering_every_rule_once()
     {
-        Assert.Equal(10, AnalyzerSet.All.Length);
+        Assert.Equal(11, AnalyzerSet.All.Length);
         var ids = AnalyzerSet.All.SelectMany(a => a.SupportedDiagnostics).Select(d => d.Id).ToArray();
         Assert.Equal(
-            ["DB0001", "DB0003", "DB0013", "DB0022", "DB0025", "DB0027", "DB0028", "DB0031", "DB0032", "DB0033"],
+            ["DB0001", "DB0003", "DB0013", "DB0022", "DB0025", "DB0027", "DB0028", "DB0031", "DB0032", "DB0033", "DB0040"],
             ids.Order(StringComparer.Ordinal));
         Assert.Equal(ids.Length, ids.Distinct(StringComparer.Ordinal).Count());
     }
@@ -56,7 +56,7 @@ public sealed class AnalyzerSetFacts
 public sealed class EmptyCatchAnalyzerFacts
 {
     [Fact]
-    public Task Empty_catch_in_screen_reports_DB0022() => Verify<EmptyCatchAnalyzer>.Diagnostics("""
+    public Task Empty_or_discard_catch_in_screen_reports_DB0022() => Verify<EmptyCatchAnalyzer>.Diagnostics("""
         using System;
         using DigitalBrain;
         using DigitalBrain.UI;
@@ -66,16 +66,20 @@ public sealed class EmptyCatchAnalyzerFacts
             protected override View Render(SState state) => new("S", 1);
             public void Swallow() { try { Console.WriteLine(); } {|DB0022:catch|} { } }
             public void Return() { try { Console.WriteLine(); } {|DB0022:catch|} (Exception) { return; } }
+            public void Discard() { try { Console.WriteLine(); } {|DB0022:catch|} (Exception e) { _ = e; } }
             public void NonSwallow() { try { Console.WriteLine(); } catch (Exception e) { throw; } }
         }
         """);
 
     [Fact]
-    public Task Empty_catch_in_non_screen_reports_nothing() => Verify<EmptyCatchAnalyzer>.Diagnostics("""
+    public Task Broad_empty_catch_in_non_screen_reports_DB0022_while_narrow_catch_is_allowed() => Verify<EmptyCatchAnalyzer>.Diagnostics("""
         using System;
         public sealed class Helper
         {
-            public void Swallow() { try { Console.WriteLine(); } catch { } }
+            public void Swallow() { try { Console.WriteLine(); } {|DB0022:catch|} { } }
+            public void SwallowException() { try { Console.WriteLine(); } {|DB0022:catch|} (Exception) { } }
+            public void SwallowDiscard() { try { Console.WriteLine(); } {|DB0022:catch|} (Exception e) { _ = e; } }
+            public void NarrowCancel() { try { Console.WriteLine(); } catch (OperationCanceledException) { } }
         }
         """);
 }

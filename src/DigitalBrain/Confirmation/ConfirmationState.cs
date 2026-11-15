@@ -39,9 +39,9 @@ public static class ConfirmationAudit
 
 /// <summary>
 /// Pure state of the confirmations neuron. Enforces the four core invariants:
-/// 1. Maximum of 20 pending confirmations per brain.
+/// 1. Maximum of 20 pending confirmations per raiser.
 /// 2. Plan id length up to 128 characters and positive expiry.
-/// 3. Expiry capped at DefaultExpiry (5 minutes), or up to 7 days for person-required / held neuron plans.
+/// 3. Expiry capped at DefaultExpiry (5 minutes), or up to 7 days for person-required plans.
 /// 4. Idempotent re-raise by same caller/neuron and matching plan shape.
 /// </summary>
 [ExportableState]
@@ -64,15 +64,6 @@ public sealed record ConfirmationState
         string raisedBy,
         ConfirmationPolicy policy,
         DateTimeOffset now)
-        => Request(plan, requester, raisedBy, policy, now, held: false);
-
-    internal ConfirmationTransition? Request(
-        ConfirmationPlan plan,
-        ConfirmationPrincipal requester,
-        string raisedBy,
-        ConfirmationPolicy policy,
-        DateTimeOffset now,
-        bool held)
     {
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentException.ThrowIfNullOrWhiteSpace(plan.Id);
@@ -84,19 +75,19 @@ public sealed record ConfirmationState
 
         if (Entries.FirstOrDefault(entry => entry.Request.PlanId == plan.Id) is { } known)
         {
-            var sameCaller = known.RaisedBy is { } by ? string.Equals(by, raisedBy, StringComparison.Ordinal) : known.Request.Requester == requester;
+            var sameCaller = SameRaiser(known, requester, raisedBy);
             var sameShape = known.Request.Plan.RequiresPerson == plan.RequiresPerson
                 && string.Equals(known.Request.Plan.Kind, plan.Kind, StringComparison.Ordinal)
                 && string.Equals(known.Request.Plan.Subject, plan.Subject, StringComparison.Ordinal);
             return sameCaller && sameShape ? null : throw new InvalidOperationException("This confirmation plan was already requested.");
         }
 
-        if (Entries.Count(entry => entry.Result is null) >= PendingLimit)
+        if (Entries.Count(entry => entry.Result is null && SameRaiser(entry, requester, raisedBy)) >= PendingLimit)
         {
-            throw new InvalidOperationException("This brain already has 20 confirmations waiting.");
+            throw new InvalidOperationException("This raiser already has 20 confirmations waiting.");
         }
 
-        var maxExpiry = (plan.RequiresPerson || held) ? MaxPersonExpiry : ConfirmationRules.DefaultExpiry;
+        var maxExpiry = plan.RequiresPerson ? MaxPersonExpiry : ConfirmationRules.DefaultExpiry;
         var expiry = plan.Expiry < maxExpiry ? plan.Expiry : maxExpiry;
         var request = new ConfirmationRequested(plan.Id, plan with { Expiry = expiry }, requester, policy, now + expiry);
 
@@ -116,17 +107,28 @@ public sealed record ConfirmationState
     public ConfirmationTransition? Answer(
         string planId,
         bool approve,
-        bool person,
-        ConfirmationPrincipal approver,
+        Answerer answerer,
         DateTimeOffset now)
     {
-        var outcome = approve && person ? ConfirmationOutcome.Approved : ConfirmationOutcome.Denied;
-        var reason = !approve
-            ? ConfirmationDenyReason.ByPerson
-            : person ? ConfirmationDenyReason.None : ConfirmationDenyReason.SelfApproval;
+        ArgumentNullException.ThrowIfNull(answerer);
 
-        return End(planId, outcome, reason, approver, now);
+        if (Entries.FirstOrDefault(entry => entry.Request.PlanId == planId && entry.Result is null) is { } open
+            && open.Request.Plan.RequiresPerson
+            && !answerer.IsPerson)
+        {
+            throw new UnauthorizedAccessException("Only a person answers this question.");
+        }
+
+        var outcome = approve && answerer.IsPerson ? ConfirmationOutcome.Approved : ConfirmationOutcome.Denied;
+        var reason = answerer.IsPerson
+            ? (approve ? ConfirmationDenyReason.None : ConfirmationDenyReason.ByPerson)
+            : ConfirmationDenyReason.SelfApproval;
+
+        return End(planId, outcome, reason, answerer.Principal, now);
     }
+
+    private static bool SameRaiser(ConfirmationEntry entry, ConfirmationPrincipal requester, string raisedBy)
+        => entry.RaisedBy is { } by ? string.Equals(by, raisedBy, StringComparison.Ordinal) : entry.Request.Requester == requester;
 
     public ConfirmationTransition? Withdraw(string planId, DateTimeOffset now)
         => End(planId, ConfirmationOutcome.Denied, ConfirmationDenyReason.PlanInvalid, null, now);

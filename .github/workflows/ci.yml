@@ -233,7 +233,7 @@ jobs:
   publish-github-packages:
     name: publish-github-packages
     needs: [ci]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'release'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -250,5 +250,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PACKAGE_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           for pkg in artifacts/packages/*.nupkg; do
-            dotnet nuget push "$pkg" --source https://nuget.pkg.github.com/intochat/index.json --api-key "${GITHUB_TOKEN}" --skip-duplicate
+            dotnet nuget push "$pkg" --source https://nuget.pkg.github.com/intochat/index.json --api-key "${GITHUB_TOKEN}"
           done

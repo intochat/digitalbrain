@@ -23,6 +23,11 @@ public static class AccessPolicy
                 return AccessDecision.Deny(AccessDenial.UnknownActor, "The caller's actor is not one the kernel knows.");
         }
 
+        if (access is OperationAccess.Public or OperationAccess.Shared)
+        {
+            return AccessDecision.Allow;
+        }
+
         if (caller.Brain != target.Brain)
         {
             return AccessDecision.Deny(AccessDenial.OutsideBrain,

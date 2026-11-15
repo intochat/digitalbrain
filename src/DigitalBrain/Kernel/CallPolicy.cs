@@ -94,11 +94,15 @@ internal static class CallPolicy
 
     /// <summary>Resolves the access level required to invoke <paramref name="method"/> on <paramref name="contract"/>.</summary>
     public static OperationAccess AccessOf(Type contract, MethodInfo method)
+        => AccessOf(contract, method, implementation: null);
+
+    internal static OperationAccess AccessOf(Type contract, MethodInfo method, MethodInfo? implementation)
     {
         ArgumentNullException.ThrowIfNull(contract);
         ArgumentNullException.ThrowIfNull(method);
 
         var attr = method.GetCustomAttribute<AccessAttribute>(inherit: false)
+            ?? implementation?.GetCustomAttribute<AccessAttribute>(inherit: false)
             ?? contract.GetCustomAttribute<AccessAttribute>(inherit: false);
 
         return attr switch

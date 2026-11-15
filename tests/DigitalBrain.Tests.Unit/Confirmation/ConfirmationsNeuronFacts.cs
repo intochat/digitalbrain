@@ -150,4 +150,51 @@ public sealed class ConfirmationsNeuronFacts
         Assert.Equal(ConfirmationOutcome.Denied, outcome.Outcome);
         Assert.Equal(ConfirmationDenyReason.PlanInvalid, outcome.Reason);
     }
+
+    [Fact]
+    public async Task Request_RelayedCallerWithoutRequiresPerson_CapsExpiryAtDefaultExpiry()
+    {
+        var brain = new BrainId("b1");
+        var context = new FakeNeuronContext(new NeuronId(brain, "runtime.confirmations", "confirmations"));
+        var raiserNeuron = new NeuronId(brain, "flow.feature-pr", "run-1");
+        var alice = new DigitalBrain.Access.Actor.Person("alice", "acc-1");
+        context.Caller = new DigitalBrain.Access.Caller(alice, brain, via: raiserNeuron);
+
+        var neuron = new ConfirmationsNeuron();
+        NeuronAttachment.Attach(neuron, context);
+
+        var plan = Plan("cf-relayed-cap") with
+        {
+            RequiresPerson = false,
+            Expiry = TimeSpan.FromHours(48),
+        };
+        Assert.Null(await neuron.Request(plan));
+
+        var pending = Assert.Single((await neuron.Read()).Pending);
+        Assert.Equal(ConfirmationRules.DefaultExpiry, pending.Plan.Expiry);
+    }
+
+    [Fact]
+    public async Task Request_StartsDurableExpiryReminder_AndStopsWhenCleared()
+    {
+        var brain = new BrainId("b1");
+        var context = new FakeNeuronContext(new NeuronId(brain, "runtime.confirmations", "confirmations"));
+        var neuron = new ConfirmationsNeuron();
+        NeuronAttachment.Attach(neuron, context);
+        context.Reminders.Target = neuron;
+
+        var plan = Plan("cf-durable-exp") with { Expiry = TimeSpan.FromMinutes(1) };
+        Assert.Null(await neuron.Request(plan));
+
+        var reminders = await context.Reminders.Names();
+        var expiryReminder = Assert.Single(reminders);
+
+        context.Clock.Advance(TimeSpan.FromMinutes(2));
+        await context.Reminders.Fire(expiryReminder, TestContext.Current.CancellationToken);
+
+        var outcome = await neuron.Outcome("cf-durable-exp");
+        Assert.NotNull(outcome);
+        Assert.Equal(ConfirmationOutcome.Expired, outcome.Outcome);
+        Assert.Empty(await context.Reminders.Names());
+    }
 }

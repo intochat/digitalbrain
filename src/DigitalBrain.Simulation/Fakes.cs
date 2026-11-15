@@ -565,8 +565,7 @@ public sealed class FakeNeuronContext : INeuronContext, INeuronSeat
 
     DigitalBrain.Access.Caller? INeuronContext.Caller => Caller ?? DigitalBrain.Testing.TestCallerAmbient.Instance.Current;
 
-    /// <summary>The confirmation gate on <see cref="Clock"/>; this neuron asks as an app and its signals are recorded in <see cref="Published"/>.</summary>
-    public TestConfirmations Confirmations => field ??= new TestConfirmations(Clock);
+    private DigitalBrain.Confirmation.ConfirmationsNeuron? _confirmations;
 
     Task<TState?> INeuronSeat.Load<TState>() where TState : class => MemoryState.Load<TState>();
 
@@ -595,10 +594,18 @@ public sealed class FakeNeuronContext : INeuronContext, INeuronSeat
     {
         if (id == DigitalBrain.Confirmation.IConfirmationRequests.Of(Id.Brain))
         {
-            if (typeof(T) == typeof(DigitalBrain.Confirmation.IConfirmationRequests)) { return (T)(object)Confirmations; }
-            if (typeof(T) == typeof(DigitalBrain.Confirmation.IConfirmationInbox)) { return (T)(object)Confirmations; }
+            if (typeof(T) == typeof(DigitalBrain.Confirmation.IConfirmationRequests)) { return (T)(object)ConfirmationsTarget(); }
+            if (typeof(T) == typeof(DigitalBrain.Confirmation.IConfirmationInbox)) { return (T)(object)ConfirmationsTarget(); }
         }
         return Proxies.Get<T>(id);
+    }
+
+    private DigitalBrain.Confirmation.ConfirmationsNeuron ConfirmationsTarget()
+    {
+        if (_confirmations is not null) { return _confirmations; }
+        var neuron = new DigitalBrain.Confirmation.ConfirmationsNeuron();
+        NeuronAttachment.Attach(neuron, new FakeNeuronContext(DigitalBrain.Confirmation.IConfirmationRequests.Of(Id.Brain), Services));
+        return _confirmations = neuron;
     }
 
     /// <inheritdoc />

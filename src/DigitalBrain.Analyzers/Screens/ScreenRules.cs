@@ -11,7 +11,7 @@ public static class ScreenRules
 
     public static readonly DiagnosticDescriptor SwallowingCatch = Create(
         "DB0022", "Empty or swallow-only catch",
-        "A catch in screen '{0}' is empty or only swallows the error; rethrow or record the error state", DiagnosticSeverity.Error);
+        "A catch in '{0}' is empty or only swallows the error; rethrow, log or record the error state", DiagnosticSeverity.Error);
 
     public static readonly DiagnosticDescriptor HandWrittenJson = Create(
         "DB0025", "Hand-written JSON",

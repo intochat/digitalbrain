@@ -133,7 +133,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         AccessCounters = new AccessCounters();
         Access = new AccessGate(TestCallerAmbient.Instance, AccessOptions, AccessCounters);
         Edge = new EdgeAuthority(TestCallerAmbient.Instance);
-        Confirmations = new TestConfirmations(Clock, this);
+        Confirmations = new TestConfirmations(this);
         AskProgress = new AskProgressHub(Clock);
         Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance, new TestInstallHooks(this), new TestSlotResolver(this), Source, () => [.. _actions.Values], () => Loader, () => Resolver, () => LiveBindings, () => _compiler.Value, () => Synapses, () => new DigitalBrain.Confirmation.ConfirmationPolicies { DefaultPolicy = Confirmations.Policy }, AskProgress);
         Register<InstallsNeuron>();

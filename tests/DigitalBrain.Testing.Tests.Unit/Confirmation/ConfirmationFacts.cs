@@ -20,6 +20,8 @@ public interface IConfirmer
     Task<string> Ask(string planId, bool destructive);
 
     Task Relay(string planId);
+
+    Task<ConfirmationResult> AskPlan(ConfirmationPlan plan);
 }
 
 /// <summary>Asks through IConfirmations and IOperations, and tries to relay an approval as itself.</summary>
@@ -43,13 +45,13 @@ public sealed class ConfirmerNeuron(IOperations operations, IConfirmations confi
     }
 
     public Task Relay(string planId) => confirmations.Resolve(planId, approve: true, CancellationToken.None);
+
+    public Task<ConfirmationResult> AskPlan(ConfirmationPlan plan) => confirmations.Confirm(plan, CancellationToken.None);
 }
 
 // 07-02 (CAP-06, FILES-04, D-03, D-09, D-16, D-19, D-22): the confirmation gate contract, its TestOS implementation and ConfirmView.
 public sealed class ConfirmationFacts
 {
-    private static readonly ConfirmationPrincipal App = ConfirmationPrincipal.App("ada/files/app");
-
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     internal static ConfirmationPlan Plan(string id, bool destructive)
@@ -66,109 +68,122 @@ public sealed class ConfirmationFacts
     }
 
     [Fact]
-    public void The_policy_has_exactly_always_destructive_only_never_and_defaults_to_destructive_only()
+    public async Task The_policy_has_exactly_always_destructive_only_never_and_defaults_to_destructive_only()
     {
         Assert.Equal(["DestructiveOnly", "Always", "Never"], Enum.GetNames<ConfirmationPolicy>());
         Assert.Equal(ConfirmationPolicy.DestructiveOnly, default);
-        Assert.Equal(ConfirmationPolicy.DestructiveOnly, new TestConfirmations(new TestClock()).Policy);
+        await using var os = OS.Local();
+        Assert.Equal(ConfirmationPolicy.DestructiveOnly, os.Confirmations.Policy);
         Assert.Equal(TimeSpan.FromMinutes(5), Plan("p", true).Expiry);
     }
 
     [Fact]
     public async Task Destructive_only_approves_a_non_destructive_plan_without_asking_and_audits_it_skipped()
     {
-        var confirmations = new TestConfirmations(new TestClock());
-        var published = new List<Signal>();
+        await using var os = OS.Local();
+        os.Register<ConfirmerNeuron>();
+        var confirmer = os.Get<IConfirmer>(new NeuronId(new BrainId("ada"), "test.confirmer", "c"));
 
-        var result = await confirmations.For(App, signal => { published.Add(signal); return Task.CompletedTask; }).Confirm(Plan("p1", false), Ct);
+        var outcome = await confirmer.Ask("p1", destructive: false);
 
-        Assert.Equal(new ConfirmationResult("p1", ConfirmationOutcome.Approved, ConfirmationDenyReason.None, Skipped: true), result);
-        Assert.Empty(confirmations.Requested);
-        var audit = Assert.IsType<ConfirmationResolved>(Assert.Single(published));
+        Assert.Equal("Approved:None:True", outcome);
+        Assert.Empty(os.Confirmations.Requested);
+        var audit = Assert.Single(os.Confirmations.Audit);
         Assert.True(audit.Skipped);
-        Assert.Equal(App, audit.Requester);
-        Assert.Single(confirmations.Audit);
+        Assert.Equal(PrincipalKind.App, audit.Requester.Kind);
     }
 
     [Fact]
     public async Task Never_approves_even_a_destructive_plan_and_still_writes_the_audit_signal()
     {
-        var confirmations = new TestConfirmations(new TestClock()) { Policy = ConfirmationPolicy.Never };
+        await using var os = OS.Local();
+        os.Confirmations.Policy = ConfirmationPolicy.Never;
+        os.Register<ConfirmerNeuron>();
+        var confirmer = os.Get<IConfirmer>(new NeuronId(new BrainId("ada"), "test.confirmer", "c"));
 
-        var result = await confirmations.For(App).Confirm(Plan("p2", true), Ct);
+        var outcome = await confirmer.Ask("p2", destructive: true);
 
-        Assert.True(result.Approved);
-        Assert.True(result.Skipped);
-        var audit = Assert.Single(confirmations.Audit);
+        Assert.Equal("Approved:None:True", outcome);
+        var audit = Assert.Single(os.Confirmations.Audit);
         Assert.Equal((ConfirmationOutcome.Approved, true, ConfirmationPolicy.Never), (audit.Outcome, audit.Skipped, audit.Policy));
     }
 
     [Fact]
     public async Task Always_asks_even_a_non_destructive_plan_and_waits_for_a_person()
     {
-        var confirmations = new TestConfirmations(new TestClock()) { Policy = ConfirmationPolicy.Always };
-        var published = new List<Signal>();
+        await using var os = OS.Local(options => options.CallTimeout = TimeSpan.FromHours(1));
+        os.Confirmations.Policy = ConfirmationPolicy.Always;
+        os.Register<ConfirmerNeuron>();
+        var confirmer = os.Get<IConfirmer>(new NeuronId(new BrainId("ada"), "test.confirmer", "c"));
 
-        var asked = confirmations.For(App, signal => { published.Add(signal); return Task.CompletedTask; }).Confirm(Plan("p3", false), Ct);
-        var request = await Waiting(confirmations, "p3");
+        var asked = confirmer.Ask("p3", destructive: false);
+        var request = await Waiting(os.Confirmations, "p3");
         Assert.False(asked.IsCompleted);
-        Assert.Equal((App, ConfirmationPolicy.Always), (request.Requester, request.Policy));
+        Assert.Equal((PrincipalKind.App, ConfirmationPolicy.Always), (request.Requester.Kind, request.Policy));
 
-        await confirmations.Approve("p3");
+        await os.Confirmations.Approve("p3");
 
-        var result = await asked;
-        Assert.Equal((ConfirmationOutcome.Approved, false), (result.Outcome, result.Skipped));
-        Assert.IsType<ConfirmationRequested>(published[0]);
-        var resolved = Assert.IsType<ConfirmationResolved>(published[1]);
+        Assert.Equal("Approved:None:False", await asked);
+        var signals = await os.Journal(new BrainId("ada")).Read(IConfirmationRequests.Of(new BrainId("ada")), 0, SignalPage.MaxLimit, Ct);
+        Assert.IsType<ConfirmationRequested>(signals.Signals[0].Signal);
+        var resolved = Assert.IsType<ConfirmationResolved>(signals.Signals[1].Signal);
         Assert.Equal(("p3", ConfirmationPrincipal.Person("person")), (resolved.PlanId, resolved.Approver));
     }
 
     [Fact]
     public async Task An_app_or_agent_approving_is_denied_self_approval()
     {
-        var confirmations = new TestConfirmations(new TestClock());
-        var asked = confirmations.For(App).Confirm(Plan("p4", true), Ct);
-        await Waiting(confirmations, "p4");
+        await using var os = OS.Local(options => options.CallTimeout = TimeSpan.FromHours(1));
+        os.Register<ConfirmerNeuron>();
+        var confirmer = os.Get<IConfirmer>(new NeuronId(new BrainId("ada"), "test.confirmer", "c"));
 
-        confirmations.Current = ConfirmationPrincipal.Agent("agent-7");
-        await confirmations.Approve("p4");
+        var asked = confirmer.Ask("p4", destructive: true);
+        await Waiting(os.Confirmations, "p4");
 
-        var result = await asked;
-        Assert.Equal((ConfirmationOutcome.Denied, ConfirmationDenyReason.SelfApproval), (result.Outcome, result.Reason));
-        Assert.Equal(PrincipalKind.Agent, Assert.Single(confirmations.Audit).Approver!.Kind);
+        os.Confirmations.Current = ConfirmationPrincipal.Agent("agent-7");
+        await os.Confirmations.Approve("p4");
+
+        Assert.Equal("Denied:SelfApproval:False", await asked);
+        Assert.Equal(PrincipalKind.Agent, Assert.Single(os.Confirmations.Audit).Approver!.Kind);
     }
 
     [Fact]
     public async Task No_answer_within_five_minutes_expires_on_the_clock()
     {
-        var clock = new TestClock();
-        var confirmations = new TestConfirmations(clock);
-        var asked = confirmations.For(App).Confirm(Plan("p5", true), Ct);
-        var request = await Waiting(confirmations, "p5");
-        Assert.Equal(clock.GetUtcNow() + TimeSpan.FromMinutes(5), request.ExpiresAt);
+        await using var os = OS.Local(options => options.CallTimeout = TimeSpan.FromHours(1));
+        os.Register<ConfirmerNeuron>();
+        var confirmer = os.Get<IConfirmer>(new NeuronId(new BrainId("ada"), "test.confirmer", "c"));
 
-        clock.Advance(TimeSpan.FromMinutes(4) + TimeSpan.FromSeconds(59));
+        var asked = confirmer.Ask("p5", destructive: true);
+        var request = await Waiting(os.Confirmations, "p5");
+        Assert.Equal(os.Clock.GetUtcNow() + TimeSpan.FromMinutes(5), request.ExpiresAt);
+
+        os.Clock.Advance(TimeSpan.FromMinutes(4) + TimeSpan.FromSeconds(59));
+        await Task.Delay(50, Ct);
         Assert.False(asked.IsCompleted);
-        clock.Advance(TimeSpan.FromSeconds(1));
+        os.Clock.Advance(TimeSpan.FromSeconds(1));
 
-        var result = await asked;
-        Assert.Equal((ConfirmationOutcome.Expired, ConfirmationDenyReason.Expired), (result.Outcome, result.Reason));
-        Assert.Null(Assert.Single(confirmations.Audit).Approver);
-        Assert.Empty(confirmations.Waiting);
+        Assert.Equal("Expired:Expired:False", await asked);
+        await os.Idle();
+        Assert.Null(Assert.Single(os.Confirmations.Audit).Approver);
+        Assert.Empty(os.Confirmations.Waiting);
     }
 
     [Fact]
     public async Task The_first_answer_wins_and_a_second_answer_writes_nothing()
     {
-        var confirmations = new TestConfirmations(new TestClock());
-        var asked = confirmations.For(App).Confirm(Plan("p6", true), Ct);
-        await Waiting(confirmations, "p6");
+        await using var os = OS.Local(options => options.CallTimeout = TimeSpan.FromHours(1));
+        os.Register<ConfirmerNeuron>();
+        var confirmer = os.Get<IConfirmer>(new NeuronId(new BrainId("ada"), "test.confirmer", "c"));
 
-        await confirmations.Deny("p6");
-        await confirmations.Approve("p6");
+        var asked = confirmer.Ask("p6", destructive: true);
+        await Waiting(os.Confirmations, "p6");
 
-        Assert.Equal((ConfirmationOutcome.Denied, ConfirmationDenyReason.ByPerson), ((await asked).Outcome, (await asked).Reason));
-        Assert.Single(confirmations.Audit);
+        await os.Confirmations.Deny("p6");
+        await os.Confirmations.Approve("p6");
+
+        Assert.Equal("Denied:ByPerson:False", await asked);
+        Assert.Single(os.Confirmations.Audit);
     }
 
     // D-19: the card resolves by plan id through the OS inbox surface; no Emit.
@@ -279,22 +294,25 @@ public sealed class ConfirmationFacts
             "rename" => WritePlan.Rename(file, "b.txt"),
             _ => WritePlan.Copy(file, a.Root),
         };
-        var confirmations = new TestConfirmations(new TestClock()) { Policy = policy };
+        await using var os = OS.Local(options => options.CallTimeout = TimeSpan.FromHours(1));
+        os.Confirmations.Policy = policy;
+        os.Register<ConfirmerNeuron>();
+        var confirmer = os.Get<IConfirmer>(new NeuronId(new BrainId("ada"), "test.confirmer", "c"));
 
-        var check = Check(runner, confirmations.For(App), plan, Ct);
+        var check = Check(runner, confirmer, plan, Ct);
         if (asks)
         {
-            var request = await WaitAny(confirmations);
+            var request = await WaitAny(os.Confirmations);
             Assert.DoesNotContain("/", request.Plan.Title + request.Plan.Body, StringComparison.Ordinal);
-            await confirmations.Deny(request.PlanId);
+            await os.Confirmations.Deny(request.PlanId);
             Assert.Equal("The confirmation was denied.", await check);
         }
         else
         {
             Assert.Null(await check);
-            Assert.Empty(confirmations.Requested);
+            Assert.Empty(os.Confirmations.Requested);
         }
-        var audit = Assert.Single(confirmations.Audit);
+        var audit = Assert.Single(os.Confirmations.Audit);
         Assert.Equal(!asks, audit.Skipped);
     }
 
@@ -308,19 +326,19 @@ public sealed class ConfirmationFacts
         throw new TimeoutException("Nothing was asked.");
     }
 
-    private static async Task<string?> Check(StorageWriteRunner runner, IConfirmations confirmations, WritePlan plan, CancellationToken ct)
+    private static async Task<string?> Check(StorageWriteRunner runner, IConfirmer confirmer, WritePlan plan, CancellationToken ct)
     {
         var question = await runner.Confirmation(plan, ct).ConfigureAwait(false);
-        var result = await confirmations.Confirm(question, ct).ConfigureAwait(false);
+        var result = await confirmer.AskPlan(question).ConfigureAwait(false);
         return result.Approved ? null : "The confirmation was denied.";
     }
 
-    private static Task<string?> Check(IStorage storage, IConfirmations confirmations, WritePlan plan, CancellationToken ct)
+    private static Task<string?> Check(IStorage storage, IConfirmer confirmer, WritePlan plan, CancellationToken ct)
     {
         var runner = new StorageWriteRunner(
             (_, _) => Task.FromResult(new CapabilityConnection<IStorage>("drive", "Drive", storage)),
             (_, _, _) => Task.FromResult<OperationResult>(new OperationResult.Succeeded()));
-        return Check(runner, confirmations, plan, ct);
+        return Check(runner, confirmer, plan, ct);
     }
 
     [Fact]
@@ -328,12 +346,14 @@ public sealed class ConfirmationFacts
     {
         var storage = new FakeStorage("Drive");
         var file = storage.AddFile(storage.Root, "a.txt", "x"u8.ToArray());
-        var confirmations = new TestConfirmations(new TestClock());
-        var checking = Check(storage, confirmations.For(App), WritePlan.Delete(file), Ct);
-        var request = await WaitAny(confirmations);
+        await using var os = OS.Local(options => options.CallTimeout = TimeSpan.FromHours(1));
+        os.Register<ConfirmerNeuron>();
+        var confirmer = os.Get<IConfirmer>(new NeuronId(new BrainId("ada"), "test.confirmer", "c"));
+        var checking = Check(storage, confirmer, WritePlan.Delete(file), Ct);
+        var request = await WaitAny(os.Confirmations);
         Assert.Contains("a.txt", request.Plan.Title, StringComparison.Ordinal);
         Assert.False(checking.IsCompleted);
-        await confirmations.Deny(request.PlanId);
+        await os.Confirmations.Deny(request.PlanId);
         Assert.Equal("The confirmation was denied.", await checking);
         Assert.Equal("a.txt", (await storage.Stat(file, Ct)).Name);
     }

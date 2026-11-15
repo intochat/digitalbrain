@@ -535,6 +535,7 @@ public sealed class FlowFacts
     public async Task CancelCancelsRunningBodyToken()
     {
         var (flow, context) = await Activated();
+        context.Caller = new DigitalBrain.Access.Caller(new DigitalBrain.Access.Actor.Person("ann", "acc"), FlowId.Brain);
         TwoStepFlow.HangsLeft = 1;
         await flow.Start("Build", "ann", null, new Box());
         var started = Drain(context);
@@ -552,6 +553,7 @@ public sealed class FlowFacts
     public async Task CancelAfterDeactivationDoesNotThrow()
     {
         var (flow, context) = await Activated();
+        context.Caller = new DigitalBrain.Access.Caller(new DigitalBrain.Access.Actor.Person("ann", "acc"), FlowId.Brain);
         await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true, Reason = WaitReason.External });
         await NeuronAttachment.Deactivate(flow, DeactivationCause.Idle, CancellationToken.None);
 
@@ -564,6 +566,7 @@ public sealed class FlowFacts
     public async Task AFailedCancelPostDoesNotStallTheFlow()
     {
         var (flow, context) = await Activated();
+        context.Caller = new DigitalBrain.Access.Caller(new DigitalBrain.Access.Actor.Person("ann", "acc"), FlowId.Brain);
         TwoStepFlow.HangsLeft = 1;
         await flow.Start("Build", "ann", null, new Box());
         var started = Drain(context);
@@ -586,12 +589,69 @@ public sealed class FlowFacts
     public async Task CancelResolvesPendingApprovalPlan()
     {
         var (flow, context) = await Activated();
+        context.Caller = new DigitalBrain.Access.Caller(new DigitalBrain.Access.Actor.Person("ann", "acc"), FlowId.Brain);
         await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true });
         var plan = Assert.Single(_confirmations.Asked);
 
         await flow.Cancel("stop");
 
         Assert.Equal([(plan.Id, false)], _confirmations.Resolved);
+        Assert.Equal(FlowStatus.Cancelled, flow.Current.Status);
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("agent")]
+    [InlineData("app")]
+    [InlineData("scheduler")]
+    [InlineData("module")]
+    [InlineData("person-with-conversation")]
+    [InlineData("foreign-person")]
+    public async Task Cancel_RejectsNonPersonOrNonKernelCallers(string kind)
+    {
+        var (flow, context) = await Activated();
+        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true });
+        var plan = Assert.Single(_confirmations.Asked);
+        var person = new DigitalBrain.Access.Actor.Person("ann", "acc");
+        context.Caller = kind switch
+        {
+            "none" => null,
+            "agent" => new DigitalBrain.Access.Caller(new DigitalBrain.Access.Actor.Agent(person), FlowId.Brain),
+            "app" => new DigitalBrain.Access.Caller(new DigitalBrain.Access.Actor.App("tasks", person), FlowId.Brain),
+            "scheduler" => new DigitalBrain.Access.Caller(new DigitalBrain.Access.Actor.Scheduler(), FlowId.Brain, inside: true),
+            "module" => new DigitalBrain.Access.Caller(new DigitalBrain.Access.Actor.Module("flows"), FlowId.Brain, inside: true),
+            "person-with-conversation" => new DigitalBrain.Access.Caller(person, FlowId.Brain, conversation: "conv-1"),
+            "foreign-person" => new DigitalBrain.Access.Caller(person, new BrainId("bob")),
+            _ => throw new InvalidOperationException(),
+        };
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => flow.Cancel("stop"));
+
+        Assert.Equal(FlowStatus.Waiting, flow.Current.Status);
+        Assert.Empty(_confirmations.Resolved);
+        Assert.DoesNotContain(Signals(context), s => s is FlowDone);
+        Assert.Contains(_confirmations.Asked, p => p.Id == plan.Id);
+    }
+
+    [Theory]
+    [InlineData("person")]
+    [InlineData("relayed-person")]
+    [InlineData("kernel")]
+    public async Task Cancel_AllowsDirectOrRelayedPersonAndKernelCallers(string kind)
+    {
+        var (flow, context) = await Activated();
+        await Started(flow, context, "Build", "ann", null, new Box { AskFirst = true });
+        var person = new DigitalBrain.Access.Actor.Person("ann", "acc");
+        context.Caller = kind switch
+        {
+            "person" => new DigitalBrain.Access.Caller(person, FlowId.Brain),
+            "relayed-person" => new DigitalBrain.Access.Caller(person, FlowId.Brain, via: new NeuronId(FlowId.Brain, "apps.flows", "default"), inside: true),
+            "kernel" => DigitalBrain.Access.Caller.OfKernel(FlowId.Brain),
+            _ => throw new InvalidOperationException(),
+        };
+
+        await flow.Cancel("stop");
+
         Assert.Equal(FlowStatus.Cancelled, flow.Current.Status);
     }
 

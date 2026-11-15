@@ -3,6 +3,7 @@ using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using DigitalBrain.Invocation;
 using DigitalBrain.Kernel;
+using DigitalBrain.Log;
 using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Units;
@@ -104,12 +105,15 @@ internal sealed class UnitNeuron<TState> : Neuron<StoredUnit<TState>>, ISynapseR
                 await Run(view, UnitCall.None, step.State, null, result =>
                 {
                     (step, var outcome) = Machine.Viewed(step, result);
-                    if (outcome == ViewOutcome.DeclaresBy) { UnitLog.ViewDeclaresBy(Logger(), view.Name); }
-                    else if (outcome == ViewOutcome.NotAView && _warned.Add(view.Name)) { UnitLog.ViewNotStored(Logger(), view.Name, result?.GetType().FullName ?? "null"); }
+                    if (outcome == ViewOutcome.DeclaresBy) { UnitLog.ViewDeclaresBy(GetLogger("DigitalBrain.Synapses"), view.Name); }
+                    else if (outcome == ViewOutcome.NotAView && _warned.Add(view.Name)) { UnitLog.ViewNotStored(GetLogger("DigitalBrain.Synapses"), view.Name, result?.GetType().FullName ?? "null"); }
                     return Task.FromResult(outcome == ViewOutcome.DeclaresBy ? "refused" : "viewed");
                 }, CancellationToken.None).ConfigureAwait(true);
             }
-            catch { }
+            catch (Exception error) when (error is not OutOfMemoryException)
+            {
+                GetLogger("DigitalBrain.Synapses").LogSwallowed(error, "Rendering initial synapse view failed.");
+            }
 #pragma warning restore CA1031
         }
 
@@ -262,8 +266,8 @@ internal sealed class UnitNeuron<TState> : Neuron<StoredUnit<TState>>, ISynapseR
                     await Run(view, UnitCall.None, step.State, null, result =>
                     {
                         (step, var outcome) = Machine.Viewed(step, result);
-                        if (outcome == ViewOutcome.DeclaresBy) { UnitLog.ViewDeclaresBy(Logger(), view.Name); }
-                        else if (outcome == ViewOutcome.NotAView && _warned.Add(view.Name)) { UnitLog.ViewNotStored(Logger(), view.Name, result?.GetType().FullName ?? "null"); }
+                        if (outcome == ViewOutcome.DeclaresBy) { UnitLog.ViewDeclaresBy(GetLogger("DigitalBrain.Synapses"), view.Name); }
+                        else if (outcome == ViewOutcome.NotAView && _warned.Add(view.Name)) { UnitLog.ViewNotStored(GetLogger("DigitalBrain.Synapses"), view.Name, result?.GetType().FullName ?? "null"); }
                         return Task.FromResult(outcome == ViewOutcome.DeclaresBy ? "refused" : "viewed");
                     }, CancellationToken.None).ConfigureAwait(true);
                 }
@@ -305,18 +309,15 @@ internal sealed class UnitNeuron<TState> : Neuron<StoredUnit<TState>>, ISynapseR
                 var message = error.Message.Length > 500 ? error.Message[..500] : error.Message;
 #pragma warning disable CA1031
                 try { await Publish(new SynapseFailed(Functions.Alias, function.Name, arriving, causeAddress, error.GetType().Name, message)).ConfigureAwait(true); }
-                catch { }
+                catch (Exception publishError) when (publishError is not OutOfMemoryException)
+                {
+                    GetLogger("DigitalBrain.Synapses").LogSwallowed(publishError, "Publishing SynapseFailed signal failed.");
+                }
 #pragma warning restore CA1031
             }
             throw;
         }
 
         await PublishEphemeral(new SynapseFinished(neuron, function.Name, outcome, clock.Elapsed.TotalMilliseconds)).ConfigureAwait(true);
-    }
-
-    private Microsoft.Extensions.Logging.ILogger Logger()
-    {
-        try { return (Seat.Services.GetService(typeof(Microsoft.Extensions.Logging.ILoggerFactory)) as Microsoft.Extensions.Logging.ILoggerFactory)?.CreateLogger("DigitalBrain.Synapses") ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance; }
-        catch { return Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance; }
     }
 }

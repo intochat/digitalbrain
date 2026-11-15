@@ -1,3 +1,4 @@
+using DigitalBrain.Access;
 using DigitalBrain.Modules;
 using DigitalBrain.Units;
 using System.Reflection;
@@ -6,7 +7,6 @@ using DigitalBrain.Confirmation;
 using DigitalBrain.Contracts;
 using DigitalBrain.Neurons;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DigitalBrain.Flows;
 
@@ -110,7 +110,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         Context.Defer(async () =>
         {
             try { await Context.Get<IFlowCallbacks>(Id).Advance().ConfigureAwait(true); }
-            catch (Exception error) when (error is not OutOfMemoryException) { FlowLog.AdvancePostFailed(Logger(), error, FlowId); }
+            catch (Exception error) when (error is not OutOfMemoryException) { FlowLog.AdvancePostFailed(GetLogger("DigitalBrain.Flows"), error, FlowId); }
         });
     }
 
@@ -143,6 +143,12 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
     [Interleaves]
     public async Task Cancel(string reason)
     {
+        if (Context.Caller is not { } caller
+            || caller.Brain != Id.Brain
+            || caller is not ({ Actor: Actor.Person, Conversation: null } or { Actor: Actor.Kernel }))
+        {
+            throw new UnauthorizedAccessException("Only a person or kernel caller of this brain may cancel a flow.");
+        }
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
         if (State.IsOver || _cancelRequested is not null) { return; }
         _cancelRequested = reason;
@@ -159,7 +165,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         {
             posted.TrySetResult(false);
             // Not posted: the body was only interrupted, the nudge runs it again, and a later Cancel tries again.
-            FlowLog.CancelPostFailed(Logger(), error, FlowId);
+            FlowLog.CancelPostFailed(GetLogger("DigitalBrain.Flows"), error, FlowId);
             Forget(proof);
             _cancelRequested = null;
             throw;
@@ -172,7 +178,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         try { Prove(proof); }
         catch (InvalidOperationException error)
         {
-            FlowLog.ForeignCancelRefused(Logger(), error, FlowId);
+            FlowLog.ForeignCancelRefused(GetLogger("DigitalBrain.Flows"), error, FlowId);
             throw;
         }
         if (State.IsOver) { return; }
@@ -447,7 +453,7 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
                 }
             }
         }
-        catch (Exception error) when (error is not OutOfMemoryException) { FlowLog.InterruptionNotSaved(Logger(), error, FlowId, step); }
+        catch (Exception error) when (error is not OutOfMemoryException) { FlowLog.InterruptionNotSaved(GetLogger("DigitalBrain.Flows"), error, FlowId, step); }
     }
 
     private async Task Wait(string step, StepResult<T> result, Waiting wait)
@@ -531,13 +537,6 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         }
     }
 
-    // A runtime without services (a test context) logs nowhere rather than turning a logged failure into a thrown one.
-    private ILogger Logger()
-    {
-        try { return (Seat.Services.GetService(typeof(ILoggerFactory)) as ILoggerFactory)?.CreateLogger("DigitalBrain.Flows") ?? NullLogger.Instance; }
-        catch (NotSupportedException) { return NullLogger.Instance; }
-    }
-
     private async Task Resolve(string step, WaitOutcome outcome, string? by)
     {
         if (State is not { Status: FlowStatus.Waiting, Waiting: { } waiting } || waiting.Step != step || _cancelRequested is not null) { return; }
@@ -553,18 +552,19 @@ public abstract class Flow<T> : Neuron<FlowState<T>>, IFlowCallbacks where T : c
         await Advance().ConfigureAwait(true);
     }
 
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, bool> CancelChecked = new();
+    private bool _cancelChecked;
 
-    // A contract whose Cancel lacks [Interleaves] makes outside cancels wait behind the body: warn once per flow type.
+    // A contract whose Cancel lacks [Interleaves] makes outside cancels wait behind the body: warn once per activation.
     private void WarnOnNonInterleavingCancel()
     {
-        if (!CancelChecked.TryAdd(GetType(), true)) { return; }
+        if (_cancelChecked) { return; }
+        _cancelChecked = true;
         foreach (var contract in GetType().GetInterfaces())
         {
             if (contract == typeof(IFlowCallbacks)) { continue; }
             if (contract.GetMethod(nameof(Cancel), [typeof(string)]) is { } cancel && !cancel.IsDefined(typeof(InterleavesAttribute), false))
             {
-                FlowLog.CancelNotInterleaved(Logger(), GetType().FullName ?? GetType().Name, contract.FullName ?? contract.Name);
+                FlowLog.CancelNotInterleaved(GetLogger("DigitalBrain.Flows"), GetType().FullName ?? GetType().Name, contract.FullName ?? contract.Name);
             }
         }
     }

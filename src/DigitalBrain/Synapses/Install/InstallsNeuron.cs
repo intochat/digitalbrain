@@ -1,5 +1,6 @@
 using DigitalBrain.Confirmation;
 using DigitalBrain.Contracts;
+using DigitalBrain.Log;
 using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Units;
@@ -200,7 +201,10 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
             await hooks.RemoveReactionEdges(state, ct).ConfigureAwait(true);
             await hooks.UnregisterSchedules(state, ct).ConfigureAwait(true);
         }
-        catch (Exception error) when (error is not OutOfMemoryException) { _ = error; }
+        catch (Exception error) when (error is not OutOfMemoryException)
+        {
+            GetLogger("DigitalBrain.Synapses").LogSwallowed(error, "Retiring unit synapses failed.");
+        }
     }
 
     /// <inheritdoc />
@@ -242,7 +246,10 @@ public sealed class InstallsNeuron(ISynapseCatalogSource catalog, IInstallHooks 
                 var asks = Context.Get<IAsks>(AskRules.AsksOf(state));
                 await asks.Attach(ct).ConfigureAwait(true);
             }
-            catch (Exception error) when (error is not OutOfMemoryException) { _ = error; }
+            catch (Exception error) when (error is not OutOfMemoryException)
+            {
+                GetLogger("DigitalBrain.Synapses").LogSwallowed(error, "Attaching asks neuron after install failed.");
+            }
             return null;
         }
         catch (Exception error) when (error is not OutOfMemoryException) { return $"hooks failed: {error.Message}"; }

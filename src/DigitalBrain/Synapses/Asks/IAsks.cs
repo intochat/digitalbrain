@@ -16,7 +16,7 @@ internal interface IAsks
     [OneWayCall]
     Task Settled(AskSettlement settlement);
 
-    /// <summary>Renews the in-memory execution lease of an in-flight ask attempt without writing to durable storage.</summary>
+    /// <summary>Renews the durable execution lease of an in-flight ask attempt.</summary>
     [OneWayCall]
     Task Renew(AskLeaseRenewal renewal);
 

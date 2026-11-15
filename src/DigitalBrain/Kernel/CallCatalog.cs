@@ -267,7 +267,7 @@ internal sealed class CallCatalog
         || (implementationMethod?.IsDefined(typeof(TAttribute), false) ?? false);
 
     private static OperationAccess ResolveAccess(Type contract, MethodInfo method, MethodInfo? implementation)
-        => OperationAccessOf.Resolve(contract, method, implementation);
+        => CallPolicy.AccessOf(contract, method, implementation);
 
     private static (InvocationResultKind Kind, Type? ResultType, Type? TaskResultType, bool IsTask, Func<object, CancellationToken, IAsyncEnumerable<object?>>? Streamer) AnalyzeReturnShape(Type returnType)
     {

@@ -135,4 +135,22 @@ public sealed class ConversationNodeFacts
         Assert.Contains("intochat/os", presented.Texts);
         Assert.Contains("src/App.cs", presented.Texts);
     }
+
+    [Fact]
+    public void ComposerNodeDefaultsDictationFalseAndRoundTripsThroughJson()
+    {
+        Assert.False(Sample.Composer.Dictation);
+        var defaultWire = JsonSerializer.SerializeToElement(Sample.Composer, Json);
+        Assert.True(defaultWire.TryGetProperty("dictation", out var defaultProp));
+        Assert.False(defaultProp.GetBoolean());
+
+        var dictated = Sample with { Composer = Sample.Composer with { Dictation = true } };
+        var wire = JsonSerializer.SerializeToElement(new View("Ino", dictated), Json);
+        var back = JsonSerializer.Deserialize<View>(wire.GetRawText(), Json);
+
+        Assert.NotNull(back);
+        var backConversation = Assert.IsType<Conversation>(back.Root);
+        Assert.True(backConversation.Composer.Dictation);
+        Assert.True(wire.GetProperty("root").GetProperty("composer").GetProperty("dictation").GetBoolean());
+    }
 }

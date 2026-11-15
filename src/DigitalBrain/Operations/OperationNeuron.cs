@@ -1,5 +1,6 @@
 using DigitalBrain.Confirmation;
 using DigitalBrain.Contracts;
+using DigitalBrain.Log;
 using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Operations;
@@ -124,14 +125,16 @@ public sealed class OperationNeuron : Neuron<OperationState>, IOperationNeuron, 
             await Save(t.Next, t.Signals).ConfigureAwait(true);
         }
 
+#pragma warning disable CA1031
         try
         {
             await Context.Synapses.Remove(IConfirmationRequests.Of(Id.Brain)).ConfigureAwait(true);
         }
-        catch
+        catch (Exception error) when (error is not OutOfMemoryException)
         {
-            // Best effort unsubscribe
+            GetLogger().LogSwallowed(error, "Unsubscribing settled operation from confirmation requests failed.");
         }
+#pragma warning restore CA1031
 
         if (State.Phase == OperationPhase.Running)
         {

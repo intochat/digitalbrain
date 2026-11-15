@@ -43,6 +43,18 @@ public sealed class CallPolicyFacts
         Task DefaultCall();
     }
 
+    public sealed class ImplementationAttributeNeuron : ITestContract
+    {
+        [Public]
+        public Task MutatingCall() => Task.CompletedTask;
+        public Task InterleavingCall() => Task.CompletedTask;
+        public Task ReadOnlyCall() => Task.CompletedTask;
+        public Task TimeoutCall() => Task.CompletedTask;
+        public Task PublicCall() => Task.CompletedTask;
+        public Task InternalCall() => Task.CompletedTask;
+        public Task SharedCall() => Task.CompletedTask;
+    }
+
     public class BaseNeuronWithPredicate
     {
         private static bool PrivateBasePredicate(RuntimeInvocation call) => call.Method == "BaseAllowed";
@@ -191,6 +203,10 @@ public sealed class CallPolicyFacts
 
         var internalContractMethod = typeof(IInternalContract).GetMethod(nameof(IInternalContract.DefaultCall))!;
         Assert.Equal(OperationAccess.Internal, CallPolicy.AccessOf(typeof(IInternalContract), internalContractMethod));
+
+        var implPublicMethod = typeof(ImplementationAttributeNeuron).GetMethod(nameof(ImplementationAttributeNeuron.MutatingCall))!;
+        Assert.Equal(OperationAccess.Public, CallPolicy.AccessOf(typeof(ITestContract), defaultMethod, implPublicMethod));
+        Assert.Equal(OperationAccess.Internal, CallPolicy.AccessOf(typeof(ITestContract), internalMethod, implPublicMethod));
     }
 
     [Fact]
