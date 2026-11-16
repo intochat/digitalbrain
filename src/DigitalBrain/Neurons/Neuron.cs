@@ -2,7 +2,6 @@ using DigitalBrain.Kernel;
 using DigitalBrain.Log;
 using DigitalBrain.Rules;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DigitalBrain.Neurons;
 
@@ -115,21 +114,7 @@ public abstract class Neuron
     protected ILogger GetLogger(string? category = null)
     {
         var name = string.IsNullOrWhiteSpace(category) ? GetType().FullName ?? GetType().Name : category;
-        try
-        {
-            if (_seat?.Services.GetService(typeof(ILoggerFactory)) is ILoggerFactory factory and not NullLoggerFactory)
-            {
-                var created = factory.CreateLogger(name);
-                if (!Swallow.IsNullLogger(created))
-                {
-                    return created;
-                }
-            }
-        }
-        catch (NotSupportedException) { }
-        catch (InvalidOperationException) { }
-
-        return TraceLogger.For(name);
+        return TraceLogger.Resolve(_seat?.Services, name);
     }
 
     internal Task Remind(string name, CancellationToken cancellationToken) => OnReminder(name, cancellationToken);

@@ -1,35 +1,12 @@
-using System.Collections.Concurrent;
-using System.Runtime.CompilerServices;
-using System.Threading.Channels;
 using DigitalBrain.Kernel;
 
 namespace DigitalBrain.Testing;
 
 internal sealed class DeliveryFanout
 {
-    private readonly ConcurrentDictionary<int, Channel<SignalDelivery>> _listeners = new();
-    private int _next;
+    private readonly DeliverySubscriptions _subscriptions = new();
 
-    public void Publish(SignalDelivery delivery)
-    {
-        foreach (var channel in _listeners.Values) { channel.Writer.TryWrite(delivery); }
-    }
+    public void Publish(SignalDelivery delivery) => _subscriptions.Publish(null, delivery);
 
-    public async IAsyncEnumerable<SignalDelivery> Listen([EnumeratorCancellation] CancellationToken cancellationToken)
-    {
-        var id = Interlocked.Increment(ref _next);
-        var channel = Channel.CreateUnbounded<SignalDelivery>();
-        _listeners[id] = channel;
-        try
-        {
-            await foreach (var delivery in channel.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
-            {
-                yield return delivery;
-            }
-        }
-        finally
-        {
-            _listeners.TryRemove(id, out _);
-        }
-    }
+    public IAsyncEnumerable<SignalDelivery> Listen(CancellationToken cancellationToken) => _subscriptions.Listen(null, cancellationToken);
 }

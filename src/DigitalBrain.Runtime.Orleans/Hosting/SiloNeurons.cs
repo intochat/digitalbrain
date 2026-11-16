@@ -48,7 +48,9 @@ public static class SiloNeurons
         var type = contract.GetCustomAttribute<DefaultNeuronTypeAttribute>(inherit: false)?.Type
             ?? throw new ArgumentException($"{contract.Name} is not a plain neuron contract.", nameof(contract));
         var brain = BrainAddressOf(fullKey);
-        return new Identity.CompoundGrainKey(new BrainId(brain), type, fullKey[(brain.Length + 1)..]).ToNeuronId();
+        var key = fullKey[(brain.Length + 1)..];
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+        return new NeuronId(new BrainId(brain), type, key);
     }
 
     private static string BrainAddressOf(string fullKey)

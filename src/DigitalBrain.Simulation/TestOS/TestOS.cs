@@ -85,18 +85,14 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
             if (assembly.IsDynamic || assembly.IsCollectible) { continue; }
-            try
+            foreach (var t in Loadable(assembly))
             {
-                foreach (var t in assembly.GetTypes())
+                if (typeof(Signal).IsAssignableFrom(t) && !t.IsAbstract && SignalAliases.Of(t) == alias)
                 {
-                    if (typeof(Signal).IsAssignableFrom(t) && !t.IsAbstract && SignalAliases.Of(t) == alias)
-                    {
-                        if (!t.IsCollectible) { _signalTypes[alias] = t; }
-                        return t;
-                    }
+                    if (!t.IsCollectible) { _signalTypes[alias] = t; }
+                    return t;
                 }
             }
-            catch { }
         }
         foreach (var desc in Catalog.Synapses)
         {
@@ -653,6 +649,12 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
             }
             catch (Exception error) when (error is InvalidOperationException or InvalidDataException) { _ = error; }
         }
+    }
+
+    private static IEnumerable<Type> Loadable(Assembly assembly)
+    {
+        try { return assembly.GetTypes(); }
+        catch (ReflectionTypeLoadException error) { return error.Types.OfType<Type>(); }
     }
 
     private static TaskCompletionSource Quiet()

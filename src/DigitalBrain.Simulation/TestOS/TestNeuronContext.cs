@@ -2,6 +2,7 @@ using DigitalBrain.Access;
 using DigitalBrain.Capabilities.Storage;
 using DigitalBrain.Confirmation;
 using DigitalBrain.Kernel;
+using DigitalBrain.Log;
 using DigitalBrain.Neurons;
 using DigitalBrain.Operations;
 
@@ -102,9 +103,9 @@ internal sealed class TestNeuronContext : INeuronContext, INeuronSeat
             {
                 await work(CancellationToken.None).ConfigureAwait(false);
             }
-            catch
+            catch (Exception error) when (error is not OutOfMemoryException)
             {
-                // Detached work failures
+                TraceLogger.Resolve(_host.OS.Services, typeof(TestNeuronContext).FullName!).LogSwallowed(error, "Detached neuron work failed.");
             }
         }));
     }

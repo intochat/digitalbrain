@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DigitalBrain.Log;
 
@@ -10,6 +11,25 @@ internal sealed class TraceLogger : ILogger
     private TraceLogger(string category) => _category = category;
 
     internal static ILogger For(string category) => new TraceLogger(string.IsNullOrWhiteSpace(category) ? "DigitalBrain" : category);
+
+    internal static ILogger Resolve(IServiceProvider? services, string category)
+    {
+        try
+        {
+            if (services?.GetService(typeof(ILoggerFactory)) is ILoggerFactory factory and not NullLoggerFactory)
+            {
+                var created = factory.CreateLogger(category);
+                if (!Swallow.IsNullLogger(created))
+                {
+                    return created;
+                }
+            }
+        }
+        catch (NotSupportedException) { }
+        catch (InvalidOperationException) { }
+
+        return For(category);
+    }
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
