@@ -694,7 +694,8 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         private IDisposable Hop(NeuronId target)
         {
             var current = TestCallerAmbient.Instance.Current;
-            return TestCallerAmbient.Instance.Enter(current?.Hop(via: caller, inside: caller is not null));
+            var inside = caller is not null || (current?.Inside ?? false) || (current?.Actor is Actor.Kernel or Actor.Scheduler or Actor.Module);
+            return TestCallerAmbient.Instance.Enter(current?.Hop(via: caller ?? current.Via, inside: inside));
         }
 
         private RuntimeInvocation Stamp(RuntimeInvocation call) => call with { Behavior = caller?.ToString() ?? string.Empty };

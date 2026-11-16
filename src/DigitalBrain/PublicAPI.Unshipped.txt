@@ -187,11 +187,19 @@ DigitalBrain.Access.Caller.Via.get -> DigitalBrain.NeuronId?
 DigitalBrain.Access.EdgeAuthority
 DigitalBrain.Access.EdgeAuthority.Agent(DigitalBrain.Access.Actor.Person! forPerson, DigitalBrain.BrainId brain, string? conversation = null) -> DigitalBrain.Access.Caller!
 DigitalBrain.Access.EdgeAuthority.App(string! key, DigitalBrain.Access.Actor.Person! forPerson, DigitalBrain.BrainId brain, string? conversation = null) -> DigitalBrain.Access.Caller!
+DigitalBrain.Access.EdgeAuthority.ClearCaller() -> System.IDisposable!
+DigitalBrain.Access.EdgeAuthority.Current.get -> DigitalBrain.Access.Caller?
 DigitalBrain.Access.EdgeAuthority.Enter(DigitalBrain.Access.Caller! caller) -> System.IDisposable!
+DigitalBrain.Access.EdgeAuthority.EnterInProcess() -> System.IDisposable!
 DigitalBrain.Access.EdgeAuthority.EnterKernel(DigitalBrain.BrainId brain) -> System.IDisposable!
+DigitalBrain.Access.EdgeAuthority.From(DigitalBrain.Capabilities.CapabilityCaller! caller) -> DigitalBrain.Access.Caller!
+DigitalBrain.Access.EdgeAuthority.Guest(string! principal, string! account, DigitalBrain.BrainId brain, string? conversation = null) -> DigitalBrain.Access.Caller!
+DigitalBrain.Access.EdgeAuthority.IsKernelActive.get -> bool
 DigitalBrain.Access.EdgeAuthority.Kernel(DigitalBrain.BrainId brain) -> DigitalBrain.Access.Caller!
 DigitalBrain.Access.EdgeAuthority.Module(string! id, DigitalBrain.BrainId brain) -> DigitalBrain.Access.Caller!
+DigitalBrain.Access.EdgeAuthority.OnBehalfOf(DigitalBrain.Access.Actor.Person! forPerson, DigitalBrain.BrainId brain, string? viaApp = null, DigitalBrain.NeuronId? via = null, string? conversation = null) -> DigitalBrain.Access.Caller!
 DigitalBrain.Access.EdgeAuthority.Person(string! principal, string! account, DigitalBrain.BrainId brain, string? conversation = null) -> DigitalBrain.Access.Caller!
+DigitalBrain.Access.EdgeAuthority.RelayedPerson(string! principal, string! account, DigitalBrain.BrainId brain, DigitalBrain.NeuronId? via = null, string? conversation = null, bool inside = true) -> DigitalBrain.Access.Caller!
 DigitalBrain.Access.EdgeAuthority.Scheduler(DigitalBrain.BrainId brain) -> DigitalBrain.Access.Caller!
 DigitalBrain.Access.ICallerAmbient
 DigitalBrain.Access.ICallerAmbient.Current.get -> DigitalBrain.Access.Caller?

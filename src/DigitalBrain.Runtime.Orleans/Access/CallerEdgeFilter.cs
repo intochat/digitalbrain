@@ -20,8 +20,9 @@ internal sealed class CallerEdgeFilter : IIncomingGrainCallFilter
             var isInternalGrain = context.SourceId is { } source
                 && !source.Type.ToString()!.StartsWith("sys.client", StringComparison.OrdinalIgnoreCase);
             var isInternal = isInternalGrain || InProcessCallerScope.IsActive;
+            var isEdgeVerified = isInternal || InProcessCallerScope.IsEdgeActive;
 
-            if (!isInternal)
+            if (!isEdgeVerified)
             {
                 // External client: cannot forge Inside or Via
                 wire.Inside = false;
@@ -32,6 +33,15 @@ internal sealed class CallerEdgeFilter : IIncomingGrainCallFilter
                 {
                     throw new UnauthorizedAccessException(
                         $"External client cannot claim actor kind {wire.Actor}. Only Person ({CallerWire.ActorPerson}), Agent ({CallerWire.ActorAgent}), and App ({CallerWire.ActorApp}) are permitted from external callers.");
+                }
+            }
+            else if (!isInternal)
+            {
+                // Verified edge caller (e.g. RelayedPerson): preserves edge-minted Via/Inside, still cannot claim Kernel/Scheduler/Module.
+                if (wire.Actor is not (CallerWire.ActorPerson or CallerWire.ActorAgent or CallerWire.ActorApp))
+                {
+                    throw new UnauthorizedAccessException(
+                        $"External edge cannot claim actor kind {wire.Actor}. Only Person ({CallerWire.ActorPerson}), Agent ({CallerWire.ActorAgent}), and App ({CallerWire.ActorApp}) are permitted without kernel scope.");
                 }
             }
             else

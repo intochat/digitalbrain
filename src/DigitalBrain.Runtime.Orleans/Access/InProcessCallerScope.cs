@@ -10,10 +10,15 @@ namespace DigitalBrain.Runtime.Orleans.Access;
 internal static class InProcessCallerScope
 {
     private const string RequestContextKey = "db.internal.inprocess_scope";
+    private const string EdgeRequestContextKey = "db.internal.edge_scope";
     private static readonly object ProcessSecretToken = new();
+    private static readonly object EdgeSecretToken = new();
     private static readonly AsyncLocal<bool> LocalActive = new();
+    private static readonly AsyncLocal<bool> LocalEdgeActive = new();
 
     public static bool IsActive => LocalActive.Value || ReferenceEquals(RequestContext.Get(RequestContextKey), ProcessSecretToken);
+
+    public static bool IsEdgeActive => IsActive || LocalEdgeActive.Value || ReferenceEquals(RequestContext.Get(EdgeRequestContextKey), EdgeSecretToken);
 
     public static IDisposable Enter()
     {
@@ -21,19 +26,28 @@ internal static class InProcessCallerScope
         var priorLocal = LocalActive.Value;
         RequestContext.Set(RequestContextKey, ProcessSecretToken);
         LocalActive.Value = true;
-        return new Scope(prior, priorLocal);
+        return new Scope(RequestContextKey, prior, LocalActive, priorLocal);
     }
 
-    private sealed class Scope(object? prior, bool priorLocal) : IDisposable
+    public static IDisposable EnterEdge()
+    {
+        var prior = RequestContext.Get(EdgeRequestContextKey);
+        var priorLocal = LocalEdgeActive.Value;
+        RequestContext.Set(EdgeRequestContextKey, EdgeSecretToken);
+        LocalEdgeActive.Value = true;
+        return new Scope(EdgeRequestContextKey, prior, LocalEdgeActive, priorLocal);
+    }
+
+    private sealed class Scope(string key, object? prior, AsyncLocal<bool> local, bool priorLocal) : IDisposable
     {
         public void Dispose()
         {
             if (prior is null)
-                RequestContext.Remove(RequestContextKey);
+                RequestContext.Remove(key);
             else
-                RequestContext.Set(RequestContextKey, prior);
+                RequestContext.Set(key, prior);
 
-            LocalActive.Value = priorLocal;
+            local.Value = priorLocal;
         }
     }
 }

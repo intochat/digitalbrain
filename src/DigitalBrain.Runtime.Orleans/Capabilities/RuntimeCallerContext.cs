@@ -28,7 +28,7 @@ public static class RuntimeCallerContext
     private const string AppKey = "db.cap.app";
     private const string ConversationKey = "db.cap.conversation";
 
-    private static readonly string[] Keys = [PrincipalKey, AccountKey, BrainKey, AppKey, ConversationKey];
+    internal static readonly string[] Keys = [PrincipalKey, AccountKey, BrainKey, AppKey, ConversationKey];
 
     /// <summary>The stamped caller of the current call, or null when nothing is stamped.</summary>
     public static CapabilityCaller? Current
