@@ -1,6 +1,7 @@
 using DigitalBrain.Confirmation;
 using DigitalBrain.Invocation;
 using DigitalBrain.Kernel;
+using DigitalBrain.Log;
 using DigitalBrain.Neurons;
 using DigitalBrain.Runtime.Orleans.Storage;
 using DigitalBrain.Runtime.Orleans.Synapses;
@@ -129,9 +130,9 @@ internal sealed class HostNeuronContext : INeuronContext, INeuronSeat, IHostNeur
             {
                 await work(CancellationToken.None).ConfigureAwait(false);
             }
-            catch
+            catch (Exception error) when (error is not OutOfMemoryException)
             {
-                // Unhandled detached work does not fault the host
+                TraceLogger.Resolve(_services, typeof(HostNeuronContext).FullName!).LogSwallowed(error, "Detached neuron work failed.");
             }
         });
     }

@@ -11,7 +11,7 @@ internal static class LegacyCallers
     public static Caller Read(CapabilityCaller legacy)
     {
         ArgumentNullException.ThrowIfNull(legacy);
-        var brain = new BrainId(legacy.BrainId);
+        var brain = BrainId.TryParseUserOrSystem(legacy.BrainId, out var parsed) ? parsed : new BrainId(legacy.BrainId);
         Actor actor = legacy.Kind switch
         {
             CallerKind.Platform => new Actor.Kernel(),
@@ -20,7 +20,9 @@ internal static class LegacyCallers
             CallerKind.App => new Actor.App(legacy.AppId ?? string.Empty, new Actor.Person(legacy.PrincipalId, legacy.AccountId)),
             _ => new Actor.Person(legacy.PrincipalId, legacy.AccountId)
         };
-        return new Caller(actor, brain, legacy.ConversationId);
+        var inside = legacy.Kind is CallerKind.Platform or CallerKind.Scheduler
+            || !string.IsNullOrEmpty(legacy.OnBehalfOf);
+        return new Caller(actor, brain, legacy.ConversationId, inside: inside);
     }
 
     public static CapabilityCaller? Project(Caller? caller)

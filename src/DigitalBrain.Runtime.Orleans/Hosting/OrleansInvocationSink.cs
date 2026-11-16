@@ -96,6 +96,6 @@ internal sealed class OrleansInvocationSink(
     {
         var current = asKernel ? Caller.OfKernel(target.Brain) : _callers.Current;
         var inside = caller is not null || (current?.Inside ?? false) || (current?.Actor is Actor.Kernel or Actor.Scheduler or Actor.Module);
-        _ = _callers.Enter(current?.Hop(via: caller, inside: inside));
+        _ = _callers.Enter(current?.Hop(via: caller ?? current.Via, inside: inside));
     }
 }

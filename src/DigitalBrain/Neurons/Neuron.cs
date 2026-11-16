@@ -1,5 +1,7 @@
 using DigitalBrain.Kernel;
+using DigitalBrain.Log;
 using DigitalBrain.Rules;
+using Microsoft.Extensions.Logging;
 
 namespace DigitalBrain.Neurons;
 
@@ -107,6 +109,13 @@ public abstract class Neuron
 
     /// <summary>Runs when the named timer or reminder fires. Ticks are turns.</summary>
     protected virtual Task OnReminder(string name, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    /// <summary>Returns a host logger for <paramref name="category"/>, falling back to trace logging when no host factory is wired.</summary>
+    protected ILogger GetLogger(string? category = null)
+    {
+        var name = string.IsNullOrWhiteSpace(category) ? GetType().FullName ?? GetType().Name : category;
+        return TraceLogger.Resolve(_seat?.Services, name);
+    }
 
     internal Task Remind(string name, CancellationToken cancellationToken) => OnReminder(name, cancellationToken);
 }

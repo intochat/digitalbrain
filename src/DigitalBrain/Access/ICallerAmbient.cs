@@ -14,5 +14,9 @@ public interface ICallerAmbient
 /// </summary>
 internal interface ICallerCarrier : ICallerAmbient
 {
+    bool IsKernelActive { get; }
+
     IDisposable Enter(Caller? caller);
+
+    IDisposable EnterKernelScope(bool clearCaller);
 }

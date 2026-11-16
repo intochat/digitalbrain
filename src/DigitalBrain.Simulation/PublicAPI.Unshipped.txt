@@ -183,7 +183,6 @@ DigitalBrain.Testing.FakeNeuronContext
 DigitalBrain.Testing.FakeNeuronContext.Caller.get -> DigitalBrain.Access.Caller?
 DigitalBrain.Testing.FakeNeuronContext.Caller.set -> void
 DigitalBrain.Testing.FakeNeuronContext.Clock.get -> DigitalBrain.Testing.ManualTime!
-DigitalBrain.Testing.FakeNeuronContext.Confirmations.get -> DigitalBrain.Testing.TestConfirmations!
 DigitalBrain.Testing.FakeNeuronContext.Defer(System.Func<System.Threading.Tasks.Task!>! work) -> void
 DigitalBrain.Testing.FakeNeuronContext.FakeNeuronContext(DigitalBrain.NeuronId id, System.IServiceProvider? services = null) -> void
 DigitalBrain.Testing.FakeNeuronContext.Get<T>(DigitalBrain.NeuronId id) -> T!
@@ -434,20 +433,16 @@ DigitalBrain.Testing.TestConfirmations.Approve(string! planId) -> System.Threadi
 DigitalBrain.Testing.TestConfirmations.ApproveAll() -> void
 DigitalBrain.Testing.TestConfirmations.Audit.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Confirmation.ConfirmationResolved!>!
 DigitalBrain.Testing.TestConfirmations.Click(DigitalBrain.UI.ApprovalCardNode! card, bool approve = true) -> System.Threading.Tasks.Task!
-DigitalBrain.Testing.TestConfirmations.Confirm(DigitalBrain.Confirmation.ConfirmationPrincipal! requester, System.Func<DigitalBrain.Signal!, System.Threading.Tasks.Task!>? publish, DigitalBrain.Confirmation.ConfirmationPlan! plan, System.Threading.CancellationToken ct) -> System.Threading.Tasks.Task<DigitalBrain.Confirmation.ConfirmationResult!>!
 DigitalBrain.Testing.TestConfirmations.Current.get -> DigitalBrain.Confirmation.ConfirmationPrincipal!
 DigitalBrain.Testing.TestConfirmations.Current.set -> void
 DigitalBrain.Testing.TestConfirmations.Deny(string! planId) -> System.Threading.Tasks.Task!
-DigitalBrain.Testing.TestConfirmations.For(DigitalBrain.Confirmation.ConfirmationPrincipal! requester, System.Func<DigitalBrain.Signal!, System.Threading.Tasks.Task!>? publish = null) -> DigitalBrain.Confirmation.IConfirmations!
 DigitalBrain.Testing.TestConfirmations.Outcome(string! planId) -> System.Threading.Tasks.Task<DigitalBrain.Confirmation.ConfirmationResult?>!
 DigitalBrain.Testing.TestConfirmations.Policy.get -> DigitalBrain.Confirmation.ConfirmationPolicy
 DigitalBrain.Testing.TestConfirmations.Policy.set -> void
 DigitalBrain.Testing.TestConfirmations.Read() -> System.Threading.Tasks.Task<DigitalBrain.Confirmation.ConfirmationInbox!>!
 DigitalBrain.Testing.TestConfirmations.Request(DigitalBrain.Confirmation.ConfirmationPlan! plan) -> System.Threading.Tasks.Task<DigitalBrain.Confirmation.ConfirmationResult?>!
-DigitalBrain.Testing.TestConfirmations.Request(DigitalBrain.Confirmation.ConfirmationPlan! plan, DigitalBrain.Confirmation.ConfirmationPrincipal! requester, string! raisedBy, System.Func<DigitalBrain.Signal!, System.Threading.Tasks.Task!>? publish) -> System.Threading.Tasks.Task<DigitalBrain.Confirmation.ConfirmationResult?>!
 DigitalBrain.Testing.TestConfirmations.Requested.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Confirmation.ConfirmationRequested!>!
 DigitalBrain.Testing.TestConfirmations.Resolve(string! planId, bool approve, DigitalBrain.Confirmation.ConfirmationPrincipal! approver) -> System.Threading.Tasks.Task!
-DigitalBrain.Testing.TestConfirmations.TestConfirmations(System.TimeProvider! clock) -> void
 DigitalBrain.Testing.TestConfirmations.Waiting.get -> System.Collections.Generic.IReadOnlyList<DigitalBrain.Confirmation.ConfirmationRequested!>!
 DigitalBrain.Testing.TestConfirmations.Withdraw(string! planId) -> System.Threading.Tasks.Task!
 DigitalBrain.Testing.TestJournal

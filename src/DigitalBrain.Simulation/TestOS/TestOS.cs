@@ -85,18 +85,14 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
             if (assembly.IsDynamic || assembly.IsCollectible) { continue; }
-            try
+            foreach (var t in Loadable(assembly))
             {
-                foreach (var t in assembly.GetTypes())
+                if (typeof(Signal).IsAssignableFrom(t) && !t.IsAbstract && SignalAliases.Of(t) == alias)
                 {
-                    if (typeof(Signal).IsAssignableFrom(t) && !t.IsAbstract && SignalAliases.Of(t) == alias)
-                    {
-                        if (!t.IsCollectible) { _signalTypes[alias] = t; }
-                        return t;
-                    }
+                    if (!t.IsCollectible) { _signalTypes[alias] = t; }
+                    return t;
                 }
             }
-            catch { }
         }
         foreach (var desc in Catalog.Synapses)
         {
@@ -133,7 +129,7 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         AccessCounters = new AccessCounters();
         Access = new AccessGate(TestCallerAmbient.Instance, AccessOptions, AccessCounters);
         Edge = new EdgeAuthority(TestCallerAmbient.Instance);
-        Confirmations = new TestConfirmations(Clock, this);
+        Confirmations = new TestConfirmations(this);
         AskProgress = new AskProgressHub(Clock);
         Services = new TestOSServices(Capabilities, options.Services ?? EmptyServices.Instance, new TestInstallHooks(this), new TestSlotResolver(this), Source, () => [.. _actions.Values], () => Loader, () => Resolver, () => LiveBindings, () => _compiler.Value, () => Synapses, () => new DigitalBrain.Confirmation.ConfirmationPolicies { DefaultPolicy = Confirmations.Policy }, AskProgress);
         Register<InstallsNeuron>();
@@ -655,6 +651,12 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         }
     }
 
+    private static IEnumerable<Type> Loadable(Assembly assembly)
+    {
+        try { return assembly.GetTypes(); }
+        catch (ReflectionTypeLoadException error) { return error.Types.OfType<Type>(); }
+    }
+
     private static TaskCompletionSource Quiet()
     {
         var quiet = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -692,7 +694,8 @@ public sealed partial class TestOS : IAsyncDisposable, IBrainObserver
         private IDisposable Hop(NeuronId target)
         {
             var current = TestCallerAmbient.Instance.Current;
-            return TestCallerAmbient.Instance.Enter(current?.Hop(via: caller, inside: caller is not null));
+            var inside = caller is not null || (current?.Inside ?? false) || (current?.Actor is Actor.Kernel or Actor.Scheduler or Actor.Module);
+            return TestCallerAmbient.Instance.Enter(current?.Hop(via: caller ?? current.Via, inside: inside));
         }
 
         private RuntimeInvocation Stamp(RuntimeInvocation call) => call with { Behavior = caller?.ToString() ?? string.Empty };

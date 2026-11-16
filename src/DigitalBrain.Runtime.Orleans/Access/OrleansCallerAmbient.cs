@@ -1,5 +1,6 @@
 using DigitalBrain.Modules;
 using DigitalBrain.Access;
+using DigitalBrain.Runtime.Orleans.Capabilities;
 using Orleans.Runtime;
 
 namespace DigitalBrain.Runtime.Orleans.Access;
@@ -12,17 +13,46 @@ internal sealed class OrleansCallerAmbient : ICallerCarrier
 
     public Caller? Current => RequestContext.Get(Key) is CallerWire wire ? Read(wire) : null;
 
+    public bool IsKernelActive => InProcessCallerScope.IsActive && Current?.Actor is null or Actor.Kernel;
+
     public IDisposable Enter(Caller? caller)
     {
         var previous = RequestContext.Get(Key);
         Set(caller is null ? null : Write(caller));
-        return new Restore(previous);
+        IDisposable? scope = caller?.Actor is Actor.Kernel or Actor.Module or Actor.Scheduler
+            ? InProcessCallerScope.Enter()
+            : caller is { Inside: true } or { Via: not null }
+                ? InProcessCallerScope.EnterEdge()
+                : null;
+        return new Restore(previous, scope);
+    }
+
+    public IDisposable EnterKernelScope(bool clearCaller)
+    {
+        var scope = InProcessCallerScope.Enter();
+        if (!clearCaller)
+        {
+            return scope;
+        }
+
+        var previous = RequestContext.Get(Key);
+        RequestContext.Remove(Key);
+
+        var capKeys = RuntimeCallerContext.Keys;
+        var previousCap = new object?[capKeys.Length];
+        for (var i = 0; i < capKeys.Length; i++)
+        {
+            previousCap[i] = RequestContext.Get(capKeys[i]);
+            RequestContext.Remove(capKeys[i]);
+        }
+
+        return new ClearRestore(scope, previous, capKeys, previousCap);
     }
 
     internal static Caller? Read(CallerWire? wire)
     {
         if (wire is null) return null;
-        var brain = new BrainId(wire.Brain);
+        var brain = BrainId.TryParseUserOrSystem(wire.Brain, out var parsed) ? parsed : new BrainId(wire.Brain);
         Actor actor = wire.Actor switch
         {
             0 => new Actor.Person(wire.Principal ?? string.Empty, wire.Account ?? string.Empty),
@@ -91,12 +121,30 @@ internal sealed class OrleansCallerAmbient : ICallerCarrier
         else { RequestContext.Set(Key, wire); }
     }
 
-    private sealed class Restore(object? previous) : IDisposable
+    private sealed class Restore(object? previous, IDisposable? scope) : IDisposable
     {
         public void Dispose()
         {
+            scope?.Dispose();
             if (previous is null) { RequestContext.Remove(Key); }
             else { RequestContext.Set(Key, previous); }
+        }
+    }
+
+    private sealed class ClearRestore(IDisposable scope, object? previous, string[] capKeys, object?[] previousCap) : IDisposable
+    {
+        public void Dispose()
+        {
+            for (var i = 0; i < capKeys.Length; i++)
+            {
+                if (previousCap[i] is null) { RequestContext.Remove(capKeys[i]); }
+                else { RequestContext.Set(capKeys[i], previousCap[i]!); }
+            }
+
+            if (previous is null) { RequestContext.Remove(Key); }
+            else { RequestContext.Set(Key, previous); }
+
+            scope.Dispose();
         }
     }
 }

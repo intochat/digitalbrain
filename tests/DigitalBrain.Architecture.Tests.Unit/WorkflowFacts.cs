@@ -32,14 +32,20 @@ public sealed partial class WorkflowFacts
     }
 
     [Fact]
-    public void CiWorkflowGatesGitHubPackagesPublishToDefaultBranchPushAfterCi()
+    public void CiWorkflowGatesGitHubPackagesPublishAwayFromBranchPushAfterCi()
     {
         var content = File.ReadAllText(CiPath);
         if (content.Contains("nuget.pkg.github.com", StringComparison.OrdinalIgnoreCase))
         {
             Assert.Contains("publish-github-packages:", content, StringComparison.Ordinal);
-            Assert.Contains("needs: [ci]", content, StringComparison.Ordinal);
-            Assert.Contains("github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')", content, StringComparison.Ordinal);
+            var publishStart = content.IndexOf("publish-github-packages:", StringComparison.Ordinal);
+            var publishSection = content[publishStart..];
+
+            Assert.Contains("needs: [ci]", publishSection, StringComparison.Ordinal);
+            Assert.DoesNotContain("refs/heads/master", publishSection, StringComparison.Ordinal);
+            Assert.DoesNotContain("refs/heads/main", publishSection, StringComparison.Ordinal);
+            Assert.Contains("refs/tags/", publishSection, StringComparison.Ordinal);
+            Assert.DoesNotContain("--skip-duplicate", publishSection, StringComparison.Ordinal);
         }
 
         Assert.DoesNotContain("api.nuget.org", content, StringComparison.OrdinalIgnoreCase);

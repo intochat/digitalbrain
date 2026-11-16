@@ -127,8 +127,6 @@ public sealed class CallerAdversarialFacts
 
     [Theory]
     [InlineData(OperationAccess.Owner)]
-    [InlineData(OperationAccess.Public)]
-    [InlineData(OperationAccess.Shared)]
     [InlineData(OperationAccess.Internal)]
     public void CrossBrainCalls_AllNonKernelActors_StrictlyDeniedWithOutsideBrain(OperationAccess access)
     {
@@ -156,6 +154,36 @@ public sealed class CallerAdversarialFacts
             Assert.Contains(AttackerBrain.Value, decision.Explanation, StringComparison.Ordinal);
             Assert.Contains(VictimBrain.Value, decision.Explanation, StringComparison.Ordinal);
         }
+    }
+
+    [Theory]
+    [InlineData(OperationAccess.Public)]
+    [InlineData(OperationAccess.Shared)]
+    public void CrossBrainCalls_PublicAndSharedOperations_AllowedForKnownActorsOnly(OperationAccess access)
+    {
+        var edge = EdgeAuthority.CreateInternal();
+        var person = new Actor.Person("caller", "caller-acct");
+
+        Caller[] callers =
+        [
+            edge.Person("caller", "caller-acct", AttackerBrain),
+            edge.Agent(person, AttackerBrain),
+            edge.App("other-app", person, AttackerBrain),
+            edge.Module("other-module", AttackerBrain),
+            edge.Scheduler(AttackerBrain),
+        ];
+
+        foreach (var caller in callers)
+        {
+            var decision = AccessPolicy.Decide(caller, VictimTarget, access);
+            Assert.True(decision.Allowed);
+            Assert.Equal(AccessDenial.None, decision.Denial);
+        }
+
+        var unknown = (Caller)RuntimeHelpers.GetUninitializedObject(typeof(Caller));
+        var unknownDecision = AccessPolicy.Decide(unknown, VictimTarget, access);
+        Assert.False(unknownDecision.Allowed);
+        Assert.Equal(AccessDenial.UnknownActor, unknownDecision.Denial);
     }
 
     [Fact]

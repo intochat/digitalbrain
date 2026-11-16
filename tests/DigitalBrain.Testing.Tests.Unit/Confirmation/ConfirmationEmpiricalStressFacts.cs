@@ -50,14 +50,15 @@ public sealed class ConfirmationEmpiricalStressFacts
     [Fact]
     public async Task TwentyPendingLimit_Attempt25ConcurrentRequests_Exactly20AcceptedAnd5Rejected()
     {
-        var clock = new TestClock();
-        var confirmations = new TestConfirmations(clock) { Policy = ConfirmationPolicy.Always };
+        await using var os = OS.Local(options => options.CallTimeout = TimeSpan.FromHours(1));
+        os.Confirmations.Policy = ConfirmationPolicy.Always;
+        os.Confirmations.Current = Requester1;
 
         var barrier = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var exceptions = new ConcurrentBag<Exception>();
-        var successes = new ConcurrentBag<string>();
+        var acceptedInitial = new ConcurrentBag<string>();
 
-        // Launch 25 concurrent requests simultaneously
+        // Launch 25 concurrent requests simultaneously from the same raiser
         var tasks = Enumerable.Range(0, 25).Select(i => Task.Run(async () =>
         {
             await barrier.Task;
@@ -65,8 +66,8 @@ public sealed class ConfirmationEmpiricalStressFacts
             var plan = Plan(planId);
             try
             {
-                var req = await confirmations.For(Requester1).Confirm(plan, Ct);
-                successes.Add(planId);
+                await os.Confirmations.Request(plan);
+                acceptedInitial.Add(planId);
             }
             catch (Exception ex)
             {
@@ -76,41 +77,37 @@ public sealed class ConfirmationEmpiricalStressFacts
 
         // Release the barrier so all 25 hit concurrently
         barrier.SetResult();
+        await Task.WhenAll(tasks);
 
-        // In TestConfirmations, calls that are waiting do not complete until answered,
-        // so give the tasks a short window to enter either Waiting or throw rejection.
-        await Task.Delay(100, Ct);
+        // Exactly 20 must be accepted and waiting
+        Assert.Equal(20, acceptedInitial.Count);
+        Assert.Equal(20, os.Confirmations.Waiting.Count);
 
-        // Exactly 20 must be waiting
-        Assert.Equal(20, confirmations.Waiting.Count);
-
-        // Exactly 5 must have thrown InvalidOperationException
+        // Exactly 5 must have thrown InvalidOperationException for this raiser
         Assert.Equal(5, exceptions.Count);
         foreach (var ex in exceptions)
         {
             var opEx = Assert.IsType<InvalidOperationException>(ex);
-            Assert.Equal("This brain already has 20 confirmations waiting.", opEx.Message);
+            Assert.Equal("This raiser already has 20 confirmations waiting.", opEx.Message);
         }
 
-        // Now resolve 1 pending confirmation to free up capacity
-        var firstWaiting = confirmations.Waiting[0].PlanId;
-        await confirmations.Deny(firstWaiting);
+        // Another raiser is NOT blocked by Requester1's 20 pending confirmations
+        os.Confirmations.Current = Requester2;
+        await os.Confirmations.Request(Plan("cf-conc-other"));
+        Assert.Equal(21, os.Confirmations.Waiting.Count);
 
-        Assert.Equal(19, confirmations.Waiting.Count);
+        // Resolve 1 pending confirmation from Requester1 as a person to free up capacity for Requester1
+        var firstWaiting = os.Confirmations.Waiting.First(w => w.PlanId.StartsWith("cf-conc-0", StringComparison.Ordinal) || w.PlanId.StartsWith("cf-conc-1", StringComparison.Ordinal)).PlanId;
+        os.Confirmations.Current = ConfirmationPrincipal.Person("ada");
+        await os.Confirmations.Deny(firstWaiting);
 
-        // Now a 26th request must be successfully accepted
-        var plan26 = Plan("cf-conc-26");
-        var accepted = false;
-        var task26 = Task.Run(async () =>
-        {
-            _ = confirmations.For(Requester1).Confirm(plan26, Ct);
-            accepted = true;
-        }, Ct);
+        Assert.Equal(20, os.Confirmations.Waiting.Count);
 
-        await Task.Delay(50, Ct);
-        Assert.True(accepted);
-        Assert.Equal(20, confirmations.Waiting.Count);
-        Assert.Contains(confirmations.Waiting, w => w.PlanId == "cf-conc-26");
+        // Now a 26th request from Requester1 must be accepted
+        os.Confirmations.Current = Requester1;
+        await os.Confirmations.Request(Plan("cf-conc-26"));
+        Assert.Equal(21, os.Confirmations.Waiting.Count);
+        Assert.Contains(os.Confirmations.Waiting, w => w.PlanId == "cf-conc-26");
     }
 
     [Fact]
@@ -118,32 +115,38 @@ public sealed class ConfirmationEmpiricalStressFacts
     {
         var state = new ConfirmationState();
 
-        // 20 sequential requests succeed
+        // 20 sequential requests from the same raiser succeed
         for (var i = 0; i < 20; i++)
         {
             var plan = Plan($"cf-seq-{i}");
-            var transition = state.Request(plan, Requester1, $"caller-{i}", ConfirmationPolicy.Always, T0);
+            var transition = state.Request(plan, Requester1, "caller-1", ConfirmationPolicy.Always, T0);
             Assert.NotNull(transition);
             state = transition.Value.Next;
         }
 
         Assert.Equal(20, Pending(state).Length);
 
-        // 21st through 25th requests are strictly rejected
+        // 21st through 25th requests from the same raiser are strictly rejected
         for (var i = 20; i < 25; i++)
         {
             var plan = Plan($"cf-seq-{i}");
             var ex = Assert.Throws<InvalidOperationException>(() =>
-                state.Request(plan, Requester1, $"caller-{i}", ConfirmationPolicy.Always, T0));
-            Assert.Equal("This brain already has 20 confirmations waiting.", ex.Message);
+                state.Request(plan, Requester1, "caller-1", ConfirmationPolicy.Always, T0));
+            Assert.Equal("This raiser already has 20 confirmations waiting.", ex.Message);
         }
+
+        // A distinct raiser succeeds cleanly
+        var secondRaiser = state.Request(Plan("cf-seq-other"), Requester2, "caller-2", ConfirmationPolicy.Always, T0);
+        Assert.NotNull(secondRaiser);
+        Assert.Equal(21, Pending(secondRaiser.Value.Next).Length);
     }
 
     [Fact]
     public async Task TwentyPendingLimit_OnConfirmationsNeuron()
     {
         var context = new FakeNeuronContext(new NeuronId(new BrainId("b1"), "runtime.confirmations", "confirmations"));
-        context.Caller = new DigitalBrain.Access.Caller(new DigitalBrain.Access.Actor.Person("alice", "acc-1"), new BrainId("b1"));
+        var alice = new DigitalBrain.Access.Actor.Person("alice", "acc-1");
+        context.Caller = new DigitalBrain.Access.Caller(alice, new BrainId("b1"), via: new NeuronId(new BrainId("b1"), "flow.one", "run-1"));
         var neuron = new ConfirmationsNeuron();
         NeuronAttachment.Attach(neuron, context);
 
@@ -158,9 +161,14 @@ public sealed class ConfirmationEmpiricalStressFacts
         var inbox = await neuron.Read();
         Assert.Equal(20, inbox.Pending.Length);
 
-        // 21st request throws
+        // 21st request from the same raiser throws
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => neuron.Request(Plan("cf-neuron-21")));
-        Assert.Equal("This brain already has 20 confirmations waiting.", ex.Message);
+        Assert.Equal("This raiser already has 20 confirmations waiting.", ex.Message);
+
+        // A second raiser in the same brain succeeds
+        context.Caller = new DigitalBrain.Access.Caller(alice, new BrainId("b1"), via: new NeuronId(new BrainId("b1"), "flow.two", "run-2"));
+        Assert.Null(await neuron.Request(Plan("cf-neuron-other")));
+        Assert.Equal(21, (await neuron.Read()).Pending.Length);
     }
 
     // -----------------------------------------------------------------------------------------

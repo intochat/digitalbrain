@@ -1,5 +1,4 @@
-using System.Text;
-using System.Text.Json;
+using System.Collections.Frozen;
 using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Units;
@@ -7,15 +6,14 @@ namespace DigitalBrain.Units;
 [Neuron(AskRules.AsksNeuronType)]
 internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? units = null, AskProgressHub? progress = null) : Neuron, IAsks
 {
-    private readonly IUnitResolver? _units = units;
-    private readonly AskProgressHub? _progress = progress;
-    private readonly Dictionary<(string Batch, int Index, int Attempt), DateTimeOffset> _leases = [];
     internal const string DueTimer = "asks-due";
     internal const string NudgeReminder = "asks-nudge";
     internal static readonly TimeSpan Nudge = TimeSpan.FromMinutes(1);
     internal static readonly TimeSpan Grace = TimeSpan.FromSeconds(5);
-    internal static readonly TimeSpan[] Backoff = [TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(10)];
 
+    private static readonly IReadOnlySet<string> EmptyKeys = FrozenSet<string>.Empty;
+    private readonly IUnitResolver? _units = units;
+    private readonly AskProgressHub? _progress = progress;
     private AsksState _state = new();
 
     protected override async Task OnActivate(CancellationToken cancellationToken)
@@ -57,7 +55,7 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
             || !string.Equals(asked.Unit, Id.Key, StringComparison.Ordinal)
             || string.IsNullOrEmpty(asked.Batch)
             || asked.Asks is not { Count: > 0 }
-            || FindBatchIndex(_state.Batches, asked.Batch) >= 0)
+            || _state.ContainsBatch(asked.Batch))
         {
             return;
         }
@@ -100,97 +98,30 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
         }
 
         var now = Context.Time.GetUtcNow();
-        var hour = now.ToUnixTimeSeconds() / 3600;
-        var askedThisHour = _state.AskedThisHour;
-        var tripped = _state.Tripped;
-        if (hour != _state.Hour)
-        {
-            askedThisHour = 0;
-            tripped = false;
-        }
-
-        if (tripped)
+        if (_state.IsTrippedAt(now))
         {
             return;
         }
 
-        var n = asked.Asks.Count;
-        var open = OpenCount(_state.Batches);
-        var batches = _state.Batches;
-        var unsent = new List<Answer>(_state.Unsent);
-        var unsentSince = _state.UnsentSince;
-        var createdAnswers = false;
+        var openKeys = _state.Batches.Count > 0 && _state.HasBudgetFor(asked.Asks.Count, now)
+            ? await CollectOpenKeys(_state.Batches).ConfigureAwait(true)
+            : EmptyKeys;
 
-        if (open + n > AskLimits.MaxOpenAsks || askedThisHour + n > AskLimits.MaxAsksPerHour)
+        var outcome = _state.Accept(asked.Batch, asked.Asks, openKeys, now);
+        if (!outcome.Save)
         {
-            if (unsent.Count == 0)
-            {
-                unsentSince = now;
-            }
-
-            for (var i = 0; i < n; i++)
-            {
-                var ask = asked.Asks[i];
-                unsent.Add(new Answer(ask.Slot, ask.Operation, ask.Key, AnswerStatus.Refused, AskRules.NoResult, "over-budget", open));
-            }
-
-            tripped = true;
-            createdAnswers = true;
-        }
-        else
-        {
-            var openKeys = await CollectOpenKeys(_state.Batches).ConfigureAwait(true);
-            var accepted = new List<Ask>(n);
-            var refused = new List<Ask>();
-            for (var i = 0; i < n; i++)
-            {
-                var ask = asked.Asks[i];
-                if (openKeys.Add(ask.Key))
-                {
-                    accepted.Add(ask);
-                }
-                else
-                {
-                    refused.Add(ask);
-                }
-            }
-
-            var openAfter = open + accepted.Count;
-            if (refused.Count > 0)
-            {
-                if (unsent.Count == 0)
-                {
-                    unsentSince = now;
-                }
-
-                for (var i = 0; i < refused.Count; i++)
-                {
-                    var ask = refused[i];
-                    unsent.Add(new Answer(ask.Slot, ask.Operation, ask.Key, AnswerStatus.Refused, AskRules.NoResult, "already-open", openAfter));
-                }
-
-                createdAnswers = true;
-            }
-
-            if (accepted.Count > 0)
-            {
-                await Get<IAskBatch>(AskRules.BatchOf(Id, asked.Batch)).Put(Id.Key, accepted).ConfigureAwait(true);
-                batches = [.. batches, new OpenBatch(asked.Batch, accepted.Count, 0, [], [], 0, LongestTimeout(accepted), now)];
-                askedThisHour += accepted.Count;
-                await Context.Reminders.Start(NudgeReminder, Nudge, Nudge).ConfigureAwait(true);
-            }
+            return;
         }
 
-        await Save(new AsksState(batches, unsent, unsentSince, hour, askedThisHour, tripped), []).ConfigureAwait(true);
+        if (outcome.Accepted.Count > 0)
+        {
+            await Get<IAskBatch>(AskRules.BatchOf(Id, asked.Batch)).Put(Id.Key, outcome.Accepted).ConfigureAwait(true);
+            await Context.Reminders.Start(NudgeReminder, Nudge, Nudge).ConfigureAwait(true);
+        }
+
+        await Save(outcome.State, []).ConfigureAwait(true);
         await Pump().ConfigureAwait(true);
-        if (createdAnswers)
-        {
-            await Flush(now: true).ConfigureAwait(true);
-        }
-        else
-        {
-            await Flush().ConfigureAwait(true);
-        }
+        await Flush(now: outcome.CreatedAnswers).ConfigureAwait(true);
     }
 
     public Task Attach(CancellationToken ct) =>
@@ -199,7 +130,6 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
     public async Task Detach(CancellationToken ct)
     {
         _ = ct;
-        _leases.Clear();
         var batches = _state.Batches;
         for (var i = 0; i < batches.Count; i++)
         {
@@ -212,11 +142,11 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
         await Save(new AsksState(), []).ConfigureAwait(true);
     }
 
-    public Task Renew(AskLeaseRenewal renewal)
+    public async Task Renew(AskLeaseRenewal renewal)
     {
         if (renewal is null || string.IsNullOrEmpty(renewal.Batch))
         {
-            return Task.CompletedTask;
+            return;
         }
 
         if (Context.Caller is { } caller && caller.Via != AskRules.BatchOf(Id, renewal.Batch))
@@ -224,12 +154,19 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
             throw new UnauthorizedAccessException("Only the batch neuron of this ask may renew its lease.");
         }
 
-        if (ExtendLease(renewal.Batch, renewal.Index, renewal.Attempt, renewal.Extension))
+        var now = Context.Time.GetUtcNow();
+        var outcome = _state.ExtendLease(renewal.Batch, renewal.Index, renewal.Attempt, renewal.Extension, now, Grace);
+        if (!outcome.Matched)
         {
-            ScheduleDue(Context.Time.GetUtcNow());
+            return;
         }
 
-        return Task.CompletedTask;
+        if (outcome.Changed)
+        {
+            await Save(outcome.State, []).ConfigureAwait(true);
+        }
+
+        ScheduleDue(now);
     }
 
     public async Task ReportProgress(AskProgressReport report)
@@ -244,12 +181,20 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
             throw new UnauthorizedAccessException("Only the batch neuron of this ask may report its progress.");
         }
 
-        if (!ExtendLease(report.Batch, report.Index, report.Attempt, report.LeaseExtension))
+        var now = Context.Time.GetUtcNow();
+        var outcome = _state.ExtendLease(report.Batch, report.Index, report.Attempt, report.LeaseExtension, now, Grace);
+        if (!outcome.Matched)
         {
             return;
         }
 
-        ScheduleDue(Context.Time.GetUtcNow());
+        // Persist the extended due deadline only once at least half of the extension window has elapsed so frequent ticks stay write-free.
+        if (outcome.Changed && outcome.PreviousRemaining <= outcome.EffectiveWindow / 2)
+        {
+            await Save(outcome.State, []).ConfigureAwait(true);
+            ScheduleDue(now);
+        }
+
         var progressed = new AskProgressed(Id.Key, report.RunId, report.Key, report.Status, report.Fraction);
         if (_progress is not null && !_progress.Dispatch(progressed))
         {
@@ -271,64 +216,16 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
             throw new UnauthorizedAccessException("Only the batch neuron of this ask may settle it.");
         }
 
-        var batchIndex = FindBatchIndex(_state.Batches, settlement.Batch);
-        if (batchIndex < 0)
+        var outcome = _state.Settle(settlement, Context.Time.GetUtcNow());
+        if (!outcome.Changed)
         {
             return;
         }
 
-        var batch = _state.Batches[batchIndex];
-        var flyingIndex = FindFlyingIndex(batch.Flying, settlement.Index, settlement.Attempt);
-        if (flyingIndex < 0)
+        await Save(outcome.State, []).ConfigureAwait(true);
+        if (outcome.DroppedBatchId is { } droppedBatchId)
         {
-            return;
-        }
-
-        _leases.Remove((settlement.Batch, settlement.Index, settlement.Attempt));
-        var now = Context.Time.GetUtcNow();
-        var nextFlying = RemoveAt(batch.Flying, flyingIndex);
-        var nextBatches = new List<OpenBatch>(_state.Batches.Count);
-
-        if (settlement.Transient && settlement.Repeatable && settlement.Attempt < AskLimits.MaxAttempts)
-        {
-            var delay = Backoff[Math.Clamp(settlement.Attempt - 1, 0, Backoff.Length - 1)];
-            IReadOnlyList<WaitingAsk> nextWaiting = [.. batch.Waiting, new WaitingAsk(settlement.Index, settlement.Attempt + 1, now + delay)];
-            for (var i = 0; i < _state.Batches.Count; i++)
-            {
-                nextBatches.Add(i == batchIndex ? batch with { Flying = nextFlying, Waiting = nextWaiting } : _state.Batches[i]);
-            }
-
-            await Save(_state with { Batches = nextBatches }, []).ConfigureAwait(true);
-        }
-        else
-        {
-            var nextSettled = batch.Settled + 1;
-            var remaining = OpenCount(_state.Batches) - 1;
-            var answer = new Answer(settlement.Slot, settlement.Operation, settlement.Key, settlement.Status, settlement.Result, settlement.Error, remaining, settlement.Detail);
-            IReadOnlyList<Answer> nextUnsent = [.. _state.Unsent, answer];
-            var nextUnsentSince = _state.Unsent.Count == 0 ? now : _state.UnsentSince ?? now;
-            var closed = nextSettled == batch.Count && nextFlying.Count == 0 && batch.Waiting.Count == 0;
-
-            for (var i = 0; i < _state.Batches.Count; i++)
-            {
-                if (i == batchIndex)
-                {
-                    if (!closed)
-                    {
-                        nextBatches.Add(batch with { Flying = nextFlying, Settled = nextSettled });
-                    }
-                }
-                else
-                {
-                    nextBatches.Add(_state.Batches[i]);
-                }
-            }
-
-            await Save(_state with { Batches = nextBatches, Unsent = nextUnsent, UnsentSince = nextUnsentSince }, []).ConfigureAwait(true);
-            if (closed)
-            {
-                await Get<IAskBatch>(AskRules.BatchOf(Id, batch.Id)).Drop().ConfigureAwait(true);
-            }
+            await Get<IAskBatch>(AskRules.BatchOf(Id, droppedBatchId)).Drop().ConfigureAwait(true);
         }
 
         await Pump().ConfigureAwait(true);
@@ -339,193 +236,54 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
 
     private async Task Sweep()
     {
-        if (_state.Batches.Count == 0)
+        var now = Context.Time.GetUtcNow();
+        var needed = _state.BatchesNeedingAsks(now);
+        if (needed.Count == 0)
         {
             return;
         }
 
-        var now = Context.Time.GetUtcNow();
-        var openRemaining = OpenCount(_state.Batches);
-        var nextBatches = new List<OpenBatch>(_state.Batches.Count);
-        var nextUnsent = new List<Answer>(_state.Unsent);
-        var nextUnsentSince = _state.UnsentSince;
-        List<string>? droppedBatchIds = null;
-        var changed = false;
-
-        for (var i = 0; i < _state.Batches.Count; i++)
+        var storedAsksByBatch = new Dictionary<string, IReadOnlyList<Ask>>(needed.Count, StringComparer.Ordinal);
+        for (var i = 0; i < needed.Count; i++)
         {
-            var batch = _state.Batches[i];
-            if (batch.AskedAt + AskLimits.MaxAge <= now)
-            {
-                changed = true;
-                RemoveBatchLeases(batch.Id);
-                var asks = await Get<IAskBatch>(AskRules.BatchOf(Id, batch.Id)).All().ConfigureAwait(true);
-                var unsettled = UnsettledIndexes(batch);
-                for (var j = 0; j < unsettled.Count; j++)
-                {
-                    var index = unsettled[j];
-                    openRemaining--;
-                    if ((uint)index < (uint)asks.Count)
-                    {
-                        var ask = asks[index];
-                        if (nextUnsent.Count == 0)
-                        {
-                            nextUnsentSince = now;
-                        }
-
-                        nextUnsent.Add(new Answer(ask.Slot, ask.Operation, ask.Key, AnswerStatus.Expired, AskRules.NoResult, "expired", openRemaining));
-                    }
-                }
-
-                (droppedBatchIds ??= []).Add(batch.Id);
-                continue;
-            }
-
-            if (!HasDueFlying(batch.Id, batch.Flying, now))
-            {
-                nextBatches.Add(batch);
-                continue;
-            }
-
-            changed = true;
-            var storedAsks = await Get<IAskBatch>(AskRules.BatchOf(Id, batch.Id)).All().ConfigureAwait(true);
-            var nextFlying = new List<FlyingAsk>(batch.Flying.Count);
-            var nextWaiting = new List<WaitingAsk>(batch.Waiting);
-            var nextSettled = batch.Settled;
-
-            for (var j = 0; j < batch.Flying.Count; j++)
-            {
-                var flying = batch.Flying[j];
-                if (EffectiveDue(batch.Id, flying) > now)
-                {
-                    nextFlying.Add(flying);
-                    continue;
-                }
-
-                _leases.Remove((batch.Id, flying.Index, flying.Attempt));
-                if ((uint)flying.Index < (uint)storedAsks.Count)
-                {
-                    var ask = storedAsks[flying.Index];
-                    if (ask.Repeatable && flying.Attempt < AskLimits.MaxAttempts)
-                    {
-                        var delay = Backoff[Math.Clamp(flying.Attempt - 1, 0, Backoff.Length - 1)];
-                        nextWaiting.Add(new WaitingAsk(flying.Index, flying.Attempt + 1, now + delay));
-                    }
-                    else
-                    {
-                        nextSettled++;
-                        openRemaining--;
-                        if (nextUnsent.Count == 0)
-                        {
-                            nextUnsentSince = now;
-                        }
-
-                        var status = ask.Repeatable ? AnswerStatus.Failed : AnswerStatus.Unknown;
-                        nextUnsent.Add(new Answer(ask.Slot, ask.Operation, ask.Key, status, AskRules.NoResult, "timeout", openRemaining));
-                    }
-                }
-                else
-                {
-                    nextSettled++;
-                    openRemaining--;
-                }
-            }
-
-            if (nextSettled == batch.Count && nextFlying.Count == 0 && nextWaiting.Count == 0)
-            {
-                (droppedBatchIds ??= []).Add(batch.Id);
-            }
-            else
-            {
-                nextBatches.Add(batch with { Flying = nextFlying, Waiting = nextWaiting, Settled = nextSettled });
-            }
+            var batchId = needed[i];
+            storedAsksByBatch[batchId] = await Get<IAskBatch>(AskRules.BatchOf(Id, batchId)).All().ConfigureAwait(true);
         }
 
-        if (changed)
+        var outcome = _state.Sweep(storedAsksByBatch, now);
+        if (!outcome.Changed)
         {
-            await Save(_state with { Batches = nextBatches, Unsent = nextUnsent, UnsentSince = nextUnsentSince }, []).ConfigureAwait(true);
-            if (droppedBatchIds is not null)
-            {
-                for (var i = 0; i < droppedBatchIds.Count; i++)
-                {
-                    await Get<IAskBatch>(AskRules.BatchOf(Id, droppedBatchIds[i])).Drop().ConfigureAwait(true);
-                }
-            }
+            return;
+        }
+
+        await Save(outcome.State, []).ConfigureAwait(true);
+        for (var i = 0; i < outcome.DroppedBatchIds.Count; i++)
+        {
+            await Get<IAskBatch>(AskRules.BatchOf(Id, outcome.DroppedBatchIds[i])).Drop().ConfigureAwait(true);
         }
     }
 
     private async Task Pump()
     {
-        var now = Context.Time.GetUtcNow();
-        var batches = _state.Batches.ToArray();
-        var flyingCount = 0;
-        for (var i = 0; i < batches.Length; i++)
+        var outcome = _state.Start(Context.Time.GetUtcNow(), Grace);
+        if (outcome.Started.Count == 0)
         {
-            flyingCount += batches[i].Flying.Count;
+            return;
         }
 
-        List<(string BatchId, int Index, int Attempt)>? started = null;
-        while (flyingCount < AskLimits.Concurrency)
+        await Save(outcome.State, []).ConfigureAwait(true);
+        for (var i = 0; i < outcome.Started.Count; i++)
         {
-            var picked = false;
-            for (var i = 0; i < batches.Length; i++)
-            {
-                var batch = batches[i];
-                var waitingIndex = ReadyWaitingIndex(batch.Waiting, now);
-                if (waitingIndex >= 0)
-                {
-                    var waiting = batch.Waiting[waitingIndex];
-                    var nextWaiting = RemoveAt(batch.Waiting, waitingIndex);
-                    IReadOnlyList<FlyingAsk> nextFlying = [.. batch.Flying, new FlyingAsk(waiting.Index, waiting.Attempt, now + batch.Timeout + Grace)];
-                    batches[i] = batch with { Flying = nextFlying, Waiting = nextWaiting };
-                    (started ??= []).Add((batch.Id, waiting.Index, waiting.Attempt));
-                    flyingCount++;
-                    picked = true;
-                    break;
-                }
-
-                if (batch.Next < batch.Count)
-                {
-                    var index = batch.Next;
-                    IReadOnlyList<FlyingAsk> nextFlying = [.. batch.Flying, new FlyingAsk(index, 1, now + batch.Timeout + Grace)];
-                    batches[i] = batch with { Next = index + 1, Flying = nextFlying };
-                    (started ??= []).Add((batch.Id, index, 1));
-                    flyingCount++;
-                    picked = true;
-                    break;
-                }
-            }
-
-            if (!picked)
-            {
-                break;
-            }
-        }
-
-        if (started is { Count: > 0 })
-        {
-            await Save(_state with { Batches = batches }, []).ConfigureAwait(true);
-            for (var i = 0; i < started.Count; i++)
-            {
-                var (batchId, index, attempt) = started[i];
-                await Get<IAskBatch>(AskRules.BatchOf(Id, batchId)).Run(index, attempt).ConfigureAwait(true);
-            }
+            var started = outcome.Started[i];
+            await Get<IAskBatch>(AskRules.BatchOf(Id, started.BatchId)).Run(started.Index, started.Attempt).ConfigureAwait(true);
         }
     }
 
     private async Task Flush(bool now = false)
     {
-        while (_state.Unsent.Count > 0 && ShouldFlush(now, Context.Time.GetUtcNow()))
+        while (_state.ShouldFlush(now, Context.Time.GetUtcNow()) && _state.NextFlushGroup() is { } flush)
         {
-            var count = GroupSize(_state.Unsent);
-            IReadOnlyList<Answer> group = [.. _state.Unsent.Take(count)];
-            IReadOnlyList<Answer> remaining = count == _state.Unsent.Count ? [] : [.. _state.Unsent.Skip(count)];
-            var next = _state with
-            {
-                Unsent = remaining,
-                UnsentSince = remaining.Count == 0 ? null : _state.UnsentSince,
-            };
-            await Save(next, [new Answered(Id.Key, group)]).ConfigureAwait(true);
+            await Save(flush.State, [new Answered(Id.Key, flush.Group)]).ConfigureAwait(true);
         }
 
         if (_state.Batches.Count == 0 && _state.Unsent.Count == 0)
@@ -539,13 +297,6 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
         }
     }
 
-    private bool ShouldFlush(bool now, DateTimeOffset clockNow) =>
-        now
-        || _state.Unsent.Count >= AskLimits.AnswersPerSignal
-        || !HasFlyingOrWaiting(_state.Batches)
-        || _state.UnsentSince is not { } since
-        || clockNow >= since + AskLimits.AnswerFlush;
-
     private async Task Save(AsksState next, IReadOnlyList<Signal> signals)
     {
         await Seat.Save(next, signals).ConfigureAwait(true);
@@ -554,36 +305,7 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
 
     private void ScheduleDue(DateTimeOffset now)
     {
-        var flyingCount = 0;
-        for (var i = 0; i < _state.Batches.Count; i++)
-        {
-            flyingCount += _state.Batches[i].Flying.Count;
-        }
-
-        DateTimeOffset? earliest = null;
-        for (var i = 0; i < _state.Batches.Count; i++)
-        {
-            var batch = _state.Batches[i];
-            for (var j = 0; j < batch.Flying.Count; j++)
-            {
-                earliest = Earlier(earliest, EffectiveDue(batch.Id, batch.Flying[j]));
-            }
-
-            if (flyingCount < AskLimits.Concurrency)
-            {
-                for (var j = 0; j < batch.Waiting.Count; j++)
-                {
-                    earliest = Earlier(earliest, batch.Waiting[j].NotBefore);
-                }
-            }
-        }
-
-        if (_state.Unsent.Count > 0 && _state.UnsentSince is { } unsentSince)
-        {
-            earliest = Earlier(earliest, unsentSince + AskLimits.AnswerFlush);
-        }
-
-        if (earliest is { } target)
+        if (_state.NextDue() is { } target)
         {
             var due = target > now ? target - now : TimeSpan.Zero;
             Context.Timers.Start(DueTimer, due, period: null, keepAlive: true);
@@ -600,29 +322,16 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
         for (var i = 0; i < batches.Count; i++)
         {
             var batch = batches[i];
-            if (batch.Next >= batch.Count && batch.Flying.Count == 0 && batch.Waiting.Count == 0)
+            var indexes = AsksState.UnsettledIndexes(batch);
+            if (indexes.Count == 0)
             {
                 continue;
             }
 
             var asks = await Get<IAskBatch>(AskRules.BatchOf(Id, batch.Id)).All().ConfigureAwait(true);
-            for (var index = batch.Next; index < batch.Count && index < asks.Count; index++)
+            for (var j = 0; j < indexes.Count; j++)
             {
-                keys.Add(asks[index].Key);
-            }
-
-            for (var j = 0; j < batch.Flying.Count; j++)
-            {
-                var index = batch.Flying[j].Index;
-                if ((uint)index < (uint)asks.Count)
-                {
-                    keys.Add(asks[index].Key);
-                }
-            }
-
-            for (var j = 0; j < batch.Waiting.Count; j++)
-            {
-                var index = batch.Waiting[j].Index;
+                var index = indexes[j];
                 if ((uint)index < (uint)asks.Count)
                 {
                     keys.Add(asks[index].Key);
@@ -632,279 +341,4 @@ internal sealed class AsksNeuron(ISynapseCatalogSource catalog, IUnitResolver? u
 
         return keys;
     }
-
-    private static int FindBatchIndex(IReadOnlyList<OpenBatch> batches, string batchId)
-    {
-        for (var i = 0; i < batches.Count; i++)
-        {
-            if (string.Equals(batches[i].Id, batchId, StringComparison.Ordinal))
-            {
-                return i;
-            }
-        }
-
-        return -1;
-    }
-
-    private static int FindFlyingIndex(IReadOnlyList<FlyingAsk> flying, int index, int attempt)
-    {
-        for (var i = 0; i < flying.Count; i++)
-        {
-            if (flying[i].Index == index && flying[i].Attempt == attempt)
-            {
-                return i;
-            }
-        }
-
-        return -1;
-    }
-
-    private static List<T> RemoveAt<T>(IReadOnlyList<T> items, int removeIndex)
-    {
-        var next = new List<T>(items.Count - 1);
-        for (var i = 0; i < items.Count; i++)
-        {
-            if (i != removeIndex)
-            {
-                next.Add(items[i]);
-            }
-        }
-
-        return next;
-    }
-
-    private bool ExtendLease(string batchId, int index, int attempt, TimeSpan? extension)
-    {
-        var batchIndex = FindBatchIndex(_state.Batches, batchId);
-        if (batchIndex < 0)
-        {
-            return false;
-        }
-
-        var batch = _state.Batches[batchIndex];
-        var flyingIndex = FindFlyingIndex(batch.Flying, index, attempt);
-        if (flyingIndex < 0)
-        {
-            return false;
-        }
-
-        var now = Context.Time.GetUtcNow();
-        var maxExpiry = batch.AskedAt + AskLimits.MaxAge;
-        if (now >= maxExpiry)
-        {
-            return false;
-        }
-
-        var requested = extension ?? batch.Timeout;
-        var clamped = requested <= TimeSpan.Zero
-            ? batch.Timeout
-            : requested < AskLimits.MaxTimeout
-                ? requested
-                : AskLimits.MaxTimeout;
-        var candidate = now + clamped + Grace;
-        if (candidate > maxExpiry)
-        {
-            candidate = maxExpiry;
-        }
-
-        var current = EffectiveDue(batchId, batch.Flying[flyingIndex]);
-        if (candidate > current)
-        {
-            _leases[(batchId, index, attempt)] = candidate;
-        }
-
-        return true;
-    }
-
-    private DateTimeOffset EffectiveDue(string batchId, FlyingAsk flying) =>
-        _leases.TryGetValue((batchId, flying.Index, flying.Attempt), out var extended) && extended > flying.Due
-            ? extended
-            : flying.Due;
-
-    private void RemoveBatchLeases(string batchId)
-    {
-        if (_leases.Count == 0)
-        {
-            return;
-        }
-
-        List<(string Batch, int Index, int Attempt)>? keys = null;
-        foreach (var key in _leases.Keys)
-        {
-            if (string.Equals(key.Batch, batchId, StringComparison.Ordinal))
-            {
-                (keys ??= []).Add(key);
-            }
-        }
-
-        if (keys is not null)
-        {
-            for (var i = 0; i < keys.Count; i++)
-            {
-                _leases.Remove(keys[i]);
-            }
-        }
-    }
-
-    private bool HasDueFlying(string batchId, IReadOnlyList<FlyingAsk> flying, DateTimeOffset now)
-    {
-        for (var i = 0; i < flying.Count; i++)
-        {
-            if (EffectiveDue(batchId, flying[i]) <= now)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool HasFlyingOrWaiting(IReadOnlyList<OpenBatch> batches)
-    {
-        for (var i = 0; i < batches.Count; i++)
-        {
-            if (batches[i].Flying.Count > 0 || batches[i].Waiting.Count > 0)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private static List<int> UnsettledIndexes(OpenBatch batch)
-    {
-        var indexes = new List<int>(batch.Flying.Count + batch.Waiting.Count + Math.Max(0, batch.Count - batch.Next));
-        for (var i = 0; i < batch.Flying.Count; i++)
-        {
-            indexes.Add(batch.Flying[i].Index);
-        }
-
-        for (var i = 0; i < batch.Waiting.Count; i++)
-        {
-            indexes.Add(batch.Waiting[i].Index);
-        }
-
-        for (var index = batch.Next; index < batch.Count; index++)
-        {
-            indexes.Add(index);
-        }
-
-        indexes.Sort();
-        for (var i = indexes.Count - 1; i > 0; i--)
-        {
-            if (indexes[i] == indexes[i - 1])
-            {
-                indexes.RemoveAt(i);
-            }
-        }
-
-        return indexes;
-    }
-
-    private static int GroupSize(IReadOnlyList<Answer> unsent)
-    {
-        var max = Math.Min(unsent.Count, AskLimits.AnswersPerSignal);
-        var bytes = ResultBytes(unsent[0]);
-        var count = 1;
-        while (count < max)
-        {
-            var nextBytes = ResultBytes(unsent[count]);
-            if (bytes + nextBytes > AskLimits.MaxResultBytes)
-            {
-                break;
-            }
-
-            bytes += nextBytes;
-            count++;
-        }
-
-        return count;
-    }
-
-    private static int ResultBytes(Answer answer) =>
-        answer.Result.ValueKind == JsonValueKind.Undefined
-            ? 0
-            : Encoding.UTF8.GetByteCount(answer.Result.GetRawText());
-
-    private static int OpenCount(IReadOnlyList<OpenBatch> batches)
-    {
-        var total = 0;
-        for (var i = 0; i < batches.Count; i++)
-        {
-            total += batches[i].Count - batches[i].Settled;
-        }
-
-        return total;
-    }
-
-    private static int ReadyWaitingIndex(IReadOnlyList<WaitingAsk> waiting, DateTimeOffset now)
-    {
-        for (var i = 0; i < waiting.Count; i++)
-        {
-            if (waiting[i].NotBefore <= now)
-            {
-                return i;
-            }
-        }
-
-        return -1;
-    }
-
-    private static TimeSpan LongestTimeout(List<Ask> asks)
-    {
-        var longest = TimeSpan.Zero;
-        for (var i = 0; i < asks.Count; i++)
-        {
-            var requested = asks[i].Timeout ?? AskLimits.DefaultTimeout;
-            var clamped = requested <= TimeSpan.Zero
-                ? AskLimits.DefaultTimeout
-                : requested < AskLimits.MaxTimeout
-                    ? requested
-                    : AskLimits.MaxTimeout;
-            if (clamped > longest)
-            {
-                longest = clamped;
-            }
-        }
-
-        return longest;
-    }
-
-    private static DateTimeOffset Earlier(DateTimeOffset? current, DateTimeOffset candidate) =>
-        current is { } existing && existing <= candidate ? existing : candidate;
 }
-
-internal sealed record AsksState(
-    IReadOnlyList<OpenBatch> Batches,
-    IReadOnlyList<Answer> Unsent,
-    DateTimeOffset? UnsentSince,
-    long Hour,
-    int AskedThisHour,
-    bool Tripped)
-{
-    public AsksState() : this([], [], null, 0, 0, false) { }
-}
-
-/// <summary>One accepted batch with asks still unsettled.</summary>
-/// <param name="Id">The batch id within the unit.</param>
-/// <param name="Count">Total accepted asks in this batch.</param>
-/// <param name="Next">The first index never started. Indexes below it are settled, flying or waiting.</param>
-/// <param name="Flying">Attempts currently in flight.</param>
-/// <param name="Waiting">Repeatable asks waiting for retry backoff.</param>
-/// <param name="Settled">Count of asks in this batch that have settled.</param>
-/// <param name="Timeout">The longest clamped timeout of the batch's asks.</param>
-/// <param name="AskedAt">When the batch was accepted.</param>
-internal sealed record OpenBatch(
-    string Id,
-    int Count,
-    int Next,
-    IReadOnlyList<FlyingAsk> Flying,
-    IReadOnlyList<WaitingAsk> Waiting,
-    int Settled,
-    TimeSpan Timeout,
-    DateTimeOffset AskedAt);
-
-internal sealed record FlyingAsk(int Index, int Attempt, DateTimeOffset Due);
-
-internal sealed record WaitingAsk(int Index, int Attempt, DateTimeOffset NotBefore);

@@ -784,7 +784,8 @@ public sealed record ComposerNode(
     string Placeholder = "Message",
     bool Enabled = true,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ActiveModelLabel = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ActiveProviderIcon = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ActiveProviderIcon = null,
+    bool Dictation = false);
 
 /// <summary>Inline recoverable error line with optional detail and retry/recovery button.</summary>
 [ViewNode("errorLine")]

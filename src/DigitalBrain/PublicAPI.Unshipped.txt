@@ -187,11 +187,19 @@ DigitalBrain.Access.Caller.Via.get -> DigitalBrain.NeuronId?
 DigitalBrain.Access.EdgeAuthority
 DigitalBrain.Access.EdgeAuthority.Agent(DigitalBrain.Access.Actor.Person! forPerson, DigitalBrain.BrainId brain, string? conversation = null) -> DigitalBrain.Access.Caller!
 DigitalBrain.Access.EdgeAuthority.App(string! key, DigitalBrain.Access.Actor.Person! forPerson, DigitalBrain.BrainId brain, string? conversation = null) -> DigitalBrain.Access.Caller!
+DigitalBrain.Access.EdgeAuthority.ClearCaller() -> System.IDisposable!
+DigitalBrain.Access.EdgeAuthority.Current.get -> DigitalBrain.Access.Caller?
 DigitalBrain.Access.EdgeAuthority.Enter(DigitalBrain.Access.Caller! caller) -> System.IDisposable!
+DigitalBrain.Access.EdgeAuthority.EnterInProcess() -> System.IDisposable!
 DigitalBrain.Access.EdgeAuthority.EnterKernel(DigitalBrain.BrainId brain) -> System.IDisposable!
+DigitalBrain.Access.EdgeAuthority.From(DigitalBrain.Capabilities.CapabilityCaller! caller) -> DigitalBrain.Access.Caller!
+DigitalBrain.Access.EdgeAuthority.Guest(string! principal, string! account, DigitalBrain.BrainId brain, string? conversation = null) -> DigitalBrain.Access.Caller!
+DigitalBrain.Access.EdgeAuthority.IsKernelActive.get -> bool
 DigitalBrain.Access.EdgeAuthority.Kernel(DigitalBrain.BrainId brain) -> DigitalBrain.Access.Caller!
 DigitalBrain.Access.EdgeAuthority.Module(string! id, DigitalBrain.BrainId brain) -> DigitalBrain.Access.Caller!
+DigitalBrain.Access.EdgeAuthority.OnBehalfOf(DigitalBrain.Access.Actor.Person! forPerson, DigitalBrain.BrainId brain, string? viaApp = null, DigitalBrain.NeuronId? via = null, string? conversation = null) -> DigitalBrain.Access.Caller!
 DigitalBrain.Access.EdgeAuthority.Person(string! principal, string! account, DigitalBrain.BrainId brain, string? conversation = null) -> DigitalBrain.Access.Caller!
+DigitalBrain.Access.EdgeAuthority.RelayedPerson(string! principal, string! account, DigitalBrain.BrainId brain, DigitalBrain.NeuronId? via = null, string? conversation = null, bool inside = true) -> DigitalBrain.Access.Caller!
 DigitalBrain.Access.EdgeAuthority.Scheduler(DigitalBrain.BrainId brain) -> DigitalBrain.Access.Caller!
 DigitalBrain.Access.ICallerAmbient
 DigitalBrain.Access.ICallerAmbient.Current.get -> DigitalBrain.Access.Caller?
@@ -423,6 +431,11 @@ DigitalBrain.CapabilityAttribute.Id.get -> DigitalBrain.Capabilities.CapabilityI
 DigitalBrain.CapabilityAttribute.Name.get -> string!
 DigitalBrain.CapabilityAttribute.Version.get -> int
 DigitalBrain.Causation
+DigitalBrain.Confirmation.Answerer
+DigitalBrain.Confirmation.Answerer.<Clone>$() -> DigitalBrain.Confirmation.Answerer!
+DigitalBrain.Confirmation.Answerer.Equals(DigitalBrain.Confirmation.Answerer? other) -> bool
+DigitalBrain.Confirmation.Answerer.IsPerson.get -> bool
+DigitalBrain.Confirmation.Answerer.Principal.get -> DigitalBrain.Confirmation.ConfirmationPrincipal!
 DigitalBrain.Confirmation.ApprovalWaiters
 DigitalBrain.Confirmation.ApprovalWaiters.ApprovalWaiters() -> void
 DigitalBrain.Confirmation.ApprovalWaiters.Cancel(string! planId) -> void
@@ -586,7 +599,7 @@ DigitalBrain.Confirmation.ConfirmationsNeuron.Resolve(string! planId, bool appro
 DigitalBrain.Confirmation.ConfirmationsNeuron.Withdraw(string! planId) -> System.Threading.Tasks.Task!
 DigitalBrain.Confirmation.ConfirmationState
 DigitalBrain.Confirmation.ConfirmationState.<Clone>$() -> DigitalBrain.Confirmation.ConfirmationState!
-DigitalBrain.Confirmation.ConfirmationState.Answer(string! planId, bool approve, bool person, DigitalBrain.Confirmation.ConfirmationPrincipal! approver, System.DateTimeOffset now) -> DigitalBrain.Confirmation.ConfirmationTransition?
+DigitalBrain.Confirmation.ConfirmationState.Answer(string! planId, bool approve, DigitalBrain.Confirmation.Answerer! answerer, System.DateTimeOffset now) -> DigitalBrain.Confirmation.ConfirmationTransition?
 DigitalBrain.Confirmation.ConfirmationState.ConfirmationState() -> void
 DigitalBrain.Confirmation.ConfirmationState.End(string! planId, DigitalBrain.Confirmation.ConfirmationOutcome outcome, DigitalBrain.Confirmation.ConfirmationDenyReason reason, DigitalBrain.Confirmation.ConfirmationPrincipal? approver, System.DateTimeOffset now) -> DigitalBrain.Confirmation.ConfirmationTransition?
 DigitalBrain.Confirmation.ConfirmationState.Entries.get -> DigitalBrain.Confirmation.ConfirmationEntry![]!
@@ -1527,6 +1540,7 @@ DigitalBrain.Neurons.Neuron.Check(string! operation, params DigitalBrain.Rules.R
 DigitalBrain.Neurons.Neuron.Context.get -> DigitalBrain.Neurons.INeuronContext!
 DigitalBrain.Neurons.Neuron.Defer(System.Func<System.Threading.Tasks.Task!>! work) -> void
 DigitalBrain.Neurons.Neuron.Get<T>(DigitalBrain.NeuronId id) -> T!
+DigitalBrain.Neurons.Neuron.GetLogger(string? category = null) -> Microsoft.Extensions.Logging.ILogger!
 DigitalBrain.Neurons.Neuron.Id.get -> DigitalBrain.NeuronId
 DigitalBrain.Neurons.Neuron.Neuron() -> void
 DigitalBrain.Neurons.Neuron.Publish(DigitalBrain.Signal! signal) -> System.Threading.Tasks.Task!
@@ -2740,6 +2754,9 @@ override DigitalBrain.Capabilities.CapabilityId.GetHashCode() -> int
 override DigitalBrain.Capabilities.CapabilityId.ToString() -> string!
 override DigitalBrain.Capabilities.CapabilityIdJsonConverter.Read(ref System.Text.Json.Utf8JsonReader reader, System.Type! typeToConvert, System.Text.Json.JsonSerializerOptions! options) -> DigitalBrain.Capabilities.CapabilityId
 override DigitalBrain.Capabilities.CapabilityIdJsonConverter.Write(System.Text.Json.Utf8JsonWriter! writer, DigitalBrain.Capabilities.CapabilityId value, System.Text.Json.JsonSerializerOptions! options) -> void
+override DigitalBrain.Confirmation.Answerer.Equals(object? obj) -> bool
+override DigitalBrain.Confirmation.Answerer.GetHashCode() -> int
+override DigitalBrain.Confirmation.Answerer.ToString() -> string!
 override DigitalBrain.Confirmation.ConfirmationEntry.Equals(object? obj) -> bool
 override DigitalBrain.Confirmation.ConfirmationEntry.GetHashCode() -> int
 override DigitalBrain.Confirmation.ConfirmationEntry.ToString() -> string!
@@ -3334,6 +3351,14 @@ static DigitalBrain.Capabilities.CapabilityId.operator ==(DigitalBrain.Capabilit
 static DigitalBrain.Capabilities.CapabilityId.Parse(string! text) -> DigitalBrain.Capabilities.CapabilityId
 static DigitalBrain.Capabilities.CapabilityId.TryParse(string? text, out DigitalBrain.Capabilities.CapabilityId id) -> bool
 static DigitalBrain.Causation.Address(DigitalBrain.NeuronId publisher, long sequence) -> string!
+static DigitalBrain.Confirmation.Answerer.Agent(string! id) -> DigitalBrain.Confirmation.Answerer!
+static DigitalBrain.Confirmation.Answerer.App(string! id) -> DigitalBrain.Confirmation.Answerer!
+static DigitalBrain.Confirmation.Answerer.From(DigitalBrain.Confirmation.ConfirmationPrincipal! principal, bool direct = false) -> DigitalBrain.Confirmation.Answerer!
+static DigitalBrain.Confirmation.Answerer.Of(DigitalBrain.Access.Caller? caller, DigitalBrain.BrainId brain) -> DigitalBrain.Confirmation.Answerer!
+static DigitalBrain.Confirmation.Answerer.Person(string! id) -> DigitalBrain.Confirmation.Answerer!
+static DigitalBrain.Confirmation.Answerer.RelayedPerson(string! id) -> DigitalBrain.Confirmation.Answerer!
+static DigitalBrain.Confirmation.Answerer.operator !=(DigitalBrain.Confirmation.Answerer? left, DigitalBrain.Confirmation.Answerer? right) -> bool
+static DigitalBrain.Confirmation.Answerer.operator ==(DigitalBrain.Confirmation.Answerer? left, DigitalBrain.Confirmation.Answerer? right) -> bool
 static DigitalBrain.Confirmation.ConfirmationAudit.Record(DigitalBrain.Confirmation.ConfirmationRequested! request, DigitalBrain.Confirmation.ConfirmationResult! result, DigitalBrain.Confirmation.ConfirmationPrincipal? approver, System.DateTimeOffset at) -> DigitalBrain.Confirmation.ConfirmationResolved!
 static DigitalBrain.Confirmation.ConfirmationEntry.operator !=(DigitalBrain.Confirmation.ConfirmationEntry? left, DigitalBrain.Confirmation.ConfirmationEntry? right) -> bool
 static DigitalBrain.Confirmation.ConfirmationEntry.operator ==(DigitalBrain.Confirmation.ConfirmationEntry? left, DigitalBrain.Confirmation.ConfirmationEntry? right) -> bool

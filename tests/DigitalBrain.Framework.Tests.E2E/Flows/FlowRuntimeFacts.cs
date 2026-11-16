@@ -1,11 +1,14 @@
+using DigitalBrain.Access;
 using DigitalBrain.Contracts;
 using DigitalBrain.Modules;
 using DigitalBrain.Neurons;
 using DigitalBrain;
+using DigitalBrain.Capabilities;
 using DigitalBrain.Capabilities.Compute;
 using DigitalBrain.Confirmation;
 using DigitalBrain.Flows;
 using DigitalBrain.Kernel;
+using DigitalBrain.Runtime.Orleans.Capabilities;
 using Microsoft.Extensions.DependencyInjection;
 using DigitalBrain.Testing;
 
@@ -233,6 +236,71 @@ public sealed class FlowRuntimeFacts(FlowRuntimeFixture fixture, FaultingConfirm
             if ((await runtime.Signals<FlowResolve>(flow, Ct)).Count > 0 || DateTime.UtcNow > deadline) { return; }
             await runtime.Elapse(TimeSpan.FromMilliseconds(100), Ct);
         }
+    }
+
+    [Fact]
+    public async Task AppAndAgentCallersCannotCancelFlowInTestOS()
+    {
+        await using var os = TestOS.Local();
+        os.Register<TwoStepFlow>();
+        var brain = new BrainId("local");
+        var id = new NeuronId(brain, "test.flow", "guard-os");
+        var person = new Actor.Person("ann", "acc");
+
+        await os.Get<ITestFlow>(id).Start("Build", "ann", null, new FlowBox { AskFirst = true, Approval = true });
+        await os.Idle();
+
+        using (os.Edge.Enter(os.Edge.Agent(person, brain)))
+        {
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => os.Get<ITestFlow>(id).Cancel("stop"));
+        }
+
+        using (os.Edge.Enter(os.Edge.App("tasks", person, brain)))
+        {
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => os.Get<ITestFlow>(id).Cancel("stop"));
+        }
+
+        using (os.Edge.Enter(os.Edge.Person("ann", "acc", brain, conversation: "conv-1")))
+        {
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => os.Get<ITestFlow>(id).Cancel("stop"));
+        }
+
+        Assert.Equal(FlowStatus.Waiting, (await os.Get<ITestFlow>(id).Read()).Status);
+
+        using (os.Edge.Enter(os.Edge.Person("ann", "acc", brain)))
+        {
+            await os.Get<ITestFlow>(id).Cancel("stop");
+        }
+
+        Assert.Equal(FlowStatus.Cancelled, (await os.Get<ITestFlow>(id).Read()).Status);
+    }
+
+    [Fact]
+    public async Task AppAndAgentCallersCannotCancelFlowInSilo()
+    {
+        var runtime = await fixture.Runtime(NeuronRuntimeKind.Silo);
+        var id = runtime.Id("test.flow", "guard-silo");
+        await runtime.Get<ITestFlow>(id).Start("Build", "ann", null, new FlowBox { AskFirst = true, Approval = true });
+        await runtime.WaitForSignals<FlowWaiting>(id, 1, TimeSpan.FromSeconds(20), Ct);
+
+        using (RuntimeCallerContext.Stamp(CapabilityCallers.Of("ann", "acc", runtime.Brain.Value, CallerKind.Agent)))
+        {
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => runtime.Get<ITestFlow>(id).Cancel("stop").WaitAsync(Ct));
+        }
+
+        using (RuntimeCallerContext.Stamp(CapabilityCallers.Of("ann", "acc", runtime.Brain.Value, CallerKind.App, appId: "tasks")))
+        {
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(() => runtime.Get<ITestFlow>(id).Cancel("stop").WaitAsync(Ct));
+        }
+
+        Assert.Equal(FlowStatus.Waiting, (await runtime.Get<ITestFlow>(id).Read()).Status);
+
+        using (RuntimeCallerContext.Stamp(CapabilityCallers.Of("ann", "acc", runtime.Brain.Value, CallerKind.User)))
+        {
+            await runtime.Get<ITestFlow>(id).Cancel("stop").WaitAsync(Ct);
+        }
+
+        Assert.Equal(FlowStatus.Cancelled, (await runtime.Get<ITestFlow>(id).Read()).Status);
     }
 }
 

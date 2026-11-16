@@ -98,7 +98,7 @@ public sealed class EmptyCatchChallengerFacts
         """);
 
     [Fact]
-    public Task NonScreenNeuron_WithEmptyCatch_DoesNotEmitDB0022() => Verify<EmptyCatchAnalyzer>.Diagnostics("""
+    public Task NonScreenNeuron_WithBroadEmptyCatch_EmitsDB0022_WhileNarrowCatchIsAllowed() => Verify<EmptyCatchAnalyzer>.Diagnostics("""
         using System;
         using DigitalBrain;
 
@@ -107,13 +107,19 @@ public sealed class EmptyCatchChallengerFacts
             public void Swallow()
             {
                 try { Console.WriteLine(); }
-                catch { }
+                {|DB0022:catch|} { }
+            }
+
+            public void NarrowCatch()
+            {
+                try { Console.WriteLine(); }
+                catch (OperationCanceledException) { }
             }
         }
         """);
 
     [Fact]
-    public Task PlainClass_WithEmptyCatch_DoesNotEmitDB0022() => Verify<EmptyCatchAnalyzer>.Diagnostics("""
+    public Task PlainClass_WithBroadEmptyOrDiscardCatch_EmitsDB0022() => Verify<EmptyCatchAnalyzer>.Diagnostics("""
         using System;
 
         public sealed class OrdinaryService
@@ -121,7 +127,13 @@ public sealed class EmptyCatchChallengerFacts
             public void Swallow()
             {
                 try { Console.WriteLine(); }
-                catch { }
+                {|DB0022:catch|} { }
+            }
+
+            public void SwallowDiscard()
+            {
+                try { Console.WriteLine(); }
+                {|DB0022:catch|} (Exception e) { _ = e; }
             }
         }
         """);

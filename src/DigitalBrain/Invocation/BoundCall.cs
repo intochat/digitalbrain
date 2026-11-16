@@ -33,7 +33,7 @@ public sealed class BoundCall
         Streamer = stream;
         Parameters = method.GetParameters().Select(parameter => parameter.ParameterType).ToArray();
         ArgumentCount = Parameters.Count(type => type != typeof(CancellationToken));
-        Access = OperationAccessOf.Resolve(contract, method);
+        Access = CallPolicy.AccessOf(contract, method);
     }
 
     internal BoundCall(CallDescriptor descriptor)

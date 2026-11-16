@@ -278,6 +278,81 @@ public sealed class AskProgressAndLeaseFacts
         Assert.Equal(AnswerStatus.Ok, answers["renewed"].Status);
     }
 
+    [Fact]
+    public async Task ExplicitRenewPersistsExtendedDueAcrossActivationRestart()
+    {
+        var clock = new ManualTimerClock();
+        var catalog = new SynapseCatalogSource(SynapseCatalog.Scan([typeof(Asker), typeof(AskerFunctions)]));
+
+        var timers = new RecordingTimers();
+        var context = new RecordingContext(AsksId)
+        {
+            Time = clock,
+            RecordedTimers = timers,
+            RecordedReminders = timers,
+        };
+
+        var asks1 = new AsksNeuron(catalog);
+        NeuronAttachment.Attach(asks1, context);
+        await NeuronAttachment.Activate(asks1, Ct);
+
+        var batchStub = new RecordingBatchStub(
+            [new Ask("feed", "Get", JsonElement.Parse("""{"id":"1"}"""), "long-job") { Timeout = TimeSpan.FromSeconds(10) }]);
+        context.Neurons[BatchId] = batchStub;
+
+        await asks1.OnAsked(new Asked("asker", "b1", batchStub.Stored), Ct);
+        Assert.Equal([(0, 1)], batchStub.Runs);
+
+        // Renew at t0 + 7s with a 10s extension -> due must persist at t0 + 7s + 10s + Grace (22s).
+        clock.Advance(TimeSpan.FromSeconds(7));
+        context.Caller = DigitalBrain.Access.Caller.OfKernel(Brain, BatchId);
+        await asks1.Renew(new AskLeaseRenewal("b1", 0, 1, TimeSpan.FromSeconds(10)));
+        context.Caller = null;
+
+        // Advance past original deadline (t0 + 15s) to t0 + 16s and simulate reactivation via fresh AsksNeuron on same Seat.
+        clock.Advance(TimeSpan.FromSeconds(9));
+        var asks2 = new AsksNeuron(catalog);
+        NeuronAttachment.Attach(asks2, context);
+        await NeuronAttachment.Activate(asks2, Ct);
+
+        Assert.Empty(context.Writes.SelectMany(w => w.Signals.OfType<Answered>()).SelectMany(a => a.Answers));
+
+        // Advancing past renewed deadline (t0 + 22s) triggers timeout on Sweep.
+        clock.Advance(TimeSpan.FromSeconds(6));
+        await asks2.Remind("asks-due", Ct);
+
+        var answer = Assert.Single(context.Writes.SelectMany(w => w.Signals.OfType<Answered>()).SelectMany(a => a.Answers));
+        Assert.Equal(("long-job", AnswerStatus.Unknown, "timeout"), (answer.Key, answer.Status, answer.Error));
+    }
+
+    private sealed class RecordingBatchStub(IReadOnlyList<Ask> stored) : IAskBatch
+    {
+        public IReadOnlyList<Ask> Stored { get; private set; } = stored;
+        public List<(int Index, int Attempt)> Runs { get; } = [];
+        public bool Dropped { get; private set; }
+
+        public Task Put(string unit, IReadOnlyList<Ask> asks)
+        {
+            Stored = [.. asks];
+            return Task.CompletedTask;
+        }
+
+        public Task<IReadOnlyList<Ask>> All() => Task.FromResult(Stored);
+
+        public Task Run(int index, int attempt)
+        {
+            Runs.Add((index, attempt));
+            return Task.CompletedTask;
+        }
+
+        public Task Drop()
+        {
+            Dropped = true;
+            Stored = [];
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class DeferredBatchStub(AskBatchNeuron inner) : IAskBatch
     {
         private readonly Queue<(int Index, int Attempt)> _queued = new();

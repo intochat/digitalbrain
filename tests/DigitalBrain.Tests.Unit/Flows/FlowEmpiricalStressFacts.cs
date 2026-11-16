@@ -208,6 +208,7 @@ public sealed class FlowEmpiricalStressFacts
         Assert.Equal(FlowStatus.Running, flow.Current.Status);
 
         // Cancel mid-step
+        context.Caller = new DigitalBrain.Access.Caller(new DigitalBrain.Access.Actor.Person("alice", "acc"), context.Id.Brain);
         await flow.Cancel("user-cancelled-mid-flight");
         await advancing;
         await Drain(context);
@@ -307,6 +308,7 @@ public sealed class FlowEmpiricalStressFacts
                             var advancing = Drain(context);
                             await flow.HangEntered.Task;
 
+                            context.Caller = new DigitalBrain.Access.Caller(new DigitalBrain.Access.Actor.Person("user", "acc"), brain);
                             await flow.Cancel($"cancel-{i}");
                             await advancing;
                             await Drain(context);

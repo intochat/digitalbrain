@@ -1,3 +1,5 @@
+using DigitalBrain.Log;
+
 namespace DigitalBrain.Confirmation;
 
 /// <summary>
@@ -49,7 +51,13 @@ public sealed class AwaitedConfirmations(
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             _waiters.Cancel(plan.Id);
-            try { await requests.Withdraw(plan.Id).ConfigureAwait(false); } catch { }
+#pragma warning disable CA1031
+            try { await requests.Withdraw(plan.Id).ConfigureAwait(false); }
+            catch (Exception error) when (error is not OutOfMemoryException)
+            {
+                TraceLogger.For(typeof(AwaitedConfirmations).FullName!).LogSwallowed(error, "Withdrawing canceled confirmation request failed.");
+            }
+#pragma warning restore CA1031
             throw;
         }
     }

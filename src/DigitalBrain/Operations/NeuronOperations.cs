@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using DigitalBrain.Contracts;
 using DigitalBrain.Invocation;
+using DigitalBrain.Log;
 using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Operations;
@@ -70,10 +71,15 @@ public sealed class OperationHandle : IOperation, IDisposable
                 }
             }
         }
-        catch
+        catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
         {
-            // Best effort
         }
+#pragma warning disable CA1031
+        catch (Exception error) when (error is not OutOfMemoryException)
+        {
+            TraceLogger.For(typeof(OperationHandle).FullName!).LogSwallowed(error, "Monitoring operation neuron state failed.");
+        }
+#pragma warning restore CA1031
     }
 
     /// <inheritdoc />

@@ -47,8 +47,14 @@ public class NeuronProxy : DispatchProxy
     public static string ContractName(Type contract)
     {
         ArgumentNullException.ThrowIfNull(contract);
-        return ContractNames.GetOrAdd(contract, static type => type.GetCustomAttribute<NeuronAliasAttribute>(inherit: false)?.Alias ?? type.FullName ?? type.Name);
+        // Never cache collectible contracts in static dictionaries; doing so pins their AssemblyLoadContext.
+        return contract.IsCollectible
+            ? ReadContractName(contract)
+            : ContractNames.GetOrAdd(contract, static type => ReadContractName(type));
     }
+
+    private static string ReadContractName(Type contract)
+        => contract.GetCustomAttribute<NeuronAliasAttribute>(inherit: false)?.Alias ?? contract.FullName ?? contract.Name;
 
     /// <summary>Two proxies for one neuron are equal.</summary>
     public override bool Equals(object? obj) => obj is NeuronProxy other && Target == other.Target && _contract == other._contract;
@@ -74,7 +80,9 @@ public class NeuronProxy : DispatchProxy
             };
         }
         // Bound once per contract method: parameter types, token position, timeout and the dispatch delegate; no per-call reflection.
-        var bound = Methods.GetOrAdd(targetMethod, static method => new ProxyMethod(method, Dispatch(method)));
+        var bound = targetMethod.DeclaringType?.IsCollectible == true || targetMethod.ReflectedType?.IsCollectible == true
+            ? new ProxyMethod(targetMethod, Dispatch(targetMethod))
+            : Methods.GetOrAdd(targetMethod, static method => new ProxyMethod(method, Dispatch(method)));
         var call = new RuntimeInvocation(string.Empty, _contract, _key, targetMethod.Name, bound.Encode(args));
         return bound.Dispatch(this, call, bound.Shape, bound.TokenOf(args));
     }
@@ -180,7 +188,7 @@ public class NeuronProxy : DispatchProxy
 
     private async IAsyncEnumerable<TItem> Items<TItem>(RuntimeInvocation call, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        await foreach (var item in _sink.Stream(Target, call, cancellationToken).ConfigureAwait(false))
+        await foreach (var item in _sink.Stream(Target, call, cancellationToken).WithCancellation(cancellationToken).ConfigureAwait(false))
         {
             yield return item.Deserialize<TItem>(RuntimeProtocol.OptionsFor(typeof(TItem)))!;
         }

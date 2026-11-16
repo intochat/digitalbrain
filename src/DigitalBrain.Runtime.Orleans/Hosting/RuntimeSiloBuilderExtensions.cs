@@ -124,6 +124,7 @@ public static class RuntimeSiloBuilderExtensions
         silo.Services.AddCapabilityBroker();
         silo.Services.TryAddSingleton<ICallerAmbient>(OrleansCallerAmbient.Instance);
         silo.Services.TryAddSingleton<ICallerCarrier>(OrleansCallerAmbient.Instance);
+        silo.Services.TryAddSingleton(new EdgeAuthority(OrleansCallerAmbient.Instance));
         silo.Services.TryAddSingleton(new AccessOptions());
         silo.Services.TryAddSingleton(new AccessCounters());
         silo.Services.TryAddSingleton(sp => new AccessGate(sp.GetRequiredService<ICallerAmbient>(), sp.GetRequiredService<AccessOptions>(), sp.GetRequiredService<AccessCounters>()));

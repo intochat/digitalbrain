@@ -268,8 +268,10 @@ DigitalBrain.UI.ComposerNode.ActiveModelLabel.get -> string?
 DigitalBrain.UI.ComposerNode.ActiveModelLabel.init -> void
 DigitalBrain.UI.ComposerNode.ActiveProviderIcon.get -> string?
 DigitalBrain.UI.ComposerNode.ActiveProviderIcon.init -> void
-DigitalBrain.UI.ComposerNode.ComposerNode(string! Key, DigitalBrain.UI.Emit! OnSubmit, string! Placeholder = "Message", bool Enabled = true, string? ActiveModelLabel = null, string? ActiveProviderIcon = null) -> void
-DigitalBrain.UI.ComposerNode.Deconstruct(out string! Key, out DigitalBrain.UI.Emit! OnSubmit, out string! Placeholder, out bool Enabled, out string? ActiveModelLabel, out string? ActiveProviderIcon) -> void
+DigitalBrain.UI.ComposerNode.ComposerNode(string! Key, DigitalBrain.UI.Emit! OnSubmit, string! Placeholder = "Message", bool Enabled = true, string? ActiveModelLabel = null, string? ActiveProviderIcon = null, bool Dictation = false) -> void
+DigitalBrain.UI.ComposerNode.Deconstruct(out string! Key, out DigitalBrain.UI.Emit! OnSubmit, out string! Placeholder, out bool Enabled, out string? ActiveModelLabel, out string? ActiveProviderIcon, out bool Dictation) -> void
+DigitalBrain.UI.ComposerNode.Dictation.get -> bool
+DigitalBrain.UI.ComposerNode.Dictation.init -> void
 DigitalBrain.UI.ComposerNode.Enabled.get -> bool
 DigitalBrain.UI.ComposerNode.Enabled.init -> void
 DigitalBrain.UI.ComposerNode.Equals(DigitalBrain.UI.ComposerNode? other) -> bool

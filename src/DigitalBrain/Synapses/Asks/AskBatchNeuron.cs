@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using DigitalBrain.Invocation;
+using DigitalBrain.Log;
 using DigitalBrain.Neurons;
 
 namespace DigitalBrain.Units;
@@ -117,7 +118,10 @@ internal sealed class AskBatchNeuron(ISynapseCatalogSource catalog, ISlotResolve
                 using var handle = await units.Resolve(Id.Brain, unit, UnitView.Live, cts.Token).ConfigureAwait(true);
                 dynamicCat = handle?.Catalog;
             }
-            catch (Exception ex) when (ex is not OutOfMemoryException) { _ = ex; }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                GetLogger("DigitalBrain.Synapses").LogSwallowed(ex, "Resolving live unit catalog before ask run failed.");
+            }
         }
         var cat = dynamicCat ?? catalog.Static;
         var slot = DeferredSlot(cat.For(unit), ask.Slot);

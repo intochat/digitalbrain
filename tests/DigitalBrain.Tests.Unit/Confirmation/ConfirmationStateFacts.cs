@@ -62,7 +62,7 @@ public sealed class ConfirmationStateFacts
         for (var i = 0; i < 20; i++)
         {
             var plan = Plan($"cf-{i}");
-            var t = state.Request(plan, Requester, $"caller-{i}", ConfirmationPolicy.Always, T0);
+            var t = state.Request(plan, Requester, "caller-1", ConfirmationPolicy.Always, T0);
             Assert.NotNull(t);
             state = t.Value.Next;
         }
@@ -71,7 +71,7 @@ public sealed class ConfirmationStateFacts
 
         var plan21 = Plan("cf-21");
         Assert.Throws<InvalidOperationException>(() =>
-            state.Request(plan21, Requester, "caller-21", ConfirmationPolicy.Always, T0));
+            state.Request(plan21, Requester, "caller-1", ConfirmationPolicy.Always, T0));
     }
 
     [Fact]
@@ -130,7 +130,7 @@ public sealed class ConfirmationStateFacts
         state = state.Request(plan, Requester, "caller-1", ConfirmationPolicy.Always, T0)!.Value.Next;
 
         var approver = ConfirmationPrincipal.Person("user-1");
-        var transition = state.Answer("cf-ans", approve: true, person: true, approver, T1);
+        var transition = state.Answer("cf-ans", approve: true, Answerer.Person("user-1"), T1);
 
         Assert.NotNull(transition);
         Assert.NotNull(transition.Value.Result);
@@ -150,7 +150,7 @@ public sealed class ConfirmationStateFacts
         state = state.Request(plan, Requester, "caller-1", ConfirmationPolicy.Always, T0)!.Value.Next;
 
         var appApprover = Requester;
-        var transition = state.Answer("cf-self", approve: true, person: false, appApprover, T1);
+        var transition = state.Answer("cf-self", approve: true, Answerer.From(appApprover), T1);
 
         Assert.NotNull(transition);
         Assert.NotNull(transition.Value.Result);
@@ -242,7 +242,7 @@ public sealed class ConfirmationStateFacts
         {
             var p = Plan($"answered-{i}") with { RequiresPerson = true };
             state = state.Request(p, Requester, "flow", ConfirmationPolicy.Always, T0)!.Value.Next;
-            state = state.Answer($"answered-{i}", approve: true, person: true, approver, T1)!.Value.Next;
+            state = state.Answer($"answered-{i}", approve: true, Answerer.From(approver, direct: true), T1)!.Value.Next;
         }
 
         // Flood with 60 unasked (Skipped = true) entries under Never policy
@@ -260,5 +260,80 @@ public sealed class ConfirmationStateFacts
             Assert.False(known.Skipped);
             Assert.Equal(ConfirmationOutcome.Approved, known.Outcome);
         }
+    }
+
+    [Fact]
+    public void RequestCapsPendingPerRaiserAt20AndAllowsDistinctRaisers()
+    {
+        var state = new ConfirmationState();
+        var raiserOne = ConfirmationPrincipal.App("app-1");
+        var raiserTwo = ConfirmationPrincipal.App("app-2");
+
+        for (var i = 0; i < ConfirmationState.PendingLimit; i++)
+        {
+            var transition = state.Request(Plan($"r1-{i}"), raiserOne, "raiser-1", ConfirmationPolicy.Always, T0);
+            Assert.NotNull(transition);
+            state = transition.Value.Next;
+        }
+
+        Assert.Throws<InvalidOperationException>(() =>
+            state.Request(Plan("r1-over"), raiserOne, "raiser-1", ConfirmationPolicy.Always, T0));
+
+        var secondRaiser = state.Request(Plan("r2-0"), raiserTwo, "raiser-2", ConfirmationPolicy.Always, T0);
+        Assert.NotNull(secondRaiser);
+        Assert.Equal(ConfirmationState.PendingLimit + 1, Pending(secondRaiser.Value.Next).Length);
+    }
+
+    [Fact]
+    public void AnswerWhenRequiresPersonAndNotPersonThrowsWithoutPoisoningPendingPlan()
+    {
+        var state = new ConfirmationState();
+        var plan = Plan("cf-human-only") with { RequiresPerson = true };
+        state = state.Request(plan, Requester, "flow-1", ConfirmationPolicy.Always, T0)!.Value.Next;
+        var agentApprover = Answerer.Agent("agent-1");
+        var relayedPerson = Answerer.RelayedPerson("alice");
+
+        Assert.Throws<UnauthorizedAccessException>(() =>
+            state.Answer("cf-human-only", approve: true, agentApprover, T1));
+        Assert.Throws<UnauthorizedAccessException>(() =>
+            state.Answer("cf-human-only", approve: false, agentApprover, T1));
+        Assert.Throws<UnauthorizedAccessException>(() =>
+            state.Answer("cf-human-only", approve: true, relayedPerson, T1));
+
+        Assert.Single(Pending(state));
+        Assert.Null(state.Known("cf-human-only"));
+    }
+
+    [Fact]
+    public void AnswerWhenNotPersonDeniesRecordsSelfApprovalNotByPerson()
+    {
+        var state = new ConfirmationState();
+        var plan = Plan("cf-nonperson-deny") with { RequiresPerson = false };
+        state = state.Request(plan, Requester, "caller-1", ConfirmationPolicy.Always, T0)!.Value.Next;
+        var agentApprover = Answerer.Agent("agent-1");
+
+        var transition = state.Answer("cf-nonperson-deny", approve: false, agentApprover, T1);
+
+        Assert.NotNull(transition);
+        Assert.NotNull(transition.Value.Result);
+        Assert.Equal(ConfirmationOutcome.Denied, transition.Value.Result.Outcome);
+        Assert.Equal(ConfirmationDenyReason.SelfApproval, transition.Value.Result.Reason);
+    }
+
+    [Fact]
+    public void AnswererOfRejectsForeignBrainAndDerivesDirectPersonAuthority()
+    {
+        var brain = new BrainId("b1");
+        var other = new BrainId("b2");
+        var alice = new DigitalBrain.Access.Actor.Person("alice", "acc-1");
+        var neuron = new NeuronId(brain, "flow.x", "run-1");
+
+        Assert.Throws<UnauthorizedAccessException>(() =>
+            Answerer.Of(new DigitalBrain.Access.Caller(alice, other), brain));
+        Assert.True(Answerer.Of(new DigitalBrain.Access.Caller(alice, brain), brain).IsPerson);
+        Assert.False(Answerer.Of(new DigitalBrain.Access.Caller(alice, brain, via: neuron), brain).IsPerson);
+        Assert.False(Answerer.Of(new DigitalBrain.Access.Caller(alice, brain, conversation: "conv-1"), brain).IsPerson);
+        Assert.False(Answerer.Of(new DigitalBrain.Access.Caller(new DigitalBrain.Access.Actor.Agent(alice), brain), brain).IsPerson);
+        Assert.False(Answerer.Of(null, brain).IsPerson);
     }
 }

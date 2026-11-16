@@ -11,7 +11,8 @@ namespace DigitalBrain.Confirmation;
 public sealed class ConfirmationsNeuron : Neuron<ConfirmationState>, IConfirmationRequests, IConfirmationInbox
 {
     public const string NeuronType = "runtime.confirmations";
-    private const string ExpiryTimer = "confirmation-expiry";
+    private const string ExpiryReminder = "confirmation-expiry";
+    private static readonly TimeSpan ExpiryPeriod = TimeSpan.FromMinutes(1);
 
     private TimeProvider Clock => Context.Time;
 
@@ -26,7 +27,7 @@ public sealed class ConfirmationsNeuron : Neuron<ConfirmationState>, IConfirmati
             throw new InvalidOperationException("A confirmation inbox has the key confirmations.");
         }
         await Expire().ConfigureAwait(true);
-        Schedule();
+        await ScheduleAsync().ConfigureAwait(true);
     }
 
     public async Task<ConfirmationResult?> Request(ConfirmationPlan plan)
@@ -34,9 +35,9 @@ public sealed class ConfirmationsNeuron : Neuron<ConfirmationState>, IConfirmati
         await Expire().ConfigureAwait(true);
         var caller = Context.Caller;
         var raisedBy = caller?.Via?.ToString() ?? caller?.Actor.ToString() ?? "edge";
-        var requester = Principal(caller);
+        var requester = Answerer.PrincipalOf(caller);
 
-        if (State.Request(plan, requester, raisedBy, Policy, Clock.GetUtcNow(), held: caller?.Via is not null) is not { } requested)
+        if (State.Request(plan, requester, raisedBy, Policy, Clock.GetUtcNow()) is not { } requested)
         {
             return State.Known(plan.Id);
         }
@@ -54,11 +55,11 @@ public sealed class ConfirmationsNeuron : Neuron<ConfirmationState>, IConfirmati
     public async Task Withdraw(string planId)
     {
         var caller = RequireCaller(required: false);
-        var person = caller is { Direct: true, Conversation: null, Actor: Actor.Person };
+        var answerer = Answerer.Of(caller, Id.Brain);
         var raisedBy = caller?.Via?.ToString() ?? caller?.Actor.ToString() ?? "edge";
         await Expire().ConfigureAwait(true);
         if (State.Entries.FirstOrDefault(e => e.Request.PlanId == planId && e.Result is null) is { } open
-            && !person
+            && !answerer.IsPerson
             && !string.Equals(open.RaisedBy, raisedBy, StringComparison.Ordinal))
         {
             throw new UnauthorizedAccessException("Only who raised this question withdraws it.");
@@ -78,24 +79,20 @@ public sealed class ConfirmationsNeuron : Neuron<ConfirmationState>, IConfirmati
 
     public async Task Resolve(string planId, bool approve)
     {
-        var caller = RequireCaller(required: false);
-        var person = caller is { Direct: true, Conversation: null, Actor: Actor.Person };
-        var approver = Principal(caller);
+        var answerer = Answerer.Of(Context.Caller, Id.Brain);
         await Expire().ConfigureAwait(true);
-        if (State.Entries.FirstOrDefault(e => e.Request.PlanId == planId && e.Result is null) is { } open
-            && open.Request.Plan.RequiresPerson
-            && !person)
-        {
-            throw new UnauthorizedAccessException("Only a person answers this question.");
-        }
-        if (State.Answer(planId, approve, person, approver, Clock.GetUtcNow()) is { } answered)
+        if (State.Answer(planId, approve, answerer, Clock.GetUtcNow()) is { } answered)
         {
             await Commit(answered).ConfigureAwait(true);
         }
     }
 
-    protected override Task OnReminder(string name, CancellationToken cancellationToken)
-        => name == ExpiryTimer ? Expire() : Task.CompletedTask;
+    protected override async Task OnReminder(string name, CancellationToken cancellationToken)
+    {
+        if (name != ExpiryReminder) { return; }
+        await Expire().ConfigureAwait(true);
+        await ScheduleAsync().ConfigureAwait(true);
+    }
 
     private async Task Expire()
     {
@@ -112,19 +109,22 @@ public sealed class ConfirmationsNeuron : Neuron<ConfirmationState>, IConfirmati
     private async Task Commit(ConfirmationTransition transition)
     {
         await Save(transition.Next, transition.Signal).ConfigureAwait(true);
-        Schedule();
+        await ScheduleAsync().ConfigureAwait(true);
     }
 
-    private void Schedule()
+    private async Task ScheduleAsync()
     {
         var pending = State.Entries.Where(e => e.Result is null).ToArray();
         if (pending.Length == 0)
         {
-            Context.Timers.Stop(ExpiryTimer);
+            await Context.Reminders.Stop(ExpiryReminder).ConfigureAwait(true);
             return;
         }
         var due = pending.Min(e => e.Request.ExpiresAt) - Clock.GetUtcNow();
-        Context.Timers.Start(ExpiryTimer, due > TimeSpan.Zero ? due : TimeSpan.FromMilliseconds(1), null, keepAlive: true);
+        await Context.Reminders.Start(
+            ExpiryReminder,
+            due > TimeSpan.Zero ? due : TimeSpan.FromMilliseconds(1),
+            ExpiryPeriod).ConfigureAwait(true);
     }
 
     private Caller? RequireCaller(bool required)
@@ -141,12 +141,4 @@ public sealed class ConfirmationsNeuron : Neuron<ConfirmationState>, IConfirmati
         }
         return caller;
     }
-
-    private static ConfirmationPrincipal Principal(Caller? caller) => caller?.Actor switch
-    {
-        Actor.Person p => ConfirmationPrincipal.Person(p.Principal),
-        Actor.App a => ConfirmationPrincipal.App(string.IsNullOrEmpty(a.Key) ? a.For.Principal : a.Key),
-        Actor.Agent ag => ConfirmationPrincipal.Agent(ag.For.Principal),
-        _ => ConfirmationPrincipal.Agent("unknown")
-    };
 }
